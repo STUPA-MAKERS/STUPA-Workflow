@@ -248,6 +248,41 @@
   --tab-pager-page-top: var(--space-3);
   --tab-pager-page-bottom: calc(56px + 2 * var(--space-4));
 }
+// Under the glass head of the page (`.td__body--pages`, which sets `--ld-pane-top`, the head
+// counted from the top edge of the screen), each page reaches up to that edge under the head
+// and the tab line, and keeps the room of both above its first card. The tab bar is one
+// glass layer from the edge of the screen down to the tab line, so the head shows no seam;
+// it is glass at rest too, the same as the head over the rows of "Meine To-Dos".
+:host-context(.td__body--pages) .bv__tabPager {
+  --bv-tabs: calc(44px + var(--border-width));
+  --bv-under: calc(var(--ld-pane-top, 0px) + var(--bv-tabs));
+}
+:host-context(.td__body--pages) .bv__tabPager ::ng-deep {
+  > .tp__pager {
+    margin-top: calc(-1 * var(--bv-under));
+  }
+  > .tp__pager > .tp__page {
+    padding-top: calc(var(--bv-under) + var(--space-3));
+    scroll-padding-top: var(--bv-under);
+  }
+  > .tp__bar {
+    z-index: calc(var(--z-sticky) - 1);
+  }
+  // The body of the page already runs over the gutter (`.td__body--pages`).
+  > .tp__bar,
+  > .tp__pager {
+    margin-inline: 0;
+  }
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  :host-context(.td__body--pages) .bv__tabPager ::ng-deep > .tp__bar.tp__bar {
+    background: transparent;
+  }
+  :host-context(.td__body--pages) .bv__tabPager ::ng-deep > .tp__bar.tp__bar::before {
+    display: block;
+    top: calc(-1 * var(--ld-pane-top, 0px));
+  }
+}
 // The pager of `todo-board-skeleton` in the geometry of the tab pager.
 .bv__pager {
   display: grid;

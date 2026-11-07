@@ -328,6 +328,21 @@ export class TodosComponent implements OnDestroy {
     if (this.all()) return true;
     return this.view() === 'board' && (this.board() ?? this.summary())?.kind === 'personal';
   });
+  /**
+   * Phone, a board in its columns: one page per column, and each page scrolls by itself
+   * under the glass head of the page (`.td__body--pages`).
+   */
+  readonly phonePages = computed(
+    () =>
+      this.phone() &&
+      !this.loading() &&
+      !this.notFound() &&
+      !this.error() &&
+      !this.noMatch() &&
+      !!this.board() &&
+      !this.phoneList() &&
+      this.view() === 'board',
+  );
   /** The personal board as the first section of the phone list. */
   readonly lead = computed<RowLead | null>(() => {
     const b = this.board();

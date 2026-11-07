@@ -136,6 +136,25 @@
     padding-bottom: calc(56px + 2 * var(--space-4));
   }
 }
+// Phone, a board in its columns: the body is the rows of the glass head (`.ld-pane__rows`),
+// but it does not scroll itself. Each column page scrolls by itself and reaches up under the
+// head and the tab line, and the tab bar carries the one glass layer of the whole head
+// (`todo-board-view`). The glass of the column would lie over the tabs and blur them, so it
+// goes, and so does its shadow, because the tab line is the edge of the head. The repeated
+// class wins over the room the kit keeps for the floating button: each page keeps its own.
+// A scroll container clips at its sides, so the body runs over the gutter of the page to
+// the screen edges, and the tab line and the pages reach them (`todo-board-view`).
+.td__body--pages {
+  margin-inline: calc(-1 * var(--space-4));
+  overflow-y: auto;
+}
+.td.ld-pane--glass:has(> .td__body--pages)::before,
+.td.ld-pane--glass:has(> .td__body--pages)::after {
+  display: none;
+}
+.td.ld-pane--glass > .td__body--pages.td__body--pages.td__body--pages.td__body--pages.td__body--pages {
+  padding-bottom: 0;
+}
 .td__state {
   display: flex;
   flex: 1 1 auto;
