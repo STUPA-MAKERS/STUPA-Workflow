@@ -6,6 +6,7 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { formatMoney } from '../../format-money';
+import { toggled } from '../../util/immutable';
 import {
   normalizePositions,
   offerHref,
@@ -19,17 +20,17 @@ import {
 /** One offer as the view draws it. */
 interface OfferRow extends PositionOffer {
   /** The link of an offer whose text is an http(s) URL, else null. */
-  href: string | null;
+  readonly href: string | null;
 }
 
 /** One position as the view draws it. */
 interface PositionRow extends CostPosition {
-  offers: OfferRow[];
-  amount: string;
+  readonly offers: readonly OfferRow[];
+  readonly amount: string;
   /** "3 Angebote" or "1 Angebot". */
-  count: string;
+  readonly count: string;
   /** The supplier of the preferred offer, or '' when none is preferred. */
-  preferred: string;
+  readonly preferred: string;
 }
 
 let nextId = 0;
@@ -94,12 +95,7 @@ export class PositionsViewComponent {
   }
 
   protected toggle(index: number): void {
-    this.toggled.update((cur) => {
-      const next = new Set(cur);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
+    this.toggled.update((cur) => toggled(cur, index));
   }
 
   /** An amount in euro; a missing value counts as 0, as on the server. */

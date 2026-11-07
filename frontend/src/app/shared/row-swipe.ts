@@ -10,9 +10,8 @@ export function swipeFrom(
   id: string,
   leaves = false,
 ): RowSwipeAction | null {
-  for (const section of sections) {
-    const item = section.items.find((i) => i.id === id);
-    if (item?.icon && !item.disabledReason) return { id, label: item.label, icon: item.icon, leaves };
-  }
-  return null;
+  const item = sections
+    .map((section) => section.items.find((i) => i.id === id))
+    .find((i) => i?.icon && !i.disabledReason);
+  return item?.icon ? { id, label: item.label, icon: item.icon, leaves } : null;
 }

@@ -1,11 +1,5 @@
 {
-  "frontend/src/app/shared/actor-label.util.ts": 1,
-  "frontend/src/app/shared/date-format.ts": 6,
-  "frontend/src/app/shared/debounced.ts": 4,
-  "frontend/src/app/shared/expand-set.ts": 2,
-  "frontend/src/app/shared/format-money.ts": 4,
-  "frontend/src/app/shared/group-by-month.ts": 9,
-  "frontend/src/app/shared/person-label.util.ts": 5,
-  "frontend/src/app/shared/row-swipe.ts": 1,
-  "frontend/src/app/shared/status-kind.util.ts": 7
+  "frontend/src/app/shared/date-format.ts": 1,
+  "frontend/src/app/shared/debounced.ts": 2,
+  "frontend/src/app/shared/group-by-month.ts": 2
 }

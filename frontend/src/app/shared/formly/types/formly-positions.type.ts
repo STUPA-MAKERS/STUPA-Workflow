@@ -4,21 +4,22 @@ import { ButtonComponent, IconComponent, SwitchComponent, parseMoney } from '@st
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { formatMoney } from '@shared/format-money';
+import { withEntry, withoutEntry } from '@shared/util/immutable';
 
 /** A comparison offer within a cost position. */
 interface Offer {
-  label: string;
-  value: number | null;
-  preferred: boolean;
+  readonly label: string;
+  readonly value: number | null;
+  readonly preferred: boolean;
 }
 
 /** A cost position with several comparison offers. */
 interface Position {
-  label: string;
-  offers: Offer[];
+  readonly label: string;
+  readonly offers: readonly Offer[];
   /** Opt-out of comparison offers. It needs a reason and allows only one offer. */
-  noOffers?: boolean;
-  noOffersReason?: string;
+  readonly noOffers?: boolean;
+  readonly noOffersReason?: string;
 }
 
 let nextUid = 0;
@@ -80,12 +81,9 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   protected toggleOpen(pi: number): void {
-    this.open.update((cur) => {
-      const next = new Set(cur);
-      if (this.isOpen(pi)) next.delete(pi);
-      else next.add(pi);
-      return next;
-    });
+    this.open.update((cur) =>
+      this.isOpen(pi) ? new Set([...cur].filter((i) => i !== pi)) : new Set([...cur, pi]),
+    );
     if (this.serverError(pi)) this.dropServerError(pi);
   }
 
@@ -171,9 +169,9 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     return this.allowNoOffers && p.noOffers ? 1 : this.minOffers;
   }
 
-  get positions(): Position[] {
+  get positions(): readonly Position[] {
     const v = this.formControl.value;
-    return Array.isArray(v) ? (v as Position[]) : [];
+    return Array.isArray(v) ? (v as readonly Position[]) : [];
   }
 
   override get showError(): boolean {
@@ -234,7 +232,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     return { label: '', value: null, preferred };
   }
 
-  private commit(next: Position[]): void {
+  private commit(next: readonly Position[]): void {
     this.clearServerErrors();
     this.formControl.setValue(next);
     this.formControl.markAsDirty();
@@ -243,12 +241,11 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   /** Mirror validity onto the FormControl (min positions/offers, one preferred, values ≥ 0). */
-  private revalidate(positions: Position[]): void {
-    let ok = positions.length >= this.minPositions;
-    for (const p of positions) {
-      if (!this.positionComplete(p)) ok = false;
-    }
-    if (this.props.required && positions.length === 0) ok = false;
+  private revalidate(positions: readonly Position[]): void {
+    const enough = positions.length >= this.minPositions;
+    const complete = positions.every((p) => this.positionComplete(p));
+    const missing = this.props.required && positions.length === 0;
+    const ok = enough && complete && !missing;
     this.formControl.setErrors(ok ? null : { positions: true });
   }
 
@@ -299,7 +296,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   setOfferValue(pi: number, oi: number, raw: string): void {
-    this.rawValues.update((cur) => new Map(cur).set(this.cellKey(pi, oi), raw));
+    this.rawValues.update((cur) => withEntry(cur, this.cellKey(pi, oi), raw));
     const value = this.parseNum(raw);
     this.commit(
       this.positions.map((p, i) =>
@@ -325,15 +322,16 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   /** Move or drop the text entries when positions or offers move. `fn` gives the new
    *  cell of an old cell, or `null` to drop it. */
   private remapRaw(fn: (pi: number, oi: number) => [number, number] | null): void {
-    this.rawValues.update((cur) => {
-      const next = new Map<string, string>();
-      for (const [key, text] of cur) {
-        const [pi, oi] = key.split(':').map(Number);
-        const to = fn(pi, oi);
-        if (to) next.set(this.cellKey(to[0], to[1]), text);
-      }
-      return next;
-    });
+    this.rawValues.update(
+      (cur) =>
+        new Map(
+          [...cur].flatMap(([key, text]): (readonly [string, string])[] => {
+            const [pi, oi] = key.split(':').map(Number);
+            const to = fn(pi, oi);
+            return to ? [[this.cellKey(to[0], to[1]), text]] : [];
+          }),
+        ),
+    );
   }
 
   /** The cell holds text that is not an amount. */
@@ -350,7 +348,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     if (this.rawValues().has(key)) return;
     const v = this.positions[pi]?.offers[oi]?.value ?? null;
     const text = v === null ? '' : String(v).replace('.', this.i18n.locale() === 'en' ? '.' : ',');
-    this.rawValues.update((cur) => new Map(cur).set(key, text));
+    this.rawValues.update((cur) => withEntry(cur, key, text));
   }
 
   /** On blur, a valid or empty cell shows the formatted value again. Invalid text stays,
@@ -359,11 +357,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     const cell = this.editing;
     this.editing = null;
     if (!cell || this.amountInvalid(cell.pi, cell.oi)) return;
-    this.rawValues.update((cur) => {
-      const next = new Map(cur);
-      next.delete(this.cellKey(cell.pi, cell.oi));
-      return next;
-    });
+    this.rawValues.update((cur) => withoutEntry(cur, this.cellKey(cell.pi, cell.oi)));
   }
 
   /** Display text of the value input: the text of the user while the cell has an entry
@@ -410,11 +404,11 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
               : [],
           );
           this.remapRaw((ri, rk) => (ri !== pi ? [ri, rk] : [ri, kept.indexOf(rk)]));
-          let offers = kept.map((k) => p.offers[k]);
-          if (!offers.length) offers = [this.blankOffer(true)];
-          if (!offers.some((o) => o.preferred)) {
-            offers = offers.map((o, k) => ({ ...o, preferred: k === 0 }));
-          }
+          const keptOffers = kept.map((k) => p.offers[k]);
+          const some = keptOffers.length ? keptOffers : [this.blankOffer(true)];
+          const offers = some.some((o) => o.preferred)
+            ? some
+            : some.map((o, k) => ({ ...o, preferred: k === 0 }));
           return { ...p, noOffers: true, offers };
         }
         const pad = Array.from({ length: Math.max(0, this.minOffers - p.offers.length) }, () =>

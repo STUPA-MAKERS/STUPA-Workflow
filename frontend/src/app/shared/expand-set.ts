@@ -31,11 +31,8 @@ export function expandSet<K>(): ExpandSet<K> {
     ids: ids.asReadonly(),
     has: (key) => ids().has(key),
     toggle: (key) => {
-      const next = new Set(ids());
-      const open = !next.has(key);
-      if (open) next.add(key);
-      else next.delete(key);
-      ids.set(next);
+      const open = !ids().has(key);
+      ids.set(open ? new Set([...ids(), key]) : new Set([...ids()].filter((k) => k !== key)));
       return open;
     },
     open: (key) => {

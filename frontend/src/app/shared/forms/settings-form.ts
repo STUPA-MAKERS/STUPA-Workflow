@@ -9,29 +9,29 @@ export type LoadState = 'loading' | 'ok' | 'forbidden' | 'error';
 /** What {@link settingsForm} needs from the page. */
 export interface SettingsFormOptions<S, D, B> {
   /** The read of the stored settings. */
-  load: () => Observable<S>;
+  readonly load: () => Observable<S>;
   /** The write. The answer is the new stored state. */
-  put: (body: B) => Observable<S>;
+  readonly put: (body: B) => Observable<S>;
   /** The draft of a stored state. The fields hold the text of the inputs. */
-  draftOf: (saved: S) => D;
+  readonly draftOf: (saved: S) => D;
   /** The draft before the read answers. */
-  initial: D;
+  readonly initial: D;
   /**
    * The body of the write, or `null` while a field is invalid. It may read the `draft`
    * of the form and the page's own signals; the form calls it only inside a computed.
    */
-  body: () => B | null;
+  readonly body: () => B | null;
   /** The body sends the stored values again. Without it the form compares by `dirty`. */
-  unchanged?: (body: B, saved: S) => boolean;
+  readonly unchanged?: (body: B, saved: S) => boolean;
   /**
    * The draft differs from the stored values. Default: an invalid body is a change, else
    * the body is not `unchanged`.
    */
-  dirty?: (saved: S) => boolean;
+  readonly dirty?: (saved: S) => boolean;
   /** The right the page needs. Without it the form does not read and shows `forbidden`. */
-  allowed?: () => boolean;
+  readonly allowed?: () => boolean;
   /** Called after each read and each write with the stored state. */
-  onApply?: (saved: S) => void;
+  readonly onApply?: (saved: S) => void;
 }
 
 /** The state and the actions of a settings form. Make it with {@link settingsForm}. */
