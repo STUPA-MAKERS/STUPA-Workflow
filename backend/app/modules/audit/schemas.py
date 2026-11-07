@@ -6,11 +6,12 @@ id references and metadata.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
 from app.modules.audit.models import (
     AuditEntry,
@@ -18,15 +19,10 @@ from app.modules.audit.models import (
     ChainBreak,
     VerificationTrigger,
 )
+from app.shared.schemas import FrozenCamelModel
 
 
-class _CamelModel(BaseModel):
-    """Base model that emits camelCase JSON aliases and accepts field names."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class AuditEntryOut(_CamelModel):
+class AuditEntryOut(FrozenCamelModel, frozen=True):
     """One audit entry (read view)."""
 
     id: int
@@ -41,10 +37,10 @@ class AuditEntryOut(_CamelModel):
     #: Readable target label, batch-resolved by the router. None when the target
     #: is deleted or unknown.
     target_label: str | None = Field(default=None, alias="targetLabel")
-    data: dict[str, Any]
+    data: Mapping[str, Any]
     #: UUID string -> display name for the entity references inside ``data``. The
     #: router resolves them in one batch and keeps only the ids it can resolve.
-    resolved_ids: dict[str, str] = Field(default_factory=dict, alias="resolvedIds")
+    resolved_ids: Mapping[str, str] = Field(default_factory=dict, alias="resolvedIds")
     #: Revertable from the audit log, as the router determines it. The backend stays
     #: authoritative on the actual revert call and answers 409 when the entry is stale.
     revertable: bool = False
@@ -57,7 +53,7 @@ class AuditEntryOut(_CamelModel):
         entry: AuditEntry,
         actor_name: str | None = None,
         target_label: str | None = None,
-        resolved_ids: dict[str, str] | None = None,
+        resolved_ids: Mapping[str, str] | None = None,
         revertable: bool = False,
     ) -> AuditEntryOut:
         """Map an ORM row to the out schema and hex-encode the bytea hashes."""
@@ -78,26 +74,26 @@ class AuditEntryOut(_CamelModel):
         )
 
 
-class AuditPageOut(_CamelModel):
+class AuditPageOut(FrozenCamelModel, frozen=True):
     """Cursor-paged audit view, keyset on ``id`` descending, newest first.
 
     ``nextCursor`` holds the ``id`` for the next call, which you pass as the query
     parameter ``before``. At the end of the log it is ``None``.
     """
 
-    items: list[AuditEntryOut]
+    items: tuple[AuditEntryOut, ...]
     next_cursor: int | None = Field(default=None, alias="nextCursor")
     has_more: bool = Field(default=False, alias="hasMore")
 
 
-class AuditActorOut(_CamelModel):
+class AuditActorOut(FrozenCamelModel, frozen=True):
     """Actor option for the actor filter: ``sub`` plus resolved display name."""
 
     sub: str
     name: str | None = None
 
 
-class ChainVerificationOut(_CamelModel):
+class ChainVerificationOut(FrozenCamelModel, frozen=True):
     """Result of chain verification (``/admin/audit/verify``)."""
 
     valid: bool
@@ -106,7 +102,7 @@ class ChainVerificationOut(_CamelModel):
     reason: str | None = None
 
 
-class AuditVerificationOut(_CamelModel):
+class AuditVerificationOut(FrozenCamelModel, frozen=True):
     """A stored chain check (``/admin/audit/verify``, ``/admin/audit/verify/latest``).
 
     ``trigger`` tells what started the check: the nightly ``cron``, a ``manual``
@@ -140,7 +136,7 @@ class AuditVerificationOut(_CamelModel):
         )
 
 
-class AuditRevertOut(_CamelModel):
+class AuditRevertOut(FrozenCamelModel, frozen=True):
     """Result of an audit-log revert (``POST /admin/audit/{id}/revert``)."""
 
     reverted_audit_id: int = Field(alias="revertedAuditId")

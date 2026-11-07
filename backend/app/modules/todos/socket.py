@@ -39,11 +39,11 @@ import json
 import logging
 import time
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,6 +54,7 @@ from app.modules.todos.access import BoardAccess
 from app.modules.todos.live import CHANNEL_PATTERN, todo_broker
 from app.modules.todos.models import TodoBoard
 from app.settings import Settings, get_settings
+from app.shared.schemas import FrozenStrictCamelModel
 from app.shared.ws import WS_FORBIDDEN, WS_UNAUTHENTICATED, resolve_ws_principal
 
 logger = logging.getLogger("app.todos.live")
@@ -78,13 +79,11 @@ _THROTTLE_RATE = 5.0
 _THROTTLE_BURST = 10.0
 
 
-class SubscribeMessage(BaseModel):
+class SubscribeMessage(FrozenStrictCamelModel, frozen=True):
     """``{"type": "subscribe", "boardIds": [...]}``: the boards of the socket."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
     type: Literal["subscribe"]
-    board_ids: list[uuid.UUID] = Field(default_factory=list, alias="boardIds")
+    board_ids: tuple[uuid.UUID, ...] = Field(default_factory=tuple, alias="boardIds")
 
 
 def _try_acquire_slot(sub: str) -> bool:
@@ -143,7 +142,7 @@ class TodoLiveConnection:
     async def _error(self, code: str) -> None:
         await self.ws.send_json({"type": "error", "code": code})
 
-    async def _readable(self, ids: list[uuid.UUID]) -> list[uuid.UUID] | None:
+    async def _readable(self, ids: Sequence[uuid.UUID]) -> list[uuid.UUID] | None:
         """The ids among ``ids`` whose board the principal reads now, in the given order.
 
         Returns:
@@ -240,13 +239,14 @@ class TodoLiveConnection:
             if not self._allow_frame():
                 await self._error("rate_limited")
                 continue
-            if not isinstance(raw, dict):
-                await self._error("invalid_message")
-            elif raw.get("type") == "subscribe":
-                if not await self._subscribe(raw):
-                    return
-            else:
-                await self._error("unknown_type")
+            match raw:
+                case dict() if raw.get("type") == "subscribe":
+                    if not await self._subscribe(raw):
+                        return
+                case dict():
+                    await self._error("unknown_type")
+                case _:
+                    await self._error("invalid_message")
 
     async def _pump(self, subscription: Subscription) -> None:
         async for message in subscription:

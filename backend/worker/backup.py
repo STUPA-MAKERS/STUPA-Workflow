@@ -35,9 +35,11 @@ logger = logging.getLogger("app.backup")
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Build the two storages the backup tasks need."""
     settings = load_settings()
-    ctx["backup_settings"] = settings
-    ctx["backup_attachments"] = build_object_storage(settings)
-    ctx["backup_archives"] = build_object_storage(settings, bucket=settings.backup_bucket)
+    ctx.update(
+        backup_settings=settings,
+        backup_attachments=build_object_storage(settings),
+        backup_archives=build_object_storage(settings, bucket=settings.backup_bucket),
+    )
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
@@ -218,11 +220,11 @@ async def restore_backup(ctx: dict[str, Any], backup_id: str, actor: str | None)
 
     await _dispose_engine(ctx)
 
-    service = _service(ctx, None)
+    restorer = _service(ctx, None)
     try:
         with temp_file(".age") as local:
             await archives.get_file(storage_key, local.name)
-            manifest = await service.apply_archive(local.name)
+            manifest = await restorer.apply_archive(local.name)
     except (BackupError, ArchiveError) as exc:
         logger.error("restore %s failed: %s", backup_id, exc)
         return "failed"

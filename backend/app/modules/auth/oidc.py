@@ -56,7 +56,7 @@ class OidcEndpoints:
     end_session: str | None
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class OidcClaims:
     """The verified claims of an ``id_token`` that the platform uses."""
 
@@ -248,6 +248,14 @@ def _find_key(keys: list[dict[str, Any]], kid: object) -> dict[str, Any] | None:
     return next((k for k in keys if k.get("kid") == kid), None)
 
 
+async def _jwk_for(issuer: str, kid: object) -> dict[str, Any] | None:
+    """Find the key of `kid` in the cached JWKS, with one forced reload on a miss."""
+    cached = _find_key(await _get_jwks(issuer, force=False), kid)
+    return (
+        cached if cached is not None else _find_key(await _get_jwks(issuer, force=True), kid)
+    )
+
+
 async def _signing_key(settings: Settings, id_token: str) -> Any:  # noqa: ANN401
     """Return the TTL-cached JWKS key that matches the `kid` of the `id_token`.
 
@@ -257,13 +265,7 @@ async def _signing_key(settings: Settings, id_token: str) -> Any:  # noqa: ANN40
         header = jwt.get_unverified_header(id_token)
     except jwt.PyJWTError as exc:
         raise OidcError(f"malformed id_token: {exc}") from exc
-    kid = header.get("kid")
-    issuer = settings.oidc_issuer or ""
-    keys = await _get_jwks(issuer, force=False)
-    jwk = _find_key(keys, kid)
-    if jwk is None:
-        keys = await _get_jwks(issuer, force=True)
-        jwk = _find_key(keys, kid)
+    jwk = await _jwk_for(settings.oidc_issuer or "", header.get("kid"))
     if jwk is None:
         raise OidcError("no matching jwks key")
     return RSAAlgorithm.from_jwk(json.dumps(jwk))
@@ -328,9 +330,8 @@ async def _decode_id_token(settings: Settings, id_token: str) -> dict[str, Any]:
 
 
 def _claims_of(settings: Settings, claims: dict[str, Any]) -> OidcClaims:
-    groups = claims.get(settings.oidc_groups_claim) or []
-    if not isinstance(groups, list):
-        groups = []
+    raw = claims.get(settings.oidc_groups_claim) or []
+    groups = raw if isinstance(raw, list) else []
     return OidcClaims(
         sub=str(claims["sub"]),
         email=claims.get("email"),
@@ -403,12 +404,9 @@ async def end_session_url(settings: Settings, *, id_token: str | None) -> str | 
     endpoints = await discover(settings.oidc_issuer)
     if endpoints.end_session is None:
         return None
-    params: dict[str, str] = {}
-    if id_token:
-        params["id_token_hint"] = id_token
-    if settings.oidc_post_logout_redirect_url:
-        params["post_logout_redirect_uri"] = settings.oidc_post_logout_redirect_url
-    url = endpoints.end_session
-    if params:
-        url += "?" + urlencode(params)
-    return url
+    redirect = settings.oidc_post_logout_redirect_url
+    params: dict[str, str] = {
+        **({"id_token_hint": id_token} if id_token else {}),
+        **({"post_logout_redirect_uri": redirect} if redirect else {}),
+    }
+    return endpoints.end_session + "?" + urlencode(params) if params else endpoints.end_session
