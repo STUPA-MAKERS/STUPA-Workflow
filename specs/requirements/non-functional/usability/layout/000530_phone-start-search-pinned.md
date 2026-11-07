@@ -15,7 +15,8 @@ scope:
 
 On the phone, the search bar of the start page with the avatar button must stay pinned at the
 top of the screen while the page scrolls. The bar must be the frosted glass of the sticky bar of
-the list pages. On the desktop, the search bar must scroll with the page.
+the list pages. The gap between the search field and the edge of the glass must be the same on
+all four sides. On the desktop, the search bar must scroll with the page.
 
 Reason: The search and the account menu are the first controls of the start page. A bar that
 scrolls away makes the user scroll back up to reach them. The list pages already pin their
