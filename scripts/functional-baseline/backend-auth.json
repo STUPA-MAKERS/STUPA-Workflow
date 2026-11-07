@@ -1,17 +1,8 @@
 {
-  "backend/app/modules/auth/bootstrap.py": 1,
-  "backend/app/modules/auth/login_settings.py": 6,
-  "backend/app/modules/auth/mcp_router.py": 2,
-  "backend/app/modules/auth/oauth.py": 3,
-  "backend/app/modules/auth/oauth_admin_router.py": 2,
-  "backend/app/modules/auth/oauth_router.py": 6,
-  "backend/app/modules/auth/oauth_service.py": 3,
-  "backend/app/modules/auth/oidc.py": 11,
-  "backend/app/modules/auth/principal.py": 2,
-  "backend/app/modules/auth/rbac.py": 4,
-  "backend/app/modules/auth/router.py": 6,
-  "backend/app/modules/auth/schemas.py": 6,
-  "backend/app/modules/auth/service.py": 7,
-  "backend/app/modules/auth/session_renewal.py": 4,
-  "backend/app/modules/auth/sessions.py": 7
+  "backend/app/modules/auth/login_settings.py": 5,
+  "backend/app/modules/auth/mcp_router.py": 1,
+  "backend/app/modules/auth/oauth.py": 1,
+  "backend/app/modules/auth/oidc.py": 2,
+  "backend/app/modules/auth/service.py": 4,
+  "backend/app/modules/auth/session_renewal.py": 4
 }

@@ -13,6 +13,7 @@ sync TestClient test stays unmarked.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, date, datetime, time
 from types import SimpleNamespace
 from typing import Any
@@ -399,8 +400,7 @@ async def test_can_vote_agent_token_is_false(monkeypatch: pytest.MonkeyPatch) ->
         return {m.gremium_id} if perm == "vote.cast" else set()
 
     _patch_gids(monkeypatch, _cast)
-    agent = _principal()
-    agent.scope_permissions = frozenset({"vote.manage"})
+    agent = replace(_principal(), scope_permissions=frozenset({"vote.manage"}))
     svc = MeetingService(_QueueSession(executes=[res()]))  # type: ignore[arg-type]
     assert await svc.can_vote(m, agent) is False
 

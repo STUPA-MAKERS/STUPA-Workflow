@@ -24,7 +24,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 from sqlalchemy import func, select
 
 from app.deps import DbSession, Principal, require_principal
@@ -35,6 +35,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthToken
 from app.shared.errors import NotFoundError, ProblemDetail
 from app.shared.paging import Page, PageParams
+from app.shared.schemas import FrozenCamelModel
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -60,15 +61,13 @@ class GrantListQuery(PageParams, frozen=True):
     principal_id: UUID | None = Field(default=None, alias="principalId")
 
 
-class OAuthGrantAdminOut(BaseModel):
+class OAuthGrantAdminOut(FrozenCamelModel, frozen=True):
     """One live grant (agent token pair) with its owner.
 
     `principalName` is the resolved display name or, without one, the email. It is never
     a UUID. `principalId` is there for the filter and for a deep link, not for display.
     The schema holds no token and no token hash.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     id: UUID
     principal_id: UUID = Field(alias="principalId")
@@ -113,13 +112,16 @@ async def list_oauth_grants_admin(
     the audit log keeps its record. The filter `principalId` narrows the list to one
     owner.
     """
-    stmt = (
+    live = (
         select(OAuthToken, PrincipalRow)
         .join(PrincipalRow, PrincipalRow.id == OAuthToken.principal_id)
         .where(OAuthToken.revoked_at.is_(None))
     )
-    if query.principal_id is not None:
-        stmt = stmt.where(OAuthToken.principal_id == query.principal_id)
+    stmt = (
+        live
+        if query.principal_id is None
+        else live.where(OAuthToken.principal_id == query.principal_id)
+    )
     total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
     rows = (
         await db.execute(
