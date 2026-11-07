@@ -1,8 +1,8 @@
 {
   "frontend/src/app/features/apply/altcha.component.ts": 1,
   "frontend/src/app/features/apply/altcha.service.ts": 2,
-  "frontend/src/app/features/apply/apply-wizard.component.ts": 24,
-  "frontend/src/app/features/apply/draft-attachments.service.ts": 19,
+  "frontend/src/app/features/apply/apply-wizard.component.ts": 10,
+  "frontend/src/app/features/apply/draft-attachments.service.ts": 5,
   "frontend/src/app/features/apply/draft-files/draft-files.component.ts": 2,
-  "frontend/src/app/features/apply/status-timeline.component.ts": 11
+  "frontend/src/app/features/apply/status-timeline.component.ts": 1
 }
