@@ -7,41 +7,34 @@ the single source of truth for a field definition. Only the wrapper schemas live
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
 from app.shared.config_schemas import FormFieldDef
 from app.shared.i18n import I18nMap
+from app.shared.schemas import FrozenCamelModel
 
-SECTION_LABELS: dict[str, I18nMap] = {
+SECTION_LABELS: Mapping[str, I18nMap] = {
     "main": {"de": "Antrag", "en": "Application"},
     "budget": {"de": "Topf-spezifische Felder", "en": "Budget-specific fields"},
 }
 
 
-class _CamelModel(BaseModel):
-    """Base model that uses camelCase aliases in JSON.
-
-    The model also accepts the Python field names as input.
-    """
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class FormVersionCreate(_CamelModel):
+class FormVersionCreate(FrozenCamelModel, frozen=True):
     """Request body for a new form version.
 
     The server validates the field definition.
     """
 
-    fields: list[FormFieldDef] = Field(min_length=1)
+    fields: Sequence[FormFieldDef] = Field(min_length=1)
     activate: bool = True
     #: Multilingual Markdown description of the form.
     description: I18nMap | None = None
 
 
-class FormActiveSet(_CamelModel):
+class FormActiveSet(FrozenCamelModel, frozen=True):
     """Activate or deactivate the form of an application type.
 
     With ``active=false`` the type has no active form version. It is then locked for new
@@ -51,18 +44,18 @@ class FormActiveSet(_CamelModel):
     active: bool
 
 
-class FormVersionOut(_CamelModel):
+class FormVersionOut(FrozenCamelModel, frozen=True):
     """The created or activated form version."""
 
     id: UUID
     application_type_id: UUID = Field(alias="applicationTypeId")
     version: int
     active: bool
-    fields: list[FormFieldDef]
+    fields: Sequence[FormFieldDef]
     description: I18nMap | None = None
 
 
-class FormDraftOut(_CamelModel):
+class FormDraftOut(FrozenCamelModel, frozen=True):
     """The most recent form version of an application type, for the form editor.
 
     The payload holds the raw field list and the description. It has no pot merge and no
@@ -75,18 +68,18 @@ class FormDraftOut(_CamelModel):
     version: int | None = None
     active: bool = False
     description: I18nMap | None = None
-    fields: list[FormFieldDef]
+    fields: Sequence[FormFieldDef]
 
 
-class FormSectionOut(_CamelModel):
+class FormSectionOut(FrozenCamelModel, frozen=True):
     """A section of the effective form."""
 
     key: str
     label: I18nMap
-    fields: list[FormFieldDef]
+    fields: Sequence[FormFieldDef]
 
 
-class EffectiveFormOut(_CamelModel):
+class EffectiveFormOut(FrozenCamelModel, frozen=True):
     """Effective form definition for one application type.
 
     Attributes:
@@ -98,4 +91,4 @@ class EffectiveFormOut(_CamelModel):
     application_type_id: UUID = Field(alias="applicationTypeId")
     form_version_id: UUID = Field(alias="formVersionId")
     has_budget: bool = Field(default=False, alias="hasBudget")
-    sections: list[FormSectionOut]
+    sections: Sequence[FormSectionOut]
