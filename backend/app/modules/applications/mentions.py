@@ -22,7 +22,6 @@ erased account) drops out. The list is sorted by display name (casefold), then i
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -46,7 +45,6 @@ async def _committee_members(session: AsyncSession, gremien: set[UUID]) -> list[
     """Return the active members (any role) of the Gremien."""
     if not gremien:
         return []
-    datetime.now(UTC)
     rows = (
         await session.execute(
             select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email)
