@@ -24,9 +24,11 @@ Mails go through ``outbox``: the router sends them after the commit.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Sequence
+from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
+from itertools import accumulate
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
@@ -40,8 +42,9 @@ from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
 from app.modules.tickets.models import TicketEvent
 from app.modules.todos import events as todo_events
-from app.modules.todos.access import BoardAccess, token_reads
+from app.modules.todos.access import BoardAccess, ReadScope, token_reads
 from app.modules.todos.boards import ensure_personal_board
+from app.modules.todos.grouping import grouped
 from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
 from app.modules.todos.link_view import LinkViewer
 from app.modules.todos.links import HIDDEN, LinkResolver, Resolved
@@ -148,22 +151,24 @@ class TodoMail:
     event_id: uuid.UUID = field(default_factory=uuid.uuid4, compare=False)
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class _Facts:
     """What the tiles of a set of cards show, loaded in one query per kind."""
 
-    labels: dict[uuid.UUID, list[uuid.UUID]] = field(default_factory=dict)
-    assignees: dict[uuid.UUID, list[uuid.UUID]] = field(default_factory=dict)
-    checklist: dict[uuid.UUID, tuple[int, int]] = field(default_factory=dict)
-    comments: dict[uuid.UUID, int] = field(default_factory=dict)
-    links: dict[uuid.UUID, list[TodoLink]] = field(default_factory=dict)
-    people: dict[uuid.UUID, PersonRef] = field(default_factory=dict)
-    resolved: dict[tuple[str, uuid.UUID], Resolved] = field(default_factory=dict)
-    events: dict[uuid.UUID, TodoCardEvent] = field(default_factory=dict)
-    series: dict[uuid.UUID, str] = field(default_factory=dict)
+    labels: Mapping[uuid.UUID, tuple[uuid.UUID, ...]] = field(default_factory=dict)
+    assignees: Mapping[uuid.UUID, tuple[uuid.UUID, ...]] = field(default_factory=dict)
+    checklist: Mapping[uuid.UUID, tuple[int, int]] = field(default_factory=dict)
+    comments: Mapping[uuid.UUID, int] = field(default_factory=dict)
+    links: Mapping[uuid.UUID, tuple[TodoLink, ...]] = field(default_factory=dict)
+    people: Mapping[uuid.UUID, PersonRef] = field(default_factory=dict)
+    resolved: Mapping[tuple[str, uuid.UUID], Resolved] = field(default_factory=dict)
+    events: Mapping[uuid.UUID, TodoCardEvent] = field(default_factory=dict)
+    series: Mapping[uuid.UUID, str] = field(default_factory=dict)
 
 
-def _event_brief(row: TodoCardEvent | None, series: dict[uuid.UUID, str]) -> TodoEventBrief | None:
+def _event_brief(
+    row: TodoCardEvent | None, series: Mapping[uuid.UUID, str]
+) -> TodoEventBrief | None:
     if row is None:
         return None
     return TodoEventBrief(
@@ -186,7 +191,7 @@ def _totals_out(value: todo_events.Totals) -> TodoEventTotals:
     )
 
 
-def _link_out(link: TodoLink, resolved: dict[tuple[str, uuid.UUID], Resolved]) -> TodoLinkOut:
+def _link_out(link: TodoLink, resolved: Mapping[tuple[str, uuid.UUID], Resolved]) -> TodoLinkOut:
     target = resolved.get((link.kind, link.target_id), HIDDEN)
     return TodoLinkOut(
         id=link.id,
@@ -202,6 +207,111 @@ def _link_out(link: TodoLink, resolved: dict[tuple[str, uuid.UUID], Resolved]) -
 
 def _label_out(label: TodoLabel) -> TodoLabelOut:
     return TodoLabelOut(id=label.id, name=label.name, color=label.color)  # pyright: ignore[reportArgumentType]
+
+
+def _mine_item(
+    tile: TodoCardTile, board: TodoBoard, column: TodoColumn, labels: Mapping[uuid.UUID, TodoLabel]
+) -> TodoMineItem:
+    """Build a card of ``GET /todos/mine`` from its tile, its board and its column."""
+    return TodoMineItem(
+        **tile.model_dump(by_alias=False),
+        board_name=board.name,
+        board_kind=board.kind,  # pyright: ignore[reportArgumentType]
+        column_name=column.name,
+        labels=[_label_out(labels[i]) for i in tile.label_ids if i in labels],
+    )
+
+
+def _linked_order(card: TodoLinkedCard) -> tuple[bool, bool, bool, date, str]:
+    """Sort key of the back-references: Events first, then open cards, each by due date."""
+    return (
+        card.event is None,
+        card.is_done,
+        card.due_date is None,
+        card.due_date or date.max,
+        card.title,
+    )
+
+
+def _assigned_board(
+    board: TodoBoard,
+    columns: Sequence[TodoColumn],
+    labels: Iterable[TodoLabel],
+    cards: Sequence[TodoCard],
+    facts: _Facts,
+    *,
+    can_write: bool,
+) -> TodoAssignedBoard:
+    """Build a board row of ``mine_boards`` or ``all_boards`` from cards in board order."""
+    return TodoAssignedBoard(
+        id=board.id,
+        name=board.name,
+        kind=board.kind,  # pyright: ignore[reportArgumentType]
+        gremium_id=board.gremium_id,
+        can_write=can_write,
+        columns=_column_outs(columns, Counter(c.column_id for c in cards)),
+        labels=[_label_out(lab) for lab in labels],
+        cards=[_tile(c, facts) for c in cards],
+    )
+
+
+def _board_order(board: TodoBoard) -> tuple[int, str, str]:
+    """Sort key of the boards: personal, then gremium, then team, each by name."""
+    return (_KIND_ORDER.get(board.kind, 3), board.name.casefold(), str(board.id))
+
+
+def _in_column_order(cards: Iterable[TodoCard], columns: Sequence[TodoColumn]) -> list[TodoCard]:
+    """Order the cards by the position of their column, then by rank.
+
+    A card of a column that is not in ``columns`` goes last.
+    """
+    position = {c.id: index for index, c in enumerate(columns)}
+    return sorted(cards, key=lambda c: (position.get(c.column_id, len(columns)), c.rank, str(c.id)))
+
+
+def _column_outs(
+    columns: Iterable[TodoColumn], per_column: Mapping[uuid.UUID, int]
+) -> tuple[TodoColumnOut, ...]:
+    """Build the columns of a board with the count of their cards."""
+    return tuple(
+        TodoColumnOut(
+            id=c.id,
+            name=c.name,
+            position=c.position,
+            is_done=c.is_done,
+            card_count=per_column.get(c.id, 0),
+        )
+        for c in columns
+    )
+
+
+def _tile(card: TodoCard, facts: _Facts) -> TodoCardTile:
+    """Build the tile of a card from the facts of its read."""
+    done, total = facts.checklist.get(card.id, (0, 0))
+    links = facts.links.get(card.id, ())
+    assignees = sorted(
+        (facts.people.get(pid, DELETED_PERSON) for pid in facts.assignees.get(card.id, ())),
+        key=lambda p: ((p.display_name or "").casefold(), str(p.principal_id)),
+    )
+    return TodoCardTile(
+        id=card.id,
+        board_id=card.board_id,
+        column_id=card.column_id,
+        rank=card.rank,
+        title=card.title,
+        due_date=card.due_date,
+        completed_at=card.completed_at,
+        label_ids=sorted(facts.labels.get(card.id, ()), key=str),
+        assignees=tuple(assignees),
+        checklist=ChecklistCount(done=done, total=total),
+        comment_count=facts.comments.get(card.id, 0),
+        primary_link=_link_out(links[0], facts.resolved) if links else None,
+        link_count=len(links),
+        event=_event_brief(facts.events.get(card.id), facts.series),
+        version=card.version,
+        created_at=card.created_at,
+        updated_at=card.updated_at,
+    )
 
 
 class TodoService:
@@ -375,11 +485,10 @@ class TodoService:
     async def _column_cards(
         self, column_id: uuid.UUID, *, exclude: uuid.UUID | None = None
     ) -> list[TodoCard]:
+        others = (TodoCard.id != exclude,) if exclude is not None else ()
         stmt = select(TodoCard).where(
-            TodoCard.column_id == column_id, TodoCard.archived_at.is_(None)
+            TodoCard.column_id == column_id, TodoCard.archived_at.is_(None), *others
         )
-        if exclude is not None:
-            stmt = stmt.where(TodoCard.id != exclude)
         return list((await self.session.scalars(stmt.order_by(TodoCard.rank, TodoCard.id))).all())
 
     async def _all_column_cards(self, column_id: uuid.UUID) -> list[TodoCard]:
@@ -395,27 +504,24 @@ class TodoService:
         )
 
     async def _facts(self, cards: Sequence[TodoCard], principal: Principal) -> _Facts:
-        facts = _Facts()
         if not cards:
-            return facts
+            return _Facts()
         ids = [c.id for c in cards]
-        for card_id, label_id in (
+        label_rows = (
             await self.session.execute(
                 select(TodoCardLabel.card_id, TodoCardLabel.label_id).where(
                     TodoCardLabel.card_id.in_(ids)
                 )
             )
-        ).all():
-            facts.labels.setdefault(card_id, []).append(label_id)
-        for card_id, principal_id in (
+        ).all()
+        assignee_rows = (
             await self.session.execute(
                 select(TodoAssignee.card_id, TodoAssignee.principal_id).where(
                     TodoAssignee.card_id.in_(ids)
                 )
             )
-        ).all():
-            facts.assignees.setdefault(card_id, []).append(principal_id)
-        for card_id, total, done in (
+        ).all()
+        checklist_rows = (
             await self.session.execute(
                 select(
                     TodoCheckItem.card_id,
@@ -425,68 +531,49 @@ class TodoService:
                 .where(TodoCheckItem.card_id.in_(ids))
                 .group_by(TodoCheckItem.card_id)
             )
-        ).all():
-            facts.checklist[card_id] = (int(done), int(total))
-        for card_id, count in (
+        ).all()
+        comment_rows = (
             await self.session.execute(
                 select(TodoComment.card_id, func.count())
                 .where(TodoComment.card_id.in_(ids), TodoComment.deleted_at.is_(None))
                 .group_by(TodoComment.card_id)
             )
-        ).all():
-            facts.comments[card_id] = int(count)
-        for link in (
+        ).all()
+        link_rows = (
             await self.session.scalars(
                 select(TodoLink)
                 .where(TodoLink.card_id.in_(ids))
                 .order_by(TodoLink.created_at, TodoLink.id)
             )
-        ).all():
-            facts.links.setdefault(link.card_id, []).append(link)
-        people = {pid for pids in facts.assignees.values() for pid in pids}
-        facts.people = await person_refs(self.session, people)
-        primaries = [links[0] for links in facts.links.values() if links]
-        facts.resolved = await self.links.resolve(
-            [(link.kind, link.target_id) for link in primaries], principal
+        ).all()
+        assignees = grouped((card_id, principal_id) for card_id, principal_id in assignee_rows)
+        links = grouped((link.card_id, link) for link in link_rows)
+        people = await person_refs(
+            self.session, {pid for pids in assignees.values() for pid in pids}
         )
-        facts.events = await todo_events.event_rows(self.session, ids)
-        facts.series = await todo_events.series_names(
-            self.session, (row.series_id for row in facts.events.values())
+        resolved = await self.links.resolve(
+            [(group[0].kind, group[0].target_id) for group in links.values() if group], principal
         )
-        return facts
-
-    @staticmethod
-    def _tile(card: TodoCard, facts: _Facts) -> TodoCardTile:
-        done, total = facts.checklist.get(card.id, (0, 0))
-        links = facts.links.get(card.id, [])
-        assignees = sorted(
-            (facts.people.get(pid, DELETED_PERSON) for pid in facts.assignees.get(card.id, [])),
-            key=lambda p: ((p.display_name or "").casefold(), str(p.principal_id)),
+        events = await todo_events.event_rows(self.session, ids)
+        series = await todo_events.series_names(
+            self.session, (row.series_id for row in events.values())
         )
-        return TodoCardTile(
-            id=card.id,
-            board_id=card.board_id,
-            column_id=card.column_id,
-            rank=card.rank,
-            title=card.title,
-            due_date=card.due_date,
-            completed_at=card.completed_at,
-            label_ids=sorted(facts.labels.get(card.id, []), key=str),
+        return _Facts(
+            labels=grouped((card_id, label_id) for card_id, label_id in label_rows),
             assignees=assignees,
-            checklist=ChecklistCount(done=done, total=total),
-            comment_count=facts.comments.get(card.id, 0),
-            primary_link=_link_out(links[0], facts.resolved) if links else None,
-            link_count=len(links),
-            event=_event_brief(facts.events.get(card.id), facts.series),
-            version=card.version,
-            created_at=card.created_at,
-            updated_at=card.updated_at,
+            checklist={card_id: (int(done), int(total)) for card_id, total, done in checklist_rows},
+            comments={card_id: int(count) for card_id, count in comment_rows},
+            links=links,
+            people=people,
+            resolved=resolved,
+            events=events,
+            series=series,
         )
 
     async def tiles(self, cards: Sequence[TodoCard], principal: Principal) -> list[TodoCardTile]:
         """Build the tiles of the cards (in the given order)."""
         facts = await self._facts(cards, principal)
-        return [self._tile(c, facts) for c in cards]
+        return [_tile(c, facts) for c in cards]
 
     async def list_boards(
         self, principal: Principal, *, gremium_id: uuid.UUID | None = None
@@ -505,11 +592,12 @@ class TodoService:
         if me is not None:
             await ensure_personal_board(self.session, me)
         scope = await self.access.scope(principal)
-        stmt = select(TodoBoard).where(scope.condition(), TodoBoard.archived_at.is_(None))
-        if gremium_id is not None:
-            stmt = stmt.where(TodoBoard.gremium_id == gremium_id)
-        boards = list((await self.session.scalars(stmt)).all())
-        if not boards:
+        of_gremium = (TodoBoard.gremium_id == gremium_id,) if gremium_id is not None else ()
+        stmt = select(TodoBoard).where(
+            scope.condition(), TodoBoard.archived_at.is_(None), *of_gremium
+        )
+        found = (await self.session.scalars(stmt)).all()
+        if not found:
             return []
         counts = {
             board_id: int(n)
@@ -518,7 +606,7 @@ class TodoService:
                     select(TodoCard.board_id, func.count())
                     .join(TodoColumn, TodoColumn.id == TodoCard.column_id)
                     .where(
-                        TodoCard.board_id.in_([b.id for b in boards]),
+                        TodoCard.board_id.in_([b.id for b in found]),
                         TodoCard.archived_at.is_(None),
                         TodoColumn.is_done.is_(False),
                     )
@@ -526,7 +614,7 @@ class TodoService:
                 )
             ).all()
         }
-        boards.sort(key=lambda b: (_KIND_ORDER.get(b.kind, 3), b.name.casefold(), str(b.id)))
+        boards = sorted(found, key=_board_order)
         return [
             TodoBoardSummary(
                 id=b.id,
@@ -552,25 +640,20 @@ class TodoService:
     async def _board_out(self, board: TodoBoard, principal: Principal) -> TodoBoardOut:
         columns = await self._columns(board.id)
         labels = await self._labels(board.id)
-        cards = list(
-            (
-                await self.session.scalars(
-                    select(TodoCard)
-                    .where(TodoCard.board_id == board.id, TodoCard.archived_at.is_(None))
-                    .order_by(TodoCard.rank, TodoCard.id)
-                )
-            ).all()
-        )
+        live = (
+            await self.session.scalars(
+                select(TodoCard)
+                .where(TodoCard.board_id == board.id, TodoCard.archived_at.is_(None))
+                .order_by(TodoCard.rank, TodoCard.id)
+            )
+        ).all()
         archived = await self.session.scalar(
             select(func.count())
             .select_from(TodoCard)
             .where(TodoCard.board_id == board.id, TodoCard.archived_at.is_not(None))
         )
-        position = {c.id: index for index, c in enumerate(columns)}
-        cards.sort(key=lambda c: (position.get(c.column_id, len(columns)), c.rank, str(c.id)))
-        per_column: dict[uuid.UUID, int] = {}
-        for card in cards:
-            per_column[card.column_id] = per_column.get(card.column_id, 0) + 1
+        cards = _in_column_order(live, columns)
+        per_column = Counter(card.column_id for card in cards)
         return TodoBoardOut(
             id=board.id,
             name=board.name,
@@ -579,17 +662,8 @@ class TodoService:
             archive_after_days=board.archive_after_days,
             can_write=await self.access.can_write(board, principal),
             can_configure=await self.access.can_configure(board, principal),
-            columns=[
-                TodoColumnOut(
-                    id=c.id,
-                    name=c.name,
-                    position=c.position,
-                    is_done=c.is_done,
-                    card_count=per_column.get(c.id, 0),
-                )
-                for c in columns
-            ],
-            labels=[_label_out(label) for label in labels],
+            columns=_column_outs(columns, per_column),
+            labels=tuple(_label_out(label) for label in labels),
             cards=await self.tiles(cards, principal),
             archived_count=int(archived or 0),
         )
@@ -628,12 +702,15 @@ class TodoService:
         ``events_only`` keeps the Events: the filter ``Veranstaltungen mit Archiv``.
         """
         board = await self._board(board_id, principal)
-        conds = [TodoCard.board_id == board.id, TodoCard.archived_at.is_not(None)]
-        if events_only:
-            conds.append(TodoCard.id.in_(select(TodoCardEvent.card_id)))
         term = (q or "").strip()
-        if term:
-            conds.append(TodoCard.title.ilike(f"%{escape_like(term)}%", escape="\\"))
+        events = (TodoCard.id.in_(select(TodoCardEvent.card_id)),) if events_only else ()
+        titled = (TodoCard.title.ilike(f"%{escape_like(term)}%", escape="\\"),) if term else ()
+        conds = (
+            TodoCard.board_id == board.id,
+            TodoCard.archived_at.is_not(None),
+            *events,
+            *titled,
+        )
         total = await self.session.scalar(select(func.count()).select_from(TodoCard).where(*conds))
         cards = list(
             (
@@ -814,11 +891,10 @@ class TodoService:
     async def _label_name_taken(
         self, board_id: uuid.UUID, name: str, *, exclude: uuid.UUID | None = None
     ) -> bool:
+        others = (TodoLabel.id != exclude,) if exclude is not None else ()
         stmt = select(TodoLabel.id).where(
-            TodoLabel.board_id == board_id, func.lower(TodoLabel.name) == name.lower()
+            TodoLabel.board_id == board_id, func.lower(TodoLabel.name) == name.lower(), *others
         )
-        if exclude is not None:
-            stmt = stmt.where(TodoLabel.id != exclude)
         return await self.session.scalar(stmt) is not None
 
     async def add_label(
@@ -926,14 +1002,12 @@ class TodoService:
                 )
             ).all()
         }
-        pairs: list[tuple[TodoCard, TodoBoard]] = []
-        for card_id in ids:
-            card = found.get(card_id)
-            if card is None:
-                continue
-            board = boards[card.board_id]
-            if await self.access.can_read(board, principal):
-                pairs.append((card, board))
+        known = [
+            (found[card_id], boards[found[card_id].board_id]) for card_id in ids if card_id in found
+        ]
+        pairs = [
+            (card, board) for card, board in known if await self.access.can_read(board, principal)
+        ]
         return await self._details(pairs, principal)
 
     async def tile(self, card_id: uuid.UUID, principal: Principal) -> TodoCardTile:
@@ -995,65 +1069,30 @@ class TodoService:
                 )
             ).all()
         )
-        refs: set[tuple[str, uuid.UUID]] = set()
-        people: set[uuid.UUID | None] = set()
-        for card in cards:
-            refs.update((link.kind, link.target_id) for link in facts.links.get(card.id, []))
-            people.add(card.created_by)
-            for event in events.get(card.id, []):
-                people.add(event.actor_id)
-                if event.kind == "assigned":
-                    people.add(_uuid_of(event.payload.get("principalId")))
-                if event.kind in ("linked", "unlinked"):
-                    ref = _ref_of(event.payload)
-                    if ref is not None:
-                        refs.add(ref)
-            for comment in comments.get(card.id, []):
-                people.add(comment.author_id)
-                people.update(_uuid_of(m) for m in comment.mentions or [])
-        resolved = await self.links.resolve(refs, principal)
-        persons = await person_refs(self.session, people)
+        resolved = await self.links.resolve(_detail_refs(cards, facts, events), principal)
+        persons = await person_refs(self.session, _detail_people(cards, events, comments))
         me = await self.access.me(principal)
         files = await self.files.message_attachments(
-            "todo_comment", [c.id for card in cards for c in comments.get(card.id, [])]
+            "todo_comment", [c.id for card in cards for c in comments.get(card.id, ())]
         )
         gathered = await self._event_facts(
             [card for card in cards if card.id in facts.events], facts, principal
         )
-        out: list[TodoCardDetail] = []
-        for card, board in pairs:
-            tile = self._tile(card, facts)
-            own_labels = set(tile.label_ids)
-            labels = board_labels[board.id]
-            out.append(
-                TodoCardDetail(
-                    **tile.model_dump(by_alias=False),
-                    description_md=card.description_md,
-                    board_name=board.name,
-                    board_kind=board.kind,  # pyright: ignore[reportArgumentType]
-                    can_write=writable[board.id],
-                    columns=[
-                        TodoColumnRef(id=c.id, name=c.name, is_done=c.is_done)
-                        for c in columns[board.id]
-                    ],
-                    labels=[_label_out(label) for label in labels if label.id in own_labels],
-                    board_labels=[_label_out(label) for label in labels],
-                    created_by=persons.get(card.created_by, DELETED_PERSON),
-                    links=[_link_out(link, resolved) for link in facts.links.get(card.id, [])],
-                    checklist_items=[
-                        TodoCheckItemOut(id=i.id, text=i.text, done=i.done, position=i.position)
-                        for i in items.get(card.id, [])
-                    ],
-                    events=[_event_out(e, persons, resolved) for e in events.get(card.id, [])],
-                    comments=[
-                        _comment_out(c, persons, me, files.get(c.id, []))
-                        for c in comments.get(card.id, [])
-                    ],
-                    archived_at=card.archived_at,
-                    event_facts=gathered.get(card.id),
-                )
-            )
-        return out
+        parts = _DetailParts(
+            facts=facts,
+            columns=columns,
+            board_labels=board_labels,
+            writable=writable,
+            items=items,
+            events=events,
+            comments=comments,
+            resolved=resolved,
+            persons=persons,
+            me=me,
+            files=files,
+            gathered=gathered,
+        )
+        return [parts.detail(card, board) for card, board in pairs]
 
     async def _event_facts(
         self, cards: Sequence[TodoCard], facts: _Facts, principal: Principal
@@ -1068,44 +1107,23 @@ class TodoService:
             )
             for card in cards
         }
-        ids = [card.id for card in cards]
-        ids += [other.id for rows, _hidden in found.values() for other, _b, _e in rows]
+        ids = [
+            *(card.id for card in cards),
+            *(other.id for rows, _hidden in found.values() for other, _b, _e in rows),
+        ]
         sums = await todo_events.totals(self.session, list(dict.fromkeys(ids)))
-        out: dict[uuid.UUID, TodoEventFacts] = {}
-        for card in cards:
-            rows, hidden = found[card.id]
-            decided = await todo_events.decisions(self.session, card.id)
-            out[card.id] = TodoEventFacts(
+        decided = {card.id: await todo_events.decisions(self.session, card.id) for card in cards}
+        return {
+            card.id: TodoEventFacts(
                 totals=_totals_out(sums[card.id]),
-                decisions=[
-                    TodoEventDecision(
-                        kind=d.kind,  # pyright: ignore[reportArgumentType]
-                        target_id=d.target_id,
-                        title=d.title,
-                        decided_at=d.decided_at,
-                        meeting_title=d.meeting_title,
-                        result=d.result,
-                        amount=todo_events.balance_text(d.amount) if d.amount is not None else None,
-                        conditions=d.conditions,
-                    )
-                    for d in decided
-                ],
+                decisions=tuple(_decision_out(d) for d in decided[card.id]),
                 editions=[
-                    TodoEventEdition(
-                        id=other.id,
-                        board_id=board.id,
-                        board_name=board.name,
-                        title=other.title,
-                        starts_on=row.starts_on,
-                        ends_on=row.ends_on,
-                        archived=other.archived_at is not None,
-                        totals=_totals_out(sums[other.id]),
-                    )
-                    for other, board, row in rows
+                    _edition_out(other, board, row, sums) for other, board, row in found[card.id][0]
                 ],
-                hidden_editions=hidden,
+                hidden_editions=found[card.id][1],
             )
-        return out
+            for card in cards
+        }
 
     async def _check_assignees(self, board: TodoBoard, ids: Iterable[uuid.UUID]) -> None:
         wanted = set(ids)
@@ -1130,15 +1148,7 @@ class TodoService:
         board = await self._board(payload.board_id, principal, write=True)
         await self._lock_board(board.id)
         columns = await self._columns(board.id)
-        if payload.column_id is None:
-            column = columns[0]
-        else:
-            matches = [c for c in columns if c.id == payload.column_id]
-            if not matches:
-                raise _invalid(
-                    "The column is not on this board.", "column_not_on_board", "columnId"
-                )
-            column = matches[0]
+        column = _pick_column(columns, payload.column_id)
         assignees = list(dict.fromkeys(payload.assignee_ids))
         await self._check_assignees(board, assignees)
         label_ids = list(dict.fromkeys(payload.label_ids))
@@ -1216,17 +1226,18 @@ class TodoService:
                 "The card was changed in the meantime.", code="card_version_conflict"
             )
         fields = payload.model_fields_set
-        changed = False
-        if payload.title is not None:
-            title = payload.title.strip() or payload.title
-            if title != card.title:
-                self._event(card, "renamed", actor, {"from": card.title, "to": title})
-                card.title = title
-                changed = True
-        if "description_md" in fields and payload.description_md != card.description_md:
+        title = (
+            (payload.title.strip() or payload.title) if payload.title is not None else card.title
+        )
+        renamed = title != card.title
+        described = "description_md" in fields and payload.description_md != card.description_md
+        redated = "due_date" in fields and payload.due_date != card.due_date
+        if renamed:
+            self._event(card, "renamed", actor, {"from": card.title, "to": title})
+            card.title = title
+        if described:
             card.description_md = payload.description_md
-            changed = True
-        if "due_date" in fields and payload.due_date != card.due_date:
+        if redated:
             self._event(
                 card,
                 "due",
@@ -1234,8 +1245,7 @@ class TodoService:
                 {"from": _iso_date(card.due_date), "to": _iso_date(payload.due_date)},
             )
             card.due_date = payload.due_date
-            changed = True
-        if changed:
+        if renamed or described or redated:
             card.version += 1
             card.updated_at = _now()
             self._touch(board, card)
@@ -1357,15 +1367,7 @@ class TodoService:
         if card.archived_at is not None:
             raise ConflictError("An archived card cannot move.", code="card_archived")
         columns = await self._columns(target.id)
-        if payload.column_id is None:
-            column = columns[0]
-        else:
-            matches = [c for c in columns if c.id == payload.column_id]
-            if not matches:
-                raise _invalid(
-                    "The column is not on this board.", "column_not_on_board", "columnId"
-                )
-            column = matches[0]
+        column = _pick_column(columns, payload.column_id)
         from_column = await self.session.get(TodoColumn, card.column_id)
         own_labels = list(
             (
@@ -1675,8 +1677,8 @@ class TodoService:
                 ).all()
             )
             others = [i for i in items if i.id != item.id]
-            others.insert(min(payload.position, len(others)), item)
-            for position, entry in enumerate(others):
+            at = min(payload.position, len(others))
+            for position, entry in enumerate([*others[:at], item, *others[at:]]):
                 entry.position = position
         self._touch(board, card)
         await self.session.commit()
@@ -1869,10 +1871,9 @@ class TodoService:
     async def series(self, q: str | None, principal: Principal) -> list[TodoEventSeriesOut]:
         """List the series by name (at most 50), filtered by ``q``."""
         await self._actor(principal)
-        stmt = select(TodoEventSeries)
         term = (q or "").strip()
-        if term:
-            stmt = stmt.where(TodoEventSeries.name.ilike(f"%{escape_like(term)}%", escape="\\"))
+        named = (TodoEventSeries.name.ilike(f"%{escape_like(term)}%", escape="\\"),) if term else ()
+        stmt = select(TodoEventSeries).where(*named)
         rows = (
             await self.session.scalars(stmt.order_by(func.lower(TodoEventSeries.name)).limit(50))
         ).all()
@@ -1942,14 +1943,13 @@ class TodoService:
         }
         if not boards:
             return []
+        term = (q or "").strip()
+        titled = (TodoCard.title.ilike(f"%{escape_like(term)}%", escape="\\"),) if term else ()
         stmt = (
             select(TodoCard, TodoCardEvent)
             .join(TodoCardEvent, TodoCardEvent.card_id == TodoCard.id)
-            .where(TodoCard.board_id.in_(boards), TodoCard.archived_at.is_(None))
+            .where(TodoCard.board_id.in_(boards), TodoCard.archived_at.is_(None), *titled)
         )
-        term = (q or "").strip()
-        if term:
-            stmt = stmt.where(TodoCard.title.ilike(f"%{escape_like(term)}%", escape="\\"))
         rows = (
             (
                 await self.session.execute(
@@ -2094,11 +2094,9 @@ class TodoService:
         await self.session.commit()
 
     async def _comment(self, comment: TodoComment, me: uuid.UUID) -> TodoCommentOut:
-        people: set[uuid.UUID | None] = {comment.author_id}
-        people.update(_uuid_of(m) for m in comment.mentions or [])
-        persons = await person_refs(self.session, people)
+        persons = await person_refs(self.session, frozenset(_comment_people(comment)))
         files = await self.files.message_attachments("todo_comment", [comment.id])
-        return _comment_out(comment, persons, me, files.get(comment.id, []))
+        return _comment_out(comment, persons, me, files.get(comment.id, ()))
 
     async def mine(self, principal: Principal) -> TodoMine:
         """The open cards assigned to the caller over every readable board.
@@ -2148,18 +2146,9 @@ class TodoService:
             ).all()
         }
         limit = berlin_today() + timedelta(days=DUE_SOON_DAYS)
-        items = []
-        for card, board, column in rows:
-            tile = self._tile(card, facts)
-            items.append(
-                TodoMineItem(
-                    **tile.model_dump(by_alias=False),
-                    board_name=board.name,
-                    board_kind=board.kind,  # pyright: ignore[reportArgumentType]
-                    column_name=column.name,
-                    labels=[_label_out(labels[i]) for i in tile.label_ids if i in labels],
-                )
-            )
+        items = [
+            _mine_item(_tile(card, facts), board, column, labels) for card, board, column in rows
+        ]
         due_soon = sum(1 for c in cards if c.due_date is not None and c.due_date <= limit)
         return TodoMine(items=items, due_soon_count=due_soon)
 
@@ -2207,105 +2196,90 @@ class TodoService:
         if not mine and me is not None:
             await ensure_personal_board(self.session, me)
         scope = await self.access.scope(principal)
-        if mine:
-            rows = (
-                await self.session.execute(
-                    select(TodoCard, TodoBoard)
-                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
-                    .join(TodoAssignee, TodoAssignee.card_id == TodoCard.id)
-                    .where(
-                        TodoAssignee.principal_id == me,
-                        TodoCard.archived_at.is_(None),
-                        TodoBoard.archived_at.is_(None),
-                        TodoBoard.kind != "personal",
-                        scope.condition(),
-                    )
-                    .order_by(TodoCard.rank, TodoCard.id)
-                )
-            ).all()
-            boards = {b.id: b for _card, b in rows}
-            cards = [c for c, _b in rows]
-        else:
-            boards = {
-                b.id: b
-                for b in (
-                    await self.session.scalars(
-                        select(TodoBoard).where(scope.condition(), TodoBoard.archived_at.is_(None))
-                    )
-                ).all()
-            }
-            cards = (
-                list(
-                    (
-                        await self.session.scalars(
-                            select(TodoCard)
-                            .where(TodoCard.board_id.in_(boards), TodoCard.archived_at.is_(None))
-                            .order_by(TodoCard.rank, TodoCard.id)
-                        )
-                    ).all()
-                )
-                if boards
-                else []
-            )
+        boards, cards = (
+            await self._assigned_cards(me, scope)
+            if mine and me is not None
+            else await self._live_cards(scope)
+        )
         if not boards:
             return []
-        columns: dict[uuid.UUID, list[TodoColumn]] = {}
-        for col in (
+        column_rows = (
             await self.session.scalars(
                 select(TodoColumn)
                 .where(TodoColumn.board_id.in_(boards))
                 .order_by(TodoColumn.position, TodoColumn.id)
             )
-        ).all():
-            columns.setdefault(col.board_id, []).append(col)
-        labels: dict[uuid.UUID, list[TodoLabel]] = {}
-        for lab in (
+        ).all()
+        label_rows = (
             await self.session.scalars(
                 select(TodoLabel)
                 .where(TodoLabel.board_id.in_(boards))
                 .order_by(func.lower(TodoLabel.name), TodoLabel.id)
             )
-        ).all():
-            labels.setdefault(lab.board_id, []).append(lab)
+        ).all()
         facts = await self._facts(cards, principal)
-        per_board: dict[uuid.UUID, list[TodoCard]] = {}
-        for c in cards:
-            per_board.setdefault(c.board_id, []).append(c)
-        out: list[TodoAssignedBoard] = []
-        ordered = sorted(
-            boards.values(),
-            key=lambda b: (_KIND_ORDER.get(b.kind, 3), b.name.casefold(), str(b.id)),
-        )
-        for b in ordered:
-            cols = columns.get(b.id, [])
-            position = {c.id: i for i, c in enumerate(cols)}
-            own = per_board.get(b.id, [])
-            own.sort(key=lambda c: (position.get(c.column_id, len(cols)), c.rank, str(c.id)))
-            per_column: dict[uuid.UUID, int] = {}
-            for c in own:
-                per_column[c.column_id] = per_column.get(c.column_id, 0) + 1
-            out.append(
-                TodoAssignedBoard(
-                    id=b.id,
-                    name=b.name,
-                    kind=b.kind,  # pyright: ignore[reportArgumentType]
-                    gremium_id=b.gremium_id,
-                    can_write=await self.access.can_write(b, principal),
-                    columns=[
-                        TodoColumnOut(
-                            id=c.id,
-                            name=c.name,
-                            position=c.position,
-                            is_done=c.is_done,
-                            card_count=per_column.get(c.id, 0),
-                        )
-                        for c in cols
-                    ],
-                    labels=[_label_out(lab) for lab in labels.get(b.id, [])],
-                    cards=[self._tile(c, facts) for c in own],
-                )
+        columns = grouped((col.board_id, col) for col in column_rows)
+        labels = grouped((lab.board_id, lab) for lab in label_rows)
+        per_board = grouped((c.board_id, c) for c in cards)
+        return [
+            _assigned_board(
+                b,
+                columns.get(b.id, ()),
+                labels.get(b.id, ()),
+                _in_column_order(per_board.get(b.id, ()), columns.get(b.id, ())),
+                facts,
+                can_write=await self.access.can_write(b, principal),
             )
-        return out
+            for b in sorted(boards.values(), key=_board_order)
+        ]
+
+    async def _assigned_cards(
+        self, me: uuid.UUID, scope: ReadScope
+    ) -> tuple[dict[uuid.UUID, TodoBoard], list[TodoCard]]:
+        """The live cards on shared boards that name ``me``, and their boards."""
+        rows = (
+            await self.session.execute(
+                select(TodoCard, TodoBoard)
+                .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                .join(TodoAssignee, TodoAssignee.card_id == TodoCard.id)
+                .where(
+                    TodoAssignee.principal_id == me,
+                    TodoCard.archived_at.is_(None),
+                    TodoBoard.archived_at.is_(None),
+                    TodoBoard.kind != "personal",
+                    scope.condition(),
+                )
+                .order_by(TodoCard.rank, TodoCard.id)
+            )
+        ).all()
+        return {b.id: b for _card, b in rows}, [c for c, _b in rows]
+
+    async def _live_cards(
+        self, scope: ReadScope
+    ) -> tuple[dict[uuid.UUID, TodoBoard], list[TodoCard]]:
+        """The live boards in ``scope`` and every live card on them."""
+        boards = {
+            b.id: b
+            for b in (
+                await self.session.scalars(
+                    select(TodoBoard).where(scope.condition(), TodoBoard.archived_at.is_(None))
+                )
+            ).all()
+        }
+        cards = (
+            list(
+                (
+                    await self.session.scalars(
+                        select(TodoCard)
+                        .where(TodoCard.board_id.in_(boards), TodoCard.archived_at.is_(None))
+                        .order_by(TodoCard.rank, TodoCard.id)
+                    )
+                ).all()
+            )
+            if boards
+            else []
+        )
+        return boards, cards
 
     async def linked(
         self, kind: str, target_id: uuid.UUID, principal: Principal
@@ -2334,7 +2308,7 @@ class TodoService:
         sums = await todo_events.totals(
             self.session, [card.id for card, _b, _c in rows if card.id in facts.events]
         )
-        out = [
+        found = [
             TodoLinkedCard(
                 id=card.id,
                 board_id=board.id,
@@ -2343,7 +2317,7 @@ class TodoService:
                 column_name=col.name,
                 is_done=col.is_done,
                 due_date=card.due_date,
-                assignees=self._tile(card, facts).assignees,
+                assignees=_tile(card, facts).assignees,
                 event=_event_brief(facts.events.get(card.id), facts.series),
                 balance=(
                     todo_events.balance_text(sums[card.id].balance) if card.id in sums else None
@@ -2351,16 +2325,7 @@ class TodoService:
             )
             for card, board, col in rows
         ]
-        out.sort(
-            key=lambda c: (
-                c.event is None,
-                c.is_done,
-                c.due_date is None,
-                c.due_date or date.max,
-                c.title,
-            )
-        )
-        return out
+        return sorted(found, key=_linked_order)
 
     async def search(
         self, q: str, principal: Principal, *, limit: int
@@ -2497,6 +2462,20 @@ def _check_transfer_kinds(source: TodoBoard, target: TodoBoard) -> None:
         )
 
 
+def _pick_column(columns: Sequence[TodoColumn], column_id: uuid.UUID | None) -> TodoColumn:
+    """Return the column ``column_id`` of a board, or its first column for ``None``.
+
+    Raises:
+        ValidationProblem: The column is not on the board (HTTP 422, ``column_not_on_board``).
+    """
+    if column_id is None:
+        return columns[0]
+    found = next((c for c in columns if c.id == column_id), None)
+    if found is None:
+        raise _invalid("The column is not on this board.", "column_not_on_board", "columnId")
+    return found
+
+
 def _card_moved() -> ConflictError:
     return ConflictError("The card was moved in the meantime.", code="card_moved")
 
@@ -2524,13 +2503,25 @@ def _append(live: Sequence[TodoCard], cards: Sequence[TodoCard]) -> None:
     a fresh order. The caller holds the board lock, so no parallel write ranks the
     column at the same time.
     """
-    last = live[-1].rank if live else None
     try:
-        for card in cards:
-            last = _rank(last, None)
-            card.rank = last
+        ranks = _ranks_after(live[-1].rank if live else None, len(cards))
     except RankError:
         _respread([*live, *cards])
+        return
+    for card, rank in zip(cards, ranks, strict=True):
+        card.rank = rank
+
+
+def _ranks_after(last: str | None, count: int) -> tuple[str, ...]:
+    """Return ``count`` ascending ranks after ``last`` (``None``: an empty column).
+
+    Raises:
+        RankError: A rank is broken or a new rank is longer than ``MAX_LENGTH``.
+    """
+    if count == 0:
+        return ()
+    first = _rank(last, None)
+    return tuple(accumulate(range(count - 1), lambda rank, _: _rank(rank, None), initial=first))
 
 
 def _place(live: Sequence[TodoCard], index: int, card: TodoCard) -> bool:
@@ -2606,12 +2597,139 @@ def _new_link(card_id: uuid.UUID, kind: str, target_id: uuid.UUID, actor: uuid.U
 
 def _by_card[R: (TodoCheckItem, TodoEvent, TodoComment)](
     rows: Iterable[R],
-) -> dict[uuid.UUID, list[R]]:
+) -> dict[uuid.UUID, tuple[R, ...]]:
     """Group rows by their card and keep the order of the query."""
-    out: dict[uuid.UUID, list[R]] = {}
-    for row in rows:
-        out.setdefault(row.card_id, []).append(row)
-    return out
+    return grouped((row.card_id, row) for row in rows)
+
+
+def _event_people(event: TodoEvent) -> tuple[uuid.UUID | None, ...]:
+    """The actor of an event and, for an assignment, the assignee."""
+    assigned = (_uuid_of(event.payload.get("principalId")),) if event.kind == "assigned" else ()
+    return (event.actor_id, *assigned)
+
+
+def _comment_people(comment: TodoComment) -> tuple[uuid.UUID | None, ...]:
+    """The author of a comment and the people it mentions."""
+    return (comment.author_id, *(_uuid_of(m) for m in comment.mentions or []))
+
+
+def _detail_people(
+    cards: Iterable[TodoCard],
+    events: Mapping[uuid.UUID, Sequence[TodoEvent]],
+    comments: Mapping[uuid.UUID, Sequence[TodoComment]],
+) -> frozenset[uuid.UUID | None]:
+    """The people that the whole cards name: creators, event people and comment people."""
+    return frozenset(
+        person
+        for card in cards
+        for person in (
+            card.created_by,
+            *(p for event in events.get(card.id, ()) for p in _event_people(event)),
+            *(p for comment in comments.get(card.id, ()) for p in _comment_people(comment)),
+        )
+    )
+
+
+def _detail_refs(
+    cards: Iterable[TodoCard], facts: _Facts, events: Mapping[uuid.UUID, Sequence[TodoEvent]]
+) -> frozenset[tuple[str, uuid.UUID]]:
+    """The link targets that the whole cards name: their links and the (un)link events."""
+    linked = (
+        (link.kind, link.target_id) for card in cards for link in facts.links.get(card.id, ())
+    )
+    logged = (
+        _ref_of(event.payload)
+        for card in cards
+        for event in events.get(card.id, ())
+        if event.kind in ("linked", "unlinked")
+    )
+    return frozenset((*linked, *(ref for ref in logged if ref is not None)))
+
+
+def _decision_out(decision: todo_events.Decision) -> TodoEventDecision:
+    amount = decision.amount
+    return TodoEventDecision(
+        kind=decision.kind,  # pyright: ignore[reportArgumentType]
+        target_id=decision.target_id,
+        title=decision.title,
+        decided_at=decision.decided_at,
+        meeting_title=decision.meeting_title,
+        result=decision.result,
+        amount=todo_events.balance_text(amount) if amount is not None else None,
+        conditions=decision.conditions,
+    )
+
+
+def _edition_out(
+    other: TodoCard,
+    board: TodoBoard,
+    row: TodoCardEvent,
+    sums: Mapping[uuid.UUID, todo_events.Totals],
+) -> TodoEventEdition:
+    return TodoEventEdition(
+        id=other.id,
+        board_id=board.id,
+        board_name=board.name,
+        title=other.title,
+        starts_on=row.starts_on,
+        ends_on=row.ends_on,
+        archived=other.archived_at is not None,
+        totals=_totals_out(sums[other.id]),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _DetailParts:
+    """What the whole cards of one read show, loaded before the first card is built."""
+
+    facts: _Facts
+    columns: Mapping[uuid.UUID, Sequence[TodoColumn]]
+    board_labels: Mapping[uuid.UUID, Sequence[TodoLabel]]
+    writable: Mapping[uuid.UUID, bool]
+    items: Mapping[uuid.UUID, Sequence[TodoCheckItem]]
+    events: Mapping[uuid.UUID, Sequence[TodoEvent]]
+    comments: Mapping[uuid.UUID, Sequence[TodoComment]]
+    resolved: Mapping[tuple[str, uuid.UUID], Resolved]
+    persons: Mapping[uuid.UUID, PersonRef]
+    me: uuid.UUID | None
+    files: Mapping[uuid.UUID, list[MessageAttachmentOut]]
+    gathered: Mapping[uuid.UUID, TodoEventFacts]
+
+    def detail(self, card: TodoCard, board: TodoBoard) -> TodoCardDetail:
+        """Build the whole card of ``card`` on ``board``."""
+        tile = _tile(card, self.facts)
+        own_labels = frozenset(tile.label_ids)
+        labels = self.board_labels[board.id]
+        return TodoCardDetail(
+            **tile.model_dump(by_alias=False),
+            description_md=card.description_md,
+            board_name=board.name,
+            board_kind=board.kind,  # pyright: ignore[reportArgumentType]
+            can_write=self.writable[board.id],
+            columns=tuple(
+                TodoColumnRef(id=c.id, name=c.name, is_done=c.is_done)
+                for c in self.columns[board.id]
+            ),
+            labels=tuple(_label_out(label) for label in labels if label.id in own_labels),
+            board_labels=tuple(_label_out(label) for label in labels),
+            created_by=self.persons.get(card.created_by, DELETED_PERSON),
+            links=tuple(
+                _link_out(link, self.resolved) for link in self.facts.links.get(card.id, ())
+            ),
+            checklist_items=tuple(
+                TodoCheckItemOut(id=i.id, text=i.text, done=i.done, position=i.position)
+                for i in self.items.get(card.id, ())
+            ),
+            events=tuple(
+                _event_out(e, self.persons, self.resolved) for e in self.events.get(card.id, ())
+            ),
+            comments=tuple(
+                _comment_out(c, self.persons, self.me, self.files.get(c.id, ()))
+                for c in self.comments.get(card.id, ())
+            ),
+            archived_at=card.archived_at,
+            event_facts=self.gathered.get(card.id),
+        )
 
 
 def _uuid_of(value: object) -> uuid.UUID | None:
@@ -2638,52 +2756,67 @@ def _excerpt(body: str) -> str:
     return flat if len(flat) <= EXCERPT_LENGTH else flat[: EXCERPT_LENGTH - 1] + "…"
 
 
-def _person(persons: dict[uuid.UUID, PersonRef], principal_id: uuid.UUID | None) -> PersonRef:
+def _person(persons: Mapping[uuid.UUID, PersonRef], principal_id: uuid.UUID | None) -> PersonRef:
     if principal_id is None:
         return DELETED_PERSON
     return persons.get(principal_id, DELETED_PERSON)
 
 
+def _event_payload(
+    event: TodoEvent,
+    persons: Mapping[uuid.UUID, PersonRef],
+    resolved: Mapping[tuple[str, uuid.UUID], Resolved],
+) -> dict[str, JsonValue]:
+    """The payload of an event as the timeline shows it.
+
+    An assignment names the person instead of its id; a link or an unlink carries the
+    title of the target when the viewer reads it.
+    """
+    payload: dict[str, JsonValue] = dict(event.payload or {})
+    match event.kind:
+        case "assigned":
+            person = _person(persons, _uuid_of(payload.get("principalId")))
+            return {
+                "person": person.model_dump(by_alias=True, mode="json"),
+                "added": bool(payload.get("added", False)),
+            }
+        case "linked" | "unlinked":
+            ref = _ref_of(payload)
+            target = resolved.get(ref, HIDDEN) if ref is not None else HIDDEN
+            return {**payload, "title": target.title if target.accessible else None}
+        case _:
+            return payload
+
+
 def _event_out(
     event: TodoEvent,
-    persons: dict[uuid.UUID, PersonRef],
-    resolved: dict[tuple[str, uuid.UUID], Resolved],
+    persons: Mapping[uuid.UUID, PersonRef],
+    resolved: Mapping[tuple[str, uuid.UUID], Resolved],
 ) -> TodoEventOut:
-    payload: dict[str, JsonValue] = dict(event.payload or {})
-    if event.kind == "assigned":
-        person = _person(persons, _uuid_of(payload.pop("principalId", None)))
-        payload = {
-            "person": person.model_dump(by_alias=True, mode="json"),
-            "added": bool(payload.get("added", False)),
-        }
-    elif event.kind in ("linked", "unlinked"):
-        ref = _ref_of(payload)
-        target = resolved.get(ref, HIDDEN) if ref is not None else HIDDEN
-        payload["title"] = target.title if target.accessible else None
     return TodoEventOut(
         id=event.id,
         kind=event.kind,  # pyright: ignore[reportArgumentType]
         actor=_person(persons, event.actor_id) if event.actor_id is not None else None,
         at=event.created_at,
-        payload=payload,
+        payload=_event_payload(event, persons, resolved),
     )
 
 
 def _comment_out(
     comment: TodoComment,
-    persons: dict[uuid.UUID, PersonRef],
+    persons: Mapping[uuid.UUID, PersonRef],
     me: uuid.UUID | None,
-    attachments: list[MessageAttachmentOut] | None = None,
+    attachments: Sequence[MessageAttachmentOut] = (),
 ) -> TodoCommentOut:
     return TodoCommentOut(
         id=comment.id,
         author=_person(persons, comment.author_id),
         body=comment.body,
-        mentions=[_person(persons, _uuid_of(m)) for m in comment.mentions or []],
+        mentions=tuple(_person(persons, _uuid_of(m)) for m in comment.mentions or []),
         at=comment.created_at,
         edited_at=comment.edited_at,
         is_own=me is not None and comment.author_id == me,
-        attachments=attachments or [],
+        attachments=list(attachments),
     )
 
 

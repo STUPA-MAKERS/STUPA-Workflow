@@ -14,8 +14,7 @@ description: Hierarchical cost center budget tree with fiscal years, top-down al
 - `tree_rules.py` — pure, DB-free domain logic (100% branch-covered): path-key composition, descendant tests, fiscal year interval overlap, allocation invariants, `rollup_committed`, `node_available`, `build_forest`, `fiscal_year_bounds`, `scope_forest`.
 - `tree/` — thin I/O wiring over `tree_rules`, one ops class per concern (`nodes`, `fiscal_years`, `allocations`, `applications`, `expenses`, `subbookings`, `invoices`, `transfers`, `revert`, `view`). `tree/service.py` combines them into `BudgetTreeService`.
 - `tree_router.py` — FastAPI router (`tags=["budget"]`), mounted in `main.py` under `/api`.
-- `tree_schemas.py` — Pydantic v2 camelCase DTOs (`_CamelModel`, `populate_by_name`).
-- `schemas.py` — shared `_CamelModel` base only.
+- `tree_schemas.py` — frozen Pydantic v2 camelCase DTOs (`FrozenCamelModel` from `app/shared/schemas.py`, `populate_by_name`).
 - `invoice_import.py` — pure ZUGFeRD/Factur-X CII-XML extraction + mapping (`parse_zugferd_pdf`, `NotZugferdError`, `UnsupportedInvoiceCurrencyError`). The module imports `pycheval` and `pypdf` lazily.
 - `stats.py` — `BudgetStatsService.refresh()` for materialized views `mv_budget_usage`, `mv_status_distribution`.
 

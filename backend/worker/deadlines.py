@@ -74,7 +74,7 @@ DEFAULT_SCAN_LIMIT = 200
 
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Load the settings into the worker context."""
-    ctx["settings"] = load_settings()
+    ctx.update(settings=load_settings())
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
@@ -236,19 +236,28 @@ async def _remove_objects(
     """
     if not keys:
         return
-    storage: ObjectStorage | None = ctx.get("object_storage")
-    if storage is None and settings is not None:
-        storage = build_object_storage(settings)
+    storage = _object_storage(ctx, settings)
     if storage is None:
         logger.warning(
             "no object storage: %d object(s) of discarded applications stay", len(keys)
         )
         return
     for key in keys:
-        try:
-            await storage.remove(key)
-        except StorageError:
-            logger.warning("could not remove an object of a discarded application")
+        await _remove_object(storage, key)
+
+
+def _object_storage(ctx: dict[str, Any], settings: Settings | None) -> ObjectStorage | None:
+    """Return the storage of the worker context, else one built from the settings."""
+    stored: ObjectStorage | None = ctx.get("object_storage")
+    return stored if stored is not None or settings is None else build_object_storage(settings)
+
+
+async def _remove_object(storage: ObjectStorage, key: str) -> None:
+    """Remove one storage object; a failure is only a warning, because the rows are gone."""
+    try:
+        await storage.remove(key)
+    except StorageError:
+        logger.warning("could not remove an object of a discarded application")
 
 
 async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
@@ -283,18 +292,32 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
             .scalars()
             .all()
         )
-    advanced = 0
-    for application_id in ids:
-        try:
-            async with maker() as session:
-                flow = FlowService(session, dispatcher, _publisher(ctx))
-                if await flow.auto_advance(application_id, _system_principal()) is not None:
-                    advanced += 1
-        except (ConflictError, NotFoundError) as exc:
-            logger.info("auto-transition skipped (app=%s): %s", application_id, exc)
-        except Exception:
-            logger.exception("auto-transition failed (app=%s)", application_id)
-    return advanced
+    advanced = [await _advance_one(ctx, maker, dispatcher, app_id) for app_id in ids]
+    return sum(advanced)
+
+
+async def _advance_one(
+    ctx: dict[str, Any],
+    maker: async_sessionmaker[AsyncSession],
+    dispatcher: ActionDispatcher,
+    application_id: UUID,
+) -> bool:
+    """Fire the automatic transition of one application in its own session.
+
+    Returns:
+        Whether the application moved. A fault gives False and a log line, because one
+        broken application must not abort the cycle.
+    """
+    try:
+        async with maker() as session:
+            flow = FlowService(session, dispatcher, _publisher(ctx))
+            return await flow.auto_advance(application_id, _system_principal()) is not None
+    except (ConflictError, NotFoundError) as exc:
+        logger.info("auto-transition skipped (app=%s): %s", application_id, exc)
+        return False
+    except Exception:
+        logger.exception("auto-transition failed (app=%s)", application_id)
+        return False
 
 
 async def due_open_vote_ids(
@@ -347,14 +370,17 @@ async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
     maker = _sessionmaker(ctx)
     async with maker() as session:
         ids = await due_open_vote_ids(session, now)
-    closed = 0
-    for vote_id in ids:
-        try:
-            if await _close_one(ctx, vote_id, now):
-                closed += 1
-        except Exception:
-            logger.exception("vote auto-close failed (vote=%s)", vote_id)
-    return closed
+    closed = [await _close_one_logged(ctx, vote_id, now) for vote_id in ids]
+    return sum(closed)
+
+
+async def _close_one_logged(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
+    """Close one due vote; a fault gives False and a log line, so the cycle goes on."""
+    try:
+        return await _close_one(ctx, vote_id, now)
+    except Exception:
+        logger.exception("vote auto-close failed (vote=%s)", vote_id)
+        return False
 
 
 async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:

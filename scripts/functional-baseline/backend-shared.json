@@ -1,18 +1,6 @@
 {
-  "backend/app/shared/altcha.py": 5,
-  "backend/app/shared/antiabuse.py": 11,
-  "backend/app/shared/config_schemas.py": 23,
-  "backend/app/shared/errors.py": 15,
-  "backend/app/shared/filenames.py": 4,
-  "backend/app/shared/guards.py": 1,
-  "backend/app/shared/jsonlogic.py": 5,
-  "backend/app/shared/mentions.py": 1,
-  "backend/app/shared/money.py": 2,
-  "backend/app/shared/paging.py": 2,
-  "backend/app/shared/people.py": 3,
-  "backend/app/shared/ratelimit.py": 3,
-  "backend/app/shared/search.py": 1,
-  "backend/app/shared/ssrf.py": 2,
-  "backend/app/shared/ws.py": 1,
-  "backend/app/shared/xlsx.py": 15
+  "backend/app/shared/altcha.py": 4,
+  "backend/app/shared/errors.py": 3,
+  "backend/app/shared/ratelimit.py": 2,
+  "backend/app/shared/xlsx.py": 2
 }

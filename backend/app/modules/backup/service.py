@@ -24,7 +24,7 @@ import os
 import tarfile
 import tempfile
 from collections.abc import AsyncIterator, Generator
-from contextlib import contextmanager, suppress
+from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -52,7 +52,7 @@ class BackupError(RuntimeError):
     """A backup or a restore failed. The message is short and carries no path."""
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ArchiveResult:
     """What `build_archive` produced."""
 
@@ -101,16 +101,15 @@ def temp_file(suffix: str) -> Generator[IO[bytes]]:
 
 
 @contextmanager
-def _open_staged(staged: list[tuple[str, Path]]) -> Generator[list[tuple[str, IO[bytes]]]]:
-    """Open every staged object for reading and close them all on the way out."""
-    handles: list[tuple[str, IO[bytes]]] = []
-    try:
-        for key, path in staged:
-            handles.append((key, path.open("rb")))
-        yield handles
-    finally:
-        for _, handle in handles:
-            handle.close()
+def _open_staged(
+    staged: tuple[tuple[str, Path], ...],
+) -> Generator[tuple[tuple[str, IO[bytes]], ...]]:
+    """Open every staged object for reading and close them all on the way out.
+
+    The exit stack also closes the files opened so far when a later open fails.
+    """
+    with ExitStack() as stack:
+        yield tuple((key, stack.enter_context(path.open("rb"))) for key, path in staged)
 
 
 class BackupService:
@@ -312,7 +311,7 @@ class BackupService:
             schema_revision=revision,
         )
 
-    async def _stage_objects(self, staging: Path) -> list[tuple[str, Path]]:
+    async def _stage_objects(self, staging: Path) -> tuple[tuple[str, Path], ...]:
         """Download the attachment bucket into `staging`, one file per object.
 
         The tar is written in a worker thread, so it cannot await a download mid-stream.
@@ -324,16 +323,22 @@ class BackupService:
             `(object key, staged path)` pairs, in bucket order.
         """
         assert self.attachments is not None
-        staged: list[tuple[str, Path]] = []
-        for index, key in enumerate(await self.attachments.list_keys()):
-            path = staging / f"{index:08d}.bin"
-            try:
-                await self.attachments.get_file(key, str(path))
-            except StorageError:
-                logger.warning("attachment vanished during backup, skipped")
-                continue
-            staged.append((key, path))
-        return staged
+        keys = await self.attachments.list_keys()
+        staged = [
+            await self._stage_object(key, staging / f"{index:08d}.bin")
+            for index, key in enumerate(keys)
+        ]
+        return tuple(pair for pair in staged if pair is not None)
+
+    async def _stage_object(self, key: str, path: Path) -> tuple[str, Path] | None:
+        """Download one attachment to `path`, or return ``None`` when it vanished."""
+        assert self.attachments is not None
+        try:
+            await self.attachments.get_file(key, str(path))
+        except StorageError:
+            logger.warning("attachment vanished during backup, skipped")
+            return None
+        return key, path
 
     async def _schema_revision(self) -> str | None:
         """Read the alembic head the live database sits at.
@@ -507,16 +512,21 @@ class BackupService:
         restored database has no row for.
         """
         assert self.attachments is not None
-        before = set(await self.attachments.list_keys())
-        seen: set[str] = set()
-        for key, payload in arch.iter_objects(tar):
-            await self.attachments.put(key, payload, ARCHIVE_CONTENT_TYPE)
-            seen.add(key)
+        before = frozenset(await self.attachments.list_keys())
+        seen = frozenset(
+            [await self._put_object(key, payload) for key, payload in arch.iter_objects(tar)]
+        )
         for stale in before - seen:
             try:
                 await self.attachments.remove(stale)
             except StorageError:
                 logger.warning("could not remove a stale object during restore")
+
+    async def _put_object(self, key: str, payload: bytes) -> str:
+        """Write one archived object to the attachment bucket and return its key."""
+        assert self.attachments is not None
+        await self.attachments.put(key, payload, ARCHIVE_CONTENT_TYPE)
+        return key
 
     async def _run(self, argv: list[str], *, what: str, tolerate_nonzero: bool = False) -> None:
         """Run one libpq tool with a timeout.
@@ -560,11 +570,10 @@ async def stream_upload(
     Raises:
         BackupError: The upload is larger than the cap.
     """
-    total = 0
+    start = target.tell()
     async for chunk in source:
-        total += len(chunk)
-        if total > cap:
+        if target.tell() - start + len(chunk) > cap:
             raise BackupError("the uploaded archive is larger than the configured cap")
         target.write(chunk)
     target.flush()
-    return total
+    return target.tell() - start
