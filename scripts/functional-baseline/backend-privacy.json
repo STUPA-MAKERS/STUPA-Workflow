@@ -1,4 +1,3 @@
 {
-  "backend/app/modules/privacy/schemas.py": 7,
-  "backend/app/modules/privacy/service.py": 30
+  "backend/app/modules/privacy/service.py": 13
 }

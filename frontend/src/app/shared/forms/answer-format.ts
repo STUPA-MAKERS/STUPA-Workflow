@@ -65,10 +65,10 @@ export function formatDateRangeValue(value: unknown, locale: string): string {
 /** What `formatAnswer` needs besides the field and the value. */
 export interface AnswerFormatEnv {
   /** The UI language, for the i18n labels of the options. */
-  lang: string;
+  readonly lang: string;
   /** The words for a checkbox answer. */
-  yes: string;
-  no: string;
+  readonly yes: string;
+  readonly no: string;
 }
 
 /**

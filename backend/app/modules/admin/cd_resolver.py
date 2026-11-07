@@ -96,7 +96,7 @@ async def _resolve(
     """Load the logo rows of a variant and turn them into names plus bytes.
 
     Only the render slots count. The square logo belongs to the app, so its row is
-    filtered out in the query and skipped again in the loop.
+    filtered out in the query and skipped again in the comprehension.
     """
     variant_id = variant.id
     rows = (
@@ -110,23 +110,28 @@ async def _resolve(
         )
     ).all()
 
-    logos: dict[str, list[str]] = {slot: [] for slot in RENDER_SLOTS}
-    assets: dict[str, bytes] = {}
-    for row in rows:
-        if row.slot not in logos:
-            continue
-        if row.vendored_name is not None:
-            logos[row.slot].append(row.vendored_name)
-            continue
-        name = asset_file_name(row.id, row.file_name, row.mime or "")
-        assets[name] = await _load_asset(storage, row.object_key)
-        logos[row.slot].append(name)
-
+    entries = [
+        (row.slot, await _logo_entry(storage, row)) for row in rows if row.slot in RENDER_SLOTS
+    ]
     return ResolvedCdVariant(
-        title_logos=tuple(logos["title"]),
-        footer_logos=tuple(logos["footer"]),
-        assets=assets,
+        title_logos=tuple(name for slot, (name, _) in entries if slot == "title"),
+        footer_logos=tuple(name for slot, (name, _) in entries if slot == "footer"),
+        assets={name: data for _, (name, data) in entries if data is not None},
     )
+
+
+async def _logo_entry(
+    storage: ObjectStorage | None, row: CdVariantLogo
+) -> tuple[str, bytes | None]:
+    """Return the tuple value of one logo row and its asset bytes.
+
+    A vendored logo gives its name and no bytes, because the render service ships the
+    file. An uploaded logo gives its asset file name and the bytes from the storage.
+    """
+    if row.vendored_name is not None:
+        return row.vendored_name, None
+    name = asset_file_name(row.id, row.file_name, row.mime or "")
+    return name, await _load_asset(storage, row.object_key)
 
 
 def cd_render_config(cd: ResolvedCdVariant) -> dict[str, object]:
@@ -136,12 +141,10 @@ def cd_render_config(cd: ResolvedCdVariant) -> dict[str, object]:
     the object, because an empty list would override the default of the document
     shape with nothing instead of leaving it alone.
     """
-    config: dict[str, object] = {}
-    if cd.title_logos:
-        config["logos"] = list(cd.title_logos)
-    if cd.footer_logos:
-        config["footer_logos"] = list(cd.footer_logos)
-    return config
+    return {
+        **({"logos": list(cd.title_logos)} if cd.title_logos else {}),
+        **({"footer_logos": list(cd.footer_logos)} if cd.footer_logos else {}),
+    }
 
 
 async def _load_asset(storage: ObjectStorage | None, object_key: str | None) -> bytes:

@@ -72,16 +72,16 @@ export const MAX_CANDIDATES = 50;
  * options.
  */
 export interface VoteDialogSource {
-  mode: 'edit' | 'repeat';
-  vote: MeetingVote;
+  readonly mode: 'edit' | 'repeat';
+  readonly vote: MeetingVote;
 }
 
 /** One candidate in the dialog: a member of the roster or a free name. */
 export interface CandidateDraft {
   /** A local key for the list; the server gives the ids. */
-  key: number;
-  name: string;
-  principalId: Uuid | null;
+  readonly key: number;
+  readonly name: string;
+  readonly principalId: Uuid | null;
 }
 
 /**
@@ -354,9 +354,10 @@ export class VoteOpenDialogComponent {
     if (it.applicationId) this.draft.set(draftOf(vote.proposal, it.amount ?? null));
     if (kind === 'election' && vote.election) {
       this.seats.set(vote.election.seats);
+      const first = this.takeKeys(vote.election.candidates.length);
       this.candidates.set(
-        vote.election.candidates.map((c) => ({
-          key: this.nextKey++,
+        vote.election.candidates.map((c, i) => ({
+          key: first + i,
           name: c.name,
           principalId: c.principalId ?? null,
         })),
@@ -365,6 +366,13 @@ export class VoteOpenDialogComponent {
     if (kind === 'poll' && vote.poll) {
       this.poll.set(pollDraftOf(vote.poll));
     }
+  }
+
+  /** Reserves `count` track keys for new candidate rows and returns the first one. */
+  private takeKeys(count: number): number {
+    const first = this.nextKey;
+    this.nextKey = first + count;
+    return first;
   }
 
   setKind(value: string | null): void {
@@ -386,16 +394,18 @@ export class VoteOpenDialogComponent {
     if (!member || this.candidates().length >= MAX_CANDIDATES) return;
     if (this.candidates().some((c) => c.principalId === principalId)) return;
     const name = personLabel(member, this.i18n, { fallbackText: principalId });
-    this.candidates.update((list) => [...list, { key: this.nextKey++, name, principalId }]);
+    const key = this.takeKeys(1);
+    this.candidates.update((list) => [...list, { key, name, principalId }]);
   }
 
   /** Add the typed free name as a candidate. */
   addFreeName(): void {
     const name = this.freeName().trim();
     if (!name || this.freeNameTaken() || this.candidates().length >= MAX_CANDIDATES) return;
+    const key = this.takeKeys(1);
     this.candidates.update((list) => [
       ...list,
-      { key: this.nextKey++, name: name.slice(0, 200), principalId: null },
+      { key, name: name.slice(0, 200), principalId: null },
     ]);
     this.freeName.set('');
   }

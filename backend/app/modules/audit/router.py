@@ -86,7 +86,7 @@ async def list_audit(
     )
     resolved_ids = await service.resolve_data_ids([e.data for e in items])
     revertable = await service.revertable_flags(items)
-    out = [
+    out = tuple(
         AuditEntryOut.from_entry(
             e,
             names.get(e.actor or ""),
@@ -99,7 +99,7 @@ async def list_audit(
             revertable=revertable.get(e.id, False),
         )
         for e in items
-    ]
+    )
     return AuditPageOut(
         items=out,
         nextCursor=items[-1].id if (has_more and items) else None,

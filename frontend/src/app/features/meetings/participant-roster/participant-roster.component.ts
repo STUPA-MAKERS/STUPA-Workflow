@@ -16,12 +16,12 @@ let nextId = 0;
 
 /** One row of the roster. */
 interface RosterRow {
-  id: Uuid;
-  name: string;
-  self: boolean;
-  keeper: boolean;
-  kind: StatusKind;
-  key: TranslationKey;
+  readonly id: Uuid;
+  readonly name: string;
+  readonly self: boolean;
+  readonly keeper: boolean;
+  readonly kind: StatusKind;
+  readonly key: TranslationKey;
 }
 
 /**

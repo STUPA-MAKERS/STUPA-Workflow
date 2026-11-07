@@ -26,8 +26,8 @@ let nextId = 0;
 /** An own attendance report: the status and, for an excuse, the reason. Without `note`
  *  the server keeps the stored reason. */
 export interface OwnAttendanceChange {
-  status: SelfAttendanceStatus;
-  note?: string | null;
+  readonly status: SelfAttendanceStatus;
+  readonly note?: string | null;
 }
 
 /**

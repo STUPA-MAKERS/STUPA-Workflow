@@ -33,7 +33,7 @@ deleted.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, time
 from typing import Any
 from uuid import UUID
@@ -142,7 +142,7 @@ class DelegationFact:
     voting: bool
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class Snapshot:
     """Everything the preview and the revoke need, loaded once (``_snapshot``).
 
@@ -190,11 +190,10 @@ class RevokePlan:
 
 def held_roles(snap: Snapshot) -> dict[UUID, RoleInfo]:
     """Return the global roles of the person (groups and manual assignments), without ``member``."""
-    roles: dict[UUID, RoleInfo] = {}
-    for _group, role in snap.group_maps:
-        roles[role.id] = role
-    for a in snap.assignments:
-        roles[a.role.id] = a.role
+    roles = {
+        **{role.id: role for _group, role in snap.group_maps},
+        **{a.role.id: a.role for a in snap.assignments},
+    }
     return {rid: r for rid, r in roles.items() if r.key != IMPLICIT_ROLE_KEY}
 
 
@@ -203,11 +202,12 @@ def tied_gremien(snap: Snapshot) -> set[UUID]:
 
     A tie is a membership, a group, a pool entry or a delegation.
     """
-    tied = {m.gremium_id for m in snap.memberships}
-    tied |= {gid for _group, gid in snap.membership_maps}
-    tied |= {p.gremium_id for p in snap.pool}
-    tied |= {d.gremium_id for d in snap.delegations}
-    return tied
+    return (
+        {m.gremium_id for m in snap.memberships}
+        | {gid for _group, gid in snap.membership_maps}
+        | {p.gremium_id for p in snap.pool}
+        | {d.gremium_id for d in snap.delegations}
+    )
 
 
 def group_targets(snap: Snapshot) -> dict[str, tuple[set[UUID], set[UUID]]]:
@@ -219,21 +219,27 @@ def group_targets(snap: Snapshot) -> dict[str, tuple[set[UUID], set[UUID]]]:
     """
     tied = tied_gremien(snap)
     own = set(snap.groups)
-    out: dict[str, tuple[set[UUID], set[UUID]]] = {}
-
-    def entry(group: str) -> tuple[set[UUID], set[UUID]]:
-        return out.setdefault(group, (set(), set()))
-
-    for group, gid in snap.membership_maps:
-        if group in own:
-            entry(group)[0].add(gid)
-    for group, gid, _role_id in snap.role_maps:
-        if group in own and gid in tied:
-            entry(group)[0].add(gid)
-    for group, role in snap.group_maps:
-        if group in own and role.key != IMPLICIT_ROLE_KEY:
-            entry(group)[1].add(role.id)
-    return out
+    gremium_pairs = [
+        *((group, gid) for group, gid in snap.membership_maps if group in own),
+        *(
+            (group, gid)
+            for group, gid, _role_id in snap.role_maps
+            if group in own and gid in tied
+        ),
+    ]
+    role_pairs = [
+        (group, role.id)
+        for group, role in snap.group_maps
+        if group in own and role.key != IMPLICIT_ROLE_KEY
+    ]
+    groups = dict.fromkeys(group for group, _ in (*gremium_pairs, *role_pairs))
+    return {
+        group: (
+            {gid for other, gid in gremium_pairs if other == group},
+            {rid for other, rid in role_pairs if other == group},
+        )
+        for group in groups
+    }
 
 
 def _ordered_groups(snap: Snapshot, wanted: Iterable[str]) -> list[str]:
@@ -251,9 +257,11 @@ def _assignment_out(a: AssignmentFact, snap: Snapshot) -> RevokeAssignmentOut:
 
     The display never shows a ``sub``: an unknown or nameless grantor gives None.
     """
-    granted = a.granted_by
-    if granted and granted != BOOTSTRAP_GRANTOR:
-        granted = snap.grantor_names.get(granted)
+    granted = (
+        snap.grantor_names.get(a.granted_by)
+        if a.granted_by and a.granted_by != BOOTSTRAP_GRANTOR
+        else a.granted_by
+    )
     return RevokeAssignmentOut(
         id=a.id,
         role_id=a.role.id,
@@ -296,8 +304,9 @@ def _membership_out(snap: Snapshot, gid: UUID) -> RevokeMembershipOut | None:
     membership = next((m for m in snap.memberships if m.gremium_id == gid), None)
     if membership is None:
         return None
-    causes = {g for g, mid in snap.membership_maps if mid == gid}
-    causes |= {g for g, _mid, rid in snap.role_maps if rid == membership.role.id}
+    causes = {g for g, mid in snap.membership_maps if mid == gid} | {
+        g for g, _mid, rid in snap.role_maps if rid == membership.role.id
+    }
     return RevokeMembershipOut(
         role_key=membership.role.key,
         role_label=membership.role.label,
@@ -336,23 +345,25 @@ def build_preview(
         ),
         key=lambda g: (g.name.casefold(), str(g.gremium_id)),
     )
-    roles = [
-        RevokeGlobalRoleOut(
-            role_id=role.id,
-            role_key=role.key,
-            role_label=role.label,
-            groups=_ordered_groups(
-                snap, (g for g, (_gs, rs) in targets.items() if role.id in rs)
-            ),
-            assignments=[
-                _assignment_out(a, snap)
-                for a in snap.assignments
-                if a.role.id == role.id
-            ],
-        )
-        for role in held_roles(snap).values()
-    ]
-    roles.sort(key=lambda r: (r.role_key, str(r.role_id)))
+    roles = sorted(
+        (
+            RevokeGlobalRoleOut(
+                role_id=role.id,
+                role_key=role.key,
+                role_label=role.label,
+                groups=_ordered_groups(
+                    snap, (g for g, (_gs, rs) in targets.items() if role.id in rs)
+                ),
+                assignments=[
+                    _assignment_out(a, snap)
+                    for a in snap.assignments
+                    if a.role.id == role.id
+                ],
+            )
+            for role in held_roles(snap).values()
+        ),
+        key=lambda r: (r.role_key, str(r.role_id)),
+    )
     groups = [
         RevokeGroupOut(
             group=g,
@@ -415,12 +426,8 @@ def plan_revoke(
     removed = [
         g for g, (gs, rs) in targets.items() if gs & chosen_g or rs & chosen_r
     ]
-    missing_g: set[UUID] = set()
-    missing_r: set[UUID] = set()
-    for g in removed:
-        gs, rs = targets[g]
-        missing_g |= gs - chosen_g
-        missing_r |= rs - chosen_r
+    missing_g = {gid for g in removed for gid in targets[g][0] - chosen_g}
+    missing_r = {rid for g in removed for rid in targets[g][1] - chosen_r}
     if missing_g or missing_r:
         raise ValidationProblem(
             "A removed SSO group also leads to an entry that is not selected.",
@@ -516,6 +523,40 @@ def _role(row: Role | GremiumRole) -> RoleInfo:
     return RoleInfo(id=row.id, key=row.key, label=dict(row.name_i18n or {}))
 
 
+def _membership_fact(membership: GremiumMembership, grole: GremiumRole) -> MembershipFact:
+    """Build the membership fact of one membership row and its gremium role."""
+    return MembershipFact(
+        membership.gremium_id,
+        _role(grole),
+        can_vote=_VOTE_CAST in (grole.permissions or []),
+    )
+
+
+def _delegation_fact(d: MeetingDelegation, meeting: Meeting) -> DelegationFact:
+    """Build the delegation fact of one delegation row and its meeting."""
+    return DelegationFact(
+        id=d.id,
+        gremium_id=d.gremium_id,
+        meeting_id=meeting.id,
+        meeting_title=meeting.title,
+        meeting_date=meeting.date,
+        meeting_status=meeting.status,
+        delegator_id=d.delegator_principal_id,
+        delegate_id=d.delegate_principal_id,
+        voting=bool(d.delegate_voting),
+    )
+
+
+def _other_people(snap: Snapshot) -> set[UUID]:
+    """Return every other person of the pool entries and the delegations (with the person)."""
+    return (
+        {p.substitute_id for p in snap.pool}
+        | {p.member_id for p in snap.pool if p.member_id is not None}
+        | {d.delegator_id for d in snap.delegations}
+        | {d.delegate_id for d in snap.delegations}
+    )
+
+
 class PrincipalRevokeService:
     """Preview and run the revoke of the rights of one person."""
 
@@ -540,9 +581,8 @@ class PrincipalRevokeService:
             NotFoundError: No principal has this id (404).
             ConflictError: The account is merged (``principal_merged``) (409).
         """
-        stmt = select(PrincipalRow).where(PrincipalRow.id == principal_id)
-        if lock:
-            stmt = stmt.with_for_update()
+        query = select(PrincipalRow).where(PrincipalRow.id == principal_id)
+        stmt = query.with_for_update() if lock else query
         row = (await self.session.scalars(stmt)).first()
         if row is None:
             raise NotFoundError(f"principal {principal_id} not found")
@@ -559,40 +599,26 @@ class PrincipalRevokeService:
         """
         s = self.session
         pid = row.id
-        snap = Snapshot(principal_id=pid, groups=[str(g) for g in (row.oidc_groups or [])])
-        for membership, grole in (
+        groups = [str(g) for g in (row.oidc_groups or [])]
+        membership_rows = (
             await s.execute(
                 select(GremiumMembership, GremiumRole)
                 .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
                 .where(GremiumMembership.principal_id == pid)
             )
-        ).all():
-            snap.memberships.append(
-                MembershipFact(
-                    membership.gremium_id,
-                    _role(grole),
-                    can_vote=_VOTE_CAST in (grole.permissions or []),
-                )
-            )
-        for assignment, role in (
+        ).all()
+        assignment_rows = (
             await s.execute(
                 select(RoleAssignment, Role)
                 .join(Role, Role.id == RoleAssignment.role_id)
                 .where(RoleAssignment.principal_id == pid)
             )
-        ).all():
-            snap.assignments.append(
-                AssignmentFact(
-                    id=assignment.id,
-                    role=_role(role),
-                    granted_by=assignment.granted_by,
-                )
-            )
-        snap.pool = [
+        ).all()
+        pool = [
             PoolFact(p.id, p.gremium_id, p.member_principal_id, p.substitute_principal_id)
             for p in await pool_entries_of(s, pid)
         ]
-        for d, meeting in (
+        delegation_rows = (
             await s.execute(
                 select(MeetingDelegation, Meeting)
                 .join(Meeting, Meeting.id == MeetingDelegation.meeting_id)
@@ -602,77 +628,83 @@ class PrincipalRevokeService:
                     Meeting.status.in_((_PLANNED, _LIVE)),
                 )
             )
-        ).all():
-            snap.delegations.append(
-                DelegationFact(
-                    id=d.id,
-                    gremium_id=d.gremium_id,
-                    meeting_id=meeting.id,
-                    meeting_title=meeting.title,
-                    meeting_date=meeting.date,
-                    meeting_status=meeting.status,
-                    delegator_id=d.delegator_principal_id,
-                    delegate_id=d.delegate_principal_id,
-                    voting=bool(d.delegate_voting),
-                )
-            )
-        if snap.groups:
-            await self._load_mappings(snap)
-        tied = tied_gremien(snap)
-        if tied:
-            snap.gremium_names = dict((
-                    await s.execute(select(Gremium.id, Gremium.name).where(Gremium.id.in_(tied)))
-                ).all())
-        others = {p.substitute_id for p in snap.pool} | {
-            p.member_id for p in snap.pool if p.member_id is not None
-        }
-        others |= {d.delegator_id for d in snap.delegations}
-        others |= {d.delegate_id for d in snap.delegations}
-        others.discard(pid)
-        snap.names = {i: ref.name for i, ref in (await refs_by_id(s, others)).items()}
-        grantors = {a.granted_by for a in snap.assignments if a.granted_by}
-        snap.grantor_names = {
+        ).all()
+        membership_maps, role_maps, group_maps = (
+            await self._load_mappings(groups) if groups else ([], [], [])
+        )
+        base = Snapshot(
+            principal_id=pid,
+            groups=groups,
+            memberships=[_membership_fact(m, grole) for m, grole in membership_rows],
+            assignments=[
+                AssignmentFact(id=a.id, role=_role(role), granted_by=a.granted_by)
+                for a, role in assignment_rows
+            ],
+            pool=pool,
+            delegations=[_delegation_fact(d, meeting) for d, meeting in delegation_rows],
+            membership_maps=membership_maps,
+            role_maps=role_maps,
+            group_maps=group_maps,
+        )
+        gremium_names = await self._gremium_names(tied_gremien(base))
+        others = _other_people(base) - {pid}
+        names = {i: ref.name for i, ref in (await refs_by_id(s, others)).items()}
+        grantors = {a.granted_by for a in base.assignments if a.granted_by}
+        grantor_names = {
             sub: ref.name for sub, ref in (await refs_by_sub(s, grantors)).items()
         }
-        snap.open_tasks = await self._open_tasks(
-            row.sub, {m.gremium_id for m in snap.memberships if m.can_vote}
+        open_tasks = await self._open_tasks(
+            row.sub, {m.gremium_id for m in base.memberships if m.can_vote}
         )
-        snap.bootstrap_admin = self._is_bootstrap_admin(row)
-        return snap
+        return replace(
+            base,
+            gremium_names=gremium_names,
+            names=names,
+            grantor_names=grantor_names,
+            open_tasks=open_tasks,
+            bootstrap_admin=self._is_bootstrap_admin(row),
+        )
 
-    async def _load_mappings(self, snap: Snapshot) -> None:
-        """Load the three mappings of the person's groups into the snapshot."""
+    async def _gremium_names(self, tied: set[UUID]) -> dict[UUID, str]:
+        """Return the name of each tied Gremium. No Gremium means no query."""
+        if not tied:
+            return {}
+        rows = await self.session.execute(
+            select(Gremium.id, Gremium.name).where(Gremium.id.in_(tied))
+        )
+        return dict(rows.all())
+
+    async def _load_mappings(
+        self, groups: list[str]
+    ) -> tuple[list[tuple[str, UUID]], list[tuple[str, UUID, UUID]], list[tuple[str, RoleInfo]]]:
+        """Load the three mappings of the person's groups for the snapshot."""
         s = self.session
-        snap.membership_maps = [
-            (str(group), gid)
-            for group, gid in (
-                await s.execute(
-                    select(
-                        GremiumMembershipMapping.oidc_group, GremiumMembershipMapping.gremium_id
-                    ).where(GremiumMembershipMapping.oidc_group.in_(snap.groups))
-                )
-            ).all()
-        ]
-        snap.role_maps = [
-            (str(group), gid, rid)
-            for group, gid, rid in (
-                await s.execute(
-                    select(GremiumRoleMapping.oidc_group, GremiumRole.gremium_id, GremiumRole.id)
-                    .join(GremiumRole, GremiumRole.id == GremiumRoleMapping.gremium_role_id)
-                    .where(GremiumRoleMapping.oidc_group.in_(snap.groups))
-                )
-            ).all()
-        ]
-        snap.group_maps = [
-            (str(group), _role(role))
-            for group, role in (
-                await s.execute(
-                    select(GroupMapping.oidc_group, Role)
-                    .join(Role, Role.id == GroupMapping.role_id)
-                    .where(GroupMapping.oidc_group.in_(snap.groups))
-                )
-            ).all()
-        ]
+        membership_rows = (
+            await s.execute(
+                select(
+                    GremiumMembershipMapping.oidc_group, GremiumMembershipMapping.gremium_id
+                ).where(GremiumMembershipMapping.oidc_group.in_(groups))
+            )
+        ).all()
+        role_rows = (
+            await s.execute(
+                select(GremiumRoleMapping.oidc_group, GremiumRole.gremium_id, GremiumRole.id)
+                .join(GremiumRole, GremiumRole.id == GremiumRoleMapping.gremium_role_id)
+                .where(GremiumRoleMapping.oidc_group.in_(groups))
+            )
+        ).all()
+        group_rows = (
+            await s.execute(
+                select(GroupMapping.oidc_group, Role)
+                .join(Role, Role.id == GroupMapping.role_id)
+                .where(GroupMapping.oidc_group.in_(groups))
+            )
+        ).all()
+        return (
+            [(str(group), gid) for group, gid in membership_rows],
+            [(str(group), gid, rid) for group, gid, rid in role_rows],
+            [(str(group), _role(role)) for group, role in group_rows],
+        )
 
     async def _open_tasks(self, sub: str, gremien: set[UUID]) -> dict[UUID, int]:
         """Count the open votes per Gremium that still wait for a ballot of ``sub``.

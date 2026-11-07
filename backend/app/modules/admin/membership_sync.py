@@ -29,6 +29,8 @@ mapped group, as of the last login.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Literal, assert_never
 from uuid import UUID
 
 from sqlalchemy import select
@@ -69,14 +71,14 @@ async def _find_default_role(session: AsyncSession, gremium_id: UUID) -> Gremium
 
 async def _default_role(session: AsyncSession, gremium_id: UUID) -> GremiumRole:
     """Return the forced role ``member`` of the gremium. Create it when it is missing."""
-    role = await _find_default_role(session, gremium_id)
-    if role is not None:
-        return role
+    found = await _find_default_role(session, gremium_id)
+    if found is not None:
+        return found
     await GremiumRoleService(session).ensure_forced_roles(gremium_id)
-    role = await _find_default_role(session, gremium_id)
-    if role is None:  # pragma: no cover - ensure_forced_roles always creates it
+    created = await _find_default_role(session, gremium_id)
+    if created is None:  # pragma: no cover - ensure_forced_roles always creates it
         raise RuntimeError(f"forced gremium role {DEFAULT_ROLE_KEY!r} missing")
-    return role
+    return created
 
 
 async def _desired_roles(
@@ -106,14 +108,49 @@ async def _desired_roles(
             )
         )
     ).all()
-    best: dict[UUID, GremiumRole] = {}
-    for role in mapped:
-        current = best.get(role.gremium_id)
-        if current is None or _role_rank(role) < _role_rank(current):
-            best[role.gremium_id] = role
-    for gremium_id in member_of - best.keys():
-        best[gremium_id] = await _default_role(session, gremium_id)
-    return {gid: role.id for gid, role in best.items()}
+    best = {
+        gremium_id: min((r for r in mapped if r.gremium_id == gremium_id), key=_role_rank)
+        for gremium_id in dict.fromkeys(r.gremium_id for r in mapped)
+    }
+    defaults = {
+        gremium_id: (await _default_role(session, gremium_id)).id
+        for gremium_id in member_of - best.keys()
+    }
+    return {**{gid: role.id for gid, role in best.items()}, **defaults}
+
+
+MembershipAction = Literal["delete", "move", "keep"]
+
+
+def _membership_action(
+    membership: GremiumMembership,
+    desired: Mapping[UUID, UUID],
+    first: Mapping[UUID, GremiumMembership],
+) -> MembershipAction:
+    """Decide what the sync does with one existing membership.
+
+    A membership goes when its gremium has no desired role, or when an earlier row of
+    the same gremium stays, because the unique constraint allows one row per pair. A
+    kept row moves to the desired role when its role differs.
+    """
+    role_id = desired.get(membership.gremium_id)
+    return (
+        "delete"
+        if role_id is None or first[membership.gremium_id] is not membership
+        else ("move" if membership.gremium_role_id != role_id else "keep")
+    )
+
+
+async def _add_membership(
+    session: AsyncSession, principal_id: UUID, gremium_id: UUID, role_id: UUID
+) -> UUID:
+    """Insert one membership, flush it and return its id."""
+    membership = GremiumMembership(
+        principal_id=principal_id, gremium_id=gremium_id, gremium_role_id=role_id
+    )
+    session.add(membership)
+    await session.flush()
+    return membership.id
 
 
 async def sync_principal_memberships(
@@ -141,29 +178,30 @@ async def sync_principal_memberships(
         )
     ).all()
     audit = AuditService(session)
-    changed: list[UUID] = []
-    kept: set[UUID] = set()
-    for membership in existing:
-        role_id = desired.get(membership.gremium_id)
-        if role_id is None or membership.gremium_id in kept:
-            await session.delete(membership)
-            changed.append(membership.id)
-            continue
-        kept.add(membership.gremium_id)
-        if membership.gremium_role_id != role_id:
-            membership.gremium_role_id = role_id
-            changed.append(membership.id)
-    if changed:
+    first = {m.gremium_id: m for m in reversed(existing)}
+    actions: tuple[tuple[GremiumMembership, MembershipAction], ...] = tuple(
+        (m, _membership_action(m, desired, first)) for m in existing
+    )
+    touched = tuple(m.id for m, action in actions if action != "keep")
+    kept = frozenset(m.gremium_id for m, action in actions if action != "delete")
+    for membership, action in actions:
+        match action:
+            case "delete":
+                await session.delete(membership)
+            case "move":
+                membership.gremium_role_id = desired[membership.gremium_id]
+            case "keep":
+                pass
+            case _:
+                assert_never(action)
+    if touched:
         await session.flush()
-    for gremium_id, role_id in desired.items():
-        if gremium_id in kept:
-            continue
-        membership = GremiumMembership(
-            principal_id=row.id, gremium_id=gremium_id, gremium_role_id=role_id
-        )
-        session.add(membership)
-        await session.flush()
-        changed.append(membership.id)
+    added = [
+        await _add_membership(session, row.id, gremium_id, role_id)
+        for gremium_id, role_id in desired.items()
+        if gremium_id not in kept
+    ]
+    changed = (*touched, *added)
     for membership_id in changed:
         await audit.record(
             actor=SYNC_ACTOR,
@@ -182,8 +220,4 @@ async def sync_all_memberships(session: AsyncSession) -> int:
         The number of principals whose memberships changed.
     """
     principals = (await session.scalars(select(PrincipalRow))).all()
-    count = 0
-    for row in principals:
-        if await sync_principal_memberships(session, row):
-            count += 1
-    return count
+    return sum([await sync_principal_memberships(session, row) for row in principals])

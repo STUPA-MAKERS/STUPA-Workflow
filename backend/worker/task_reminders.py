@@ -80,11 +80,10 @@ async def process_task_reminders(
 
     One failing case is logged and does not break the cycle.
     """
-    now = now or datetime.now(UTC)
+    moment = now or datetime.now(UTC)
     settings: Settings = ctx.get("settings") or load_settings()
     maker = _sessionmaker(ctx)
     queue = _mail_queue(ctx)
-    sent = 0
     async with maker() as session:
         service = NotificationService(session, queue=queue, settings=settings)
         config = await service.get_notification_settings()
@@ -92,28 +91,45 @@ async def process_task_reminders(
             return 0
         due = await _due_applications(
             session,
-            now=now,
+            now=moment,
             after=timedelta(days=config.task_reminder_after_days),
             repeat=timedelta(days=config.task_reminder_repeat_days)
             if config.task_reminder_repeat_days > 0
             else None,
         )
-        for app_id, event_id, entered_at, state in due:
-            try:
-                if await _remind_one(
-                    session,
-                    service,
-                    settings,
-                    now=now,
-                    application_id=app_id,
-                    status_event_id=event_id,
-                    entered_at=entered_at,
-                    state=state,
-                ):
-                    sent += 1
-            except Exception:
-                logger.exception("task reminder failed (application=%s)", app_id)
-    return sent
+        sent = [
+            await _remind_one_logged(session, service, settings, moment, entry)
+            for entry in due
+        ]
+    return sum(sent)
+
+
+async def _remind_one_logged(
+    session: AsyncSession,
+    service: NotificationService,
+    settings: Settings,
+    now: datetime,
+    entry: tuple[uuid.UUID, uuid.UUID | None, datetime, State | None],
+) -> bool:
+    """Send the reminder of one due entry; a failure logs and gives False.
+
+    One failing case must not break the cycle, so the error stops here.
+    """
+    app_id, event_id, entered_at, state = entry
+    try:
+        return await _remind_one(
+            session,
+            service,
+            settings,
+            now=now,
+            application_id=app_id,
+            status_event_id=event_id,
+            entered_at=entered_at,
+            state=state,
+        )
+    except Exception:
+        logger.exception("task reminder failed (application=%s)", app_id)
+        return False
 
 
 async def _due_applications(
@@ -178,26 +194,78 @@ async def _due_applications(
         ).all()
     }
 
-    due: list[tuple[uuid.UUID, uuid.UUID | None, datetime, State | None]] = []
-    for app_id, state_id, entered_at in rows:
-        state = states.get(state_id)
-        if state is None or not await state_actionable(session, state):
-            continue
-        event_id = await session.scalar(
-            select(StatusEvent.id)
-            .where(StatusEvent.application_id == app_id)
-            .order_by(StatusEvent.at.desc())
-            .limit(1)
+    entries = [
+        await _due_entry(
+            session,
+            app_id,
+            states.get(state_id),
+            entered_at,
+            logs.get(app_id),
+            now=now,
+            repeat=repeat,
         )
-        log = logs.get(app_id)
-        if (
-            log is not None
-            and log.status_event_id == event_id
-            and (repeat is None or log.reminded_at > now - repeat)
-        ):
-            continue
-        due.append((app_id, event_id, entered_at, state))
-    return due
+        for app_id, state_id, entered_at in rows
+    ]
+    return [entry for entry in entries if entry is not None]
+
+
+async def _due_entry(
+    session: AsyncSession,
+    app_id: uuid.UUID,
+    state: State | None,
+    entered_at: datetime,
+    log: TaskReminderLog | None,
+    *,
+    now: datetime,
+    repeat: timedelta | None,
+) -> tuple[uuid.UUID, uuid.UUID | None, datetime, State | None] | None:
+    """Return the due entry of one application, or `None` when it is not due.
+
+    It is not due when nobody can act on its state, or when the log already holds a
+    reminder for this stay that `_reminded` still counts.
+    """
+    if state is None or not await state_actionable(session, state):
+        return None
+    event_id = await session.scalar(
+        select(StatusEvent.id)
+        .where(StatusEvent.application_id == app_id)
+        .order_by(StatusEvent.at.desc())
+        .limit(1)
+    )
+    return (
+        None
+        if _reminded(log, event_id, now=now, repeat=repeat)
+        else (app_id, event_id, entered_at, state)
+    )
+
+
+def _reminded(
+    log: TaskReminderLog | None,
+    event_id: uuid.UUID | None,
+    *,
+    now: datetime,
+    repeat: timedelta | None,
+) -> bool:
+    """Tell whether the log holds a reminder for this stay that still counts.
+
+    Without `repeat` one reminder per stay counts forever; with it, only one newer than
+    `repeat`.
+    """
+    return (
+        log is not None
+        and log.status_event_id == event_id
+        and (repeat is None or log.reminded_at > now - repeat)
+    )
+
+
+def _status_label(state: State | None, lang: str) -> str:
+    """Return the label of the state in `lang`, else its first label, else an empty string."""
+    labels = state.label_i18n if state is not None else None
+    return (
+        labels.get(lang) or next(iter(labels.values()))
+        if isinstance(labels, dict) and labels
+        else ""
+    )
 
 
 async def _remind_one(
@@ -230,11 +298,7 @@ async def _remind_one(
     if not recipients:
         return False
     title = (data or {}).get("title")
-    status_label = ""
-    if state is not None and isinstance(state.label_i18n, dict) and state.label_i18n:
-        status_label = state.label_i18n.get(settings.mail_default_lang) or next(
-            iter(state.label_i18n.values())
-        )
+    status_label = _status_label(state, settings.mail_default_lang)
     sent = await service.send_kind_mail(
         recipients,
         kind="task_reminder",

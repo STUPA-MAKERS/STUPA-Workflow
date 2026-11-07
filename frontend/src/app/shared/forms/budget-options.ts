@@ -14,40 +14,41 @@ const LABEL = /^(.*) \(([^()]*)\)$/;
  * makes its child a root. The nodes carry no figures, so the picker shows no free amounts.
  */
 export function budgetOptionTree(options: readonly FieldOption[], lang: Lang): BudgetTreeNode[] {
-  const byId = new Map<string, BudgetTreeNode>();
-  for (const o of options) {
-    const label = resolveI18n(o.label, lang);
-    const parts = LABEL.exec(label);
-    const key = o.key ?? '';
-    byId.set(o.value, {
-      id: o.value,
-      parentId: o.parentId ?? null,
-      gremiumId: null,
-      key,
-      pathKey: parts ? parts[2] : key,
-      name: parts ? parts[1] : label,
-      currency: 'EUR',
-      active: true,
-      color: o.color ?? null,
-      acceptedStateKeys: [],
-      deniedStateKeys: [],
-      hiddenInBudget: false,
-      viewGremiumId: null,
-      fiscalStartMonth: 1,
-      fiscalStartDay: 1,
-      byFiscalYear: [],
-      children: [],
-    });
-  }
-  const roots: BudgetTreeNode[] = [];
-  for (const n of byId.values()) {
-    const parent = n.parentId ? byId.get(n.parentId) : undefined;
-    if (parent) {
-      parent.children.push(n);
-    } else {
-      n.parentId = null;
-      roots.push(n);
-    }
-  }
-  return roots;
+  const byId: ReadonlyMap<string, BudgetTreeNode> = new Map(
+    options.map((o) => [o.value, optionNode(o, lang)] as const),
+  );
+  const nodes = [...byId.values()];
+  const build = (n: BudgetTreeNode): BudgetTreeNode => ({
+    ...n,
+    children: nodes.filter((c) => !!c.parentId && c.parentId === n.id).map(build),
+  });
+  return nodes
+    .filter((n) => !(n.parentId && byId.has(n.parentId)))
+    .map((n) => ({ ...build(n), parentId: null }));
+}
+
+/** The tree node of one option, still without its children. */
+function optionNode(o: FieldOption, lang: Lang): BudgetTreeNode {
+  const label = resolveI18n(o.label, lang);
+  const parts = LABEL.exec(label);
+  const key = o.key ?? '';
+  return {
+    id: o.value,
+    parentId: o.parentId ?? null,
+    gremiumId: null,
+    key,
+    pathKey: parts ? parts[2] : key,
+    name: parts ? parts[1] : label,
+    currency: 'EUR',
+    active: true,
+    color: o.color ?? null,
+    acceptedStateKeys: [],
+    deniedStateKeys: [],
+    hiddenInBudget: false,
+    viewGremiumId: null,
+    fiscalStartMonth: 1,
+    fiscalStartDay: 1,
+    byFiscalYear: [],
+    children: [],
+  };
 }

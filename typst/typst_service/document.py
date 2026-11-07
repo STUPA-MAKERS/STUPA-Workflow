@@ -24,9 +24,10 @@ pages. The rules here follow the pytex protocol variant (`protocol-stupa`,
 
 from __future__ import annotations
 
+import itertools
 import re
 from collections.abc import Collection, Mapping
-from typing import Final
+from typing import Final, cast
 
 from .frontmatter import Meta, Records, parse_frontmatter
 from .markdown import ConversionError, Node, convert_body
@@ -103,24 +104,42 @@ def _span(keeper: Mapping[str, str]) -> str:
     """Write the period of one keeper: the TOP numbers, else the times."""
     start = f"TOP {keeper['from_top']}" if keeper.get("from_top") else keeper.get("from", "")
     end = f"TOP {keeper['to_top']}" if keeper.get("to_top") else keeper.get("to", "")
-    if start and end:
-        return f"{start} – {end}"  # an en dash between start and end
-    if start:
-        return f"ab {start}"
-    if end:
-        return f"bis {end}"
-    return ""
+    match (start, end):
+        case ("", ""):
+            return ""
+        case (_, ""):
+            return f"ab {start}"
+        case ("", _):
+            return f"bis {end}"
+        case _:
+            return f"{start} – {end}"  # an en dash between start and end
+
+
+def _keeper_label(keeper: Mapping[str, str]) -> str:
+    """Write one keeper of the `Protokoll` row: the name, with the period if it has one."""
+    span = _span(keeper)
+    return f"{keeper['name']} ({span})" if span else keeper["name"]
 
 
 def _keeper_row(keepers: list[dict[str, str]]) -> str:
     """Write the `Protokoll` row: one name, or every period with its span."""
-    if len(keepers) == 1:
-        return keepers[0]["name"]
-    parts: list[str] = []
-    for keeper in keepers:
-        span = _span(keeper)
-        parts.append(f"{keeper['name']} ({span})" if span else keeper["name"])
-    return ", ".join(parts)
+    return (
+        keepers[0]["name"]
+        if len(keepers) == 1
+        else ", ".join(_keeper_label(keeper) for keeper in keepers)
+    )
+
+
+def _handover(keeper: Mapping[str, str]) -> Node:
+    """Build the handover line of one keeper: who takes over, and when."""
+    at = f" um {keeper['from']} Uhr" if keeper.get("from") else ""
+    text = f"Die Protokollführung übernimmt {keeper['name']}{at}."
+    return {"t": "par", "c": [{"t": "emph", "c": [{"t": "text", "v": text}]}]}
+
+
+def _is_agenda_item(block: Node) -> bool:
+    """Test whether a block is the `#` heading of an agenda item."""
+    return block.get("t") == "heading" and block.get("level") == 1
 
 
 def _handover_lines(blocks: list[Node], keepers: list[dict[str, str]]) -> list[Node]:
@@ -130,25 +149,20 @@ def _handover_lines(blocks: list[Node], keepers: list[dict[str, str]]) -> list[N
     TOP number, or with a number that the body does not have, gets no line; the
     title page still names it with its time.
     """
-    lines: dict[int, list[Node]] = {}
-    for keeper in keepers[1:]:
-        top = keeper.get("from_top", "")
-        if not top.isdigit():
-            continue
-        at = f" um {keeper['from']} Uhr" if keeper.get("from") else ""
-        text = f"Die Protokollführung übernimmt {keeper['name']}{at}."
-        node: Node = {"t": "par", "c": [{"t": "emph", "c": [{"t": "text", "v": text}]}]}
-        lines.setdefault(int(top), []).append(node)
-    if not lines:
+    pairs = [
+        (int(keeper["from_top"]), _handover(keeper))
+        for keeper in keepers[1:]
+        if keeper.get("from_top", "").isdigit()
+    ]
+    if not pairs:
         return blocks
-    out: list[Node] = []
-    top_no = 0
-    for block in blocks:
-        out.append(block)
-        if block.get("t") == "heading" and block.get("level") == 1:
-            top_no += 1
-            out.extend(lines.get(top_no, []))
-    return out
+    lines = {top: [node for at, node in pairs if at == top] for top, _ in pairs}
+    tops = itertools.accumulate(int(_is_agenda_item(block)) for block in blocks)
+    return [
+        node
+        for block, top in zip(blocks, tops, strict=True)
+        for node in ([block, *lines.get(top, [])] if _is_agenda_item(block) else [block])
+    ]
 
 
 def format_date(value: str) -> str:
@@ -165,34 +179,41 @@ def format_date(value: str) -> str:
 
 
 def _scalar(options: Mapping[str, object], *keys: str) -> str:
-    for key in keys:
-        value = options.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return ""
+    values = (options.get(key) for key in keys)
+    return next((v.strip() for v in values if isinstance(v, str) and v.strip()), "")
+
+
+def _filled(value: object) -> bool:
+    """Test whether a config value is a non-empty list or a non-blank string."""
+    return (isinstance(value, list) and bool(value)) or (
+        isinstance(value, str) and bool(value.strip())
+    )
 
 
 def _items(options: Mapping[str, object], *keys: str) -> list[str]:
-    for key in keys:
-        value = options.get(key)
-        if isinstance(value, list) and value:
-            return [str(v) for v in value if str(v).strip()]
-        if isinstance(value, str) and value.strip():
-            return [v.strip() for v in value.split(",") if v.strip()]
-    return []
+    values = (options.get(key) for key in keys)
+    match next((v for v in values if _filled(v)), None):
+        case list() as items:
+            return [str(v) for v in cast("list[object]", items) if str(v).strip()]
+        case str() as text:
+            return [v.strip() for v in text.split(",") if v.strip()]
+        case _:
+            return []
 
 
 def _title(options: Mapping[str, object]) -> str:
     title = _scalar(options, "title", "titel")
-    if title:
-        return title
     gremium = _scalar(options, "gremium")
     datum = _scalar(options, "datum", "date")
-    if gremium and datum:
-        return f"Protokoll der Sitzung des {gremium} vom {format_date(datum.split()[0])}"
-    if gremium:
-        return f"Protokoll der Sitzung des {gremium}"
-    return "Sitzungsprotokoll"
+    match (title, gremium, datum):
+        case ("", "", _):
+            return "Sitzungsprotokoll"
+        case ("", _, ""):
+            return f"Protokoll der Sitzung des {gremium}"
+        case ("", _, _):
+            return f"Protokoll der Sitzung des {gremium} vom {format_date(datum.split()[0])}"
+        case _:
+            return title
 
 
 def _started(options: Mapping[str, object]) -> tuple[str, str]:
@@ -203,48 +224,69 @@ def _started(options: Mapping[str, object]) -> tuple[str, str]:
     return f"{match[1]}-{match[2]}-{match[3]}", match[4] or ""
 
 
+def _scalar_rows(options: Mapping[str, object], keepers: list[dict[str, str]]) -> list[list[str]]:
+    """Write the rows of the single values. The keepers replace the `protokoll` name."""
+    keeper_row = _keeper_row(keepers) if keepers else ""
+    values = (
+        (label, (keeper_row if label == "Protokoll" else "") or _scalar(options, *keys))
+        for label, keys in _SCALAR_ROWS
+    )
+    return [[label, value] for label, value in values if value]
+
+
+def _free_row(line: str) -> list[str]:
+    """Split a free `Label: Wert` line. A line without a colon is a value without a label."""
+    label, sep, value = line.partition(":")
+    return [label.strip(), value.strip()] if sep else ["", line.strip()]
+
+
+def _list_rows(options: Mapping[str, object]) -> list[list[str]]:
+    """Write the attendance rows with their head count."""
+    lists = ((label, _items(options, *keys)) for label, keys in _LIST_ROWS)
+    return [[f"{label} ({len(people)})", ", ".join(people)] for label, people in lists if people]
+
+
 def _data_lines(options: Mapping[str, object], keepers: list[dict[str, str]]) -> list[list[str]]:
-    rows: list[list[str]] = []
     started_date, started_time = _started(options)
-    datum = _scalar(options, "datum", "date")
-    if not datum and started_date:
-        datum = f"{started_date} {started_time}".strip()
-    if datum:
-        rows.append(["Datum", format_date(datum)])
+    datum = _scalar(options, "datum", "date") or (
+        f"{started_date} {started_time}".strip() if started_date else ""
+    )
     beginn = _scalar(options, "beginn", "start") or started_time
     span = " – ".join(  # an en dash between start and end
         t for t in (beginn, _scalar(options, "ende", "end")) if t
     )
-    if span:
-        rows.append(["Zeit", span])
-    for label, keys in _SCALAR_ROWS:
-        value = _keeper_row(keepers) if label == "Protokoll" and keepers else ""
-        value = value or _scalar(options, *keys)
-        if value:
-            rows.append([label, value])
-    # A free `Label: Wert` line, for example the head counts of the public
-    # variant. A line without a colon prints as a value without a label.
-    for line in _items(options, "datalines"):
-        label, sep, value = line.partition(":")
-        rows.append([label.strip(), value.strip()] if sep else ["", line.strip()])
-    for label, keys in _LIST_ROWS:
-        people = _items(options, *keys)
-        if people:
-            rows.append([f"{label} ({len(people)})", ", ".join(people)])
-    return rows
+    return [
+        *([["Datum", format_date(datum)]] if datum else []),
+        *([["Zeit", span]] if span else []),
+        *_scalar_rows(options, keepers),
+        # A free `Label: Wert` line, for example the head counts of the public variant.
+        *(_free_row(line) for line in _items(options, "datalines")),
+        *_list_rows(options),
+    ]
+
+
+def _role_signers(
+    role: str, options: Mapping[str, object], keepers: list[dict[str, str]]
+) -> list[list[str]]:
+    """Write the signature lines of one role.
+
+    Every protocol keeper signs the part of the minutes they kept, so a keeper
+    role gets one line per keeper.
+    """
+    key = role.strip().lower()
+    return (
+        [[role.strip(), name] for name in _keeper_names(keepers)]
+        if keepers and key in _KEEPER_ROLES
+        else [[role.strip(), _scalar(options, *_SIGNER_KEYS.get(key, (key,)))]]
+    )
 
 
 def _signers(options: Mapping[str, object], keepers: list[dict[str, str]]) -> list[list[str]]:
-    signers: list[list[str]] = []
-    for role in _items(options, "unterschriften"):
-        key = role.strip().lower()
-        if keepers and key in _KEEPER_ROLES:
-            # Every protocol keeper signs the part of the minutes they kept.
-            signers.extend([role.strip(), name] for name in _keeper_names(keepers))
-            continue
-        keys = _SIGNER_KEYS.get(key, (key,))
-        signers.append([role.strip(), _scalar(options, *keys)])
-    return signers
+    return [
+        signer
+        for role in _items(options, "unterschriften")
+        for signer in _role_signers(role, options, keepers)
+    ]
 
 
 def _logo(entry: str, assets: Collection[str]) -> dict[str, str]:
@@ -256,12 +298,23 @@ def _logo(entry: str, assets: Collection[str]) -> dict[str, str]:
 
 
 def _logo_list(options: Mapping[str, object], key: str) -> list[str] | None:
-    value = options.get(key)
-    if isinstance(value, list):
-        return [str(v) for v in value]
-    if isinstance(value, str) and value:
-        return [value]
-    return None
+    match options.get(key):
+        case list() as items:
+            return [str(v) for v in cast("list[object]", items)]
+        case str() as name if name:
+            return [name]
+        case _:
+            return None
+
+
+def _default_logos(variant: str | None, options: Mapping[str, object]) -> tuple[str, ...]:
+    """Return the default logos of the variant, else of the `gremium` key."""
+    logos = PROTOCOL_VARIANTS.get(variant) if variant else None
+    return (
+        _GREMIUM_LOGOS.get(_scalar(options, "gremium").lower(), ("STUPA",))
+        if logos is None
+        else logos
+    )
 
 
 def build_document(
@@ -293,23 +346,18 @@ def build_document(
     meta, records, body = parse_frontmatter(source)
     options: dict[str, object] = {**meta, **(config or {})}
     keepers = _keepers(records)
-
-    defaults = PROTOCOL_VARIANTS.get(variant) if variant else None
-    if defaults is None:
-        defaults = _GREMIUM_LOGOS.get(_scalar(options, "gremium").lower(), ("STUPA",))
-    title_names = _logo_list(options, "logos")
-    if title_names is None:
-        title_names = list(defaults)
-    footer_names = _logo_list(options, "footer_logos")
-    if footer_names is None:
-        # pytex falls back to the footer set of the variant here, not to a
-        # custom title-page set.
-        footer_names = [_FOOTER_SWAP.get(n, n) for n in defaults]
-
-    blocks: list[Node] = _handover_lines(convert_body(body, meta, assets), keepers)
+    defaults = _default_logos(variant, options)
+    title_logos = _logo_list(options, "logos")
+    footer_logos = _logo_list(options, "footer_logos")
+    title_names = list(defaults) if title_logos is None else title_logos
+    # pytex falls back to the footer set of the variant here, not to a custom
+    # title-page set.
+    footer_names = (
+        [_FOOTER_SWAP.get(n, n) for n in defaults] if footer_logos is None else footer_logos
+    )
+    converted = _handover_lines(convert_body(body, meta, assets), keepers)
     signers = _signers(options, keepers)
-    if signers:
-        blocks.append({"t": "signatures", "signers": signers})
+    blocks = [*converted, {"t": "signatures", "signers": signers}] if signers else converted
     return {
         "title": _title(options),
         "logos": [_logo(n, assets) for n in title_names],

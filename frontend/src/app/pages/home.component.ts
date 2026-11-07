@@ -44,7 +44,7 @@ export class HomeComponent {
   private readonly protocols = inject(PublicProtocolsService);
 
   /** The newest public protocols. */
-  protected readonly latest = signal<PublicProtocolSummary[]>([]);
+  protected readonly latest = signal<readonly PublicProtocolSummary[]>([]);
   /** The number of all public protocols; 0 hides the card and the strip. */
   protected readonly protocolTotal = signal(0);
 

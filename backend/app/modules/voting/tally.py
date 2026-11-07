@@ -43,10 +43,11 @@ quorum, no majority, no tie break.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from collections import Counter
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, assert_never
 
 from app.shared.config_schemas import ElectionConfig, PollConfig, Quorum, VoteConfig
 
@@ -55,6 +56,7 @@ NO = "no"
 ABSTAIN = "abstain"
 
 VoteResult = Literal["passed", "rejected", "tie"]
+MajorityRule = Literal["simple", "absolute", "two_thirds"]
 FailedReason = Literal["quorum", "majority"]
 
 
@@ -67,9 +69,7 @@ def failed_reason(result: VoteResult, quorum_met: bool) -> FailedReason | None:
     Returns:
         `quorum` or `majority` for a rejected result. None for passed and for tie.
     """
-    if result != "rejected":
-        return None
-    return "quorum" if not quorum_met else "majority"
+    return None if result != "rejected" else ("majority" if quorum_met else "quorum")
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,11 +86,9 @@ def tally(options: Iterable[str], choices: Iterable[str | None]) -> dict[str, in
 
     A choice of None and a choice outside the option list do not count.
     """
-    counts = dict.fromkeys(options, 0)
-    for choice in choices:
-        if choice is not None and choice in counts:
-            counts[choice] += 1
-    return counts
+    keys = tuple(dict.fromkeys(options))
+    hits = Counter(choices)
+    return {opt: hits[opt] for opt in keys}
 
 
 def leading(counts: Mapping[str, int]) -> str | None:
@@ -99,13 +97,9 @@ def leading(counts: Mapping[str, int]) -> str | None:
     Returns:
         The leading option. None when no vote exists or when the top is a tie.
     """
-    if not counts:
-        return None
-    top = max(counts.values())
-    if top == 0:
-        return None
-    winners = [opt for opt, n in counts.items() if n == top]
-    return winners[0] if len(winners) == 1 else None
+    top = max(counts.values(), default=0)
+    winners = tuple(opt for opt, n in counts.items() if n == top)
+    return winners[0] if top > 0 and len(winners) == 1 else None
 
 
 def _quorum_met(quorum: Quorum | None, participation: int, eligible: int) -> bool:
@@ -120,14 +114,31 @@ def _quorum_met(quorum: Quorum | None, participation: int, eligible: int) -> boo
     if quorum is None:
         return True
     value = Decimal(str(quorum.value))
-    if quorum.type == "count":
-        return Decimal(participation) >= value
-    if eligible <= 0:
-        return False
-    return Decimal(participation) * Decimal(100) >= value * Decimal(eligible)
+    return (
+        Decimal(participation) >= value
+        if quorum.type == "count"
+        else eligible > 0 and Decimal(participation) * Decimal(100) >= value * Decimal(eligible)
+    )
 
 
-def _majority(rule: str, yes: int, no: int, cast: int) -> VoteResult:
+def _by_sign(margin: int) -> VoteResult:
+    """Give passed for a positive margin, rejected for a negative one and tie for zero."""
+    return "passed" if margin > 0 else ("rejected" if margin < 0 else "tie")
+
+
+def _two_thirds(yes: int, no: int) -> VoteResult:
+    """Apply the 2/3 rule to the decisive votes (yes plus no).
+
+    A side passes or rejects at a share of 2/3 or more. When neither side reaches 2/3, a
+    blocking minority holds and the result is a tie. No decisive vote is a tie too.
+    """
+    decisive = yes + no
+    passes = decisive > 0 and 3 * yes >= 2 * decisive
+    rejects = decisive > 0 and 3 * no >= 2 * decisive
+    return "passed" if passes else ("rejected" if rejects else "tie")
+
+
+def _majority(rule: MajorityRule, yes: int, no: int, cast: int) -> VoteResult:
     """Apply the majority rule to the yes and no counts.
 
     The `two_thirds` rule accepts at a share of 2/3 or more, and rejects symmetrically.
@@ -136,30 +147,15 @@ def _majority(rule: str, yes: int, no: int, cast: int) -> VoteResult:
     Returns:
         passed, rejected or tie. A tie here is raw and still needs `tieBreak`.
     """
-    if rule == "two_thirds":
-        decisive = yes + no
-        if decisive == 0:
-            return "tie"
-        if 3 * yes >= 2 * decisive:
-            return "passed"
-        if 3 * no >= 2 * decisive:
-            return "rejected"
-        return "tie"
-    threshold = 2 * yes - cast if rule == "absolute" else yes - no
-    if threshold > 0:
-        return "passed"
-    if threshold < 0:
-        return "rejected"
-    return "tie"
-
-
-def _resolve_tie(tie_break: str) -> VoteResult:
-    """Resolve a raw tie with the `tieBreak` setting."""
-    if tie_break == "passed":
-        return "passed"
-    if tie_break == "rejected":
-        return "rejected"
-    return "tie"
+    match rule:
+        case "simple":
+            return _by_sign(yes - no)
+        case "absolute":
+            return _by_sign(2 * yes - cast)
+        case "two_thirds":
+            return _two_thirds(yes, no)
+        case _:
+            assert_never(rule)
 
 
 def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outcome:
@@ -177,12 +173,9 @@ def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outc
     quorum_met = _quorum_met(config.quorum, participation, eligible)
     lead = leading(counts)
 
-    if not quorum_met:
-        return Outcome(result="rejected", quorum_met=False, leading=lead)
-
-    raw = _majority(config.majority_rule, yes, no, cast)
-    final: VoteResult = _resolve_tie(config.tie_break) if raw == "tie" else raw
-    return Outcome(result=final, quorum_met=True, leading=lead)
+    raw = _majority(config.majority_rule, yes, no, cast) if quorum_met else "rejected"
+    final: VoteResult = config.tie_break if raw == "tie" else raw
+    return Outcome(result=final, quorum_met=quorum_met, leading=lead)
 
 
 ElectionResult = Literal["elected", "runoff", "tie", "rejected"]
@@ -271,45 +264,63 @@ def tally_election(
     The sort is stable, so candidates with equal votes keep the order of the candidate
     list.
     """
-    raw = list(choices)
+    raw = tuple(choices)
     if config.yes_no:
         return _yes_no_outcome(config, raw, eligible)
     known = config.candidate_ids
-    counts = dict.fromkeys(known, 0)
-    abstentions = 0
-    full_abstentions = 0
-    for item in raw:
-        picks = [c for c in dict.fromkeys(decode_election_choice(item) or []) if c in counts]
-        picks = picks[: config.seats]
-        for cid in picks:
-            counts[cid] += 1
-        abstentions += config.seats - len(picks)
-        if not picks:
-            full_abstentions += 1
+    known_ids = frozenset(known)
+    picks = tuple(_list_picks(item, known_ids, config.seats) for item in raw)
+    hits = Counter(cid for ballot in picks for cid in ballot)
+    counts = {cid: hits[cid] for cid in known}
     ballots = len(raw)
+    full_abstentions = sum(1 for ballot in picks if not ballot)
     participation = ballots if config.abstain_counts_quorum else ballots - full_abstentions
     quorum_met = _quorum_met(config.quorum, participation, eligible)
-    base = {"counts": counts, "abstentions": abstentions, "ballots": ballots}
-    if not quorum_met:
-        return ElectionOutcome(result="rejected", quorum_met=False, **base)
-    ranked = sorted((cid for cid in known if counts[cid] > 0), key=lambda c: -counts[c])
-    if len(ranked) <= config.seats:
-        result: ElectionResult = "elected" if ranked else "rejected"
-        return ElectionOutcome(result=result, quorum_met=True, elected=tuple(ranked), **base)
-    boundary = counts[ranked[config.seats - 1]]
-    if counts[ranked[config.seats]] < boundary:
-        return ElectionOutcome(
-            result="elected", quorum_met=True, elected=tuple(ranked[: config.seats]), **base
-        )
+    missed = ElectionOutcome(
+        result="rejected",
+        quorum_met=False,
+        counts=counts,
+        abstentions=sum(config.seats - len(ballot) for ballot in picks),
+        ballots=ballots,
+    )
+    ranked = tuple(sorted((cid for cid in known if counts[cid] > 0), key=lambda c: -counts[c]))
+    return _seat_outcome(missed, ranked, config.seats) if quorum_met else missed
+
+
+def _list_picks(raw: str | None, known: Collection[str], limit: int) -> tuple[str, ...]:
+    """Return the known ids of one list ballot, without repeats and cut at ``limit``."""
+    distinct = dict.fromkeys(decode_election_choice(raw) or [])
+    return tuple(c for c in distinct if c in known)[:limit]
+
+
+def _seat_outcome(base: ElectionOutcome, ranked: tuple[str, ...], seats: int) -> ElectionOutcome:
+    """Fill the seats of a quorate election from the candidates ranked by votes.
+
+    The first ``seats`` candidates win, unless a tie crosses the seat boundary: then the
+    candidates above the boundary are elected and the lot decides among the tied ones.
+    """
+    counts = base.counts
+    fits = len(ranked) <= seats
+    boundary = 0 if fits else counts[ranked[seats - 1]]
+    clear_cut = fits or counts[ranked[seats]] < boundary
     above = tuple(c for c in ranked if counts[c] > boundary)
     tied = tuple(c for c in ranked if counts[c] == boundary)
-    return ElectionOutcome(
-        result="tie",
-        quorum_met=True,
-        elected=above,
-        tied=tied,
-        open_seats=config.seats - len(above),
-        **base,
+    return (
+        replace(
+            base,
+            result="elected" if ranked else "rejected",
+            quorum_met=True,
+            elected=ranked[:seats],
+        )
+        if clear_cut
+        else replace(
+            base,
+            result="tie",
+            quorum_met=True,
+            elected=above,
+            tied=tied,
+            open_seats=seats - len(above),
+        )
     )
 
 
@@ -322,12 +333,16 @@ def draw_lot(
     takes one candidate at a time without replacement.
     """
     pool = list(among)
-    drawn: list[str] = []
-    for _ in range(min(seats, len(pool))):
-        pick = choose(pool)
-        pool.remove(pick)
-        drawn.append(pick)
-    return drawn
+    return [] if seats <= 0 or not pool else _draw_one_more(pool, seats, choose)
+
+
+def _draw_one_more(
+    pool: list[str], seats: int, choose: Callable[[Sequence[str]], str]
+) -> list[str]:
+    """Draw one candidate from a non-empty pool, then the rest from the pool without it."""
+    pick = choose(pool)
+    index = pool.index(pick)
+    return [pick, *draw_lot([*pool[:index], *pool[index + 1 :]], seats - 1, choose)]
 
 
 def encode_poll_answers(answers: Mapping[str, str]) -> str:
@@ -368,9 +383,11 @@ class PollOutcome:
 
     def display_counts(self) -> dict[str, int]:
         """Return the counts for the tally card: per option, plus ``abstain`` (no date)."""
-        if self.maybe is not None:
-            return dict(self.counts)
-        return {**self.counts, ABSTAIN: self.abstentions}
+        return (
+            dict(self.counts)
+            if self.maybe is not None
+            else {**self.counts, ABSTAIN: self.abstentions}
+        )
 
 
 def tally_poll(choices: Iterable[str | None], config: PollConfig) -> PollOutcome:
@@ -381,33 +398,45 @@ def tally_poll(choices: Iterable[str | None], config: PollConfig) -> PollOutcome
     them anyway). A single or multi poll ranks by votes; a date poll ranks by the Ja
     answers, then by Ja plus Vielleicht.
     """
-    raw = list(choices)
+    raw = tuple(choices)
     known = config.option_ids
-    counts = dict.fromkeys(known, 0)
-    if config.mode == "date":
-        maybe = dict.fromkeys(known, 0)
-        for item in raw:
-            for oid, answer in (decode_poll_answers(item) or {}).items():
-                if oid in counts and answer == YES:
-                    counts[oid] += 1
-                elif oid in maybe and answer == "maybe":
-                    maybe[oid] += 1
+    return (
+        _date_poll(raw, known)
+        if config.mode == "date"
+        else _list_poll(raw, known, config.choice_limit)
+    )
 
-        def key(oid: str) -> tuple[int, int]:
-            return (counts[oid], counts[oid] + maybe[oid])
 
-        order = tuple(sorted(known, key=lambda oid: (-key(oid)[0], -key(oid)[1])))
-        best = key(order[0])
-        top = tuple(oid for oid in order if key(oid) == best) if best[1] > 0 else ()
-        return PollOutcome(counts, maybe, 0, len(raw), order, top)
-    abstentions = 0
-    for item in raw:
-        picks = [c for c in dict.fromkeys(decode_election_choice(item) or []) if c in counts]
-        picks = picks[: config.choice_limit]
-        for oid in picks:
-            counts[oid] += 1
-        if not picks:
-            abstentions += 1
+def _date_poll(raw: tuple[str | None, ...], known: Sequence[str]) -> PollOutcome:
+    """Count a date poll: the Ja and the Vielleicht answers per option id."""
+    known_ids = frozenset(known)
+    answers = tuple(
+        (oid, answer)
+        for item in raw
+        for oid, answer in (decode_poll_answers(item) or {}).items()
+        if oid in known_ids
+    )
+    yes_hits = Counter(oid for oid, answer in answers if answer == YES)
+    maybe_hits = Counter(oid for oid, answer in answers if answer == "maybe")
+    counts = {oid: yes_hits[oid] for oid in known}
+    maybe = {oid: maybe_hits[oid] for oid in known}
+
+    def key(oid: str) -> tuple[int, int]:
+        return (counts[oid], counts[oid] + maybe[oid])
+
+    order = tuple(sorted(known, key=lambda oid: (-key(oid)[0], -key(oid)[1])))
+    best = key(order[0])
+    top = tuple(oid for oid in order if key(oid) == best) if best[1] > 0 else ()
+    return PollOutcome(counts, maybe, 0, len(raw), order, top)
+
+
+def _list_poll(raw: tuple[str | None, ...], known: Sequence[str], limit: int) -> PollOutcome:
+    """Count a single or multi poll: the picks per option id and the empty ballots."""
+    known_ids = frozenset(known)
+    picks = tuple(_list_picks(item, known_ids, limit) for item in raw)
+    hits = Counter(oid for ballot in picks for oid in ballot)
+    counts = {oid: hits[oid] for oid in known}
+    abstentions = sum(1 for ballot in picks if not ballot)
     order = tuple(sorted(known, key=lambda oid: -counts[oid]))
     most = counts[order[0]]
     top = tuple(oid for oid in order if counts[oid] == most) if most > 0 else ()

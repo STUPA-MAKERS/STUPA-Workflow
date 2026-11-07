@@ -51,9 +51,9 @@ async def load_login_settings(session: AsyncSession) -> LoginSettings:
 
 def session_days(settings: LoginSettings, client: str) -> int:
     """Return the lifetime in days for a session client (`web` or `pwa`)."""
-    if client == SESSION_CLIENT_PWA:
-        return settings.pwa_session_days
-    return settings.web_session_days
+    return (
+        settings.pwa_session_days if client == SESSION_CLIENT_PWA else settings.web_session_days
+    )
 
 
 class LoginSettingsService:
@@ -65,12 +65,15 @@ class LoginSettingsService:
 
     async def get(self) -> LoginSettings:
         """Return the settings row. Create it with the defaults when it is missing."""
-        row = await self.session.get(LoginSettings, 1)
-        if row is None:
-            row = _defaults()
-            row.updated_at = datetime.now(UTC)
-            self.session.add(row)
-            await self.session.flush()
+        existing = await self.session.get(LoginSettings, 1)
+        return existing if existing is not None else await self._create()
+
+    async def _create(self) -> LoginSettings:
+        """Store the row with the defaults."""
+        row = _defaults()
+        row.updated_at = datetime.now(UTC)
+        self.session.add(row)
+        await self.session.flush()
         return row
 
     async def update(

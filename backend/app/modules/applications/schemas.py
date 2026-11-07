@@ -13,10 +13,10 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any, Literal, assert_never
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import ConfigDict, EmailStr, Field, model_validator
 
 from app.modules.applications.diff import DataDiff
 from app.modules.files.schemas import MessageAttachmentOut, MessageFilesIn
@@ -24,18 +24,10 @@ from app.shared.altcha import AltchaSolutionStr
 from app.shared.i18n import DEFAULT_LANG, I18nMap, Lang
 from app.shared.mentions import MAX_MENTIONS
 from app.shared.people import PersonRef
+from app.shared.schemas import FrozenCamelModel
 
 
-class _CamelModel(BaseModel):
-    """Base model with camelCase aliases in JSON.
-
-    The fields also populate by their Python name.
-    """
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class ApplicationCreate(_CamelModel):
+class ApplicationCreate(FrozenCamelModel, frozen=True):
     """Create an application.
 
     The server validates ``data`` against the effective form. An anonymous
@@ -75,7 +67,7 @@ class ApplicationCreate(_CamelModel):
     )
 
 
-class OnBehalfCreate(_CamelModel):
+class OnBehalfCreate(FrozenCamelModel, frozen=True):
     """Capture an application on behalf of an applicant.
 
     The applicant is EITHER an existing account (``applicantPrincipalId``) OR a guest
@@ -122,7 +114,7 @@ class OnBehalfCreate(_CamelModel):
         return self
 
 
-class ApplicantCandidateOut(_CamelModel):
+class ApplicantCandidateOut(FrozenCamelModel, frozen=True):
     """One account that the capture dialog offers as the applicant."""
 
     id: UUID
@@ -130,13 +122,13 @@ class ApplicantCandidateOut(_CamelModel):
     email: str | None = None
 
 
-class ApplicationCreated(_CamelModel):
+class ApplicationCreated(FrozenCamelModel, frozen=True):
     """201 response of ``POST /applications``, with the new id only."""
 
     application_id: UUID = Field(alias="applicationId")
 
 
-class StateOut(_CamelModel):
+class StateOut(FrozenCamelModel, frozen=True):
     """A flow state as the application shows it.
 
     Attributes:
@@ -152,7 +144,7 @@ class StateOut(_CamelModel):
     kind: str = "normal"
 
 
-class ApplicantOut(_CamelModel):
+class ApplicantOut(FrozenCamelModel, frozen=True):
     """Applicant PII, visible to an authorized identity only."""
 
     email: str | None = None
@@ -160,7 +152,7 @@ class ApplicantOut(_CamelModel):
     anonymized: bool = False
 
 
-class ApplicationOut(_CamelModel):
+class ApplicationOut(FrozenCamelModel, frozen=True):
     """One application with its current state and the view flags of the requester.
 
     Attributes:
@@ -210,13 +202,13 @@ class ApplicationOut(_CamelModel):
     is_owner: bool = Field(default=False, alias="isOwner")
     archived_at: datetime | None = Field(default=None, alias="archivedAt")
     state_since: datetime | None = Field(default=None, alias="stateSince")
-    hidden_keys: list[str] = Field(default_factory=list, alias="hiddenKeys")
+    hidden_keys: tuple[str, ...] = Field(default=(), alias="hiddenKeys")
     capture: CaptureOut | None = None
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
     decision: DecisionOut | None = None
 
 
-class DecisionOut(_CamelModel):
+class DecisionOut(FrozenCamelModel, frozen=True):
     """The valid decision on an application (approval with deviations).
 
     ``approvedAmount`` null means "as requested". The applicant view gets the same
@@ -234,7 +226,7 @@ class DecisionOut(_CamelModel):
     agenda_position: int | None = Field(default=None, alias="agendaPosition")
 
 
-class TimelineDecisionOut(_CamelModel):
+class TimelineDecisionOut(FrozenCamelModel, frozen=True):
     """The decision that a status event carried, for the history line."""
 
     requested_amount: Decimal | None = Field(default=None, alias="requestedAmount")
@@ -243,7 +235,7 @@ class TimelineDecisionOut(_CamelModel):
     condition_count: int = Field(default=0, alias="conditionCount")
 
 
-class ApplicationPatch(_CamelModel):
+class ApplicationPatch(FrozenCamelModel, frozen=True):
     """Update the application data.
 
     A new version follows only when ``state.editAllowed`` is true.
@@ -255,7 +247,7 @@ class ApplicationPatch(_CamelModel):
 ActorKind = Literal["principal", "applicant", "system", "gremium", "deleted"]
 
 
-class ActorOut(_CamelModel):
+class ActorOut(FrozenCamelModel, frozen=True):
     """The resolved actor of a timeline event, a version or a comment.
 
     The frontend renders this object and never a raw stored value. ``kind`` tells
@@ -292,14 +284,18 @@ class ActorOut(_CamelModel):
         the stored key, for example ``applicant`` or ``system:deadlines``. A
         deleted account gives null, so that no raw ``sub`` leaves the server.
         """
-        if self.kind in ("principal", "gremium"):
-            return self.display_name
-        if self.kind in ("applicant", "system"):
-            return raw
-        return None
+        match self.kind:
+            case "principal" | "gremium":
+                return self.display_name
+            case "applicant" | "system":
+                return raw
+            case "deleted":
+                return None
+            case _:
+                assert_never(self.kind)
 
 
-class CaptureOut(_CamelModel):
+class CaptureOut(FrozenCamelModel, frozen=True):
     """How an application captured on behalf of the applicant came in.
 
     ``capturedBy`` follows the actor rules of the timeline: the applicant view shows
@@ -312,7 +308,7 @@ class CaptureOut(_CamelModel):
     intake: str | None = None
 
 
-class TimelineEventOut(_CamelModel):
+class TimelineEventOut(FrozenCamelModel, frozen=True):
     """One status change of the timeline.
 
     In the applicant view (magic link or creator), ``actor`` names the Gremium of the
@@ -345,7 +341,7 @@ class TimelineEventOut(_CamelModel):
     decision: TimelineDecisionOut | None = None
 
 
-class VersionOut(_CamelModel):
+class VersionOut(FrozenCamelModel, frozen=True):
     """One submission version.
 
     ``changedKeys`` holds the keys of the added, removed and changed fields. The
@@ -361,13 +357,13 @@ class VersionOut(_CamelModel):
     version: int
     data: dict[str, Any] | None = None
     diff: DataDiff | None = None
-    changed_keys: list[str] = Field(default_factory=list, alias="changedKeys")
+    changed_keys: tuple[str, ...] = Field(default=(), alias="changedKeys")
     changed_by: str | None = Field(default=None, alias="changedBy")
     changed_by_info: ActorOut | None = Field(default=None, alias="changedByInfo")
     at: datetime
 
 
-class ApplicationListItem(_CamelModel):
+class ApplicationListItem(FrozenCamelModel, frozen=True):
     """One row of the application list.
 
     Attributes:
@@ -393,10 +389,11 @@ class ApplicationListItem(_CamelModel):
     state_since: datetime | None = Field(default=None, alias="stateSince")
 
 
-class CommentCreate(MessageFilesIn, _CamelModel):
+class CommentCreate(MessageFilesIn):
     """A new comment. ``attachmentIds`` and ``draftToken`` bind its files.
 
-    The body may be empty only with at least one file.
+    The body may be empty only with at least one file. The model is not frozen, because
+    its base ``MessageFilesIn`` is not, and a frozen class cannot inherit from it.
 
     Attributes:
         body: Capped against DoS, so one comment cannot grow without a bound in the
@@ -407,12 +404,14 @@ class CommentCreate(MessageFilesIn, _CamelModel):
             (the applicant view) may not mention anybody.
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     body: str = Field(max_length=10_000)
     visibility: Literal["internal", "public"] = "public"
     mentions: list[UUID] = Field(default_factory=list, max_length=MAX_MENTIONS)
 
 
-class CommentPatch(_CamelModel):
+class CommentPatch(FrozenCamelModel, frozen=True):
     """Replace the body of a comment in place.
 
     The visibility is not patchable. A public comment is already out, so
@@ -427,7 +426,7 @@ class CommentPatch(_CamelModel):
     mentions: list[UUID] | None = Field(default=None, max_length=MAX_MENTIONS)
 
 
-class CommentOut(_CamelModel):
+class CommentOut(FrozenCamelModel, frozen=True):
     """One comment as the viewer sees it.
 
     Attributes:

@@ -154,8 +154,8 @@ export class MarkdownImageUploadDirective {
     const value = area.value;
     const at = value.indexOf(mark);
     if (at < 0) return;
-    let end = at + mark.length;
-    if (!text && value[end] === '\n') end++;
+    const after = at + mark.length;
+    const end = !text && value[after] === '\n' ? after + 1 : after;
     this.write(value.slice(0, at) + text + value.slice(end), at + text.length);
   }
 
@@ -173,6 +173,6 @@ function isImageType(type: string): boolean {
   return MEDIA_IMAGE_TYPES.includes(type);
 }
 
-function imagesOf(list: FileList | null | undefined): File[] {
+function imagesOf(list: FileList | null | undefined): readonly File[] {
   return Array.from(list ?? []).filter((f) => isImageType(f.type));
 }

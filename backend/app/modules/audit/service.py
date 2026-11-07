@@ -17,12 +17,12 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Select, delete, func, select, text
+from sqlalchemy import ColumnElement, Row, Select, delete, func, select, text
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,7 @@ from app.modules.audit.models import (
     VERIFICATION_KEEP,
     AuditEntry,
     AuditVerification,
+    ChainBreak,
     VerificationTrigger,
 )
 from app.shared.errors import ConflictError, RateLimitedError
@@ -47,30 +48,167 @@ _CHAIN_LOCK_KEY = 0x4155_4449_5400
 _VERIFY_LOCK_KEY = 0x4155_4449_5601
 
 
-def data_uuid_strings(data: object) -> set[str]:
+def _as_uuid(value: str) -> uuid.UUID | None:
+    """Parse ``value`` as a UUID. Return ``None`` when it is not one."""
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        return None
+
+
+def data_uuid_strings(data: object) -> frozenset[str]:
     """Collect every UUID-shaped string value from a ``data`` payload, recursively.
 
     The caller resolves the entity ids inside ``data`` to display names with this
     set. The walk ignores keys and looks at values only.
     """
-    found: set[str] = set()
+    match data:
+        case str():
+            return frozenset({data}) if _as_uuid(data) is not None else frozenset()
+        case dict():
+            return frozenset[str]().union(*(data_uuid_strings(v) for v in data.values()))
+        case list() | tuple():
+            return frozenset[str]().union(*(data_uuid_strings(v) for v in data))
+        case _:
+            return frozenset()
 
-    def walk(v: object) -> None:
-        if isinstance(v, str):
-            try:
-                uuid.UUID(v)
-            except ValueError:
-                return
-            found.add(v)
-        elif isinstance(v, dict):
-            for x in v.values():
-                walk(x)
-        elif isinstance(v, (list, tuple)):
-            for x in v:
-                walk(x)
 
-    walk(data)
-    return found
+def _i18n_label(names: object) -> str | None:
+    """Pick the German name of an i18n map, else its first name. ``None`` for no name."""
+    match names:
+        case dict() if names:
+            return names.get("de") or next(iter(names.values()), None)
+        case _:
+            return None
+
+
+def _application_title(data: Mapping[str, Any] | None) -> str | None:
+    """Return the stripped ``title`` of an application ``data``. ``None`` when it is blank."""
+    title = (data or {}).get("title")
+    return (title.strip() or None) if isinstance(title, str) else None
+
+
+def _first_wins(pairs: Iterable[tuple[str, str | None]]) -> dict[str, str]:
+    """Map each key to its first non-empty label.
+
+    A later pair never overwrites an earlier one, so the order of the pairs is the
+    priority of the lookups.
+    """
+    return dict(reversed([(key, label) for key, label in pairs if label]))
+
+
+def _uuids_by_type(
+    targets: Iterable[tuple[str | None, str | None]],
+) -> dict[str, frozenset[uuid.UUID]]:
+    """Group the ids of ``(target_type, target_id)`` pairs by type.
+
+    A pair without a type or an id drops out, and so does an id that is not a UUID,
+    because no table can resolve them.
+    """
+    parsed = tuple(
+        (target_type, target_uuid)
+        for target_type, target_id in targets
+        if target_type and target_id
+        if (target_uuid := _as_uuid(target_id)) is not None
+    )
+    return {
+        target_type: frozenset(u for t, u in parsed if t == target_type)
+        for target_type in dict.fromkeys(t for t, _ in parsed)
+    }
+
+
+def _type_label_pairs(
+    rows: Iterable[Row[uuid.UUID, dict[str, Any]]],
+    form_ids: Collection[uuid.UUID],
+    type_ids: Collection[uuid.UUID],
+) -> tuple[tuple[tuple[str, str], str | None], ...]:
+    """Label the ``form`` and the ``application_type`` targets from one name query.
+
+    A form target holds the id of its application type, and the type name is the only
+    name a form has. A row that both lists ask for gives two labels.
+    """
+    return tuple(
+        ((target_type, str(row_id)), _i18n_label(name_i18n))
+        for row_id, name_i18n in rows
+        for target_type, ids in (("form", form_ids), ("application_type", type_ids))
+        if row_id in ids
+    )
+
+
+def _revertable_without_revision(action: str, data: Mapping[str, Any]) -> bool:
+    """Tell whether an entry without a config revision is revertable.
+
+    A status change needs both states. A budget update needs the captured prior
+    state, and an allocation needs the previous amount. The other revertable budget
+    actions need nothing more.
+    """
+    match action:
+        case AuditAction.STATUS_CHANGE:
+            return bool(data.get("fromStateId") and data.get("toStateId"))
+        case AuditAction.BUDGET_NODE_UPDATE | AuditAction.BUDGET_EXPENSE_UPDATE:
+            return bool(data.get("before"))
+        case AuditAction.BUDGET_ALLOCATION_SET:
+            return "previousAllocated" in data
+        case _:
+            return action in REVERTABLE_BUDGET_ACTIONS
+
+
+def _entry_hash(entry: AuditEntry) -> bytes:
+    """Recompute the hash of a stored entry from its fields and its ``prev_hash``."""
+    canonical = canonical_payload(
+        actor=entry.actor,
+        action=entry.action,
+        target_type=entry.target_type,
+        target_id=entry.target_id,
+        at=entry.at,
+        data=entry.data,
+    )
+    return compute_hash(entry.prev_hash, canonical)
+
+
+def _link_break(prev_hash: bytes | None, entry: AuditEntry) -> ChainBreak | None:
+    """Tell why ``entry`` does not continue the chain after ``prev_hash``.
+
+    A different ``prev_hash`` means a removed or an inserted row. A different
+    recomputed hash means a changed field. The ``prev_hash`` check comes first and
+    the hash is recomputed only for a linked row, because ``canonical_payload`` raises
+    on a ``data`` value that JSON cannot represent.
+
+    Returns:
+        The reason of the break, or ``None`` when the entry is intact.
+    """
+    return (
+        "prev_hash_mismatch"
+        if entry.prev_hash != prev_hash
+        else None if _entry_hash(entry) == entry.hash else "hash_mismatch"
+    )
+
+
+def _entry_filters(
+    *,
+    action: str | None = None,
+    actor: str | None = None,
+    target_type: str | None = None,
+    target_id: str | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
+    before: int | None = None,
+) -> tuple[ColumnElement[bool], ...]:
+    """Build the WHERE clauses of the set filters of an audit query, in a fixed order.
+
+    A filter that is ``None`` adds no clause. Each clause is built only for a set
+    filter, because SQLAlchemy refuses an order comparison with ``None``.
+    """
+    clauses = (
+        AuditEntry.action == action if action is not None else None,
+        AuditEntry.actor == actor if actor is not None else None,
+        AuditEntry.target_type == target_type if target_type is not None else None,
+        AuditEntry.target_id == target_id if target_id is not None else None,
+        AuditEntry.at >= since if since is not None else None,
+        AuditEntry.at <= until if until is not None else None,
+        AuditEntry.id < before if before is not None else None,
+    )
+    return tuple(clause for clause in clauses if clause is not None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,50 +289,48 @@ class AuditService:
         revertable. A budget update needs the captured prior state. One batch lookup
         resolves the config-snapshot predecessor check.
         """
-        flags: dict[int, bool] = {}
-        revision_ids: dict[int, str] = {}
-        for e in entries:
-            data = e.data or {}
-            rid = data.get("revisionId")
-            if rid:
-                revision_ids[e.id] = str(rid)
-                flags[e.id] = False
-            elif e.action == AuditAction.STATUS_CHANGE:
-                flags[e.id] = bool(data.get("fromStateId") and data.get("toStateId"))
-            elif e.action in REVERTABLE_BUDGET_ACTIONS:
-                if e.action in (
-                    AuditAction.BUDGET_NODE_UPDATE,
-                    AuditAction.BUDGET_EXPENSE_UPDATE,
-                ):
-                    flags[e.id] = bool(data.get("before"))
-                elif e.action == AuditAction.BUDGET_ALLOCATION_SET:
-                    flags[e.id] = "previousAllocated" in data
-                else:
-                    flags[e.id] = True
-            else:
-                flags[e.id] = False
-        if revision_ids:
-            from app.modules.config_revision.models import ConfigRevision
+        revision_ids = {
+            e.id: str(rid) for e in entries if (rid := (e.data or {}).get("revisionId"))
+        }
+        static = {
+            e.id: e.id not in revision_ids
+            and _revertable_without_revision(e.action, e.data or {})
+            for e in entries
+        }
+        by_revision = {
+            revision_uuid: eid
+            for eid, rid in revision_ids.items()
+            if (revision_uuid := _as_uuid(rid)) is not None
+        }
+        predecessors = await self._revision_predecessors(by_revision)
+        return {**static, **predecessors}
 
-            uuid_map: dict[uuid.UUID, int] = {}
-            for eid, rid in revision_ids.items():
-                try:
-                    uuid_map[uuid.UUID(rid)] = eid
-                except ValueError:
-                    continue
-            if uuid_map:
-                rows = (
-                    await self.session.execute(
-                        select(
-                            ConfigRevision.id, ConfigRevision.prev_revision_id
-                        ).where(ConfigRevision.id.in_(uuid_map.keys()))
-                    )
-                ).all()
-                for rev_id, prev_id in rows:
-                    eid = uuid_map.get(rev_id)
-                    if eid is not None:
-                        flags[eid] = prev_id is not None
-        return flags
+    async def _revision_predecessors(
+        self, by_revision: Mapping[uuid.UUID, int]
+    ) -> dict[int, bool]:
+        """Map the entry of each config revision to whether the revision has a predecessor.
+
+        One batch query serves all revisions. An empty map runs no query.
+        """
+        from app.modules.config_revision.models import ConfigRevision
+
+        rows = await self._rows_for(
+            by_revision,
+            select(ConfigRevision.id, ConfigRevision.prev_revision_id).where(
+                ConfigRevision.id.in_(by_revision.keys())
+            ),
+        )
+        return {
+            by_revision[rev_id]: prev_id is not None
+            for rev_id, prev_id in rows
+            if rev_id in by_revision
+        }
+
+    async def _rows_for(
+        self, ids: Collection[object], stmt: Select[*tuple[Any, ...]]
+    ) -> Sequence[Row[*tuple[Any, ...]]]:
+        """Run ``stmt`` and return its rows. Without ``ids`` no query runs."""
+        return (await self.session.execute(stmt)).all() if ids else ()
 
     async def verify_chain(self) -> ChainVerification:
         """Recompute the chain from genesis and report the first break.
@@ -202,7 +338,9 @@ class AuditService:
         The check is fail-closed. The method streams row by row with a server-side
         cursor instead of loading the whole chain into memory. A very long log stays
         verifiable. ``populate_existing`` makes it read the rows as the database holds
-        them, never a copy that the identity map of this session still caches.
+        them, never a copy that the identity map of this session still caches. The
+        fold over the stream stays a loop that carries the previous hash and the count,
+        because a comprehension would load the whole chain into memory.
         """
         prev_hash: bytes | None = None
         checked = 0
@@ -212,27 +350,10 @@ class AuditService:
             .execution_options(populate_existing=True)
         )
         async for entry in stream:
-            if entry.prev_hash != prev_hash:
+            reason = _link_break(prev_hash, entry)
+            if reason is not None:
                 return ChainVerification(
-                    valid=False,
-                    checked=checked,
-                    broken_at=entry.id,
-                    reason="prev_hash_mismatch",
-                )
-            canonical = canonical_payload(
-                actor=entry.actor,
-                action=entry.action,
-                target_type=entry.target_type,
-                target_id=entry.target_id,
-                at=entry.at,
-                data=entry.data,
-            )
-            if compute_hash(entry.prev_hash, canonical) != entry.hash:
-                return ChainVerification(
-                    valid=False,
-                    checked=checked,
-                    broken_at=entry.id,
-                    reason="hash_mismatch",
+                    valid=False, checked=checked, broken_at=entry.id, reason=reason
                 )
             prev_hash = entry.hash
             checked += 1
@@ -301,15 +422,18 @@ class AuditService:
                 )
             )
         ).scalar_one_or_none()
-        if last_manual is not None:
-            wait = last_manual + cooldown - datetime.now(UTC)
-            if wait > timedelta(0):
-                await self.session.rollback()
-                raise RateLimitedError(
-                    "a manual audit chain check ran a short time ago",
-                    retry_after=int(wait.total_seconds()) + 1,
-                    code="audit_verify_cooldown",
-                )
+        wait = (
+            last_manual + cooldown - datetime.now(UTC)
+            if last_manual is not None
+            else timedelta(0)
+        )
+        if wait > timedelta(0):
+            await self.session.rollback()
+            raise RateLimitedError(
+                "a manual audit chain check ran a short time ago",
+                retry_after=int(wait.total_seconds()) + 1,
+                code="audit_verify_cooldown",
+            )
         return await self._verify_and_store_locked(
             trigger="manual", triggered_by=triggered_by, keep=VERIFICATION_KEEP
         )
@@ -428,20 +552,16 @@ class AuditService:
         offset: int = 0,
     ) -> Page[AuditEntry]:
         """Read a filtered, offset-paged audit view, newest entry first."""
-        stmt: Select[AuditEntry] = select(AuditEntry)
-        if action is not None:
-            stmt = stmt.where(AuditEntry.action == action)
-        if actor is not None:
-            stmt = stmt.where(AuditEntry.actor == actor)
-        if target_type is not None:
-            stmt = stmt.where(AuditEntry.target_type == target_type)
-        if target_id is not None:
-            stmt = stmt.where(AuditEntry.target_id == target_id)
-        if since is not None:
-            stmt = stmt.where(AuditEntry.at >= since)
-        if until is not None:
-            stmt = stmt.where(AuditEntry.at <= until)
-
+        stmt: Select[AuditEntry] = select(AuditEntry).where(
+            *_entry_filters(
+                action=action,
+                actor=actor,
+                target_type=target_type,
+                target_id=target_id,
+                since=since,
+                until=until,
+            )
+        )
         total = (
             await self.session.execute(
                 select(func.count()).select_from(stmt.subquery())
@@ -482,17 +602,9 @@ class AuditService:
         Returns:
             The page items and a flag that states whether more rows follow.
         """
-        stmt: Select[AuditEntry] = select(AuditEntry)
-        if action is not None:
-            stmt = stmt.where(AuditEntry.action == action)
-        if actor is not None:
-            stmt = stmt.where(AuditEntry.actor == actor)
-        if since is not None:
-            stmt = stmt.where(AuditEntry.at >= since)
-        if until is not None:
-            stmt = stmt.where(AuditEntry.at <= until)
-        if before is not None:
-            stmt = stmt.where(AuditEntry.id < before)
+        stmt: Select[AuditEntry] = select(AuditEntry).where(
+            *_entry_filters(action=action, actor=actor, since=since, until=until, before=before)
+        )
 
         rows = (
             (
@@ -544,125 +656,90 @@ class AuditService:
         binds it. A site-config version has no name column, so its version number is
         the label: it tells two drafts apart and reads the same in both UI locales.
         """
-        by_type: dict[str, set[uuid.UUID]] = {}
-        for target_type, target_id in targets:
-            if not target_type or not target_id:
-                continue
-            try:
-                by_type.setdefault(target_type, set()).add(uuid.UUID(target_id))
-            except ValueError:
-                continue
+        from app.modules.admin.models import (
+            ApplicationType,
+            CdVariant,
+            Gremium,
+            SiteConfigVersion,
+            Webhook,
+        )
+        from app.modules.applications.models import Application
+        from app.modules.auth.identity import refs_by_id
+        from app.modules.auth.models import Role
+        from app.modules.files.models import Attachment
+        from app.modules.voting.models import Vote
 
-        labels: dict[tuple[str, str], str] = {}
-
-        async def fill(
-            target_type: str, stmt: Select[uuid.UUID, Any]
-        ) -> None:
-            for row_id, label in (await self.session.execute(stmt)).all():
-                if label:
-                    labels[(target_type, str(row_id))] = label
-
-        def i18n_label(m: object) -> str | None:
-            if not isinstance(m, dict) or not m:
-                return None
-            return m.get("de") or next(iter(m.values()), None)
-
-        if ids := by_type.get("application"):
-            from app.modules.applications.models import Application
-
-            rows = (
-                await self.session.execute(
-                    select(Application.id, Application.data).where(
-                        Application.id.in_(ids)
-                    )
-                )
-            ).all()
-            for row_id, data in rows:
-                title = (data or {}).get("title")
-                if isinstance(title, str) and title.strip():
-                    labels[("application", str(row_id))] = title.strip()
-        if ids := by_type.get("gremium"):
-            from app.modules.admin.models import Gremium
-
-            await fill(
-                "gremium", select(Gremium.id, Gremium.name).where(Gremium.id.in_(ids))
-            )
-        form_ids = by_type.get("form", set())
-        type_ids = by_type.get("application_type", set())
-        if form_ids or type_ids:
-            from app.modules.admin.models import ApplicationType
-
-            rows = (
-                await self.session.execute(
-                    select(ApplicationType.id, ApplicationType.name_i18n).where(
-                        ApplicationType.id.in_(form_ids | type_ids)
-                    )
-                )
-            ).all()
-            for row_id, name_i18n in rows:
-                label = i18n_label(name_i18n)
-                if not label:
-                    continue
-                if row_id in form_ids:
-                    labels[("form", str(row_id))] = label
-                if row_id in type_ids:
-                    labels[("application_type", str(row_id))] = label
-        if ids := by_type.get("role"):
-            from app.modules.auth.models import Role
-
-            rows = (
-                await self.session.execute(
-                    select(Role.id, Role.name_i18n, Role.key).where(Role.id.in_(ids))
-                )
-            ).all()
-            for row_id, name_i18n, key in rows:
-                if label := i18n_label(name_i18n) or key:
-                    labels[("role", str(row_id))] = label
-        if ids := by_type.get("principal"):
-            from app.modules.auth.identity import refs_by_id
-
-            for row_id, ref in (await refs_by_id(self.session, ids)).items():
-                if label := ref.label:
-                    labels[("principal", str(row_id))] = label
-        if ids := by_type.get("webhook"):
-            from app.modules.admin.models import Webhook
-
-            await fill(
-                "webhook", select(Webhook.id, Webhook.name).where(Webhook.id.in_(ids))
-            )
-        if ids := by_type.get("vote"):
-            from app.modules.voting.models import Vote
-
-            await fill("vote", select(Vote.id, Vote.question).where(Vote.id.in_(ids)))
-        if ids := by_type.get("attachment"):
-            from app.modules.files.models import Attachment
-
-            await fill(
+        by_type = _uuids_by_type(targets)
+        application_ids = by_type.get("application", frozenset())
+        gremium_ids = by_type.get("gremium", frozenset())
+        form_ids = by_type.get("form", frozenset())
+        type_ids = by_type.get("application_type", frozenset())
+        role_ids = by_type.get("role", frozenset())
+        webhook_ids = by_type.get("webhook", frozenset())
+        vote_ids = by_type.get("vote", frozenset())
+        attachment_ids = by_type.get("attachment", frozenset())
+        cd_variant_ids = by_type.get("cd_variant", frozenset())
+        site_config_ids = by_type.get("site_config", frozenset())
+        applications = await self._rows_for(
+            application_ids,
+            select(Application.id, Application.data).where(Application.id.in_(application_ids)),
+        )
+        gremien = await self._rows_for(
+            gremium_ids, select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremium_ids))
+        )
+        types = await self._rows_for(
+            form_ids | type_ids,
+            select(ApplicationType.id, ApplicationType.name_i18n).where(
+                ApplicationType.id.in_(form_ids | type_ids)
+            ),
+        )
+        roles = await self._rows_for(
+            role_ids, select(Role.id, Role.name_i18n, Role.key).where(Role.id.in_(role_ids))
+        )
+        principals = await refs_by_id(self.session, by_type.get("principal", frozenset()))
+        named_queries = (
+            (
+                "webhook",
+                webhook_ids,
+                select(Webhook.id, Webhook.name).where(Webhook.id.in_(webhook_ids)),
+            ),
+            ("vote", vote_ids, select(Vote.id, Vote.question).where(Vote.id.in_(vote_ids))),
+            (
                 "attachment",
+                attachment_ids,
                 select(Attachment.id, Attachment.filename).where(
-                    Attachment.id.in_(ids), Attachment.application_id.is_not(None)
+                    Attachment.id.in_(attachment_ids), Attachment.application_id.is_not(None)
                 ),
-            )
-        if ids := by_type.get("cd_variant"):
-            from app.modules.admin.models import CdVariant
-
-            await fill(
+            ),
+            (
                 "cd_variant",
-                select(CdVariant.id, CdVariant.name).where(CdVariant.id.in_(ids)),
-            )
-        if ids := by_type.get("site_config"):
-            from app.modules.admin.models import SiteConfigVersion
-
-            rows = (
-                await self.session.execute(
-                    select(SiteConfigVersion.id, SiteConfigVersion.version).where(
-                        SiteConfigVersion.id.in_(ids)
-                    )
-                )
-            ).all()
-            for row_id, version in rows:
-                labels[("site_config", str(row_id))] = f"Version {version}"
-        return labels
+                cd_variant_ids,
+                select(CdVariant.id, CdVariant.name).where(CdVariant.id.in_(cd_variant_ids)),
+            ),
+        )
+        named = [
+            (target_type, await self._rows_for(ids, stmt))
+            for target_type, ids, stmt in named_queries
+        ]
+        site_configs = await self._rows_for(
+            site_config_ids,
+            select(SiteConfigVersion.id, SiteConfigVersion.version).where(
+                SiteConfigVersion.id.in_(site_config_ids)
+            ),
+        )
+        pairs = (
+            *((("application", str(i)), _application_title(data)) for i, data in applications),
+            *_type_label_pairs(types, form_ids, type_ids),
+            *((("role", str(i)), _i18n_label(name_i18n) or key) for i, name_i18n, key in roles),
+            *((("principal", str(i)), ref.label) for i, ref in principals.items()),
+            *(
+                ((target_type, str(i)), name)
+                for target_type, rows in (("gremium", gremien), *named)
+                for i, name in rows
+            ),
+            *((("site_config", str(i)), f"Version {version}") for i, version in site_configs),
+        )
+        return {key: label for key, label in pairs if label}
 
     async def resolve_data_ids(
         self, data_dicts: Sequence[dict[str, Any] | None]
@@ -680,25 +757,17 @@ class AuditService:
         names the account itself (``sourceId`` of a merge names the old one). The
         order of the lookups does not matter, because no lookup overwrites an entry.
         """
-        candidates: set[uuid.UUID] = set()
-        for d in data_dicts:
-            for s in data_uuid_strings(d):
-                candidates.add(uuid.UUID(s))
-        if not candidates:
-            return {}
+        candidates = frozenset(
+            uuid.UUID(s) for d in data_dicts for s in data_uuid_strings(d)
+        )
+        return await self._data_id_labels(candidates) if candidates else {}
 
-        labels: dict[str, str] = {}
+    async def _data_id_labels(self, candidates: frozenset[uuid.UUID]) -> dict[str, str]:
+        """Look up the candidate ids table by table, in a fixed order.
 
-        def i18n_label(m: object) -> str | None:
-            if not isinstance(m, dict) or not m:
-                return None
-            return m.get("de") or next(iter(m.values()), None)
-
-        async def fill(stmt: Select[uuid.UUID, Any]) -> None:
-            for row_id, label in (await self.session.execute(stmt)).all():
-                if label and str(row_id) not in labels:
-                    labels[str(row_id)] = label
-
+        The first table that names an id wins, because `_first_wins` keeps the first
+        label of each id.
+        """
         from app.modules.admin.models import ApplicationType, Gremium, Webhook
         from app.modules.applications.models import Application
         from app.modules.auth.identity import refs_by_id
@@ -708,59 +777,46 @@ class AuditService:
         from app.modules.livevote.models import Meeting
         from app.modules.voting.models import Vote
 
-        for row_id, data in (
-            await self.session.execute(
-                select(Application.id, Application.data).where(
-                    Application.id.in_(candidates)
-                )
-            )
-        ).all():
-            title = (data or {}).get("title")
-            if isinstance(title, str) and title.strip():
-                labels[str(row_id)] = title.strip()
-
-        await fill(select(Gremium.id, Gremium.name).where(Gremium.id.in_(candidates)))
-        await fill(select(Budget.id, Budget.name).where(Budget.id.in_(candidates)))
-        await fill(select(Meeting.id, Meeting.title).where(Meeting.id.in_(candidates)))
-        await fill(select(Webhook.id, Webhook.name).where(Webhook.id.in_(candidates)))
-        await fill(select(Vote.id, Vote.question).where(Vote.id.in_(candidates)))
-        await fill(
+        applications = await self._rows_for(
+            candidates,
+            select(Application.id, Application.data).where(Application.id.in_(candidates)),
+        )
+        named_queries = (
+            select(Gremium.id, Gremium.name).where(Gremium.id.in_(candidates)),
+            select(Budget.id, Budget.name).where(Budget.id.in_(candidates)),
+            select(Meeting.id, Meeting.title).where(Meeting.id.in_(candidates)),
+            select(Webhook.id, Webhook.name).where(Webhook.id.in_(candidates)),
+            select(Vote.id, Vote.question).where(Vote.id.in_(candidates)),
             select(Attachment.id, Attachment.filename).where(
                 Attachment.id.in_(candidates), Attachment.application_id.is_not(None)
+            ),
+        )
+        named = [await self._rows_for(candidates, stmt) for stmt in named_queries]
+        principals = await refs_by_id(self.session, candidates)
+        roles = await self._rows_for(
+            candidates,
+            select(Role.id, Role.name_i18n, Role.key).where(Role.id.in_(candidates)),
+        )
+        types = await self._rows_for(
+            candidates,
+            select(ApplicationType.id, ApplicationType.name_i18n).where(
+                ApplicationType.id.in_(candidates)
+            ),
+        )
+        years = await self._rows_for(
+            candidates,
+            select(FiscalYear.id, FiscalYear.year).where(FiscalYear.id.in_(candidates)),
+        )
+        return _first_wins(
+            (
+                *((str(i), _application_title(data)) for i, data in applications),
+                *((str(i), name) for rows in named for i, name in rows),
+                *((str(i), ref.label) for i, ref in principals.items()),
+                *((str(i), _i18n_label(name_i18n) or key) for i, name_i18n, key in roles),
+                *((str(i), _i18n_label(name_i18n)) for i, name_i18n in types),
+                *((str(i), str(year)) for i, year in years),
             )
         )
-
-        for row_id, ref in (await refs_by_id(self.session, candidates)).items():
-            if (label := ref.label) and str(row_id) not in labels:
-                labels[str(row_id)] = label
-        for row_id, name_i18n, key in (
-            await self.session.execute(
-                select(Role.id, Role.name_i18n, Role.key).where(
-                    Role.id.in_(candidates)
-                )
-            )
-        ).all():
-            if (label := i18n_label(name_i18n) or key) and str(row_id) not in labels:
-                labels[str(row_id)] = label
-        for row_id, name_i18n in (
-            await self.session.execute(
-                select(ApplicationType.id, ApplicationType.name_i18n).where(
-                    ApplicationType.id.in_(candidates)
-                )
-            )
-        ).all():
-            if (label := i18n_label(name_i18n)) and str(row_id) not in labels:
-                labels[str(row_id)] = label
-        for row_id, year in (
-            await self.session.execute(
-                select(FiscalYear.id, FiscalYear.year).where(
-                    FiscalYear.id.in_(candidates)
-                )
-            )
-        ).all():
-            if str(row_id) not in labels:
-                labels[str(row_id)] = str(year)
-        return labels
 
     async def list_actors(self) -> list[tuple[str, str | None]]:
         """List distinct log actors (``sub``) with resolved display names."""

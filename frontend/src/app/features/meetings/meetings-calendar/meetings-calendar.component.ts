@@ -76,13 +76,13 @@ export const CELL_ENTRIES = 2;
 
 /** One meeting of the selected day, as the side panel shows it. */
 interface DayCard {
-  meeting: Meeting;
-  status: StatusView;
-  time: string;
-  progress: AgendaProgress | null;
-  progressSegs: Seg[];
-  vote: { voted: number; present: number; segs: Seg[] } | null;
-  menu: RowMenuSection[];
+  readonly meeting: Meeting;
+  readonly status: StatusView;
+  readonly time: string;
+  readonly progress: AgendaProgress | null;
+  readonly progressSegs: readonly Seg[];
+  readonly vote: { readonly voted: number; readonly present: number; readonly segs: readonly Seg[] } | null;
+  readonly menu: readonly RowMenuSection[];
 }
 
 /**
@@ -162,7 +162,7 @@ export class MeetingsCalendarComponent {
    */
   readonly query = signal(inject(MeetingsTimelineService).searchQuery());
 
-  readonly weeks = computed<CalendarDay[][]>(() => monthGrid(this.month(), this.today()));
+  readonly weeks = computed<readonly (readonly CalendarDay[])[]>(() => monthGrid(this.month(), this.today()));
   readonly monthText = computed(() => monthYear(new Date(this.month().year, this.month().month, 1), this.i18n.formatLocale()));
   readonly weekdays = computed(() => weekdayNames(this.i18n.formatLocale()));
   private readonly range = computed(() => gridRange(this.weeks()));
@@ -275,9 +275,9 @@ export class MeetingsCalendarComponent {
     };
     const day = parseDay(this.selectedDay());
     if (!day) return;
-    let delta = steps[event.key];
-    if (event.key === 'Home') delta = -((day.getDay() + 6) % 7);
-    if (event.key === 'End') delta = 6 - ((day.getDay() + 6) % 7);
+    const weekday = (day.getDay() + 6) % 7;
+    const delta: number | undefined =
+      event.key === 'Home' ? -weekday : event.key === 'End' ? 6 - weekday : steps[event.key];
     if (delta === undefined) return;
     event.preventDefault();
     const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + delta);
@@ -302,7 +302,7 @@ export class MeetingsCalendarComponent {
     else this.dialogs.askDeleteMeeting(m);
   }
 
-  meetingsOf(iso: string): Meeting[] {
+  meetingsOf(iso: string): readonly Meeting[] {
     return this.byDay().get(iso) ?? [];
   }
 
@@ -395,7 +395,8 @@ export class MeetingsCalendarComponent {
   }
 
   private load(range: { from: string; to: string }, gremium: string): void {
-    const seq = ++this.seq;
+    this.seq += 1;
+    const seq = this.seq;
     this.loading.set(true);
     this.api.listMeetings(gremium || undefined, range).subscribe({
       next: (items) => {
