@@ -243,9 +243,10 @@ class CommentOps(ApplicationsServiceBase):
         no mentions (an empty list), because they are member names.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
-        stmt = select(Comment).where(Comment.application_id == application_id)
-        if not include_internal:
-            stmt = stmt.where(Comment.visibility == "public")
+        stmt = select(Comment).where(
+            Comment.application_id == application_id,
+            *(() if include_internal else (Comment.visibility == "public",)),
+        )
         rows = (await self.session.scalars(stmt.order_by(Comment.at))).all()
         actors = await self._resolve_actors(
             app,
@@ -404,17 +405,20 @@ class CommentOps(ApplicationsServiceBase):
             viewer_is_applicant=viewer_is_applicant,
             can_manage=can_manage,
         )
-        self.added_mentions = []
-        if mentions is not None:
-            before = mention_ids(comment.mentions)
-            wanted = await self._checked_mentions(
+        before = mention_ids(comment.mentions) if mentions is not None else []
+        wanted = (
+            await self._checked_mentions(
                 application_id,
                 mentions,
                 may_mention=may_mention,
                 visibility=comment.visibility,
                 before=before,
             )
-            self.added_mentions = new_mentions(wanted, before)
+            if mentions is not None
+            else None
+        )
+        self.added_mentions = new_mentions(wanted, before) if wanted is not None else []
+        if wanted is not None:
             comment.mentions = stored_mentions(wanted)
         comment.body = body
         await self._audit_comment(comment, AuditAction.COMMENT_UPDATE, actor=actor)

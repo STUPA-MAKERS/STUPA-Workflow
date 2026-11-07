@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
 
 from app.modules.applications.decision import amount_deviates, decisions_by_event
-from app.modules.applications.models import StatusEvent
+from app.modules.applications.models import Application, ApplicationDecision, StatusEvent
 from app.modules.applications.schemas import (
+    ActorOut,
     ApplicationOut,
+    StateOut,
     TimelineDecisionOut,
     TimelineEventOut,
 )
@@ -104,7 +107,6 @@ class ReadOps(ApplicationsServiceBase):
                 .order_by(StatusEvent.at)
             )
         ).all()
-        out: list[TimelineEventOut] = []
         actors = await self._resolve_actors(
             app,
             (ev.actor for ev, _ in rows),
@@ -112,31 +114,49 @@ class ReadOps(ApplicationsServiceBase):
             magic_link_view=magic_link_view,
         )
         decisions = await decisions_by_event(self.session, application_id)
-        for ev, label in rows:
-            decision = decisions.get(ev.id) if decisions else None
-            to_state = await self._get_state(ev.to_state_id)
-            info = actors.get(ev.actor) if ev.actor else None
-            from_vote = (ev.note or "").startswith("vote:")
-            out.append(
-                TimelineEventOut(
-                    fromStateId=ev.from_state_id,
-                    toStateId=ev.to_state_id,
-                    toState=await self._state_out_resolved(to_state),
-                    transitionLabel=label or None,
-                    actor=info.legacy(ev.actor) if info and ev.actor else None,
-                    actorInfo=info,
-                    at=ev.at,
-                    note=ev.note,
-                    voteId=None if applicant_view else ev.vote_id,
-                    voteDeleted=from_vote and ev.vote_id is None,
-                    decision=TimelineDecisionOut(
-                        requestedAmount=app.amount,
-                        approvedAmount=decision.approved_amount,
-                        amountDeviates=amount_deviates(app.amount, decision.approved_amount),
-                        conditionCount=len(decision.conditions or []),
-                    )
-                    if decision is not None
-                    else None,
-                )
+        return [
+            _event_out(
+                app,
+                ev,
+                label,
+                await self._state_out_resolved(await self._get_state(ev.to_state_id)),
+                actors.get(ev.actor) if ev.actor else None,
+                decisions.get(ev.id) if decisions else None,
+                applicant_view=applicant_view,
             )
-        return out
+            for ev, label in rows
+        ]
+
+
+def _event_out(
+    app: Application,
+    ev: StatusEvent,
+    label: dict[str, Any] | None,
+    to_state: StateOut | None,
+    info: ActorOut | None,
+    decision: ApplicationDecision | None,
+    *,
+    applicant_view: bool,
+) -> TimelineEventOut:
+    """Build one event of the timeline from its row and its resolved parts."""
+    from_vote = (ev.note or "").startswith("vote:")
+    return TimelineEventOut(
+        fromStateId=ev.from_state_id,
+        toStateId=ev.to_state_id,
+        toState=to_state,
+        transitionLabel=label or None,
+        actor=info.legacy(ev.actor) if info and ev.actor else None,
+        actorInfo=info,
+        at=ev.at,
+        note=ev.note,
+        voteId=None if applicant_view else ev.vote_id,
+        voteDeleted=from_vote and ev.vote_id is None,
+        decision=TimelineDecisionOut(
+            requestedAmount=app.amount,
+            approvedAmount=decision.approved_amount,
+            amountDeviates=amount_deviates(app.amount, decision.approved_amount),
+            conditionCount=len(decision.conditions or []),
+        )
+        if decision is not None
+        else None,
+    )
