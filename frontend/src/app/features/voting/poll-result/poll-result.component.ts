@@ -41,7 +41,7 @@ export class PollResultComponent {
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   protected readonly date = computed(() => this.poll().mode === 'date');
-  protected readonly bars = computed<PollBar[]>(() =>
+  protected readonly bars = computed<readonly PollBar[]>(() =>
     pollBars(this.poll(), this.result(), this.counts(), this.i18n.formatLocale(), this.t),
   );
   /** The base of the bars: the ballots of a date poll, else every vote and abstention. */

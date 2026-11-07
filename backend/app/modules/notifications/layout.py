@@ -166,11 +166,9 @@ def _linkify(escaped: str) -> str:
     """
 
     def repl(match: re.Match[str]) -> str:
-        url = match.group(0)
-        tail = ""
-        while url and url[-1] in _TRAILING_PUNCT:
-            tail = url[-1] + tail
-            url = url[:-1]
+        found = match.group(0)
+        url = found.rstrip(_TRAILING_PUNCT)
+        tail = found[len(url) :]
         return f'<a href="{url}" style="{_LINK_STYLE}">{url}</a>{tail}'
 
     return _URL_RE.sub(repl, escaped)

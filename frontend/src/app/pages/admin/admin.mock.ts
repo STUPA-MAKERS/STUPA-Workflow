@@ -37,8 +37,18 @@ import type {
 } from './admin.models';
 import { MERGE_AREAS } from './admin.models';
 
+/**
+ * A copy of `T` whose fields can change. The mock store is the in-memory stand-in for the
+ * database, so its rows change in place like ORM rows, while the DTO types stay readonly.
+ */
+export type MockRow<T> = T extends readonly (infer U)[]
+  ? MockRow<U>[]
+  : T extends object
+    ? { -readonly [K in keyof T]: MockRow<T[K]> }
+    : T;
+
 /** Permission catalog (mirror of `app.shared.permissions.PERMISSION_CATALOGUE`). */
-export const MOCK_PERMISSIONS: string[] = [
+export const MOCK_PERMISSIONS: readonly string[] = [
   'application.read',
   'application.read_all',
   'application.transition',
@@ -87,7 +97,7 @@ export const MOCK_PERMISSIONS: string[] = [
  * merged into Robin Mitglied without a conflict; a merge into Alex Admin shows the
  * conflicts.
  */
-export const MOCK_PRINCIPALS: AdminPrincipal[] = [
+export const MOCK_PRINCIPALS: readonly AdminPrincipal[] = [
   {
     id: 'p-old-1',
     sub: 'e03ad7d7-5c1e-4f0a-9a3b-6f2a1d9c8b70',
@@ -199,7 +209,7 @@ export const MOCK_PRINCIPALS: AdminPrincipal[] = [
  */
 export const MOCK_GREMIUM_STUPA_ID = 'g0000000-0000-0000-0000-000000000001';
 
-export const MOCK_GREMIEN: Gremium[] = [
+export const MOCK_GREMIEN: readonly Gremium[] = [
   { id: MOCK_GREMIUM_STUPA_ID, name: 'Studierendenparlament', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: true, delegationLeadMinutes: 60, delegationAllowExternal: false, quorumPercent: 50 },
   { id: 'g-asta', name: 'AStA', slug: 'asta', cdVariantId: 'cd-asta', defaultLang: 'de', allowVoteDelegation: false, delegationLeadMinutes: 0, delegationAllowExternal: false, quorumPercent: null },
 ];
@@ -209,7 +219,7 @@ export const MOCK_GREMIEN: Gremium[] = [
  * empty or absent. It mirrors the seed roles from `auth/seed`
  * (member/referent/vorstand/admin).
  */
-export const MOCK_ROLES: Role[] = [
+export const MOCK_ROLES: readonly Role[] = [
   { id: 'r-member', key: 'member', label: { de: 'Mitglied', en: 'Member' }, permissions: ['application.read'] },
   { id: 'r-referent', key: 'referent', label: { de: 'Referent:in', en: 'Officer' }, permissions: ['application.read', 'application.update', 'application.transition'] },
   { id: 'r-vorstand', key: 'vorstand', label: { de: 'Vorstand', en: 'Board' }, permissions: ['application.read', 'budget.view', 'meeting.view_all'] },
@@ -220,7 +230,7 @@ export const MOCK_ROLES: Role[] = [
  * The forced roles of each mock gremium (mirror of `FORCED_GREMIUM_ROLES` in the backend)
  * and one own role of the Studierendenparlament.
  */
-export const MOCK_GREMIUM_ROLES: GremiumRole[] = [
+export const MOCK_GREMIUM_ROLES: readonly GremiumRole[] = [
   ...MOCK_GREMIEN.flatMap((g) => [
     { id: `gr-${g.slug}-vorstand`, gremiumId: g.id, key: 'vorstand', name: { de: 'Vorstand', en: 'Board' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize'] },
     { id: `gr-${g.slug}-manager`, gremiumId: g.id, key: 'manager', name: { de: 'Manager', en: 'Manager' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize'] },
@@ -230,7 +240,7 @@ export const MOCK_GREMIUM_ROLES: GremiumRole[] = [
 ];
 
 /** Read-only memberships. In the real backend the OIDC group sync writes them. */
-export const MOCK_GREMIUM_MEMBERSHIPS: GremiumMembership[] = [
+export const MOCK_GREMIUM_MEMBERSHIPS: readonly GremiumMembership[] = [
   { id: 'gms-1', principalId: 'p-1', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-vorstand' },
   { id: 'gms-2', principalId: 'p-2', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-member' },
   { id: 'gms-3', principalId: 'p-6', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-protokoll' },
@@ -245,19 +255,19 @@ export const MOCK_GREMIUM_MEMBERSHIPS: GremiumMembership[] = [
 ];
 
 /** OIDC group → global role. */
-export const MOCK_GROUP_MAPPINGS: GroupMapping[] = [
+export const MOCK_GROUP_MAPPINGS: readonly GroupMapping[] = [
   { id: 'gm-1', oidcGroup: 'stupa-admins', roleId: 'r-admin' },
   { id: 'gm-2', oidcGroup: 'stupa-referate', roleId: 'r-referent' },
 ];
 
 /** OIDC group → gremium membership. */
-export const MOCK_GREMIUM_MEMBERSHIP_MAPPINGS: GremiumMembershipMapping[] = [
+export const MOCK_GREMIUM_MEMBERSHIP_MAPPINGS: readonly GremiumMembershipMapping[] = [
   { id: 'gmm-1', gremiumId: MOCK_GREMIUM_STUPA_ID, oidcGroup: 'stupa-mitglieder' },
   { id: 'gmm-2', gremiumId: 'g-asta', oidcGroup: 'asta-referate' },
 ];
 
 /** OIDC group → role of one gremium. */
-export const MOCK_GREMIUM_ROLE_MAPPINGS: GremiumRoleMapping[] = [
+export const MOCK_GREMIUM_ROLE_MAPPINGS: readonly GremiumRoleMapping[] = [
   { id: 'grm-1', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-vorstand', oidcGroup: 'stupa-praesidium' },
   { id: 'grm-2', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-manager', oidcGroup: 'stupa-sitzungsleitung' },
   { id: 'grm-3', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-protokoll', oidcGroup: 'stupa-protokoll' },
@@ -265,12 +275,12 @@ export const MOCK_GREMIUM_ROLE_MAPPINGS: GremiumRoleMapping[] = [
 ];
 
 /** Extra protocol recipients per gremium (`/admin/gremien/{id}/mail-recipients`). */
-export const MOCK_GREMIUM_MAIL_RECIPIENTS: Record<string, string[]> = {
+export const MOCK_GREMIUM_MAIL_RECIPIENTS: Record<string, readonly string[]> = {
   [MOCK_GREMIUM_STUPA_ID]: ['protokolle@stupa.example', 'verteiler@lists.stupa.example'],
 };
 
 /** Seed for the forms overview, until `/admin/application-types` is real. */
-export const MOCK_FORMS: FormOverviewItem[] = [
+export const MOCK_FORMS: readonly FormOverviewItem[] = [
   { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, status: 'active', version: 3 },
   { id: 'f-veranstaltung', name: { de: 'Veranstaltungsantrag', en: 'Event application' }, gremiumId: 'g-asta', status: 'active', version: 2 },
   { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, status: 'draft', version: 1 },
@@ -278,7 +288,7 @@ export const MOCK_FORMS: FormOverviewItem[] = [
 ];
 
 /** Application types/forms for the forms builder — mock until the backend is real. */
-export const MOCK_APP_TYPES: ApplicationTypeFull[] = [
+export const MOCK_APP_TYPES: readonly ApplicationTypeFull[] = [
   { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: 'fv-foerderung-3', activeFormVersion: 3 },
   { id: 'f-veranstaltung', name: { de: 'Veranstaltungsantrag', en: 'Event application' }, gremiumId: 'g-asta', hasBudget: false, activeFormVersionId: 'fv-veranstaltung-2', activeFormVersion: 2 },
   { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: null, activeFormVersion: null },
@@ -342,7 +352,7 @@ export const MOCK_FORM_DRAFTS: Record<string, FormDraft> = {
   },
 };
 
-export const MOCK_WEBHOOKS: WebhookConfig[] = [
+export const MOCK_WEBHOOKS: readonly WebhookConfig[] = [
   {
     id: 'wh-1',
     name: 'Matrix-Bridge',
@@ -360,7 +370,7 @@ export const MOCK_WEBHOOKS: WebhookConfig[] = [
 ];
 
 /** The delivery state of the mock webhooks: one of each state. */
-export const MOCK_WEBHOOK_STATUS: WebhookDeliveryStatus[] = [
+export const MOCK_WEBHOOK_STATUS: readonly WebhookDeliveryStatus[] = [
   { webhookId: 'wh-1', lastState: 'sent', reasonClass: 'delivered', responseCode: 200, attempts: 1, lastAt: '2026-10-04T16:20:00Z' },
   { webhookId: 'wh-2', lastState: 'dead', reasonClass: 'target_server_error', responseCode: 502, attempts: 5, lastAt: '2026-10-04T18:12:00Z' },
   { webhookId: 'wh-3', lastState: 'pending', reasonClass: 'in_progress', responseCode: null, attempts: 2, lastAt: '2026-10-05T07:45:00Z' },
@@ -388,7 +398,7 @@ export const MOCK_LOGIN_SETTINGS: LoginSettings = {
 };
 
 /** CD variants of the mock gremien. */
-export const MOCK_CD_VARIANTS: CdVariant[] = [
+export const MOCK_CD_VARIANTS: readonly CdVariant[] = [
   {
     id: 'cd-stupa',
     key: 'stupa',
@@ -404,7 +414,7 @@ export const MOCK_CD_VARIANTS: CdVariant[] = [
 ];
 
 /** A part of the builtin mail catalogue, one template with an override. */
-export const MOCK_MAIL_TEMPLATES: MailTemplate[] = [
+export const MOCK_MAIL_TEMPLATES: readonly MailTemplate[] = [
   {
     id: null,
     key: 'magic_link',
@@ -455,7 +465,7 @@ export const MOCK_MAIL_TEMPLATES: MailTemplate[] = [
 ];
 
 /** The versions of the site config in the mock backend, newest first. */
-export const MOCK_SITE_REVISIONS: ConfigRevision[] = [
+export const MOCK_SITE_REVISIONS: readonly ConfigRevision[] = [
   { id: 'rev-form-3', entityType: 'form', entityId: 'f-foerderung', version: 3, at: '2026-09-24T08:14:00Z', createdBy: 'p-1', createdByName: 'Mara Keller', isCurrent: true },
   { id: 'rev-form-2', entityType: 'form', entityId: 'f-foerderung', version: 2, at: '2026-09-12T15:02:00Z', createdBy: 'p-1', createdByName: 'Mara Keller', isCurrent: false },
   { id: 'rev-flow-12', entityType: 'flow', entityId: 'global', version: 12, at: '2026-09-28T10:30:00Z', createdBy: 'p-1', createdByName: 'Mara Keller', isCurrent: true },
@@ -484,7 +494,7 @@ export const MOCK_BRANDING: Branding = {
 };
 
 /** Seed for the backup catalogue in mock mode. */
-export const MOCK_BACKUPS: Backup[] = [
+export const MOCK_BACKUPS: readonly Backup[] = [
   {
     id: 'b-nightly',
     kind: 'scheduled',
@@ -512,7 +522,7 @@ export const MOCK_BACKUPS: Backup[] = [
 ];
 
 /** Seed for the erasure queue in mock mode: two open requests and two handled ones. */
-export const MOCK_ERASURES: ErasureRequest[] = [
+export const MOCK_ERASURES: readonly ErasureRequest[] = [
   {
     id: 'e-1',
     createdAt: '2026-06-05T09:12:00+00:00',
@@ -561,13 +571,13 @@ export const MOCK_AUDIT_VERIFICATION: AuditVerification = {
 };
 
 /** Actors of the mock audit log. */
-export const MOCK_AUDIT_ACTORS: AuditActor[] = [
+export const MOCK_AUDIT_ACTORS: readonly AuditActor[] = [
   { sub: 'kc|alex.admin', name: 'Alex Admin' },
   { sub: 'kc|kim.kasse', name: 'Kim Kasse' },
 ];
 
 /** A short mock audit log, newest first. Entry 7 is a revertable config change. */
-export const MOCK_AUDIT_ENTRIES: AuditEntry[] = [
+export const MOCK_AUDIT_ENTRIES: readonly AuditEntry[] = [
   {
     id: 8,
     at: '2026-06-07T14:12:00+00:00',

@@ -41,12 +41,12 @@ import { LINK_ICON, linkSub } from '../todos.util';
 type PickerKind = TodoLinkKind | 'all';
 
 interface PickerGroup {
-  key: string;
-  label: TranslationKey;
-  hits: TodoLinkTarget[];
+  readonly key: string;
+  readonly label: TranslationKey;
+  readonly hits: readonly TodoLinkTarget[];
 }
 
-const KIND_CHIPS: readonly { value: PickerKind; label: TranslationKey }[] = [
+const KIND_CHIPS: readonly { readonly value: PickerKind; readonly label: TranslationKey }[] = [
   { value: 'all', label: 'todos.picker.all' },
   { value: 'application', label: 'todos.picker.applications' },
   { value: 'meeting', label: 'todos.picker.meetings' },

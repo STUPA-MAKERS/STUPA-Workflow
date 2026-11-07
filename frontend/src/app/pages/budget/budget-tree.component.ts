@@ -53,18 +53,19 @@ import { PALETTE, resolveNodeColors } from './budget-color.util';
 import { BudgetTreeApi, FISCAL_YEAR_CLOSED, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 import { problemCode } from '@core/api/problem';
 import { formatMoney } from '@shared/format-money';
+import { toggled } from '@shared/util/immutable';
 
 /** A visible tree row: a node, its depth and whether it has children. */
 interface Row {
-  node: BudgetTreeNode;
-  depth: number;
-  hasChildren: boolean;
+  readonly node: BudgetTreeNode;
+  readonly depth: number;
+  readonly hasChildren: boolean;
 }
 
 /** How the colour cell shows a node: its own colour, a colour from above, or none. */
 export interface Swatch {
-  kind: 'own' | 'inherited' | 'none';
-  color: string | null;
+  readonly kind: 'own' | 'inherited' | 'none';
+  readonly color: string | null;
 }
 
 /** The colour of a cost centre: `#rrggbb`, the format the dialog stores. */
@@ -276,18 +277,15 @@ export class BudgetTreeComponent {
   private readonly resolved = computed(() => resolveNodeColors(this.tree()));
 
   /** Subtree of the selected budget -> visible rows (pre-order) with depth. */
-  readonly rows = computed<Row[]>(() => {
+  readonly rows = computed<readonly Row[]>(() => {
     const top = this.selectedTop();
     if (!top) return [];
     const folded = this.collapsed();
-    const out: Row[] = [];
-    const walk = (node: BudgetTreeNode, depth: number): void => {
-      out.push({ node, depth, hasChildren: node.children.length > 0 });
-      if (folded.has(node.id)) return;
-      for (const c of node.children) walk(c, depth + 1);
-    };
-    walk(top, 0);
-    return out;
+    const walk = (node: BudgetTreeNode, depth: number): readonly Row[] => [
+      { node, depth, hasChildren: node.children.length > 0 },
+      ...(folded.has(node.id) ? [] : node.children.flatMap((c) => walk(c, depth + 1))),
+    ];
+    return walk(top, 0);
   });
 
   /** The row after which the inline create row of `addingChildOf` stands: the last
@@ -298,9 +296,10 @@ export class BudgetTreeComponent {
     const rows = this.rows();
     const start = rows.findIndex((r) => r.node.id === parentId);
     if (start < 0) return null;
-    let last = start;
-    for (let i = start + 1; i < rows.length && rows[i].depth > rows[start].depth; i++) last = i;
-    return rows[last].node.id;
+    const depth = rows[start].depth;
+    // The trailing `true` stands for the end of the table, where a last subtree stops.
+    const outsideAt = [...rows.slice(start + 1).map((r) => r.depth <= depth), true].indexOf(true);
+    return rows[start + outsideAt].node.id;
   });
 
   /** The parent of the inline create row, for its label "Unter VS-200". */
@@ -316,20 +315,17 @@ export class BudgetTreeComponent {
   readonly columns = computed<ColumnDef[]>(() => {
     const t = (k: TranslationKey): string => this.i18n.translate(k);
     const money = (key: string, label: TranslationKey): ColumnDef => ({ key, label: t(label), align: 'end', width: AMOUNT_WIDTH });
-    const cols: ColumnDef[] = [
+    const hidden = this.hidden();
+    return [
       { key: 'node', label: t('budget.tree.col.node'), card: 'title', width: '13rem' },
       money('allocated', 'budget.tree.col.allocated'),
       money('bound', 'budget.tree.col.bound'),
-    ];
-    const hidden = this.hidden();
-    if (!hidden.has('expended')) cols.push(money('expended', 'budget.tree.col.expended'));
-    if (!hidden.has('income')) cols.push(money('income', 'budget.tree.col.income'));
-    cols.push(
+      ...(hidden.has('expended') ? [] : [money('expended', 'budget.tree.col.expended')]),
+      ...(hidden.has('income') ? [] : [money('income', 'budget.tree.col.income')]),
       money('available', 'budget.tree.col.available'),
       { key: 'color', label: t('budget.tree.col.color'), width: '4rem' },
       { key: 'actions', label: t('budget.tree.col.actions'), align: 'end', width: '3.5rem', card: 'actions', sticky: 'end' },
-    );
-    return cols;
+    ];
   });
   readonly rowId = (r: unknown): string => (r as Row).node.id;
   readonly childExpanded = (r: unknown): boolean => this.childFormAfter() === (r as Row).node.id;
@@ -337,20 +333,22 @@ export class BudgetTreeComponent {
   /** Fiscal-year table inside the manage dialog. The action column appears only with
    *  `budget.structure`, so a read-only user never sees an edit or a delete button. */
   readonly fyColumns = computed<ColumnDef[]>(() => {
-    const cols: ColumnDef[] = [
+    const actions: ColumnDef[] = this.canStructure()
+      ? [
+          {
+            key: 'actions',
+            label: this.i18n.translate('budget.tree.col.actions'),
+            align: 'end',
+            width: '3.5rem',
+            card: 'actions',
+          },
+        ]
+      : [];
+    return [
       { key: 'display', label: this.i18n.translate('budget.tree.fyYear'), card: 'title' },
       { key: 'active', label: this.i18n.translate('budget.tree.fyState') },
+      ...actions,
     ];
-    if (this.canStructure()) {
-      cols.push({
-        key: 'actions',
-        label: this.i18n.translate('budget.tree.col.actions'),
-        align: 'end',
-        width: '3.5rem',
-        card: 'actions',
-      });
-    }
-    return cols;
   });
   readonly fyRowId = (r: unknown): string => (r as FiscalYear).id;
 
@@ -407,15 +405,16 @@ export class BudgetTreeComponent {
    * text in the cell, not a tooltip, so a keyboard, touch or screen-reader user reads
    * them too. Empty when the table shows every amount or the node has no allocation.
    */
-  hiddenAmounts(node: BudgetTreeNode): string[] {
+  hiddenAmounts(node: BudgetTreeNode): readonly string[] {
     const hidden = this.hidden();
     if (!hidden.size || !this.alloc(node)) return [];
-    const lines: string[] = [];
-    if (hidden.has('expended')) {
-      lines.push(this.i18n.translate('budget.tree.expendedTitle', { amount: this.amount(node, 'expended') }));
-    }
-    lines.push(this.i18n.translate('budget.tree.incomeTitle', { amount: this.amount(node, 'income') }));
-    return lines;
+    const expendedTitle = (): string =>
+      this.i18n.translate('budget.tree.expendedTitle', { amount: this.amount(node, 'expended') });
+    const expended = hidden.has('expended') ? [expendedTitle()] : [];
+    return [
+      ...expended,
+      this.i18n.translate('budget.tree.incomeTitle', { amount: this.amount(node, 'income') }),
+    ];
   }
 
   isNegative(node: BudgetTreeNode): boolean {
@@ -441,12 +440,7 @@ export class BudgetTreeComponent {
   }
 
   toggleCollapse(id: string): void {
-    this.collapsed.update((set) => {
-      const next = new Set(set);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    this.collapsed.update((set) => toggled(set, id));
   }
 
   /** The phone menu of a row: the same four actions as the icon buttons. */
@@ -521,23 +515,19 @@ export class BudgetTreeComponent {
   readonly headerMenu = computed<RowMenuSection[]>(() => {
     const t = (k: TranslationKey): string => this.i18n.translate(k);
     const noTop = this.selectedTopId() ? null : t('budget.tree.pickHint');
+    const fyItem: RowMenuItem[] = this.phone()
+      ? [{ id: 'fy', label: t('budget.tree.fyTitle'), icon: 'cal', disabledReason: noTop }]
+      : [];
     const items: RowMenuItem[] = [
       { id: 'states', label: t('budget.tree.stateConfig'), disabledReason: noTop },
       { id: 'cutoff', label: t('budget.tree.stichtagTitle'), disabledReason: noTop },
+      ...fyItem,
     ];
-    if (this.phone()) items.push({ id: 'fy', label: t('budget.tree.fyTitle'), icon: 'cal', disabledReason: noTop });
-    const sections: RowMenuSection[] = [{ items }];
     const fy = this.selectedFy();
-    if (fy) {
-      sections.push({
-        items: [
-          fy.closedAt
-            ? { id: 'fyReopen', label: this.i18n.translate('budget.tree.fyReopenSelected', { year: fy.display }), icon: 'undo' }
-            : { id: 'fyClose', label: this.i18n.translate('budget.tree.fyCloseSelected', { year: fy.display }), icon: 'lock' },
-        ],
-      });
-    }
-    return sections;
+    const fySection: RowMenuSection[] = fy
+      ? [{ items: [fyCloseItem(fy, (key) => this.i18n.translate(key, { year: fy.display }))] }]
+      : [];
+    return [{ items }, ...fySection];
   });
 
   onHeaderMenu(item: RowMenuItem): void {
@@ -611,16 +601,7 @@ export class BudgetTreeComponent {
   toggleState(kind: 'accepted' | 'denied', key: string): void {
     const top = this.selectedTop();
     if (!top) return;
-    const accepted = new Set(this.acceptedKeys());
-    const denied = new Set(this.deniedKeys());
-    const target = kind === 'accepted' ? accepted : denied;
-    const other = kind === 'accepted' ? denied : accepted;
-    if (target.has(key)) {
-      target.delete(key);
-    } else {
-      target.add(key);
-      other.delete(key);
-    }
+    const { accepted, denied } = toggledStateKey(kind, key, this.acceptedKeys(), this.deniedKeys());
     this.api
       .updateNode(top.id, { acceptedStateKeys: [...accepted], deniedStateKeys: [...denied] })
       .subscribe({
@@ -704,11 +685,7 @@ export class BudgetTreeComponent {
    * and the focus scrolls it into view inside the pane.
    */
   startAddChild(node: BudgetTreeNode): void {
-    this.collapsed.update((set) => {
-      const next = new Set(set);
-      next.delete(node.id);
-      return next;
-    });
+    this.collapsed.update((set) => new Set([...set].filter((id) => id !== node.id)));
     this.addingChildOf.set(node.id);
     this.childDraft.set({ key: '', name: '' });
     afterNextRender(() => this.focusChildKey(), { injector: this.injector });
@@ -1052,16 +1029,41 @@ export class BudgetTreeComponent {
   }
 
   private findNode(id: string): BudgetTreeNode | undefined {
-    const walk = (nodes: readonly BudgetTreeNode[]): BudgetTreeNode | undefined => {
-      for (const n of nodes) {
-        if (n.id === id) return n;
-        const hit = walk(n.children);
-        if (hit) return hit;
-      }
-      return undefined;
-    };
+    const walk = (nodes: readonly BudgetTreeNode[]): BudgetTreeNode | undefined =>
+      nodes.reduce<BudgetTreeNode | undefined>(
+        (hit, n) => hit ?? (n.id === id ? n : walk(n.children)),
+        undefined,
+      );
     return walk(this.tree());
   }
+}
+
+/** The header menu item that closes the selected fiscal year, or reopens a closed one. */
+function fyCloseItem(
+  fy: FiscalYear,
+  label: (key: 'budget.tree.fyReopenSelected' | 'budget.tree.fyCloseSelected') => string,
+): RowMenuItem {
+  return fy.closedAt
+    ? { id: 'fyReopen', label: label('budget.tree.fyReopenSelected'), icon: 'undo' }
+    : { id: 'fyClose', label: label('budget.tree.fyCloseSelected'), icon: 'lock' };
+}
+
+/**
+ * The accepted and denied state keys after a toggle of `key` in the set of `kind`. A key
+ * that joins one set leaves the other, because a state cannot count as both.
+ */
+function toggledStateKey(
+  kind: 'accepted' | 'denied',
+  key: string,
+  accepted: ReadonlySet<string>,
+  denied: ReadonlySet<string>,
+): { readonly accepted: ReadonlySet<string>; readonly denied: ReadonlySet<string> } {
+  const target = toggled(kind === 'accepted' ? accepted : denied, key);
+  const other = kind === 'accepted' ? denied : accepted;
+  const rest = target.has(key) ? new Set([...other].filter((k) => k !== key)) : other;
+  return kind === 'accepted'
+    ? { accepted: target, denied: rest }
+    : { accepted: rest, denied: target };
 }
 
 /** The default year of a budget: the newest active year, else the newest year. */

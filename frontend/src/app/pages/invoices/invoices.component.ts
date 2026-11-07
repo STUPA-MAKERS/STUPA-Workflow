@@ -17,6 +17,7 @@ import { problemDetail } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   ConfirmDialogComponent,
@@ -180,12 +181,12 @@ export class InvoicesComponent implements InvoiceFormHost {
 
   /** The cost-centre tree, for the swatches of the bookings in the detail. It loads once
    *  the first open invoice with a booking shows up. */
-  readonly tree = signal<BudgetTreeNode[]>([]);
+  readonly tree = signal<readonly BudgetTreeNode[]>([]);
   private treeRequested = false;
   readonly costCentres = computed(() => costCentreIndex(this.tree()));
 
   private readonly PAGE = 20;
-  readonly items = signal<Invoice[]>([]);
+  readonly items = signal<readonly Invoice[]>([]);
   readonly total = signal(0);
   /** The size of each segment under the other filters; null from an older backend. */
   readonly counts = signal<InvoiceSegmentCounts | null>(null);
@@ -238,13 +239,11 @@ export class InvoicesComponent implements InvoiceFormHost {
 
   /** Active filters as the query part of a list request, with the segment. */
   filterParams(): InvoiceQuery {
-    const params: InvoiceQuery = { ...SEGMENT_QUERY[this.segment()] };
-    for (const f of this.filterSignals) {
+    const set = this.filterSignals.flatMap((f) => {
       const value = f.signal().trim();
-      if (value === '') continue;
-      Object.assign(params, { [f.key]: f.numeric ? Number(value) : value });
-    }
-    return params;
+      return value === '' ? [] : [[f.key, f.numeric ? Number(value) : value] as const];
+    });
+    return { ...SEGMENT_QUERY[this.segment()], ...Object.fromEntries(set) };
   }
 
   /** The number of set filters (chips and search). */
@@ -437,12 +436,10 @@ export class InvoicesComponent implements InvoiceFormHost {
     });
 
     effect(() => {
-      const queryParams: Record<string, string | null> = {
+      const queryParams: Readonly<Record<string, string | null>> = {
         seg: this.segment() === 'all' ? null : this.segment(),
+        ...Object.fromEntries(this.filterSignals.map((f) => [f.key, f.signal().trim() || null])),
       };
-      for (const f of this.filterSignals) {
-        queryParams[f.key as string] = f.signal().trim() || null;
-      }
       untracked(
         () =>
           void this.router.navigate([], {
@@ -474,20 +471,14 @@ export class InvoicesComponent implements InvoiceFormHost {
    * detail always agree.
    */
   private adoptUrl(qp: ParamMap): boolean {
-    let changed = false;
-    for (const f of this.filterSignals) {
-      const next = this.sanitizeFilter(f, qp.get(f.key as string) ?? '');
-      if (next !== f.signal()) {
-        f.signal.set(next);
-        changed = true;
-      }
-    }
+    const updates = this.filterSignals
+      .map((f) => ({ f, next: this.sanitizeFilter(f, qp.get(f.key as string) ?? '') }))
+      .filter(({ f, next }) => next !== f.signal());
+    for (const { f, next } of updates) f.signal.set(next);
     const raw = qp.get('seg') ?? 'all';
     const seg = (SEGMENTS as readonly string[]).includes(raw) ? (raw as InvoiceSegment) : 'all';
-    if (seg !== this.segment()) {
-      this.segment.set(seg);
-      changed = true;
-    }
+    const changed = updates.length > 0 || seg !== this.segment();
+    this.segment.set(seg);
     const id = qp.get('id') ?? '';
     if (id !== this.selectedId()) {
       if (id) this.closeForms();
@@ -914,22 +905,22 @@ export class InvoicesComponent implements InvoiceFormHost {
 
   /** The row menu of an invoice. */
   rowMenu(i: Invoice): RowMenuSection[] {
-    const items: RowMenuItem[] = [];
-    if (this.canManage()) {
-      items.push({ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' });
-      if (i.status === 'open') {
-        items.push({ id: 'paid', label: this.i18n.translate('invoices.markPaid'), icon: 'check' });
-      }
-      items.push({ id: 'book', label: this.i18n.translate('invoices.createBooking'), icon: 'plus' });
-    }
-    if (i.hasFile) items.push({ id: 'file', label: this.i18n.translate('invoices.openFile'), icon: 'file' });
-    const sections: RowMenuSection[] = items.length ? [{ items }] : [];
-    if (this.canManage()) {
-      sections.push({
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
-      });
-    }
-    return sections;
+    const manage = this.canManage();
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    const edit: RowMenuItem = { id: 'edit', label: t('action.edit'), icon: 'edit' };
+    const paid: RowMenuItem = { id: 'paid', label: t('invoices.markPaid'), icon: 'check' };
+    const book: RowMenuItem = { id: 'book', label: t('invoices.createBooking'), icon: 'plus' };
+    const file: RowMenuItem = { id: 'file', label: t('invoices.openFile'), icon: 'file' };
+    const items: RowMenuItem[] = [
+      ...(manage ? [edit] : []),
+      ...(manage && i.status === 'open' ? [paid] : []),
+      ...(manage ? [book] : []),
+      ...(i.hasFile ? [file] : []),
+    ];
+    const remove: RowMenuSection = {
+      items: [{ id: 'delete', label: t('action.delete'), icon: 'trash', danger: true }],
+    };
+    return [...(items.length ? [{ items }] : []), ...(manage ? [remove] : [])];
   }
 
   onRowMenu(item: RowMenuItem, i: Invoice): void {
@@ -992,12 +983,9 @@ export class InvoicesComponent implements InvoiceFormHost {
   }
 
   private setSwipedAway(id: string, away: boolean): void {
-    this.swipedAway.update((cur) => {
-      const next = new Set(cur);
-      if (away) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    this.swipedAway.update((cur) =>
+      away ? new Set([...cur, id]) : new Set([...cur].filter((x) => x !== id)),
+    );
   }
 
   rowMenuLabel(i: Invoice): string {

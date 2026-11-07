@@ -1,6 +1,3 @@
 {
-  "backend/app/modules/media/images.py": 12,
-  "backend/app/modules/media/refs.py": 1,
-  "backend/app/modules/media/schemas.py": 1,
-  "backend/app/modules/media/service.py": 7
+  "backend/app/modules/media/service.py": 4
 }

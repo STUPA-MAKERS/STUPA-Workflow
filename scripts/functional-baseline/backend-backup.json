@@ -1,7 +1,5 @@
 {
-  "backend/app/modules/backup/archive.py": 13,
-  "backend/app/modules/backup/queue.py": 1,
-  "backend/app/modules/backup/router.py": 11,
-  "backend/app/modules/backup/schemas.py": 6,
-  "backend/app/modules/backup/service.py": 15
+  "backend/app/modules/backup/archive.py": 3,
+  "backend/app/modules/backup/router.py": 9,
+  "backend/app/modules/backup/service.py": 10
 }

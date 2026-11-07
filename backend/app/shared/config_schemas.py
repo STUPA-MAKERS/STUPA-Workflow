@@ -13,16 +13,15 @@ types.
 
 from __future__ import annotations
 
-from collections import deque
 from collections.abc import Mapping
 from decimal import Decimal
+from functools import reduce
 from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import (
     AwareDatetime,
     BaseModel,
-    ConfigDict,
     Field,
     HttpUrl,
     field_validator,
@@ -38,6 +37,7 @@ from app.shared.guards import (
 )
 from app.shared.i18n import I18nMap
 from app.shared.jsonlogic import JsonLogicError, validate_jsonlogic
+from app.shared.schemas import FrozenStrictCamelModel
 
 #: Pattern of a field or state key: lowercase snake case.
 KEY_PATTERN = r"^[a-z][a-z0-9_]*$"
@@ -67,33 +67,33 @@ def _redos_prone(pattern: str) -> bool:
         return False
 
     def children(op_name: str, av: Any) -> tuple[Any, ...]:  # noqa: ANN401
-        if op_name in ("MAX_REPEAT", "MIN_REPEAT"):
-            return (av[2],)
-        if op_name == "SUBPATTERN":
-            return (av[3],)
-        if op_name == "BRANCH":
-            return tuple(av[1])
-        return ()
+        match op_name:
+            case "MAX_REPEAT" | "MIN_REPEAT":
+                return (av[2],)
+            case "SUBPATTERN":
+                return (av[3],)
+            case "BRANCH":
+                return tuple(av[1])
+            case _:
+                return ()
 
     def has_unbounded_repeat(toks: Any) -> bool:  # noqa: ANN401
-        for op, av in toks:
-            if op.name in ("MAX_REPEAT", "MIN_REPEAT") and av[1] is maxrepeat:
-                return True
-            if any(has_unbounded_repeat(c) for c in children(op.name, av)):
-                return True
-        return False
+        return any(
+            (op.name in ("MAX_REPEAT", "MIN_REPEAT") and av[1] is maxrepeat)
+            or any(has_unbounded_repeat(c) for c in children(op.name, av))
+            for op, av in toks
+        )
+
+    def nested_repeat(op_name: str, av: Any) -> bool:  # noqa: ANN401
+        match op_name:
+            case "MAX_REPEAT" | "MIN_REPEAT":
+                _min, _max, body = av
+                return (_max is maxrepeat and has_unbounded_repeat(body)) or walk(body)
+            case _:
+                return any(walk(c) for c in children(op_name, av))
 
     def walk(toks: Any) -> bool:  # noqa: ANN401
-        for op, av in toks:
-            if op.name in ("MAX_REPEAT", "MIN_REPEAT"):
-                _min, _max, body = av
-                if _max is maxrepeat and has_unbounded_repeat(body):
-                    return True
-                if walk(body):
-                    return True
-            elif any(walk(c) for c in children(op.name, av)):
-                return True
-        return False
+        return any(nested_repeat(op.name, av) for op, av in toks)
 
     try:
         return walk(tokens)
@@ -147,17 +147,11 @@ EventName = Literal[
 ]
 
 
-class _CamelModel(BaseModel):
-    """Base: camelCase aliases in JSON, fields fillable by name, no extra field."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
-
 class FlowValidationError(Exception):
     """The flow graph violates a structural rule (initial, reachability, ref, op, action)."""
 
 
-class FieldOption(_CamelModel):
+class FieldOption(FrozenStrictCamelModel, frozen=True):
     """One option of a select field.
 
     Attributes:
@@ -174,7 +168,7 @@ class FieldOption(_CamelModel):
     color: str | None = None
 
 
-class FieldValidation(_CamelModel):
+class FieldValidation(FrozenStrictCamelModel, frozen=True):
     """Validation constraints of one form field.
 
     Attributes:
@@ -226,7 +220,7 @@ class FieldValidation(_CamelModel):
         return v
 
 
-class FormFieldDef(_CamelModel):
+class FormFieldDef(FrozenStrictCamelModel, frozen=True):
     """Definition of one form field."""
     key: str = Field(pattern=KEY_PATTERN)
     type: FieldType
@@ -268,7 +262,7 @@ StateKind = Literal["normal", "vote"]
 TransitionBranch = Literal["pass", "fail"]
 
 
-class StateDef(_CamelModel):
+class StateDef(FrozenStrictCamelModel, frozen=True):
     """One state of a flow graph.
 
     Attributes:
@@ -284,7 +278,7 @@ class StateDef(_CamelModel):
     config: dict[str, Any] = Field(default_factory=dict)
 
 
-class TransitionDef(_CamelModel):
+class TransitionDef(FrozenStrictCamelModel, frozen=True):
     """One transition of a flow graph.
 
     Attributes:
@@ -306,7 +300,7 @@ class TransitionDef(_CamelModel):
     requires_action: bool = Field(default=True, alias="requiresAction")
 
 
-class FlowGraph(_CamelModel):
+class FlowGraph(FrozenStrictCamelModel, frozen=True):
     """A flow: its states, transitions and editor layout."""
     states: list[StateDef]
     transitions: list[TransitionDef] = Field(default_factory=list)
@@ -426,10 +420,7 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
     normal state has no branch transition, because only a vote outcome fires one, so it
     would be a dead edge.
     """
-    outgoing: dict[str, list[TransitionDef]] = {k: [] for k in key_set}
-    for t in graph.transitions:
-        if t.from_ in outgoing:
-            outgoing[t.from_].append(t)
+    outgoing = {k: [t for t in graph.transitions if t.from_ == k] for k in key_set}
 
     for s in graph.states:
         branches = sorted(t.branch for t in outgoing[s.key] if t.branch)
@@ -493,20 +484,32 @@ def _assert_all_reachable(
     initial: str, key_set: set[str], transitions: list[TransitionDef]
 ) -> None:
     """Raise FlowValidationError when a state is not reachable from the initial one."""
-    adjacency: dict[str, list[str]] = {k: [] for k in key_set}
-    for t in transitions:
-        adjacency[t.from_].append(t.to)
-    seen: set[str] = set()
-    queue: deque[str] = deque([initial])
-    while queue:
-        node = queue.popleft()
-        if node in seen:
-            continue
-        seen.add(node)
-        queue.extend(adjacency[node])
+    adjacency = {k: tuple(t.to for t in transitions if t.from_ == k) for k in key_set}
+    seen = _reachable(initial, adjacency)
     unreachable = key_set - seen
     if unreachable:
         raise FlowValidationError(f"unreachable states: {sorted(unreachable)}")
+
+
+#: One layer of a breadth-first search: the frontier and the states seen before it.
+_Layer = tuple[frozenset[str], frozenset[str]]
+
+
+def _reachable(initial: str, adjacency: Mapping[str, tuple[str, ...]]) -> frozenset[str]:
+    """Return the states that the initial state reaches, the initial state included.
+
+    The breadth-first search adds one layer per step. A graph of n states has at most n
+    layers, so n steps reach the fixed point without recursion.
+    """
+
+    def step(layer: _Layer, _: str) -> _Layer:
+        frontier, seen = layer
+        visited = seen | frontier
+        following = frozenset(n for node in frontier for n in adjacency[node]) - visited
+        return (following, visited) if frontier else layer
+
+    frontier, seen = reduce(step, adjacency, (frozenset({initial}), frozenset[str]()))
+    return seen | frontier
 
 
 def _assert_no_automatic_cycle(
@@ -522,35 +525,51 @@ def _assert_no_automatic_cycle(
     cycle over two or more states. It runs a DFS over the automatic edges and reports a
     back edge as a cycle.
     """
-    auto_adj: dict[str, list[str]] = {k: [] for k in key_set}
-    for t in transitions:
-        if t.automatic:
-            auto_adj[t.from_].append(t.to)
+    auto_adj = {
+        k: tuple(t.to for t in transitions if t.automatic and t.from_ == k) for k in key_set
+    }
+    cycle, _done = _first_cycle(tuple(key_set), (), frozenset(), auto_adj)
+    if cycle is not None:
+        raise FlowValidationError(
+            f"automatic transitions form a cycle (infinite auto-advance): {' -> '.join(cycle)}"
+        )
 
-    WHITE, GREY, BLACK = 0, 1, 2
-    color: dict[str, int] = dict.fromkeys(key_set, WHITE)
 
-    def _visit(node: str, path: list[str]) -> None:
-        color[node] = GREY
-        path.append(node)
-        for nxt in auto_adj[node]:
-            if color[nxt] == GREY:
-                cycle = path[path.index(nxt) :] + [nxt]
-                raise FlowValidationError(
-                    "automatic transitions form a cycle "
-                    f"(infinite auto-advance): {' -> '.join(cycle)}"
+#: The result of a cycle search: the first cycle found (or None) and the finished nodes.
+_CycleSearch = tuple[tuple[str, ...] | None, frozenset[str]]
+
+
+def _first_cycle(
+    nodes: tuple[str, ...],
+    trail: tuple[str, ...],
+    done: frozenset[str],
+    adjacency: Mapping[str, tuple[str, ...]],
+) -> _CycleSearch:
+    """Search the nodes depth-first in order and return the first cycle with the finished nodes.
+
+    ``trail`` is the path from the root of the search to the current node. A neighbour on
+    the trail closes a cycle (a back edge). A node in ``done`` was searched completely and
+    holds no cycle. The search stops at the first cycle, so the cycle is the same one that
+    a recursive depth-first search in the same node order reports first.
+    """
+
+    def step(found: _CycleSearch, node: str) -> _CycleSearch:
+        cycle, finished = found
+        match (cycle, node in trail, node in finished):
+            case (None, True, _):
+                return (*trail[trail.index(node) :], node), finished
+            case (None, False, False):
+                inner, searched = _first_cycle(
+                    adjacency[node], (*trail, node), finished, adjacency
                 )
-            if color[nxt] == WHITE:
-                _visit(nxt, path)
-        path.pop()
-        color[node] = BLACK
+                return inner, searched | {node}
+            case _:
+                return found
 
-    for key in key_set:
-        if color[key] == WHITE:
-            _visit(key, [])
+    return reduce(step, nodes, (None, done))
 
 
-class Quorum(_CamelModel):
+class Quorum(FrozenStrictCamelModel, frozen=True):
     """Quorum of a vote: a count or a percentage."""
     type: Literal["count", "percent"]
     value: float = Field(ge=0)
@@ -560,7 +579,7 @@ class Quorum(_CamelModel):
 _LEGACY_VOTE_KEYS = frozenset({"allowChange", "allow_change"})
 
 
-class VoteConfig(_CamelModel):
+class VoteConfig(FrozenStrictCamelModel, frozen=True):
     """The rules of one vote, stored as JSONB in ``vote.config``.
 
     A ballot can never change after the cast, so the config has no
@@ -609,13 +628,17 @@ class VoteConfig(_CamelModel):
         poll row (with ``mode``) return their projection on the motion rules, so the
         readers of secret, guests and options work for every vote kind.
         """
-        if isinstance(data, VoteConfig):
-            return data
-        if "seats" in data:
-            return ElectionConfig.model_validate(data).as_vote_config()
-        if "mode" in data:
-            return PollConfig.model_validate(data).as_vote_config()
-        return cls.model_validate({k: v for k, v in data.items() if k not in _LEGACY_VOTE_KEYS})
+        match data:
+            case VoteConfig():
+                return data
+            case _ if "seats" in data:
+                return ElectionConfig.model_validate(data).as_vote_config()
+            case _ if "mode" in data:
+                return PollConfig.model_validate(data).as_vote_config()
+            case _:
+                return cls.model_validate(
+                    {k: v for k, v in data.items() if k not in _LEGACY_VOTE_KEYS}
+                )
 
 
 #: Answer keys of the single-candidate ballot (Ja/Nein/Enthaltung) and of a full
@@ -624,7 +647,7 @@ ELECTION_RESERVED_IDS = frozenset({"yes", "no", "abstain"})
 ELECTION_MAX_CANDIDATES = 50
 
 
-class ElectionCandidate(_CamelModel):
+class ElectionCandidate(FrozenStrictCamelModel, frozen=True):
     """One candidate of an election.
 
     ``id`` is the key of the candidate in the ballots and in the result. The server
@@ -650,7 +673,7 @@ class ElectionCandidate(_CamelModel):
         return stripped
 
 
-class ElectionConfig(_CamelModel):
+class ElectionConfig(FrozenStrictCamelModel, frozen=True):
     """The rules of one election, stored as JSONB in ``vote.config``.
 
     ``vote.kind = 'election'`` marks the row. An election has no majority rule and no
@@ -737,7 +760,7 @@ PollMode = Literal["single", "multi", "date"]
 DateAnswer = Literal["yes", "maybe", "no"]
 
 
-class PollOption(_CamelModel):
+class PollOption(FrozenStrictCamelModel, frozen=True):
     """One option of a poll: a text (``label``) or a date (``start``, optional ``end``).
 
     The server sets ``id`` (``o1``, ``o2``, ...) in the order of the creator. A
@@ -769,7 +792,7 @@ class PollOption(_CamelModel):
         return self
 
 
-class PollConfig(_CamelModel):
+class PollConfig(FrozenStrictCamelModel, frozen=True):
     """The rules of one poll, stored as JSONB in ``vote.config`` (``vote.kind = 'poll'``).
 
     ``single``: one option or an abstention. ``multi``: 0 to ``maxChoices`` options
@@ -809,9 +832,7 @@ class PollConfig(_CamelModel):
     @property
     def choice_limit(self) -> int:
         """Return the most options of one ballot (single: 1, multi: maxChoices)."""
-        if self.mode == "single":
-            return 1
-        return self.max_choices or len(self.options)
+        return 1 if self.mode == "single" else self.max_choices or len(self.options)
 
     def as_vote_config(self) -> VoteConfig:
         """Project the poll on the motion rules for the shared vote readers.
@@ -831,7 +852,7 @@ class PollConfig(_CamelModel):
         )
 
 
-class Recipient(_CamelModel):
+class Recipient(FrozenStrictCamelModel, frozen=True):
     """Recipient of a notification rule: a group, a role or the applicant."""
     kind: Literal["group", "role", "applicant"]
     ref: str | None = None
@@ -846,7 +867,7 @@ class Recipient(_CamelModel):
         return self
 
 
-class NotificationRule(_CamelModel):
+class NotificationRule(FrozenStrictCamelModel, frozen=True):
     """Rule that sends a mail template to recipients on an event."""
     event: EventName
     filter_type_id: UUID | None = Field(default=None, alias="filterTypeId")
@@ -855,14 +876,14 @@ class NotificationRule(_CamelModel):
     enabled: bool = True
 
 
-class WebhookConfig(_CamelModel):
+class WebhookConfig(FrozenStrictCamelModel, frozen=True):
     """Config of one outgoing webhook."""
     name: str
     url: HttpUrl
     active: bool = True
 
 
-class ComparisonOffers(_CamelModel):
+class ComparisonOffers(FrozenStrictCamelModel, frozen=True):
     """Requirement for comparison offers on an application."""
     required: bool = False
     min_count: int = Field(default=2, alias="minCount", ge=0)

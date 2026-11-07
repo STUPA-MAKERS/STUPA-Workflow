@@ -7,9 +7,9 @@ export type ApplicationsPane = 'list' | 'detail';
 
 /** An application changed: its state, its data, its archive flag, or it is gone. */
 export interface ApplicationChange {
-  id: Uuid;
-  kind: 'updated' | 'deleted';
-  source: ApplicationsPane;
+  readonly id: Uuid;
+  readonly kind: 'updated' | 'deleted';
+  readonly source: ApplicationsPane;
 }
 
 /**

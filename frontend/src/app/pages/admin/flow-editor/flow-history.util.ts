@@ -13,8 +13,8 @@ const MAX_UNDO = 100;
 
 /** Undo/redo history over graph snapshots. */
 export class FlowHistory {
-  private undoStack: FlowGraph[] = [];
-  private redoStack: FlowGraph[] = [];
+  private undoStack: readonly FlowGraph[] = [];
+  private redoStack: readonly FlowGraph[] = [];
 
   /** Reactive availability for the toolbar buttons. */
   readonly canUndo = signal(false);
@@ -22,25 +22,26 @@ export class FlowHistory {
 
   /** Record a structural edit: `prev` becomes the next undo target. */
   record(prev: FlowGraph): void {
-    this.undoStack.push(prev);
-    if (this.undoStack.length > MAX_UNDO) this.undoStack.shift();
+    this.undoStack = [...this.undoStack, prev].slice(-MAX_UNDO);
     this.redoStack = [];
     this.sync();
   }
 
   /** Pop the previous snapshot. `current` becomes redoable. */
   undo(current: FlowGraph): FlowGraph | undefined {
-    const prev = this.undoStack.pop();
+    const prev = this.undoStack.at(-1);
     if (prev === undefined) return undefined;
-    this.redoStack.push(current);
+    this.undoStack = this.undoStack.slice(0, -1);
+    this.redoStack = [...this.redoStack, current];
     this.sync();
     return prev;
   }
 
   redo(current: FlowGraph): FlowGraph | undefined {
-    const next = this.redoStack.pop();
+    const next = this.redoStack.at(-1);
     if (next === undefined) return undefined;
-    this.undoStack.push(current);
+    this.redoStack = this.redoStack.slice(0, -1);
+    this.undoStack = [...this.undoStack, current];
     this.sync();
     return next;
   }

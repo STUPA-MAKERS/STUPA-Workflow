@@ -253,9 +253,7 @@ async def set_attendance(
       Without `note` an excused member keeps the stored reason.
     The change goes into the audit log (`attendance_set`), without the note.
     """
-    body: dict[str, str] = {"status": status}
-    if note is not None:
-        body["note"] = note
+    body: dict[str, str] = {"status": status, **({"note": note} if note is not None else {})}
     return await api().put(
         f"/meetings/{meeting_id}/attendance/{principal_id}", json=body
     )
@@ -521,11 +519,10 @@ async def update_protocol(
     the gremium permission protocol.finalize (or admin), and goes into the audit log
     (`protocol_publication`).
     """
-    body: dict[str, object] = {}
-    if markdown is not None:
-        body["markdown"] = markdown
-    if public_withheld is not None:
-        body["publicWithheld"] = public_withheld
+    body: dict[str, object] = {
+        **({"markdown": markdown} if markdown is not None else {}),
+        **({"publicWithheld": public_withheld} if public_withheld is not None else {}),
+    }
     return await api().patch(f"/protocols/{protocol_id}", json=body)
 
 
@@ -662,13 +659,18 @@ def _disposition_params(header: str) -> dict[str, str]:
     let an uploader pick the name that the tool saves the file under. The first
     occurrence of a parameter wins.
     """
-    params: dict[str, str] = {}
-    for match in _DISPOSITION_PARAM.finditer(header):
-        value = match.group(2).strip()
-        if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
-            value = re.sub(r"\\(.)", r"\1", value[1:-1])
-        params.setdefault(match.group(1).lower(), value)
-    return params
+    pairs = [
+        (match.group(1).lower(), _unquoted(match.group(2).strip()))
+        for match in _DISPOSITION_PARAM.finditer(header)
+    ]
+    # A later duplicate comes first, so the first occurrence overwrites it.
+    return dict(reversed(pairs))
+
+
+def _unquoted(value: str) -> str:
+    """Return a parameter value without its quotes and backslash escapes, if it is quoted."""
+    quoted = len(value) >= 2 and value[0] == '"' and value[-1] == '"'
+    return re.sub(r"\\(.)", r"\1", value[1:-1]) if quoted else value
 
 
 def _decode_ext_value(value: str) -> str:
@@ -699,12 +701,17 @@ def _fit_name_max(name: str) -> str:
     """
     if len(name.encode()) <= _NAME_MAX_BYTES:
         return name
-    stem, ext = os.path.splitext(name)
-    if len(ext.encode()) > 32:
-        stem, ext = name, ""
-    while stem and len((stem + ext).encode()) > _NAME_MAX_BYTES:
-        stem = stem[:-1]
-    return stem + ext if stem else ""
+    split_stem, split_ext = os.path.splitext(name)
+    stem, ext = (name, "") if len(split_ext.encode()) > 32 else (split_stem, split_ext)
+    cut = next(
+        (
+            stem[:n]
+            for n in range(len(stem), 0, -1)
+            if len((stem[:n] + ext).encode()) <= _NAME_MAX_BYTES
+        ),
+        "",
+    )
+    return cut + ext if cut else ""
 
 
 def _disposition_filename(header: str) -> str:
@@ -717,10 +724,8 @@ def _disposition_filename(header: str) -> str:
     only, at most 255 bytes in UTF-8, or `""` when there is none.
     """
     params = _disposition_params(header)
-    name = _decode_ext_value(params.get("filename*", ""))
-    if not name:
-        name = params.get("filename", "")
-    name = Path(name.replace("\\", "/")).name
+    raw = _decode_ext_value(params.get("filename*", "")) or params.get("filename", "")
+    name = Path(raw.replace("\\", "/")).name
     return "" if name in {".", ".."} else _fit_name_max(name)
 
 
@@ -800,9 +805,7 @@ async def upload_attachment(
         scan still runs, the file cannot be downloaded yet).
     """
     name, data, mime = _attachment_part(file_path, filename)
-    form: dict[str, str] = {}
-    if field_key is not None:
-        form["field_key"] = field_key
+    form: dict[str, str] = {"field_key": field_key} if field_key is not None else {}
     return await api().post(
         f"/applications/{application_id}/attachments",
         files={"file": (name, data, mime)},
@@ -838,19 +841,17 @@ async def download_attachment(
         if target.exists() and not overwrite:
             raise ApiError(400, f"file exists (pass overwrite=true): {target_path!r}")
     async with api().stream("GET", f"/attachments/{attachment_id}/download") as resp:
-        stored = _disposition_filename(resp.headers.get("content-disposition", ""))
-        if not stored or "\x00" in stored:
-            stored = f"attachment-{attachment_id}"
+        named = _disposition_filename(resp.headers.get("content-disposition", ""))
+        stored = named if named and "\x00" not in named else f"attachment-{attachment_id}"
         final = target / stored if target.is_dir() else target
         if final.exists() and not overwrite:
             raise ApiError(400, f"file exists (pass overwrite=true): {str(final)!r}")
         fd, tmp = tempfile.mkstemp(dir=final.parent, prefix=".download-")
-        size = 0
         try:
             with os.fdopen(fd, "wb") as out:
                 async for chunk in resp.aiter_bytes(_DOWNLOAD_CHUNK):
                     out.write(chunk)
-                    size += len(chunk)
+                size = out.tell()
             os.replace(tmp, final)
         except BaseException:
             Path(tmp).unlink(missing_ok=True)

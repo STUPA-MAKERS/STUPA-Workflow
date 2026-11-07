@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.shared.schemas import FrozenModel
 
 #: The kinds a hit can have. The client groups by this and picks the icon and label,
 #: so the value is a stable key and never a translated string.
@@ -27,7 +29,7 @@ SearchKind = Literal[
 ]
 
 
-class SearchHit(BaseModel):
+class SearchHit(FrozenModel, frozen=True):
     """One result row."""
 
     kind: SearchKind
@@ -44,7 +46,7 @@ class SearchHit(BaseModel):
     archived: bool = False
 
 
-class SearchResults(BaseModel):
+class SearchResults(FrozenModel, frozen=True):
     """Everything found for one query, in one round trip."""
 
     hits: list[SearchHit]

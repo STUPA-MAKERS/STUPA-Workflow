@@ -93,7 +93,7 @@ export class BackupsComponent implements OnDestroy {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  protected readonly rows = signal<Backup[]>([]);
+  protected readonly rows = signal<readonly Backup[]>([]);
   /** False without an age recipient: this installation cannot create an archive. */
   protected readonly enabled = signal(true);
   /** False without the private key: it cannot read one either, so no restore, no import. */
@@ -256,17 +256,23 @@ export class BackupsComponent implements OnDestroy {
         label: t(row.pinned ? 'admin.backups.unpin' : 'admin.backups.pin'),
         icon: row.pinned ? 'pinslash' : 'pin',
       },
+      ...(this.restoreEnabled()
+        ? [
+            {
+              id: 'restore',
+              label: t('admin.backups.restore'),
+              icon: 'history',
+            } satisfies RowMenuItem,
+          ]
+        : []),
+      {
+        id: 'delete',
+        label: t('admin.common.delete'),
+        icon: 'trash',
+        danger: true,
+        disabledReason: row.pinned ? t('admin.backups.pinnedHint') : null,
+      },
     ];
-    if (this.restoreEnabled()) {
-      items.push({ id: 'restore', label: t('admin.backups.restore'), icon: 'history' });
-    }
-    items.push({
-      id: 'delete',
-      label: t('admin.common.delete'),
-      icon: 'trash',
-      danger: true,
-      disabledReason: row.pinned ? t('admin.backups.pinnedHint') : null,
-    });
     return [{ items }];
   }
 

@@ -32,7 +32,7 @@ export class ExpenseTransfersState {
    *  dropped, exactly as in the bookings list. */
   private fetchEpoch = 0;
 
-  readonly items = signal<BudgetTransfer[]>([]);
+  readonly items = signal<readonly BudgetTransfer[]>([]);
   readonly total = signal(0);
   readonly loading = signal(false);
   readonly loadingMore = signal(false);

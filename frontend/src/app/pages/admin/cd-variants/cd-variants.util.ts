@@ -2,8 +2,8 @@ import { CD_SQUARE_LOGO_ACCEPT, SQUARE_LOGO_MIN_PX, SQUARE_LOGO_TOLERANCE } from
 
 /** The pixel size of an image. */
 export interface ImageSize {
-  width: number;
-  height: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 /**

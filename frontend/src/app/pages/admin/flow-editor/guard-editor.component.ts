@@ -170,8 +170,9 @@ export class GuardEditorComponent {
   protected setChild(index: number, child: Guard | null): void {
     const op = this.op();
     if (op !== 'and' && op !== 'or' && op !== 'not') return;
-    let next = this.children().map((c, i) => (i === index ? child : c));
-    next = next.filter((c): c is Guard => c !== null);
+    const next = this.children()
+      .map((c, i) => (i === index ? child : c))
+      .filter((c): c is Guard => c !== null);
     if (op === 'not') {
       this.guardChange.emit(next.length ? { not: [next[0]] } : null);
       return;

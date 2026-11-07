@@ -23,7 +23,7 @@ import logging
 import threading
 import uuid
 from collections.abc import AsyncIterator, Sequence
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
 from typing import Final
 
 from sqlalchemy import select
@@ -92,25 +92,19 @@ class ImageStream:
     size: int
 
 
+@dataclass(frozen=True, slots=True)
 class MediaService:
-    """Upload, read and render collection of the Markdown images."""
+    """Upload, read and render collection of the Markdown images.
 
-    def __init__(
-        self,
-        session: AsyncSession,
-        *,
-        storage: ObjectStorage | None,
-        max_bytes: int = 10 * 1024 * 1024,
-        settings: Settings | None = None,
-    ) -> None:
-        """Bind the service to a session, the storage and the upload limits.
+    The service is bound to a session, the storage and the upload limits. Without
+    ``storage`` an upload gives 503. ``settings`` None means ``get_settings()``.
+    """
 
-        Without ``storage`` an upload gives 503. ``settings`` None means ``get_settings()``.
-        """
-        self.session = session
-        self.storage = storage
-        self.max_bytes = max_bytes
-        self.settings = settings
+    session: AsyncSession
+    _: KW_ONLY
+    storage: ObjectStorage | None
+    max_bytes: int = 10 * 1024 * 1024
+    settings: Settings | None = None
 
     async def upload(self, data: bytes) -> MarkdownImageOut:
         """Scan, clean and store one image.

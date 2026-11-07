@@ -127,17 +127,20 @@ export class InvoiceDetailComponent {
 
   protected readonly menu = computed<RowMenuSection[]>(() => {
     const i = this.invoice();
-    const items: RowMenuItem[] = [];
-    if (this.phone() && i.hasFile) {
-      items.push({ id: 'file', label: this.i18n.translate('invoices.openFile'), icon: 'download' });
-    }
-    const sections: RowMenuSection[] = items.length ? [{ items }] : [];
-    if (this.canManage()) {
-      sections.push({
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
-      });
-    }
-    return sections;
+    const file: RowMenuItem = {
+      id: 'file',
+      label: this.i18n.translate('invoices.openFile'),
+      icon: 'download',
+    };
+    const remove: RowMenuSection = {
+      items: [
+        { id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true },
+      ],
+    };
+    return [
+      ...(this.phone() && i.hasFile ? [{ items: [file] }] : []),
+      ...(this.canManage() ? [remove] : []),
+    ];
   });
 
   onMenu(item: RowMenuItem): void {

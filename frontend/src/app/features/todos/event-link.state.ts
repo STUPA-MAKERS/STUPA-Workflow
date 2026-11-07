@@ -24,7 +24,7 @@ export class EventLinkState {
   readonly value = signal<Uuid>('');
   /** The Event that links the booking when the form opened. */
   private readonly initial = signal<Uuid>('');
-  private readonly events = signal<TodoEventRef[]>([]);
+  private readonly events = signal<readonly TodoEventRef[]>([]);
   /** The current Event when the person cannot write its board, so it is not in `events`. */
   private readonly extra = signal<SelectOption | null>(null);
 
@@ -32,8 +32,8 @@ export class EventLinkState {
     const none = { value: '', label: this.i18n.translate('todos.eventCard.none') };
     const list = this.events().map((e) => ({ value: e.id, label: this.label(e) }));
     const extra = this.extra();
-    if (extra && !list.some((o) => o.value === extra.value)) list.unshift(extra);
-    return [none, ...list];
+    const missing = extra !== null && !list.some((o) => o.value === extra.value);
+    return missing ? [none, extra, ...list] : [none, ...list];
   });
 
   readonly changed = computed(() => this.value() !== this.initial());

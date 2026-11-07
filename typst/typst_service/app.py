@@ -25,7 +25,9 @@ import json
 import os
 import re
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Final
 
 from fastapi import FastAPI, Query, Request, Response
@@ -83,12 +85,19 @@ class _TooLarge(Exception):
         self.detail = detail
 
 
-# The multipart contract. The service accepts these three field names and no
-# other, so the accepted surface stays as narrow as the raw-body one.
 _MULTIPART_TYPE: Final[str] = "multipart/form-data"
-_SOURCE_FIELD: Final[str] = "source"
-_CONFIG_FIELD: Final[str] = "config"
-_ASSETS_FIELD: Final[str] = "assets"
+
+
+class _Field(StrEnum):
+    """The multipart contract.
+
+    The service accepts these three field names and no other, so the accepted
+    surface stays as narrow as the raw-body one.
+    """
+
+    SOURCE = "source"
+    CONFIG = "config"
+    ASSETS = "assets"
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,8 +105,33 @@ class _Payload:
     """What one render request carries, whatever its wire shape is."""
 
     source: bytes
-    config: dict[str, object] = field(default_factory=dict[str, object])
-    assets: dict[str, bytes] = field(default_factory=dict[str, bytes])
+    config: Mapping[str, object] = field(default_factory=dict[str, object])
+    assets: Mapping[str, bytes] = field(default_factory=dict[str, bytes])
+
+
+@dataclass(frozen=True, slots=True)
+class _SourcePart:
+    """The `source` part of a multipart request."""
+
+    data: bytes
+
+
+@dataclass(frozen=True, slots=True)
+class _ConfigPart:
+    """The parsed `config` part of a multipart request."""
+
+    data: dict[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class _AssetPart:
+    """One `assets` part of a multipart request, with its checked file name."""
+
+    name: str
+    data: bytes
+
+
+type _Part = _SourcePart | _ConfigPart | _AssetPart
 
 
 async def _part_bytes(value: UploadFile | str) -> bytes:
@@ -134,7 +168,7 @@ def _asset_name(value: UploadFile | str) -> str:
             name is not a plain image file name.
     """
     if isinstance(value, str) or not value.filename:
-        raise _BadRequest(f"each `{_ASSETS_FIELD}` part must be a file part with a file name")
+        raise _BadRequest(f"each `{_Field.ASSETS}` part must be a file part with a file name")
     name = value.filename
     if not ASSET_NAME_RE.fullmatch(name):
         raise _BadRequest(
@@ -143,8 +177,43 @@ def _asset_name(value: UploadFile | str) -> str:
     return name
 
 
+def _repeated_assets(items: Sequence[tuple[str, UploadFile | str]]) -> frozenset[int]:
+    """Return the positions of the asset parts whose file name an earlier asset part has."""
+    names = [
+        value.filename if key == _Field.ASSETS and not isinstance(value, str) else None
+        for key, value in items
+    ]
+    first = {name: index for index, name in reversed(tuple(enumerate(names))) if name}
+    return frozenset(index for index, name in enumerate(names) if name and first[name] != index)
+
+
+async def _read_part(key: str, value: UploadFile | str, repeated: bool) -> _Part:
+    """Read one multipart part by its field name.
+
+    Raises:
+        _BadRequest: The field name is unknown, or the part breaks the contract.
+    """
+    match key:
+        case _Field.SOURCE:
+            return _SourcePart(await _part_bytes(value))
+        case _Field.CONFIG:
+            return _ConfigPart(_parse_config(await _part_bytes(value)))
+        case _Field.ASSETS:
+            name = _asset_name(value)
+            if repeated:
+                raise _BadRequest(f"duplicate asset name {name!r}")
+            return _AssetPart(name, await _part_bytes(value))
+        case _:
+            raise _BadRequest(
+                f"unknown multipart field {key!r}; allowed: "
+                f"{_Field.SOURCE}, {_Field.CONFIG}, {_Field.ASSETS}"
+            )
+
+
 async def _read_multipart(request: Request) -> _Payload:
     """Read `source`, `config` and the repeated `assets` parts out of the form.
+
+    A repeated `source` or `config` part replaces the earlier one.
 
     Raises:
         _BadRequest: The body is malformed, it names an unknown field, or a
@@ -160,27 +229,21 @@ async def _read_multipart(request: Request) -> _Payload:
         # The parser under starlette raises this for a broken part header.
         raise _BadRequest(f"malformed multipart body: {exc}") from None
     try:
-        source = b""
-        config: dict[str, object] = {}
-        assets: dict[str, bytes] = {}
-        for key, value in form.multi_items():
-            if key == _SOURCE_FIELD:
-                source = await _part_bytes(value)
-            elif key == _CONFIG_FIELD:
-                config = _parse_config(await _part_bytes(value))
-            elif key == _ASSETS_FIELD:
-                name = _asset_name(value)
-                if name in assets:
-                    raise _BadRequest(f"duplicate asset name {name!r}")
-                assets[name] = await _part_bytes(value)
-            else:
-                raise _BadRequest(
-                    f"unknown multipart field {key!r}; allowed: "
-                    f"{_SOURCE_FIELD}, {_CONFIG_FIELD}, {_ASSETS_FIELD}"
-                )
+        items = form.multi_items()
+        repeated = _repeated_assets(items)
+        parts = [
+            await _read_part(key, value, index in repeated)
+            for index, (key, value) in enumerate(items)
+        ]
     finally:
         await form.close()
-    return _Payload(source=source, config=config, assets=assets)
+    sources = [part.data for part in parts if isinstance(part, _SourcePart)]
+    configs = [part.data for part in parts if isinstance(part, _ConfigPart)]
+    return _Payload(
+        source=sources[-1] if sources else b"",
+        config=configs[-1] if configs else {},
+        assets={part.name: part.data for part in parts if isinstance(part, _AssetPart)},
+    )
 
 
 async def _read_payload(request: Request) -> _Payload:
@@ -190,14 +253,15 @@ async def _read_payload(request: Request) -> _Payload:
         _BadRequest: The body is malformed or it carries no source.
     """
     media_type = request.headers.get("content-type", "").split(";", 1)[0].strip()
-    if media_type.lower() == _MULTIPART_TYPE:
-        payload = await _read_multipart(request)
-    else:
-        payload = _Payload(source=await request.body())
+    payload = (
+        await _read_multipart(request)
+        if media_type.lower() == _MULTIPART_TYPE
+        else _Payload(source=await request.body())
+    )
     if not payload.source:
         raise _BadRequest(
             "empty source; POST the source as the raw body or as the "
-            f"multipart `{_SOURCE_FIELD}` field"
+            f"multipart `{_Field.SOURCE}` field"
         )
     return payload
 

@@ -1,13 +1,4 @@
 {
-  "frontend/src/app/features/voting/ballot/ballot.component.ts": 9,
-  "frontend/src/app/features/voting/beamer.component.ts": 1,
-  "frontend/src/app/features/voting/election.util.ts": 10,
-  "frontend/src/app/features/voting/poll-editor/poll-editor.component.ts": 2,
-  "frontend/src/app/features/voting/poll.util.ts": 19,
-  "frontend/src/app/features/voting/vote-bars.component.ts": 5,
-  "frontend/src/app/features/voting/vote-cast.component.ts": 4,
-  "frontend/src/app/features/voting/vote-panel/vote-context.ts": 2,
-  "frontend/src/app/features/voting/vote-panel/vote-panel.component.ts": 2,
-  "frontend/src/app/features/voting/voting-page/voting-page.service.ts": 6,
-  "frontend/src/app/features/voting/voting-page/voting.component.ts": 40
+  "frontend/src/app/features/voting/voting-page/voting-page.service.ts": 1,
+  "frontend/src/app/features/voting/voting-page/voting.component.ts": 2
 }

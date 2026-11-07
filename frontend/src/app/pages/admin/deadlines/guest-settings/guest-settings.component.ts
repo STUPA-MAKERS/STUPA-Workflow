@@ -22,9 +22,9 @@ type LinkMode = 'unlimited' | 'days';
 
 /** The edit state. The fields hold the text of the inputs, so a bad entry stays visible. */
 interface Draft {
-  hours: string;
-  mode: LinkMode;
-  days: string;
+  readonly hours: string;
+  readonly mode: LinkMode;
+  readonly days: string;
 }
 
 /** A whole number in [min, max], else `null`. */

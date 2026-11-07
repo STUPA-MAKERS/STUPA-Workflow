@@ -7,16 +7,16 @@ import { voteOptionLabel } from '../meetings/meetings-display.util';
 import { SegBarComponent, type SegTone, StatusTextComponent } from '@stupa-makers/ui-kit';
 
 interface BarRow {
-  option: string;
-  label: string;
-  count: number;
+  readonly option: string;
+  readonly label: string;
+  readonly count: number;
   /** Share of the cast ballots, rounded to whole percent. */
-  pct: number;
-  tone: SegTone;
+  readonly pct: number;
+  readonly tone: SegTone;
 }
 
 /** Ja in the accent, Nein in the error colour, Enthaltung grey. */
-const TONES: Record<string, SegTone> = { yes: 'filled', no: 'error', abstain: 'muted' };
+const TONES: Readonly<Record<string, SegTone>> = { yes: 'filled', no: 'error', abstain: 'muted' };
 
 /**
  * The result of a vote: one row per option with the count, the share of the cast
@@ -56,7 +56,7 @@ export class VoteBarsComponent {
     this.options().reduce((sum, o) => sum + (this.counts()[o] ?? 0), 0),
   );
 
-  protected readonly rows = computed<BarRow[]>(() => {
+  protected readonly rows = computed<readonly BarRow[]>(() => {
     const counts = this.counts();
     const cast = this.cast();
     return this.options().map((option) => {

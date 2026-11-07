@@ -36,8 +36,8 @@ export type TransferFormMode = 'create' | 'edit';
 /** "Frei danach" of one leg: the free amount now and after the transfer. */
 interface LegFree {
   /** The free amount now, shown struck through while an amount is entered. */
-  before: string | null;
-  after: string;
+  readonly before: string | null;
+  readonly after: string;
 }
 
 /**
@@ -86,7 +86,7 @@ export class TransferFormComponent {
   readonly dialogs = input.required<ExpenseDialogsState>();
   readonly transfers = input.required<ExpenseTransfersState>();
   readonly mode = input<TransferFormMode>('create');
-  readonly tree = input<BudgetTreeNode[]>([]);
+  readonly tree = input<readonly BudgetTreeNode[]>([]);
   readonly costCentres = input<ReadonlyMap<string, CostCentreLabel>>(new Map());
   readonly saving = input(false);
   readonly layout = input<FinanceFormLayout>('pane');

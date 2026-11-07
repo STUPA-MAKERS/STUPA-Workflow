@@ -19,8 +19,8 @@ import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 
 /** Row of the guard priority stack. The parent computes the label. */
 export interface GuardPriorityRow {
-  sig: string;
-  label: string;
+  readonly sig: string;
+  readonly label: string;
 }
 
 /**

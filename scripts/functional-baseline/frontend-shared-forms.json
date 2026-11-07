@@ -1,12 +1,5 @@
 {
-  "frontend/src/app/shared/forms/answer-format.ts": 3,
-  "frontend/src/app/shared/forms/answer-view/answer-view.component.ts": 42,
-  "frontend/src/app/shared/forms/budget-options.ts": 7,
-  "frontend/src/app/shared/forms/formly-mapper.ts": 35,
-  "frontend/src/app/shared/forms/i18n-text.ts": 2,
-  "frontend/src/app/shared/forms/jsonlogic.ts": 6,
-  "frontend/src/app/shared/forms/positions-view/positions-view.component.ts": 9,
-  "frontend/src/app/shared/forms/positions.ts": 9,
-  "frontend/src/app/shared/forms/server-errors.ts": 16,
-  "frontend/src/app/shared/forms/settings-form.ts": 9
+  "frontend/src/app/shared/forms/formly-mapper.ts": 2,
+  "frontend/src/app/shared/forms/positions-view/positions-view.component.ts": 1,
+  "frontend/src/app/shared/forms/server-errors.ts": 10
 }

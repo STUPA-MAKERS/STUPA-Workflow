@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
+from app.modules.todos.grouping import grouped
 from app.modules.todos.models import (
     TodoAssignee,
     TodoBoard,
@@ -178,7 +179,5 @@ async def _file_names(ids: list[UUID], session: AsyncSession) -> dict[UUID, list
             .order_by(Attachment.created_at, Attachment.id)
         )
     ).all()
-    out: dict[UUID, list[str]] = {}
-    for comment_id, filename in rows:
-        out.setdefault(cast(UUID, comment_id), []).append(filename)
-    return out
+    by_comment = grouped((cast(UUID, comment_id), filename) for comment_id, filename in rows)
+    return {comment_id: list(names) for comment_id, names in by_comment.items()}

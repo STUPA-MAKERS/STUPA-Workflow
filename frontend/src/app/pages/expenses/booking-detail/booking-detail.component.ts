@@ -4,6 +4,7 @@ import type { Application } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   EmptyStateComponent,
@@ -79,7 +80,7 @@ export class BookingDetailComponent {
 
   readonly expense = input.required<Expense>();
   readonly costCentres = input<ReadonlyMap<string, CostCentreLabel>>(new Map());
-  readonly tree = input<BudgetTreeNode[]>([]);
+  readonly tree = input<readonly BudgetTreeNode[]>([]);
   /** The label of the fiscal year, null while unknown. */
   readonly fyLabel = input<string | null>(null);
   readonly invoice = input<Invoice | null>(null);
@@ -196,24 +197,24 @@ export class BookingDetailComponent {
 
   protected readonly menu = computed<RowMenuSection[]>(() => {
     const e = this.expense();
-    const items: RowMenuItem[] = [];
-    if (this.canDuplicate() && !e.parentExpenseId) {
-      items.push({ id: 'duplicate', label: this.i18n.translate('expenses.action.duplicate'), icon: 'copy' });
-    }
-    if (this.canManage() && !e.parentExpenseId) {
-      items.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'plus' });
-    }
     const inv = this.invoice();
-    if (inv && inv.id === e.invoiceId && inv.hasFile) {
-      items.push({ id: 'file', label: this.i18n.translate('invoices.openFile'), icon: 'file' });
-    }
-    const sections: RowMenuSection[] = items.length ? [{ items }] : [];
-    if (this.canManage()) {
-      sections.push({
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
-      });
-    }
-    return sections;
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    const duplicate: RowMenuItem = {
+      id: 'duplicate',
+      label: t('expenses.action.duplicate'),
+      icon: 'copy',
+    };
+    const sub: RowMenuItem = { id: 'sub', label: t('expenses.sub.add'), icon: 'plus' };
+    const file: RowMenuItem = { id: 'file', label: t('invoices.openFile'), icon: 'file' };
+    const items: RowMenuItem[] = [
+      ...(this.canDuplicate() && !e.parentExpenseId ? [duplicate] : []),
+      ...(this.canManage() && !e.parentExpenseId ? [sub] : []),
+      ...(inv && inv.id === e.invoiceId && inv.hasFile ? [file] : []),
+    ];
+    const remove: RowMenuSection = {
+      items: [{ id: 'delete', label: t('action.delete'), icon: 'trash', danger: true }],
+    };
+    return [...(items.length ? [{ items }] : []), ...(this.canManage() ? [remove] : [])];
   });
 
   onMenu(item: RowMenuItem): void {

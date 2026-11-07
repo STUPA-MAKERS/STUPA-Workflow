@@ -47,8 +47,8 @@ export function canChangeAgenda(meeting: Meeting, locked: boolean): boolean {
 
 /** A move of an agenda item from one position to another (0-based). */
 export interface AgendaMove {
-  from: number;
-  to: number;
+  readonly from: number;
+  readonly to: number;
 }
 
 /**
@@ -196,12 +196,15 @@ export class AgendaPaneComponent {
    * free-text item needs no kind: it gets a sub line only for an open vote, else none.
    */
   protected sub(item: AgendaItem): string | null {
-    const parts: string[] = [];
-    if (item.applicationId) parts.push(this.i18n.translate('meetings.agenda.kindApplication'));
-    else if (item.todoId) parts.push(this.i18n.translate('meetings.agenda.kindTodo'));
-    if (this.votesFor(item.id).some((v) => v.status === 'open')) {
-      parts.push(this.i18n.translate('meetings.agenda.voteOpen'));
-    }
+    const kind = item.applicationId
+      ? [this.i18n.translate('meetings.agenda.kindApplication')]
+      : item.todoId
+        ? [this.i18n.translate('meetings.agenda.kindTodo')]
+        : [];
+    const open = this.votesFor(item.id).some((v) => v.status === 'open')
+      ? [this.i18n.translate('meetings.agenda.voteOpen')]
+      : [];
+    const parts = [...kind, ...open];
     return parts.length ? parts.join(' · ') : null;
   }
 
@@ -241,20 +244,18 @@ export class AgendaPaneComponent {
   protected readonly menus = computed(() => this.agenda().map((item, i) => this.menu(item, i)));
 
   /** The row menu of an item. Empty when nothing on the agenda may change. */
-  private menu(item: AgendaItem, index: number): RowMenuSection[] {
-    const sections = this.agendaMenu(item, index);
-    if (this.canCreateTodo()) {
-      const todo: RowMenuItem = { id: 'todo', label: this.i18n.translate('meetings.agenda.todo'), icon: 'circleok' };
-      sections.unshift({ items: [todo] });
-    }
-    if (this.canTick()) {
-      const key: TranslationKey = item.doneAt ? 'meetings.agenda.markOpen' : 'meetings.agenda.markDone';
-      sections.unshift({ items: [{ id: 'done', label: this.i18n.translate(key), icon: 'check' }] });
-    }
-    return sections;
+  private menu(item: AgendaItem, index: number): readonly RowMenuSection[] {
+    const todo: RowMenuItem = { id: 'todo', label: this.i18n.translate('meetings.agenda.todo'), icon: 'circleok' };
+    const key: TranslationKey = item.doneAt ? 'meetings.agenda.markOpen' : 'meetings.agenda.markDone';
+    const done: RowMenuItem = { id: 'done', label: this.i18n.translate(key), icon: 'check' };
+    return [
+      ...(this.canTick() ? [{ items: [done] }] : []),
+      ...(this.canCreateTodo() ? [{ items: [todo] }] : []),
+      ...this.agendaMenu(item, index),
+    ];
   }
 
-  private agendaMenu(item: AgendaItem, index: number): RowMenuSection[] {
+  private agendaMenu(item: AgendaItem, index: number): readonly RowMenuSection[] {
     if (!this.canEditAgenda()) return [];
     const t = (key: TranslationKey): string => this.i18n.translate(key);
     const nonPublic: RowMenuItem = {
@@ -265,12 +266,13 @@ export class AgendaPaneComponent {
     };
     if (!this.canChangeAgenda()) return [{ items: [nonPublic] }];
 
-    const edit: RowMenuItem[] = [];
-    edit.push({ id: 'rename', label: t('meetings.agenda.rename'), icon: 'edit' });
-    if (index > 0) edit.push({ id: 'up', label: t('meetings.agenda.moveUp'), icon: 'up' });
-    if (index < this.agenda().length - 1) {
-      edit.push({ id: 'down', label: t('meetings.agenda.moveDown'), icon: 'down' });
-    }
+    const up: RowMenuItem = { id: 'up', label: t('meetings.agenda.moveUp'), icon: 'up' };
+    const down: RowMenuItem = { id: 'down', label: t('meetings.agenda.moveDown'), icon: 'down' };
+    const edit: readonly RowMenuItem[] = [
+      { id: 'rename', label: t('meetings.agenda.rename'), icon: 'edit' },
+      ...(index > 0 ? [up] : []),
+      ...(index < this.agenda().length - 1 ? [down] : []),
+    ];
     const blocked = this.removeBlockedReason(item.id);
     return [
       { items: edit },
@@ -294,12 +296,12 @@ export class AgendaPaneComponent {
   }
 
   protected onAction(item: AgendaItem, index: number, action: RowMenuItem): void {
-    if (action.id === 'todo') {
-      this.openTodo(item, index);
-      return;
-    }
-    if (this.savingAgenda()) return;
-    switch (action.id as AgendaAction) {
+    const id = action.id as AgendaAction;
+    if (id !== 'todo' && this.savingAgenda()) return;
+    switch (id) {
+      case 'todo':
+        this.openTodo(item, index);
+        break;
       case 'done':
         this.setDone.emit({ item, done: !item.doneAt });
         break;
@@ -335,16 +337,21 @@ export class AgendaPaneComponent {
   private openTodo(item: AgendaItem, index: number): void {
     const title = this.title(item);
     const top = this.i18n.translate('todos.link.top', { n: index + 1 });
-    const links: NewTodoLink[] = [];
-    if (item.applicationId) {
-      links.push({
-        kind: 'application',
-        targetId: item.applicationId,
-        label: `${this.i18n.translate('todos.linkKind.application')} · ${item.applicationTitle || title}`,
-      });
-    }
-    links.push({ kind: 'agenda_item', targetId: item.id, label: `${this.meeting().title} · ${top}` });
-    this.todoLinks.set(links);
+    const application: readonly NewTodoLink[] = item.applicationId
+      ? [
+          {
+            kind: 'application',
+            targetId: item.applicationId,
+            label: `${this.i18n.translate('todos.linkKind.application')} · ${item.applicationTitle || title}`,
+          },
+        ]
+      : [];
+    const agendaItem: NewTodoLink = {
+      kind: 'agenda_item',
+      targetId: item.id,
+      label: `${this.meeting().title} · ${top}`,
+    };
+    this.todoLinks.set([...application, agendaItem]);
     this.todoOpen.set(true);
   }
 

@@ -21,7 +21,7 @@ export function isAllowedLinkUrl(url: string | null | undefined): boolean {
 }
 
 /** All disallowed URLs of the legal links of a branding draft. */
-export function brandingLinkErrors(branding: Branding | null | undefined): string[] {
+export function brandingLinkErrors(branding: Branding | null | undefined): readonly string[] {
   if (!branding) return [];
   return branding.legalLinks.map((l) => l.url).filter((u) => !isAllowedLinkUrl(u));
 }

@@ -1,15 +1,21 @@
 import { Injectable, computed, inject } from '@angular/core';
-import type { Routes } from '@angular/router';
+import type { Data, Routes } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { routes } from '../../app.routes';
 
 /** One navigable page, already resolved to a label the reader would recognise. */
 export interface PageEntry {
-  path: string;
-  label: string;
+  readonly path: string;
+  readonly label: string;
   /** The section it sits under, for example "Verwaltung". Null at the top level. */
-  parentLabel: string | null;
+  readonly parentLabel: string | null;
+}
+
+/** A routed page that passed the filters, before its labels are read. */
+interface PageCandidate {
+  readonly path: string;
+  readonly data: Data;
 }
 
 /**
@@ -29,37 +35,47 @@ export class PageIndexService {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
 
-  readonly visible = computed<PageEntry[]>(() => {
+  readonly visible = computed<readonly PageEntry[]>(() => {
     if (!this.auth.isAuthenticated()) return [];
-    const out: PageEntry[] = [];
-    this.collect(routes[0]?.children ?? [], '', out);
-    return out;
+    const found = this.collect(routes[0]?.children ?? [], '');
+    const unique = found.filter((c, i) => found.findIndex((o) => o.path === c.path) === i);
+    return unique.map((c) => this.entry(c));
   });
 
   /**
-   * Add the pages of `list` below `prefix`. A route with children is a frame (the admin
-   * frame, the applications list): its children are pages too, at the full path.
+   * The pages of `list` below `prefix`, each child before its frame. A route with children
+   * is a frame (the admin frame, the applications list): its children are pages too, at the
+   * full path. A path can come twice; the first one counts.
    *
    * A parameterised route (`:id`) is a record view, which the record half of the search already
    * covers. A `contextual` route is left out, because it only means something after an action
    * carried the reader there: /status without an id renders "Antrag nicht gefunden".
    */
-  private collect(list: Routes, prefix: string, out: PageEntry[]): void {
-    for (const route of list) {
+  private collect(list: Routes, prefix: string): readonly PageCandidate[] {
+    return list.flatMap((route) => {
       const path = [prefix, route.path ?? ''].filter(Boolean).join('/');
       const data = route.data;
-      if (route.children) this.collect(route.children, path, out);
-      if (!path || path.includes(':') || !data?.['title']) continue;
-      if (data['contextual'] === true) continue;
-      if (!this.allowed(data)) continue;
-      if (out.some((e) => e.path === `/${path}`)) continue;
-      const parent = (data['parent'] as string[] | undefined)?.[0];
-      out.push({
-        path: `/${path}`,
-        label: this.i18n.translate(data['title'] as never),
-        parentLabel: parent ? this.i18n.translate(`nav.${parent}` as never) : null,
-      });
-    }
+      const children = route.children ? this.collect(route.children, path) : [];
+      const offered = !!data && this.offered(path, data);
+      return offered ? [...children, { path: `/${path}`, data }] : children;
+    });
+  }
+
+  /** A page of the palette: a plain path with a title, not contextual, and allowed. */
+  private offered(path: string, data: Data): boolean {
+    if (!path || path.includes(':') || !data['title']) return false;
+    if (data['contextual'] === true) return false;
+    return this.allowed(data);
+  }
+
+  /** The entry of a page, with the labels in the current language. */
+  private entry({ path, data }: PageCandidate): PageEntry {
+    const parent = (data['parent'] as string[] | undefined)?.[0];
+    return {
+      path,
+      label: this.i18n.translate(data['title'] as never),
+      parentLabel: parent ? this.i18n.translate(`nav.${parent}` as never) : null,
+    };
   }
 
   /** The same decision `authGuard` makes, minus the redirect. */
