@@ -87,8 +87,9 @@ class AnonymizeOps(ApplicationsServiceBase):
         app.capture_intake = None
 
         fields = await self._pinned_fields(app)
-        pii_keys = {f.key for f in fields if f.is_pii}
-        pii_keys |= await self._pii_keys_for_type(app.type_id)
+        pii_keys = {f.key for f in fields if f.is_pii} | await self._pii_keys_for_type(
+            app.type_id
+        )
         if pii_keys:
             app.data = {k: v for k, v in app.data.items() if k not in pii_keys}
             versions = (

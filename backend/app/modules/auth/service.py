@@ -66,14 +66,15 @@ async def resolve_application(
     newest application of that address, which is the one the magic link opens. The
     router uses the same function to read the language of that application.
     """
-    stmt = (
+    by_email = (
         select(Application)
         .join(ApplicantRow, ApplicantRow.application_id == Application.id)
         .where(ApplicantRow.email == email)
     )
-    if application_id is not None:
-        stmt = stmt.where(Application.id == application_id)
-    stmt = stmt.order_by(Application.created_at.desc())
+    narrowed = (
+        by_email if application_id is None else by_email.where(Application.id == application_id)
+    )
+    stmt = narrowed.order_by(Application.created_at.desc())
     return (await db.execute(stmt)).scalars().first()
 
 
@@ -224,16 +225,16 @@ async def upsert_principal(db: AsyncSession, claims: oidc.OidcClaims) -> Princip
             new principal either, because only the IdP `sub` of the new principal
             proves that identity.
     """
-    row = (
+    existing = (
         await db.execute(select(PrincipalRow).where(PrincipalRow.sub == claims.sub))
     ).scalar_one_or_none()
-    if row is not None and row.merged_into is not None:
+    if existing is not None and existing.merged_into is not None:
         raise ForbiddenError(
             "This account was merged into another account. Log in with that account.",
             code="account_merged",
         )
-    if row is None:
-        row = PrincipalRow(sub=claims.sub)
+    row = existing if existing is not None else PrincipalRow(sub=claims.sub)
+    if existing is None:
         db.add(row)
     row.email = claims.email
     row.display_name = claims.name

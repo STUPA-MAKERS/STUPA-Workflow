@@ -171,9 +171,9 @@ async def _send_each(
     link: MailLink,
 ) -> int:
     service = NotificationService(session, queue=queue, settings=settings)
-    sent = 0
-    for pid, address in recipients:
-        if await service.send_kind_mail(
+
+    async def send_to(pid: UUID, address: str) -> bool:
+        return await service.send_kind_mail(
             [address],
             kind=MENTION_KIND,
             template_key=key,
@@ -183,9 +183,10 @@ async def _send_each(
             context=context,
             idempotency_parts=(key, str(message_id), str(pid)),
             link=link,
-        ):
-            sent += 1
-    return sent
+        )
+
+    sent = [await send_to(pid, address) for pid, address in recipients]
+    return sum(sent)
 
 
 async def send_comment_mentions(
@@ -220,15 +221,18 @@ async def send_comment_mentions(
     title = (data or {}).get("title")
     files = await FilesService(session).message_attachments("comment", [comment.id])
     text = comment_mail_text(comment.body, [a.filename for a in files.get(comment.id, [])])
-    if comment.author_kind == "principal" and comment.author:
-        author_row = await session.scalar(
-            select(PrincipalRow).where(PrincipalRow.sub == comment.author)
-        )
-        author = _name(author_row)
-    else:
-        lang = settings.mail_default_lang
-        author = pick_lang(_APPLICANT_AUTHOR_FALLBACK, lang)
-    author = author or _name(actor)
+    by_member = comment.author_kind == "principal" and bool(comment.author)
+    author_row = (
+        await session.scalar(select(PrincipalRow).where(PrincipalRow.sub == comment.author))
+        if by_member
+        else None
+    )
+    named = (
+        _name(author_row)
+        if by_member
+        else pick_lang(_APPLICANT_AUTHOR_FALLBACK, settings.mail_default_lang)
+    )
+    author = named or _name(actor)
     context: dict[str, object] = {
         "actor": _name(actor),
         "applicationId": str(comment.application_id),
@@ -281,6 +285,12 @@ async def notify_comment_mentions(
         return 0
 
 
+async def _note_filenames(session: AsyncSession, note: TicketNote) -> list[str]:
+    """Return the file names of the attachments of a ticket note."""
+    files = await FilesService(session).message_attachments("ticket_note", [note.id])
+    return [a.filename for a in files.get(note.id, [])]
+
+
 async def send_ticket_mentions(
     session: AsyncSession,
     *,
@@ -309,10 +319,8 @@ async def send_ticket_mentions(
     if not targets:
         return 0
     author = _name(await session.get(PrincipalRow, note.author_id) if note.author_id else None)
-    message = note.body
-    if not message.strip():
-        files = await FilesService(session).message_attachments("ticket_note", [note.id])
-        message = comment_mail_text(message, [a.filename for a in files.get(note.id, [])])
+    filenames = await _note_filenames(session, note) if not note.body.strip() else []
+    message = comment_mail_text(note.body, filenames)
     context: dict[str, object] = {
         "actor": author,
         "number": format_number(ticket.number),

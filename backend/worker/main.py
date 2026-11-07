@@ -88,8 +88,10 @@ async def _on_startup(ctx: dict[str, Any]) -> None:
     await deadlines_on_startup(ctx)
     await backup_on_startup(ctx)
     await cd_builtin_on_startup(ctx)
-    ctx["flow_dispatcher"] = build_worker_dispatcher(
-        ctx.get("redis"), get_sessionmaker(), ctx.get("settings")
+    ctx.update(
+        flow_dispatcher=build_worker_dispatcher(
+            ctx.get("redis"), get_sessionmaker(), ctx.get("settings")
+        )
     )
 
 

@@ -21,6 +21,27 @@ from app.shared.config_schemas import ElectionConfig, PollConfig, VoteConfig
 from app.shared.errors import ValidationProblem
 
 
+def _vote_config(
+    payload: MeetingVoteBody,
+    config_data: dict[str, object],
+    *,
+    election: bool,
+    guests_vote: bool,
+) -> VoteConfig | ElectionConfig | PollConfig:
+    """Validate the config of the vote kind: a poll, an election or a motion."""
+    match (payload.poll, election):
+        case (None, True):
+            return ElectionConfig.model_validate(config_data)
+        case (None, False):
+            return VoteConfig.model_validate(config_data)
+        case (poll, _):
+            return build_poll_config(
+                poll,
+                secret=secret_only(payload.secret, field="secret"),
+                guests_vote=guests_vote,
+            )
+
+
 async def build_meeting_vote(
     service: MeetingService,
     meeting: MeetingOut,
@@ -71,7 +92,7 @@ async def build_meeting_vote(
         if payload.guests_vote is not None
         else guests_allowed and not item.non_public and not election
     )
-    config_data: dict[str, object] = (
+    base: dict[str, object] = (
         {
             "seats": payload.seats,
             "candidates": payload.election_candidates(),
@@ -94,25 +115,16 @@ async def build_meeting_vote(
         if payload.quorum_percent is not None
         else await service.gremium_quorum_percent(meeting.gremium_id)
     )
-    if quorum_percent is not None:
-        config_data["quorum"] = {"type": "percent", "value": quorum_percent}
+    quorum: dict[str, object] = (
+        {} if quorum_percent is None else {"quorum": {"type": "percent", "value": quorum_percent}}
+    )
+    config_data = {**base, **quorum}
     if election:
         await service.assert_candidates_exist(
             [c.principal_id for c in payload.candidates if c.principal_id is not None]
         )
-    config: VoteConfig | ElectionConfig | PollConfig
-    if payload.poll is not None:
-        config = build_poll_config(
-            payload.poll,
-            secret=secret_only(payload.secret, field="secret"),
-            guests_vote=guests_vote,
-        )
-    elif election:
-        config = ElectionConfig.model_validate(config_data)
-    else:
-        config = VoteConfig.model_validate(config_data)
     return VoteCreateInternal(
-        config=config,
+        config=_vote_config(payload, config_data, election=election, guests_vote=guests_vote),
         eligibleGroup=meeting.gremium_id,
         question=payload.question,
         eligibleCount=await eligible_count(service, meeting, guests_vote=guests_vote),

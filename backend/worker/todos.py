@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
@@ -146,10 +146,8 @@ async def process_todo_due(ctx: dict[str, Any], now: datetime | None = None) -> 
     tomorrow = local.date() + timedelta(days=1)
     settings: Settings = ctx.get("settings") or load_settings()
     queue = _mail_queue(ctx)
-    sent = 0
     async with _sessionmaker(ctx)() as session:
         access = BoardAccess(session)
-        members: dict[uuid.UUID, set[uuid.UUID]] = {}
         rows = (
             await session.execute(
                 select(TodoCard, TodoBoard)
@@ -166,33 +164,62 @@ async def process_todo_due(ctx: dict[str, Any], now: datetime | None = None) -> 
                 .with_for_update(of=TodoCard, skip_locked=True)
             )
         ).all()
-        for card, board in rows:
-            if board.id not in members:
-                members[board.id] = await access.member_ids(board)
-            assignees = [
-                pid
-                for pid in (
-                    await session.scalars(
-                        select(TodoAssignee.principal_id).where(TodoAssignee.card_id == card.id)
-                    )
-                ).all()
-                if pid in members[board.id]
-            ]
-            try:
-                if await send_todo_due(
-                    session,
-                    queue=queue,
-                    settings=settings,
-                    card=card,
-                    board=board,
-                    assignee_ids=assignees,
-                    due=tomorrow,
-                ):
-                    sent += 1
-            except Exception:
-                logger.exception("todo_due mail failed for %s", card.id)
-                continue
-            card.due_reminded_on = tomorrow
+        boards = {board.id: board for _, board in rows}
+        members = {board_id: await access.member_ids(b) for board_id, b in boards.items()}
+        sent = [
+            await _remind_card(
+                session,
+                queue,
+                settings,
+                card=card,
+                board=board,
+                members=members[board.id],
+                due=tomorrow,
+            )
+            for card, board in rows
+        ]
         if rows:
             await session.commit()
+    return sum(sent)
+
+
+async def _remind_card(
+    session: AsyncSession,
+    queue: MailQueue | None,
+    settings: Settings,
+    *,
+    card: TodoCard,
+    board: TodoBoard,
+    members: set[uuid.UUID],
+    due: date,
+) -> bool:
+    """Send the ``todo_due`` mail of one card to its assignees who are board members.
+
+    Returns:
+        Whether a mail went out. A failed send logs and leaves the card unmarked, so the
+        next run tries it again.
+    """
+    assignees = [
+        pid
+        for pid in (
+            await session.scalars(
+                select(TodoAssignee.principal_id).where(TodoAssignee.card_id == card.id)
+            )
+        ).all()
+        if pid in members
+    ]
+    try:
+        sent = await send_todo_due(
+            session,
+            queue=queue,
+            settings=settings,
+            card=card,
+            board=board,
+            assignee_ids=assignees,
+            due=due,
+        )
+    except Exception:
+        logger.exception("todo_due mail failed for %s", card.id)
+        return False
+    card.due_reminded_on = due
     return sent
