@@ -52,14 +52,12 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function children(op: string, value: unknown): Guard[] {
+function children(op: string, value: unknown): readonly Guard[] {
   const list = Array.isArray(value) ? value : [value];
-  for (const c of list) {
-    if (!isRecord(c)) {
-      throw new GuardError('admin.flow.err.guardChildren', { op });
-    }
+  if (!list.every(isRecord)) {
+    throw new GuardError('admin.flow.err.guardChildren', { op });
   }
-  return list as Guard[];
+  return list as readonly Guard[];
 }
 
 /**

@@ -20,11 +20,11 @@ import { personName } from '@shared/person-label.util';
 
 /** A row above the cards in the same look, for the object that the list belongs to. */
 export interface LinkedLead {
-  icon: IconName;
-  title: string;
-  sub: string;
+  readonly icon: IconName;
+  readonly title: string;
+  readonly sub: string;
   /** The router link. The row opens it in a new tab. */
-  link: readonly unknown[];
+  readonly link: readonly unknown[];
 }
 
 /**
@@ -121,9 +121,10 @@ export class TodoLinkedListComponent {
   }
 
   sub(card: TodoLinkedCard): string {
-    const parts = [card.boardName, card.columnName];
-    if (card.dueDate) parts.push(this.t('todos.linked.due', { date: dayMonth(card.dueDate, this.i18n.formatLocale()) }));
-    return parts.join(' · ');
+    const due = card.dueDate
+      ? [this.t('todos.linked.due', { date: dayMonth(card.dueDate, this.i18n.formatLocale()) })]
+      : [];
+    return [card.boardName, card.columnName, ...due].join(' · ');
   }
 
   names(card: TodoLinkedCard): string[] {

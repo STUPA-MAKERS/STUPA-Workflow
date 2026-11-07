@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from itertools import groupby
+from typing import Any, Literal
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -25,6 +27,125 @@ from app.modules.voting.schemas import MyBallot
 from app.modules.voting.tally import ElectionOutcome, PollOutcome, tally_election, tally_poll
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ValidationProblem
+
+#: The reload tally of one vote: counts, leading option and failed reason.
+_Tally = tuple[dict[str, int] | None, str | None, Literal["quorum", "majority"] | None]
+_NO_TALLY: _Tally = (None, None, None)
+#: The display aggregates of one vote: counts, leading option, voted and failed reason.
+_Aggregates = tuple[dict[str, int] | None, str | None, int, Literal["quorum", "majority"] | None]
+
+
+@dataclass(frozen=True, slots=True)
+class _VoteReads:
+    """The batched reads that the reload path needs to build the votes of meetings."""
+
+    tallies: Mapping[UUID, _Tally]
+    elections: Mapping[UUID, ElectionOutcome]
+    polls: Mapping[UUID, PollOutcome]
+    present_by_meeting: Mapping[UUID, int]
+    guests_by_meeting: Mapping[UUID, int]
+    late_guests: Mapping[UUID, int]
+    own: Mapping[UUID, MyBallot]
+    represented: frozenset[UUID]
+    for_principal: bool
+
+
+def _grouped(rows: Sequence[Any]) -> dict[Any, list[Any]]:
+    """Group `(key, value)` rows by key; the values keep their order within a key."""
+    ordered = sorted(rows, key=lambda row: row[0])
+    return {
+        key: [value for _, value in group] for key, group in groupby(ordered, key=lambda r: r[0])
+    }
+
+
+def _aggregates(
+    vote: Vote, tally: _Tally, election: ElectionOutcome | None, poll: PollOutcome | None
+) -> _Aggregates:
+    """Return the display aggregates: a poll or an election replaces the plain tally."""
+    counts, leading, reason = tally
+    match (election, poll):
+        case (_, PollOutcome()):
+            return poll.display_counts(), None, poll.ballots, None
+        case (ElectionOutcome(), None):
+            failed = "quorum" if vote.status == "closed" and not election.quorum_met else None
+            return election.display_counts(), None, election.ballots, failed
+        case _:
+            return counts, leading, sum((counts or {}).values()), reason
+
+
+def _meeting_vote_out(vote: Vote, meeting_id: UUID, reads: _VoteReads) -> MeetingVoteOut:
+    """Build one vote of the reload path from the batched reads."""
+    config = VoteConfig.from_stored(vote.config)
+    poll = reads.polls.get(vote.id)
+    counts, leading, voted, reason = _aggregates(
+        vote, reads.tallies.get(vote.id, _NO_TALLY), reads.elections.get(vote.id), poll
+    )
+    settled = vote.status in ("closed", "cancelled")
+    members: int | None = (
+        getattr(vote, "present_members", None)
+        if settled
+        else reads.present_by_meeting.get(meeting_id, 0)
+    )
+    stored_guests: int | None = (
+        getattr(vote, "present_guests", None)
+        if settled
+        else reads.guests_by_meeting.get(meeting_id, 0)
+    )
+    present_members = reads.present_by_meeting.get(meeting_id, 0)
+    with_guests = config.guests_vote and not settled
+    late = reads.late_guests.get(vote.id, 0)
+    guests = (stored_guests or 0) + late if with_guests else stored_guests
+    present = (
+        present_members + reads.guests_by_meeting.get(meeting_id, 0) + late
+        if with_guests
+        else present_members
+    )
+    revealed = vote.status == "closed"
+    return MeetingVoteOut(
+        id=vote.id,
+        applicationId=vote.application_id,
+        agendaItemId=vote.agenda_item_id,
+        question=vote.question,
+        options=list(config.options),
+        status=vote.status,  # type: ignore[arg-type]
+        result=vote.result,
+        counts=counts if revealed else {},
+        leading=leading if revealed else None,
+        voted=voted,
+        present=present,
+        revealed=revealed,
+        failedReason=reason,
+        majorityRule=config.majority_rule,
+        secret=config.secret,
+        quorum=config.quorum,
+        openedAt=vote.opens_at,
+        closedAt=vote.closed_at,
+        myBallot=reads.own.get(vote.id, MyBallot()) if reads.for_principal else None,
+        representedCast=vote.id in reads.represented,
+        guestsVote=config.guests_vote,
+        presentMembers=members,
+        presentGuests=guests,
+        proposal=DecisionIn.from_stored(getattr(vote, "proposal", None)),
+        repeatOfId=getattr(vote, "repeat_of_id", None),
+        attempt=getattr(vote, "attempt", 1) or 1,
+        **election_fields(vote),
+        **poll_fields(vote, result_of(poll) if poll is not None and revealed else None),
+    )
+
+
+def _reload_tally(vote: Vote, choices: list[str | None]) -> _Tally:
+    """Tally one vote from its stored choices; the failed reason only for a closed result."""
+    from app.modules.voting import tally as tally_mod
+
+    config = VoteConfig.from_stored(vote.config)
+    counts = tally_mod.tally(config.options, choices)
+    outcome = tally_mod.result(config, counts, vote.eligible_count or 0)
+    reason: Literal["quorum", "majority"] | None = (
+        tally_mod.failed_reason(outcome.result, outcome.quorum_met)
+        if vote.status == "closed" and vote.result is not None
+        else None
+    )
+    return dict(counts), outcome.leading, reason
 
 
 class VoteReadOps(MeetingServiceBase):
@@ -74,88 +195,42 @@ class VoteReadOps(MeetingServiceBase):
             and bool((v.config if isinstance(v.config, dict) else {}).get("guestsVote"))
         ]
         late_guests = await self._departed_guest_voters(guest_votes) if guest_votes else {}
-        own: dict[UUID, MyBallot] = {}
-        represented: set[UUID] = set()
-        if principal is not None and rows:
-            own, represented = await self._ballots_of(principal.sub, rows)
-        out: dict[UUID, list[MeetingVoteOut]] = {}
-        for v in rows:
-            if v.meeting_id is None:
-                continue
-            config = VoteConfig.from_stored(v.config)
-            opts = config.options
-            counts, leading, reason = tallies.get(v.id, (None, None, None))
-            voted = sum((counts or {}).values())
-            ev = elections.get(v.id)
-            if ev is not None:
-                counts, leading, voted = ev.display_counts(), None, ev.ballots
-                reason = "quorum" if v.status == "closed" and not ev.quorum_met else None
-            pv = polls.get(v.id)
-            if pv is not None:
-                counts, leading, voted, reason = pv.display_counts(), None, pv.ballots, None
-            members: int | None
-            guests: int | None
-            if v.status in ("closed", "cancelled"):
-                members = getattr(v, "present_members", None)
-                guests = getattr(v, "present_guests", None)
-            else:
-                members = present_by_meeting.get(v.meeting_id, 0)
-                guests = guests_by_meeting.get(v.meeting_id, 0)
-            present = present_by_meeting.get(v.meeting_id, 0)
-            if config.guests_vote and v.status not in ("closed", "cancelled"):
-                extra = late_guests.get(v.id, 0)
-                guests = (guests or 0) + extra
-                present += guests_by_meeting.get(v.meeting_id, 0) + extra
-            revealed = v.status == "closed"
-            out.setdefault(v.meeting_id, []).append(
-                MeetingVoteOut(
-                    id=v.id,
-                    applicationId=v.application_id,
-                    agendaItemId=v.agenda_item_id,
-                    question=v.question,
-                    options=list(opts),
-                    status=v.status,  # type: ignore[arg-type]
-                    result=v.result,
-                    counts=counts if revealed else {},
-                    leading=leading if revealed else None,
-                    voted=voted,
-                    present=present,
-                    revealed=revealed,
-                    failedReason=reason,
-                    majorityRule=config.majority_rule,
-                    secret=config.secret,
-                    quorum=config.quorum,
-                    openedAt=v.opens_at,
-                    closedAt=v.closed_at,
-                    myBallot=own.get(v.id, MyBallot()) if principal is not None else None,
-                    representedCast=v.id in represented,
-                    guestsVote=config.guests_vote,
-                    presentMembers=members,
-                    presentGuests=guests,
-                    proposal=DecisionIn.from_stored(getattr(v, "proposal", None)),
-                    repeatOfId=getattr(v, "repeat_of_id", None),
-                    attempt=getattr(v, "attempt", 1) or 1,
-                    **election_fields(v),
-                    **poll_fields(
-                        v,
-                        result_of(pv) if pv is not None and revealed else None,
-                    ),
-                )
-            )
-        return out
+        own, represented = (
+            await self._ballots_of(principal.sub, rows)
+            if principal is not None and rows
+            else ({}, set[UUID]())
+        )
+        reads = _VoteReads(
+            tallies=tallies,
+            elections=elections,
+            polls=polls,
+            present_by_meeting=present_by_meeting,
+            guests_by_meeting=guests_by_meeting,
+            late_guests=late_guests,
+            own=own,
+            represented=frozenset(represented),
+            for_principal=principal is not None,
+        )
+        outs = [
+            (v.meeting_id, _meeting_vote_out(v, v.meeting_id, reads))
+            for v in rows
+            if v.meeting_id is not None
+        ]
+        return {
+            meeting_id: [out for owner, out in outs if owner == meeting_id]
+            for meeting_id in dict.fromkeys(meeting_id for meeting_id, _ in outs)
+        }
 
     async def _choices_by_vote(self, votes: Sequence[Vote]) -> dict[UUID, list[str | None]]:
         """Load the stored choices of the votes from ``secret_ballot`` in one query."""
-        choices: dict[UUID, list[str | None]] = {}
-        for vid, choice in (
+        rows = (
             await self.session.execute(
                 select(SecretBallot.vote_id, SecretBallot.choice).where(
                     SecretBallot.vote_id.in_([v.id for v in votes])
                 )
             )
-        ).all():
-            choices.setdefault(vid, []).append(choice)
-        return choices
+        ).all()
+        return _grouped(rows)
 
     async def _poll_tallies(self, votes: Sequence[Vote]) -> dict[UUID, PollOutcome]:
         """Tally the polls of the reload path in one query."""
@@ -242,14 +317,16 @@ class VoteReadOps(MeetingServiceBase):
             ).all()
         }
 
-        own: dict[UUID, MyBallot] = {}
-        represented: set[UUID] = set()
-        for v in votes:
-            if (v.id, sub) in markers:
-                own[v.id] = MyBallot(cast=True)
-            d_sub = delegator_of.get((v.meeting_id, v.eligible_group)) if v.meeting_id else None
-            if d_sub is not None and (v.id, d_sub) in markers:
-                represented.add(v.id)
+        own = {v.id: MyBallot(cast=True) for v in votes if (v.id, sub) in markers}
+        delegator_by_vote = {
+            v.id: delegator_of.get((v.meeting_id, v.eligible_group)) if v.meeting_id else None
+            for v in votes
+        }
+        represented = {
+            vid
+            for vid, d_sub in delegator_by_vote.items()
+            if d_sub is not None and (vid, d_sub) in markers
+        }
         return own, represented
 
     async def _present_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
@@ -284,17 +361,15 @@ class VoteReadOps(MeetingServiceBase):
             .scalars()
             .all()
         }
-        voters: dict[UUID, set[str]] = {}
-        for vid, sub in (
+        markers = (
             await self.session.execute(
                 select(VotedMarker.vote_id, VotedMarker.voter_sub).where(
                     VotedMarker.vote_id.in_(vote_ids),
                     VotedMarker.voter_sub.startswith(GUEST_VOTER_PREFIX),
                 )
             )
-        ).all():
-            voters.setdefault(vid, set()).add(sub)
-        return {vid: len(subs - admitted) for vid, subs in voters.items()}
+        ).all()
+        return {vid: len(set(subs) - admitted) for vid, subs in _grouped(markers).items()}
 
     async def admitted_guests_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
         """Return `{meeting_id: number of admitted guests}`."""
@@ -312,36 +387,17 @@ class VoteReadOps(MeetingServiceBase):
         ).all()
         return dict(rows)
 
-    async def _vote_tallies(
-        self, votes: Sequence[Vote]
-    ) -> dict[
-        UUID,
-        tuple[dict[str, int] | None, str | None, Literal["quorum", "majority"] | None],
-    ]:
+    async def _vote_tallies(self, votes: Sequence[Vote]) -> dict[UUID, _Tally]:
         """Build `{vote_id: (counts, leading, failedReason)}` from the ballots.
 
         This is the reload path. The method loads the ballots from `secret_ballot` in
         one batch and then applies the pure tally logic. It sets `failedReason` for
         closed, failed votes only.
         """
-        from app.modules.voting import tally as tally_mod
-
         if not votes:
             return {}
         by_vote = await self._choices_by_vote(votes)
-        out: dict[
-            UUID,
-            tuple[dict[str, int] | None, str | None, Literal["quorum", "majority"] | None],
-        ] = {}
-        for v in votes:
-            config = VoteConfig.from_stored(v.config)
-            counts = tally_mod.tally(config.options, by_vote.get(v.id, []))
-            outcome = tally_mod.result(config, counts, v.eligible_count or 0)
-            reason: Literal["quorum", "majority"] | None = None
-            if v.status == "closed" and v.result is not None:
-                reason = tally_mod.failed_reason(outcome.result, outcome.quorum_met)
-            out[v.id] = (dict(counts), outcome.leading, reason)
-        return out
+        return {v.id: _reload_tally(v, by_vote.get(v.id, [])) for v in votes}
 
     async def open_vote(self, meeting_id: UUID) -> Vote | None:
         """Return the open vote of this meeting for the `subscribe` reconnect state."""

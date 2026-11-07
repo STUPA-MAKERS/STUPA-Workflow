@@ -3,8 +3,8 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 interface MultiOption {
-  value: string;
-  label: string;
+  readonly value: string;
+  readonly label: string;
 }
 
 /**
@@ -64,9 +64,8 @@ export class FormlyMultiCheckboxType extends FieldType<FieldTypeConfig> {
   }
 
   toggle(value: string, checked: boolean): void {
-    const set = new Set(this.current());
-    if (checked) set.add(value);
-    else set.delete(value);
+    const cur = this.current();
+    const set = new Set(checked ? [...cur, value] : cur.filter((v) => v !== value));
     this.formControl.setValue([...set]);
     this.formControl.markAsDirty();
     this.formControl.markAsTouched();

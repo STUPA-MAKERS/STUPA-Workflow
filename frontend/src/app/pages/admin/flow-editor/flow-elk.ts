@@ -25,53 +25,53 @@ import type { Point } from './flow-editor.models';
 
 /** A port on the east side of a box: one connector dot. */
 export interface LayoutPort {
-  id: string;
+  readonly id: string;
   /** Y of the dot, from the top of the box. */
-  y: number;
+  readonly y: number;
   /** The text beside the dot (a guard or a branch); empty for none. */
-  label: string;
+  readonly label: string;
 }
 
 /** One box of the level: a state, a group box or a proxy. */
 export interface LayoutBox {
-  id: string;
-  w: number;
-  h: number;
-  ports: LayoutPort[];
+  readonly id: string;
+  readonly w: number;
+  readonly h: number;
+  readonly ports: readonly LayoutPort[];
   /** A proxy of an outside source goes first, of an outside target last. */
-  layer?: 'first' | 'last';
+  readonly layer?: 'first' | 'last';
 }
 
 /** One visible transition: from a port of a box to the west side of a box. */
 export interface LayoutLink {
-  index: number;
-  src: string;
-  port: string;
-  dst: string;
-  label: string;
-  automatic: boolean;
+  readonly index: number;
+  readonly src: string;
+  readonly port: string;
+  readonly dst: string;
+  readonly label: string;
+  readonly automatic: boolean;
 }
 
 /** The input of one level. Two equal inputs give the same layout. */
 export interface LayoutInput {
-  boxes: LayoutBox[];
-  links: LayoutLink[];
+  readonly boxes: readonly LayoutBox[];
+  readonly links: readonly LayoutLink[];
 }
 
 /** The line of one transition. A bundle has the label on its first member only. */
 export interface LayoutRoute {
-  d: string;
+  readonly d: string;
   /** Centre of the label box, or null when the line has no label. */
-  label: { x: number; y: number; text: string } | null;
+  readonly label: { readonly x: number; readonly y: number; readonly text: string } | null;
   /** The transitions of the bundle this line draws (the same for every member). */
-  bundle: number[];
+  readonly bundle: readonly number[];
 }
 
 export interface LevelLayout {
   /** Top-left corner per box id. */
-  pos: Map<string, Point>;
+  readonly pos: ReadonlyMap<string, Point>;
   /** Line per transition index. */
-  routes: Map<number, LayoutRoute>;
+  readonly routes: ReadonlyMap<number, LayoutRoute>;
 }
 
 /** Fonts of the canvas texts (flow-editor.component.scss), for the text widths. */
@@ -103,15 +103,9 @@ function bundleKey(l: LayoutLink): string {
 }
 
 /** The transitions of each bundle, in the order of their first member. */
-export function bundles(links: readonly LayoutLink[]): LayoutLink[][] {
-  const by = new Map<string, LayoutLink[]>();
-  for (const l of links) {
-    const k = bundleKey(l);
-    const list = by.get(k);
-    if (list) list.push(l);
-    else by.set(k, [l]);
-  }
-  return [...by.values()];
+export function bundles(links: readonly LayoutLink[]): readonly (readonly LayoutLink[])[] {
+  const keys = [...new Set(links.map(bundleKey))];
+  return keys.map((k) => links.filter((l) => bundleKey(l) === k));
 }
 
 /**
@@ -128,11 +122,7 @@ export function bundleLabel(b: readonly LayoutLink[], many: (n: number) => strin
 export function roundedPath(points: readonly Point[], r = 10): string {
   const p = points.filter((q, i) => i === 0 || q.x !== points[i - 1].x || q.y !== points[i - 1].y);
   if (p.length === 0) return '';
-  let d = `M ${p[0].x} ${p[0].y}`;
-  for (let i = 1; i < p.length - 1; i++) {
-    const a = p[i - 1];
-    const b = p[i];
-    const c = p[i + 1];
+  const corner = (a: Point, b: Point, c: Point): string => {
     const l1 = Math.hypot(b.x - a.x, b.y - a.y);
     const l2 = Math.hypot(c.x - b.x, c.y - b.y);
     const rr = Math.min(r, l1 / 2, l2 / 2);
@@ -140,8 +130,10 @@ export function roundedPath(points: readonly Point[], r = 10): string {
     const sy = b.y - ((b.y - a.y) / l1) * rr;
     const ex = b.x + ((c.x - b.x) / l2) * rr;
     const ey = b.y + ((c.y - b.y) / l2) * rr;
-    d += ` L ${sx} ${sy} Q ${b.x} ${b.y}, ${ex} ${ey}`;
-  }
+    return ` L ${sx} ${sy} Q ${b.x} ${b.y}, ${ex} ${ey}`;
+  };
+  const corners = p.slice(1, -1).map((b, j) => corner(p[j], b, p[j + 2]));
+  const d = `M ${p[0].x} ${p[0].y}${corners.join('')}`;
   const last = p[p.length - 1];
   return p.length > 1 ? `${d} L ${last.x} ${last.y}` : d;
 }
@@ -215,28 +207,37 @@ export function elkGraph(input: LayoutInput, many: (n: number) => string): ElkNo
 
 /** Read the positions and lines out of a laid-out ELK graph. Exported for the tests. */
 export function readLayout(input: LayoutInput, out: ElkNode, many: (n: number) => string): LevelLayout {
-  const pos = new Map<string, Point>();
-  for (const c of out.children ?? []) pos.set(c.id, { x: Math.round(c.x ?? 0), y: Math.round(c.y ?? 0) });
+  const pos = new Map(
+    (out.children ?? []).map((c) => [c.id, { x: Math.round(c.x ?? 0), y: Math.round(c.y ?? 0) }]),
+  );
   const byId = new Map((out.edges ?? []).map((e) => [e.id, e]));
-  const routes = new Map<number, LayoutRoute>();
-  for (const b of bundles(input.links)) {
-    const members = b.map((l) => l.index);
-    b.forEach((l, j) => {
-      const e = byId.get(`t${l.index}`);
-      const s = e?.sections?.[0];
-      if (!s) return;
-      const pts: ElkPoint[] = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
-      const lab = j === 0 ? e.labels?.[0] : undefined;
-      routes.set(l.index, {
-        d: roundedPath(pts),
-        label:
-          lab && lab.x !== undefined && lab.y !== undefined
-            ? { x: lab.x + (lab.width ?? 0) / 2, y: lab.y + (lab.height ?? 0) / 2, text: bundleLabel(b, many) }
-            : null,
-        bundle: members,
-      });
-    });
-  }
+  const routeOf = (
+    b: readonly LayoutLink[],
+    members: readonly number[],
+    l: LayoutLink,
+    j: number,
+  ): readonly (readonly [number, LayoutRoute])[] => {
+    const e = byId.get(`t${l.index}`);
+    const s = e?.sections?.[0];
+    if (!s) return [];
+    const pts: readonly ElkPoint[] = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
+    const lab = j === 0 ? e.labels?.[0] : undefined;
+    const label =
+      lab && lab.x !== undefined && lab.y !== undefined
+        ? {
+            x: lab.x + (lab.width ?? 0) / 2,
+            y: lab.y + (lab.height ?? 0) / 2,
+            text: bundleLabel(b, many),
+          }
+        : null;
+    return [[l.index, { d: roundedPath(pts), label, bundle: members }]];
+  };
+  const routes = new Map(
+    bundles(input.links).flatMap((b) => {
+      const members = b.map((l) => l.index);
+      return b.flatMap((l, j) => routeOf(b, members, l, j));
+    }),
+  );
   return { pos, routes };
 }
 

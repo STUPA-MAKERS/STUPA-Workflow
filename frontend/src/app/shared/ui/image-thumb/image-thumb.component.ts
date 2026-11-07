@@ -10,7 +10,10 @@ const THUMB_MIMES: ReadonlySet<string> = new Set([
 ]);
 
 /** A file shows as an image: a raster type, and the scan found it clean (absent: clean). */
-export function isThumbImage(file: { mime: string; scanState?: string | null }): boolean {
+export function isThumbImage(file: {
+  readonly mime: string;
+  readonly scanState?: string | null;
+}): boolean {
   return THUMB_MIMES.has(file.mime) && (file.scanState ?? 'clean') === 'clean';
 }
 

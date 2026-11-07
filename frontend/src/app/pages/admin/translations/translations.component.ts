@@ -37,7 +37,7 @@ import { type TranslationKey, de, loadCatalog } from '@core/i18n/translations';
 import { type AdminUiLanguage, TranslationsApiService } from './translations-api.service';
 
 /** Every key of the catalog, in catalog order. */
-const ALL_KEYS = Object.keys(de) as TranslationKey[];
+const ALL_KEYS = Object.keys(de) as readonly TranslationKey[];
 
 /** The rows that the list shows at first and adds each time the end of the list comes into view. */
 export const PAGE_SIZE = 50;
@@ -56,9 +56,9 @@ export function areaOf(key: string): string {
 
 /** The draft of the language dialog. `code` is null when the dialog renames a language. */
 interface LanguageDraft {
-  code: string | null;
-  newCode: string;
-  name: string;
+  readonly code: string | null;
+  readonly newCode: string;
+  readonly name: string;
 }
 
 /**
@@ -247,17 +247,13 @@ export class AdminTranslationsComponent {
   protected readonly hasMore = computed(() => this.filtered().length > this.limit());
 
   /** Locale → the changes to send: key → text or null. */
-  private readonly changes = computed(() => {
-    const out: Record<string, Record<string, string | null>> = {};
-    for (const [loc, edits] of Object.entries(this.draft())) {
-      for (const [key, text] of Object.entries(edits)) {
-        const next = text.trim() ? text : null;
-        const before = this.stored()[loc]?.[key] ?? null;
-        if (next === before) continue;
-        (out[loc] ??= {})[key] = next;
-      }
-    }
-    return out;
+  private readonly changes = computed((): Record<string, Record<string, string | null>> => {
+    const stored = this.stored();
+    return Object.fromEntries(
+      Object.entries(this.draft())
+        .map(([loc, edits]) => [loc, localeChanges(edits, stored[loc])] as const)
+        .filter(([, out]) => Object.keys(out).length > 0),
+    );
   });
 
   protected readonly dirty = computed(() => Object.keys(this.changes()).length > 0);
@@ -330,11 +326,10 @@ export class AdminTranslationsComponent {
     this.saving.set(true);
     forkJoin(locales.map((loc) => this.api.saveTexts(loc, changes[loc]))).subscribe({
       next: (results) => {
-        this.stored.update((s) => {
-          const next = { ...s };
-          for (const r of results) next[r.locale] = r.overrides;
-          return next;
-        });
+        this.stored.update((s) => ({
+          ...s,
+          ...Object.fromEntries(results.map((r) => [r.locale, r.overrides])),
+        }));
         for (const r of results) this.i18n.applyOverrides(r.locale, r.overrides);
         this.draft.set({});
         this.saving.set(false);
@@ -452,4 +447,19 @@ export class AdminTranslationsComponent {
   private replaceLanguage(row: AdminUiLanguage): void {
     this.languages.update((list) => list.map((l) => (l.code === row.code ? row : l)));
   }
+}
+
+/**
+ * The changes of one locale: key → text, or null to drop the override. A text that equals
+ * the stored one is no change. A blank text means null.
+ */
+function localeChanges(
+  edits: Readonly<Record<string, string>>,
+  stored: Readonly<Record<string, string>> | undefined,
+): Record<string, string | null> {
+  return Object.fromEntries(
+    Object.entries(edits)
+      .map(([key, text]) => [key, text.trim() ? text : null] as const)
+      .filter(([key, next]) => next !== (stored?.[key] ?? null)),
+  );
 }

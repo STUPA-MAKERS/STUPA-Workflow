@@ -25,9 +25,9 @@ import { canTransfer, sortedColumns } from '../todos.util';
 
 /** The target that the person picked in the dialog. */
 export interface TodoTransferTarget {
-  boardId: Uuid;
-  columnId: Uuid;
-  boardName: string;
+  readonly boardId: Uuid;
+  readonly columnId: Uuid;
+  readonly boardName: string;
 }
 
 /**

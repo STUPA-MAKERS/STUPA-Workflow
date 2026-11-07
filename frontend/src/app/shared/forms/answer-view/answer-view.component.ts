@@ -6,34 +6,52 @@ import { formatAnswer, formatFieldValue, isEmptyAnswer } from '../answer-format'
 import { resolveI18n } from '../i18n-text';
 import { evalJsonLogic, isFieldVisible } from '../jsonlogic';
 import { PositionsViewComponent } from '../positions-view/positions-view.component';
+import { runs } from '@shared/util/immutable';
 import { FieldGroupComponent, FieldRowComponent, SectionComponent } from '@stupa-makers/ui-kit';
 
 /** One answer as a label and its text. */
 export interface AnswerCell {
-  key: string;
-  label: string;
-  value: string;
+  readonly key: string;
+  readonly label: string;
+  readonly value: string;
   /** Mono face: IBAN and amounts. */
-  mono: boolean;
+  readonly mono: boolean;
 }
 
 /** A row of the field group: short fields side by side, or one long field. */
 export type AnswerRow =
-  | { kind: 'grid'; key: string; cells: AnswerCell[] }
-  | { kind: 'text'; cell: AnswerCell; markdown: boolean }
-  | { kind: 'table'; key: string; label: string; columns: string[]; rows: string[][] };
+  | { readonly kind: 'grid'; readonly key: string; readonly cells: readonly AnswerCell[] }
+  | { readonly kind: 'text'; readonly cell: AnswerCell; readonly markdown: boolean }
+  | {
+      readonly kind: 'table';
+      readonly key: string;
+      readonly label: string;
+      readonly columns: readonly string[];
+      readonly rows: readonly (readonly string[])[];
+    };
 
 /** A run of rows in one field group, or the cost positions in their own block. */
 export type AnswerChunk =
-  | { kind: 'group'; key: string; rows: AnswerRow[] }
-  | { kind: 'positions'; key: string; label: string; value: unknown };
+  | { readonly kind: 'group'; readonly key: string; readonly rows: readonly AnswerRow[] }
+  | {
+      readonly kind: 'positions';
+      readonly key: string;
+      readonly label: string;
+      readonly value: unknown;
+    };
 
 /** A section of the form with its visible answers. */
 export interface AnswerBlock {
-  key: string;
-  label: string;
-  chunks: AnswerChunk[];
+  readonly key: string;
+  readonly label: string;
+  readonly chunks: readonly AnswerChunk[];
 }
+
+/** One shown answer before the grouping: a short cell, a full-width row or the positions. */
+type AnswerPiece =
+  | { readonly kind: 'cell'; readonly cell: AnswerCell }
+  | { readonly kind: 'row'; readonly row: AnswerRow }
+  | { readonly kind: 'positions'; readonly chunk: AnswerChunk };
 
 /** Field types that the detail never shows: display text, markers and files (the files
  *  have the block "Anhänge" with the scan state). */
@@ -85,54 +103,60 @@ export class AnswerViewComponent {
   readonly surface = input<1 | 2 | 3>(2);
 
   /** Answers without a field come from an older form version and show last, as plain text. */
-  readonly blocks = computed<AnswerBlock[]>(() => {
+  readonly blocks = computed<readonly AnswerBlock[]>(() => {
     const lang = this.i18n.uiLocale();
     const data = this.data();
     const ctx = { ...this.context(), ...data };
-    const skip = new Set(this.skipKeys());
-    const known = new Set<string>();
-    const blocks: AnswerBlock[] = [];
-
-    for (const section of this.sections()) {
-      const builder = new ChunkBuilder();
-      for (const f of section.fields) {
-        known.add(f.key);
-        if (skip.has(f.key) || NOT_SHOWN.has(f.type)) continue;
-        if (!isFieldVisible(f.visibleIf, ctx)) continue;
-        const raw = f.type === 'computed' ? this.computedValue(f, data, ctx) : data[f.key];
-        if (isEmptyAnswer(raw)) continue;
-        const label = resolveI18n(f.label, lang);
-        if (f.type === 'positions') {
-          builder.positions({ kind: 'positions', key: f.key, label, value: raw });
-        } else if (f.type === 'table') {
-          builder.row(tableRow(f.key, label, raw));
-        } else if (f.type === 'textarea') {
-          builder.row({ kind: 'text', cell: this.cell(f, label, raw), markdown: true });
-        } else {
-          builder.cell(this.cell(f, label, raw));
-        }
-      }
-      const chunks = builder.done();
-      if (chunks.length) {
-        blocks.push({ key: section.key, label: resolveI18n(section.label, lang), chunks });
-      }
-    }
-
-    const other = new ChunkBuilder();
-    for (const [key, value] of Object.entries(data)) {
-      if (known.has(key) || skip.has(key) || isEmptyAnswer(value)) continue;
-      other.cell({ key, label: key, value: formatFieldValue(value), mono: false });
-    }
-    const otherChunks = other.done();
-    if (otherChunks.length) {
-      blocks.push({
-        key: '__other',
-        label: this.i18n.translate('forms.answers.other'),
-        chunks: otherChunks,
-      });
-    }
-    return blocks;
+    const skip: ReadonlySet<string> = new Set(this.skipKeys());
+    const known: ReadonlySet<string> = new Set(
+      this.sections().flatMap((s) => s.fields.map((f) => f.key)),
+    );
+    const shown = (f: FormFieldDef): boolean =>
+      !skip.has(f.key) && !NOT_SHOWN.has(f.type) && isFieldVisible(f.visibleIf, ctx);
+    const sectionBlocks = this.sections().map((section) => ({
+      key: section.key,
+      label: resolveI18n(section.label, lang),
+      chunks: chunksOf(section.fields.filter(shown).flatMap((f) => this.piece(f, data, ctx, lang))),
+    }));
+    const otherChunks = chunksOf(
+      Object.entries(data)
+        .filter(([key, value]) => !known.has(key) && !skip.has(key) && !isEmptyAnswer(value))
+        .map(([key, value]) => ({
+          kind: 'cell' as const,
+          cell: { key, label: key, value: formatFieldValue(value), mono: false },
+        })),
+    );
+    const other = {
+      key: '__other',
+      label: this.i18n.translate('forms.answers.other'),
+      chunks: otherChunks,
+    };
+    return [...sectionBlocks, other].filter((b) => b.chunks.length);
   });
+
+  /** The piece of a shown field, or none when its answer is empty. */
+  private piece(
+    f: FormFieldDef,
+    data: Readonly<Record<string, unknown>>,
+    ctx: Readonly<Record<string, unknown>>,
+    lang: string,
+  ): readonly AnswerPiece[] {
+    const raw = f.type === 'computed' ? this.computedValue(f, data, ctx) : data[f.key];
+    if (isEmptyAnswer(raw)) return [];
+    const label = resolveI18n(f.label, lang);
+    switch (f.type) {
+      case 'positions':
+        return [{ kind: 'positions', chunk: { kind: 'positions', key: f.key, label, value: raw } }];
+      case 'table':
+        return [{ kind: 'row', row: tableRow(f.key, label, raw) }];
+      case 'textarea':
+        return [
+          { kind: 'row', row: { kind: 'text', cell: this.cell(f, label, raw), markdown: true } },
+        ];
+      default:
+        return [{ kind: 'cell', cell: this.cell(f, label, raw) }];
+    }
+  }
 
   private cell(f: FormFieldDef, label: string, raw: unknown): AnswerCell {
     const value = formatAnswer(f, raw, {
@@ -155,7 +179,7 @@ export class AnswerViewComponent {
   private computedValue(
     f: FormFieldDef,
     data: Readonly<Record<string, unknown>>,
-    ctx: Record<string, unknown>,
+    ctx: Readonly<Record<string, unknown>>,
   ): unknown {
     if (!isEmptyAnswer(data[f.key]) || !f.compute) return data[f.key];
     try {
@@ -166,45 +190,27 @@ export class AnswerViewComponent {
   }
 }
 
-/** Collects the rows of a section: short cells in pairs, the rest one per row. */
-class ChunkBuilder {
-  private readonly chunks: AnswerChunk[] = [];
-  private rows: AnswerRow[] = [];
-  private cells: AnswerCell[] = [];
+/** The rows of a run of cells and rows: neighbouring short cells share one grid row. */
+function rowsOf(pieces: readonly AnswerPiece[]): readonly AnswerRow[] {
+  const cellRuns = runs(pieces, (a, b) => a.kind === 'cell' && b.kind === 'cell');
+  return cellRuns.flatMap((run): readonly AnswerRow[] => {
+    const cells = run.flatMap((p) => (p.kind === 'cell' ? [p.cell] : []));
+    const rows = run.flatMap((p) => (p.kind === 'row' ? [p.row] : []));
+    return cells.length ? [{ kind: 'grid', key: cells[0].key, cells }] : rows;
+  });
+}
 
-  cell(cell: AnswerCell): void {
-    this.cells.push(cell);
-  }
-
-  row(row: AnswerRow): void {
-    this.flushCells();
-    this.rows.push(row);
-  }
-
-  positions(chunk: AnswerChunk): void {
-    this.flushRows();
-    this.chunks.push(chunk);
-  }
-
-  done(): AnswerChunk[] {
-    this.flushRows();
-    return this.chunks;
-  }
-
-  private flushCells(): void {
-    if (!this.cells.length) return;
-    this.rows.push({ kind: 'grid', key: this.cells[0].key, cells: this.cells });
-    this.cells = [];
-  }
-
-  private flushRows(): void {
-    this.flushCells();
-    if (!this.rows.length) return;
-    const first = this.rows[0];
-    const key = first.kind === 'text' ? first.cell.key : first.key;
-    this.chunks.push({ kind: 'group', key, rows: this.rows });
-    this.rows = [];
-  }
+/** The chunks of a section: the cost positions alone, everything between them in one group. */
+function chunksOf(pieces: readonly AnswerPiece[]): readonly AnswerChunk[] {
+  return runs(pieces, (a, b) => a.kind !== 'positions' && b.kind !== 'positions').flatMap(
+    (run): readonly AnswerChunk[] => {
+      const head = run[0];
+      if (head.kind === 'positions') return [head.chunk];
+      const rows = rowsOf(run);
+      const first = rows[0];
+      return [{ kind: 'group', key: first.kind === 'text' ? first.cell.key : first.key, rows }];
+    },
+  );
 }
 
 /**

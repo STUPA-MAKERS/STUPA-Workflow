@@ -57,7 +57,10 @@ export interface GremiumRow {
   readonly item: GremiumOverview;
   readonly sub: string;
   /** `live`, a date ("Di, 20.10."), or `none`. */
-  readonly next: { kind: 'live' } | { kind: 'date'; text: string; title: string } | { kind: 'none' };
+  readonly next:
+    | { readonly kind: 'live' }
+    | { readonly kind: 'date'; readonly text: string; readonly title: string }
+    | { readonly kind: 'none' };
 }
 
 /**
@@ -225,15 +228,17 @@ export class GremienComponent {
         : this.i18n.translate('gremien.list.members', { n: item.memberCount });
     const role = item.isMember ? localized(item.roleName, locale, item.roleKey ?? '') : '';
     const sub = role ? `${role} · ${count}` : count;
-    let next: GremiumRow['next'] = { kind: 'none' };
-    if (item.live) next = { kind: 'live' };
-    else if (item.nextMeeting?.date) {
-      next = {
-        kind: 'date',
-        text: weekdayDate(item.nextMeeting.date, this.i18n.formatLocale(), { year: false }),
-        title: this.i18n.translate('gremien.list.nextTitle', { title: item.nextMeeting.title }),
-      };
-    }
-    return { item, sub, next };
+    return { item, sub, next: this.nextOf(item) };
+  }
+
+  /** The next meeting of a row: running now, a planned date, or none. */
+  private nextOf(item: GremiumOverview): GremiumRow['next'] {
+    if (item.live) return { kind: 'live' };
+    if (!item.nextMeeting?.date) return { kind: 'none' };
+    return {
+      kind: 'date',
+      text: weekdayDate(item.nextMeeting.date, this.i18n.formatLocale(), { year: false }),
+      title: this.i18n.translate('gremien.list.nextTitle', { title: item.nextMeeting.title }),
+    };
   }
 }

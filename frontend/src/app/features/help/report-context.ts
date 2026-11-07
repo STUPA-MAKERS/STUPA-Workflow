@@ -2,11 +2,11 @@ import type { TicketContext } from '@core/api/tickets.service';
 
 /** The parts of the browser the context reads; a spec passes its own. */
 export interface ReportEnv {
-  href: string;
-  path: string;
-  userAgent: string;
-  width: number;
-  height: number;
+  readonly href: string;
+  readonly path: string;
+  readonly userAgent: string;
+  readonly width: number;
+  readonly height: number;
 }
 
 /** The current browser, read when the dialog opens. */
@@ -46,7 +46,7 @@ export function reportContext(
   };
 }
 
-const BROWSERS: readonly [RegExp, string][] = [
+const BROWSERS: readonly (readonly [RegExp, string])[] = [
   [/Edg\/(\d+)/, 'Edge'],
   [/OPR\/(\d+)/, 'Opera'],
   [/Firefox\/(\d+)/, 'Firefox'],
@@ -54,7 +54,7 @@ const BROWSERS: readonly [RegExp, string][] = [
   [/Version\/(\d+)[\d.]* (?:Mobile\/\S+ )?Safari/, 'Safari'],
 ];
 
-const SYSTEMS: readonly [RegExp, string][] = [
+const SYSTEMS: readonly (readonly [RegExp, string])[] = [
   [/Android/, 'Android'],
   [/iPhone|iPad|iPod/, 'iOS'],
   [/Windows/, 'Windows'],

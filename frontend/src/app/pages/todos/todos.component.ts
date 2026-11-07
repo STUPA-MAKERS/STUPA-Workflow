@@ -254,7 +254,7 @@ export class TodosComponent implements OnDestroy {
   readonly loading = signal(true);
   readonly notFound = signal(false);
   readonly error = signal(false);
-  readonly members = signal<TodoMember[]>([]);
+  readonly members = signal<readonly TodoMember[]>([]);
   /** The ids of the open cards assigned to me (`GET /todos/mine`), for "Zuständig: Ich". */
   readonly mine = signal<ReadonlySet<Uuid>>(new Set());
   /** "Alle": my principal id (the one member of my personal board), for "Zuständig: Ich". */
@@ -376,11 +376,12 @@ export class TodosComponent implements OnDestroy {
    */
   readonly labelsById = computed<ReadonlyMap<Uuid, TodoLabel>>(() => {
     if (!this.all()) return new Map((this.board()?.labels ?? []).map((l) => [l.id, l]));
-    const byName = new Map<string, TodoLabel>();
-    for (const b of this.rowsView()?.boards() ?? []) {
-      for (const l of b.labels) if (!byName.has(l.name.toLowerCase())) byName.set(l.name.toLowerCase(), l);
-    }
-    const sorted = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }));
+    const labels = (this.rowsView()?.boards() ?? []).flatMap((b) => b.labels);
+    const key = (l: TodoLabel): string => l.name.toLowerCase();
+    const firsts = labels.filter((l, i) => labels.findIndex((x) => key(x) === key(l)) === i);
+    const byName = (a: TodoLabel, b: TodoLabel): number =>
+      a.name.localeCompare(b.name, 'de', { sensitivity: 'base' });
+    const sorted = [...firsts].sort(byName);
     return new Map(sorted.map((l) => [l.id, l]));
   });
 
@@ -426,20 +427,15 @@ export class TodosComponent implements OnDestroy {
   /** The cards that pass the filters, by column. */
   readonly visible = computed<ReadonlyMap<Uuid, readonly TodoCardTile[]>>(() => {
     const board = this.board();
-    const out = new Map<Uuid, TodoCardTile[]>();
-    if (!board) return out;
+    if (!board) return new Map();
     const f = this.filter();
     const ctx = { today: this.today(), mine: this.mine(), labels: this.labelsById() };
-    for (const col of board.columns) out.set(col.id, []);
-    for (const card of board.cards) {
-      if (matchesFilter(card, f, ctx)) out.get(card.columnId)?.push(card);
-    }
-    if (f.kind === 'archive') {
-      for (const card of this.archivedEvents()) {
-        if (card.boardId === board.id && matchesFilter(card, f, ctx)) out.get(card.columnId)?.push(card);
-      }
-    }
-    return out;
+    const archived =
+      f.kind === 'archive' ? this.archivedEvents().filter((card) => card.boardId === board.id) : [];
+    const cards = [...board.cards, ...archived].filter((card) => matchesFilter(card, f, ctx));
+    const inColumn = (columnId: Uuid): readonly TodoCardTile[] =>
+      cards.filter((c) => c.columnId === columnId);
+    return new Map(board.columns.map((col) => [col.id, inColumn(col.id)]));
   });
 
   /** The archived Events of the board, for "Veranstaltungen mit Archiv" (spec 000485). */
@@ -450,8 +446,7 @@ export class TodosComponent implements OnDestroy {
     if (!this.filtered()) return false;
     if (this.all()) return this.rowMatches() === 0;
     if (this.withRows() && (this.rowMatches() ?? 0) > 0) return false;
-    for (const list of this.visible().values()) if (list.length) return false;
-    return true;
+    return ![...this.visible().values()].some((list) => list.length > 0);
   });
 
   readonly assigneeOptions = computed<FilterSelectOption[]>(() => {
@@ -507,17 +502,19 @@ export class TodosComponent implements OnDestroy {
   );
 
   readonly phoneMenu = computed<RowMenuSection[]>(() => {
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    const board = this.board();
     const items: RowMenuItem[] = [
       this.view() === 'board'
-        ? { id: 'list', label: this.i18n.translate('todos.view.showList'), icon: 'list' }
-        : { id: 'board', label: this.i18n.translate('todos.view.showBoard'), icon: 'kanban' },
+        ? { id: 'list', label: t('todos.view.showList'), icon: 'list' }
+        : { id: 'board', label: t('todos.view.showBoard'), icon: 'kanban' },
+      ...(board?.canConfigure
+        ? [{ id: 'settings', label: t('todos.settings.title'), icon: 'tune' } as const]
+        : []),
+      ...(board
+        ? [{ id: 'archive', label: t('todos.archive.title'), icon: 'archive' } as const]
+        : []),
     ];
-    if (this.board()?.canConfigure) {
-      items.push({ id: 'settings', label: this.i18n.translate('todos.settings.title'), icon: 'tune' });
-    }
-    if (this.board()) {
-      items.push({ id: 'archive', label: this.i18n.translate('todos.archive.title'), icon: 'archive' });
-    }
     return [{ items }];
   });
 

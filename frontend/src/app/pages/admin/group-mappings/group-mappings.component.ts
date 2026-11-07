@@ -40,38 +40,38 @@ import type {
 export type MappingKind = 'global' | 'membership' | 'role';
 
 interface GlobalRow {
-  id: string;
-  oidcGroup: string;
-  roleLabel: string;
+  readonly id: string;
+  readonly oidcGroup: string;
+  readonly roleLabel: string;
 }
 
 interface MembershipRow {
-  id: string;
-  oidcGroup: string;
-  gremiumLabel: string;
+  readonly id: string;
+  readonly oidcGroup: string;
+  readonly gremiumLabel: string;
 }
 
 interface RoleRow {
-  id: string;
-  oidcGroup: string;
-  gremiumLabel: string;
-  roleLabel: string;
+  readonly id: string;
+  readonly oidcGroup: string;
+  readonly gremiumLabel: string;
+  readonly roleLabel: string;
 }
 
 /** One row of a section: "group → target", for a gremium role "gremium · role". */
 export interface MappingRow {
-  id: string;
-  oidcGroup: string;
-  target: string;
+  readonly id: string;
+  readonly oidcGroup: string;
+  readonly target: string;
   /** The gremium role, set in bold after the gremium. */
-  role: string | null;
+  readonly role: string | null;
 }
 
 /** One section of the page. */
 export interface MappingSection {
-  kind: MappingKind;
-  rows: MappingRow[];
-  loading: boolean;
+  readonly kind: MappingKind;
+  readonly rows: readonly MappingRow[];
+  readonly loading: boolean;
 }
 
 /** The RBAC resolver reserves this group prefix. The backend refuses it with 422. */
@@ -399,22 +399,30 @@ export class GroupMappingsComponent {
     this.dialog.set(null);
   }
 
+  /** The create or update call of the open dialog. */
+  private saveRequest(kind: MappingKind, id: Uuid | null, oidcGroup: string): Observable<unknown> {
+    switch (kind) {
+      case 'global': {
+        const body = { oidcGroup, roleId: this.roleId() as Uuid };
+        return id ? this.api.updateGroupMapping(id, body) : this.api.createGroupMapping(body);
+      }
+      case 'membership': {
+        const body = { oidcGroup, gremiumId: this.gremiumId() as Uuid };
+        return id
+          ? this.api.updateMembershipMapping(id, body)
+          : this.api.createMembershipMapping(body);
+      }
+      case 'role': {
+        const body = { oidcGroup, gremiumRoleId: this.gremiumRoleId() as Uuid };
+        return id ? this.api.updateRoleMapping(id, body) : this.api.createRoleMapping(body);
+      }
+    }
+  }
+
   save(): void {
     const kind = this.dialog();
     if (!kind || !this.valid() || this.saving()) return;
-    const id = this.editId() as Uuid | null;
-    const oidcGroup = this.oidcGroup().trim();
-    let req: Observable<unknown>;
-    if (kind === 'global') {
-      const body = { oidcGroup, roleId: this.roleId() as Uuid };
-      req = id ? this.api.updateGroupMapping(id, body) : this.api.createGroupMapping(body);
-    } else if (kind === 'membership') {
-      const body = { oidcGroup, gremiumId: this.gremiumId() as Uuid };
-      req = id ? this.api.updateMembershipMapping(id, body) : this.api.createMembershipMapping(body);
-    } else {
-      const body = { oidcGroup, gremiumRoleId: this.gremiumRoleId() as Uuid };
-      req = id ? this.api.updateRoleMapping(id, body) : this.api.createRoleMapping(body);
-    }
+    const req = this.saveRequest(kind, this.editId() as Uuid | null, this.oidcGroup().trim());
     this.saving.set(true);
     req.subscribe({
       next: () => {

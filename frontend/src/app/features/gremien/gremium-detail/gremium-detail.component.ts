@@ -16,6 +16,7 @@ import type { GremiumOverview } from '@core/api/gremien.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   EmptyStateComponent,
@@ -124,6 +125,8 @@ export class GremiumDetailComponent {
   readonly meetingCount = signal<number | null>(null);
 
   readonly createOpen = signal(false);
+  /** The gremium whose tabs `visited` holds: a new one starts the set again. */
+  private shownId: string | null = null;
 
   readonly roleLabel = computed(() => {
     const g = this.gremium();
@@ -135,18 +138,18 @@ export class GremiumDetailComponent {
     const g = this.gremium();
     if (!g) return [];
     const role = this.roleLabel();
-    const out = role ? [`${this.i18n.translate('gremien.detail.yourRole')} ${role}`] : [];
-    out.push(
+    const i18n = this.i18n;
+    return [
+      ...(role ? [`${i18n.translate('gremien.detail.yourRole')} ${role}`] : []),
       g.memberCount === 1
-        ? this.i18n.translate('gremien.list.member1')
-        : this.i18n.translate('gremien.list.members', { n: g.memberCount }),
-    );
-    if (g.quorumPercent !== null) {
-      out.push(this.i18n.translate('gremien.detail.quorum', { n: g.quorumPercent }));
-    }
-    if (g.protocolsPublic) out.push(this.i18n.translate('gremien.detail.protocolsPublic'));
-    if (g.allowVoteDelegation) out.push(this.i18n.translate('gremien.detail.delegation'));
-    return out;
+        ? i18n.translate('gremien.list.member1')
+        : i18n.translate('gremien.list.members', { n: g.memberCount }),
+      ...(g.quorumPercent !== null
+        ? [i18n.translate('gremien.detail.quorum', { n: g.quorumPercent })]
+        : []),
+      ...(g.protocolsPublic ? [i18n.translate('gremien.detail.protocolsPublic')] : []),
+      ...(g.allowVoteDelegation ? [i18n.translate('gremien.detail.delegation')] : []),
+    ];
   });
 
   /** "Sitzung planen": `session.manage` in this gremium (the admin passes). */
@@ -173,32 +176,53 @@ export class GremiumDetailComponent {
   readonly menu = computed<RowMenuSection[]>(() => {
     const g = this.gremium();
     const t = (k: Parameters<I18nService['translate']>[0]) => this.i18n.translate(k);
-    const items: RowMenuItem[] = [];
-    if (this.phone()) {
-      items.push({ id: 'calendar', label: t('gremien.detail.subscribe'), icon: 'cal' });
-      if (g?.nextMeeting && !this.showNext()) {
-        items.push({ id: 'next', label: t(g.live ? 'gremien.detail.live' : 'gremien.detail.next'), icon: 'arrow' });
-      }
-      if (this.canAdmin()) items.push({ id: 'admin', label: t('gremien.detail.admin'), icon: 'shield' });
-    }
-    items.push({ id: 'meetings', label: t('gremien.detail.allMeetings'), icon: 'users' });
-    items.push({ id: 'votes', label: t('gremien.detail.votes'), icon: 'vote' });
+    const phoneItems = this.phone() ? this.phoneMenu(g, t) : [];
+    const items: RowMenuItem[] = [
+      ...phoneItems,
+      { id: 'meetings', label: t('gremien.detail.allMeetings'), icon: 'users' },
+      { id: 'votes', label: t('gremien.detail.votes'), icon: 'vote' },
+    ];
     return [{ items }];
   });
+
+  /** The menu items only the phone shows: calendar, the next meeting and the admin page. */
+  private phoneMenu(
+    g: GremiumOverview | null,
+    t: (k: TranslationKey) => string,
+  ): readonly RowMenuItem[] {
+    const next: readonly RowMenuItem[] =
+      g?.nextMeeting && !this.showNext()
+        ? [
+            {
+              id: 'next',
+              label: t(g.live ? 'gremien.detail.live' : 'gremien.detail.next'),
+              icon: 'arrow',
+            },
+          ]
+        : [];
+    const admin: readonly RowMenuItem[] = this.canAdmin()
+      ? [{ id: 'admin', label: t('gremien.detail.admin'), icon: 'shield' }]
+      : [];
+    const calendar: RowMenuItem = {
+      id: 'calendar',
+      label: t('gremien.detail.subscribe'),
+      icon: 'cal',
+    };
+    return [calendar, ...next, ...admin];
+  }
 
   /**
    * On a phone the tabs beside the active one render too, because a swipe shows them before they
    * are active.
    */
   constructor() {
-    let shownId: string | null = null;
     effect(() => {
       const id = this.id();
       const tab = this.tab();
       const i = GREMIUM_TABS.indexOf(tab);
       const open = this.phone() ? GREMIUM_TABS.filter((_, j) => Math.abs(j - i) <= 1) : [tab];
-      if (id !== shownId) {
-        shownId = id;
+      if (id !== this.shownId) {
+        this.shownId = id;
         this.meetingCount.set(null);
         this.visited.set(new Set(open));
         return;

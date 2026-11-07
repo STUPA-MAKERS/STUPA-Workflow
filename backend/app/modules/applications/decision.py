@@ -26,7 +26,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, field_validator
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +35,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget.tree_models import Budget
 from app.shared.errors import ValidationProblem
+from app.shared.schemas import FrozenStrictCamelModel
 
 #: At most this many conditions, each 1 to MAX_CONDITION_LENGTH characters (trimmed).
 MAX_CONDITIONS = 20
@@ -50,15 +51,13 @@ CODE_NOT_ALLOWED = "decision_not_allowed"
 _CENT = Decimal("0.01")
 
 
-class DecisionIn(BaseModel):
+class DecisionIn(FrozenStrictCamelModel, frozen=True):
     """A decision proposal: the approved amount and the conditions.
 
     The body of a vote (`proposal`) and of a manual transition (`decision`) use it.
     `approvedAmount` null means "as requested". The amount rules need the requested
     amount of the application, so `check_approved_amount` runs them in the service.
     """
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     approved_amount: Decimal | None = Field(
         default=None, alias="approvedAmount", allow_inf_nan=False
@@ -288,10 +287,9 @@ async def _swap(
     if undone is not None:
         undone.superseded_at = stamp
         await session.flush()
-    restored_amount: Decimal | None = None
+    restored_amount = None if restored is None else restored.approved_amount
     if restored is not None:
         restored.superseded_at = None
-        restored_amount = restored.approved_amount
     app.approved_amount = restored_amount
     await session.flush()
     swap = DecisionSwap(
@@ -464,38 +462,57 @@ async def decision_source(
     the Gremium of the application.
     """
     from app.modules.admin.models import Gremium
-    from app.modules.livevote.agenda_service import agenda_order
-    from app.modules.livevote.models import Meeting, MeetingAgendaItem
+    from app.modules.livevote.models import Meeting
     from app.modules.voting.models import Vote
 
-    gremium_id: UUID | None = app.gremium_id
-    meeting_title: str | None = None
-    position: int | None = None
     vote = await session.get(Vote, row.vote_id) if row.vote_id is not None else None
-    if vote is not None:
-        meeting = await session.get(Meeting, vote.meeting_id) if vote.meeting_id else None
-        if meeting is not None:
-            gremium_id = meeting.gremium_id
-            meeting_title = meeting.title
-        else:
-            try:
-                gremium_id = UUID(vote.eligible_group)
-            except (TypeError, ValueError):
-                gremium_id = None
-        if vote.agenda_item_id is not None and vote.meeting_id is not None:
-            number = func.row_number().over(order_by=list(agenda_order())).label("n")
-            ranked = (
-                select(MeetingAgendaItem.id.label("item_id"), number)
-                .where(MeetingAgendaItem.meeting_id == vote.meeting_id)
-                .subquery()
-            )
-            found = await session.scalar(
-                select(ranked.c.n).where(ranked.c.item_id == vote.agenda_item_id)
-            )
-            position = int(found) if found is not None else None
+    meeting = (
+        await session.get(Meeting, vote.meeting_id)
+        if vote is not None and vote.meeting_id
+        else None
+    )
+    gremium_id = (
+        app.gremium_id
+        if vote is None
+        else meeting.gremium_id if meeting is not None else _uuid_or_none(vote.eligible_group)
+    )
+    position = (
+        await _agenda_position(session, vote.meeting_id, vote.agenda_item_id)
+        if vote is not None and vote.agenda_item_id is not None and vote.meeting_id is not None
+        else None
+    )
     name = (
         await session.scalar(select(Gremium.name).where(Gremium.id == gremium_id))
         if gremium_id is not None
         else None
     )
-    return DecisionSource(gremium_name=name, meeting_title=meeting_title, agenda_position=position)
+    return DecisionSource(
+        gremium_name=name,
+        meeting_title=meeting.title if meeting is not None else None,
+        agenda_position=position,
+    )
+
+
+def _uuid_or_none(value: str) -> UUID | None:
+    """Parse a stored group value as a Gremium id; another value or a NULL gives None."""
+    try:
+        return UUID(value)
+    except (TypeError, ValueError):
+        return None
+
+
+async def _agenda_position(
+    session: AsyncSession, meeting_id: UUID, agenda_item_id: UUID
+) -> int | None:
+    """Return the 1-based number of an agenda item in its meeting, or None."""
+    from app.modules.livevote.agenda_service import agenda_order
+    from app.modules.livevote.models import MeetingAgendaItem
+
+    number = func.row_number().over(order_by=list(agenda_order())).label("n")
+    ranked = (
+        select(MeetingAgendaItem.id.label("item_id"), number)
+        .where(MeetingAgendaItem.meeting_id == meeting_id)
+        .subquery()
+    )
+    found = await session.scalar(select(ranked.c.n).where(ranked.c.item_id == agenda_item_id))
+    return int(found) if found is not None else None

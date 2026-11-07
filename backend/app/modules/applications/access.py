@@ -59,7 +59,7 @@ MEMBER_PERMISSIONS = _MEMBER_PERMISSIONS
 AccessVia = Literal["permission", "applicant", "owner", "committee"]
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class Access:
     """Resolved access to exactly one application, by a principal or an applicant."""
 
@@ -241,7 +241,6 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
     from app.modules.livevote.models import Meeting
     from app.modules.voting.models import Vote
 
-    out: set[UUID] = set()
     row = (
         await db.execute(
             select(Application.budget_id, Application.vote_gremium_id).where(
@@ -250,27 +249,28 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
         )
     ).first()
     if row is None:
-        return out
+        return set()
     budget_id, vote_gremium_id = row
-    if vote_gremium_id is not None:
-        out.add(vote_gremium_id)
-    if budget_id is not None:
-        path_key = await db.scalar(select(Budget.path_key).where(Budget.id == budget_id))
-        if path_key is not None:
-            segments = path_key.split(_SEP)
-            prefixes = [_SEP.join(segments[: i + 1]) for i in range(len(segments))]
-            views = await db.scalars(
-                select(Budget.view_gremium_id).where(Budget.path_key.in_(prefixes))
-            )
-            out.update(v for v in views if v is not None)
+    path_key = (
+        await db.scalar(select(Budget.path_key).where(Budget.id == budget_id))
+        if budget_id is not None
+        else None
+    )
+    segments = path_key.split(_SEP) if path_key is not None else []
+    prefixes = [_SEP.join(segments[: i + 1]) for i in range(len(segments))]
+    views = (
+        await db.scalars(select(Budget.view_gremium_id).where(Budget.path_key.in_(prefixes)))
+        if path_key is not None
+        else ()
+    )
     meetings = await db.scalars(
         select(Meeting.gremium_id)
         .join(Vote, Vote.meeting_id == Meeting.id)
         .where(Vote.application_id == application_id)
         .distinct()
     )
-    out.update(meetings)
-    return out
+    vote_gremien = {vote_gremium_id} if vote_gremium_id is not None else set[UUID]()
+    return {*vote_gremien, *(v for v in views if v is not None), *meetings}
 
 
 async def _resolve_with_creator(

@@ -11,6 +11,7 @@ The pure validation and merge logic lives in `app.modules.forms.validation`.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
 
@@ -67,22 +68,20 @@ DYNAMIC_OPTION_TYPES: frozenset[str] = frozenset({"gremium_select", "budget_sele
 
 
 def _inject_dynamic_options(
-    fields: list[FormFieldDef], options_by_type: dict[str, list[FieldOption]]
-) -> list[FormFieldDef]:
+    fields: Sequence[FormFieldDef], options_by_type: Mapping[str, list[FieldOption]]
+) -> tuple[FormFieldDef, ...]:
     """Set the server-side options on the dynamic picker fields.
 
     ``options_by_type`` maps a field type to its options. ``gremium_select`` gets the
     Gremien, ``budget_select`` gets the budget tree. The function keeps every other field
     as it is. It copies only the affected fields, because ``FormFieldDef`` is immutable.
     """
-    if not any(f.type in options_by_type for f in fields):
-        return fields
-    return [
+    return tuple(
         f.model_copy(update={"options": options_by_type[f.type]})
         if f.type in options_by_type
         else f
         for f in fields
-    ]
+    )
 
 
 def _field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
@@ -125,7 +124,7 @@ class FormsService:
             raise NotFoundError(f"application type {type_id} not found")
         return app_type
 
-    async def _fields_of_version(self, form_version_id: UUID) -> list[FormFieldDef]:
+    async def _fields_of_version(self, form_version_id: UUID) -> tuple[FormFieldDef, ...]:
         rows = (
             await self.session.scalars(
                 select(FormField)
@@ -133,7 +132,7 @@ class FormsService:
                 .order_by(FormField.order)
             )
         ).all()
-        return [_row_to_field_def(r) for r in rows]
+        return tuple(_row_to_field_def(r) for r in rows)
 
     async def get_effective_form(
         self,
@@ -159,24 +158,31 @@ class FormsService:
         sections = effective_form(type_fields)
 
         present = {f.type for s in sections for f in s.fields} & DYNAMIC_OPTION_TYPES
-        options_by_type: dict[str, list[FieldOption]] = {}
-        if "gremium_select" in present:
-            options_by_type["gremium_select"] = await self._gremium_field_options()
-        if "budget_select" in present:
-            options_by_type["budget_select"] = await self._budget_field_options()
+        gremium_options = (
+            await self._gremium_field_options() if "gremium_select" in present else None
+        )
+        budget_options = await self._budget_field_options() if "budget_select" in present else None
+        options_by_type = {
+            field_type: options
+            for field_type, options in (
+                ("gremium_select", gremium_options),
+                ("budget_select", budget_options),
+            )
+            if options is not None
+        }
 
         return EffectiveFormOut(
             applicationTypeId=type_id,
             formVersionId=version_id,
             hasBudget=app_type.has_budget,
-            sections=[
+            sections=tuple(
                 FormSectionOut(
                     key=s.key,
                     label=s.label or SECTION_LABELS.get(s.key) or SECTION_LABELS["main"],
                     fields=_inject_dynamic_options(s.fields, options_by_type),
                 )
                 for s in sections
-            ],
+            ),
         )
 
     async def _gremium_field_options(self) -> list[FieldOption]:
@@ -303,7 +309,7 @@ class FormsService:
             applicationTypeId=type_id,
             version=next_version,
             active=payload.activate,
-            fields=list(payload.fields),
+            fields=payload.fields,
             description=payload.description,
         )
 
@@ -369,7 +375,7 @@ class FormsService:
             version=version.version,
             active=version.active,
             description=version.description_i18n,
-            fields=fields,
+            fields=list(fields),
         )
 
     async def _next_version(self, type_id: UUID) -> int:

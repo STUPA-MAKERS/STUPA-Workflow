@@ -89,28 +89,65 @@ def _icc(img: Image) -> bytes | None:
     return None
 
 
+def _still_mode(img: Image, mime: str) -> str | None:
+    """Return the mode that a still image converts to before the encode, or None to keep it."""
+    match mime:
+        case "image/jpeg":
+            return None if img.mode in ("RGB", "L") else "RGB"
+        case _:
+            keep = img.mode in ("1", "L", "LA", "P", "RGB", "RGBA")
+            return None if keep else ("RGBA" if "A" in img.getbands() else "RGB")
+
+
+def _scaled(img: Image, size: tuple[int, int]) -> Image:
+    """Scale ``img`` to ``size``; a palette or bilevel image goes through RGBA first."""
+    from PIL import Image as PILImage
+
+    if size == img.size:
+        return img
+    base = img.convert("RGBA") if img.mode in ("1", "P") else img
+    return base.resize(size, PILImage.Resampling.LANCZOS)
+
+
+def _with_info(img: Image, info: dict[str | tuple[int, int], object]) -> Image:
+    """Replace the info blocks of ``img`` and return it.
+
+    Pillow keeps the metadata in the mutable ``info`` of the image, so the only way to
+    drop it is to overwrite that attribute in place.
+    """
+    img.info = info
+    return img
+
+
 def _still(img: Image, mime: str) -> Image:
     """Return the oriented, scaled pixels of a single-frame image, without metadata.
 
     A palette image scales with NEAREST only, so it converts to RGBA to keep the quality.
     The transparency of a palette or RGB image stays. Every other info block goes.
     """
-    from PIL import Image as PILImage
     from PIL import ImageOps
 
-    out = ImageOps.exif_transpose(img)
-    if mime == "image/jpeg":
-        if out.mode not in ("RGB", "L"):
-            out = out.convert("RGB")
-    elif out.mode not in ("1", "L", "LA", "P", "RGB", "RGBA"):
-        out = out.convert("RGBA" if "A" in out.getbands() else "RGB")
-    size = _target_size(out.width, out.height)
-    if size != out.size:
-        if out.mode in ("1", "P"):
-            out = out.convert("RGBA")
-        out = out.resize(size, PILImage.Resampling.LANCZOS)
-    out.info = {k: v for k, v in out.info.items() if k == "transparency"}
-    return out
+    oriented = ImageOps.exif_transpose(img)
+    mode = _still_mode(oriented, mime)
+    converted = oriented if mode is None else oriented.convert(mode)
+    scaled = _scaled(converted, _target_size(converted.width, converted.height))
+    return _with_info(scaled, {k: v for k, v in scaled.info.items() if k == "transparency"})
+
+
+def _frame(img: Image, canvas: tuple[int, int], size: tuple[int, int]) -> tuple[Image, int]:
+    """Return one animation frame as scaled RGBA without metadata, and its duration.
+
+    Raises:
+        ImageRejected: The frame is not the size of the canvas.
+    """
+    from PIL import Image as PILImage
+
+    if img.size != canvas:
+        raise ImageRejected("A frame of the animation is larger than its canvas.")
+    duration = int(img.info.get("duration") or 100)
+    rgba = img.convert("RGBA")
+    scaled = rgba if size == rgba.size else rgba.resize(size, PILImage.Resampling.LANCZOS)
+    return _with_info(scaled, {}), duration
 
 
 def _frames(img: Image) -> tuple[list[Image], list[int]]:
@@ -127,23 +164,12 @@ def _frames(img: Image) -> tuple[list[Image], list[int]]:
         ImageRejected: A frame is not the size of the canvas. Every frame then has
             the pixels that ``_check_dimensions`` counted.
     """
-    from PIL import Image as PILImage
     from PIL import ImageSequence
 
-    frames: list[Image] = []
-    durations: list[int] = []
     canvas = (img.width, img.height)
     size = _target_size(img.width, img.height, MAX_ANIMATION_SIDE)
-    for frame in ImageSequence.Iterator(img):
-        if frame.size != canvas:
-            raise ImageRejected("A frame of the animation is larger than its canvas.")
-        durations.append(int(frame.info.get("duration") or 100))
-        rgba = frame.convert("RGBA")
-        if size != rgba.size:
-            rgba = rgba.resize(size, PILImage.Resampling.LANCZOS)
-        rgba.info = {}
-        frames.append(rgba)
-    return frames, durations
+    pairs = tuple(_frame(frame, canvas, size) for frame in ImageSequence.Iterator(img))
+    return [frame for frame, _ in pairs], [duration for _, duration in pairs]
 
 
 def _check_dimensions(img: Image) -> int:
@@ -162,38 +188,53 @@ def _check_dimensions(img: Image) -> int:
     return n_frames
 
 
+def _animation(img: Image, mime: str, loop: int) -> tuple[bytes, tuple[int, int]]:
+    """Encode the frames of an animated GIF or WEBP; return the bytes and the size."""
+    frames, durations = _frames(img)
+    first, rest = frames[0], frames[1:]
+    options: dict[str, object] = {
+        "save_all": True,
+        "append_images": rest,
+        "duration": durations,
+        "loop": loop,
+    }
+    buffer = io.BytesIO()
+    match mime:
+        case "image/gif":
+            first.save(buffer, "GIF", disposal=2, **options)
+        case _:
+            first.save(buffer, "WEBP", quality=QUALITY, **options)
+    return buffer.getvalue(), first.size
+
+
+def _single(img: Image, mime: str, icc: bytes | None) -> tuple[bytes, tuple[int, int]]:
+    """Encode a single-frame image in its own format; return the bytes and the size."""
+    still = _still(img, mime)
+    buffer = io.BytesIO()
+    match mime:
+        case "image/jpeg":
+            still.save(buffer, "JPEG", quality=QUALITY, icc_profile=icc)
+        case "image/png":
+            still.save(buffer, "PNG", icc_profile=icc)
+        case "image/gif":
+            still.save(buffer, "GIF")
+        case _:
+            still.save(buffer, "WEBP", quality=QUALITY, icc_profile=icc)
+    return buffer.getvalue(), still.size
+
+
 def _encode(img: Image, mime: str) -> CleanImage:
-    """Encode the decoded image again. ``img`` is open and its format is checked."""
+    """Encode the decoded image again. ``img`` is open and its format is checked.
+
+    The ICC profile and the loop count are read before the frames decode, because a
+    seek to a later frame can change ``img.info``.
+    """
     n_frames = _check_dimensions(img)
     icc = _icc(img)
     loop = int(img.info.get("loop") or 0)
-    buffer = io.BytesIO()
-    if n_frames > 1 and mime in ("image/gif", "image/webp"):
-        frames, durations = _frames(img)
-        first, rest = frames[0], frames[1:]
-        options: dict[str, object] = {
-            "save_all": True,
-            "append_images": rest,
-            "duration": durations,
-            "loop": loop,
-        }
-        if mime == "image/gif":
-            first.save(buffer, "GIF", disposal=2, **options)
-        else:
-            first.save(buffer, "WEBP", quality=QUALITY, **options)
-        width, height = first.size
-    else:
-        still = _still(img, mime)
-        width, height = still.size
-        if mime == "image/jpeg":
-            still.save(buffer, "JPEG", quality=QUALITY, icc_profile=icc)
-        elif mime == "image/png":
-            still.save(buffer, "PNG", icc_profile=icc)
-        elif mime == "image/gif":
-            still.save(buffer, "GIF")
-        else:
-            still.save(buffer, "WEBP", quality=QUALITY, icc_profile=icc)
-    return CleanImage(data=buffer.getvalue(), mime=mime, width=width, height=height)
+    animated = n_frames > 1 and mime in ("image/gif", "image/webp")
+    data, (width, height) = _animation(img, mime, loop) if animated else _single(img, mime, icc)
+    return CleanImage(data=data, mime=mime, width=width, height=height)
 
 
 def clean_image(data: bytes) -> CleanImage:

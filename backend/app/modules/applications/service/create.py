@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -323,15 +323,24 @@ def _file_refs(
     fields: list[FormFieldDef], data: dict[str, Any]
 ) -> Iterator[tuple[str, str]]:
     """Yield ``(field key, reference)`` for each value of a ``file`` field."""
-    for field in fields:
-        if field.type != "file":
-            continue
-        value = data.get(field.key)
-        refs = [value] if isinstance(value, str) else value
-        if isinstance(refs, list):
-            for ref in refs:
-                if isinstance(ref, str) and ref:
-                    yield field.key, ref
+    return (
+        (field.key, ref)
+        for field in fields
+        if field.type == "file"
+        for ref in _file_values(data.get(field.key))
+        if isinstance(ref, str) and ref
+    )
+
+
+def _file_values(value: object) -> list[Any]:
+    """Return the values of a ``file`` answer: one reference or a list of them."""
+    match value:
+        case str():
+            return [value]
+        case list():
+            return cast("list[Any]", value)
+        case _:
+            return []
 
 
 def _as_uuid(ref: str) -> UUID | None:

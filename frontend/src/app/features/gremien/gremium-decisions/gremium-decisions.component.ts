@@ -41,7 +41,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { electionStatus } from '../../voting/election.util';
 import { GREMIEN_NOW } from '../gremien.store';
-import { monthKey, shiftMonth } from '../gremien.util';
+import { groupInOrder, monthKey, shiftMonth } from '../gremien.util';
 import { dayMonth, monthYear } from '@shared/date-format';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { majorityLabel } from '../../meetings/meetings-display.util';
@@ -68,7 +68,7 @@ export interface DecisionGroup {
   readonly label: string;
   /** "33. Sitzung · 06.10." or "Ohne Sitzung". */
   readonly meeting: string;
-  readonly rows: DecisionRow[];
+  readonly rows: readonly DecisionRow[];
 }
 
 const KIND_KEYS: Record<GremiumDecisionKind, TranslationKey> = {
@@ -77,6 +77,17 @@ const KIND_KEYS: Record<GremiumDecisionKind, TranslationKey> = {
   election: 'gremien.decisions.kindElection',
 };
 const NO_RESULT: StatusView = { kind: 'muted', key: 'gremien.decisions.noResult' };
+
+/** The month (`YYYY-MM`) of a vote: of its meeting, else of its close, else empty. */
+function decisionMonth(d: GremiumDecision): string {
+  const day = d.meetingDate ?? d.closedAt?.slice(0, 10) ?? null;
+  return day ? day.slice(0, 7) : '';
+}
+
+/** The group key of a vote: its month and its meeting. */
+function decisionKey(d: GremiumDecision): string {
+  return `${decisionMonth(d)}|${d.meetingId ?? ''}`;
+}
 
 /**
  * The sub-tab "Beschlüsse" of a gremium: every closed vote, the newest first, grouped by
@@ -188,28 +199,19 @@ export class GremiumDecisionsComponent {
     () => this.result() !== '' || this.kind() !== '' || this.since() !== '' || this.search.applied() !== '',
   );
 
-  readonly groups = computed<DecisionGroup[]>(() => {
+  readonly groups = computed<readonly DecisionGroup[]>(() => {
     const locale = this.i18n.formatLocale();
-    const out = new Map<string, DecisionGroup>();
-    for (const d of this.items()) {
-      const day = d.meetingDate ?? d.closedAt?.slice(0, 10) ?? null;
-      const month = day ? day.slice(0, 7) : '';
-      const key = `${month}|${d.meetingId ?? ''}`;
-      let group = out.get(key);
-      if (!group) {
-        group = {
-          key,
-          label: month ? monthYear(month, locale) : this.i18n.translate('gremien.decisions.undated'),
-          meeting: d.meetingId
-            ? [d.meetingTitle, dayMonth(d.meetingDate, locale)].filter(Boolean).join(' · ')
-            : this.i18n.translate('gremien.decisions.noMeeting'),
-          rows: [],
-        };
-        out.set(key, group);
-      }
-      group.rows.push(this.toRow(d));
-    }
-    return [...out.values()];
+    return groupInOrder(this.items(), decisionKey).map(({ key, first: d, items }) => {
+      const month = decisionMonth(d);
+      return {
+        key,
+        label: month ? monthYear(month, locale) : this.i18n.translate('gremien.decisions.undated'),
+        meeting: d.meetingId
+          ? [d.meetingTitle, dayMonth(d.meetingDate, locale)].filter(Boolean).join(' · ')
+          : this.i18n.translate('gremien.decisions.noMeeting'),
+        rows: items.map((item) => this.toRow(item)),
+      };
+    });
   });
 
   constructor() {
@@ -282,25 +284,17 @@ export class GremiumDecisionsComponent {
 
   private toRow(d: GremiumDecision): DecisionRow {
     const t = (key: TranslationKey, params?: Record<string, string | number>) => this.i18n.translate(key, params);
-    const parts: string[] = [];
-    if (d.kind === 'application') {
-      const amount = formatMoney(d.amount, this.i18n.formatLocale());
-      parts.push(amount ? `${t(KIND_KEYS.application)} · ${amount}` : t(KIND_KEYS.application));
-    } else {
-      parts.push(t(KIND_KEYS[d.kind]));
-    }
-    if (d.counts) {
-      parts.push(
-        t('gremien.decisions.counts', { yes: d.counts.yes, no: d.counts.no, abstain: d.counts.abstain }),
-      );
-    } else {
-      parts.push(d.ballots === 1 ? t('gremien.decisions.ballots1') : t('gremien.decisions.ballots', { n: d.ballots }));
-    }
-    if (d.majorityRule) parts.push(majorityLabel(d.majorityRule, false, t));
-    let status = NO_RESULT;
-    if (d.result) {
-      status = d.kind === 'election' ? electionStatus(d.result) : voteResultStatus(d.result as VoteResult);
-    }
+    const amount = d.kind === 'application' ? formatMoney(d.amount, this.i18n.formatLocale()) : '';
+    const kind = amount ? `${t(KIND_KEYS.application)} · ${amount}` : t(KIND_KEYS[d.kind]);
+    const counts = d.counts;
+    const votes = counts
+      ? t('gremien.decisions.counts', { yes: counts.yes, no: counts.no, abstain: counts.abstain })
+      : d.ballots === 1
+        ? t('gremien.decisions.ballots1')
+        : t('gremien.decisions.ballots', { n: d.ballots });
+    const majority = d.majorityRule ? [majorityLabel(d.majorityRule, false, t)] : [];
+    const parts = [kind, votes, ...majority];
+    const status = this.decisionStatus(d);
     return {
       decision: d,
       title: d.question || d.applicationTitle || t('gremien.decisions.untitled'),
@@ -308,5 +302,13 @@ export class GremiumDecisionsComponent {
       status,
       elected: d.result === 'elected' ? d.elected.join(', ') : '',
     };
+  }
+
+  /** The result badge: an election result, a vote result or "Kein Ergebnis". */
+  private decisionStatus(d: GremiumDecision): StatusView {
+    if (!d.result) return NO_RESULT;
+    return d.kind === 'election'
+      ? electionStatus(d.result)
+      : voteResultStatus(d.result as VoteResult);
   }
 }
