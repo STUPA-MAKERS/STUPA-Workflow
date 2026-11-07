@@ -98,13 +98,14 @@ class HandoverOps(PermissionOps, VoteReadOps):
 
     async def _period(self, meeting_id: UUID, *, planned: bool) -> ProtocolKeeperPeriod | None:
         """Return the planned or the running period of a meeting, or `None`."""
-        stmt = select(ProtocolKeeperPeriod).where(ProtocolKeeperPeriod.meeting_id == meeting_id)
-        if planned:
-            stmt = stmt.where(ProtocolKeeperPeriod.from_at.is_(None))
-        else:
-            stmt = stmt.where(
-                ProtocolKeeperPeriod.from_at.is_not(None), ProtocolKeeperPeriod.to_at.is_(None)
-            )
+        state = (
+            (ProtocolKeeperPeriod.from_at.is_(None),)
+            if planned
+            else (ProtocolKeeperPeriod.from_at.is_not(None), ProtocolKeeperPeriod.to_at.is_(None))
+        )
+        stmt = select(ProtocolKeeperPeriod).where(
+            ProtocolKeeperPeriod.meeting_id == meeting_id, *state
+        )
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def _agenda_ids(self, meeting_id: UUID) -> list[UUID]:
