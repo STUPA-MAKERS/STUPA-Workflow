@@ -102,6 +102,13 @@ import { personName } from '@shared/person-label.util';
 
 type DetailTab = 'log' | 'details';
 
+/** One row of "Technische Angaben". */
+interface ContextRow {
+  readonly label: TranslationKey;
+  readonly value: string;
+  readonly href?: string;
+}
+
 /** The fragment of a link to one note: `#note-<id>`. */
 const NOTE_FRAGMENT = /^note-(.+)$/;
 /**
@@ -319,24 +326,19 @@ export class TicketDetailComponent {
   readonly menuSections = computed<RowMenuSection[]>(() => {
     const t = this.ticket();
     if (!t || !this.manager) return [];
-    const sections: RowMenuSection[] = [];
-    if (t.status !== 'new') {
-      sections.push({
-        items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }],
-      });
-    }
-    const apart: RowMenuItem[] = [];
-    if (isOpen(t.status))
-      apart.push({ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' });
-    if (!t.anonymizedAt && !this.ownReport(t.reporter)) {
-      apart.push(
-        t.senderBlocked
-          ? { id: 'unblock', label: this.t('tickets.detail.unblockSender'), icon: 'lock' }
-          : { id: 'block', label: this.t('tickets.detail.blockSender'), icon: 'lock' },
-      );
-    }
-    if (apart.length) sections.push({ items: apart });
-    return sections;
+    const reset: RowMenuSection[] =
+      t.status !== 'new'
+        ? [{ items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }] }]
+        : [];
+    const duplicate: RowMenuItem[] = isOpen(t.status)
+      ? [{ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' }]
+      : [];
+    const blockItem: RowMenuItem = t.senderBlocked
+      ? { id: 'unblock', label: this.t('tickets.detail.unblockSender'), icon: 'lock' }
+      : { id: 'block', label: this.t('tickets.detail.blockSender'), icon: 'lock' };
+    const block = !t.anonymizedAt && !this.ownReport(t.reporter) ? [blockItem] : [];
+    const apart = [...duplicate, ...block];
+    return [...reset, ...(apart.length ? [{ items: apart }] : [])];
   });
 
   readonly tabs = computed<TabItem[]>(() => [
@@ -346,16 +348,18 @@ export class TicketDetailComponent {
 
   readonly assigneeOptions = computed<FilterSelectOption[]>(() => {
     const nobody = this.t('tickets.detail.unassigned');
-    const opts: FilterSelectOption[] = [{ value: '', label: nobody, person: { name: nobody, icon: 'user' } }];
-    const seen = new Set<string>();
     const current = this.ticket()?.assignee;
-    for (const p of [...this.assignees(), ...(current ? [current] : [])]) {
-      if (!p.principalId || seen.has(p.principalId)) continue;
-      seen.add(p.principalId);
+    const people = [...this.assignees(), ...(current ? [current] : [])].filter(
+      (p): p is PersonRef & { readonly principalId: Uuid } => !!p.principalId,
+    );
+    const unique = people.filter(
+      (p, i) => people.findIndex((q) => q.principalId === p.principalId) === i,
+    );
+    const options = unique.map((p): FilterSelectOption => {
       const label = personName(p, this.t);
-      opts.push({ value: p.principalId, label, person: { name: label, principalId: p.principalId } });
-    }
-    return opts;
+      return { value: p.principalId, label, person: { name: label, principalId: p.principalId } };
+    });
+    return [{ value: '', label: nobody, person: { name: nobody, icon: 'user' } }, ...options];
   });
 
   readonly kindOptions = computed<FilterSelectOption[]>(() =>
@@ -443,17 +447,21 @@ export class TicketDetailComponent {
   /** The rows of "Technische Angaben". */
   readonly contextRows = computed(() => {
     const c = this.ticket()?.context ?? {};
-    const rows: { label: TranslationKey; value: string; href?: string }[] = [];
-    if (c.url) rows.push({ label: 'tickets.context.page', value: c.url, href: c.url });
-    if (c.appVersion) rows.push({ label: 'tickets.context.version', value: c.appVersion });
-    if (c.userAgent || c.viewport) {
-      const parts = [
-        c.userAgent ? browserLabel(c.userAgent) : null,
-        c.viewport ? viewportLabel(c.viewport) : null,
-      ];
-      rows.push({ label: 'tickets.context.browser', value: parts.filter(Boolean).join(' · ') });
-    }
-    return rows;
+    const parts = [
+      c.userAgent ? browserLabel(c.userAgent) : null,
+      c.viewport ? viewportLabel(c.viewport) : null,
+    ];
+    const page: readonly ContextRow[] = c.url
+      ? [{ label: 'tickets.context.page', value: c.url, href: c.url }]
+      : [];
+    const version: readonly ContextRow[] = c.appVersion
+      ? [{ label: 'tickets.context.version', value: c.appVersion }]
+      : [];
+    const browser: readonly ContextRow[] =
+      c.userAgent || c.viewport
+        ? [{ label: 'tickets.context.browser', value: parts.filter(Boolean).join(' · ') }]
+        : [];
+    return [...page, ...version, ...browser];
   });
 
   readonly contextLink = computed(() => {

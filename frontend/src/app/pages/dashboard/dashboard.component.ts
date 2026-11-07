@@ -77,37 +77,47 @@ const TABS: readonly WorkTab[] = ['tasks', 'mine'];
 
 /** A row of "Offene Aufgaben" or "Meine Anträge". */
 export interface WorkRow {
-  id: Uuid;
-  link: readonly string[];
-  title: string;
-  statusLabel: string;
-  statusKind: StatusKind;
+  readonly id: Uuid;
+  readonly link: readonly string[];
+  readonly title: string;
+  readonly statusLabel: string;
+  readonly statusKind: StatusKind;
   /** "4 Tage" (tasks) or "28.08." (own applications). */
-  since: string;
+  readonly since: string;
   /** The exact moment, for the tooltip. */
-  sinceTitle: string | null;
+  readonly sinceTitle: string | null;
 }
 
 /** A live meeting in the sheet. */
 export interface LiveCard {
-  meeting: Meeting;
+  readonly meeting: Meeting;
   /** "seit 18:04 · Du führst Protokoll". */
-  sub: string;
-  now: { position: number; title: string; count: number } | null;
+  readonly sub: string;
+  readonly now: {
+    readonly position: number;
+    readonly title: string;
+    readonly count: number;
+  } | null;
   /** The open vote of the meeting and the own state in it, or null without one. */
-  vote: { ballot: 'cast' | 'pending' | null } | null;
+  readonly vote: { readonly ballot: 'cast' | 'pending' | null } | null;
 }
 
 /** A planned meeting in the sheet. */
 export interface UpcomingRow {
-  meeting: Meeting;
+  readonly meeting: Meeting;
   /** "Du vertrittst Konrad Pfeiffer" while a delegation of the user is on it. */
-  note: string | null;
+  readonly note: string | null;
   /** "Fr, 17:30". */
-  when: string;
+  readonly when: string;
 }
 
 type Loaded<T> = T | null | undefined;
+
+/** A request as a signal, and the trigger that sends it again. */
+interface Load<T> {
+  readonly value: () => Loaded<T>;
+  readonly reload: () => void;
+}
 
 /**
  * The start page of a signed-in person (variant B "Arbeitsliste + Seitenleiste").
@@ -195,18 +205,18 @@ export class DashboardComponent {
   /** The account sheet of the compact phone head. */
   readonly accountOpen = signal(false);
 
-  /** The "load again" trigger of each request that `load` made, by its signal. */
-  private readonly reloads = new Map<() => unknown, () => void>();
-  private readonly tasks = this.load(this.api.listTasks());
+  private readonly tasksLoad = this.load(this.api.listTasks());
+  private readonly tasks = this.tasksLoad.value;
   /** The own applications (`mine=true`), newest status change first: the date the rows
    *  show. `mine` forces the owner filter, also for a reader with `application.read`. */
-  private readonly mine = this.load<Page<ApplicationListItem>>(
+  private readonly mineLoad = this.load<Page<ApplicationListItem>>(
     this.api.listApplications({ mine: true, limit: ROWS, sort: 'stateSince', order: 'desc' }),
   );
+  private readonly mine = this.mineLoad.value;
   /** The live and the next meetings. The timeline already scopes and sorts them. */
   private readonly timeline = this.load<MeetingPage>(
     this.api.listMeetingsTimeline({ direction: 'upcoming', limit: TIMELINE_LIMIT }),
-  );
+  ).value;
   private readonly delegationsRaw = toSignal(
     this.delegationsApi.list().pipe(catchError(() => of([] as Delegation[]))),
     { initialValue: [] as Delegation[] },
@@ -471,15 +481,15 @@ export class DashboardComponent {
 
   /** Send the request of the open tab again after it failed. */
   retryTab(tab: string = this.tab()): void {
-    const source = tab === 'mine' ? this.mine : this.tasks;
-    this.reloads.get(source)?.();
+    const source = tab === 'mine' ? this.mineLoad : this.tasksLoad;
+    source.reload();
   }
 
   /**
-   * A request as a signal: `undefined` while it runs, `null` when it failed. The trigger
-   * in `reloads` sends it again, and the signal is `undefined` until the answer arrives.
+   * A request as a signal: `undefined` while it runs, `null` when it failed. `reload`
+   * sends it again, and the signal is `undefined` until the answer arrives.
    */
-  private load<T>(source: Observable<T>) {
+  private load<T>(source: Observable<T>): Load<T> {
     const again = new Subject<void>();
     const value = toSignal(
       again.pipe(
@@ -493,8 +503,7 @@ export class DashboardComponent {
       ),
       { initialValue: undefined },
     ) as () => Loaded<T>;
-    this.reloads.set(value, () => again.next());
-    return value;
+    return { value, reload: () => again.next() };
   }
 
   openAccount(): void {
