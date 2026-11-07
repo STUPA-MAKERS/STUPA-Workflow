@@ -1,7 +1,9 @@
 import type { BudgetApplication, Expense } from '../budget-tree.api';
 
 /** An application of a cost centre for a spec. */
-export function itemApp(over: Partial<BudgetApplication> & { applicationId: string }): BudgetApplication {
+export function itemApp(
+  over: Partial<BudgetApplication> & { readonly applicationId: string },
+): BudgetApplication {
   return {
     applicationId: over.applicationId,
     title: 'title' in over ? (over.title ?? null) : `Antrag ${over.applicationId}`,
@@ -18,7 +20,7 @@ export function itemApp(over: Partial<BudgetApplication> & { applicationId: stri
 }
 
 /** A top-level booking for a spec. */
-export function itemBooking(over: Partial<Expense> & { id: string }): Expense {
+export function itemBooking(over: Partial<Expense> & { readonly id: string }): Expense {
   return {
     budgetId: 'b-800',
     pathKey: 'VS-800',

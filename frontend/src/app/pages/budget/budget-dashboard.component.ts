@@ -47,6 +47,7 @@ import {
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
+import { toggled } from '@shared/util/immutable';
 import { formatMoney } from '@shared/format-money';
 import { BudgetItemListComponent } from './budget-items/budget-item-list.component';
 import { BudgetItemsDialogComponent } from './budget-items/budget-items-dialog.component';
@@ -54,15 +55,15 @@ import { type BudgetItem, mergeBudgetItems } from './budget-items/budget-items';
 
 /** The amounts of one cost centre in one fiscal year, as numbers. */
 export interface Figures {
-  allocated: number;
-  requested: number;
+  readonly allocated: number;
+  readonly requested: number;
   /** Accepted applications minus the bookings against them. */
-  bound: number;
-  expended: number;
-  income: number;
+  readonly bound: number;
+  readonly expended: number;
+  readonly income: number;
   /** bound + expended. */
-  committed: number;
-  available: number;
+  readonly committed: number;
+  readonly available: number;
 }
 
 /** A figure the sheet names. `committed` is only a sum for the bars. */
@@ -73,28 +74,28 @@ export type DistributionMetric = 'allocated' | 'requested' | 'bound' | 'expended
 
 /** One row of the cost-centre tree in the pane. */
 interface TreeRow {
-  node: BudgetTreeNode;
-  depth: number;
-  hasChildren: boolean;
-  expanded: boolean;
+  readonly node: BudgetTreeNode;
+  readonly depth: number;
+  readonly hasChildren: boolean;
+  readonly expanded: boolean;
   /** Display colour of the node (see `nodeColors`). */
-  color: string;
+  readonly color: string;
   /** The node has an own or inherited colour, so the row shows a swatch. */
-  swatch: boolean;
-  allocated: number;
-  segments: Seg[];
-  total: number | null;
-  percent: number | null;
+  readonly swatch: boolean;
+  readonly allocated: number;
+  readonly segments: readonly Seg[];
+  readonly total: number | null;
+  readonly percent: number | null;
 }
 
 /** One row of "Auslastung je Budget". */
 interface UsageRow {
-  node: BudgetTreeNode;
-  color: string;
-  figures: Figures;
-  percent: number | null;
-  segments: Seg[];
-  total: number | null;
+  readonly node: BudgetTreeNode;
+  readonly color: string;
+  readonly figures: Figures;
+  readonly percent: number | null;
+  readonly segments: readonly Seg[];
+  readonly total: number | null;
 }
 
 /** An application on the selected cost centre, ready to show. */
@@ -193,9 +194,9 @@ export class BudgetDashboardComponent {
 
   readonly loading = signal(true);
   readonly error = signal(false);
-  readonly tree = signal<BudgetTreeNode[]>([]);
+  readonly tree = signal<readonly BudgetTreeNode[]>([]);
   /** Fiscal years per root of the tree. */
-  readonly fiscalYearsByBudget = signal<Record<Uuid, FiscalYear[]>>({});
+  readonly fiscalYearsByBudget = signal<Readonly<Record<Uuid, readonly FiscalYear[]>>>({});
 
   /** The root (top budget, or a scoped sub cost centre) the selection hangs under. */
   readonly selectedBudgetId = signal('');
@@ -221,13 +222,9 @@ export class BudgetDashboardComponent {
   /** Tree without the hidden cost centres. `hiddenInBudget` removes the node and its
    *  subtree from the budget tab. This changes the display only: the values still count
    *  in the parent rollups. */
-  private readonly visibleTree = computed<BudgetTreeNode[]>(() => {
-    const prune = (nodes: BudgetTreeNode[]): BudgetTreeNode[] =>
-      nodes
-        .filter((n) => !n.hiddenInBudget)
-        .map((n) => ({ ...n, children: prune(n.children) }));
-    return prune(this.tree());
-  });
+  private readonly visibleTree = computed<readonly BudgetTreeNode[]>(() =>
+    pruneHidden(this.tree()),
+  );
 
   /** Roots of the tree: the forest roots of the server response that HAVE a fiscal year.
    *  The full view gives the top budgets; a gremium scope gives the assigned sub cost
@@ -254,17 +251,9 @@ export class BudgetDashboardComponent {
     return this.pendingFiscalYears() > 0 ? null : 'noFiscalYear';
   });
 
-  private readonly nodeById = computed(() => {
-    const out = new Map<string, BudgetTreeNode>();
-    const walk = (nodes: BudgetTreeNode[]): void => {
-      for (const n of nodes) {
-        out.set(n.id, n);
-        walk(n.children);
-      }
-    };
-    walk(this.visibleTree());
-    return out;
-  });
+  private readonly nodeById = computed<ReadonlyMap<string, BudgetTreeNode>>(
+    () => new Map(flattenTree(this.visibleTree()).map((n) => [n.id, n] as const)),
+  );
 
   /** Own or inherited colour of every visible node, `null` when it has none. */
   private readonly setColors = computed(() => resolveNodeColors(this.visibleTree()));
@@ -277,7 +266,7 @@ export class BudgetDashboardComponent {
   readonly current = this.selectedKs;
 
   /** The fiscal years of the selected root, for the year chip. */
-  readonly years = computed<FiscalYear[]>(
+  readonly years = computed<readonly FiscalYear[]>(
     () => this.fiscalYearsByBudget()[this.selectedBudgetId()] ?? [],
   );
   /** The choices of the year chip. */
@@ -294,16 +283,9 @@ export class BudgetDashboardComponent {
   );
 
   /** The path from the root to the selected cost centre. */
-  readonly breadcrumbs = computed<BudgetTreeNode[]>(() => {
-    const map = this.nodeById();
-    let node = this.selectedKs();
-    const chain: BudgetTreeNode[] = [];
-    while (node) {
-      chain.unshift(node);
-      node = node.parentId ? (map.get(node.parentId) ?? null) : null;
-    }
-    return chain;
-  });
+  readonly breadcrumbs = computed<readonly BudgetTreeNode[]>(() =>
+    pathTo(this.nodeById(), this.selectedKs()),
+  );
 
   /** The label of the path chip on a narrow viewport. */
   readonly pathLabel = computed(() => this.breadcrumbs().map((n) => n.name).join(' › '));
@@ -327,32 +309,22 @@ export class BudgetDashboardComponent {
   }
 
   /** The visible rows of the tree, flattened in display order. */
-  readonly treeRows = computed<TreeRow[]>(() => {
+  readonly treeRows = computed<readonly TreeRow[]>(() => {
     const q = this.query().trim().toLowerCase();
     const open = this.expanded();
     const colors = this.colors();
     const set = this.setColors();
-    const out: TreeRow[] = [];
     const matches = (n: BudgetTreeNode): boolean =>
       n.name.toLowerCase().includes(q) ||
       n.key.toLowerCase().includes(q) ||
       n.pathKey.toLowerCase().includes(q);
-    const hits = new Set<string>();
-    const mark = (n: BudgetTreeNode): boolean => {
-      let any = matches(n);
-      for (const c of n.children) any = mark(c) || any;
-      if (any) hits.add(n.id);
-      return any;
-    };
-    if (q) for (const t of this.tops()) mark(t);
-
-    const walk = (n: BudgetTreeNode, depth: number, fyId: string): void => {
-      if (q && !hits.has(n.id)) return;
-      const children = q ? n.children.filter((c) => hits.has(c.id)) : n.children;
-      const expanded = children.length > 0 && (q ? true : open.has(n.id));
+    const hits: ReadonlySet<string> = new Set(
+      q ? this.tops().flatMap((t) => hitIds(t, matches)) : [],
+    );
+    const rowOf = (n: BudgetTreeNode, depth: number, fyId: string, expanded: boolean): TreeRow => {
       const f = this.figuresOf(n, fyId);
       const total = f.available + f.committed;
-      out.push({
+      return {
         node: n,
         depth,
         hasChildren: n.children.length > 0,
@@ -363,31 +335,26 @@ export class BudgetDashboardComponent {
         segments: [{ value: f.committed, tone: f.available < 0 ? 'error' : 'filled' }],
         total: total > 0 ? total : null,
         percent: utilisation(f),
-      });
-      if (expanded) for (const c of children) walk(c, depth + 1, fyId);
+      };
     };
-    for (const t of this.tops()) walk(t, 0, this.fyIdFor(t.id));
-    return out;
+    const rowsOf = (n: BudgetTreeNode, depth: number, fyId: string): readonly TreeRow[] => {
+      if (q && !hits.has(n.id)) return [];
+      const children = q ? n.children.filter((c) => hits.has(c.id)) : n.children;
+      const expanded = children.length > 0 && (q ? true : open.has(n.id));
+      const below = expanded ? children.flatMap((c) => rowsOf(c, depth + 1, fyId)) : [];
+      return [rowOf(n, depth, fyId, expanded), ...below];
+    };
+    return this.tops().flatMap((t) => rowsOf(t, 0, this.fyIdFor(t.id)));
   });
 
   toggle(id: string): void {
-    this.expanded.update((s) => {
-      const next = new Set(s);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    this.expanded.update((s) => toggled(s, id));
   }
 
   /** Open the path to a node and the node itself, so its sub cost centres show. */
   private expandPath(id: string): void {
     const map = this.nodeById();
-    const add: string[] = [];
-    let node = map.get(id) ?? null;
-    while (node) {
-      add.push(node.id);
-      node = node.parentId ? (map.get(node.parentId) ?? null) : null;
-    }
+    const add = pathTo(map, map.get(id) ?? null).map((n) => n.id);
     if (add.every((x) => this.expanded().has(x))) return;
     this.expanded.update((s) => new Set([...s, ...add]));
   }
@@ -420,26 +387,24 @@ export class BudgetDashboardComponent {
 
   /** "Verteilung": the chosen figure over the direct sub cost centres. The part the
    *  selected cost centre keeps for itself is its own grey slice. */
-  readonly distribution = computed<PieSlice[]>(() => {
+  readonly distribution = computed<readonly PieSlice[]>(() => {
     const ks = this.selectedKs();
     if (!ks?.children.length) return [];
     const metric = this.metric();
     const colors = this.colors();
-    const slices: PieSlice[] = ks.children.map((c) => ({
+    const slices: readonly PieSlice[] = ks.children.map((c) => ({
       label: c.name,
       value: this.figuresOf(c)[metric],
       color: colors.get(c.id) ?? '',
       id: c.id,
     }));
     const own = this.figuresOf(ks)[metric] - slices.reduce((s, x) => s + x.value, 0);
-    if (own > 0.005) {
-      slices.push({
-        label: this.i18n.translate('budget.dash.ownShare', { name: ks.name }),
-        value: own,
-        color: 'var(--color-text-subtle)',
-      });
-    }
-    return slices.filter((s) => s.value > 0);
+    const ownSlice: PieSlice = {
+      label: this.i18n.translate('budget.dash.ownShare', { name: ks.name }),
+      value: own,
+      color: 'var(--color-text-subtle)',
+    };
+    return [...slices, ...(own > 0.005 ? [ownSlice] : [])].filter((s) => s.value > 0);
   });
 
   metricLabel(m: DistributionMetric | SunburstMetric): string {
@@ -491,10 +456,10 @@ export class BudgetDashboardComponent {
   }
 
   /** The applications of the selected cost centre and its subtree; `null` while loading. */
-  readonly apps = signal<BudgetApplication[] | null>(null);
+  readonly apps = signal<readonly BudgetApplication[] | null>(null);
   /** The newest bookings of the same cost centre and year, at most {@link APPS_SHOWN}. Empty
    *  for a reader who may not read the bookings. */
-  readonly previewBookings = signal<Expense[]>([]);
+  readonly previewBookings = signal<readonly Expense[]>([]);
   readonly appsError = signal(false);
   private readonly appsKey = new Subject<{ ks: string; fy: string; bookings: boolean }>();
 
@@ -513,7 +478,7 @@ export class BudgetDashboardComponent {
 
   readonly overviewOpen = signal(false);
   readonly overviewMetric = signal<SunburstMetric>('allocated');
-  readonly overviewMetrics: SunburstMetric[] = ['allocated', 'available', 'expended'];
+  readonly overviewMetrics: readonly SunburstMetric[] = ['allocated', 'available', 'expended'];
   /** Root of the sunburst: the cost centre that is selected now. */
   readonly overviewRoot = computed(() => this.selectedKs());
 
@@ -687,7 +652,7 @@ export class BudgetDashboardComponent {
   /** Restore the first selection from the query params. Else take the first root and
    *  its newest fiscal year. */
   private restored = false;
-  private restoreOrDefault(tops: BudgetTreeNode[]): void {
+  private restoreOrDefault(tops: readonly BudgetTreeNode[]): void {
     if (this.restored || !tops.length) return;
     const next = this.resolveSelection(tops);
     if (next === null) return;
@@ -730,7 +695,7 @@ export class BudgetDashboardComponent {
    * for the first ready root, because the choice is latched.
    */
   private resolveSelection(
-    tops: BudgetTreeNode[],
+    tops: readonly BudgetTreeNode[],
   ): { budgetId: string; ksId: string; fyId: string } | null {
     if (!tops.length) return null;
     const withFy = tops.filter((t) => (this.fiscalYearsByBudget()[t.id]?.length ?? 0) > 0);
@@ -758,13 +723,8 @@ export class BudgetDashboardComponent {
   /** The root a cost centre hangs under. */
   private rootOf(id: string): string | null {
     const map = this.nodeById();
-    let node = map.get(id) ?? null;
-    while (node?.parentId) {
-      const parent = map.get(node.parentId);
-      if (!parent) break;
-      node = parent;
-    }
-    return node?.id ?? null;
+    const node = map.get(id);
+    return node ? rootIn(map, node).id : null;
   }
 
   /** The one place that changes the selection: it opens the path in the tree and loads
@@ -843,13 +803,20 @@ export class BudgetDashboardComponent {
 
   /** The actions of the page, as the "more" menu of a phone. */
   actionSections(): RowMenuSection[] {
-    const items: RowMenuItem[] = [];
-    if (this.canExport()) {
-      items.push({ id: 'export', label: this.i18n.translate('budget.dash.export'), icon: 'download' });
-    }
-    if (this.canSeeBookings()) {
-      items.push({ id: 'bookings', label: this.i18n.translate('budget.usage.viewExpenses'), icon: 'receipt' });
-    }
+    const exportItem: RowMenuItem = {
+      id: 'export',
+      label: this.i18n.translate('budget.dash.export'),
+      icon: 'download',
+    };
+    const bookingsItem: RowMenuItem = {
+      id: 'bookings',
+      label: this.i18n.translate('budget.usage.viewExpenses'),
+      icon: 'receipt',
+    };
+    const items: RowMenuItem[] = [
+      ...(this.canExport() ? [exportItem] : []),
+      ...(this.canSeeBookings() ? [bookingsItem] : []),
+    ];
     return [{ items }];
   }
 
@@ -898,7 +865,39 @@ export function utilisation(f: Figures): number | null {
 
 /** The id of the newest fiscal year (the highest start year), or `''` without one. */
 function newestFyId(fys: readonly FiscalYear[]): string {
-  let newest: FiscalYear | null = null;
-  for (const f of fys) if (!newest || f.year > newest.year) newest = f;
+  const newest = fys.reduce<FiscalYear | null>((n, f) => (!n || f.year > n.year ? f : n), null);
   return newest?.id ?? '';
+}
+
+/** Remove the cost centres hidden in the budget tab, and their subtrees. */
+function pruneHidden(nodes: readonly BudgetTreeNode[]): readonly BudgetTreeNode[] {
+  return nodes
+    .filter((n) => !n.hiddenInBudget)
+    .map((n) => ({ ...n, children: pruneHidden(n.children) }));
+}
+
+/** Every node of a forest, each before its subtree. */
+function flattenTree(nodes: readonly BudgetTreeNode[]): readonly BudgetTreeNode[] {
+  return nodes.flatMap((n) => [n, ...flattenTree(n.children)]);
+}
+
+/** The path from the root down to `node`, empty without a node. */
+function pathTo(
+  map: ReadonlyMap<string, BudgetTreeNode>,
+  node: BudgetTreeNode | null,
+): readonly BudgetTreeNode[] {
+  const parent = node?.parentId ? (map.get(node.parentId) ?? null) : null;
+  return node ? [...pathTo(map, parent), node] : [];
+}
+
+/** The topmost ancestor of `node` in `map`, or `node` itself when its parent is missing. */
+function rootIn(map: ReadonlyMap<string, BudgetTreeNode>, node: BudgetTreeNode): BudgetTreeNode {
+  const parent = node.parentId ? map.get(node.parentId) : undefined;
+  return parent ? rootIn(map, parent) : node;
+}
+
+/** The ids of the nodes of a subtree that match, or that have a match below them. */
+function hitIds(n: BudgetTreeNode, matches: (n: BudgetTreeNode) => boolean): readonly string[] {
+  const below = n.children.flatMap((c) => hitIds(c, matches));
+  return matches(n) || below.length > 0 ? [n.id, ...below] : below;
 }

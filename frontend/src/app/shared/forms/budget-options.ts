@@ -13,21 +13,21 @@ const LABEL = /^(.*) \(([^()]*)\)$/;
  * another shape is the name, and the key is the path key then. A parent without an option
  * makes its child a root. The nodes carry no figures, so the picker shows no free amounts.
  */
-export function budgetOptionTree(options: readonly FieldOption[], lang: Lang): BudgetTreeNode[] {
-  const byId: ReadonlyMap<string, BudgetTreeNode> = new Map(
-    options.map((o) => [o.value, optionNode(o, lang)] as const),
-  );
+export function budgetOptionTree(
+  options: readonly FieldOption[],
+  lang: Lang,
+): readonly BudgetTreeNode[] {
+  const byId = new Map(options.map((o) => [o.value, optionNode(o, lang)] as const));
   const nodes = [...byId.values()];
-  const build = (n: BudgetTreeNode): BudgetTreeNode => ({
+  const isRoot = (n: BudgetTreeNode): boolean => !(n.parentId && byId.has(n.parentId));
+  const withChildren = (n: BudgetTreeNode): BudgetTreeNode => ({
     ...n,
-    children: nodes.filter((c) => !!c.parentId && c.parentId === n.id).map(build),
+    children: nodes.filter((c) => !isRoot(c) && c.parentId === n.id).map(withChildren),
   });
-  return nodes
-    .filter((n) => !(n.parentId && byId.has(n.parentId)))
-    .map((n) => ({ ...build(n), parentId: null }));
+  return nodes.filter(isRoot).map((n) => withChildren({ ...n, parentId: null }));
 }
 
-/** The tree node of one option, still without its children. */
+/** One option as a tree node without children. */
 function optionNode(o: FieldOption, lang: Lang): BudgetTreeNode {
   const label = resolveI18n(o.label, lang);
   const parts = LABEL.exec(label);

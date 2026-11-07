@@ -16,17 +16,17 @@ import {
 /** A pie slice: label, value in currency units and colour (any CSS colour).
  *  An `id`, which is a cost centre id, makes the slice clickable for a drilldown. */
 export interface PieSlice {
-  label: string;
-  value: number;
-  color: string;
-  id?: string;
+  readonly label: string;
+  readonly value: number;
+  readonly color: string;
+  readonly id?: string;
 }
 
 interface Arc extends PieSlice {
-  d: string;
-  midX: number;
-  midY: number;
-  percent: number;
+  readonly d: string;
+  readonly midX: number;
+  readonly midY: number;
+  readonly percent: number;
 }
 
 const SIZE = 200;
@@ -64,7 +64,7 @@ export class BudgetPieComponent {
   readonly label = input<string>('');
   /** The accessible name of the chart. Defaults to the label. */
   readonly ariaLabel = input<string | null>(null);
-  readonly slices = input<PieSlice[]>([]);
+  readonly slices = input<readonly PieSlice[]>([]);
   /** The currency of the amounts. */
   readonly currency = input<string>('EUR');
   /** Click on a slice or an entry with an `id`: emits the cost centre id. */
@@ -79,26 +79,16 @@ export class BudgetPieComponent {
     this.slices().reduce((s, x) => s + Math.max(0, x.value), 0),
   );
 
-  protected readonly arcs = computed<Arc[]>(() => {
+  protected readonly arcs = computed<readonly Arc[]>(() => {
     const total = this.total();
-    if (total <= 0) return [];
-    const out: Arc[] = [];
-    let angle = -Math.PI / 2;
-    for (const s of this.slices()) {
-      const frac = Math.max(0, s.value) / total;
-      if (frac <= 0) continue;
-      const end = angle + frac * Math.PI * 2;
-      const mid = (angle + end) / 2;
-      out.push({
-        ...s,
-        percent: Math.round(frac * 100),
-        d: donutArc(angle, end),
-        midX: Math.cos(mid),
-        midY: Math.sin(mid),
-      });
-      angle = end;
-    }
-    return out;
+    const parts = this.slices()
+      .map((slice) => ({ slice, frac: Math.max(0, slice.value) / total }))
+      .filter((p) => p.frac > 0);
+    const angles = parts.reduce<readonly number[]>(
+      (acc, p) => [...acc, acc[acc.length - 1] + p.frac * Math.PI * 2],
+      [-Math.PI / 2],
+    );
+    return total <= 0 ? [] : parts.map((p, i) => toArc(p.slice, p.frac, angles[i], angles[i + 1]));
   });
 
   protected readonly active = computed<Arc | null>(() => {
@@ -125,6 +115,18 @@ export class BudgetPieComponent {
       : 'none';
   }
 
+}
+
+/** The arc of a slice that covers `frac` of the ring between two angles (radians). */
+function toArc(slice: PieSlice, frac: number, start: number, end: number): Arc {
+  const mid = (start + end) / 2;
+  return {
+    ...slice,
+    percent: Math.round(frac * 100),
+    d: donutArc(start, end),
+    midX: Math.cos(mid),
+    midY: Math.sin(mid),
+  };
 }
 
 /**

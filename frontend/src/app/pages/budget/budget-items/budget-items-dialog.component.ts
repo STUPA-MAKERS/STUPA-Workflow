@@ -27,10 +27,10 @@ const SEARCH_PAGE = 200;
 
 /** One request for a page of bookings. */
 interface PageRequest {
-  ks: string;
-  fy: string;
-  q: string;
-  offset: number;
+  readonly ks: string;
+  readonly fy: string;
+  readonly q: string;
+  readonly offset: number;
 }
 
 /**
@@ -80,7 +80,7 @@ export class BudgetItemsDialogComponent {
   readonly query = signal('');
   readonly applied = signal('');
 
-  readonly bookings = signal<Expense[]>([]);
+  readonly bookings = signal<readonly Expense[]>([]);
   readonly total = signal(0);
   /** A page of bookings is on its way; `first` is true for the first page. */
   readonly loading = signal(false);

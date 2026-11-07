@@ -66,7 +66,7 @@ export class BulkPanelComponent {
   readonly variant = input<'panel' | 'reassign'>('panel');
   readonly rows = input<readonly Expense[]>([]);
   readonly costCentres = input<ReadonlyMap<string, CostCentreLabel>>(new Map());
-  readonly tree = input<BudgetTreeNode[]>([]);
+  readonly tree = input<readonly BudgetTreeNode[]>([]);
   readonly canExport = input(false);
   readonly busy = input(false);
   /** Why the delete is off, or null. */

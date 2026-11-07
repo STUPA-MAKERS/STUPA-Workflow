@@ -51,17 +51,16 @@ export function paletteColor(index: number): string {
 export function resolveNodeColors(
   roots: readonly BudgetTreeNode[],
   inherited: string | null = null,
-): Map<string, string | null> {
-  const out = new Map<string, string | null>();
-  const walk = (nodes: readonly BudgetTreeNode[], above: string | null): void => {
-    for (const n of nodes) {
+): ReadonlyMap<string, string | null> {
+  const entries = (
+    nodes: readonly BudgetTreeNode[],
+    above: string | null,
+  ): readonly (readonly [string, string | null])[] =>
+    nodes.flatMap((n) => {
       const color = ownColor(n) ?? above;
-      out.set(n.id, color);
-      walk(n.children, color);
-    }
-  };
-  walk(roots, inherited);
-  return out;
+      return [[n.id, color] as const, ...entries(n.children, color)];
+    });
+  return new Map(entries(roots, inherited));
 }
 
 /**
@@ -93,39 +92,35 @@ export function shadeColor(hex: string, step: number): string {
 export function nodeColors(
   roots: readonly BudgetTreeNode[],
   inherited: string | null = null,
-): Map<string, string> {
-  const out = new Map<string, string>();
-  const walk = (nodes: readonly BudgetTreeNode[], above: string | null, top: boolean): void => {
-    const steps = new Map<string, number>();
-    for (const n of nodes) {
-      const own = ownColor(n);
-      if (own) steps.set(own, 1);
-    }
-    nodes.forEach((n, i) => {
-      const own = ownColor(n);
-      let color: string;
-      if (own) {
-        color = own;
-      } else if (above) {
-        const step = steps.get(above) ?? 0;
-        steps.set(above, step + 1);
-        color = shadeColor(above, step);
-      } else {
-        color = paletteColor(i);
-      }
-      out.set(n.id, color);
-      walk(n.children, own ?? above ?? (top ? null : color), false);
+): ReadonlyMap<string, string> {
+  const entries = (
+    nodes: readonly BudgetTreeNode[],
+    above: string | null,
+    top: boolean,
+  ): readonly (readonly [string, string])[] => {
+    const owns = nodes.map(ownColor);
+    const firstStep = above && owns.includes(above) ? 1 : 0;
+    const uncoloredBefore = (i: number): number => owns.slice(0, i).filter((o) => !o).length;
+    return nodes.flatMap((n, i) => {
+      const own = owns[i];
+      const shaded = above ? shadeColor(above, firstStep + uncoloredBefore(i)) : paletteColor(i);
+      const color = own ?? shaded;
+      return [
+        [n.id, color] as const,
+        ...entries(n.children, own ?? above ?? (top ? null : color), false),
+      ];
     });
   };
-  walk(roots, inherited?.trim() || null, true);
-  return out;
+  return new Map(entries(roots, inherited?.trim() || null, true));
 }
 
 function ownColor(node: BudgetTreeNode): string | null {
   return node.color?.trim() || null;
 }
 
-function parseHex(hex: string): { r: number; g: number; b: number } | null {
+function parseHex(
+  hex: string,
+): { readonly r: number; readonly g: number; readonly b: number } | null {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return null;
   const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];

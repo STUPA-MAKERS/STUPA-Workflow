@@ -50,35 +50,35 @@ const MIN_WIDTH = 520;
 
 /** The name of a cost centre, cut in three around the first hit of the search. */
 interface NameParts {
-  before: string;
-  hit: string;
-  after: string;
+  readonly before: string;
+  readonly hit: string;
+  readonly after: string;
 }
 
 /** One cost centre in the list. */
 export interface CostCentreChoice {
-  id: string;
-  key: string;
-  name: NameParts;
-  color: string | null;
+  readonly id: string;
+  readonly key: string;
+  readonly name: NameParts;
+  readonly color: string | null;
   /** 0 for a top-level budget (the head of its group), else the depth below it. */
-  depth: number;
+  readonly depth: number;
   /** "2.750,00 €", or null when the tree has no figures for the fiscal year. */
-  free: string | null;
-  negative: boolean;
+  readonly free: string | null;
+  readonly negative: boolean;
   /** The index among the choices: the keyboard moves over it. */
-  index: number;
+  readonly index: number;
 }
 
 /** One line of a group: a choice, or the path of the choices below it (while searching). */
 export type CostCentreLine =
-  | { kind: 'choice'; choice: CostCentreChoice }
-  | { kind: 'trail'; text: string };
+  | { readonly kind: 'choice'; readonly choice: CostCentreChoice }
+  | { readonly kind: 'trail'; readonly text: string };
 
 /** The choices of one top-level budget. */
 export interface CostCentreGroup {
-  head: CostCentreChoice;
-  lines: CostCentreLine[];
+  readonly head: CostCentreChoice;
+  readonly lines: readonly CostCentreLine[];
 }
 
 /**
@@ -211,41 +211,39 @@ export class CostCentreSelectComponent {
   );
 
   /** The groups of the list: every top-level budget with a hit, its choices below. */
-  protected readonly groups = computed<CostCentreGroup[]>(() => {
+  protected readonly groups = computed<readonly CostCentreGroup[]>(() => {
     const q = this.query().trim().toLocaleLowerCase();
-    const out: CostCentreGroup[] = [];
-    let index = this.allChoice() ? 1 : 0;
-    for (const top of this.nodes()) {
-      const lines: CostCentreLine[] = [];
-      let lastParent: string | null = null;
-      const walk = (list: readonly BudgetTreeNode[], depth: number, trail: BudgetTreeNode[]) => {
-        for (const n of list) {
-          if (!q || this.matches(n, q)) {
-            if (q && n.parentId !== lastParent && trail.length) {
-              lines.push({
-                kind: 'trail',
-                text: trail.map((t) => `${t.key} ${t.name}`).join(' › '),
-              });
-            }
-            lastParent = n.parentId;
-            lines.push({ kind: 'choice', choice: this.choice(n, top, q ? 1 : depth, q, 0) });
-          }
-          walk(n.children ?? [], depth + 1, [...trail, n]);
-        }
-      };
-      walk(top.children ?? [], 1, []);
-      if (q && !lines.length && !this.matches(top, q)) continue;
-      const head = this.choice(top, top, 0, q, index++);
-      for (const line of lines) {
-        if (line.kind === 'choice') line.choice.index = index++;
-      }
-      out.push({ head, lines });
-    }
-    return out;
+    const start = { groups: [] as readonly CostCentreGroup[], next: this.allChoice() ? 1 : 0 };
+    return this.nodes().reduce((acc, top) => {
+      const group = this.group(top, q, acc.next);
+      return group
+        ? { groups: [...acc.groups, group], next: acc.next + 1 + choiceCount(group) }
+        : acc;
+    }, start).groups;
   });
 
+  /**
+   * The group of one top-level budget, its head at `index` and its choices after it, or
+   * `null` when a search runs and nothing in it matches.
+   */
+  private group(top: BudgetTreeNode, q: string, index: number): CostCentreGroup | null {
+    const entries = treeEntries(top.children ?? [], 1, []);
+    const hits = q ? entries.filter((e) => this.matches(e.node, q)) : entries;
+    const lines = hits.flatMap((e, i): readonly CostCentreLine[] => {
+      const lastParent = i > 0 ? hits[i - 1].node.parentId : null;
+      const trail: readonly CostCentreLine[] =
+        q && e.node.parentId !== lastParent && e.trail.length
+          ? [{ kind: 'trail', text: e.trail.map((t) => `${t.key} ${t.name}`).join(' › ') }]
+          : [];
+      const choice = this.choice(e.node, top, q ? 1 : e.depth, q, index + 1 + i);
+      return [...trail, { kind: 'choice', choice }];
+    });
+    if (q && !lines.length && !this.matches(top, q)) return null;
+    return { head: this.choice(top, top, 0, q, index), lines };
+  }
+
   /** Every choice in the order of the list. */
-  private readonly choices = computed<CostCentreChoice[]>(() => {
+  private readonly choices = computed<readonly CostCentreChoice[]>(() => {
     const all = this.allChoice();
     return [
       ...(all ? [all] : []),
@@ -529,4 +527,28 @@ export class CostCentreSelectComponent {
     this.rendered?.destroy();
     this.rendered = null;
   }
+}
+
+/** A node of the tree below a top-level budget, with its depth and its ancestors. */
+interface TreeEntry {
+  readonly node: BudgetTreeNode;
+  readonly depth: number;
+  readonly trail: readonly BudgetTreeNode[];
+}
+
+/** Every node of `list` and below, in the order of the list, each before its children. */
+function treeEntries(
+  list: readonly BudgetTreeNode[],
+  depth: number,
+  trail: readonly BudgetTreeNode[],
+): readonly TreeEntry[] {
+  return list.flatMap((node) => [
+    { node, depth, trail },
+    ...treeEntries(node.children ?? [], depth + 1, [...trail, node]),
+  ]);
+}
+
+/** The number of choices below the head of a group. */
+function choiceCount(group: CostCentreGroup): number {
+  return group.lines.filter((l) => l.kind === 'choice').length;
 }
