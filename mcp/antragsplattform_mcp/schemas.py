@@ -17,7 +17,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class WireModel(BaseModel):
+class FrozenModel(BaseModel, frozen=True):
+    """An immutable Pydantic model.
+
+    The package does not import the backend, so it keeps its own frozen base. A subclass
+    repeats `frozen=True`, because basedpyright requires it.
+    """
+
+
+class WireModel(FrozenModel, frozen=True):
     """Base for all request bodies: camelCase field names, unknown keys allowed."""
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
@@ -53,7 +61,7 @@ def check_vote_config(config: dict[str, Any]) -> None:
 
 
 # Flow graph, shared by the flow tools.
-class StateDef(WireModel):
+class StateDef(WireModel, frozen=True):
     key: str = Field(description="State key, ^[a-z][a-z0-9_]*$")
     label: I18nMap = Field(
         description='Display label per language, e.g. {"de": "...", "en": "..."}'
@@ -78,7 +86,7 @@ class StateDef(WireModel):
         return self
 
 
-class StateDefPatch(WireModel):
+class StateDefPatch(WireModel, frozen=True):
     """Partial state update. Only the keys you provide change."""
 
     key: str | None = Field(
@@ -103,7 +111,7 @@ class StateDefPatch(WireModel):
         return self
 
 
-class TransitionDef(WireModel):
+class TransitionDef(WireModel, frozen=True):
     from_: str = Field(alias="from", description="Source state key")
     to: str = Field(description="Target state key")
     label: I18nMap | None = None
@@ -143,7 +151,7 @@ class TransitionDef(WireModel):
     requiresAction: bool = True
 
 
-class TransitionDefPatch(WireModel):
+class TransitionDefPatch(WireModel, frozen=True):
     """Partial transition update.
 
     Only the keys you provide change. An explicit `null` removes the key. For example,
@@ -162,7 +170,7 @@ class TransitionDefPatch(WireModel):
     requiresAction: bool | None = None
 
 
-class FlowGroupDef(WireModel):
+class FlowGroupDef(WireModel, frozen=True):
     """Visual node group for the editor only.
 
     The graph keeps it in `layout.groups` and the engine ignores it. Groups are NESTABLE
@@ -180,7 +188,7 @@ class FlowGroupDef(WireModel):
 
 
 # Form fields, shared by the form tools.
-class FormFieldDef(WireModel):
+class FormFieldDef(WireModel, frozen=True):
     key: str = Field(description="Field key, ^[a-z][a-z0-9_]*$")
     type: str = Field(
         description="text|textarea|number|currency|date|select|multiselect|gremium_select|"
@@ -207,7 +215,7 @@ class FormFieldDef(WireModel):
     promoteTarget: str | None = None
 
 
-class FormFieldPatch(WireModel):
+class FormFieldPatch(WireModel, frozen=True):
     """Partial form-field update. Only the keys you provide change."""
 
     key: str | None = None
@@ -224,7 +232,7 @@ class FormFieldPatch(WireModel):
 
 
 # Admin: Gremien and RBAC.
-class GremiumCreate(WireModel):
+class GremiumCreate(WireModel, frozen=True):
     name: str
     slug: str
     # The corporate design is a row now, not a name. `list_cd_variants`
@@ -244,7 +252,7 @@ class GremiumCreate(WireModel):
     )
 
 
-class GremiumUpdate(WireModel):
+class GremiumUpdate(WireModel, frozen=True):
     name: str | None = None
     slug: str | None = None
     cdVariantId: str | None = None
@@ -263,18 +271,18 @@ class GremiumUpdate(WireModel):
     )
 
 
-class CdVariantCreate(WireModel):
+class CdVariantCreate(WireModel, frozen=True):
     key: str
     name: str
 
 
-class CdVariantUpdate(WireModel):
+class CdVariantUpdate(WireModel, frozen=True):
     """Patch of a CD variant. `key` is immutable — a different value gives 409."""
 
     name: str | None = None
 
 
-class CdVariantLogoVendoredCreate(WireModel):
+class CdVariantLogoVendoredCreate(WireModel, frozen=True):
     """Add a logo that the render service ships. Deprecated: upload a file through the web UI.
 
     The worker turns a vendored logo into a normal upload at its next start.
@@ -289,68 +297,68 @@ class CdVariantLogoVendoredCreate(WireModel):
     vendoredName: str
 
 
-class GremiumRoleCreate(WireModel):
+class GremiumRoleCreate(WireModel, frozen=True):
     key: str
     name: I18nMap = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
 
 
-class GremiumRoleUpdate(WireModel):
+class GremiumRoleUpdate(WireModel, frozen=True):
     name: I18nMap | None = None
     permissions: list[str] | None = None
 
 
-class GremiumMembershipMappingCreate(WireModel):
+class GremiumMembershipMappingCreate(WireModel, frozen=True):
     oidcGroup: str = Field(description="OIDC group name. The prefix 'vote:' is reserved.")
     gremiumId: str = Field(description="The Gremium that the group gives membership in")
 
 
-class GremiumMembershipMappingUpdate(WireModel):
+class GremiumMembershipMappingUpdate(WireModel, frozen=True):
     """Partial update. Send at least one key."""
 
     oidcGroup: str | None = None
     gremiumId: str | None = None
 
 
-class GremiumRoleMappingCreate(WireModel):
+class GremiumRoleMappingCreate(WireModel, frozen=True):
     oidcGroup: str = Field(description="OIDC group name. The prefix 'vote:' is reserved.")
     gremiumRoleId: str = Field(
         description="A Gremium role. It applies only to members of its Gremium."
     )
 
 
-class GremiumRoleMappingUpdate(WireModel):
+class GremiumRoleMappingUpdate(WireModel, frozen=True):
     """Partial update. Send at least one key."""
 
     oidcGroup: str | None = None
     gremiumRoleId: str | None = None
 
 
-class RoleCreate(WireModel):
+class RoleCreate(WireModel, frozen=True):
     key: str
     label: I18nMap = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
 
 
-class RoleUpdate(WireModel):
+class RoleUpdate(WireModel, frozen=True):
     label: I18nMap | None = None
     permissions: list[str] | None = None
 
 
-class GroupMappingCreate(WireModel):
+class GroupMappingCreate(WireModel, frozen=True):
     """OIDC group to a global role. A global role has no Gremium scope."""
 
     oidcGroup: str
     roleId: str
 
 
-class GroupMappingUpdate(WireModel):
+class GroupMappingUpdate(WireModel, frozen=True):
     oidcGroup: str | None = None
     roleId: str | None = None
 
 
 # Admin: application types and webhooks.
-class ApplicationTypeCreate(WireModel):
+class ApplicationTypeCreate(WireModel, frozen=True):
     key: str
     nameI18n: I18nMap
     gremiumId: str | None = None
@@ -358,14 +366,14 @@ class ApplicationTypeCreate(WireModel):
     comparisonOffers: dict[str, Any] | None = None
 
 
-class ApplicationTypeUpdate(WireModel):
+class ApplicationTypeUpdate(WireModel, frozen=True):
     nameI18n: I18nMap | None = None
     gremiumId: str | None = None
     hasBudget: bool | None = None
     comparisonOffers: dict[str, Any] | None = None
 
 
-class UiLanguageCreate(WireModel):
+class UiLanguageCreate(WireModel, frozen=True):
     """An extra UI language. `code` is a BCP 47 tag such as `fr` or `pt-BR`."""
 
     code: str
@@ -373,27 +381,27 @@ class UiLanguageCreate(WireModel):
     active: bool = False
 
 
-class UiLanguageUpdate(WireModel):
+class UiLanguageUpdate(WireModel, frozen=True):
     """A change of the name or of the switch `active`. An absent field stays."""
 
     name: str | None = None
     active: bool | None = None
 
 
-class WebhookCreate(WireModel):
+class WebhookCreate(WireModel, frozen=True):
     name: str
     url: str
     active: bool = True
 
 
-class WebhookUpdate(WireModel):
+class WebhookUpdate(WireModel, frozen=True):
     name: str | None = None
     url: str | None = None
     active: bool | None = None
 
 
 # Budget tree, bookings and transfers.
-class BudgetNodeCreate(WireModel):
+class BudgetNodeCreate(WireModel, frozen=True):
     key: str
     name: str
     parentId: str | None = None
@@ -410,7 +418,7 @@ class BudgetNodeCreate(WireModel):
     )
 
 
-class BudgetNodeUpdate(WireModel):
+class BudgetNodeUpdate(WireModel, frozen=True):
     key: str | None = None
     name: str | None = None
     active: bool | None = None
@@ -437,7 +445,7 @@ class BudgetNodeUpdate(WireModel):
     )
 
 
-class ExpenseUpdate(WireModel):
+class ExpenseUpdate(WireModel, frozen=True):
     amount: str | None = Field(default=None, description="Decimal string > 0")
     description: str | None = None
     budgetId: str | None = Field(
@@ -453,7 +461,7 @@ class ExpenseUpdate(WireModel):
     invoiceId: str | None = Field(default=None, description="Linked invoice; null clears")
 
 
-class TransferCreate(WireModel):
+class TransferCreate(WireModel, frozen=True):
     fromBudgetId: str
     toBudgetId: str
     fiscalYearId: str
@@ -461,7 +469,7 @@ class TransferCreate(WireModel):
     description: str
 
 
-class InvoiceCreate(WireModel):
+class InvoiceCreate(WireModel, frozen=True):
     """Create an invoice.
 
     `grossAmount` is required and the rest is optional. `fileToken` links an original PDF
@@ -482,7 +490,7 @@ class InvoiceCreate(WireModel):
     fileMime: str | None = None
 
 
-class InvoiceUpdate(WireModel):
+class InvoiceUpdate(WireModel, frozen=True):
     number: str | None = None
     issueDate: str | None = None
     dueDate: str | None = None
@@ -495,7 +503,7 @@ class InvoiceUpdate(WireModel):
 
 
 # Meetings and votes.
-class MeetingCreate(WireModel):
+class MeetingCreate(WireModel, frozen=True):
     gremiumId: str
     title: str
     date: str | None = Field(default=None, description="ISO date")
@@ -511,7 +519,7 @@ class MeetingCreate(WireModel):
     )
 
 
-class MeetingPatch(WireModel):
+class MeetingPatch(WireModel, frozen=True):
     activeApplicationId: str | None = None
     status: Literal["planned", "live", "closed"] | None = None
     title: str | None = Field(
@@ -537,7 +545,7 @@ class MeetingPatch(WireModel):
     )
 
 
-class DecisionProposal(WireModel):
+class DecisionProposal(WireModel, frozen=True):
     """A decision: the approved amount and the conditions (approval with deviations).
 
     When a vote with this proposal passes, the proposal becomes the decision of the
@@ -556,7 +564,7 @@ class DecisionProposal(WireModel):
     )
 
 
-class ElectionCandidateIn(WireModel):
+class ElectionCandidateIn(WireModel, frozen=True):
     """One candidate of a personnel election. The server gives the ids c1..cn.
 
     Only `name` and `principalId`. The server rejects any other key with 422, so do
@@ -573,7 +581,7 @@ class ElectionCandidateIn(WireModel):
     )
 
 
-class MeetingVoteOpenBody(WireModel):
+class MeetingVoteOpenBody(WireModel, frozen=True):
     """Open a live vote. A meeting vote has no casting vote: a tie is `rejected`.
 
     `kind: "election"` opens a personnel election: `question` names the round,
@@ -617,7 +625,7 @@ class MeetingVoteOpenBody(WireModel):
     )
 
 
-class VoteCreate(WireModel):
+class VoteCreate(WireModel, frozen=True):
     """Application-bound vote (voting module).
 
     The server counts the eligible voters from the roster of the gremium. The body has
@@ -649,13 +657,13 @@ class VoteCreate(WireModel):
 
 
 # Notification settings, delegations and substitutes.
-class NotificationSettingsUpdate(WireModel):
+class NotificationSettingsUpdate(WireModel, frozen=True):
     taskReminderEnabled: bool | None = None
     taskReminderAfterDays: int | None = None
     taskReminderRepeatDays: int | None = None
 
 
-class GuestSettingsUpdate(WireModel):
+class GuestSettingsUpdate(WireModel, frozen=True):
     confirmTtlHours: int = Field(
         ge=1, le=720, description="Hours a guest has to confirm the email (1..720)"
     )
@@ -672,7 +680,7 @@ class GuestSettingsUpdate(WireModel):
     )
 
 
-class MeetingSettingsUpdate(WireModel):
+class MeetingSettingsUpdate(WireModel, frozen=True):
     openLeadMinutes: int = Field(
         ge=0,
         le=10080,
@@ -688,7 +696,7 @@ class MeetingSettingsUpdate(WireModel):
     )
 
 
-class DelegationCreate(WireModel):
+class DelegationCreate(WireModel, frozen=True):
     meetingId: str
     delegateId: str
     delegateVoting: bool = False
@@ -703,7 +711,7 @@ class DelegationCreate(WireModel):
     )
 
 
-class SubstituteCreate(WireModel):
+class SubstituteCreate(WireModel, frozen=True):
     gremiumId: str
     memberId: str | None = Field(default=None, description="None = pool substitute for any member")
     substituteId: str
@@ -724,14 +732,14 @@ TicketKind = Literal["bug", "question", "idea"]
 TicketStatus = Literal["new", "in_progress", "done", "rejected"]
 
 
-class TodoLinkIn(WireModel):
+class TodoLinkIn(WireModel, frozen=True):
     kind: TodoLinkKind
     targetId: str = Field(
         description="The id of the linked object; the caller must be able to read it"
     )
 
 
-class TodoCardCreate(WireModel):
+class TodoCardCreate(WireModel, frozen=True):
     boardId: str
     columnId: str | None = Field(default=None, description="Default: the first column")
     title: str = Field(description="1 to 300 characters")
@@ -745,14 +753,14 @@ class TodoCardCreate(WireModel):
     links: list[TodoLinkIn] | None = None
 
 
-class TodoCardPatch(WireModel):
+class TodoCardPatch(WireModel, frozen=True):
     version: int = Field(description="The `version` of the card as last read; 409 on a mismatch")
     title: str | None = Field(default=None, description="1 to 300 characters")
     descriptionMd: str | None = Field(default=None, description="Markdown; explicit null clears it")
     dueDate: str | None = Field(default=None, description="ISO date; explicit null clears it")
 
 
-class TicketPatch(WireModel):
+class TicketPatch(WireModel, frozen=True):
     status: TicketStatus | None = None
     assigneeId: str | None = Field(
         default=None,

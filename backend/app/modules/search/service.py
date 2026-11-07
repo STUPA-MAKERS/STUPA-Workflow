@@ -17,13 +17,13 @@ shows a stack trace.
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium
@@ -38,6 +38,9 @@ if TYPE_CHECKING:
     from app.modules.auth.principal import Principal
 
 log = logging.getLogger(__name__)
+
+#: One search source: the query, the caller and the language give its hits.
+type Source = Callable[[str, Principal, str], Awaitable[list[SearchHit]]]
 
 #: Hits per kind. Small on purpose: a palette is a way to jump to one thing, not a
 #: report. The client says so when a source hits the cap.
@@ -131,21 +134,16 @@ class SearchService:
             "todo": self._todos,
             "event": self._events,
         }
-        hits: list[SearchHit] = []
-        failed: list[str] = []
-        truncated = False
-        for name, run in sources.items():
-            try:
-                found = await run(query, principal, lang)
-            except Exception:
-                log.exception("search source %s failed", name)
-                failed.append(name)
-                continue
-            if len(found) > PER_KIND:
-                truncated = True
-                found = found[:PER_KIND]
-            hits.extend(found)
-        return SearchResults(hits=hits, truncated=truncated, failed=failed)
+        outcomes = [
+            (name, await _answer(name, run, query, principal, lang))
+            for name, run in sources.items()
+        ]
+        answered = [found for _, found in outcomes if found is not None]
+        return SearchResults(
+            hits=[hit for found in answered for hit in found[:PER_KIND]],
+            truncated=any(len(found) > PER_KIND for found in answered),
+            failed=[name for name, found in outcomes if found is None],
+        )
 
     async def _applications(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
         """Reuses `ApplicationsService.list_applications`, gated exactly as its router.
@@ -248,17 +246,13 @@ class SearchService:
         (`gremium_reader_ids`), through `view_gremium_id`, which is the
         column the tree endpoint filters roots on.
         """
-        from app.modules.admin.gremium_roles import gremium_reader_ids
-
         where, rank = trigram_rank(
             q, [Budget.name, Budget.path_key], dialect=dialect_of(self.session)
         )
-        stmt = select(Budget).where(where, Budget.hidden_in_budget.is_(False))
-        if not has_budget_read(principal):
-            member = await gremium_reader_ids(self.session, principal.sub)
-            if not member:
-                return []
-            stmt = stmt.where(Budget.view_gremium_id.in_(member))
+        scope = await self._budget_scope(principal)
+        if scope is None:
+            return []
+        stmt = select(Budget).where(where, Budget.hidden_in_budget.is_(False), *scope)
         rows = (await self.session.scalars(stmt.order_by(rank.desc()).limit(PER_KIND + 1))).all()
         return [
             SearchHit(
@@ -270,6 +264,19 @@ class SearchService:
             )
             for b in rows
         ]
+
+    async def _budget_scope(self, principal: Principal) -> tuple[ColumnElement[bool], ...] | None:
+        """Return the extra filter of the cost-centre search, or `None` for no visible node.
+
+        A global budget permission needs no filter. Anyone else is limited to the nodes of
+        the Gremien they read, and a caller who reads no Gremium sees no node at all.
+        """
+        from app.modules.admin.gremium_roles import gremium_reader_ids
+
+        if has_budget_read(principal):
+            return ()
+        member = await gremium_reader_ids(self.session, principal.sub)
+        return (Budget.view_gremium_id.in_(member),) if member else None
 
     async def _gremien(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
         """Search the committees, for a caller who can act on one.
@@ -383,12 +390,27 @@ class SearchService:
 
 def _days(start: date | None, end: date | None) -> str | None:
     """The dates of an Event as ``DD.MM.YYYY`` or ``DD.MM.YYYY–DD.MM.YYYY``."""
-    if start is None:
+    match start:
+        case None:
+            return None
+        case date():
+            first = start.strftime("%d.%m.%Y")
+            return first if end is None or end == start else f"{first}–{end.strftime('%d.%m.%Y')}"
+
+
+async def _answer(
+    name: str, run: Source, query: str, principal: Principal, lang: str
+) -> list[SearchHit] | None:
+    """Ask one source, or log its failure and return `None`.
+
+    A broken source must not empty the palette, so the failure ends here and the caller
+    lists the source in ``failed``.
+    """
+    try:
+        return await run(query, principal, lang)
+    except Exception:
+        log.exception("search source %s failed", name)
         return None
-    first = start.strftime("%d.%m.%Y")
-    if end is None or end == start:
-        return first
-    return f"{first}–{end.strftime('%d.%m.%Y')}"
 
 
 def _untitled(lang: str) -> str:

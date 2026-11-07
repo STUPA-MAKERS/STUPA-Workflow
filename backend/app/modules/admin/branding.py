@@ -25,9 +25,10 @@ import base64
 import binascii
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.shared.i18n import I18nMap
+from app.shared.schemas import FrozenStrictCamelModel
 
 #: Image whitelist for the logos and the favicon. image/svg+xml is left out on purpose,
 #: because SVG carries an XSS risk.
@@ -89,12 +90,6 @@ def _cap_i18n(value: I18nMap, limit: int) -> I18nMap:
     return value
 
 
-class _CamelModel(BaseModel):
-    """Base model with camelCase JSON aliases, population by name and no extra fields."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
-
 def _reject_unsafe_url(url: str) -> str:
     """Reject `javascript:`/`data:`/`vbscript:` schemes in (footer) URLs."""
     low = url.strip().lower()
@@ -103,7 +98,7 @@ def _reject_unsafe_url(url: str) -> str:
     return url
 
 
-class BrandingAsset(_CamelModel):
+class BrandingAsset(FrozenStrictCamelModel, frozen=True):
     """Logo/favicon asset: inline base64 data URL or asset URL. Image-only, no SVG."""
 
     url: str
@@ -183,7 +178,7 @@ class BrandingAsset(_CamelModel):
             raise ValueError(f"logo bytes are {sniffed!r}, not the declared {self.mime!r}")
 
 
-class FooterLink(_CamelModel):
+class FooterLink(FrozenStrictCamelModel, frozen=True):
     """A footer link with an i18n label."""
 
     label: I18nMap = Field(default_factory=dict)
@@ -200,7 +195,7 @@ class FooterLink(_CamelModel):
         return _reject_unsafe_url(v)
 
 
-class SiteFreetexts(_CamelModel):
+class SiteFreetexts(FrozenStrictCamelModel, frozen=True):
     """The i18n freetexts of the site.
 
     They are the login hint, the welcome, the support text, the e-mail footer, the
@@ -246,7 +241,7 @@ def check_http_url(url: str) -> str:
     return value
 
 
-class HelpSettings(_CamelModel):
+class HelpSettings(FrozenStrictCamelModel, frozen=True):
     """The help menu: ``wikiUrl`` is the target of "Handbuch". http(s) only."""
 
     wiki_url: str = Field(default=DEFAULT_WIKI_URL, alias="wikiUrl", max_length=2048)
@@ -257,7 +252,7 @@ class HelpSettings(_CamelModel):
         return check_http_url(v)
 
 
-class TicketSettings(_CamelModel):
+class TicketSettings(FrozenStrictCamelModel, frozen=True):
     """The ticket reports.
 
     ``publicEnabled`` lets a person without a session report (ALTCHA). ``notifyNew``
@@ -275,7 +270,7 @@ class TicketSettings(_CamelModel):
 ACCENT_PATTERN = r"^#[0-9a-fA-F]{6}$"
 
 
-class Branding(_CamelModel):
+class Branding(FrozenStrictCamelModel, frozen=True):
     """Full branding config (active or draft)."""
 
     #: App name from the config, language-neutral. It drives the PWA manifest, the
@@ -328,7 +323,7 @@ class Branding(_CamelModel):
         return _cap_i18n(v, MAX_LABEL_CHARS)
 
 
-class PublicBranding(Branding):
+class PublicBranding(Branding, frozen=True):
     """The branding of the public ``GET /site-config``.
 
     The help and ticket settings stay out of it, because ``notifyNew`` and

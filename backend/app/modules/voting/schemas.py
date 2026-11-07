@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.modules.applications.decision import DecisionIn
 from app.shared.config_schemas import (
@@ -20,13 +21,7 @@ from app.shared.config_schemas import (
     Quorum,
     VoteConfig,
 )
-
-
-class _CamelModel(BaseModel):
-    """Give JSON the camelCase aliases. A field also accepts its Python name."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
+from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 #: The result of a closed vote. A motion gives ``passed``/``rejected``/``tie``. An
 #: election gives ``elected``, ``runoff`` (a runoff decides the open seats),
@@ -35,18 +30,18 @@ VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff"]
 VoteKind = Literal["motion", "election", "poll"]
 
 
-class ElectionRunoffOut(_CamelModel):
+class ElectionRunoffOut(FrozenCamelModel, frozen=True):
     """A runoff that a tie at the seat boundary needs.
 
     ``voteId`` is the runoff vote once ``POST /votes/{id}/runoff`` created it.
     """
 
-    candidate_ids: list[str] = Field(alias="candidateIds")
+    candidate_ids: Sequence[str] = Field(alias="candidateIds")
     seats: int
     vote_id: UUID | None = Field(default=None, alias="voteId")
 
 
-class ElectionLotOut(_CamelModel):
+class ElectionLotOut(FrozenCamelModel, frozen=True):
     """The lot of a tie. ``drawn`` is None while the lot is pending.
 
     ``at`` is the moment of the draw and ``by`` the ``sub`` of the meeting lead who
@@ -54,24 +49,24 @@ class ElectionLotOut(_CamelModel):
     (a runoff round) draws several candidates.
     """
 
-    among: list[str]
+    among: Sequence[str]
     seats: int = 1
-    drawn: list[str] | None = None
+    drawn: Sequence[str] | None = None
     at: datetime | None = None
     by: str | None = None
     by_name: str | None = Field(default=None, alias="byName")
 
 
-class ElectionResultOut(_CamelModel):
+class ElectionResultOut(FrozenCamelModel, frozen=True):
     """The stored result of a closed election (``vote.election_result``)."""
 
-    counts: dict[str, int]
+    counts: Mapping[str, int]
     abstentions: int = 0
     ballots: int = 0
     #: Only the single-candidate ballot (Ja/Nein/Enthaltung).
     yes: int | None = None
     no: int | None = None
-    elected: list[str] = Field(default_factory=list)
+    elected: Sequence[str] = Field(default_factory=tuple)
     runoff: ElectionRunoffOut | None = None
     lot: ElectionLotOut | None = None
 
@@ -81,12 +76,14 @@ class ElectionResultOut(_CamelModel):
         The WebSocket channel of a meeting reaches the beamer and the guests, so it
         carries this form. ``byName`` stays for the lot note.
         """
-        if self.lot is None or self.lot.by is None:
-            return self
-        return self.model_copy(update={"lot": self.lot.model_copy(update={"by": None})})
+        return (
+            self
+            if self.lot is None or self.lot.by is None
+            else self.model_copy(update={"lot": self.lot.model_copy(update={"by": None})})
+        )
 
 
-class PollResultOut(_CamelModel):
+class PollResultOut(FrozenCamelModel, frozen=True):
     """The counts of a poll (``vote.poll_result`` once closed).
 
     ``counts`` holds the votes per option id (a date poll: the Ja answers), ``maybe``
@@ -95,32 +92,28 @@ class PollResultOut(_CamelModel):
     only, never a voter.
     """
 
-    counts: dict[str, int]
-    maybe: dict[str, int] | None = None
+    counts: Mapping[str, int]
+    maybe: Mapping[str, int] | None = None
     abstentions: int = 0
     ballots: int = 0
-    order: list[str] = Field(default_factory=list)
-    top: list[str] = Field(default_factory=list)
+    order: Sequence[str] = Field(default_factory=tuple)
+    top: Sequence[str] = Field(default_factory=tuple)
 
 
-class PollOptionIn(_CamelModel):
+class PollOptionIn(FrozenStrictCamelModel, frozen=True):
     """One option of a new poll: a text, or a date with a start and an optional end.
 
     The server gives the ids (``o1``, ``o2``, ...) in the given order. An unknown key
     gives 422.
     """
 
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
     label: str | None = Field(default=None, max_length=POLL_LABEL_MAX)
     start: datetime | None = None
     end: datetime | None = None
 
 
-class PollIn(_CamelModel):
+class PollIn(FrozenStrictCamelModel, frozen=True):
     """The options of a poll as the creator types them (create and edit)."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     mode: PollMode
     options: list[PollOptionIn] = Field(min_length=POLL_MIN_OPTIONS, max_length=POLL_MAX_OPTIONS)
@@ -149,7 +142,7 @@ class PollIn(_CamelModel):
         )
 
 
-class PollCreate(PollIn):
+class PollCreate(PollIn, frozen=True):
     """``POST /votes`` - create a poll of a Gremium, without a meeting.
 
     ``eligibleGroup`` is the Gremium. ``closesAt`` is the planned end (at least one
@@ -174,14 +167,12 @@ class PollCreate(PollIn):
         return stripped
 
 
-class PollPatch(_CamelModel):
+class PollPatch(FrozenStrictCamelModel, frozen=True):
     """``PATCH /votes/{id}`` - change a poll while it holds no ballot.
 
     ``options`` replaces every option (the server gives new ids), and the mode stays.
     ``closesAt`` moves the end of a poll without a meeting.
     """
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     question: str | None = Field(default=None, min_length=1, max_length=2000)
     options: list[PollOptionIn] | None = Field(
@@ -191,15 +182,13 @@ class PollPatch(_CamelModel):
     closes_at: datetime | None = Field(default=None, alias="closesAt")
 
 
-class VoteCreate(_CamelModel):
+class VoteCreate(FrozenStrictCamelModel, frozen=True):
     """``POST /applications/{id}/votes`` - create a vote (status ``draft``).
 
     ``eligibleGroup`` is the UUID of the gremium that votes. A free group key is not
     valid (422). The server sets the eligible-voter count from the roster of that
     gremium, so the body has no ``eligibleCount``. An unknown field gives 422.
     """
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     config: VoteConfig
     eligible_group: UUID = Field(alias="eligibleGroup")
@@ -215,7 +204,7 @@ class VoteCreate(_CamelModel):
     proposal: DecisionIn | None = None
 
 
-class VoteCreateInternal(_CamelModel):
+class VoteCreateInternal(FrozenCamelModel, frozen=True):
     """The server-side create payload with the eligible-voter count.
 
     ``VotingService.create`` builds it from ``VoteCreate`` and the roster of the
@@ -258,7 +247,7 @@ class VoteCreateInternal(_CamelModel):
         return self
 
 
-class BallotIn(_CamelModel):
+class BallotIn(FrozenCamelModel, frozen=True):
     """``POST /votes/{id}/ballot`` - cast a vote (``choice`` in ``config.options``).
 
     ``asDelegation=true`` casts the represented vote: own and delegated voting
@@ -283,7 +272,7 @@ class BallotIn(_CamelModel):
         return v
 
 
-class TallyOut(_CamelModel):
+class TallyOut(FrozenCamelModel, frozen=True):
     """Aggregated interim/final result. Only ``counts`` when ``secret``."""
 
     counts: dict[str, int]
@@ -312,7 +301,7 @@ class TallyOut(_CamelModel):
     present_guests: int | None = Field(default=None, alias="presentGuests")
 
 
-class MyBallot(_CamelModel):
+class MyBallot(FrozenCamelModel, frozen=True):
     """The own ballot of the calling principal in one vote.
 
     ``cast`` tells whether the principal has cast the own ballot (from the voted
@@ -324,12 +313,12 @@ class MyBallot(_CamelModel):
     #: The chosen option. Always None, because every vote is secret.
     choice: str | None = None
     #: The chosen candidate or option ids. Always None, because every vote is secret.
-    choices: list[str] | None = None
+    choices: tuple[str, ...] | None = None
     #: The answers of a date poll. Always None, because every vote is secret.
     answers: dict[str, DateAnswer] | None = None
 
 
-class VoteOut(_CamelModel):
+class VoteOut(FrozenCamelModel, frozen=True):
     """Vote state + tally (``GET /votes/{id}``)."""
 
     id: UUID
@@ -400,7 +389,7 @@ class VoteOut(_CamelModel):
 VoteStatus = Literal["draft", "open", "closed", "cancelled"]
 
 
-class VoteListItem(_CamelModel):
+class VoteListItem(FrozenCamelModel, frozen=True):
     """One row of the vote list (``GET /votes``).
 
     The row carries no tally. The client reads the tally from ``GET /votes/{id}``.
@@ -433,7 +422,7 @@ class VoteListItem(_CamelModel):
     my_ballot: MyBallot = Field(default_factory=MyBallot, alias="myBallot")
 
 
-class BallotAccepted(_CamelModel):
+class BallotAccepted(FrozenCamelModel, frozen=True):
     """Response for an accepted ballot.
 
     A ballot never changes after the cast. A second cast gives 409
@@ -443,7 +432,7 @@ class BallotAccepted(_CamelModel):
     status: Literal["cast"] = "cast"
 
 
-class VoteClosed(_CamelModel):
+class VoteClosed(FrozenCamelModel, frozen=True):
     """Result of a vote close (``POST /votes/{id}/close``).
 
     The close always ends the vote. ``branchFired`` tells whether the pass or fail

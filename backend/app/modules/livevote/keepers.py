@@ -46,10 +46,11 @@ async def member_permissions(session: AsyncSession, gremium_id: UUID) -> dict[UU
             )
         )
     ).all()
-    out: dict[UUID, set[str]] = {}
-    for pid, perms in rows:
-        out.setdefault(pid, set()).update(perms or [])
-    return {pid: frozenset(perms) for pid, perms in out.items()}
+    members = dict.fromkeys(pid for pid, _ in rows)
+    return {
+        pid: frozenset(perm for member, perms in rows if member == pid for perm in perms or [])
+        for pid in members
+    }
 
 
 async def keeper_principal_ids(session: AsyncSession, gremium_id: UUID) -> set[UUID]:
@@ -69,12 +70,15 @@ async def agenda_positions(session: AsyncSession, meeting_ids: Sequence[UUID]) -
             .order_by(MeetingAgendaItem.meeting_id, *agenda_order())
         )
     ).all()
-    counts: dict[UUID, int] = {}
-    out: dict[UUID, int] = {}
-    for meeting_id, item_id in rows:
-        counts[meeting_id] = counts.get(meeting_id, 0) + 1
-        out[item_id] = counts[meeting_id]
-    return out
+    by_meeting = {
+        meeting_id: [item_id for owner, item_id in rows if owner == meeting_id]
+        for meeting_id in dict.fromkeys(meeting_id for meeting_id, _ in rows)
+    }
+    return {
+        item_id: position
+        for item_ids in by_meeting.values()
+        for position, item_id in enumerate(item_ids, start=1)
+    }
 
 
 async def keeper_periods(
@@ -127,9 +131,8 @@ async def keeper_summaries(
     names, and the agenda positions when a period refers to an agenda item.
     """
     periods = await keeper_periods(session, meeting_ids)
-    out: dict[UUID, KeeperSummary] = {mid: ([], None) for mid in meeting_ids}
     if not periods:
-        return out
+        return {mid: ([], None) for mid in meeting_ids}
     names = await principal_names(session, {p.principal_id for p in periods})
     referenced = any(
         p.from_agenda_item_id is not None or p.to_agenda_item_id is not None for p in periods
@@ -137,21 +140,32 @@ async def keeper_summaries(
     positions = (
         await agenda_positions(session, list({p.meeting_id for p in periods})) if referenced else {}
     )
-    for p in periods:
-        row = KeeperPeriodOut(
-            principalId=p.principal_id,
-            name=names.get(p.principal_id),
-            fromAt=p.from_at,
-            toAt=p.to_at,
-            fromAgendaItemId=p.from_agenda_item_id,
-            toAgendaItemId=p.to_agenda_item_id,
-            fromPosition=positions.get(p.from_agenda_item_id) if p.from_agenda_item_id else None,
-            toPosition=positions.get(p.to_agenda_item_id) if p.to_agenda_item_id else None,
+    rows = tuple((p, _period_out(p, names, positions)) for p in periods)
+    return {
+        mid: (
+            [row for p, row in rows if p.meeting_id == mid and p.from_at is not None],
+            next(
+                (row for p, row in reversed(rows) if p.meeting_id == mid and p.from_at is None),
+                None,
+            ),
         )
-        done, planned = out[p.meeting_id]
-        if p.from_at is None:
-            planned = row
-        else:
-            done.append(row)
-        out[p.meeting_id] = (done, planned)
-    return out
+        for mid in meeting_ids
+    }
+
+
+def _period_out(
+    period: ProtocolKeeperPeriod, names: dict[UUID, str | None], positions: dict[UUID, int]
+) -> KeeperPeriodOut:
+    """Build the wire form of one keeper period."""
+    return KeeperPeriodOut(
+        principalId=period.principal_id,
+        name=names.get(period.principal_id),
+        fromAt=period.from_at,
+        toAt=period.to_at,
+        fromAgendaItemId=period.from_agenda_item_id,
+        toAgendaItemId=period.to_agenda_item_id,
+        fromPosition=(
+            positions.get(period.from_agenda_item_id) if period.from_agenda_item_id else None
+        ),
+        toPosition=positions.get(period.to_agenda_item_id) if period.to_agenda_item_id else None,
+    )

@@ -13,6 +13,7 @@ a `VALUE=DATE` event exclusive. An Event without an end lasts one day.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from datetime import date as _date
@@ -21,7 +22,10 @@ from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:  # pragma: no cover - types only (icalendar imported lazily)
-    from icalendar import Event
+    from icalendar import Component, Event
+
+#: One iCal property as a name and the value that icalendar encodes.
+type Property = tuple[str, object]
 
 _LOCAL_TZ = ZoneInfo("Europe/Berlin")
 
@@ -70,9 +74,7 @@ class CardEvent:
 
 def _as_utc(value: datetime) -> datetime:
     """Convert a datetime to UTC and treat a naive value as UTC (defensive)."""
-    if value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
-    return value.astimezone(UTC)
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 def _local_to_utc(day: _date, clock: _time) -> datetime:
@@ -83,6 +85,43 @@ def _local_to_utc(day: _date, clock: _time) -> datetime:
     return datetime.combine(day, clock, tzinfo=_LOCAL_TZ).astimezone(UTC)
 
 
+def _filled[C: Component](
+    component: C, properties: Iterable[Property], parts: Iterable[Component] = ()
+) -> C:
+    """Add the properties, then the subcomponents, to a new component and return it.
+
+    icalendar builds a component only through `add`, so this is the one place that writes into
+    one. The order of the properties is the order of the lines in the feed.
+    """
+    for name, value in properties:
+        component.add(name, value)
+    for part in parts:
+        component.add_component(part)
+    return component
+
+
+def _when(condition: object, *properties: Property) -> tuple[Property, ...]:
+    """Return the properties when the condition is truthy, else no property."""
+    return properties if condition else ()
+
+
+def _timed_span(
+    day: _date, start_time: _time, end_time: _time | None, default_duration: timedelta
+) -> tuple[Property, ...]:
+    """Return DTSTART and DTEND of a timed meeting in UTC.
+
+    The end time counts only when it is after the start time, else the meeting lasts
+    `default_duration`.
+    """
+    start = _local_to_utc(day, start_time)
+    end = (
+        _local_to_utc(day, end_time)
+        if end_time is not None and end_time > start_time
+        else start + default_duration
+    )
+    return (("dtstart", start), ("dtend", end))
+
+
 def _build_event(event: MeetingEvent, *, domain: str, default_duration: timedelta) -> Event:
     """Build one VEVENT for a meeting.
 
@@ -91,57 +130,52 @@ def _build_event(event: MeetingEvent, *, domain: str, default_duration: timedelt
     """
     from icalendar import Alarm, Event
 
-    ical = Event()
-    ical.add("uid", f"meeting-{event.uid}@{domain}")
-    ical.add("dtstamp", _as_utc(event.stamp))
-    ical.add("summary", event.title)
-    if event.gremium_name:
-        ical.add("description", f"Gremium: {event.gremium_name}")
-
-    if event.start_time is None:
-        ical.add("dtstart", event.date)
-        lead = _ALARM_LEAD_ALLDAY
-    else:
-        start = _local_to_utc(event.date, event.start_time)
-        if event.end_time is not None and event.end_time > event.start_time:
-            end = _local_to_utc(event.date, event.end_time)
-        else:
-            end = start + default_duration
-        ical.add("dtstart", start)
-        ical.add("dtend", end)
-        lead = _ALARM_LEAD_TIMED
-
-    alarm = Alarm()
-    alarm.add("action", "DISPLAY")
-    alarm.add("description", f"Erinnerung: {event.title}")
-    alarm.add("trigger", lead)
-    ical.add_component(alarm)
-    return ical
+    span = (
+        (("dtstart", event.date),)
+        if event.start_time is None
+        else _timed_span(event.date, event.start_time, event.end_time, default_duration)
+    )
+    lead = _ALARM_LEAD_ALLDAY if event.start_time is None else _ALARM_LEAD_TIMED
+    alarm = _filled(
+        Alarm(),
+        (
+            ("action", "DISPLAY"),
+            ("description", f"Erinnerung: {event.title}"),
+            ("trigger", lead),
+        ),
+    )
+    properties = (
+        ("uid", f"meeting-{event.uid}@{domain}"),
+        ("dtstamp", _as_utc(event.stamp)),
+        ("summary", event.title),
+        *_when(event.gremium_name, ("description", f"Gremium: {event.gremium_name}")),
+        *span,
+    )
+    return _filled(Event(), properties, (alarm,))
 
 
 def _build_card_event(event: CardEvent, *, domain: str) -> Event:
     """Build one all-day VEVENT for an Event card."""
     from icalendar import Event
 
-    ical = Event()
-    ical.add("uid", f"event-{event.uid}@{domain}")
-    ical.add("dtstamp", _as_utc(event.stamp))
-    ical.add("summary", event.title)
-    if event.place:
-        ical.add("location", event.place)
-    if event.board_name:
-        ical.add("description", f"Board: {event.board_name}")
     last = event.end if event.end is not None and event.end > event.start else event.start
-    ical.add("dtstart", event.start)
-    ical.add("dtend", last + timedelta(days=1))
-    return ical
+    properties = (
+        ("uid", f"event-{event.uid}@{domain}"),
+        ("dtstamp", _as_utc(event.stamp)),
+        ("summary", event.title),
+        *_when(event.place, ("location", event.place)),
+        *_when(event.board_name, ("description", f"Board: {event.board_name}")),
+        ("dtstart", event.start),
+        ("dtend", last + timedelta(days=1)),
+    )
+    return _filled(Event(), properties)
 
 
 def build_calendar(
-    events: list[MeetingEvent],
+    events: Sequence[MeetingEvent],
     *,
     domain: str,
-    card_events: list[CardEvent] | None = None,
+    card_events: Sequence[CardEvent] | None = None,
     calendar_name: str = "STUPA — Sitzungen",
     default_duration: timedelta = DEFAULT_DURATION,
 ) -> bytes:
@@ -152,15 +186,16 @@ def build_calendar(
     """
     from icalendar import Calendar
 
-    cal = Calendar()
-    cal.add("prodid", "-//STUPA-Workflow//iCal Feed//DE")
-    cal.add("version", "2.0")
-    cal.add("calscale", "GREGORIAN")
-    cal.add("method", "PUBLISH")
-    cal.add("x-wr-calname", calendar_name)
-    cal.add("x-wr-timezone", "Europe/Berlin")
-    for event in events:
-        cal.add_component(_build_event(event, domain=domain, default_duration=default_duration))
-    for card_event in card_events or []:
-        cal.add_component(_build_card_event(card_event, domain=domain))
-    return cal.to_ical()
+    properties = (
+        ("prodid", "-//STUPA-Workflow//iCal Feed//DE"),
+        ("version", "2.0"),
+        ("calscale", "GREGORIAN"),
+        ("method", "PUBLISH"),
+        ("x-wr-calname", calendar_name),
+        ("x-wr-timezone", "Europe/Berlin"),
+    )
+    parts = (
+        *(_build_event(e, domain=domain, default_duration=default_duration) for e in events),
+        *(_build_card_event(c, domain=domain) for c in card_events or ()),
+    )
+    return _filled(Calendar(), properties, parts).to_ical()

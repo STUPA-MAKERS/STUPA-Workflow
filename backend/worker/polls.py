@@ -59,7 +59,6 @@ async def process_poll_reminders(ctx: dict[str, Any], now: datetime | None = Non
     moment = now or datetime.now(UTC)
     settings: Settings = ctx.get("settings") or load_settings()
     queue = _mail_queue(ctx)
-    sent = 0
     async with _sessionmaker(ctx)() as session:
         rows = (
             await session.scalars(
@@ -80,20 +79,33 @@ async def process_poll_reminders(ctx: dict[str, Any], now: datetime | None = Non
                 .with_for_update(skip_locked=True)
             )
         ).all()
-        for vote in rows:
-            try:
-                if await send_poll_mail(
-                    session,
-                    queue=queue,
-                    settings=settings,
-                    vote=vote,
-                    reminder=True,
-                ):
-                    sent += 1
-            except Exception:
-                logger.exception("poll_reminder mail failed for %s", vote.id)
-                continue
-            vote.reminded_at = moment
+        sent = sum(
+            [await _remind(session, queue, settings, vote, moment) for vote in rows]
+        )
         if rows:
             await session.commit()
+    return sent
+
+
+async def _remind(
+    session: AsyncSession,
+    queue: MailQueue | None,
+    settings: Settings,
+    vote: Vote,
+    moment: datetime,
+) -> bool:
+    """Send the reminder of one poll and mark it as reminded.
+
+    Returns:
+        Whether a mail went out. A failed send logs and leaves the poll unmarked, so the
+        next run tries it again.
+    """
+    try:
+        sent = await send_poll_mail(
+            session, queue=queue, settings=settings, vote=vote, reminder=True
+        )
+    except Exception:
+        logger.exception("poll_reminder mail failed for %s", vote.id)
+        return False
+    vote.reminded_at = moment
     return sent

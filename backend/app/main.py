@@ -162,14 +162,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     connects lazily on the first PUBLISH or SUBSCRIBE, so creating it is cheap.
     """
     settings = get_settings()
-    app.state.arq_pool = await create_mail_pool(settings.redis_url)
-    app.state.object_storage = build_object_storage(settings)
+    arq_pool = await create_mail_pool(settings.redis_url)
     import redis.asyncio as aioredis
 
     livevote_redis = aioredis.from_url(settings.redis_url)
-    app.state.broker = RedisBroker(livevote_redis)
-    app.state.locker = RedisLocker(livevote_redis)
-    app.state.meeting_publisher = BrokerPublisher(app.state.broker)
+    broker = RedisBroker(livevote_redis)
+    clients = {
+        "arq_pool": arq_pool,
+        "object_storage": build_object_storage(settings),
+        "broker": broker,
+        "locker": RedisLocker(livevote_redis),
+        "meeting_publisher": BrokerPublisher(broker),
+    }
+    for name, client in clients.items():
+        setattr(app.state, name, client)
     await _bootstrap_admins_on_startup(settings)
     try:
         yield
@@ -217,23 +223,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     OpenGraph tags. The answer must be HTML from a path nginx proxies ahead of the SPA
     fallback; under /api it would work but read as an internal URL in a chat.
     """
-    settings = settings or get_settings()
-    configure_logging(settings.log_level)
+    config = settings or get_settings()
+    configure_logging(config.log_level)
 
     app = FastAPI(
-        title=settings.app_name,
-        version=settings.app_version,
+        title=config.app_name,
+        version=config.app_version,
         lifespan=lifespan,
     )
 
-    app.add_middleware(DefaultWriteRateLimitMiddleware, settings=settings)
-    app.add_middleware(CsrfMiddleware, settings=settings)
+    app.add_middleware(DefaultWriteRateLimitMiddleware, settings=config)
+    app.add_middleware(CsrfMiddleware, settings=config)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
 
     register_exception_handlers(app)
 
-    app.dependency_overrides[get_action_dispatcher] = _flow_action_dispatcher
+    app.dependency_overrides.update({get_action_dispatcher: _flow_action_dispatcher})
 
     app.include_router(api_router)
     app.include_router(oauth_well_known_router)

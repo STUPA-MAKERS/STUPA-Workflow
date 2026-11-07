@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
@@ -37,6 +36,8 @@ from app.modules.audit.service import record as audit_record
 from app.shared.errors import ServiceUnavailableError
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.modules.files.storage import ObjectStorage
@@ -103,44 +104,25 @@ async def convert_builtin_cd_logos(
     if not rows and not seed_named:
         return BuiltinConversion()
 
-    converted: dict[uuid.UUID, list[dict[str, Any]]] = defaultdict(list)
-    for row in rows:
-        name = row.vendored_name or ""
-        bundled = builtin_logo_bytes(name)
-        if bundled is None:
-            logger.warning("cd logo %s: no bundled file for %r, row stays vendored", row.id, name)
-            continue
-        if storage is None:
-            raise ServiceUnavailableError("Object storage unavailable.")
-        entry, data = bundled
-        object_key = f"{CD_LOGO_PREFIX}{uuid.uuid4().hex}/{entry.file_name}"
-        await storage.put(object_key, data, BUILTIN_LOGO_MIME)
-        row.object_key = object_key
-        row.file_name = entry.file_name
-        row.mime = BUILTIN_LOGO_MIME
-        row.size = len(data)
-        row.vendored_name = None
-        converted[row.variant_id].append(
-            {"logoId": str(row.id), "slot": row.slot, "vendoredName": name}
-        )
+    results = [(row.variant_id, await _convert_row(row, storage)) for row in rows]
+    pairs = tuple((variant_id, item) for variant_id, item in results if item is not None)
+    converted = {
+        variant_id: [item for other, item in pairs if other == variant_id]
+        for variant_id in dict.fromkeys(variant_id for variant_id, _ in pairs)
+    }
 
     renamed = {variant.id: variant for variant in seed_named}
     for variant in renamed.values():
         variant.name = NEW_NAME
 
     for variant_id in sorted({*converted, *renamed}, key=str):
-        data_out: dict[str, Any] = {"reason": "builtin_cd_logos_converted"}
-        if variant_id in converted:
-            data_out["convertedLogos"] = converted[variant_id]
-        if variant_id in renamed:
-            data_out["renamed"] = {"old": SEED_NAME, "new": NEW_NAME}
         await audit_record(
             session,
             actor=SYSTEM_ACTOR,
             action=AuditAction.CONFIG_CHANGE,
             target_type="cd_variant",
             target_id=str(variant_id),
-            data=data_out,
+            data=_audit_data(variant_id, converted, renamed),
         )
     await session.commit()
     return BuiltinConversion(
@@ -148,3 +130,46 @@ async def convert_builtin_cd_logos(
         variants=len({*converted, *renamed}),
         renamed=len(renamed),
     )
+
+
+async def _convert_row(
+    row: CdVariantLogo, storage: ObjectStorage | None
+) -> dict[str, Any] | None:
+    """Upload the bundled file of one vendored row and turn the row into an upload.
+
+    Returns:
+        The audit item of the row, or ``None`` when the manifest does not hold its name
+        and the row stays vendored.
+
+    Raises:
+        ServiceUnavailableError: The row needs a conversion, but the object storage is off.
+    """
+    name = row.vendored_name or ""
+    bundled = builtin_logo_bytes(name)
+    if bundled is None:
+        logger.warning("cd logo %s: no bundled file for %r, row stays vendored", row.id, name)
+        return None
+    if storage is None:
+        raise ServiceUnavailableError("Object storage unavailable.")
+    entry, data = bundled
+    object_key = f"{CD_LOGO_PREFIX}{uuid.uuid4().hex}/{entry.file_name}"
+    await storage.put(object_key, data, BUILTIN_LOGO_MIME)
+    row.object_key = object_key
+    row.file_name = entry.file_name
+    row.mime = BUILTIN_LOGO_MIME
+    row.size = len(data)
+    row.vendored_name = None
+    return {"logoId": str(row.id), "slot": row.slot, "vendoredName": name}
+
+
+def _audit_data(
+    variant_id: uuid.UUID,
+    converted: Mapping[uuid.UUID, list[dict[str, Any]]],
+    renamed: Mapping[uuid.UUID, CdVariant],
+) -> dict[str, Any]:
+    """Return the audit data of one variant: its converted logos and its rename."""
+    return {
+        "reason": "builtin_cd_logos_converted",
+        **({"convertedLogos": converted[variant_id]} if variant_id in converted else {}),
+        **({"renamed": {"old": SEED_NAME, "new": NEW_NAME}} if variant_id in renamed else {}),
+    }

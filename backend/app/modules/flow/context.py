@@ -147,9 +147,7 @@ async def _field_types(session: AsyncSession, app: Application) -> dict[str, str
             )
         )
     ).all()
-    types = {key: _compare_type(ftype) for key, ftype in rows}
-    types["amount"] = "currency"
-    return types
+    return {**{key: _compare_type(ftype) for key, ftype in rows}, "amount": "currency"}
 
 
 async def build_base_context(
@@ -169,8 +167,8 @@ async def build_base_context(
     applicant_committees = await committee_ids_for_sub(session, app.created_by)
     application_type_key = await _application_type_key(session, app)
     has_attachment = await _has_attachment(session, app)
-    field_values: dict[str, Any] = dict(app.data) if isinstance(app.data, dict) else {}
-    field_values["amount"] = app.amount
+    data: dict[str, Any] = app.data if isinstance(app.data, dict) else {}
+    field_values: dict[str, Any] = {**data, "amount": app.amount}
     field_types = await _field_types(session, app)
 
     return GuardContext(
