@@ -52,6 +52,15 @@
   max-width: 600px;
 }
 
+// On a phone the bar is a sticky bar (`app-sticky-bar`). No chip row follows the pill, so the
+// gap below the pill in the glass is the gutter, the same as above and at the sides. The
+// negative margin of the bar takes the same value, so the page below does not move.
+@include bp.phone {
+  app-sticky-bar.dash__top {
+    --stb-pad: var(--stb-bleed, var(--space-4));
+  }
+}
+
 .dash__btn {
   display: inline-flex;
   flex: none;

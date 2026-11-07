@@ -53,6 +53,7 @@ import {
   FabComponent,
   PageHeaderComponent,
   SectionComponent,
+  StickyBarComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import { flowColorKind } from '@shared/status-kind.util';
@@ -135,6 +136,8 @@ interface Load<T> {
  * scroll inside themselves and reach down to the pane gap, because the page has no
  * footer. Narrow and on a phone the page scrolls: the "Heute" band comes first, then the
  * work list. A phone shows the rows as list rows and a floating "Antrag" button.
+ * On a phone the search bar with the avatar button is a sticky bar: it stays pinned at the
+ * top while the page scrolls, as frosted glass like the bar of a list page.
  *
  * A person without tasks and without own applications sees the empty tab next to the
  * card "Antrag stellen" with the active application types.
@@ -175,6 +178,7 @@ interface Load<T> {
     SkeletonComponent,
     StatusTextComponent,
     ScrollFadeDirective,
+    StickyBarComponent,
     AppAccountMenuComponent,
   ],
   host: {
