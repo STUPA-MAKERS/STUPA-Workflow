@@ -4,19 +4,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
 from app.modules.applications.decision import DecisionIn
 from app.shared.i18n import I18nMap
+from app.shared.schemas import FrozenCamelModel
 
 
-class _CamelModel(BaseModel):
-    """Use camelCase aliases in JSON. The caller may also populate the fields by name."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class TransitionOut(_CamelModel):
+class TransitionOut(FrozenCamelModel, frozen=True):
     """A transition available to the current principal (guard satisfied).
 
     Attributes:
@@ -44,7 +39,7 @@ class TransitionOut(_CamelModel):
     allows_decision: bool = Field(default=False, alias="allowsDecision")
 
 
-class TransitionRequest(_CamelModel):
+class TransitionRequest(FrozenCamelModel, frozen=True):
     """`POST /applications/{id}/transition` — fire a transition.
 
     `meetingId` picks the meeting for the `addToNextSession` action of the
@@ -65,7 +60,7 @@ class TransitionRequest(_CamelModel):
     decision: DecisionIn | None = None
 
 
-class ForceStatusRequest(_CamelModel):
+class ForceStatusRequest(FrozenCamelModel, frozen=True):
     """`POST /applications/{id}/force-status` — force a status directly.
 
     This is the privileged `application.force_status` override. The `note` gives the
@@ -76,7 +71,7 @@ class ForceStatusRequest(_CamelModel):
     note: str = Field(min_length=1)
 
 
-class TransitionResult(_CamelModel):
+class TransitionResult(FrozenCamelModel, frozen=True):
     """Result of a successful transition (200)."""
 
     new_state_id: UUID = Field(alias="newStateId")
