@@ -8,8 +8,10 @@ as a `.tar.gz` archive for a local installation.
 from __future__ import annotations
 
 import io
+import itertools
 import json
 import tarfile
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -38,6 +40,15 @@ def _is_pkg(d: Path) -> bool:
     return (d / "pyproject.toml").is_file() and (d / "antragsplattform_mcp").is_dir()
 
 
+def _upward_candidates() -> Iterator[Path]:
+    """Yield the `mcp/` directory beside each parent of this file, the nearest first.
+
+    The generator resolves the path only on the first step, so the search touches the
+    file system only after the container mount missed.
+    """
+    yield from (parent / "mcp" for parent in Path(__file__).resolve().parents)
+
+
 def _package_dir(settings: Settings) -> Path | None:
     """Find the MCP source package directory (`mcp/`) across layouts and containers.
 
@@ -48,17 +59,13 @@ def _package_dir(settings: Settings) -> Path | None:
         The package directory, or `None` when the deployment ships no source. The route
         then answers 404.
     """
-    if settings.mcp_package_dir:
-        cand = Path(settings.mcp_package_dir)
-        return cand if _is_pkg(cand) else None
-    mount = Path("/opt/mcp")
-    if _is_pkg(mount):
-        return mount
-    for parent in Path(__file__).resolve().parents:
-        cand = parent / "mcp"
-        if _is_pkg(cand):
-            return cand
-    return None
+    explicit = Path(settings.mcp_package_dir) if settings.mcp_package_dir else None
+    searched = itertools.chain((Path("/opt/mcp"),), _upward_candidates())
+    return (
+        next((d for d in searched if _is_pkg(d)), None)
+        if explicit is None
+        else (explicit if _is_pkg(explicit) else None)
+    )
 
 
 @router.get("/config", responses=_errors(401, 403))

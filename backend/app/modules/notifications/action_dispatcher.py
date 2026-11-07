@@ -122,7 +122,21 @@ def _log_unconfirmed(action: DispatchedAction) -> None:
     )
 
 
-@dataclass(slots=True)
+def _status_label(state: State | None, default_lang: str) -> str:
+    """Return the label of the state in the default language, else its first label.
+
+    A state without a label gives an empty string, because the task template tests
+    ``status`` for truth.
+    """
+    labels = state.label_i18n if state is not None else None
+    return (
+        (labels.get(default_lang) or next(iter(labels.values())))
+        if isinstance(labels, dict) and labels
+        else ""
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class NotificationActionDispatcher:
     """`ActionDispatcher` implementation for the notify actions.
 
@@ -136,16 +150,17 @@ class NotificationActionDispatcher:
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
         """Run the notify and task-notify actions; log every other type."""
         for action in actions:
-            if action.type == "notify":
-                await self._dispatch_notify(action)
-            elif action.type == "taskNotify":
-                await self._dispatch_task(action)
-            else:
-                logger.info(
-                    "flow action not handled by notify-dispatcher (type=%s key=%s)",
-                    action.type,
-                    action.idempotency_key,
-                )
+            match action.type:
+                case "notify":
+                    await self._dispatch_notify(action)
+                case "taskNotify":
+                    await self._dispatch_task(action)
+                case _:
+                    logger.info(
+                        "flow action not handled by notify-dispatcher (type=%s key=%s)",
+                        action.type,
+                        action.idempotency_key,
+                    )
 
     async def _dispatch_notify(self, action: DispatchedAction) -> None:
         """Send the mails of one ``notify`` action with the application context.
@@ -175,36 +190,41 @@ class NotificationActionDispatcher:
                 _log_unconfirmed(action)
                 return
             title = (app_data or {}).get("title")
-            context: dict[str, object] = {
-                "applicationId": str(action.application_id),
-                "applicationTitle": title.strip()
-                if isinstance(title, str)
-                else "",
-            }
             raw_lang = action.params.get("lang")
-            lang = str(raw_lang) if raw_lang else None
-            if lang is None and _applicant_only(action.params.get("recipients")):
-                lang = await resolve_application_lang(
+            explicit_lang = str(raw_lang) if raw_lang else None
+            lang = (
+                await resolve_application_lang(
                     session,
                     application_id=action.application_id,
                     settings=self.settings,
                 )
-            if current_state_id is not None:
-                label_i18n = await session.scalar(
+                if explicit_lang is None
+                and _applicant_only(action.params.get("recipients"))
+                else explicit_lang
+            )
+            label_i18n = (
+                await session.scalar(
                     select(State.label_i18n).where(State.id == current_state_id)
                 )
-                if isinstance(label_i18n, dict) and label_i18n:
-                    context["status"] = resolve_i18n(
-                        label_i18n, lang or self.settings.mail_default_lang
-                    )
-            context.update(
-                await _decision_context(
-                    session, action, lang or self.settings.mail_default_lang
-                )
+                if current_state_id is not None
+                else None
+            )
+            status: dict[str, object] = (
+                {"status": resolve_i18n(label_i18n, lang or self.settings.mail_default_lang)}
+                if isinstance(label_i18n, dict) and label_i18n
+                else {}
+            )
+            decision = await _decision_context(
+                session, action, lang or self.settings.mail_default_lang
             )
             extra = action.params.get("context")
-            if isinstance(extra, dict):
-                context.update(extra)
+            context: dict[str, object] = {
+                "applicationId": str(action.application_id),
+                "applicationTitle": title.strip() if isinstance(title, str) else "",
+                **status,
+                **decision,
+                **(extra if isinstance(extra, dict) else {}),
+            }
             service = NotificationService(
                 session, queue=self.queue, settings=self.settings
             )
@@ -264,15 +284,7 @@ class NotificationActionDispatcher:
             if not recipients:
                 return
             title = (data or {}).get("title")
-            status_label = ""
-            if (
-                state is not None
-                and isinstance(state.label_i18n, dict)
-                and state.label_i18n
-            ):
-                status_label = state.label_i18n.get(
-                    self.settings.mail_default_lang
-                ) or next(iter(state.label_i18n.values()))
+            status_label = _status_label(state, self.settings.mail_default_lang)
             service = NotificationService(
                 session, queue=self.queue, settings=self.settings
             )

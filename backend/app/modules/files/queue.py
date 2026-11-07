@@ -32,7 +32,7 @@ class ScanQueue(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ArqScanQueue:
     """Queue on top of arq: a ``scan_attachment`` job with an idempotent job id.
 

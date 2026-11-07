@@ -8,6 +8,7 @@ the old row. The caller commits.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -53,23 +54,19 @@ async def create_authorization_code(
     return code
 
 
+@dataclass(frozen=True, slots=True, repr=False)
 class IssuedTokens:
     """A fresh token pair.
 
     The plaintext exists only in this object and never again. ``expires_in`` None
-    means that the token never expires.
+    means that the token never expires. The class has no generated `repr`, because a
+    log line of the object would show the plaintext tokens.
     """
 
-    __slots__ = ("access_token", "refresh_token", "scope", "expires_in")
-
-    def __init__(
-        self, access_token: str, refresh_token: str, scope: str, expires_in: int | None
-    ) -> None:
-        """Hold the plaintext tokens, the scope and the lifetime."""
-        self.access_token = access_token
-        self.refresh_token = refresh_token
-        self.scope = scope
-        self.expires_in = expires_in
+    access_token: str
+    refresh_token: str
+    scope: str
+    expires_in: int | None
 
 
 def _expiry(now: datetime, ttl: int | None) -> datetime | None:

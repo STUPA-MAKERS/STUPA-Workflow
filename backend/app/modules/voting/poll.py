@@ -22,6 +22,7 @@ race-safe ballot tables and the reveal rule. A poll is always secret
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -45,6 +46,8 @@ from app.shared.config_schemas import PollConfig
 from app.shared.errors import ConflictError, ForbiddenError, ValidationProblem
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from app.modules.voting.service import VotingService
 
 POLL = "poll"
@@ -175,13 +178,80 @@ def _check_end(closes_at: datetime, now: datetime) -> None:
         )
 
 
+def _patched_question(question: str | None) -> str | None:
+    """Return the stripped new question of an edit, or None when the edit keeps it.
+
+    Raises:
+        ValidationProblem: The new question is empty (422 ``poll_invalid``).
+    """
+    stripped = question.strip() if question is not None else None
+    if stripped == "":
+        raise ValidationProblem(
+            "The question is empty.",
+            code="poll_invalid",
+            errors=[{"field": "question", "msg": "empty"}],
+        )
+    return stripped
+
+
+def _patched_config(payload: PollPatch, config: PollConfig) -> PollConfig | None:
+    """Return the new config of an edit of the options, or None when the edit keeps them.
+
+    The mode, the secret flag and the guests flag stay. Options that the edit does not
+    name keep their texts and get new ids.
+
+    Raises:
+        ValidationProblem: The options do not fit the mode (422 ``poll_invalid``).
+    """
+    max_set = "max_choices" in payload.model_fields_set
+    options = (
+        [o.model_dump(by_alias=True, exclude_none=True) for o in payload.options]
+        if payload.options is not None
+        else [
+            o.model_dump(by_alias=True, exclude_none=True, exclude={"id"})
+            for o in config.options
+        ]
+    )
+    data = {
+        "mode": config.mode,
+        "options": options,
+        "maxChoices": payload.max_choices if max_set else config.max_choices,
+    }
+    return (
+        build_config(
+            PollIn.model_validate(data), secret=config.secret, guests_vote=config.guests_vote
+        )
+        if payload.options is not None or max_set
+        else None
+    )
+
+
+def _check_patched_end(vote: Vote, closes_at: datetime, now: datetime) -> None:
+    """Check the new end of an edit: only a poll without a meeting, one hour ahead.
+
+    Raises:
+        ValidationProblem: The poll belongs to a meeting or the end is too soon (422
+            ``closes_at_too_soon``).
+    """
+    if vote.meeting_id is not None:
+        raise ValidationProblem(
+            "A meeting poll ends with its close in the meeting.",
+            code="closes_at_too_soon",
+            errors=[{"field": "closesAt", "msg": "a meeting poll"}],
+        )
+    _check_end(closes_at, now)
+
+
+@dataclass(frozen=True, slots=True)
 class PollService:
     """The poll of a Gremium and the edit of a poll, on a ``VotingService`` session."""
 
-    def __init__(self, voting: VotingService) -> None:
-        """Bind the service to a voting service and its session."""
-        self.voting = voting
-        self.session = voting.session
+    voting: VotingService
+
+    @property
+    def session(self) -> AsyncSession:
+        """The session of the voting service."""
+        return self.voting.session
 
     async def can_create(self, gremium_id: UUID, principal: Principal) -> bool:
         """Tell whether the principal creates a poll in this Gremium.
@@ -277,58 +347,34 @@ class PollService:
             raise ConflictError(
                 "The poll holds answers; its options are fixed.", code=POLL_HAS_ANSWERS
             )
-        config = poll_config(vote)
-        changed: list[str] = []
-        if payload.question is not None:
-            question = payload.question.strip()
-            if not question:
-                raise ValidationProblem(
-                    "The question is empty.",
-                    code="poll_invalid",
-                    errors=[{"field": "question", "msg": "empty"}],
-                )
-            vote.question = question
-            changed.append("question")
-        if payload.options is not None or "max_choices" in payload.model_fields_set:
-            data = PollIn.model_validate(
-                {
-                    "mode": config.mode,
-                    "options": (
-                        [o.model_dump(by_alias=True, exclude_none=True) for o in payload.options]
-                        if payload.options is not None
-                        else [
-                            o.model_dump(by_alias=True, exclude_none=True, exclude={"id"})
-                            for o in config.options
-                        ]
-                    ),
-                    "maxChoices": (
-                        payload.max_choices
-                        if "max_choices" in payload.model_fields_set
-                        else config.max_choices
-                    ),
-                }
-            )
-            config = build_config(data, secret=config.secret, guests_vote=config.guests_vote)
-            vote.config = config.model_dump(mode="json", by_alias=True)
-            changed.append("options")
+        stored = poll_config(vote)
+        question = _patched_question(payload.question)
+        new_config = _patched_config(payload, stored)
         if payload.closes_at is not None:
-            if vote.meeting_id is not None:
-                raise ValidationProblem(
-                    "A meeting poll ends with its close in the meeting.",
-                    code="closes_at_too_soon",
-                    errors=[{"field": "closesAt", "msg": "a meeting poll"}],
-                )
-            _check_end(payload.closes_at, now)
+            _check_patched_end(vote, payload.closes_at, now)
+        if question is not None:
+            vote.question = question
+        if new_config is not None:
+            vote.config = new_config.model_dump(mode="json", by_alias=True)
+        if payload.closes_at is not None:
             vote.closes_at = payload.closes_at
             vote.reminded_at = None
-            changed.append("closesAt")
+        changed = [
+            name
+            for name, hit in (
+                ("question", question is not None),
+                ("options", new_config is not None),
+                ("closesAt", payload.closes_at is not None),
+            )
+            if hit
+        ]
         await audit_record(
             self.session,
             actor=principal.sub,
             action=AuditAction.POLL_UPDATED,
             target_type="vote",
             target_id=str(vote.id),
-            data={**audit_data(vote, config), "changed": changed},
+            data={**audit_data(vote, new_config or stored), "changed": changed},
         )
         await self.session.commit()
         return await self.voting.get(vote.id)

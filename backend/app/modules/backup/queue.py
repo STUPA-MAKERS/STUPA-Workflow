@@ -38,7 +38,7 @@ class BackupQueue(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ArqBackupQueue:
     """arq-backed queue for the two backup tasks."""
 

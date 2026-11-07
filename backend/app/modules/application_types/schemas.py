@@ -20,7 +20,7 @@ class _CamelModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-class ApplicationTypeListQuery(PageParams):
+class ApplicationTypeListQuery(PageParams, frozen=True):
     """Query parameters of the list route: paging and `lang`.
 
     `extra="forbid"` rejects an unknown query parameter with 422 instead of a
