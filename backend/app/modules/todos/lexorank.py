@@ -18,6 +18,8 @@ caller gives the column a fresh order with ``spread`` once a rank is longer than
 
 from __future__ import annotations
 
+import itertools
+
 DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"
 _BASE = len(DIGITS)
 MAX_LENGTH = 50
@@ -42,6 +44,18 @@ def _check(rank: str) -> None:
         _digit(char)
 
 
+def _shared(low: str, high: str) -> int:
+    """Return the length of the common prefix of ``low`` (padded with ``0``) and ``high``.
+
+    ``low`` is below ``high``, so the two differ at some position of ``high``.
+    """
+    return next(
+        index
+        for index in itertools.count()
+        if (low[index] if index < len(low) else "0") != high[index]
+    )
+
+
 def _midpoint(low: str, high: str | None) -> str:
     """Return a string strictly between ``low`` and ``high`` (``low`` may be empty).
 
@@ -51,9 +65,7 @@ def _midpoint(low: str, high: str | None) -> str:
     prefix: list[str] = []
     while True:
         if high is not None:
-            shared = 0
-            while (low[shared] if shared < len(low) else "0") == high[shared]:
-                shared += 1
+            shared = _shared(low, high)
             if shared > 0:
                 prefix.append(high[:shared])
                 low, high = low[shared:], high[shared:]
@@ -87,22 +99,17 @@ def between(low: str | None, high: str | None) -> str:
     return _midpoint(low or "", high)
 
 
+def _digits(value: int, width: int) -> str:
+    """Return ``value`` in base 36 with exactly ``width`` digits, the most significant first."""
+    return "".join(DIGITS[value // _BASE**place % _BASE] for place in reversed(range(width)))
+
+
 def spread(count: int) -> list[str]:
     """Return ``count`` evenly spaced ascending ranks for a fresh order of a column.
 
     All ranks have the same width before the trailing zeros go, so the order of the
     strings is the order of the numbers.
     """
-    width = 1
-    while _BASE**width <= count:
-        width += 1
+    width = next(w for w in itertools.count(1) if _BASE**w > count)
     step = _BASE**width // (count + 1)
-    ranks: list[str] = []
-    for index in range(1, count + 1):
-        value = index * step
-        chars = []
-        for _ in range(width):
-            value, rest = divmod(value, _BASE)
-            chars.append(DIGITS[rest])
-        ranks.append("".join(reversed(chars)).rstrip("0"))
-    return ranks
+    return [_digits(index * step, width).rstrip("0") for index in range(1, count + 1)]

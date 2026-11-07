@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import Field, StringConstraints
 
 from app.shared.i18n import LANGUAGE_CODE_PATTERN
+from app.shared.schemas import FrozenStrictCamelModel
 
 #: The longest override. The longest built-in text has under 300 characters.
 MAX_VALUE_LENGTH = 1000
@@ -23,13 +25,7 @@ TextKey = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 TextValue = Annotated[str, StringConstraints(max_length=MAX_VALUE_LENGTH)]
 
 
-class _CamelModel(BaseModel):
-    """Base model with camelCase JSON aliases and population by field name."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
-
-class LanguageOut(_CamelModel):
+class LanguageOut(FrozenStrictCamelModel, frozen=True):
     """An extra UI language as the admin page shows it."""
 
     code: str
@@ -38,14 +34,14 @@ class LanguageOut(_CamelModel):
     updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
 
 
-class PublicLanguageOut(_CamelModel):
+class PublicLanguageOut(FrozenStrictCamelModel, frozen=True):
     """An active extra UI language as the language switch lists it."""
 
     code: str
     name: str
 
 
-class LanguageCreate(_CamelModel):
+class LanguageCreate(FrozenStrictCamelModel, frozen=True):
     """A new extra UI language. It starts inactive unless `active` says otherwise."""
 
     code: LanguageCode
@@ -53,30 +49,30 @@ class LanguageCreate(_CamelModel):
     active: bool = False
 
 
-class LanguageUpdate(_CamelModel):
+class LanguageUpdate(FrozenStrictCamelModel, frozen=True):
     """A change of the name or of the switch `active`. An absent field stays."""
 
     name: LanguageName | None = None
     active: bool | None = None
 
 
-class TextsOut(_CamelModel):
+class TextsOut(FrozenStrictCamelModel, frozen=True):
     """The overrides of one locale: key to text. A key without an override is absent."""
 
     locale: str
-    overrides: dict[str, str]
+    overrides: Mapping[str, str]
 
 
-class TextsUpdate(_CamelModel):
+class TextsUpdate(FrozenStrictCamelModel, frozen=True):
     """The changes of one save: key to the new text, or null for the built-in text.
 
     An empty or blank text counts as null. A key that the body leaves out stays.
     """
 
-    changes: dict[TextKey, TextValue | None] = Field(max_length=MAX_CHANGES)
+    changes: Mapping[TextKey, TextValue | None] = Field(max_length=MAX_CHANGES)
 
 
-class BuiltinTextOut(_CamelModel):
+class BuiltinTextOut(FrozenStrictCamelModel, frozen=True):
     """The built-in texts of one key and, for a requested locale, its own text.
 
     `en` is null where EN shows the DE text. `own` is the override of the requested
@@ -89,14 +85,14 @@ class BuiltinTextOut(_CamelModel):
     own: str | None = None
 
 
-class BuiltinTextsOut(_CamelModel):
+class BuiltinTextsOut(FrozenStrictCamelModel, frozen=True):
     """The built-in texts that match a request, sorted by key."""
 
     locale: str | None
-    texts: list[BuiltinTextOut]
+    texts: tuple[BuiltinTextOut, ...]
 
 
-class I18nBundleOut(_CamelModel):
+class I18nBundleOut(FrozenStrictCamelModel, frozen=True):
     """What the app needs before its first paint.
 
     `locale` is the resolved UI locale: the requested one when it is built-in or an
@@ -105,5 +101,5 @@ class I18nBundleOut(_CamelModel):
     """
 
     locale: str
-    languages: list[PublicLanguageOut]
-    overrides: dict[str, dict[str, str]]
+    languages: tuple[PublicLanguageOut, ...]
+    overrides: Mapping[str, Mapping[str, str]]

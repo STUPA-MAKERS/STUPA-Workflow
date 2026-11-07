@@ -67,23 +67,18 @@ def build_dispatched_actions(
     `validate_action` already rejects unknown types at save time. The strict worker
     whitelist here keeps the inline-handled types out of the queue.
     """
-    dispatched: list[DispatchedAction] = []
-    for index, action in enumerate(actions):
-        action_type = action.get("type")
-        if action_type not in WORKER_ACTION_TYPES:
-            continue
-        params = {k: v for k, v in action.items() if k != "type"}
-        dispatched.append(
-            DispatchedAction(
-                type=str(action_type),
-                application_id=application_id,
-                transition_id=transition_id,
-                status_event_id=status_event_id,
-                idempotency_key=f"{application_id}:{status_event_id}:{index}:{action_type}",
-                params=params,
-            )
+    return [
+        DispatchedAction(
+            type=str(action_type),
+            application_id=application_id,
+            transition_id=transition_id,
+            status_event_id=status_event_id,
+            idempotency_key=f"{application_id}:{status_event_id}:{index}:{action_type}",
+            params={k: v for k, v in action.items() if k != "type"},
         )
-    return dispatched
+        for index, action in enumerate(actions)
+        if (action_type := action.get("type")) in WORKER_ACTION_TYPES
+    ]
 
 
 def build_implicit_notifications(
@@ -108,31 +103,25 @@ def build_implicit_notifications(
         )
         for action in actions
     )
-    implicit: list[DispatchedAction] = []
-    if not applicant_covered:
-        implicit.append(
-            DispatchedAction(
-                type="notify",
-                application_id=application_id,
-                transition_id=transition_id,
-                status_event_id=status_event_id,
-                idempotency_key=f"{application_id}:{status_event_id}:auto:applicant",
-                params={
-                    "templateKey": "status_update",
-                    "recipients": [{"kind": "applicant"}],
-                },
-            )
-        )
-    implicit.append(
-        DispatchedAction(
-            type="taskNotify",
-            application_id=application_id,
-            transition_id=transition_id,
-            status_event_id=status_event_id,
-            idempotency_key=f"{application_id}:{status_event_id}:auto:task",
-        )
+    applicant_mail = DispatchedAction(
+        type="notify",
+        application_id=application_id,
+        transition_id=transition_id,
+        status_event_id=status_event_id,
+        idempotency_key=f"{application_id}:{status_event_id}:auto:applicant",
+        params={
+            "templateKey": "status_update",
+            "recipients": [{"kind": "applicant"}],
+        },
     )
-    return implicit
+    task_mail = DispatchedAction(
+        type="taskNotify",
+        application_id=application_id,
+        transition_id=transition_id,
+        status_event_id=status_event_id,
+        idempotency_key=f"{application_id}:{status_event_id}:auto:task",
+    )
+    return [task_mail] if applicant_covered else [applicant_mail, task_mail]
 
 
 @runtime_checkable
@@ -157,7 +146,7 @@ class NullActionDispatcher:
             )
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ChainActionDispatcher:
     """Call several dispatchers in order.
 

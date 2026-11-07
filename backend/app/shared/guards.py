@@ -142,7 +142,7 @@ class GuardError(Exception):
     """Invalid guard, for example an unknown operator or a wrong structure."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GuardContext:
     """Runtime context for `eval_guard`.
 
@@ -200,25 +200,34 @@ def _to_decimal(value: object) -> Decimal | None:
         return None
 
 
+def _iso_date(value: str) -> date | None:
+    """Read the ISO date at the start of ``value``, or ``None`` when there is none."""
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
 def _to_date(value: object) -> date | None:
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-    if isinstance(value, str):
-        try:
-            return date.fromisoformat(value[:10])
-        except ValueError:
+    match value:
+        case datetime():
+            return value.date()
+        case date():
+            return value
+        case str():
+            return _iso_date(value)
+        case _:
             return None
-    return None
 
 
 def _to_bool(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        return value.strip().lower() in {"true", "1", "yes", "on", "ja"}
-    return bool(value)
+    match value:
+        case bool():
+            return value
+        case str():
+            return value.strip().lower() in {"true", "1", "yes", "on", "ja"}
+        case _:
+            return bool(value)
 
 
 def ops_for_type(value_type: str) -> frozenset[str]:
@@ -226,13 +235,15 @@ def ops_for_type(value_type: str) -> frozenset[str]:
 
     The frontend mirrors this mapping.
     """
-    if value_type in {"number", "currency"}:
-        return _NUMERIC_OPS
-    if value_type == "date":
-        return _DATE_OPS
-    if value_type == "bool":
-        return _BOOL_OPS
-    return _TEXT_OPS
+    match value_type:
+        case "number" | "currency":
+            return _NUMERIC_OPS
+        case "date":
+            return _DATE_OPS
+        case "bool":
+            return _BOOL_OPS
+        case _:
+            return _TEXT_OPS
 
 
 def _eval_compare(spec: object, ctx: GuardContext) -> bool:
@@ -263,27 +274,33 @@ def _eval_compare(spec: object, ctx: GuardContext) -> bool:
     left = ctx.field_values.get(fld)
     if left is None or (isinstance(left, str) and left == ""):
         return False
+    match value_type:
+        case "number" | "currency":
+            return _compare_ordered(op, _to_decimal(left), _to_decimal(operand))
+        case "date":
+            return _compare_ordered(op, _to_date(left), _to_date(operand))
+        case "bool":
+            return _to_bool(left) == _to_bool(operand)
+        case _:
+            return _compare_text(op, str(left), operand)
 
-    if value_type in {"number", "currency"}:
-        l_num, r_num = _to_decimal(left), _to_decimal(operand)
-        if l_num is None or r_num is None:
+
+def _compare_ordered(op: str, left: Decimal | date | None, right: Decimal | date | None) -> bool:
+    """Apply an ordered operator; a side that did not convert gives False."""
+    return left is not None and right is not None and _apply_ordered(op, left, right)
+
+
+def _compare_text(op: str, left: str, operand: object) -> bool:
+    """Compare a text field; an operator without a text meaning gives False."""
+    match op:
+        case "==":
+            return left == str(operand)
+        case "!=":
+            return left != str(operand)
+        case "in":
+            return isinstance(operand, list) and left in [str(v) for v in operand]
+        case _:
             return False
-        return _apply_ordered(op, l_num, r_num)
-    if value_type == "date":
-        l_d, r_d = _to_date(left), _to_date(operand)
-        if l_d is None or r_d is None:
-            return False
-        return _apply_ordered(op, l_d, r_d)
-    if value_type == "bool":
-        return _to_bool(left) == _to_bool(operand)
-    left_s = str(left)
-    if op == "==":
-        return left_s == str(operand)
-    if op == "!=":
-        return left_s != str(operand)
-    if op == "in":
-        return isinstance(operand, list) and left_s in [str(v) for v in operand]
-    return False
 
 
 #: Ordered comparison operators. An unknown operator gives False (fail closed), and
@@ -357,29 +374,37 @@ def eval_guard(guard: dict[str, Any] | None, ctx: GuardContext) -> bool:
     if len(guard) != 1:
         raise GuardError(f"guard must have exactly one operator, got {list(guard)}")
     op, value = next(iter(guard.items()))
-
-    if op == "and":
-        return all(eval_guard(g, ctx) for g in _children(op, value))
-    if op == "or":
-        return any(eval_guard(g, ctx) for g in _children(op, value))
-    if op == "not":
-        children = _children(op, value)
-        if len(children) != 1:
-            raise GuardError("'not' requires exactly one child guard")
-        return not eval_guard(children[0], ctx)
-    if op in GUARD_LEAF_OPERATORS:
-        return _eval_leaf(op, value, ctx)
-    raise GuardError(f"unknown guard operator: {op!r}")
+    match op:
+        case "and":
+            return all(eval_guard(g, ctx) for g in _children(op, value))
+        case "or":
+            return any(eval_guard(g, ctx) for g in _children(op, value))
+        case "not":
+            return not eval_guard(_only_child(op, value), ctx)
+        case _ if op in GUARD_LEAF_OPERATORS:
+            return _eval_leaf(op, value, ctx)
+        case _:
+            raise GuardError(f"unknown guard operator: {op!r}")
 
 
 def _children(op: str, value: object) -> list[dict[str, Any]]:
-    raw = value if isinstance(value, list) else [value]
-    children: list[dict[str, Any]] = []
-    for c in raw:
-        if not isinstance(c, dict):
-            raise GuardError(f"'{op}' children must be guard objects, got {c!r}")
-        children.append(c)
-    return children
+    raw: list[object] = value if isinstance(value, list) else [value]
+    invalid = [c for c in raw if not isinstance(c, dict)]
+    if invalid:
+        raise GuardError(f"'{op}' children must be guard objects, got {invalid[0]!r}")
+    return [c for c in raw if isinstance(c, dict)]
+
+
+def _only_child(op: str, value: object) -> dict[str, Any]:
+    """Return the single child guard of ``op``.
+
+    Raises:
+        GuardError: ``op`` has no child or more than one.
+    """
+    children = _children(op, value)
+    if len(children) != 1:
+        raise GuardError("'not' requires exactly one child guard")
+    return children[0]
 
 
 def guard_requires_applicant(guard: dict[str, Any] | None) -> bool:
@@ -391,12 +416,14 @@ def guard_requires_applicant(guard: dict[str, Any] | None) -> bool:
     if not isinstance(guard, dict) or len(guard) != 1:
         return False
     op, value = next(iter(guard.items()))
-    if op == "actorIsApplicant":
-        return True
-    if op in GUARD_COMBINATORS:
-        children = value if isinstance(value, list) else [value]
-        return any(guard_requires_applicant(c) for c in children if isinstance(c, dict))
-    return False
+    match op:
+        case "actorIsApplicant":
+            return True
+        case _ if op in GUARD_COMBINATORS:
+            children = value if isinstance(value, list) else [value]
+            return any(guard_requires_applicant(c) for c in children if isinstance(c, dict))
+        case _:
+            return False
 
 
 def validate_guard(guard: dict[str, Any] | None, *, allow_actor_ops: bool = True) -> None:

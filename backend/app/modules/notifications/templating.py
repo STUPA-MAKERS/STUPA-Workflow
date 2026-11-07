@@ -76,10 +76,10 @@ def render_mail(
 ) -> RenderedMail:
     """Render subject/body (+ optional HTML) in `lang` (fallback `default_lang`)."""
     subject_tpl, used = _resolve(subject_i18n, lang, default_lang)
-    body_tpl, _ = _resolve(body_i18n, lang, default_lang)
+    body_tpl = _resolve(body_i18n, lang, default_lang)[0]
     if subject_tpl is None or body_tpl is None:
         raise TemplateRenderError("template missing subject or body")
-    html_tpl, _ = _resolve(body_html_i18n, lang, default_lang)
+    html_tpl = _resolve(body_html_i18n, lang, default_lang)[0]
 
     subject = _sanitize_subject(_render_str(subject_tpl, context, html=False))
     text = _render_str(body_tpl, context, html=False)
