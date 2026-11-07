@@ -138,11 +138,12 @@ class GuestConnection:
                         .limit(1)
                     )
                 ).scalar_one_or_none()
-                vote_out = None
-                if open_vote is not None and await self.guests.vote_is_public(
-                    open_vote.id, self.meeting_id
-                ):
-                    vote_out = await VotingService(self.session).get(open_vote.id)
+                vote_out = (
+                    await VotingService(self.session).get(open_vote.id)
+                    if open_vote is not None
+                    and await self.guests.vote_is_public(open_vote.id, self.meeting_id)
+                    else None
+                )
             finally:
                 await self.session.commit()
         await self._send(state)
@@ -163,53 +164,66 @@ class GuestConnection:
             _Closed: The guest reached a terminal state, or the meeting closed.
         """
         kind = message.get("type")
-        if kind == "guest_updated":
-            guest = message.get("guest")
-            if not isinstance(guest, dict) or guest.get("id") != str(self.guest_id):
+        match kind:
+            case "guest_updated":
+                await self._on_guest_updated(message)
+            case "meeting_state":
+                await self._on_meeting_state(message)
+            case _ if self.status != "admitted":
                 return
-            self.status = str(guest.get("status"))
-            self.display_name = guest.get("displayName")
-            number = guest.get("number")
-            if isinstance(number, int):
-                self.number = number
-            reason = message.get("reason")
-            await self._send_status(reason if isinstance(reason, str) else None)
-            if self.status in _TERMINAL:
-                raise _Closed
-            if self.status == "admitted":
-                await self.send_state()
-            return
-        if kind == "meeting_state":
-            self._public_votes.clear()
-            status = message.get("status")
-            if self.status == "admitted":
-                await self._send(
-                    {
-                        "type": "meeting_state",
-                        "status": status,
-                        "currentAgendaItemId": message.get("currentAgendaItemId"),
-                    }
-                )
-            elif status == "closed":
-                await self._send_status("meeting_closed")
-            if status == "closed":
-                raise _Closed
-            return
-        if self.status != "admitted":
-            return
-        if kind == "agenda_changed":
-            await self._send({"type": "agenda_changed"})
-        elif kind == "guest_counts":
-            admitted = message.get("admittedGuests")
-            await self._send({"type": "guest_counts", "admittedGuests": admitted})
-        elif kind in _VOTE_EVENTS:
-            raw = message.get("voteId")
-            try:
-                vote_id = UUID(str(raw))
-            except ValueError:
+            case "agenda_changed":
+                await self._send({"type": "agenda_changed"})
+            case "guest_counts":
+                admitted = message.get("admittedGuests")
+                await self._send({"type": "guest_counts", "admittedGuests": admitted})
+            case _ if kind in _VOTE_EVENTS:
+                await self._on_vote_event(message)
+            case _:
                 return
-            if await self._vote_is_public(vote_id):
-                await self._send(message)
+
+    async def _on_guest_updated(self, message: dict[str, Any]) -> None:
+        """Take over the own new state; an admission sends the state of the meeting."""
+        guest = message.get("guest")
+        if not isinstance(guest, dict) or guest.get("id") != str(self.guest_id):
+            return
+        self.status = str(guest.get("status"))
+        self.display_name = guest.get("displayName")
+        number = guest.get("number")
+        if isinstance(number, int):
+            self.number = number
+        reason = message.get("reason")
+        await self._send_status(reason if isinstance(reason, str) else None)
+        if self.status in _TERMINAL:
+            raise _Closed
+        if self.status == "admitted":
+            await self.send_state()
+
+    async def _on_meeting_state(self, message: dict[str, Any]) -> None:
+        """Forward the status and the current item; the close ends the connection."""
+        self._public_votes.clear()
+        status = message.get("status")
+        if self.status == "admitted":
+            await self._send(
+                {
+                    "type": "meeting_state",
+                    "status": status,
+                    "currentAgendaItemId": message.get("currentAgendaItemId"),
+                }
+            )
+        elif status == "closed":
+            await self._send_status("meeting_closed")
+        if status == "closed":
+            raise _Closed
+
+    async def _on_vote_event(self, message: dict[str, Any]) -> None:
+        """Forward a vote event only for a vote of a public agenda item."""
+        raw = message.get("voteId")
+        try:
+            vote_id = UUID(str(raw))
+        except ValueError:
+            return
+        if await self._vote_is_public(vote_id):
+            await self._send(message)
 
     async def _pump(self, subscription: object) -> None:
         async for message in subscription:  # type: ignore[attr-defined]

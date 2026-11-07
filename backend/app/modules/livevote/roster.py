@@ -53,13 +53,18 @@ def roster_filter(gremium_id: UUID, *, meeting_id: UUID | None = None) -> Column
     members = select(GremiumMembership.principal_id).where(
         GremiumMembership.gremium_id == gremium_id
     )
-    clauses: list[ColumnElement[bool]] = [PrincipalRow.id.in_(members)]
-    if meeting_id is not None:
-        recorded = select(MeetingAttendance.principal_id).where(
-            MeetingAttendance.meeting_id == meeting_id
+    recorded = (
+        ()
+        if meeting_id is None
+        else (
+            PrincipalRow.id.in_(
+                select(MeetingAttendance.principal_id).where(
+                    MeetingAttendance.meeting_id == meeting_id
+                )
+            ),
         )
-        clauses.append(PrincipalRow.id.in_(recorded))
-    return or_(*clauses)
+    )
+    return or_(PrincipalRow.id.in_(members), *recorded)
 
 
 def meeting_roster_filter(meeting: Meeting) -> ColumnElement[bool]:
