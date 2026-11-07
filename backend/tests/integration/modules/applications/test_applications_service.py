@@ -262,8 +262,9 @@ async def test_list_filters_and_paging(session: AsyncSession) -> None:
     app_type, draft, _ = await _seed_type(session)
     svc = ApplicationsService(session)
     a1, _ = await svc.create(_create_payload(app_type.id), actor="admin")
-    p2 = _create_payload(app_type.id)
-    p2.data = {"title": "Solarpanel", "cost": "5.00", "note": "g"}
+    p2 = _create_payload(app_type.id).model_copy(
+        update={"data": {"title": "Solarpanel", "cost": "5.00", "note": "g"}}
+    )
     await svc.create(p2, actor="admin")
 
     page = await svc.list_applications(type_id=app_type.id, limit=50, offset=0)

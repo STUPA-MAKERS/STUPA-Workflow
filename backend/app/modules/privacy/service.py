@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+from itertools import groupby
 from typing import Any, cast
 from uuid import UUID
 
@@ -49,7 +50,7 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _i18n(value: dict[str, str] | None, locale: str) -> str:
+def _i18n(value: Mapping[str, str] | None, locale: str) -> str:
     """Pick a localized value from an i18n map, with fallback to de then en."""
     data = value or {}
     return data.get(locale) or data.get("de") or data.get("en") or ""
@@ -163,7 +164,7 @@ class PrincipalService:
                 await files.remove_objects(storage_keys)
         else:
             await self.session.flush()
-            self.storage_keys.extend(storage_keys)
+            self.storage_keys = [*self.storage_keys, *storage_keys]
         return principal
 
 
@@ -189,11 +190,10 @@ async def anonymize_reported_tickets(
     Returns:
         The number of anonymized tickets.
     """
-    reporter: list[ColumnElement[bool]] = []
-    if principal_id is not None:
-        reporter.append(Ticket.reporter_principal_id == principal_id)
-    if email:
-        reporter.append(Ticket.reporter_email == email)
+    reporter: tuple[ColumnElement[bool], ...] = (
+        *((Ticket.reporter_principal_id == principal_id,) if principal_id is not None else ()),
+        *((Ticket.reporter_email == email,) if email else ()),
+    )
     if not reporter:
         return 0
     reported = (
@@ -237,15 +237,13 @@ async def erase_email(
     Returns:
         ``applications`` and ``tickets`` (the anonymized counts) and ``principalId``.
     """
-    app_ids = list(
-        (
-            await session.scalars(
-                select(Applicant.application_id).where(
-                    Applicant.email == email, Applicant.anonymized_at.is_(None)
-                )
+    app_ids = (
+        await session.scalars(
+            select(Applicant.application_id).where(
+                Applicant.email == email, Applicant.anonymized_at.is_(None)
             )
-        ).all()
-    )
+        )
+    ).all()
     applications = ApplicationsService(session)
     for application_id in app_ids:
         await applications.anonymize(application_id, files=files, actor=actor, commit=False)
@@ -283,11 +281,12 @@ class PrivacySettingsService:
 
     async def get(self) -> PrivacySettings:
         """Return the settings row, and create it when the seed row is missing."""
-        settings = await self.session.get(PrivacySettings, 1)
-        if settings is None:
-            settings = PrivacySettings(id=1)
-            self.session.add(settings)
-            await self.session.flush()
+        existing = await self.session.get(PrivacySettings, 1)
+        if existing is not None:
+            return existing
+        settings = PrivacySettings(id=1)
+        self.session.add(settings)
+        await self.session.flush()
         return settings
 
     async def update(self, *, default_retention_months: int) -> PrivacySettings:
@@ -334,15 +333,18 @@ class ErasureRequestService:
             and await self.session.get(Application, application_id) is None
         ):
             raise NotFoundError(f"application {application_id} not found")
-        if subject_type == "applicant" and email is None and application_id is not None:
-            email = await self.session.scalar(
+        subject_email = (
+            await self.session.scalar(
                 select(Applicant.email).where(Applicant.application_id == application_id)
             )
+            if subject_type == "applicant" and email is None and application_id is not None
+            else email
+        )
         request = ErasureRequest(
             subject_type=subject_type,
             application_id=application_id,
             principal_id=principal_id,
-            email=email,
+            email=subject_email,
             status="open",
             requested_by=requested_by,
         )
@@ -362,9 +364,12 @@ class ErasureRequestService:
 
     async def list(self, *, status: str | None = None) -> list[ErasureRequest]:
         """List the erasure requests, the newest first, optionally by status."""
-        stmt = select(ErasureRequest).order_by(ErasureRequest.created_at.desc())
-        if status is not None:
-            stmt = stmt.where(ErasureRequest.status == status)
+        newest_first = select(ErasureRequest).order_by(ErasureRequest.created_at.desc())
+        stmt = (
+            newest_first.where(ErasureRequest.status == status)
+            if status is not None
+            else newest_first
+        )
         return list((await self.session.scalars(stmt)).all())
 
     async def get(self, request_id: UUID) -> ErasureRequest | None:
@@ -396,30 +401,7 @@ class ErasureRequestService:
             ConflictError: The request is not open, or it has no resolvable subject.
         """
         request = await self._require_open(request_id)
-        storage_keys: list[str] = []
-        if request.subject_type == "applicant" and request.application_id is not None:
-            await ApplicationsService(self.session).anonymize(
-                request.application_id, files=files, actor=actor, commit=False
-            )
-            await audit_record(
-                self.session,
-                actor=actor,
-                action=AuditAction.ANONYMIZATION,
-                target_type="application",
-                target_id=str(request.application_id),
-            )
-            await anonymize_reported_tickets(
-                self.session, actor=actor, files=files, email=request.email
-            )
-            await erase_sender_blocks(self.session, email=request.email)
-        elif request.subject_type == "principal" and request.principal_id is not None:
-            principals = PrincipalService(self.session)
-            await principals.erase(request.principal_id, actor=actor, commit=False, files=files)
-            storage_keys = principals.storage_keys
-        else:
-            raise ConflictError(
-                "erasure request has no resolvable subject", code="erasure_no_subject"
-            )
+        storage_keys = await self._erase_subject(request, actor=actor, files=files)
         request.status = "executed"
         request.handled_by = actor
         request.handled_at = _now()
@@ -435,6 +417,43 @@ class ErasureRequestService:
             await files.remove_objects(storage_keys)
         await self.session.refresh(request)
         return request
+
+    async def _erase_subject(
+        self, request: ErasureRequest, *, actor: str, files: FilesService | None
+    ) -> list[str]:
+        """Erase the subject of a request without a commit.
+
+        Returns:
+            The storage keys whose objects go after the commit.
+
+        Raises:
+            ConflictError: The request has no resolvable subject.
+        """
+        match (request.subject_type, request.application_id, request.principal_id):
+            case ("applicant", application_id, _) if application_id is not None:
+                await ApplicationsService(self.session).anonymize(
+                    application_id, files=files, actor=actor, commit=False
+                )
+                await audit_record(
+                    self.session,
+                    actor=actor,
+                    action=AuditAction.ANONYMIZATION,
+                    target_type="application",
+                    target_id=str(application_id),
+                )
+                await anonymize_reported_tickets(
+                    self.session, actor=actor, files=files, email=request.email
+                )
+                await erase_sender_blocks(self.session, email=request.email)
+                return []
+            case ("principal", _, principal_id) if principal_id is not None:
+                principals = PrincipalService(self.session)
+                await principals.erase(principal_id, actor=actor, commit=False, files=files)
+                return principals.storage_keys
+            case _:
+                raise ConflictError(
+                    "erasure request has no resolvable subject", code="erasure_no_subject"
+                )
 
     async def reject(
         self, request_id: UUID, *, actor: str, reason: str | None = None
@@ -460,6 +479,29 @@ class ErasureRequestService:
         await self.session.commit()
         await self.session.refresh(request)
         return request
+
+
+def _application_row(
+    application: Application, applicant: Applicant | None, *, type_name: str, status: str
+) -> dict[str, Any]:
+    """Return the export row of one application."""
+    return {
+        "id": application.id,
+        "typeName": type_name,
+        "status": status,
+        "createdAt": application.created_at,
+        "applicantName": applicant.name if applicant else "",
+        "data": application.data,
+    }
+
+
+def _names_by_owner(rows: Sequence[tuple[UUID | None, str]]) -> dict[UUID, list[str]]:
+    """Group the file names by the row that owns the file, in the order of the rows.
+
+    The sort is stable, so each group keeps the upload order of the query.
+    """
+    by_owner = groupby(sorted(rows, key=lambda row: str(row[0])), key=lambda row: row[0])
+    return {cast(UUID, owner): [name for _, name in group] for owner, group in by_owner}
 
 
 class AuskunftService:
@@ -488,139 +530,17 @@ class AuskunftService:
         Returns:
             Rows ready for `build_auskunft_workbook`.
         """
-        applicants = list(
-            (await self.session.scalars(select(Applicant).where(Applicant.email == email))).all()
-        )
+        applicants = (
+            await self.session.scalars(select(Applicant).where(Applicant.email == email))
+        ).all()
         applicant_by_app = {a.application_id: a for a in applicants}
         app_ids = list(applicant_by_app.keys())
-
-        applications: list[dict[str, Any]] = []
-        versions: list[dict[str, Any]] = []
-        comments: list[dict[str, Any]] = []
-        attachments: list[dict[str, Any]] = []
-        if app_ids:
-            apps = list(
-                (
-                    await self.session.scalars(
-                        select(Application).where(Application.id.in_(app_ids))
-                    )
-                ).all()
-            )
-            type_ids = {a.type_id for a in apps}
-            type_names = dict((
-                    await self.session.execute(
-                        select(ApplicationType.id, ApplicationType.name_i18n).where(
-                            ApplicationType.id.in_(type_ids)
-                        )
-                    )
-                ).all())
-            state_ids = {a.current_state_id for a in apps if a.current_state_id}
-            state_labels = (
-                dict((
-                        await self.session.execute(
-                            select(State.id, State.label_i18n).where(State.id.in_(state_ids))
-                        )
-                    ).all())
-                if state_ids
-                else {}
-            )
-            for a in apps:
-                applicant = applicant_by_app.get(a.id)
-                applications.append(
-                    {
-                        "id": a.id,
-                        "typeName": _i18n(type_names.get(a.type_id), locale),
-                        "status": _i18n(
-                            state_labels.get(a.current_state_id)
-                            if a.current_state_id is not None
-                            else None,
-                            locale,
-                        ),
-                        "createdAt": a.created_at,
-                        "applicantName": applicant.name if applicant else "",
-                        "data": a.data,
-                    }
-                )
-            vrows = list(
-                (
-                    await self.session.scalars(
-                        select(SubmissionVersion)
-                        .where(SubmissionVersion.application_id.in_(app_ids))
-                        .order_by(SubmissionVersion.application_id, SubmissionVersion.version)
-                    )
-                ).all()
-            )
-            versions = [
-                {
-                    "applicationId": v.application_id,
-                    "version": v.version,
-                    "changedBy": v.changed_by,
-                    "at": v.at,
-                    "data": v.data,
-                }
-                for v in vrows
-            ]
-
-            crows = list(
-                (
-                    await self.session.scalars(
-                        select(Comment)
-                        .where(
-                            Comment.application_id.in_(app_ids),
-                            or_(
-                                Comment.author_kind == "applicant",
-                                Comment.visibility == "public",
-                            ),
-                        )
-                        .order_by(Comment.application_id, Comment.at)
-                    )
-                ).all()
-            )
-            names: dict[UUID, list[str]] = {}
-            if crows:
-                for comment_id, filename in (
-                    await self.session.execute(
-                        select(Attachment.comment_id, Attachment.filename)
-                        .where(Attachment.comment_id.in_([c.id for c in crows]))
-                        .order_by(Attachment.created_at, Attachment.id)
-                    )
-                ).all():
-                    names.setdefault(cast(UUID, comment_id), []).append(filename)
-            comments = [
-                {
-                    "applicationId": c.application_id,
-                    "authorKind": c.author_kind,
-                    "visibility": c.visibility,
-                    "body": c.body,
-                    "at": c.at,
-                    "attachments": names.get(c.id, []),
-                }
-                for c in crows
-            ]
-
-            arows = list(
-                (
-                    await self.session.scalars(
-                        select(Attachment)
-                        .where(
-                            Attachment.application_id.is_not(None),
-                            Attachment.application_id.in_(app_ids),
-                        )
-                        .order_by(Attachment.application_id, Attachment.created_at)
-                    )
-                ).all()
-            )
-            attachments = [
-                {
-                    "applicationId": at.application_id,
-                    "filename": at.filename,
-                    "mime": at.mime,
-                    "size": at.size,
-                    "createdAt": at.created_at,
-                }
-                for at in arows
-            ]
-
+        applications = (
+            await self._applications(app_ids, applicant_by_app, locale) if app_ids else []
+        )
+        versions = await self._versions(app_ids) if app_ids else []
+        comments = await self._comments(app_ids) if app_ids else []
+        application_files = await self._application_attachments(app_ids) if app_ids else []
         principal_row = await self.session.scalar(
             select(Principal)
             .where(Principal.email == email)
@@ -631,30 +551,15 @@ class AuskunftService:
             )
             .limit(1)
         )
-        attendance: list[dict[str, Any]] = []
-        if principal_row is not None:
-            arows = (
-                await self.session.execute(
-                    select(MeetingAttendance, Meeting)
-                    .join(Meeting, Meeting.id == MeetingAttendance.meeting_id)
-                    .where(MeetingAttendance.principal_id == principal_row.id)
-                    .order_by(Meeting.date, Meeting.id)
-                )
-            ).all()
-            attendance = [
-                {
-                    "meetingId": meeting.id,
-                    "meetingTitle": meeting.title,
-                    "meetingDate": meeting.date,
-                    "status": rec.status,
-                    "source": rec.source,
-                    "note": rec.note,
-                }
-                for rec, meeting in arows
-            ]
-        reporter = [Ticket.reporter_email == email]
-        if principal_row is not None:
-            reporter.append(Ticket.reporter_principal_id == principal_row.id)
+        attendance = await self._attendance(principal_row) if principal_row is not None else []
+        reporter = (
+            Ticket.reporter_email == email,
+            *(
+                (Ticket.reporter_principal_id == principal_row.id,)
+                if principal_row is not None
+                else ()
+            ),
+        )
         trows = (
             await self.session.scalars(select(Ticket).where(or_(*reporter)).order_by(Ticket.number))
         ).all()
@@ -669,56 +574,10 @@ class AuskunftService:
             }
             for t in trows
         ]
-        if trows:
-            number_by_ticket = {t.id: format_number(t.number) for t in trows}
-            tarows = (
-                await self.session.scalars(
-                    select(Attachment)
-                    .where(Attachment.ticket_id.in_(list(number_by_ticket)))
-                    .order_by(Attachment.ticket_id, Attachment.created_at)
-                )
-            ).all()
-            attachments.extend(
-                {
-                    "ticketNumber": number_by_ticket.get(at.ticket_id) if at.ticket_id else None,
-                    "filename": at.filename,
-                    "mime": at.mime,
-                    "size": at.size,
-                    "createdAt": at.created_at,
-                }
-                for at in tarows
-            )
-        ticket_notes: list[dict[str, Any]] = []
-        if principal_row is not None:
-            nrows = (
-                await self.session.execute(
-                    select(TicketNote, Ticket.number)
-                    .join(Ticket, Ticket.id == TicketNote.ticket_id)
-                    .where(TicketNote.author_id == principal_row.id)
-                    .order_by(Ticket.number, TicketNote.created_at, TicketNote.id)
-                )
-            ).all()
-            note_files: dict[UUID, list[str]] = {}
-            if nrows:
-                for note_id, filename in (
-                    await self.session.execute(
-                        select(Attachment.ticket_note_id, Attachment.filename)
-                        .where(Attachment.ticket_note_id.in_([n.id for n, _ in nrows]))
-                        .order_by(Attachment.created_at, Attachment.id)
-                    )
-                ).all():
-                    note_files.setdefault(cast(UUID, note_id), []).append(filename)
-            ticket_notes = [
-                {
-                    "ticketNumber": format_number(number),
-                    "visibility": note.visibility,
-                    "createdAt": note.created_at,
-                    "deletedAt": note.deleted_at,
-                    "body": note.body,
-                    "attachments": note_files.get(note.id, []),
-                }
-                for note, number in nrows
-            ]
+        ticket_files = await self._ticket_attachments(trows) if trows else []
+        ticket_notes = (
+            await self._ticket_notes(principal_row) if principal_row is not None else []
+        )
         todos = await todo_export(
             self.session, [principal_row.id] if principal_row is not None else []
         )
@@ -751,7 +610,7 @@ class AuskunftService:
             "applications": applications,
             "versions": versions,
             "comments": comments,
-            "attachments": attachments,
+            "attachments": [*application_files, *ticket_files],
             "attendance": attendance,
             "tickets": tickets,
             "ticket_notes": ticket_notes,
@@ -760,6 +619,214 @@ class AuskunftService:
             "sender_blocks": blocks,
             "principal": principal,
         }
+
+    async def _applications(
+        self,
+        app_ids: Sequence[UUID],
+        applicant_by_app: Mapping[UUID, Applicant],
+        locale: str,
+    ) -> list[dict[str, Any]]:
+        """Return the applications with their localized type name and state label."""
+        apps = (
+            await self.session.scalars(select(Application).where(Application.id.in_(app_ids)))
+        ).all()
+        type_ids = {a.type_id for a in apps}
+        type_names = dict(
+            (
+                await self.session.execute(
+                    select(ApplicationType.id, ApplicationType.name_i18n).where(
+                        ApplicationType.id.in_(type_ids)
+                    )
+                )
+            ).all()
+        )
+        state_ids = {a.current_state_id for a in apps if a.current_state_id}
+        state_labels = (
+            dict(
+                (
+                    await self.session.execute(
+                        select(State.id, State.label_i18n).where(State.id.in_(state_ids))
+                    )
+                ).all()
+            )
+            if state_ids
+            else {}
+        )
+        return [
+            _application_row(
+                a,
+                applicant_by_app.get(a.id),
+                type_name=_i18n(type_names.get(a.type_id), locale),
+                status=_i18n(
+                    state_labels.get(a.current_state_id)
+                    if a.current_state_id is not None
+                    else None,
+                    locale,
+                ),
+            )
+            for a in apps
+        ]
+
+    async def _versions(self, app_ids: Sequence[UUID]) -> list[dict[str, Any]]:
+        """Return the submission versions of the applications."""
+        vrows = (
+            await self.session.scalars(
+                select(SubmissionVersion)
+                .where(SubmissionVersion.application_id.in_(app_ids))
+                .order_by(SubmissionVersion.application_id, SubmissionVersion.version)
+            )
+        ).all()
+        return [
+            {
+                "applicationId": v.application_id,
+                "version": v.version,
+                "changedBy": v.changed_by,
+                "at": v.at,
+                "data": v.data,
+            }
+            for v in vrows
+        ]
+
+    async def _comments(self, app_ids: Sequence[UUID]) -> list[dict[str, Any]]:
+        """Return the comments that the subject can see, with the names of their files."""
+        crows = (
+            await self.session.scalars(
+                select(Comment)
+                .where(
+                    Comment.application_id.in_(app_ids),
+                    or_(
+                        Comment.author_kind == "applicant",
+                        Comment.visibility == "public",
+                    ),
+                )
+                .order_by(Comment.application_id, Comment.at)
+            )
+        ).all()
+        names = (
+            _names_by_owner(
+                (
+                    await self.session.execute(
+                        select(Attachment.comment_id, Attachment.filename)
+                        .where(Attachment.comment_id.in_([c.id for c in crows]))
+                        .order_by(Attachment.created_at, Attachment.id)
+                    )
+                ).all()
+            )
+            if crows
+            else {}
+        )
+        return [
+            {
+                "applicationId": c.application_id,
+                "authorKind": c.author_kind,
+                "visibility": c.visibility,
+                "body": c.body,
+                "at": c.at,
+                "attachments": names.get(c.id, []),
+            }
+            for c in crows
+        ]
+
+    async def _application_attachments(self, app_ids: Sequence[UUID]) -> list[dict[str, Any]]:
+        """Return the attachment metadata of the applications."""
+        arows = (
+            await self.session.scalars(
+                select(Attachment)
+                .where(
+                    Attachment.application_id.is_not(None),
+                    Attachment.application_id.in_(app_ids),
+                )
+                .order_by(Attachment.application_id, Attachment.created_at)
+            )
+        ).all()
+        return [
+            {
+                "applicationId": at.application_id,
+                "filename": at.filename,
+                "mime": at.mime,
+                "size": at.size,
+                "createdAt": at.created_at,
+            }
+            for at in arows
+        ]
+
+    async def _attendance(self, principal_row: Principal) -> list[dict[str, Any]]:
+        """Return the meeting attendance of the principal with the reason of an excuse."""
+        rows = (
+            await self.session.execute(
+                select(MeetingAttendance, Meeting)
+                .join(Meeting, Meeting.id == MeetingAttendance.meeting_id)
+                .where(MeetingAttendance.principal_id == principal_row.id)
+                .order_by(Meeting.date, Meeting.id)
+            )
+        ).all()
+        return [
+            {
+                "meetingId": meeting.id,
+                "meetingTitle": meeting.title,
+                "meetingDate": meeting.date,
+                "status": rec.status,
+                "source": rec.source,
+                "note": rec.note,
+            }
+            for rec, meeting in rows
+        ]
+
+    async def _ticket_attachments(self, trows: Sequence[Ticket]) -> list[dict[str, Any]]:
+        """Return the attachment metadata of the tickets, keyed by the ticket number."""
+        number_by_ticket = {t.id: format_number(t.number) for t in trows}
+        tarows = (
+            await self.session.scalars(
+                select(Attachment)
+                .where(Attachment.ticket_id.in_(list(number_by_ticket)))
+                .order_by(Attachment.ticket_id, Attachment.created_at)
+            )
+        ).all()
+        return [
+            {
+                "ticketNumber": number_by_ticket.get(at.ticket_id) if at.ticket_id else None,
+                "filename": at.filename,
+                "mime": at.mime,
+                "size": at.size,
+                "createdAt": at.created_at,
+            }
+            for at in tarows
+        ]
+
+    async def _ticket_notes(self, principal_row: Principal) -> list[dict[str, Any]]:
+        """Return the own ticket notes of the principal, with the names of their files."""
+        nrows = (
+            await self.session.execute(
+                select(TicketNote, Ticket.number)
+                .join(Ticket, Ticket.id == TicketNote.ticket_id)
+                .where(TicketNote.author_id == principal_row.id)
+                .order_by(Ticket.number, TicketNote.created_at, TicketNote.id)
+            )
+        ).all()
+        note_files = (
+            _names_by_owner(
+                (
+                    await self.session.execute(
+                        select(Attachment.ticket_note_id, Attachment.filename)
+                        .where(Attachment.ticket_note_id.in_([n.id for n, _ in nrows]))
+                        .order_by(Attachment.created_at, Attachment.id)
+                    )
+                ).all()
+            )
+            if nrows
+            else {}
+        )
+        return [
+            {
+                "ticketNumber": format_number(number),
+                "visibility": note.visibility,
+                "createdAt": note.created_at,
+                "deletedAt": note.deleted_at,
+                "body": note.body,
+                "attachments": note_files.get(note.id, []),
+            }
+            for note, number in nrows
+        ]
 
 
 def build_auskunft_workbook(

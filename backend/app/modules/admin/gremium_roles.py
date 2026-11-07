@@ -180,21 +180,21 @@ class GremiumRoleService:
                 )
             ).all()
         )
-        added = False
-        for key, name, perms in FORCED_GREMIUM_ROLES:
-            if key not in present:
-                self.session.add(
-                    GremiumRole(
-                        gremium_id=gremium_id,
-                        key=key,
-                        name_i18n=name,
-                        permissions=list(perms),
-                    )
+        missing = tuple(
+            (key, name, perms) for key, name, perms in FORCED_GREMIUM_ROLES if key not in present
+        )
+        for key, name, perms in missing:
+            self.session.add(
+                GremiumRole(
+                    gremium_id=gremium_id,
+                    key=key,
+                    name_i18n=name,
+                    permissions=list(perms),
                 )
-                added = True
-        if added:
+            )
+        if missing:
             await self.session.flush()
-        return added
+        return bool(missing)
 
     async def list_roles(self, gremium_id: UUID) -> list[GremiumRoleOut]:
         """List the roles of a gremium, and backfill its forced roles first."""

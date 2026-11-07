@@ -21,7 +21,8 @@ gives 404. There is no public meeting read of any kind.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 from datetime import date as _date
 from typing import Any, Literal
 from uuid import UUID
@@ -38,6 +39,7 @@ from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.models import Protocol
 from app.shared.config_schemas import ElectionConfig
 from app.shared.errors import NotFoundError, ServiceUnavailableError
+from app.shared.schemas import FrozenCamelModel
 
 logger = logging.getLogger("app.protocol")
 
@@ -47,22 +49,17 @@ VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
 MajorityRule = Literal["simple", "absolute", "two_thirds"]
 
 
-class _CamelModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-
 def passed_conditions(view: object) -> list[str]:
     """Return the conditions of the decision of a passed vote, else none.
 
     Only a passed vote makes its proposal the decision of the application.
     """
-    if getattr(view, "result", None) != "passed":
-        return []
+    passed = getattr(view, "result", None) == "passed"
     proposal = getattr(view, "proposal", None)
-    return list(getattr(proposal, "conditions", None) or [])
+    return list(getattr(proposal, "conditions", None) or []) if passed else []
 
 
-class PublicDecision(_CamelModel):
+class PublicDecision(FrozenCamelModel, frozen=True):
     """One closed vote of a public TOP: question, counts, result and conditions."""
 
     question: str | None = None
@@ -121,7 +118,7 @@ class PublicDecision(_CamelModel):
         )
 
 
-class PublicTop(_CamelModel):
+class PublicTop(FrozenCamelModel, frozen=True):
     """One TOP of the public version. A non-public TOP has its number only."""
 
     number: int
@@ -136,7 +133,7 @@ class PublicTop(_CamelModel):
         return [d.result for d in self.decisions if d.result is not None]
 
 
-class PublicAttendance(_CamelModel):
+class PublicAttendance(FrozenCamelModel, frozen=True):
     """The attendance of the public version: counts only."""
 
     present: int = 0
@@ -145,8 +142,14 @@ class PublicAttendance(_CamelModel):
     guests: int = 0
 
 
-class PublicSnapshot(_CamelModel):
-    """The stored public version of one protocol (`protocol.public_content`)."""
+class PublicSnapshot(BaseModel):
+    """The stored public version of one protocol (`protocol.public_content`).
+
+    The model stays mutable, because it collects the public version in the same pass
+    that renders the public PDF: `ProtocolService._build_document` fills it in place.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     version: int = SNAPSHOT_VERSION
     tops: list[PublicTop] = Field(default_factory=list)
@@ -156,15 +159,14 @@ class PublicSnapshot(_CamelModel):
 
     def search_text(self) -> str:
         """Return the plain text of the public parts for the search."""
-        parts: list[str] = []
-        for top in self.tops:
-            if top.non_public:
-                continue
-            parts.extend(p for p in (top.title, top.markdown) if p)
-            parts.extend(d.question for d in top.decisions if d.question)
-        if self.markdown:
-            parts.append(self.markdown)
-        return "\n".join(parts)
+        parts = (
+            part
+            for top in self.tops
+            if not top.non_public
+            for part in (top.title, top.markdown, *(d.question for d in top.decisions))
+            if part
+        )
+        return "\n".join([*parts, *([self.markdown] if self.markdown else [])])
 
 
 def apply_public_snapshot(protocol: Protocol, snapshot: PublicSnapshot, pdf: bytes | None) -> None:
@@ -185,26 +187,30 @@ def semester_of(day: _date) -> str:
     `ws-YYYY` is the winter semester YYYY/YY+1 (October to March), `ss-YYYY` the
     summer semester YYYY (April to September).
     """
-    if day.month >= 10:
-        return f"ws-{day.year}"
-    if day.month <= 3:
-        return f"ws-{day.year - 1}"
-    return f"ss-{day.year}"
+    match day.month:
+        case month if month >= 10:
+            return f"ws-{day.year}"
+        case month if month <= 3:
+            return f"ws-{day.year - 1}"
+        case _:
+            return f"ss-{day.year}"
 
 
 def semester_range(key: str) -> tuple[_date, _date]:
     """Return the first and the last day of a semester key (`ws-2026`, `ss-2026`)."""
     kind, _, year_text = key.partition("-")
     year = int(year_text)
-    if kind == "ws":
-        return _date(year, 10, 1), _date(year + 1, 3, 31)
-    return _date(year, 4, 1), _date(year, 9, 30)
+    return (
+        (_date(year, 10, 1), _date(year + 1, 3, 31))
+        if kind == "ws"
+        else (_date(year, 4, 1), _date(year, 9, 30))
+    )
 
 
 SEMESTER_PATTERN = r"^(ws|ss)-(19|20)\d{2}$"
 
 
-class PublicGremiumRef(_CamelModel):
+class PublicGremiumRef(FrozenCamelModel, frozen=True):
     """A gremium as the public page names it."""
 
     id: UUID
@@ -212,13 +218,13 @@ class PublicGremiumRef(_CamelModel):
     slug: str
 
 
-class PublicGremiumOut(PublicGremiumRef):
+class PublicGremiumOut(PublicGremiumRef, frozen=True):
     """A gremium with the number of its public protocols."""
 
     protocol_count: int = Field(alias="protocolCount")
 
 
-class PublicTopSummary(_CamelModel):
+class PublicTopSummary(FrozenCamelModel, frozen=True):
     """One TOP in the public list: number, title and results."""
 
     number: int
@@ -227,14 +233,14 @@ class PublicTopSummary(_CamelModel):
     results: list[VoteResult] = Field(default_factory=list)
 
 
-class PublicTopOut(PublicTopSummary):
+class PublicTopOut(PublicTopSummary, frozen=True):
     """One TOP on the public detail page, with its text and its decisions."""
 
     markdown: str | None = None
     decisions: list[PublicDecision] = Field(default_factory=list)
 
 
-class PublicProtocolSummary(_CamelModel):
+class PublicProtocolSummary(FrozenCamelModel, frozen=True):
     """One protocol in the public list."""
 
     id: UUID
@@ -248,7 +254,7 @@ class PublicProtocolSummary(_CamelModel):
     pdf_size: int | None = Field(default=None, alias="pdfSize")
 
 
-class PublicProtocolDetail(_CamelModel):
+class PublicProtocolDetail(FrozenCamelModel, frozen=True):
     """One protocol on the public detail page."""
 
     id: UUID
@@ -264,7 +270,7 @@ class PublicProtocolDetail(_CamelModel):
     pdf_size: int | None = Field(default=None, alias="pdfSize")
 
 
-class PublicProtocolPage(_CamelModel):
+class PublicProtocolPage(FrozenCamelModel, frozen=True):
     """One page of the public protocol list."""
 
     items: list[PublicProtocolSummary]
@@ -273,7 +279,7 @@ class PublicProtocolPage(_CamelModel):
     offset: int
 
 
-class PublicSemesterOut(_CamelModel):
+class PublicSemesterOut(FrozenCamelModel, frozen=True):
     """A semester key with the number of its public protocols."""
 
     key: str
@@ -317,13 +323,17 @@ class PublicFilter:
     q: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
 class PublicProtocolService:
-    """The reads of the public protocols page. No write and no auth here."""
+    """The reads of the public protocols page. No write and no auth here.
 
-    def __init__(self, session: AsyncSession, *, storage: ObjectStorage | None = None) -> None:
-        """Bind the service to a session and the optional object storage."""
-        self.session = session
-        self.storage = storage
+    Attributes:
+        session: The database session of the request.
+        storage: The object storage of the public PDF, or `None` when storage is off.
+    """
+
+    session: AsyncSession
+    storage: ObjectStorage | None = field(default=None, kw_only=True)
 
     @staticmethod
     def _base() -> Select[Protocol, Meeting, Gremium]:
@@ -338,22 +348,24 @@ class PublicProtocolService:
     def _filtered[*Ts](
         stmt: Select[*Ts], flt: PublicFilter, *, with_semester: bool = True
     ) -> Select[*Ts]:
-        if flt.gremium_ids:
-            stmt = stmt.where(Protocol.gremium_id.in_(flt.gremium_ids))
-        if with_semester and flt.semester:
-            first, last = semester_range(flt.semester)
-            stmt = stmt.where(meeting_day_expr() >= first, meeting_day_expr() <= last)
-        if with_semester and flt.year is not None:
-            stmt = stmt.where(func.extract("year", meeting_day_expr()) == flt.year)
-        if flt.q:
-            pattern = f"%{_escape_like(flt.q.strip())}%"
-            stmt = stmt.where(
-                or_(
-                    Meeting.title.ilike(pattern, escape="\\"),
-                    Protocol.public_search_text.ilike(pattern, escape="\\"),
-                )
-            )
-        return stmt
+        semester = semester_range(flt.semester) if with_semester and flt.semester else None
+        by_year = with_semester and flt.year is not None
+        pattern = f"%{_escape_like(flt.q.strip())}%" if flt.q else ""
+        search = or_(
+            Meeting.title.ilike(pattern, escape="\\"),
+            Protocol.public_search_text.ilike(pattern, escape="\\"),
+        )
+        clauses = (
+            *([Protocol.gremium_id.in_(flt.gremium_ids)] if flt.gremium_ids else []),
+            *(
+                [meeting_day_expr() >= semester[0], meeting_day_expr() <= semester[1]]
+                if semester is not None
+                else []
+            ),
+            *([func.extract("year", meeting_day_expr()) == flt.year] if by_year else []),
+            *([search] if flt.q else []),
+        )
+        return stmt.where(*clauses)
 
     def _has_pdf(self, protocol: Protocol) -> bool:
         return protocol.public_pdf_storage_key is not None and self.storage is not None
@@ -448,10 +460,8 @@ class PublicProtocolService:
             flt,
             with_semester=False,
         )
-        counts: dict[str, int] = {}
-        for (day,) in (await self.session.execute(stmt)).all():
-            key = semester_of(day)
-            counts[key] = counts.get(key, 0) + 1
+        rows = (await self.session.execute(stmt)).all()
+        counts = Counter(semester_of(day) for (day,) in rows)
         ordered = sorted(counts, key=lambda k: (semester_range(k)[0]), reverse=True)
         return [PublicSemesterOut(key=k, count=counts[k]) for k in ordered]
 
@@ -505,7 +515,7 @@ class PublicProtocolService:
         Raises:
             NotFoundError: The protocol is not visible.
         """
-        protocol, _, _ = await self._visible(protocol_id)
+        protocol = (await self._visible(protocol_id))[0]
         snap = self._snapshot(protocol)
         texts = [snap.markdown, *(t.markdown for t in snap.tops if not t.non_public)]
         return set(image_ids_in(*texts))

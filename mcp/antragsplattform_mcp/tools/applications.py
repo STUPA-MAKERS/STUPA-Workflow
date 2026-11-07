@@ -212,9 +212,11 @@ async def comment_application(
             comment (the applicant reads its body), gives 422 `mention_not_member`.
     """
     chosen = visibility or ("internal" if mentions else "public")
-    payload: dict[str, object] = {"body": body, "visibility": chosen}
-    if mentions:
-        payload["mentions"] = mentions
+    payload: dict[str, object] = {
+        "body": body,
+        "visibility": chosen,
+        **({"mentions": mentions} if mentions else {}),
+    }
     return await post_message(f"/applications/{application_id}/comments", payload, file_paths)
 
 

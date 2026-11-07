@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from app.modules.livevote.broker import InMemoryBroker, PatternBroker
@@ -50,15 +50,38 @@ def todo_broker(state: object) -> PatternBroker:
     return broker or _FALLBACK_BROKER
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class _Touched:
-    cards: dict[uuid.UUID, PingKind] = field(default_factory=dict)
+    cards: Mapping[uuid.UUID, PingKind] = field(default_factory=dict)
     whole: bool = False
 
 
-@dataclass(slots=True)
+def _touched(entry: _Touched, card_id: uuid.UUID | None, *, removed: bool) -> _Touched:
+    """Return the entry of a board after one more write.
+
+    A card that left the board stays gone, whatever the request did before.
+    """
+    if card_id is None:
+        return replace(entry, whole=True)
+    if removed or entry.cards.get(card_id) != "card_removed":
+        return replace(entry, cards={**entry.cards, card_id: "card_removed" if removed else "card"})
+    return entry
+
+
+def _ping(board_id: uuid.UUID, entry: _Touched) -> dict[str, object]:
+    """The ping of one board: ``board`` for a board change or several cards."""
+    if entry.whole or len(entry.cards) != 1:
+        return {"type": "board", "boardId": str(board_id)}
+    ((card_id, kind),) = entry.cards.items()
+    return {"type": kind, "boardId": str(board_id), "cardId": str(card_id)}
+
+
+@dataclass(frozen=True, slots=True)
 class BoardPings:
-    """The boards and cards that one request changed, in the order of the first write."""
+    """The boards and cards that one request changed, in the order of the first write.
+
+    The collector of a request: ``touch`` records into its one dict, ``drain`` empties it.
+    """
 
     _boards: dict[uuid.UUID, _Touched] = field(default_factory=dict)
 
@@ -69,22 +92,12 @@ class BoardPings:
 
         A card that left the board stays gone, whatever the request did before.
         """
-        entry = self._boards.setdefault(board_id, _Touched())
-        if card_id is None:
-            entry.whole = True
-        elif removed or entry.cards.get(card_id) != "card_removed":
-            entry.cards[card_id] = "card_removed" if removed else "card"
+        entry = self._boards.get(board_id, _Touched())
+        self._boards[board_id] = _touched(entry, card_id, removed=removed)
 
     def messages(self) -> list[dict[str, object]]:
         """One ping per touched board: ``board`` for a board change or several cards."""
-        out: list[dict[str, object]] = []
-        for board_id, entry in self._boards.items():
-            if entry.whole or len(entry.cards) != 1:
-                out.append({"type": "board", "boardId": str(board_id)})
-                continue
-            ((card_id, kind),) = entry.cards.items()
-            out.append({"type": kind, "boardId": str(board_id), "cardId": str(card_id)})
-        return out
+        return [_ping(board_id, entry) for board_id, entry in self._boards.items()]
 
     def drain(self) -> list[dict[str, object]]:
         """Return the pings and forget them (a second publish sends nothing)."""

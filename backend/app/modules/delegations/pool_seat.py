@@ -137,11 +137,12 @@ async def _find_seat(
             ).where(MeetingDelegation.meeting_id == meeting_id)
         )
     ).all()
-    taken: set[UUID] = set()
-    for delegator_id, delegate_id, voting in rows:
-        if delegator_id == deputy.id or (voting and delegate_id == deputy.id):
-            return None
-        taken.update((delegator_id, delegate_id))
+    if any(
+        delegator_id == deputy.id or (voting and delegate_id == deputy.id)
+        for delegator_id, delegate_id, voting in rows
+    ):
+        return None
+    taken = {pid for delegator_id, delegate_id, _ in rows for pid in (delegator_id, delegate_id)}
     voters = await _voting_member_ids(session, gremium_id)
     pool = voters if gremium_wide else personal & voters
     present = set(

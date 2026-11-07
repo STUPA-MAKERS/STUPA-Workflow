@@ -211,17 +211,14 @@ class GremiumOps(ConfigServiceBase):
             row.delegation_allow_external = payload.delegation_allow_external
         if "quorum_percent" in payload.model_fields_set:
             row.quorum_percent = payload.quorum_percent
-        data: dict[str, object] | None = None
-        if (
-            payload.protocols_public is not None
-            and payload.protocols_public != bool(row.protocols_public)
-        ):
-            data = {
-                "field": "protocolsPublic",
-                "old": bool(row.protocols_public),
-                "new": payload.protocols_public,
-            }
-            row.protocols_public = payload.protocols_public
+        publish = payload.protocols_public
+        data: dict[str, object] | None = (
+            {"field": "protocolsPublic", "old": bool(row.protocols_public), "new": publish}
+            if publish is not None and publish != bool(row.protocols_public)
+            else None
+        )
+        if data is not None and publish is not None:
+            row.protocols_public = publish
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id, data)
         await self.session.commit()
         return _gremium_out(row)

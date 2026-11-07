@@ -12,8 +12,8 @@ import {
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 interface MultiOption {
-  value: string;
-  label: string;
+  readonly value: string;
+  readonly label: string;
 }
 
 /**
@@ -137,9 +137,8 @@ export class FormlyMultiSelectType extends FieldType<FieldTypeConfig> {
 
   /** The order of the options stays, so the summary and the stored answer stay stable. */
   toggle(value: string, checked: boolean): void {
-    const set = new Set(this.current());
-    if (checked) set.add(value);
-    else set.delete(value);
+    const cur = this.current();
+    const set = new Set(checked ? [...cur, value] : cur.filter((v) => v !== value));
     const order = this.optionList.map((o) => o.value);
     const next = [...set].sort((a, b) => order.indexOf(a) - order.indexOf(b));
     this.formControl.setValue(next);

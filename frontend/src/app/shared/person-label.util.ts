@@ -10,18 +10,18 @@ import type { Translate, TranslationKey } from '@core/i18n/translations';
 
 /** The fields a person label reads. Every API person shape has them, some without `email`. */
 export interface PersonLike {
-  displayName?: string | null;
-  email?: string | null;
+  readonly displayName?: string | null;
+  readonly email?: string | null;
 }
 
 /** The translate function, or the `I18nService` (anything with its `translate`). */
-export type Translator = Translate | { translate: Translate };
+export type Translator = Translate | { readonly translate: Translate };
 
 export interface PersonLabelOptions {
   /** The text for a person without name and e-mail. Default "Ohne Namen" (`common.unnamed`). */
-  fallback?: TranslationKey;
+  readonly fallback?: TranslationKey;
   /** A literal fallback instead of a key, for example "—" or an id the page already shows. */
-  fallbackText?: string;
+  readonly fallbackText?: string;
 }
 
 /** The name, else the e-mail, else the fallback. An empty name or e-mail counts as none. */

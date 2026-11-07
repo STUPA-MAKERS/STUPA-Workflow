@@ -11,18 +11,18 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel
 
 from app.shared.altcha import create_challenge
 from app.shared.antiabuse import SettingsDep, now_unix
 from app.shared.errors import NotFoundError, ProblemDetail
+from app.shared.schemas import FrozenModel
 
 router = APIRouter(tags=["antiabuse"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
-class AltchaChallengeOut(BaseModel):
+class AltchaChallengeOut(FrozenModel, frozen=True):
     """ALTCHA proof-of-work challenge in the altcha-lib format."""
 
     algorithm: str

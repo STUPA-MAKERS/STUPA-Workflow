@@ -1,15 +1,7 @@
 {
-  "backend/app/modules/applications/access.py": 4,
-  "backend/app/modules/applications/decision.py": 7,
-  "backend/app/modules/applications/guest_settings.py": 5,
-  "backend/app/modules/applications/mentions.py": 6,
-  "backend/app/modules/applications/router.py": 2,
-  "backend/app/modules/applications/schemas.py": 19,
-  "backend/app/modules/applications/service/anonymize.py": 7,
-  "backend/app/modules/applications/service/comments.py": 4,
-  "backend/app/modules/applications/service/edits.py": 7,
-  "backend/app/modules/applications/service/listing.py": 29,
-  "backend/app/modules/applications/service/on_behalf.py": 8,
-  "backend/app/modules/applications/service/reads.py": 1,
-  "backend/app/modules/applications/service/service_base.py": 20
+  "backend/app/modules/applications/guest_settings.py": 4,
+  "backend/app/modules/applications/schemas.py": 1,
+  "backend/app/modules/applications/service/anonymize.py": 6,
+  "backend/app/modules/applications/service/comments.py": 2,
+  "backend/app/modules/applications/service/edits.py": 4
 }

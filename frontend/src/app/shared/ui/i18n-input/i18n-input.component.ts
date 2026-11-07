@@ -56,9 +56,10 @@ export class I18nInputComponent {
   /** The text a reader of the language gets while the field is empty. */
   protected readonly fallback = computed(() => {
     const map = this.value();
-    for (const code of fallbackChain(this.lang()).slice(1)) {
-      if (map[code]) return map[code];
-    }
+    const code = fallbackChain(this.lang())
+      .slice(1)
+      .find((c) => map[c]);
+    if (code !== undefined) return map[code];
     return this.lang() === 'de' ? this.placeholder() : '';
   });
 
