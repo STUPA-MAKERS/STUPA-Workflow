@@ -78,6 +78,31 @@ def _is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     return not _unmap(ip).is_global
 
 
+def _ip_literal(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """Return the host as an IP address, or ``None`` when it is a name."""
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        return None
+
+
+def _target_ips(
+    host: str, resolver: Resolver
+) -> tuple[ipaddress.IPv4Address | ipaddress.IPv6Address, ...]:
+    """Return the IPs to check: the literal itself, else every resolved record.
+
+    Raises:
+        SsrfError: The host is a name and resolves to no address.
+    """
+    literal = _ip_literal(host)
+    if literal is not None:
+        return (literal,)
+    addrs = resolver(host)
+    if not addrs:
+        raise SsrfError(f"dns resolution failed: {host!r}")
+    return tuple(ipaddress.ip_address(a) for a in addrs)
+
+
 def assert_allowed_url(
     url: str,
     *,
@@ -106,19 +131,10 @@ def assert_allowed_url(
     if allow and host.lower() not in allow:
         raise SsrfError(f"host not in allowlist: {host!r}")
 
-    try:
-        literal = ipaddress.ip_address(host)
-    except ValueError:
-        addrs = resolver(host)
-        if not addrs:
-            raise SsrfError(f"dns resolution failed: {host!r}") from None
-        ips = [ipaddress.ip_address(a) for a in addrs]
-    else:
-        ips = [literal]
-
-    for ip in ips:
-        if _is_blocked(ip):
-            raise SsrfError(f"blocked non-global target: {ip}")
+    ips = _target_ips(host, resolver)
+    blocked = next((ip for ip in ips if _is_blocked(ip)), None)
+    if blocked is not None:
+        raise SsrfError(f"blocked non-global target: {blocked}")
     return [str(ip) for ip in ips]
 
 
@@ -134,9 +150,8 @@ def pin_url(url: str, ip: str) -> tuple[str, str]:
     """
     parsed = urlsplit(url)
     port = parsed.port
-    host_header = parsed.hostname or ""
-    if port is not None:
-        host_header = f"{host_header}:{port}"
+    host = parsed.hostname or ""
+    host_header = f"{host}:{port}" if port is not None else host
     ip_host = f"[{ip}]" if ":" in ip else ip
     netloc = f"{ip_host}:{port}" if port is not None else ip_host
     ip_url = urlunsplit((parsed.scheme, netloc, parsed.path or "/", parsed.query, ""))

@@ -231,11 +231,14 @@ class PermissionOps(MeetingServiceBase):
         vote.
         """
         pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
-        stmt = select(MeetingDelegation.meeting_id).where(
+        query = select(MeetingDelegation.meeting_id).where(
             MeetingDelegation.delegate_principal_id == pid_subq
         )
-        if voting_only:
-            stmt = stmt.where(MeetingDelegation.delegate_voting.is_(True))
+        stmt = (
+            query.where(MeetingDelegation.delegate_voting.is_(True))
+            if voting_only
+            else query
+        )
         return set((await self.session.execute(stmt)).scalars().all())
 
     async def assert_can_read(self, meeting_id: UUID, principal: Principal) -> None:
