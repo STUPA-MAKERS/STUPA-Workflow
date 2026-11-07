@@ -1,6 +1,6 @@
 """API schemas of the protocol module.
 
-The wire form is camelCase through `_CamelModel`. The frontend is built
+The wire form is camelCase through `FrozenCamelModel`. The frontend is built
 against `ProtocolOut` exactly: `markdown` plus `status`
 (draft/rendering/final), plus `pdfUrl` and `sentAt` after `finalize`. The
 status `rendering` means the worker still renders in the background.
@@ -12,16 +12,12 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import Field, model_validator
+
+from app.shared.schemas import FrozenCamelModel
 
 
-class _CamelModel(BaseModel):
-    """Give JSON camelCase aliases and allow filling fields by name."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class ProtocolPatch(_CamelModel):
+class ProtocolPatch(FrozenCamelModel, frozen=True):
     """`PATCH /protocols/{id}`: update the Markdown body or the publication.
 
     `markdown` updates the body of a draft. `publicWithheld` holds back the
@@ -43,7 +39,7 @@ class ProtocolPatch(_CamelModel):
         return self
 
 
-class ProtocolFinalizeBody(_CamelModel):
+class ProtocolFinalizeBody(FrozenCamelModel, frozen=True):
     """`POST /protocols/{id}/finalize`: the optional finalize options."""
 
     #: Hold back this protocol from the public protocols page (True) or release it
@@ -52,13 +48,13 @@ class ProtocolFinalizeBody(_CamelModel):
     public_withheld: bool | None = Field(default=None, alias="publicWithheld")
 
 
-class ProtocolVotesBody(_CamelModel):
+class ProtocolVotesBody(FrozenCamelModel, frozen=True):
     """`POST /protocols/{id}/votes`: embed votes."""
 
-    vote_ids: list[UUID] = Field(alias="voteIds", min_length=1)
+    vote_ids: tuple[UUID, ...] = Field(alias="voteIds", min_length=1)
 
 
-class ProtocolOut(_CamelModel):
+class ProtocolOut(FrozenCamelModel, frozen=True):
     """Meeting minutes, the shape that every protocol endpoint returns."""
 
     id: UUID

@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import EmailStr, Field
 
 from app.shared.altcha import AltchaSolutionStr
+from app.shared.schemas import FrozenModel
 
 
-class MagicLinkRequest(BaseModel):
+class MagicLinkRequest(FrozenModel, frozen=True):
     """Body of `POST /auth/magic-link`. The response is always 202 to block enumeration."""
 
     email: EmailStr
@@ -21,13 +23,13 @@ class MagicLinkRequest(BaseModel):
     altcha: AltchaSolutionStr | None = None
 
 
-class MagicLinkVerifyRequest(BaseModel):
+class MagicLinkVerifyRequest(FrozenModel, frozen=True):
     """Body of the magic-link verify: the token from the URL fragment."""
 
     token: str = Field(min_length=1)
 
 
-class MagicLinkVerifyOut(BaseModel):
+class MagicLinkVerifyOut(FrozenModel, frozen=True):
     """Result of a magic-link verify.
 
     The applicant session travels only in the HttpOnly cookie, never in the body.
@@ -40,7 +42,7 @@ class MagicLinkVerifyOut(BaseModel):
     scope: Literal["edit"] = "edit"
 
 
-class LogoutOut(BaseModel):
+class LogoutOut(FrozenModel, frozen=True):
     """Result of an RP-initiated logout.
 
     With OIDC, `logout_url` ends the SSO session at the IdP. The frontend must redirect
@@ -50,7 +52,7 @@ class LogoutOut(BaseModel):
     logout_url: str | None = None
 
 
-class GremiumRef(BaseModel):
+class GremiumRef(FrozenModel, frozen=True):
     """Slim Gremium reference for the "my Gremien" view."""
 
     id: UUID
@@ -58,26 +60,26 @@ class GremiumRef(BaseModel):
     slug: str
 
 
-class MeOut(BaseModel):
+class MeOut(FrozenModel, frozen=True):
     """The logged-in principal with its roles, permissions and Gremium links."""
 
     sub: str
     email: str | None = None
     display_name: str | None = None
-    roles: list[str]
-    permissions: list[str]
-    groups: list[str]
+    roles: tuple[str, ...]
+    permissions: tuple[str, ...]
+    groups: tuple[str, ...]
     #: Gremien the principal is a member of (valid role assignment). This is the base of
     #: the user-facing "my Gremien" view.
-    gremien: list[GremiumRef] = []
+    gremien: tuple[GremiumRef, ...] = ()
     #: Gremien the principal MANAGES through a gremium role (`session.manage`). The
     #: frontend uses this to show "create meeting". The OAuth scope caps the list.
-    session_manage_gremien: list[UUID] = []
+    session_manage_gremien: tuple[UUID, ...] = ()
     #: Gremium id to the gremium permissions of the active role of the principal in
     #: that gremium. The OAuth scope caps the lists: a key outside the token scope does
     #: not show. The frontend gates the meeting pages on it. This is UX only; the
     #: server checks every call.
-    gremium_permissions: dict[UUID, list[str]] = {}
+    gremium_permissions: Mapping[UUID, tuple[str, ...]] = {}
     #: True if at least one cost center has a Gremium of the principal as visibility
     #: root. The frontend uses this to show the budget tab without a global `budget.*`
     #: permission.

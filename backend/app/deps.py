@@ -14,6 +14,7 @@ a leaf, so the re-export avoids an import cycle between `deps` and `auth`.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -94,8 +95,9 @@ async def _principal_from_access_token(
     principal = await rbac.resolve_principal(db, row, now)
     if not principal.has("mcp.use"):
         return None
-    principal.scope_permissions = oauth.scope_permissions(oauth.parse_scope(scope))
-    return principal
+    return replace(
+        principal, scope_permissions=oauth.scope_permissions(oauth.parse_scope(scope))
+    )
 
 
 async def get_current_principal(
