@@ -151,6 +151,7 @@
     class="td__body"
     cdkScrollable
     [class.td__body--fab]="canAdd()"
+    [class.td__body--pages]="phonePages()"
     [class.td__body--rows]="all() || phoneList() || view() === 'list' || (loading() ? skeleton().natural : rowsBelow())">
     @if (all()) {
       @if (rowMatches() === null) {

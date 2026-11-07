@@ -2,7 +2,7 @@
 id: "000532"
 title: A sheet over a sheet is as opaque as the first one
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-07
 implementation:
