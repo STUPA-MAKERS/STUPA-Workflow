@@ -2,9 +2,9 @@ import type { MarkdownFormat } from '@stupa-makers/ui-kit/markdown-editor';
 
 /** A text with a selection, as a textarea holds it. */
 export interface RawText {
-  text: string;
-  start: number;
-  end: number;
+  readonly text: string;
+  readonly start: number;
+  readonly end: number;
 }
 
 const MARKS: Partial<Record<MarkdownFormat, string>> = { bold: '**', italic: '*' };
@@ -43,15 +43,11 @@ function toggleMark({ text, start, end }: RawText, mark: string): RawText {
 }
 
 function starsBefore(text: string, at: number): number {
-  let i = at;
-  while (i > 0 && text[i - 1] === '*') i--;
-  return at - i;
+  return /\*+$/.exec(text.slice(0, Math.max(0, at)))?.[0].length ?? 0;
 }
 
 function starsAfter(text: string, at: number): number {
-  let i = at;
-  while (i < text.length && text[i] === '*') i++;
-  return i - at;
+  return /^\*+/.exec(text.slice(Math.max(0, at)))?.[0].length ?? 0;
 }
 
 function togglePrefix({ text, start, end }: RawText, prefix: string): RawText {

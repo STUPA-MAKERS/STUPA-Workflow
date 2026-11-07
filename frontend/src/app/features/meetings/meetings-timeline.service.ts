@@ -10,8 +10,8 @@ import { liveSearch } from '@stupa-makers/ui-kit';
 
 /** A change of one meeting, see `MeetingsTimelineService.lastChange`. */
 export type MeetingChange =
-  | { kind: 'updated'; meeting: Meeting }
-  | { kind: 'removed'; id: Uuid };
+  | { readonly kind: 'updated'; readonly meeting: Meeting }
+  | { readonly kind: 'removed'; readonly id: Uuid };
 
 /** Page size of a "load more" step (both directions and the search). */
 export const TIMELINE_PAGE = 15;
@@ -145,7 +145,7 @@ export class MeetingsTimelineService {
   }
 
   private startSearch(q: string): Observable<MeetingPage> | void {
-    ++this.searchSeq;
+    this.searchSeq += 1;
     this.searchCursor = null;
     this.searchItems.set([]);
     this.searchHasMore.set(false);
@@ -161,7 +161,8 @@ export class MeetingsTimelineService {
   loadMoreSearch(): void {
     if (this.loadingSearch() || !this.searchHasMore() || this.searchCursor === null) return;
     this.loadingSearch.set(true);
-    const seq = ++this.searchSeq;
+    this.searchSeq += 1;
+    const seq = this.searchSeq;
     this.searchPage(this.searchQuery().trim()).subscribe({
       next: (page) => {
         if (seq === this.searchSeq) this.applySearchPage(page, false);
@@ -291,7 +292,8 @@ export class MeetingsTimelineService {
    */
   loadList(): void {
     if (!this.canReadTimeline()) return;
-    const seq = ++this.listSeq;
+    this.listSeq += 1;
+    const seq = this.listSeq;
     const shown = this.upcomingItems().length + this.pastItems().length > 0;
     this.upcomingCursor = null;
     this.pastCursor = null;
