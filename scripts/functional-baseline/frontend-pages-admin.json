@@ -13,7 +13,6 @@
   "frontend/src/app/pages/admin/branding/branding-editor.component.ts": 15,
   "frontend/src/app/pages/admin/cd-variants/cd-variants.component.ts": 18,
   "frontend/src/app/pages/admin/cd-variants/cd-variants.util.ts": 5,
-  "frontend/src/app/pages/admin/config/webhooks.component.ts": 4,
   "frontend/src/app/pages/admin/deadlines/deadlines.component.ts": 1,
   "frontend/src/app/pages/admin/deadlines/guest-settings/guest-settings.component.ts": 3,
   "frontend/src/app/pages/admin/deadlines/meeting-window/meeting-window.component.ts": 2,
