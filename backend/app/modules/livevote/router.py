@@ -106,7 +106,7 @@ def _try_acquire_slot(meeting_id: UUID, sub: str) -> bool:
     current = _connection_counts.get(key, 0)
     if current >= _MAX_CONNECTIONS_PER_PRINCIPAL:
         return False
-    _connection_counts[key] = current + 1
+    _connection_counts.update({key: current + 1})
     return True
 
 
@@ -120,7 +120,7 @@ def _release_slot(meeting_id: UUID, sub: str) -> None:
     if current <= 1:
         _connection_counts.pop(key, None)
     else:
-        _connection_counts[key] = current - 1
+        _connection_counts.update({key: current - 1})
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
@@ -668,20 +668,21 @@ async def open_meeting_vote(
             "this application TOP already has a decision vote",
             code="agenda_decision_vote_exists",
         )
-    create = await build_meeting_vote(service, meeting, item, payload)
+    built = await build_meeting_vote(service, meeting, item, payload)
     if item.application_id is not None:
         moved_on = (
             source is not None and await assert_reopenable(service.session, source) is not None
         )
-        if source is not None and moved_on and not payload.draft:
+        reopens = moved_on and not payload.draft
+        if reopens and source is not None:
             await reopen_application(service.session, source, actor=principal.sub)
-            moved_on = False
-        if not moved_on:
+        if not moved_on or reopens:
             await assert_application_votable(service, meeting, item.application_id)
-    if source is not None:
-        create = create.model_copy(
-            update={"repeat_of_id": source.id, "attempt": (source.attempt or 1) + 1}
-        )
+    create = (
+        built.model_copy(update={"repeat_of_id": source.id, "attempt": (source.attempt or 1) + 1})
+        if source is not None
+        else built
+    )
     vote = await voting.create_internal(
         item.application_id,
         create,

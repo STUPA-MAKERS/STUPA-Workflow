@@ -36,9 +36,7 @@ def compose_path_key(parent_path: str | None, key: str) -> str:
 
     A top-level node gets `key`. Any other node gets `<parent_path>-<key>`.
     """
-    if parent_path is None:
-        return key
-    return f"{parent_path}{_SEP}{key}"
+    return key if parent_path is None else f"{parent_path}{_SEP}{key}"
 
 
 def is_descendant_path(ancestor_path: str, node_path: str) -> bool:
@@ -72,13 +70,15 @@ def fiscal_year_delete_blocker(
     Returns:
         The blocking reason, or `None` when the delete may proceed.
     """
-    if has_bookings:
-        return "bookings"
-    if has_allocations:
-        return "allocations"
-    if has_applications:
-        return "applications"
-    return None
+    match (has_bookings, has_allocations, has_applications):
+        case (True, _, _):
+            return "bookings"
+        case (_, True, _):
+            return "allocations"
+        case (_, _, True):
+            return "applications"
+        case _:
+            return None
 
 
 def transfer_pair_changed(
@@ -93,9 +93,8 @@ def transfer_pair_changed(
     different transfer, so the caller books a new one instead. A patch that
     repeats the current pair, or that omits both fields, changes nothing.
     """
-    if requested_from is not None and requested_from != current_from:
-        return True
-    return requested_to is not None and requested_to != current_to
+    from_changed = requested_from is not None and requested_from != current_from
+    return from_changed or (requested_to is not None and requested_to != current_to)
 
 
 def as_amount(value: Decimal | None) -> Decimal:
@@ -147,15 +146,18 @@ def rollup_committed(
     Returns:
         The bound sum per node id.
     """
-    leaves = [(path, as_amount(amount)) for path, amount in leaf_amounts]
-    out: dict[object, Decimal] = {}
-    for node_id, node_path in node_paths:
-        total = _ZERO
-        for leaf_path, amount in leaves:
-            if is_self_or_descendant_path(node_path, leaf_path):
-                total += amount
-        out[node_id] = total
-    return out
+    leaves = tuple((path, as_amount(amount)) for path, amount in leaf_amounts)
+    return {
+        node_id: sum(
+            (
+                amount
+                for leaf_path, amount in leaves
+                if is_self_or_descendant_path(node_path, leaf_path)
+            ),
+            _ZERO,
+        )
+        for node_id, node_path in node_paths
+    }
 
 
 def node_available(
@@ -185,10 +187,14 @@ def pick_fiscal_year[T](candidates: Sequence[tuple[T, date, date]], today: date)
     still being settled. Every other case returns `None`, and the caller asks
     for an explicit fiscal year or leaves it open.
     """
-    if len(candidates) == 1:
-        return candidates[0][0]
-    current = [fid for fid, start, end in candidates if start <= today <= end]
-    return current[0] if len(current) == 1 else None
+    current = tuple(fid for fid, start, end in candidates if start <= today <= end)
+    match (candidates, current):
+        case ([(only, _, _)], _):
+            return only
+        case (_, [only]):
+            return only
+        case _:
+            return None
 
 
 def is_valid_fiscal_start(start_month: int, start_day: int) -> bool:
@@ -222,9 +228,11 @@ def fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[dat
 
 def fiscal_year_display(year: int, start_month: int, start_day: int) -> str:
     """Format a fiscal year: `YYYY` for a Jan 1 cutoff, else `YYYY/YY`."""
-    if start_month == 1 and start_day == 1:
-        return str(year)
-    return f"{year}/{(year + 1) % 100:02d}"
+    return (
+        str(year)
+        if start_month == 1 and start_day == 1
+        else f"{year}/{(year + 1) % 100:02d}"
+    )
 
 
 def resolve_decision_gremium[K, G](
@@ -245,15 +253,27 @@ def resolve_decision_gremium[K, G](
         value: the node itself or an ancestor. Both are `None` when no node on the
         path holds a value.
     """
-    current: K | None = node_id
-    seen: set[K] = set()
-    while current is not None and current not in seen and current in parent_of:
-        seen.add(current)
-        own = own_of.get(current)
-        if own is not None:
-            return own, current
-        current = parent_of[current]
-    return None, None
+    return _decision_from(node_id, parent_of, own_of, frozenset())
+
+
+def _decision_from[K, G](
+    node_id: K | None,
+    parent_of: Mapping[K, K | None],
+    own_of: Mapping[K, G | None],
+    seen: frozenset[K],
+) -> tuple[G | None, K | None]:
+    """Walk up from `node_id` to the first node with an own deciding Gremium.
+
+    `seen` holds the nodes already visited, so a cycle in bad data ends the walk.
+    """
+    if node_id is None or node_id in seen or node_id not in parent_of:
+        return None, None
+    own = own_of.get(node_id)
+    return (
+        (own, node_id)
+        if own is not None
+        else _decision_from(parent_of[node_id], parent_of, own_of, seen | {node_id})
+    )
 
 
 #: Field order of a node tuple: id, parent_id, gremium_id, key, path_key, name,
@@ -274,20 +294,16 @@ def scope_forest(forest: list[dict[str, Any]], gremium_ids: set[object]) -> list
     depth first. A hit takes its WHOLE subtree, so a nested match is not
     duplicated. The outer match wins.
     """
-    if not gremium_ids:
-        return []
-    out: list[dict[str, Any]] = []
+    return [hit for root in forest for hit in _scoped(root, gremium_ids)] if gremium_ids else []
 
-    def walk(node: dict[str, Any]) -> None:
-        if node.get("view_gremium_id") in gremium_ids:
-            out.append(node)
-            return
-        for child in node.get("children", []):
-            walk(child)
 
-    for root in forest:
-        walk(root)
-    return out
+def _scoped(node: dict[str, Any], gremium_ids: set[object]) -> tuple[dict[str, Any], ...]:
+    """Return the outermost nodes of the subtree of `node` that a Gremium may see."""
+    return (
+        (node,)
+        if node.get("view_gremium_id") in gremium_ids
+        else tuple(hit for child in node.get("children", []) for hit in _scoped(child, gremium_ids))
+    )
 
 
 def _views_for_node(
@@ -303,31 +319,35 @@ def _views_for_node(
     `committed` is `bound + expended`, the total consumption. It stays for
     backward compatibility.
     """
-    fys = {fy for (nid, fy) in alloc_by_node if nid == node_id}
-    fys |= {fy for (nid, fy) in bound_by_node if nid == node_id}
-    fys |= {fy for (nid, fy) in requested_by_node if nid == node_id}
-    fys |= {fy for (nid, fy) in expended_by_node if nid == node_id}
-    fys |= {fy for (nid, fy) in income_by_node if nid == node_id}
-    views: list[dict[str, Any]] = []
-    for fy in sorted(fys, key=str):
-        allocated = alloc_by_node.get((node_id, fy), _ZERO)
-        bound = bound_by_node.get((node_id, fy), _ZERO)
-        requested = requested_by_node.get((node_id, fy), _ZERO)
-        expended = expended_by_node.get((node_id, fy), _ZERO)
-        income = income_by_node.get((node_id, fy), _ZERO)
-        views.append(
-            {
-                "fiscal_year_id": fy,
-                "allocated": allocated,
-                "bound": bound,
-                "expended": expended,
-                "income": income,
-                "committed": bound + expended,
-                "requested": requested,
-                "available": node_available(allocated, bound, expended, income),
-            }
-        )
-    return views
+    tables = (alloc_by_node, bound_by_node, requested_by_node, expended_by_node, income_by_node)
+    fys = {fy for table in tables for (nid, fy) in table if nid == node_id}
+    return [_view(node_id, fy, *tables) for fy in sorted(fys, key=str)]
+
+
+def _view(
+    node_id: object,
+    fy: object,
+    alloc_by_node: dict[tuple[object, object], Decimal],
+    bound_by_node: dict[tuple[object, object], Decimal],
+    requested_by_node: dict[tuple[object, object], Decimal],
+    expended_by_node: dict[tuple[object, object], Decimal],
+    income_by_node: dict[tuple[object, object], Decimal],
+) -> dict[str, Any]:
+    """Build the `AllocationView` dict of a node in one fiscal year."""
+    allocated = alloc_by_node.get((node_id, fy), _ZERO)
+    bound = bound_by_node.get((node_id, fy), _ZERO)
+    expended = expended_by_node.get((node_id, fy), _ZERO)
+    income = income_by_node.get((node_id, fy), _ZERO)
+    return {
+        "fiscal_year_id": fy,
+        "allocated": allocated,
+        "bound": bound,
+        "expended": expended,
+        "income": income,
+        "committed": bound + expended,
+        "requested": requested_by_node.get((node_id, fy), _ZERO),
+        "available": node_available(allocated, bound, expended, income),
+    }
 
 
 def _rollup_by_fy(
@@ -335,15 +355,16 @@ def _rollup_by_fy(
     rows: Sequence[tuple[object, str, Decimal | None]],
 ) -> dict[tuple[object, object], Decimal]:
     """Roll `(fy, leaf_path, amount)` rows up per fiscal year over the path prefix."""
-    fy_leaves: dict[object, list[tuple[str, Decimal | None]]] = {}
-    for fy_id, leaf_path, amount in rows:
-        fy_leaves.setdefault(fy_id, []).append((leaf_path, amount))
-    out: dict[tuple[object, object], Decimal] = {}
-    for fy_id, leaves in fy_leaves.items():
-        for nid, total in rollup_committed(node_paths, leaves).items():
-            if total != _ZERO:
-                out[(nid, fy_id)] = total
-    return out
+    fy_leaves = {
+        fy_id: tuple((leaf_path, amount) for row_fy, leaf_path, amount in rows if row_fy == fy_id)
+        for fy_id in dict.fromkeys(fy_id for fy_id, _, _ in rows)
+    }
+    return {
+        (nid, fy_id): total
+        for fy_id, leaves in fy_leaves.items()
+        for nid, total in rollup_committed(node_paths, leaves).items()
+        if total != _ZERO
+    }
 
 
 def build_forest(
@@ -378,9 +399,8 @@ def build_forest(
         (bid, fy): as_amount(value) for bid, fy, value in allocations
     }
 
-    children_of: dict[object | None, list[NodeTuple]] = {}
-    for n in nodes:
-        children_of.setdefault(n[1], []).append(n)
+    parents = dict.fromkeys(n[1] for n in nodes)
+    children_of = {parent: [n for n in nodes if n[1] == parent] for parent in parents}
     parent_of = {n[0]: n[1] for n in nodes}
     decision_of = {n[0]: n[15] for n in nodes}
 

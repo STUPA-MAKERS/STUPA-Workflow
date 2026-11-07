@@ -57,10 +57,9 @@ def resolve_i18n(
     """
     if not value:
         return None
-    for code in (*fallback_chain(lang), default_lang):
-        if code in value:
-            return value[code]
-    return next(iter(value.values()), None)
+    chain = (*fallback_chain(lang), default_lang)
+    code = next((c for c in chain if c in value), None)
+    return value[code] if code is not None else next(iter(value.values()), None)
 
 
 def pick_lang[T](table: Mapping[str, T], lang: str) -> T:
@@ -70,7 +69,4 @@ def pick_lang[T](table: Mapping[str, T], lang: str) -> T:
     and English, so an extra language gets the English entry. A table without the entry
     of the chain gives the German one, which every table has.
     """
-    for code in fallback_chain(lang):
-        if code in table:
-            return table[code]
-    return table[DEFAULT_LANG]
+    return table[next((c for c in fallback_chain(lang) if c in table), DEFAULT_LANG)]

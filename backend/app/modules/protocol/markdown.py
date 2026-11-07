@@ -30,10 +30,15 @@ frontmatter key.
 
 from __future__ import annotations
 
+import operator
 import re
-from dataclasses import dataclass, field
+from collections import Counter
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import date as _date
 from datetime import time as _time
+from functools import partial, reduce
+from itertools import accumulate
 
 from app.modules.media.refs import is_image_path
 
@@ -150,6 +155,12 @@ def _neutralize_unsafe_image(match: re.Match[str]) -> str:
     return f"*[{_md_escape(alt)} (Bild entfernt)]*"
 
 
+def _strip_until_clean(markdown: str, rounds: int) -> str:
+    """Strip again while marko still finds an eval trigger, at most `rounds` more times."""
+    clean = rounds == 0 or not _has_eval_refdef(markdown)
+    return markdown if clean else _strip_until_clean(_strip_eval_refdefs(markdown), rounds - 1)
+
+
 def sanitize_user_markdown(markdown: str) -> str:
     r"""Strip the former pytex `eval` escapes and path-traversal images from user Markdown.
 
@@ -168,23 +179,16 @@ def sanitize_user_markdown(markdown: str) -> str:
     The pytex marker `\iffalse{pytex(...)}\fi` holds the evaluated expression. An editor
     body never needs it, and the pattern also matches a multi-line marker.
     """
-    cleaned = _PYTEX_IFFALSE_RE.sub("", markdown)
-    cleaned = _strip_eval_refdefs(cleaned)
-    for _ in range(3):
-        if not _has_eval_refdef(cleaned):
-            break
-        cleaned = _strip_eval_refdefs(cleaned)
-    return _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, cleaned)
+    stripped = _strip_eval_refdefs(_PYTEX_IFFALSE_RE.sub("", markdown))
+    return _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, _strip_until_clean(stripped, 3))
 
 #: Gremium `cd_variant` values that select a protocol render variant.
-_PROTOCOL_VARIANTS = {"stupa", "asta"}
+_PROTOCOL_VARIANTS = frozenset({"stupa", "asta"})
 
 
 def protocol_variant_for(cd_variant: str | None) -> str | None:
     """Map `cd_variant` to the render variant `protocol-<cd>`, or `None` for auto."""
-    if cd_variant in _PROTOCOL_VARIANTS:
-        return f"protocol-{cd_variant}"
-    return None
+    return f"protocol-{cd_variant}" if cd_variant in _PROTOCOL_VARIANTS else None
 
 
 @dataclass(slots=True, frozen=True)
@@ -203,7 +207,7 @@ class KeeperLine:
     to_top: int | None = None
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ProtocolDoc:
     """All header data of a protocol, filled from the database by the service.
 
@@ -231,46 +235,63 @@ class ProtocolDoc:
     start_time: _time | None = None
     end_time: _time | None = None
     protokollant: str | None = None
-    keepers: list[KeeperLine] = field(default_factory=list)
-    present: list[str] = field(default_factory=list)
-    excused: list[str] = field(default_factory=list)
-    absent: list[str] = field(default_factory=list)
+    keepers: Sequence[KeeperLine] = ()
+    present: Sequence[str] = ()
+    excused: Sequence[str] = ()
+    absent: Sequence[str] = ()
     started_at: str | None = None
-    datalines: list[str] = field(default_factory=list)
+    datalines: Sequence[str] = ()
     quorate: bool | None = None
 
 
 #: Signature block of the renderer (`unterschriften`). The frontmatter
 #: supplies the name of the secretary. The board line stays a blank
 #: line for a hand signature.
-_SIGNATURES = ["Schriftführung", "Vorstand"]
+_SIGNATURES = ("Schriftführung", "Vorstand")
 
 
-def _yaml_list(key: str, items: list[str]) -> list[str]:
+def _yaml_list(key: str, items: Sequence[str]) -> list[str]:
     """Build a YAML block list with quoted values, or nothing for an empty list."""
-    if not items:
-        return []
-    return [f"{key}:", *(f"  - {_yaml_scalar(i)}" for i in items)]
+    return [f"{key}:", *(f"  - {_yaml_scalar(i)}" for i in items)] if items else []
 
 
-def _yaml_keepers(keepers: list[KeeperLine]) -> list[str]:
+def _yaml_entry(key: str, value: str | None) -> list[str]:
+    """Build one `key: "value"` line, or nothing for an empty or absent value."""
+    return [f"{key}: {_yaml_scalar(value)}"] if value else []
+
+
+def _yaml_keeper(keeper: KeeperLine) -> list[str]:
+    """Build the lines of one keeper mapping: the set fields, the first one with the dash."""
+    fields = (
+        ("name", keeper.name),
+        ("from", keeper.from_time),
+        ("to", keeper.to_time),
+        ("from_top", None if keeper.from_top is None else str(keeper.from_top)),
+        ("to_top", None if keeper.to_top is None else str(keeper.to_top)),
+    )
+    present = [(k, v) for k, v in fields if v]
+    return [
+        f"{'  - ' if n == 0 else '    '}{key}: {_yaml_scalar(value)}"
+        for n, (key, value) in enumerate(present)
+    ]
+
+
+def _yaml_keepers(keepers: Sequence[KeeperLine]) -> list[str]:
     """Build the `keepers` block list of mappings, with quoted values only."""
-    if not keepers:
-        return []
-    lines = ["keepers:"]
-    for keeper in keepers:
-        fields = (
-            ("name", keeper.name),
-            ("from", keeper.from_time),
-            ("to", keeper.to_time),
-            ("from_top", None if keeper.from_top is None else str(keeper.from_top)),
-            ("to_top", None if keeper.to_top is None else str(keeper.to_top)),
-        )
-        present = [(k, v) for k, v in fields if v]
-        for n, (key, value) in enumerate(present):
-            lead = "  - " if n == 0 else "    "
-            lines.append(f"{lead}{key}: {_yaml_scalar(value)}")
-    return lines
+    lines = [line for keeper in keepers for line in _yaml_keeper(keeper)]
+    return ["keepers:", *lines] if keepers else []
+
+
+def _hhmm(value: _time | None) -> str | None:
+    """Format a time as `HH:MM`, or `None` for no time."""
+    return None if value is None else value.strftime("%H:%M")
+
+
+def _datum(doc: ProtocolDoc) -> str | None:
+    """Return the `datum` value: the date, with the start time when it is known."""
+    day = None if doc.date is None else doc.date.isoformat()
+    start = _hhmm(doc.start_time)
+    return day if day is None or start is None else f"{day} {start}"
 
 
 def _frontmatter(doc: ProtocolDoc) -> list[str]:
@@ -281,36 +302,28 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
     line. The quorum is a title-page data line. The renderer sets one signature line per
     entry of `unterschriften`.
     """
-    lines = ["---", f"title: {_yaml_scalar(doc.title)}", "typ: protokoll"]
-    if doc.gremium_name:
-        lines.append(f"gremium: {_yaml_scalar(doc.gremium_name)}")
-    if doc.cd_variant:
-        lines.append(f"cd: {_yaml_scalar(doc.cd_variant)}")
-    if doc.date is not None:
-        datum = doc.date.isoformat()
-        if doc.start_time is not None:
-            datum = f"{datum} {doc.start_time.strftime('%H:%M')}"
-        lines.append(f"datum: {_yaml_scalar(datum)}")
-        lines.append(f"date: {_yaml_scalar(doc.date.isoformat())}")
-    if doc.start_time is not None:
-        lines.append(f"beginn: {_yaml_scalar(doc.start_time.strftime('%H:%M'))}")
-    if doc.end_time is not None:
-        lines.append(f"ende: {_yaml_scalar(doc.end_time.strftime('%H:%M'))}")
-    if doc.started_at:
-        lines.append(f"started_at: {_yaml_scalar(doc.started_at)}")
-    if doc.protokollant:
-        lines.append(f"protokoll: {_yaml_scalar(doc.protokollant)}")
-    lines += _yaml_keepers(doc.keepers)
-    lines += _yaml_list("anwesend", doc.present)
-    lines += _yaml_list("entschuldigt", doc.excused)
-    lines += _yaml_list("abwesend", doc.absent)
-    if doc.quorate is not None:
-        quorate = "Gegeben" if doc.quorate else "Nicht gegeben"
-        lines.append(f"beschlussfaehigkeit: {_yaml_scalar(quorate)}")
-    lines += _yaml_list("datalines", doc.datalines)
-    lines += _yaml_list("unterschriften", _SIGNATURES)
-    lines.append("---")
-    return lines
+    quorate = None if doc.quorate is None else ("Gegeben" if doc.quorate else "Nicht gegeben")
+    return [
+        "---",
+        f"title: {_yaml_scalar(doc.title)}",
+        "typ: protokoll",
+        *_yaml_entry("gremium", doc.gremium_name),
+        *_yaml_entry("cd", doc.cd_variant),
+        *_yaml_entry("datum", _datum(doc)),
+        *_yaml_entry("date", None if doc.date is None else doc.date.isoformat()),
+        *_yaml_entry("beginn", _hhmm(doc.start_time)),
+        *_yaml_entry("ende", _hhmm(doc.end_time)),
+        *_yaml_entry("started_at", doc.started_at),
+        *_yaml_entry("protokoll", doc.protokollant),
+        *_yaml_keepers(doc.keepers),
+        *_yaml_list("anwesend", doc.present),
+        *_yaml_list("entschuldigt", doc.excused),
+        *_yaml_list("abwesend", doc.absent),
+        *_yaml_entry("beschlussfaehigkeit", quorate),
+        *_yaml_list("datalines", doc.datalines),
+        *_yaml_list("unterschriften", _SIGNATURES),
+        "---",
+    ]
 
 
 def build_protocol_document(doc: ProtocolDoc) -> str:
@@ -322,10 +335,7 @@ def build_protocol_document(doc: ProtocolDoc) -> str:
     scalars stay YAML-quoted.
     """
     body = sanitize_user_markdown(doc.markdown).strip("\n")
-    out = [*_frontmatter(doc), ""]
-    if body:
-        out.append(body)
-    return "\n".join(out).rstrip() + "\n"
+    return "\n".join([*_frontmatter(doc), "", *([body] if body else [])]).rstrip() + "\n"
 
 
 def guest_vote_note(
@@ -336,20 +346,19 @@ def guest_vote_note(
     Such a vote has no quorum; the majority of the cast ballots decides. The line
     names the attendance when the close fixed it.
     """
-    parts: list[str] = []
-    if present_members is not None and present_guests is not None:
-        parts.append(f"{present_members} Mitglieder + {present_guests} Gäste anwesend")
-    parts.append(f"Abgegeben {cast}")
-    parts.append("Mehrheit der abgegebenen Stimmen")
-    return " · ".join(parts)
+    known = present_members is not None and present_guests is not None
+    attendance = f"{present_members} Mitglieder + {present_guests} Gäste anwesend"
+    return " · ".join(
+        [*([attendance] if known else []), f"Abgegeben {cast}", "Mehrheit der abgegebenen Stimmen"]
+    )
 
 
 def build_vote_snippet(
     title: str,
-    counts: dict[str, int] | None,
+    counts: Mapping[str, int] | None,
     question: str | None = None,
     note: str | None = None,
-    conditions: list[str] | None = None,
+    conditions: Sequence[str] | None = None,
 ) -> str:
     """Render a vote as a protocol callout (`> [!abstimmung]`).
 
@@ -366,15 +375,18 @@ def build_vote_snippet(
     note below the tally box.
     """
     head = question.strip() if question and question.strip() else title
-    lines = [f"> [!abstimmung] **{_md_escape(head)}**"]
-    if counts:
-        tally = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in counts.items())
-        lines.append(f"> {tally}")
-    for index, condition in enumerate(conditions or [], start=1):
-        lines.append(f"> Auflage {index}: {_md_escape(condition)}")
-    if note:
-        lines.append(f"> {_md_escape(note)}")
-    return "\n".join(lines)
+    tally = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in (counts or {}).items())
+    return "\n".join(
+        [
+            f"> [!abstimmung] **{_md_escape(head)}**",
+            *([f"> {tally}"] if counts else []),
+            *(
+                f"> Auflage {index}: {_md_escape(condition)}"
+                for index, condition in enumerate(conditions or (), start=1)
+            ),
+            *([f"> {_md_escape(note)}"] if note else []),
+        ]
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -393,18 +405,56 @@ class ElectionSnippet:
     question: str
     seats: int
     round: int = 1
-    candidates: list[ElectionLine] = field(default_factory=list)
+    candidates: Sequence[ElectionLine] = ()
     abstentions: int = 0
     #: The single-candidate ballot (Ja/Nein/Enthaltung).
     yes: int | None = None
     no: int | None = None
     by_lot: bool = False
     lot_pending: bool = False
-    runoff_names: list[str] = field(default_factory=list)
+    runoff_names: Sequence[str] = ()
     runoff_seats: int = 0
     closed: bool = True
     #: The number of a repeat ("erneut abstimmen"); 1 for an election that repeats nothing.
     attempt: int = 1
+
+
+def _election_head(view: ElectionSnippet) -> str:
+    """Return the escaped question, with the number of the ballot from the second one on."""
+    number = view.round + view.attempt - 1
+    head = _md_escape(view.question)
+    return f"{head} ({number}. Wahlgang)" if number > 1 else head
+
+
+def _election_ballot(view: ElectionSnippet) -> list[str]:
+    """Return the vote lines of the internal snippet of a closed election."""
+    match (view.yes, view.no):
+        case (int() as yes, int() as no):
+            name = view.candidates[0].name if view.candidates else ""
+            return [
+                f"> Kandidatur: {_md_escape(name)}",
+                f"> ja: {yes}, nein: {no}, enthaltung: {view.abstentions}",
+            ]
+        case _:
+            votes = " · ".join(f"{_md_escape(c.name)}: {c.votes}" for c in view.candidates)
+            return [f"> {votes} · Enthaltungen: {view.abstentions}"]
+
+
+def _election_outcome(view: ElectionSnippet, *, public: bool) -> list[str]:
+    """Return the outcome lines of a closed election: elected, lot and runoff notes."""
+    elected = [c.name for c in view.candidates if c.elected]
+    names = ", ".join(_md_escape(n) for n in elected) if elected else "niemand"
+    others = len(view.candidates) - len(elected)
+    who = ", ".join(_md_escape(n) for n in view.runoff_names)
+    target = who if not public else f"{len(view.runoff_names)} Kandidierende"
+    runoff = f"> Stichwahl ({view.round + 1}. Wahlgang) um {view.runoff_seats} Posten: {target}"
+    return [
+        f"> Gewählt: {names}",
+        *([f"> {others} weitere Kandidierende"] if public and others > 0 else []),
+        *(["> Durch Los entschieden."] if view.by_lot else []),
+        *(["> Gleichstand: das Los steht aus."] if view.lot_pending else []),
+        *([runoff] if view.runoff_seats else []),
+    ]
 
 
 def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> str:
@@ -422,42 +472,17 @@ def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> st
     (`attempt`), but its kind line names no runoff. Each round then has its own head line,
     which `replace_vote_blocks` and `votes_in_body` match on.
     """
-    head = _md_escape(view.question)
-    number = view.round + view.attempt - 1
-    if number > 1:
-        head += f" ({number}. Wahlgang)"
-    lines = [f"> [!abstimmung] **{head}**"]
-    meta = f"Wahl · {view.seats} Posten"
-    if view.round > 1:
-        meta += f" · Stichwahl ({view.round}. Wahlgang)"
-    lines.append(f"> {meta}")
-    elected = [c.name for c in view.candidates if c.elected]
-    if not public and view.closed:
-        if view.yes is not None and view.no is not None:
-            name = view.candidates[0].name if view.candidates else ""
-            lines.append(f"> Kandidatur: {_md_escape(name)}")
-            lines.append(f"> ja: {view.yes}, nein: {view.no}, enthaltung: {view.abstentions}")
-        else:
-            votes = " · ".join(f"{_md_escape(c.name)}: {c.votes}" for c in view.candidates)
-            lines.append(f"> {votes} · Enthaltungen: {view.abstentions}")
-    if view.closed:
-        names = ", ".join(_md_escape(n) for n in elected) if elected else "niemand"
-        lines.append(f"> Gewählt: {names}")
-        if public:
-            others = len(view.candidates) - len(elected)
-            if others > 0:
-                lines.append(f"> {others} weitere Kandidierende")
-        if view.by_lot:
-            lines.append("> Durch Los entschieden.")
-        if view.lot_pending:
-            lines.append("> Gleichstand: das Los steht aus.")
-        if view.runoff_seats:
-            who = ", ".join(_md_escape(n) for n in view.runoff_names)
-            target = who if not public else f"{len(view.runoff_names)} Kandidierende"
-            lines.append(
-                f"> Stichwahl ({view.round + 1}. Wahlgang) um {view.runoff_seats} Posten: {target}"
-            )
-    return "\n".join(lines)
+    runoff = f" · Stichwahl ({view.round}. Wahlgang)" if view.round > 1 else ""
+    ballot = _election_ballot(view) if view.closed and not public else []
+    outcome = _election_outcome(view, public=public) if view.closed else []
+    return "\n".join(
+        [
+            f"> [!abstimmung] **{_election_head(view)}**",
+            f"> Wahl · {view.seats} Posten{runoff}",
+            *ballot,
+            *outcome,
+        ]
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -481,12 +506,30 @@ class PollSnippet:
     question: str
     #: "Umfrage · Einzelwahl", "Umfrage · Mehrfachwahl, höchstens 2", "Terminumfrage".
     meta: str
-    lines: list[PollLine] = field(default_factory=list)
+    lines: Sequence[PollLine] = ()
     #: None for a date poll: it has no abstention.
     abstentions: int | None = 0
     ballots: int = 0
     date: bool = False
     closed: bool = True
+
+
+def _poll_result(view: PollSnippet) -> list[str]:
+    """Return the result lines of a closed poll: the votes per option, the top and the answers."""
+    top = [_md_escape(line.label) for line in view.lines if line.top]
+    lead = "Bester Termin" if view.date else "Meiste Stimmen"
+    answers = "Antwort" if view.ballots == 1 else "Antworten"
+    return [
+        *(
+            f"> {_md_escape(line.label)}: "
+            + (f"{line.count} (+{line.maybe})" if line.maybe is not None else str(line.count))
+            for line in view.lines
+        ),
+        *([f"> Enthaltungen: {view.abstentions}"] if view.abstentions is not None else []),
+        *(["> Zahl = Ja, (+n) = Vielleicht"] if view.date else []),
+        *([f"> {lead}: {', '.join(top)}"] if top else []),
+        f"> {view.ballots} {answers}",
+    ]
 
 
 def build_poll_snippet(view: PollSnippet) -> str:
@@ -499,25 +542,85 @@ def build_poll_snippet(view: PollSnippet) -> str:
     Ja/Nein/Enthaltung line that the renderer turns into a tally box. A poll lists
     counts only, never a name, in both variants.
     """
-    lines = [f"> [!abstimmung] **{_md_escape(view.question)}**", f"> {view.meta}"]
-    if not view.closed:
-        return "\n".join(lines)
-    for line in view.lines:
-        count = f"{line.count} (+{line.maybe})" if line.maybe is not None else str(line.count)
-        lines.append(f"> {_md_escape(line.label)}: {count}")
-    if view.abstentions is not None:
-        lines.append(f"> Enthaltungen: {view.abstentions}")
-    if view.date:
-        lines.append("> Zahl = Ja, (+n) = Vielleicht")
-    top = [_md_escape(line.label) for line in view.lines if line.top]
-    if top:
-        lead = "Bester Termin" if view.date else "Meiste Stimmen"
-        lines.append(f"> {lead}: {', '.join(top)}")
-    lines.append(f"> {view.ballots} {'Antwort' if view.ballots == 1 else 'Antworten'}")
-    return "\n".join(lines)
+    result = _poll_result(view) if view.closed else []
+    return "\n".join(
+        [f"> [!abstimmung] **{_md_escape(view.question)}**", f"> {view.meta}", *result]
+    )
 
 
-def replace_vote_blocks(body: str, pairs: list[tuple[str, str]]) -> str:
+def _is_quote(line: str) -> bool:
+    """Return True for a blockquote line."""
+    return line.lstrip().startswith(">")
+
+
+def _continues(line: str) -> bool:
+    """Return True for a `>` line that continues a callout, so no `> [!` marker line."""
+    return _is_quote(line) and not line.lstrip().startswith("> [!")
+
+
+def _block_end(lines: Sequence[str], start: int) -> int:
+    """Return the index after the callout that starts at `start`."""
+    return next((j for j in range(start + 1, len(lines)) if not _continues(lines[j])), len(lines))
+
+
+def _quote_blocks(lines: Sequence[str]) -> tuple[tuple[int, int], ...]:
+    """Return the (start, stop) range of every `>` block, split at each `> [!` marker line.
+
+    A `>` line starts a block unless it continues the block of the line above it.
+    """
+    starts = (
+        k
+        for k, line in enumerate(lines)
+        if _is_quote(line) and not (k > 0 and _is_quote(lines[k - 1]) and _continues(line))
+    )
+    return tuple((start, _block_end(lines, start)) for start in starts)
+
+
+def _stripped_lines(text: str) -> tuple[str, ...]:
+    """Split a text into its lines without the outer whitespace."""
+    return tuple(line.strip() for line in text.split("\n"))
+
+
+def _whole(lines: tuple[str, ...]) -> object:
+    """Match key of a block on its whole text."""
+    return lines
+
+
+def _head(lines: tuple[str, ...]) -> object:
+    """Match key of a block on its head line."""
+    return lines[0]
+
+
+def _claim(
+    key: Callable[[tuple[str, ...]], object],
+    texts: Sequence[tuple[str, ...]],
+    assigned: Mapping[int, int],
+    item: tuple[int, str],
+) -> Mapping[int, int]:
+    """Give the vote `item` the first free block whose `key` equals the key of its snippet.
+
+    `assigned` maps a block index to a vote index; a vote without a free block changes
+    nothing.
+    """
+    n, snippet = item
+    want = key(_stripped_lines(snippet))
+    free = (k for k, text in enumerate(texts) if k not in assigned and key(text) == want)
+    k = next(free, None)
+    return assigned if k is None else {**assigned, k: n}
+
+
+def _assign_blocks(
+    texts: Sequence[tuple[str, ...]], snippets: Sequence[str]
+) -> Mapping[int, int]:
+    """Assign each block to at most one vote: the exact text first, then the head line."""
+    empty: Mapping[int, int] = {}
+    exact = reduce(partial(_claim, _whole, texts), enumerate(snippets), empty)
+    done = frozenset(exact.values())
+    pending = ((n, snippet) for n, snippet in enumerate(snippets) if n not in done)
+    return reduce(partial(_claim, _head, texts), pending, exact)
+
+
+def replace_vote_blocks(body: str, pairs: Sequence[tuple[str, str]]) -> str:
     """Replace the callout of each vote in `body` with its other form.
 
     Each pair is (the snippet of the text, the replacement). The public protocol uses
@@ -529,53 +632,34 @@ def replace_vote_blocks(body: str, pairs: list[tuple[str, str]]) -> str:
     ends before the next `> [!` marker line. A vote without a block changes nothing.
     """
     lines = body.split("\n")
-    blocks: list[tuple[int, int]] = []
-    i = 0
-    while i < len(lines):
-        if lines[i].lstrip().startswith(">"):
-            j = i + 1
-            while (
-                j < len(lines)
-                and lines[j].lstrip().startswith(">")
-                and not lines[j].lstrip().startswith("> [!")
-            ):
-                j += 1
-            blocks.append((i, j))
-            i = j
-            continue
-        i += 1
-
-    def text_of(block: tuple[int, int]) -> list[str]:
-        return [line.strip() for line in lines[block[0] : block[1]]]
-
-    assigned: dict[int, str] = {}
-    done = [False] * len(pairs)
-    for n, (match, _) in enumerate(pairs):
-        want = [line.strip() for line in match.split("\n")]
-        for k, block in enumerate(blocks):
-            if k not in assigned and text_of(block) == want:
-                assigned[k] = pairs[n][1]
-                done[n] = True
-                break
-    for n, (match, _) in enumerate(pairs):
-        if done[n]:
-            continue
-        head = match.split("\n", 1)[0].strip()
-        for k, block in enumerate(blocks):
-            if k not in assigned and text_of(block)[0] == head:
-                assigned[k] = pairs[n][1]
-                break
-    out: list[str] = []
-    i = 0
-    for k, (start, stop) in enumerate(blocks):
-        out.extend(lines[i:start])
-        out.extend(assigned[k].split("\n") if k in assigned else lines[start:stop])
-        i = stop
-    out.extend(lines[i:])
-    return "\n".join(out)
+    blocks = _quote_blocks(lines)
+    texts = tuple(tuple(line.strip() for line in lines[start:stop]) for start, stop in blocks)
+    assigned = _assign_blocks(texts, [match for match, _ in pairs])
+    replaced = {blocks[k][0]: pairs[n][1].split("\n") for k, n in assigned.items()}
+    hidden = frozenset(i for k in assigned for i in range(blocks[k][0] + 1, blocks[k][1]))
+    return "\n".join(
+        out for i, line in enumerate(lines) if i not in hidden for out in replaced.get(i, [line])
+    )
 
 
-def mark_vote_blocks(body: str, marks: list[tuple[str, str]]) -> str:
+def _mark_from(lines: tuple[str, ...], head: str, marked: str, start: int) -> tuple[str, ...]:
+    """Add `marked` below the first block from `start` on that starts with `head` and lacks it."""
+    match next((k for k in range(start, len(lines)) if lines[k].strip() == head), None):
+        case None:
+            return lines
+        case i:
+            j = _block_end(lines, i)
+            done = any(line.strip() == marked for line in lines[i:j])
+            return _mark_from(lines, head, marked, j) if done else (*lines[:j], marked, *lines[j:])
+
+
+def _mark_one(lines: tuple[str, ...], pair: tuple[str, str]) -> tuple[str, ...]:
+    """Add the mark of one (snippet, line) pair to the block of its vote."""
+    snippet, mark = pair
+    return _mark_from(lines, snippet.split("\n", 1)[0].strip(), f"> {_md_escape(mark)}", 0)
+
+
+def mark_vote_blocks(body: str, marks: Sequence[tuple[str, str]]) -> str:
     """Add a mark line to the callout of each vote in `body`.
 
     Each pair is (the snippet of the vote, the line). The block of a vote is the
@@ -584,31 +668,55 @@ def mark_vote_blocks(body: str, marks: list[tuple[str, str]]) -> str:
     changed inside the callout stays. A block that already holds the line stays as it
     is, and a vote without a block changes nothing.
     """
-    lines = body.split("\n")
-    for snippet, mark in marks:
-        head = snippet.split("\n", 1)[0].strip()
-        marked = f"> {_md_escape(mark)}"
-        i = 0
-        while i < len(lines):
-            if lines[i].strip() != head:
-                i += 1
-                continue
-            j = i + 1
-            while (
-                j < len(lines)
-                and lines[j].lstrip().startswith(">")
-                and not lines[j].lstrip().startswith("> [!")
-            ):
-                j += 1
-            if any(line.strip() == marked for line in lines[i:j]):
-                i = j
-                continue
-            lines.insert(j, marked)
-            break
-    return "\n".join(lines)
+    return "\n".join(reduce(_mark_one, marks, tuple(body.split("\n"))))
 
 
-def votes_in_body(body: str, snippets: list[str]) -> list[bool]:
+def _head_line(snippet: str) -> str:
+    """Return the head line of a snippet without the outer whitespace."""
+    return snippet.split("\n", 1)[0].strip()
+
+
+@dataclass(frozen=True, slots=True)
+class _Found:
+    """The state of the match in `votes_in_body`: the unclaimed lines and the result so far.
+
+    Attributes:
+        heads: How many times each stripped line of the body is still unclaimed.
+        exact: How many times each snippet text is still unclaimed in the body.
+        found: One flag per snippet visited so far.
+    """
+
+    heads: Mapping[str, int]
+    exact: Mapping[str, int]
+    found: tuple[bool, ...] = ()
+
+
+def _less(counts: Mapping[str, int], key: str) -> Mapping[str, int]:
+    """Return `counts` with one less of `key`."""
+    return {**counts, key: counts[key] - 1}
+
+
+def _found_exact(state: _Found, snippet: str) -> _Found:
+    """Claim the text of `snippet` and its head line when both are still in the body."""
+    head = _head_line(snippet)
+    hit = state.exact[snippet] > 0 and state.heads.get(head, 0) > 0
+    return (
+        _Found(_less(state.heads, head), _less(state.exact, snippet), (*state.found, True))
+        if hit
+        else replace(state, found=(*state.found, False))
+    )
+
+
+def _found_head(state: _Found, item: tuple[str, bool]) -> _Found:
+    """Claim the head line of a snippet that has no exact match yet, when one is left."""
+    snippet, done = item
+    head = _head_line(snippet)
+    hit = not done and state.heads.get(head, 0) > 0
+    heads = _less(state.heads, head) if hit else state.heads
+    return replace(state, heads=heads, found=(*state.found, done or hit))
+
+
+def votes_in_body(body: str, snippets: Sequence[str]) -> list[bool]:
     """Report for each snippet whether its vote is in the body.
 
     Two votes can share a question and then share the head line, so a head line
@@ -616,30 +724,26 @@ def votes_in_body(body: str, snippets: list[str]) -> list[bool]:
     that vote first. The other head lines go to the remaining votes in the given
     order (oldest first). The editor matches the same way (`votesInText`).
     """
-    heads: dict[str, int] = {}
-    for line in body.split("\n"):
-        key = line.strip()
-        heads[key] = heads.get(key, 0) + 1
-    exact: dict[str, int] = {}
-    found = [False] * len(snippets)
+    heads = Counter(line.strip() for line in body.split("\n"))
+    exact = {snippet: body.count(snippet) for snippet in snippets}
+    first = reduce(_found_exact, snippets, _Found(heads=heads, exact=exact))
+    second = reduce(
+        _found_head, zip(snippets, first.found, strict=True), _Found(first.heads, first.exact)
+    )
+    return list(second.found)
 
-    def head_of(snippet: str) -> str:
-        return snippet.split("\n", 1)[0].strip()
 
-    for i, snippet in enumerate(snippets):
-        if snippet not in exact:
-            exact[snippet] = body.count(snippet)
-        head = head_of(snippet)
-        if exact[snippet] > 0 and heads.get(head, 0) > 0:
-            exact[snippet] -= 1
-            heads[head] -= 1
-            found[i] = True
-    for i, snippet in enumerate(snippets):
-        head = head_of(snippet)
-        if not found[i] and heads.get(head, 0) > 0:
-            heads[head] -= 1
-            found[i] = True
-    return found
+def _demoted(line: str) -> str:
+    """Demote an ATX heading of level 1 to 5 by one level; any other line stays."""
+    stripped = line.lstrip()
+    hashes = len(stripped) - len(stripped.lstrip("#"))
+    heading = 1 <= hashes <= 5 and stripped[hashes : hashes + 1] in (" ", "\t")
+    return line.replace("#", "##", 1) if heading else line
+
+
+def _is_fence(line: str) -> bool:
+    """Return True for a line that opens or closes a code fence."""
+    return line.lstrip().startswith(("```", "~~~"))
 
 
 def demote_headings(markdown: str) -> str:
@@ -650,40 +754,32 @@ def demote_headings(markdown: str) -> str:
     body as a separate agenda item. Code fences stay untouched. Level 6 stays
     at level 6.
     """
-    out: list[str] = []
-    in_fence = False
-    for line in markdown.split("\n"):
-        stripped = line.lstrip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_fence = not in_fence
-        elif not in_fence and stripped.startswith("#"):
-            hashes = len(stripped) - len(stripped.lstrip("#"))
-            if 1 <= hashes <= 5 and stripped[hashes : hashes + 1] in (" ", "\t"):
-                out.append(line.replace("#", "##", 1))
-                continue
-        out.append(line)
-    return "\n".join(out)
+    lines = markdown.split("\n")
+    fences = tuple(_is_fence(line) for line in lines)
+    inside = accumulate(fences, operator.xor, initial=False)
+    return "\n".join(
+        line if fence or fenced else _demoted(line)
+        for line, fence, fenced in zip(lines, fences, inside, strict=False)
+    )
+
+
+_YAML_ESCAPES: Mapping[str, str] = {
+    "\\": "\\\\",
+    '"': '\\"',
+    "\n": "\\n",
+    "\r": "\\r",
+    "\t": "\\t",
+}
+
+
+def _yaml_char(ch: str) -> str:
+    """Escape one character of a double-quoted YAML scalar."""
+    return _YAML_ESCAPES.get(ch, f"\\x{ord(ch):02x}" if ord(ch) < 0x20 else ch)
 
 
 def _yaml_scalar(value: str) -> str:
     """Quote a string as a safe double-quoted YAML scalar that cannot inject a directive."""
-    out = []
-    for ch in value:
-        if ch == "\\":
-            out.append("\\\\")
-        elif ch == '"':
-            out.append('\\"')
-        elif ch == "\n":
-            out.append("\\n")
-        elif ch == "\r":
-            out.append("\\r")
-        elif ch == "\t":
-            out.append("\\t")
-        elif ord(ch) < 0x20:
-            out.append(f"\\x{ord(ch):02x}")
-        else:
-            out.append(ch)
-    return '"' + "".join(out) + '"'
+    return '"' + "".join(_yaml_char(ch) for ch in value) + '"'
 
 
 def _md_escape(text: str) -> str:

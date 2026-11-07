@@ -31,7 +31,7 @@ import hashlib
 import logging
 import secrets
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -122,13 +122,27 @@ def qr_matrix(text: str) -> QrMatrixOut:
     return QrMatrixOut(size=len(rows), rows=rows)
 
 
-@dataclass
+#: One `guest_updated` broadcast: the guest and the reason of the change.
+GuestUpdate = tuple[MeetingGuestOut, GuestEventReason | None]
+
+
+@dataclass(frozen=True, slots=True)
 class GuestEvents:
     """The broadcasts that a change produces. The caller sends them after the commit."""
 
-    requested: list[MeetingGuestOut] = field(default_factory=list)
-    updated: list[tuple[MeetingGuestOut, GuestEventReason | None]] = field(default_factory=list)
+    requested: Sequence[MeetingGuestOut] = ()
+    updated: Sequence[GuestUpdate] = ()
     counts: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _Joined:
+    """The outcome of a join: the own row, its broadcasts and the meeting the device left."""
+
+    guest: MeetingGuest
+    events: GuestEvents
+    token: str | None = None
+    left: tuple[UUID, GuestEvents] | None = None
 
 
 class GuestService:
@@ -150,9 +164,12 @@ class GuestService:
         self.base_url = base_url.rstrip("/")
 
     async def _meeting(self, meeting_id: UUID, *, for_update: bool = False) -> Meeting:
-        stmt = select(Meeting).where(Meeting.id == meeting_id)
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        query = select(Meeting).where(Meeting.id == meeting_id)
+        stmt = (
+            query.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else query
+        )
         meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
@@ -161,11 +178,14 @@ class GuestService:
     async def _guest(
         self, meeting_id: UUID, guest_id: UUID, *, for_update: bool = False
     ) -> MeetingGuest:
-        stmt = select(MeetingGuest).where(
+        query = select(MeetingGuest).where(
             MeetingGuest.id == guest_id, MeetingGuest.meeting_id == meeting_id
         )
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        stmt = (
+            query.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else query
+        )
         guest = (await self.session.execute(stmt)).scalar_one_or_none()
         if guest is None:
             raise NotFoundError(f"guest {guest_id} not found", code="guest_not_found")
@@ -304,9 +324,13 @@ class GuestService:
         raise ConflictError("No free join code; try again.", code="join_code_exhausted")
 
     async def _void_pending(
-        self, meeting: Meeting, events: GuestEvents, reason: GuestEventReason
-    ) -> int:
-        """Delete the open requests of the meeting: they are no longer valid."""
+        self, meeting: Meeting, reason: GuestEventReason
+    ) -> tuple[GuestUpdate, ...]:
+        """Delete the open requests of the meeting: they are no longer valid.
+
+        Returns:
+            One `expired` broadcast per deleted request.
+        """
         pending = (
             (
                 await self.session.execute(
@@ -318,19 +342,20 @@ class GuestService:
             .scalars()
             .all()
         )
+        updates: tuple[GuestUpdate, ...] = tuple(
+            (self._out(guest, status="expired"), reason) for guest in pending
+        )
         for guest in pending:
-            events.updated.append((self._out(guest, status="expired"), reason))
             await self.session.delete(guest)
         await self.session.flush()
-        return len(pending)
+        return updates
 
     async def switch_off(self, meeting: Meeting, *, actor_sub: str, now: datetime) -> GuestEvents:
         """Public participation goes off: void the requests and remove the guests.
 
         The cast ballots of the removed guests stay counted. The caller commits.
         """
-        events = GuestEvents(counts=True)
-        await self._void_pending(meeting, events, "public_off")
+        voided = await self._void_pending(meeting, "public_off")
         actor_id = await self._principal_id(actor_sub)
         admitted = (
             (
@@ -348,9 +373,10 @@ class GuestService:
             guest.decided_at = now
             guest.decided_by = actor_id
         await self.session.flush()
-        for out in await self._outs(admitted):
-            events.updated.append((out, "public_off"))
-        return events
+        outs = await self._outs(admitted)
+        return GuestEvents(
+            updated=(*voided, *((out, "public_off") for out in outs)), counts=True
+        )
 
     async def purge_on_close(self, meeting: Meeting) -> GuestEvents:
         """The meeting closes: delete the requests and pseudonymize the guests.
@@ -366,7 +392,6 @@ class GuestService:
             The broadcasts for the deleted rows (status ``expired``, reason
             ``meeting_closed``).
         """
-        events = GuestEvents(counts=True)
         gone = (
             (
                 await self.session.execute(
@@ -379,8 +404,9 @@ class GuestService:
             .scalars()
             .all()
         )
-        for guest in gone:
-            events.updated.append((self._out(guest, status="expired"), "meeting_closed"))
+        updates: tuple[GuestUpdate, ...] = tuple(
+            (self._out(guest, status="expired"), "meeting_closed") for guest in gone
+        )
         await self.session.execute(
             delete(MeetingGuest).where(
                 MeetingGuest.meeting_id == meeting.id, MeetingGuest.admitted_at.is_(None)
@@ -391,7 +417,7 @@ class GuestService:
             .where(MeetingGuest.meeting_id == meeting.id)
             .values(token_hash=None, display_name=None)
         )
-        return events
+        return GuestEvents(updated=updates, counts=True)
 
     async def pseudonymize(self, meeting_id: UUID) -> int:
         """Replace every guest name of the meeting with "Gast 1 … n".
@@ -483,7 +509,7 @@ class GuestService:
         await self.session.flush()
         out = (await self._outs([guest]))[0]
         await self.session.commit()
-        await self.publish(meeting_id, GuestEvents(updated=[(out, None)]))
+        await self.publish(meeting_id, GuestEvents(updated=((out, None),)))
         return out
 
     async def admit(self, meeting_id: UUID, guest_id: UUID, *, actor_sub: str) -> MeetingGuestOut:
@@ -538,7 +564,7 @@ class GuestService:
         await self.session.flush()
         out = (await self._outs([guest]))[0]
         await self.session.commit()
-        await self.publish(meeting_id, GuestEvents(updated=[(out, None)]))
+        await self.publish(meeting_id, GuestEvents(updated=((out, None),)))
         return out
 
     async def admit_all(self, meeting_id: UUID, *, actor_sub: str) -> list[MeetingGuestOut]:
@@ -575,7 +601,7 @@ class GuestService:
         await self.session.flush()
         outs = await self._outs(guests)
         await self.session.commit()
-        await self.publish(meeting_id, GuestEvents(updated=[(o, None) for o in outs]))
+        await self.publish(meeting_id, GuestEvents(updated=tuple((o, None) for o in outs)))
         return outs
 
     def join_url(self, code: str) -> str:
@@ -603,16 +629,15 @@ class GuestService:
         meeting = await self._meeting(meeting_id, for_update=True)
         self._assert_open(meeting)
         code = await self.assign_code(meeting)
-        events = GuestEvents(counts=True)
-        voided = await self._void_pending(meeting, events, "rotated")
+        voided = await self._void_pending(meeting, "rotated")
         await self._audit(
             AuditAction.MEETING_JOIN_CODE_ROTATED,
             actor=actor_sub,
             meeting=meeting,
-            voidedRequests=voided,
+            voidedRequests=len(voided),
         )
         await self.session.commit()
-        await self.publish(meeting_id, events)
+        await self.publish(meeting_id, GuestEvents(updated=voided, counts=True))
         return self._link(code)
 
     async def meeting_by_code(self, code: str, *, for_update: bool = False) -> Meeting:
@@ -625,13 +650,16 @@ class GuestService:
             NotFoundError: ``join_code_unknown``.
         """
         normalized = normalize_code(code)
-        stmt = select(Meeting).where(
+        query = select(Meeting).where(
             Meeting.join_code == normalized,
             Meeting.status != "closed",
             Meeting.public_join.is_(True),
         )
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        stmt = (
+            query.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else query
+        )
         meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError("Unknown join code.", code="join_code_unknown")
@@ -681,9 +709,12 @@ class GuestService:
     ) -> MeetingGuest | None:
         if not token:
             return None
-        stmt = select(MeetingGuest).where(MeetingGuest.token_hash == token_hash(token))
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        query = select(MeetingGuest).where(MeetingGuest.token_hash == token_hash(token))
+        stmt = (
+            query.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else query
+        )
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     @staticmethod
@@ -718,75 +749,95 @@ class GuestService:
                 (``retry_later``).
         """
         meeting = await self.meeting_by_code(code, for_update=True)
-        events = GuestEvents()
-        other_events = GuestEvents()
-        other_meeting: UUID | None = None
         existing = await self._by_token(token, for_update=True)
-        new_token_value: str | None = None
-        guest: MeetingGuest
-        if (
-            existing is not None
+        joined = (
+            await self._rejoin(existing, name, now)
+            if existing is not None
             and existing.meeting_id == meeting.id
-            and existing.status
-            in (
-                "pending",
-                "admitted",
-                "rejected",
-            )
-        ):
-            if existing.status == "admitted":
-                raise ConflictError("You are already admitted.", code="already_admitted")
-            self._check_retry(existing, now)
-            guest = existing
-            was_pending = guest.status == "pending"
-            guest.display_name = name
-            guest.requested_at = now
-            guest.status = "pending"
-            guest.decided_at = None
-            guest.decided_by = None
-            await self.session.flush()
-            out = self._out(guest)
-            if was_pending:
-                events.updated.append((out, None))
-            else:
-                events.requested.append(out)
-        else:
-            if existing is not None:
-                if existing.meeting_id == meeting.id:
-                    self._check_retry(existing, now)
-                elif existing.status in ("pending", "admitted"):
-                    existing.status = "left"
-                    existing.decided_at = now
-                    existing.display_name = None
-                    other_meeting = existing.meeting_id
-                    other_events.updated.append((self._out(existing), None))
-                existing.token_hash = None
-            new_token_value = new_token()
-            seq = (
-                await self.session.scalar(
-                    select(func.coalesce(func.max(MeetingGuest.seq), 0)).where(
-                        MeetingGuest.meeting_id == meeting.id
-                    )
-                )
-            ) or 0
-            guest = MeetingGuest(
-                meeting_id=meeting.id,
-                seq=seq + 1,
-                display_name=name,
-                status="pending",
-                token_hash=token_hash(new_token_value),
-                requested_at=now,
-                last_seen_at=now,
-            )
-            self.session.add(guest)
-            await self.session.flush()
-            events.requested.append(self._out(guest))
-        me = await self._me(meeting, guest, now)
+            and existing.status in ("pending", "admitted", "rejected")
+            else await self._join_new(meeting, existing, name, now)
+        )
+        me = await self._me(meeting, joined.guest, now)
         await self.session.commit()
-        await self.publish(meeting.id, events)
-        if other_meeting is not None:
-            await self.publish(other_meeting, other_events)
-        return me, new_token_value
+        await self.publish(meeting.id, joined.events)
+        if joined.left is not None:
+            await self.publish(*joined.left)
+        return me, joined.token
+
+    async def _rejoin(self, existing: MeetingGuest, name: str, now: datetime) -> _Joined:
+        """Ask again with the row of this device in the same meeting."""
+        if existing.status == "admitted":
+            raise ConflictError("You are already admitted.", code="already_admitted")
+        self._check_retry(existing, now)
+        was_pending = existing.status == "pending"
+        existing.display_name = name
+        existing.requested_at = now
+        existing.status = "pending"
+        existing.decided_at = None
+        existing.decided_by = None
+        await self.session.flush()
+        out = self._out(existing)
+        events = (
+            GuestEvents(updated=((out, None),)) if was_pending else GuestEvents(requested=(out,))
+        )
+        return _Joined(guest=existing, events=events)
+
+    async def _join_new(
+        self, meeting: Meeting, existing: MeetingGuest | None, name: str, now: datetime
+    ) -> _Joined:
+        """Add a new request with a new token; an old row of the device lets go of its token."""
+        left = self._release_old(meeting, existing, now)
+        new_token_value = new_token()
+        seq = (
+            await self.session.scalar(
+                select(func.coalesce(func.max(MeetingGuest.seq), 0)).where(
+                    MeetingGuest.meeting_id == meeting.id
+                )
+            )
+        ) or 0
+        guest = MeetingGuest(
+            meeting_id=meeting.id,
+            seq=seq + 1,
+            display_name=name,
+            status="pending",
+            token_hash=token_hash(new_token_value),
+            requested_at=now,
+            last_seen_at=now,
+        )
+        self.session.add(guest)
+        await self.session.flush()
+        return _Joined(
+            guest=guest,
+            events=GuestEvents(requested=(self._out(guest),)),
+            token=new_token_value,
+            left=left,
+        )
+
+    def _release_old(
+        self, meeting: Meeting, existing: MeetingGuest | None, now: datetime
+    ) -> tuple[UUID, GuestEvents] | None:
+        """Take the token from the old row of the device.
+
+        A request or a seat in another meeting ends, and its name goes at once.
+
+        Returns:
+            The other meeting and its broadcast, or None when the device left no meeting.
+        """
+        if existing is None:
+            return None
+        moves = existing.meeting_id != meeting.id and existing.status in ("pending", "admitted")
+        if existing.meeting_id == meeting.id:
+            self._check_retry(existing, now)
+        if moves:
+            existing.status = "left"
+            existing.decided_at = now
+            existing.display_name = None
+        existing.token_hash = None
+        return (
+            (existing.meeting_id, GuestEvents(updated=((self._out(existing), None),)))
+            if moves
+            else None
+        )
 
     def _check_retry(self, guest: MeetingGuest, now: datetime) -> None:
         wait = self._retry_after(guest, now)
@@ -843,7 +894,7 @@ class GuestService:
         await self.session.flush()
         me = await self._me(meeting, guest, now)
         await self.session.commit()
-        await self.publish(meeting.id, GuestEvents(updated=[(self._out(guest), None)]))
+        await self.publish(meeting.id, GuestEvents(updated=((self._out(guest), None),)))
         return me
 
     async def leave(self, code: str, token: str | None, *, now: datetime) -> None:
@@ -861,7 +912,7 @@ class GuestService:
         await self.session.flush()
         out = (await self._outs([guest]))[0]
         await self.session.commit()
-        await self.publish(meeting.id, GuestEvents(updated=[(out, None)]))
+        await self.publish(meeting.id, GuestEvents(updated=((out, None),)))
 
     async def cast(
         self,
@@ -950,16 +1001,7 @@ class GuestService:
             .all()
         )
         app_ids = [i.application_id for i in items if i.application_id is not None]
-        titles: dict[UUID, str | None] = {}
-        if app_ids:
-            titles = {
-                app_id: title_of(data)
-                for app_id, data in (
-                    await self.session.execute(
-                        select(Application.id, Application.data).where(Application.id.in_(app_ids))
-                    )
-                ).all()
-            }
+        titles = await self._app_titles(app_ids)
         agenda = [
             GuestAgendaItem(
                 id=item.id,
@@ -994,6 +1036,17 @@ class GuestService:
             votes=votes,
         )
 
+    async def _app_titles(self, app_ids: list[UUID]) -> dict[UUID, str | None]:
+        """Return the title of each application, or nothing for no application."""
+        if not app_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(Application.id, Application.data).where(Application.id.in_(app_ids))
+            )
+        ).all()
+        return {app_id: title_of(data) for app_id, data in rows}
+
     async def _votes(
         self, meeting: Meeting, guest: MeetingGuest, public_ids: list[UUID]
     ) -> list[GuestVote]:
@@ -1020,50 +1073,52 @@ class GuestService:
         )
         voting = VotingService(self.session)
         voter = guest_voter_sub(guest.id)
-        out: list[GuestVote] = []
-        for vote in rows:
-            config = VoteConfig.from_stored(vote.config)
-            view = await voting.get(vote.id)
-            mine = await voting.my_ballot(vote, voter)
-            can_cast = (
-                vote.status == "open"
-                and config.guests_vote
-                and meeting.guests_mode == "vote"
-                and not mine.cast
-            )
-            out.append(
-                GuestVote(
-                    id=vote.id,
-                    agendaItemId=vote.agenda_item_id,
-                    question=vote.question,
-                    options=list(config.options),
-                    status=vote.status,  # type: ignore[arg-type]
-                    secret=config.secret,
-                    majorityRule=config.majority_rule,
-                    guestsVote=config.guests_vote,
-                    quorum=config.quorum,
-                    openedAt=vote.opens_at,
-                    closedAt=vote.closed_at,
-                    result=vote.result,  # type: ignore[arg-type]
-                    failedReason=view.tally.failed_reason,
-                    tally=GuestTally(
-                        counts=view.tally.counts,
-                        voted=view.tally.voted,
-                        present=view.tally.present,
-                        revealed=view.tally.revealed,
-                        leading=view.tally.leading,
-                        presentMembers=view.tally.present_members,
-                        presentGuests=view.tally.present_guests,
-                    ),
-                    myBallot=mine,
-                    canCast=can_cast,
-                    kind=view.kind,
-                    election=view.election.public() if view.election is not None else None,
-                    electionResult=(
-                        view.election_result.public() if view.election_result is not None else None
-                    ),
-                    poll=view.poll,
-                    pollResult=view.poll_result,
-                )
-            )
-        return out
+        return [await self._guest_vote(meeting, vote, voting, voter) for vote in rows]
+
+    @staticmethod
+    async def _guest_vote(
+        meeting: Meeting, vote: Vote, voting: VotingService, voter: str
+    ) -> GuestVote:
+        """Build one vote as a guest sees it."""
+        config = VoteConfig.from_stored(vote.config)
+        view = await voting.get(vote.id)
+        mine = await voting.my_ballot(vote, voter)
+        can_cast = (
+            vote.status == "open"
+            and config.guests_vote
+            and meeting.guests_mode == "vote"
+            and not mine.cast
+        )
+        return GuestVote(
+            id=vote.id,
+            agendaItemId=vote.agenda_item_id,
+            question=vote.question,
+            options=list(config.options),
+            status=vote.status,  # type: ignore[arg-type]
+            secret=config.secret,
+            majorityRule=config.majority_rule,
+            guestsVote=config.guests_vote,
+            quorum=config.quorum,
+            openedAt=vote.opens_at,
+            closedAt=vote.closed_at,
+            result=vote.result,  # type: ignore[arg-type]
+            failedReason=view.tally.failed_reason,
+            tally=GuestTally(
+                counts=view.tally.counts,
+                voted=view.tally.voted,
+                present=view.tally.present,
+                revealed=view.tally.revealed,
+                leading=view.tally.leading,
+                presentMembers=view.tally.present_members,
+                presentGuests=view.tally.present_guests,
+            ),
+            myBallot=mine,
+            canCast=can_cast,
+            kind=view.kind,
+            election=view.election.public() if view.election is not None else None,
+            electionResult=(
+                view.election_result.public() if view.election_result is not None else None
+            ),
+            poll=view.poll,
+            pollResult=view.poll_result,
+        )

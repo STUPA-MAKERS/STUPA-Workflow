@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from datetime import date
+from itertools import accumulate
 
 TITLE_MAX = 80
 """The longest title part in characters. A longer title is cut at a word."""
@@ -35,14 +36,9 @@ def _clean_title(title: str | None) -> str:
         if c.isspace() or unicodedata.category(c) not in {"Cc", "Cf", "Cs", "Co", "Cn"}
     )
     words = kept.split()
-    out = ""
-    for word in words:
-        candidate = f"{out}_{word}" if out else word
-        if len(candidate) > TITLE_MAX:
-            if not out:
-                out = word[:TITLE_MAX]
-            break
-        out = candidate
+    joined = tuple(accumulate(words, lambda out, word: f"{out}_{word}"))
+    fitting = [part for part in joined if len(part) <= TITLE_MAX]
+    out = fitting[-1] if fitting else (words[0][:TITLE_MAX] if words else "")
     return re.sub(r"_+", "_", out).strip("._-")
 
 
@@ -58,11 +54,11 @@ def protocol_pdf_filename(title: str | None, day: date, *, public: bool = False)
         For example `Protokoll_3._ordentliche_Sitzung_STUPA_2026-11-05.pdf`, or
         `Protokoll_2026-11-05_oeffentlich.pdf` without a title.
     """
-    parts = ["Protokoll"]
     stem = _clean_title(title)
-    if stem:
-        parts.append(stem)
-    parts.append(day.isoformat())
-    if public:
-        parts.append("oeffentlich")
+    parts = (
+        "Protokoll",
+        *([stem] if stem else []),
+        day.isoformat(),
+        *(["oeffentlich"] if public else []),
+    )
     return "_".join(parts) + ".pdf"

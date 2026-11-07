@@ -56,11 +56,14 @@ class AllocationOps(BudgetTreeServiceBase):
                 .where(Budget.parent_id == parent_id)
             )
         ).all()
-        total = _ZERO
-        for child_id, allocated in rows:
-            if child_id != exclude_id:
-                total += tree_rules.as_amount(allocated)
-        return total
+        return sum(
+            (
+                tree_rules.as_amount(allocated)
+                for child_id, allocated in rows
+                if child_id != exclude_id
+            ),
+            _ZERO,
+        )
 
     async def set_allocation(
         self, budget_id: UUID, fiscal_year_id: UUID, payload: AllocationSet
@@ -115,18 +118,22 @@ class AllocationOps(BudgetTreeServiceBase):
                 errors=[{"field": "allocated", "msg": "below children allocations"}],
             )
 
-        alloc = await self._allocation(budget_id, fiscal_year_id)
+        existing = await self._allocation(budget_id, fiscal_year_id)
         previous_allocated = (
-            str(alloc.allocated)
-            if alloc is not None and alloc.allocated is not None
+            str(existing.allocated)
+            if existing is not None and existing.allocated is not None
             else None
         )
-        if alloc is None:
-            alloc = BudgetAllocation(
+        alloc = (
+            existing
+            if existing is not None
+            else BudgetAllocation(
                 id=uuid.uuid4(),
                 budget_id=budget_id,
                 fiscal_year_id=fiscal_year_id,
             )
+        )
+        if existing is None:
             self.session.add(alloc)
         alloc.allocated = payload.allocated
         await self._audit(
