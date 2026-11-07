@@ -622,5 +622,19 @@ describe('DashboardComponent', () => {
       cmp(fixture).closeAccount();
       expect(cmp(fixture).accountOpen()).toBe(false);
     });
+
+    it('pins the search bar in a sticky bar on a phone, not on the desktop', async () => {
+      const { fixture } = await setup(MEMBER, { phone: true });
+      const bar = (fixture.nativeElement as HTMLElement).querySelector('app-sticky-bar.dash__top');
+      expect(bar?.querySelector('app-search-pill')).toBeTruthy();
+      expect(bar?.querySelector('.dash__me')).toBeTruthy();
+    });
+
+    it('keeps the desktop search bar in the flow', async () => {
+      const { fixture } = await setup(MEMBER);
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('app-sticky-bar')).toBeNull();
+      expect(el.querySelector('div.dash__top app-search-pill')).toBeTruthy();
+    });
   });
 });

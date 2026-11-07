@@ -1,5 +1,5 @@
-<div class="dash__top">
-  @if (phone()) {
+@if (phone()) {
+  <app-sticky-bar class="dash__top">
     <app-search-pill
       class="dash__search"
       mode="button"
@@ -19,7 +19,9 @@
         <app-avatar [name]="auth.displayName()" principalId="me" size="sm" [decorative]="true" />
       </button>
     </app-search-pill>
-  } @else {
+  </app-sticky-bar>
+} @else {
+  <div class="dash__top">
     <app-search-pill
       class="dash__search"
       mode="button"
@@ -28,8 +30,8 @@
       [label]="'search.title' | t"
       (activate)="palette.open()"
     />
-  }
-</div>
+  </div>
+}
 
 <app-page-header
   class="dash__head"
