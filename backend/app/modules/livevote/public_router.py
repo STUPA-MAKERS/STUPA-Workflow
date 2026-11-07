@@ -312,7 +312,7 @@ def _try_acquire(guest_id: UUID) -> bool:
     current = _guest_connections.get(guest_id, 0)
     if current >= _MAX_CONNECTIONS_PER_GUEST:
         return False
-    _guest_connections[guest_id] = current + 1
+    _guest_connections.update({guest_id: current + 1})
     return True
 
 
@@ -321,7 +321,7 @@ def _release(guest_id: UUID) -> None:
     if current <= 1:
         _guest_connections.pop(guest_id, None)
     else:
-        _guest_connections[guest_id] = current - 1
+        _guest_connections.update({guest_id: current - 1})
 
 
 @router.websocket("/{code}/ws")

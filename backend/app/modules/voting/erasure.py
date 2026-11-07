@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import Principal
@@ -64,12 +64,36 @@ def _candidacies(vote: Vote, principals: frozenset[str]) -> list[dict[str, Any]]
     ]
 
 
+def _unerased(vote: Vote, principals: frozenset[str]) -> list[dict[str, Any]]:
+    """Return the candidacies of ``principals`` in ``vote`` that carry no erased marker."""
+    return [
+        candidate
+        for candidate in _candidacies(vote, principals)
+        if candidate.get(ERASED_KEY) is not True
+    ]
+
+
+def _erased_config(config: dict[str, Any], mine: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return a new config whose candidates in ``mine`` carry the placeholder name."""
+    return {
+        **config,
+        "candidates": [
+            {**c, "name": ERASED_CANDIDATE_NAME, ERASED_KEY: True}
+            if any(c is m for m in mine)
+            else c
+            for c in config["candidates"]
+        ],
+    }
+
+
 def _elected_in(vote: Vote, candidate_id: str) -> bool:
     """Tell whether the closed result of ``vote`` elected ``candidate_id``."""
     stored = vote.election_result
-    if vote.status != "closed" or not stored:
-        return False
-    return candidate_id in (stored.get("elected") or [])
+    return (
+        vote.status == "closed"
+        and bool(stored)
+        and candidate_id in (stored.get("elected") or [])
+    )
 
 
 def _root_of(vote: Vote, by_id: dict[UUID, Vote]) -> UUID:
@@ -81,13 +105,17 @@ def _root_of(vote: Vote, by_id: dict[UUID, Vote]) -> UUID:
 
     A cycle cannot come from the API. The walk stops on one all the same.
     """
-    seen = {vote.id}
-    while vote.parent_vote_id is not None and vote.parent_vote_id in by_id:
-        vote = by_id[vote.parent_vote_id]
-        if vote.id in seen:
-            break
-        seen.add(vote.id)
-    return vote.id
+    return _walk_up(vote, by_id, frozenset({vote.id}))
+
+
+def _walk_up(vote: Vote, by_id: dict[UUID, Vote], seen: frozenset[UUID]) -> UUID:
+    """Follow the parents of ``vote`` inside ``by_id`` and stop at a round in ``seen``."""
+    parent = by_id.get(vote.parent_vote_id) if vote.parent_vote_id is not None else None
+    return (
+        vote.id
+        if parent is None
+        else (parent.id if parent.id in seen else _walk_up(parent, by_id, seen | {parent.id}))
+    )
 
 
 async def _principal_ids(session: AsyncSession, principal_id: UUID) -> frozenset[str]:
@@ -114,20 +142,24 @@ async def _locked_elections(session: AsyncSession, principals: frozenset[str]) -
     match = or_(
         *(Vote.config.contains({"candidates": [{"principalId": p}]}) for p in sorted(principals))
     )
-    found: list[Vote] = []
-    seen: set[UUID] = set()
-    for _ in range(_MAX_PASSES):
-        stmt = select(Vote).where(Vote.kind == ELECTION, match)
-        if seen:
-            stmt = stmt.where(Vote.id.not_in(sorted(seen)))
-        new = (
-            await session.scalars(stmt.order_by(Vote.round.desc(), Vote.id).with_for_update())
-        ).all()
-        if not new:
-            break
-        found.extend(new)
-        seen.update(vote.id for vote in new)
-    return found
+    return await _lock_rounds(session, match, (), _MAX_PASSES)
+
+
+async def _lock_rounds(
+    session: AsyncSession, match: ColumnElement[bool], found: tuple[Vote, ...], passes: int
+) -> list[Vote]:
+    """Lock the matching rounds that ``found`` does not hold, for at most ``passes`` passes.
+
+    A pass that finds no new round ends the search.
+    """
+    base = select(Vote).where(Vote.kind == ELECTION, match)
+    stmt = base.where(Vote.id.not_in(sorted({v.id for v in found}))) if found else base
+    new = (
+        (await session.scalars(stmt.order_by(Vote.round.desc(), Vote.id).with_for_update())).all()
+        if passes > 0
+        else ()
+    )
+    return await _lock_rounds(session, match, (*found, *new), passes - 1) if new else list(found)
 
 
 async def erase_candidacies(session: AsyncSession, principal_id: UUID) -> list[ErasedCandidacy]:
@@ -151,31 +183,19 @@ async def erase_candidacies(session: AsyncSession, principal_id: UUID) -> list[E
     principals = await _principal_ids(session, principal_id)
     votes = await _locked_elections(session, principals)
     by_id = {vote.id: vote for vote in votes}
-    elected_roots: set[UUID] = set()
-    for vote in votes:
+    elected_roots = frozenset(
+        _root_of(vote, by_id)
+        for vote in votes
         if any(
             _elected_in(vote, str(candidate.get("id")))
             for candidate in _candidacies(vote, principals)
-        ):
-            elected_roots.add(_root_of(vote, by_id))
-    changed: list[ErasedCandidacy] = []
-    for vote in votes:
-        mine = [
-            candidate
-            for candidate in _candidacies(vote, principals)
-            if candidate.get(ERASED_KEY) is not True
-        ]
-        if not mine or _root_of(vote, by_id) in elected_roots:
-            continue
-        old_config = vote.config
-        vote.config = {
-            **old_config,
-            "candidates": [
-                {**c, "name": ERASED_CANDIDATE_NAME, ERASED_KEY: True}
-                if any(c is m for m in mine)
-                else c
-                for c in old_config["candidates"]
-            ],
-        }
-        changed.append(ErasedCandidacy(vote=vote, old_config=old_config))
+        )
+    )
+    changed = [
+        ErasedCandidacy(vote=vote, old_config=vote.config)
+        for vote in votes
+        if _unerased(vote, principals) and _root_of(vote, by_id) not in elected_roots
+    ]
+    for entry in changed:
+        entry.vote.config = _erased_config(entry.old_config, _unerased(entry.vote, principals))
     return changed
