@@ -201,9 +201,11 @@ async def create_form_version(
     Use this for a full rebuild only. For a small change, prefer the atomic `form_*`
     operations. Requires form.configure.
     """
-    body: dict[str, Any] = {"fields": [dump_create(f) for f in fields], "activate": activate}
-    if description:
-        body["description"] = description
+    body: dict[str, Any] = {
+        "fields": [dump_create(f) for f in fields],
+        "activate": activate,
+        **({"description": description} if description else {}),
+    }
     return await api().post(f"/admin/application-types/{type_id}/form-versions", json=body)
 
 
@@ -227,9 +229,11 @@ async def _form_state(type_id: str) -> tuple[list[dict[str, Any]], dict[str, Any
 async def _save_form(
     type_id: str, fields: list[dict[str, Any]], description: dict[str, Any] | None
 ) -> dict:
-    body: dict[str, Any] = {"fields": fields, "activate": True}
-    if description:
-        body["description"] = description
+    body: dict[str, Any] = {
+        "fields": fields,
+        "activate": True,
+        **({"description": description} if description else {}),
+    }
     result = await api().post(
         f"/admin/application-types/{type_id}/form-versions", json=body
     )

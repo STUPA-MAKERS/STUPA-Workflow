@@ -1,39 +1,48 @@
-"""Pure mutations on the global-flow graph dict (read-modify-write helpers).
+"""Pure operations on the global-flow graph dict (read-modify-write helpers).
 
 Each function takes the graph that `GET /admin/flow-versions/global` returns, that is
-`{states, transitions, layout}`. It mutates a **copy** and returns the copy. A
-`ValueError` from here surfaces as a clean tool error before the server writes anything.
+`{states, transitions, layout}`. It builds a new graph from a deep copy and returns it, so the
+input stays unchanged. A `ValueError` from here surfaces as a clean tool error before the server
+writes anything.
 """
 
 from __future__ import annotations
 
 from copy import deepcopy
+from functools import reduce
 from typing import Any
 
 Graph = dict[str, Any]
 
 
 def _states(graph: Graph) -> list[dict[str, Any]]:
-    return graph.setdefault("states", [])
+    return graph.get("states", [])
 
 
 def _transitions(graph: Graph) -> list[dict[str, Any]]:
-    return graph.setdefault("transitions", [])
+    return graph.get("transitions", [])
 
 
 def _layout(graph: Graph) -> dict[str, Any]:
     layout = graph.get("layout")
-    if not isinstance(layout, dict):
-        layout = {}
-        graph["layout"] = layout
-    return layout
+    return layout if isinstance(layout, dict) else {}
+
+
+def _without(mapping: dict[str, Any], key: str) -> dict[str, Any]:
+    """Return a copy of a dict without one key."""
+    return {k: v for k, v in mapping.items() if k != key}
+
+
+def _clamped(index: int, length: int) -> int:
+    """Return an insert position inside `0..length`, as `list.insert` takes it."""
+    return max(0, min(index, length))
 
 
 def _state_index(graph: Graph, key: str) -> int:
-    for i, s in enumerate(_states(graph)):
-        if s.get("key") == key:
-            return i
-    raise ValueError(f"unknown state key: {key!r}")
+    index = next((i for i, s in enumerate(_states(graph)) if s.get("key") == key), None)
+    if index is None:
+        raise ValueError(f"unknown state key: {key!r}")
+    return index
 
 
 def add_state(graph: Graph, state: dict[str, Any], x: int | None, y: int | None) -> Graph:
@@ -41,63 +50,97 @@ def add_state(graph: Graph, state: dict[str, Any], x: int | None, y: int | None)
     key = state["key"]
     if any(s.get("key") == key for s in _states(g)):
         raise ValueError(f"state key already exists: {key!r}")
-    _states(g).append(state)
-    if x is not None and y is not None:
-        _layout(g).setdefault("positions", {})[key] = {"x": x, "y": y}
-    return g
+    layout = _layout(g)
+    placed = (
+        {"layout": {**layout, "positions": {**layout.get("positions", {}), key: {"x": x, "y": y}}}}
+        if x is not None and y is not None
+        else {}
+    )
+    return {**g, "states": [*_states(g), state], **placed}
+
+
+def _renamed_transition(t: dict[str, Any], key: str, new_key: str) -> dict[str, Any]:
+    """Return a transition with the state `key` renamed to `new_key` at both ends."""
+    return {
+        **t,
+        **({"from": new_key} if t.get("from") == key else {}),
+        **({"to": new_key} if t.get("to") == key else {}),
+    }
+
+
+def _renamed_layout(layout: dict[str, Any], key: str, new_key: str) -> dict[str, Any]:
+    """Return a layout with the state `key` renamed in the positions and in the groups."""
+    positions = layout.get("positions") or {}
+    groups = layout.get("groups") or []
+    moved = (
+        {"positions": {**_without(positions, key), new_key: positions[key]}}
+        if key in positions
+        else {}
+    )
+    regrouped = (
+        {
+            "groups": [
+                {**grp, "stateKeys": [new_key if k == key else k for k in grp.get("stateKeys", [])]}
+                for grp in groups
+            ]
+        }
+        if groups
+        else {}
+    )
+    return {**layout, **moved, **regrouped}
 
 
 def update_state(graph: Graph, key: str, patch: dict[str, Any]) -> Graph:
     g = deepcopy(graph)
     i = _state_index(g, key)
     new_key = patch.get("key")
-    _states(g)[i] = {**_states(g)[i], **patch}
-    if new_key and new_key != key:
-        if any(s.get("key") == new_key for j, s in enumerate(_states(g)) if j != i):
-            raise ValueError(f"state key already exists: {new_key!r}")
-        # Rename cascades: transitions, layout positions, group membership.
-        for t in _transitions(g):
-            if t.get("from") == key:
-                t["from"] = new_key
-            if t.get("to") == key:
-                t["to"] = new_key
-        positions = _layout(g).get("positions") or {}
-        if key in positions:
-            positions[new_key] = positions.pop(key)
-        for grp in _layout(g).get("groups") or []:
-            grp["stateKeys"] = [new_key if k == key else k for k in grp.get("stateKeys", [])]
-    return g
+    renamed = bool(new_key) and new_key != key
+    if renamed and any(s.get("key") == new_key for j, s in enumerate(_states(g)) if j != i):
+        raise ValueError(f"state key already exists: {new_key!r}")
+    states = [{**s, **patch} if j == i else s for j, s in enumerate(_states(g))]
+    cascade = _rename_cascade(g, key, new_key) if new_key and new_key != key else {}
+    return {**g, "states": states, **cascade}
+
+
+def _rename_cascade(g: Graph, key: str, new_key: str) -> Graph:
+    """Return the transitions and the layout of a graph with the state `key` renamed."""
+    return {
+        "transitions": [_renamed_transition(t, key, new_key) for t in _transitions(g)],
+        "layout": _renamed_layout(_layout(g), key, new_key),
+    }
 
 
 def remove_state(graph: Graph, key: str) -> Graph:
     g = deepcopy(graph)
     _state_index(g, key)  # raises on unknown key
-    g["states"] = [s for s in _states(g) if s.get("key") != key]
-    g["transitions"] = [
-        t for t in _transitions(g) if t.get("from") != key and t.get("to") != key
-    ]
-    positions = _layout(g).get("positions") or {}
-    positions.pop(key, None)
-    groups = [
+    layout = _layout(g)
+    positions = layout.get("positions")
+    stripped = (
         {**grp, "stateKeys": [k for k in grp.get("stateKeys", []) if k != key]}
-        for grp in (_layout(g).get("groups") or [])
-    ]
-    groups = [grp for grp in groups if grp["stateKeys"] or _group_children(grp)]
-    if groups:
-        _layout(g)["groups"] = groups
-    else:
-        _layout(g).pop("groups", None)
-    return g
+        for grp in (layout.get("groups") or [])
+    )
+    groups = [grp for grp in stripped if grp["stateKeys"] or _group_children(grp)]
+    placed = {**layout, "positions": _without(positions, key)} if positions else layout
+    return {
+        **g,
+        "states": [s for s in _states(g) if s.get("key") != key],
+        "transitions": [
+            t for t in _transitions(g) if t.get("from") != key and t.get("to") != key
+        ],
+        "layout": {**placed, "groups": groups} if groups else _without(placed, "groups"),
+    }
 
 
 def add_transition(graph: Graph, transition: dict[str, Any]) -> Graph:
     g = deepcopy(graph)
     keys = {s.get("key") for s in _states(g)}
-    for end in ("from", "to"):
-        if transition.get(end) not in keys:
-            raise ValueError(f"transition references unknown {end}-state: {transition.get(end)!r}")
-    _transitions(g).append(transition)
-    return g
+    unknown_end = next((end for end in ("from", "to") if transition.get(end) not in keys), None)
+    if unknown_end is not None:
+        raise ValueError(
+            f"transition references unknown {unknown_end}-state: "
+            f"{transition.get(unknown_end)!r}"
+        )
+    return {**g, "transitions": [*_transitions(g), transition]}
 
 
 def _transition_at(graph: Graph, index: int) -> dict[str, Any]:
@@ -112,19 +155,19 @@ def _transition_at(graph: Graph, index: int) -> dict[str, Any]:
 def update_transition(graph: Graph, index: int, patch: dict[str, Any]) -> Graph:
     g = deepcopy(graph)
     t = _transition_at(g, index)
-    for k, v in patch.items():
-        if v is None:
-            t.pop(k, None)  # explicit null removes the key (e.g. drop a guard)
-        else:
-            t[k] = v
-    return g
+    # An explicit null removes the key (e.g. drop a guard).
+    kept = {k: v for k, v in t.items() if not (k in patch and patch[k] is None)}
+    updated = {**kept, **{k: v for k, v in patch.items() if v is not None}}
+    return {
+        **g,
+        "transitions": [updated if j == index else x for j, x in enumerate(_transitions(g))],
+    }
 
 
 def remove_transition(graph: Graph, index: int) -> Graph:
     g = deepcopy(graph)
     _transition_at(g, index)
-    _transitions(g).pop(index)
-    return g
+    return {**g, "transitions": [x for j, x in enumerate(_transitions(g)) if j != index]}
 
 
 def merge_positions(graph: Graph, positions: dict[str, dict[str, int]]) -> Graph:
@@ -133,31 +176,62 @@ def merge_positions(graph: Graph, positions: dict[str, dict[str, int]]) -> Graph
     unknown = sorted(set(positions) - keys)
     if unknown:
         raise ValueError(f"unknown state keys in positions: {unknown}")
-    _layout(g).setdefault("positions", {}).update(positions)
-    return g
+    layout = _layout(g)
+    return {
+        **g,
+        "states": _states(g),
+        "layout": {**layout, "positions": {**layout.get("positions", {}), **positions}},
+    }
 
 
 def _group_children(grp: dict[str, Any]) -> list[str]:
     return list(grp.get("groupIds") or [])
 
 
+def _visit(
+    gid: str, children: dict[Any, list[str]], path: frozenset[str], done: frozenset[str]
+) -> frozenset[str]:
+    """Walk the groups below `gid` depth first and return the set of the finished groups.
+
+    Raises:
+        ValueError: `gid` is on its own path, so the nesting has a cycle.
+    """
+    if gid in path:
+        raise ValueError(f"group nesting cycle involving {gid!r}")
+    below = (
+        done
+        if gid in done
+        else reduce(
+            lambda acc, child: _visit(child, children, path | {gid}, acc),
+            children.get(gid, []),
+            done,
+        )
+    )
+    return below | {gid}
+
+
 def _assert_acyclic(groups: list[dict[str, Any]]) -> None:
     children = {grp.get("id"): _group_children(grp) for grp in groups}
-    state: dict[str, int] = {}  # 0=visiting, 1=done
+    reduce(
+        lambda done, gid: _visit(gid, children, frozenset(), done),
+        (gid for gid in children if gid is not None),
+        frozenset[str](),
+    )
 
-    def visit(gid: str) -> None:
-        if state.get(gid) == 1:
-            return
-        if state.get(gid) == 0:
-            raise ValueError(f"group nesting cycle involving {gid!r}")
-        state[gid] = 0
-        for child in children.get(gid, []):
-            visit(child)
-        state[gid] = 1
 
-    for gid in children:
-        if gid is not None:
-            visit(gid)
+def _left_out(
+    grp: dict[str, Any], member: set[str], children: set[str]
+) -> dict[str, Any]:
+    """Return a group without the states and sub-groups that join another group."""
+    return {
+        **grp,
+        "stateKeys": [k for k in grp.get("stateKeys", []) if k not in member],
+        **(
+            {"groupIds": [c for c in _group_children(grp) if c not in children]}
+            if children
+            else {}
+        ),
+    }
 
 
 def upsert_group(graph: Graph, group: dict[str, Any]) -> Graph:
@@ -166,7 +240,8 @@ def upsert_group(graph: Graph, group: dict[str, Any]) -> Graph:
     unknown = sorted(set(group.get("stateKeys", [])) - keys)
     if unknown:
         raise ValueError(f"unknown state keys in group: {unknown}")
-    groups: list[dict[str, Any]] = _layout(g).setdefault("groups", [])
+    layout = _layout(g)
+    groups: list[dict[str, Any]] = layout.get("groups", [])
     group_ids = {grp.get("id") for grp in groups} | {group["id"]}
     children = set(group.get("groupIds") or [])
     if group["id"] in children:
@@ -178,68 +253,62 @@ def upsert_group(graph: Graph, group: dict[str, Any]) -> Graph:
         raise ValueError("group needs at least one state key or sub-group")
     # A state or a group lives in at most one parent. A join removes it everywhere else.
     member = set(group["stateKeys"])
-    for grp in groups:
-        if grp.get("id") != group["id"]:
-            grp["stateKeys"] = [k for k in grp.get("stateKeys", []) if k not in member]
-            if children:
-                grp["groupIds"] = [c for c in _group_children(grp) if c not in children]
-    groups[:] = [
-        grp
+    stripped = (
+        grp if grp.get("id") == group["id"] else _left_out(grp, member, children)
         for grp in groups
+    )
+    kept = [
+        grp
+        for grp in stripped
         if grp.get("id") == group["id"] or grp["stateKeys"] or _group_children(grp)
     ]
-    for i, grp in enumerate(groups):
-        if grp.get("id") == group["id"]:
-            groups[i] = group
-            break
-    else:
-        groups.append(group)
-    _assert_acyclic(groups)
-    return g
+    first = next((i for i, grp in enumerate(kept) if grp.get("id") == group["id"]), None)
+    result = (
+        [*kept, group]
+        if first is None
+        else [group if i == first else grp for i, grp in enumerate(kept)]
+    )
+    _assert_acyclic(result)
+    return {**g, "states": _states(g), "layout": {**layout, "groups": result}}
+
+
+def _without_child(grp: dict[str, Any], group_id: str) -> dict[str, Any]:
+    """Return a group without the sub-group `group_id`, and without an empty `groupIds`."""
+    ids = [c for c in _group_children(grp) if c != group_id]
+    return {**grp, "groupIds": ids} if ids else _without(grp, "groupIds")
 
 
 def delete_group(graph: Graph, group_id: str) -> Graph:
     g = deepcopy(graph)
-    groups = _layout(g).get("groups") or []
+    layout = _layout(g)
+    groups = layout.get("groups") or []
     if not any(grp.get("id") == group_id for grp in groups):
         raise ValueError(f"unknown group id: {group_id!r}")
     # The children of the deleted group move up to the top level. The code drops the
     # reference to the deleted group.
-    remaining = [
-        {**grp, "groupIds": [c for c in _group_children(grp) if c != group_id]}
-        for grp in groups
-        if grp.get("id") != group_id
-    ]
-    remaining = [
-        {k: v for k, v in grp.items() if not (k == "groupIds" and not v)}
-        for grp in remaining
-    ]
-    if remaining:
-        _layout(g)["groups"] = remaining
-    else:
-        _layout(g).pop("groups", None)
-    return g
+    remaining = [_without_child(grp, group_id) for grp in groups if grp.get("id") != group_id]
+    return {
+        **g,
+        "layout": {**layout, "groups": remaining} if remaining else _without(layout, "groups"),
+    }
 
 
 Fields = list[dict[str, Any]]
 
 
 def _field_index(fields: Fields, key: str) -> int:
-    for i, f in enumerate(fields):
-        if f.get("key") == key:
-            return i
-    raise ValueError(f"unknown field key: {key!r}")
+    index = next((i for i, f in enumerate(fields) if f.get("key") == key), None)
+    if index is None:
+        raise ValueError(f"unknown field key: {key!r}")
+    return index
 
 
 def add_field(fields: Fields, field: dict[str, Any], index: int | None) -> Fields:
     out = deepcopy(fields)
     if any(f.get("key") == field["key"] for f in out):
         raise ValueError(f"field key already exists: {field['key']!r}")
-    if index is None:
-        out.append(field)
-    else:
-        out.insert(max(0, min(index, len(out))), field)
-    return out
+    position = len(out) if index is None else _clamped(index, len(out))
+    return [*out[:position], field, *out[position:]]
 
 
 def update_field(fields: Fields, key: str, patch: dict[str, Any]) -> Fields:
@@ -248,18 +317,18 @@ def update_field(fields: Fields, key: str, patch: dict[str, Any]) -> Fields:
     new_key = patch.get("key")
     if new_key and new_key != key and any(f.get("key") == new_key for f in out):
         raise ValueError(f"field key already exists: {new_key!r}")
-    out[i] = {**out[i], **patch}
-    return out
+    return [{**f, **patch} if j == i else f for j, f in enumerate(out)]
 
 
 def remove_field(fields: Fields, key: str) -> Fields:
     out = deepcopy(fields)
-    out.pop(_field_index(out, key))
-    return out
+    i = _field_index(out, key)
+    return [f for j, f in enumerate(out) if j != i]
 
 
 def move_field(fields: Fields, key: str, index: int) -> Fields:
     out = deepcopy(fields)
-    f = out.pop(_field_index(out, key))
-    out.insert(max(0, min(index, len(out))), f)
-    return out
+    i = _field_index(out, key)
+    rest = [f for j, f in enumerate(out) if j != i]
+    position = _clamped(index, len(rest))
+    return [*rest[:position], out[i], *rest[position:]]
