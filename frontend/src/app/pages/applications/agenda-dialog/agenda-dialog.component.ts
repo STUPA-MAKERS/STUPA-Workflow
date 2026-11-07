@@ -31,9 +31,9 @@ import { localToday, weekdayName } from '@shared/date-format';
 
 /** A meeting row of the dialog. */
 interface MeetingChoice {
-  meeting: Meeting;
+  readonly meeting: Meeting;
   /** "Di, 18:00 · 7 TOPs": the parts that exist, joined by a dot. */
-  sub: string;
+  readonly sub: string;
 }
 
 /**
@@ -147,7 +147,8 @@ export class AgendaDialogComponent {
   /** Load the planned meetings of the agenda gremium, oldest first. */
   private load(transition: Transition): void {
     const gremiumId = transition.agendaGremiumId;
-    const seq = ++this.seq;
+    this.seq = this.seq + 1;
+    const seq = this.seq;
     this.meetings.set([]);
     if (!gremiumId) return;
     this.loading.set(true);
@@ -172,20 +173,14 @@ export class AgendaDialogComponent {
 
   /** "Di, 18:00 · 7 TOPs". */
   private subLine(m: Meeting): string {
-    const parts: string[] = [];
-    const head: string[] = [];
     const weekday = weekdayName(m.date, this.i18n.formatLocale());
-    if (weekday) head.push(weekday);
-    if (m.startTime) head.push(m.startTime.slice(0, 5));
-    if (head.length) parts.push(head.join(', '));
+    const head = [weekday, m.startTime ? m.startTime.slice(0, 5) : ''].filter(Boolean);
     const count = m.agendaItemCount ?? 0;
-    parts.push(
-      this.i18n.translate(
-        count === 1 ? 'applications.agenda.itemsOne' : 'applications.agenda.itemsOther',
-        { count },
-      ),
+    const items = this.i18n.translate(
+      count === 1 ? 'applications.agenda.itemsOne' : 'applications.agenda.itemsOther',
+      { count },
     );
-    return parts.join(' · ');
+    return [...(head.length ? [head.join(', ')] : []), items].join(' · ');
   }
 
   /** Fire the transition with the chosen meeting, or without one when none is visible. */

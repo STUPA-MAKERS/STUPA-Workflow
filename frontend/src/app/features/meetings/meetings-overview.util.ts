@@ -45,17 +45,17 @@ export function storeView(view: MeetingsView): void {
 
 /** One day cell of the month grid. */
 export interface CalendarDay {
-  iso: string;
-  day: number;
+  readonly iso: string;
+  readonly day: number;
   /** The day is in the shown month (else it fills a week before or after it). */
-  inMonth: boolean;
-  isToday: boolean;
+  readonly inMonth: boolean;
+  readonly isToday: boolean;
 }
 
 /** A month as `{ year, month }`, `month` 0-based like `Date`. */
 export interface MonthRef {
-  year: number;
-  month: number;
+  readonly year: number;
+  readonly month: number;
 }
 
 /** The month that holds this date. */
@@ -76,45 +76,35 @@ export function shiftMonth(ref: MonthRef, delta: number): MonthRef {
  *
  * `getDay` returns 0 for Sunday, and Monday is the first column.
  */
-export function monthGrid(ref: MonthRef, today: Date): CalendarDay[][] {
+export function monthGrid(ref: MonthRef, today: Date): readonly (readonly CalendarDay[])[] {
   const first = new Date(ref.year, ref.month, 1);
   const lead = (first.getDay() + 6) % 7;
   const start = new Date(ref.year, ref.month, 1 - lead);
   const last = new Date(ref.year, ref.month + 1, 0);
   const trail = 6 - ((last.getDay() + 6) % 7);
-  const end = new Date(ref.year, ref.month + 1, trail);
+  const count = lead + last.getDate() + trail;
   const todayIso = isoDay(today);
-  const weeks: CalendarDay[][] = [];
-  for (let d = start; d <= end; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
-    if ((d.getDay() + 6) % 7 === 0) weeks.push([]);
+  const days = Array.from({ length: count }, (_, i): CalendarDay => {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
     const iso = isoDay(d);
-    weeks[weeks.length - 1].push({
-      iso,
-      day: d.getDate(),
-      inMonth: d.getMonth() === ref.month,
-      isToday: iso === todayIso,
-    });
-  }
-  return weeks;
+    const inMonth = d.getMonth() === ref.month;
+    return { iso, day: d.getDate(), inMonth, isToday: iso === todayIso };
+  });
+  return Array.from({ length: count / 7 }, (_, w) => days.slice(w * 7, w * 7 + 7));
 }
 
 /** The first and the last day of the grid, for the request of the month. */
-export function gridRange(weeks: readonly CalendarDay[][]): { from: string; to: string } {
+export function gridRange(weeks: readonly (readonly CalendarDay[])[]): { readonly from: string; readonly to: string } {
   const lastWeek = weeks[weeks.length - 1];
   return { from: weeks[0][0].iso, to: lastWeek[lastWeek.length - 1].iso };
 }
 
 /** The meetings of each day, in the order of their start time. */
-export function meetingsByDay(meetings: readonly Meeting[]): Map<string, Meeting[]> {
-  const map = new Map<string, Meeting[]>();
-  for (const m of meetings) {
-    if (!m.date) continue;
-    const list = map.get(m.date) ?? [];
-    list.push(m);
-    map.set(m.date, list);
-  }
-  for (const list of map.values()) list.sort(byStart);
-  return map;
+export function meetingsByDay(meetings: readonly Meeting[]): ReadonlyMap<string, readonly Meeting[]> {
+  const dates = [...new Set(meetings.flatMap((m) => (m.date ? [m.date] : [])))];
+  const onDay = (date: string): readonly Meeting[] =>
+    [...meetings.filter((m) => m.date === date)].sort(byStart);
+  return new Map(dates.map((date) => [date, onDay(date)]));
 }
 
 /** Order by date, then start time, then title. A meeting without a date comes last. */
@@ -142,17 +132,17 @@ function fold(text: string): string {
  *
  * 2024-01-01 is a Monday.
  */
-export function weekdayNames(locale: string): string[] {
+export function weekdayNames(locale: string): readonly string[] {
   return Array.from({ length: 7 }, (_, i) => weekdayName(new Date(2024, 0, 1 + i), locale));
 }
 
 /** A group of rows in the list view. */
 export interface MeetingGroup {
-  key: string;
-  kind: 'now' | 'upcoming' | 'past';
+  readonly key: string;
+  readonly kind: 'now' | 'upcoming' | 'past';
   /** The month of the group ("Oktober 2026"), or '' for "Jetzt" and an undated group. */
-  month: string;
-  items: Meeting[];
+  readonly month: string;
+  readonly items: readonly Meeting[];
 }
 
 /**
@@ -164,31 +154,38 @@ export function overviewGroups(
   upcoming: readonly Meeting[],
   past: readonly Meeting[],
   i18nLocale: string,
-): MeetingGroup[] {
+): readonly MeetingGroup[] {
   const locale = toFormatLocale(i18nLocale);
-  const groups: MeetingGroup[] = [];
   const live = upcoming.filter((m) => m.status === 'live');
-  if (live.length) groups.push({ key: 'now', kind: 'now', month: '', items: live });
-  const add = (kind: 'upcoming' | 'past', m: Meeting): void => {
-    const month = m.date ? m.date.slice(0, 7) : '';
-    const key = `${kind}-${month}`;
-    const last = groups[groups.length - 1];
-    if (last && last.key === key) {
-      last.items.push(m);
-      return;
-    }
-    groups.push({ key, kind, month: monthYear(m.date, locale), items: [m] });
-  };
-  for (const m of upcoming) if (m.status !== 'live') add('upcoming', m);
-  for (const m of [...past].reverse()) add('past', m);
-  return groups;
+  const now: readonly MeetingGroup[] = live.length
+    ? [{ key: 'now', kind: 'now', month: '', items: live }]
+    : [];
+  const rows = [
+    ...upcoming.filter((m) => m.status !== 'live').map((m) => ({ kind: 'upcoming' as const, m })),
+    ...[...past].reverse().map((m) => ({ kind: 'past' as const, m })),
+  ];
+  return rows.reduce((groups, { kind, m }) => withMonthRow(groups, kind, m, locale), now);
+}
+
+/** Adds `m` to the last group when it has the same kind and month, else opens a new group. */
+function withMonthRow(
+  groups: readonly MeetingGroup[],
+  kind: 'upcoming' | 'past',
+  m: Meeting,
+  locale: string,
+): readonly MeetingGroup[] {
+  const key = `${kind}-${m.date ? m.date.slice(0, 7) : ''}`;
+  const last = groups[groups.length - 1];
+  return last && last.key === key
+    ? [...groups.slice(0, -1), { ...last, items: [...last.items, m] }]
+    : [...groups, { key, kind, month: monthYear(m.date, locale), items: [m] }];
 }
 
 /** The progress of a live meeting through its agenda, or null without a current item. */
 export interface AgendaProgress {
-  position: number;
-  count: number;
-  title: string | null;
+  readonly position: number;
+  readonly count: number;
+  readonly title: string | null;
 }
 
 export function agendaProgress(m: Meeting): AgendaProgress | null {
@@ -209,21 +206,19 @@ export function openVoteOf(m: Meeting): MeetingVote | null {
 
 /** The counts of the roster: present, excused, absent, open and all members. */
 export interface AttendanceCounts {
-  present: number;
-  excused: number;
-  absent: number;
-  open: number;
-  total: number;
+  readonly present: number;
+  readonly excused: number;
+  readonly absent: number;
+  readonly open: number;
+  readonly total: number;
 }
 
 export function attendanceCounts(rows: readonly Attendance[]): AttendanceCounts {
-  const counts: AttendanceCounts = { present: 0, excused: 0, absent: 0, open: 0, total: 0 };
-  for (const row of rows) {
-    counts.total++;
-    if (row.status === 'present') counts.present++;
-    else if (row.status === 'excused') counts.excused++;
-    else if (row.status === 'absent') counts.absent++;
-    else counts.open++;
-  }
-  return counts;
+  const count = (status: Attendance['status']): number =>
+    rows.filter((row) => row.status === status).length;
+  const present = count('present');
+  const excused = count('excused');
+  const absent = count('absent');
+  const total = rows.length;
+  return { present, excused, absent, open: total - present - excused - absent, total };
 }

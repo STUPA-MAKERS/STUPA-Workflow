@@ -60,8 +60,8 @@ import {
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
-  key: string;
-  name: string;
+  readonly key: string;
+  readonly name: string;
 }
 
 /**
@@ -69,13 +69,13 @@ interface VariantForm {
  * dialog also holds an object URL of the file (the preview) and its pixel size.
  */
 interface LogoDraft {
-  variantId: Uuid;
-  variantName: string;
-  slot: CdLogoSlot;
-  file: File | null;
-  previewUrl: string | null;
-  size: ImageSize | null;
-  checking: boolean;
+  readonly variantId: Uuid;
+  readonly variantName: string;
+  readonly slot: CdLogoSlot;
+  readonly file: File | null;
+  readonly previewUrl: string | null;
+  readonly size: ImageSize | null;
+  readonly checking: boolean;
 }
 
 /** Message per server error code of a square upload (`check_square_logo`). */
@@ -190,12 +190,13 @@ export class AdminCdVariantsComponent {
     this.reload();
     this.api.listGremienOptions().subscribe({
       next: (gremien) => {
-        const map = new Map<string, string[]>();
-        for (const g of gremien) {
-          if (!g.cdVariantId) continue;
-          map.set(g.cdVariantId, [...(map.get(g.cdVariantId) ?? []), g.name]);
-        }
-        this.usedBy.set(map);
+        const used = gremien.filter((g) => !!g.cdVariantId);
+        const ids = [...new Set(used.map((g) => g.cdVariantId as string))];
+        this.usedBy.set(
+          new Map(
+            ids.map((id) => [id, used.filter((g) => g.cdVariantId === id).map((g) => g.name)]),
+          ),
+        );
       },
       error: () => this.usedBy.set(new Map()),
     });
@@ -255,11 +256,27 @@ export class AdminCdVariantsComponent {
    * not past the ends), download an upload, remove.
    */
   logoMenu(slot: CdLogoSlot, index: number, last: boolean, logo: CdVariantLogo): RowMenuSection[] {
-    const move: RowMenuItem[] = [];
-    if (slot !== 'square') {
-      if (index > 0) move.push({ id: 'up', label: this.i18n.translate('admin.common.moveUp'), icon: 'up' });
-      if (!last) move.push({ id: 'down', label: this.i18n.translate('admin.common.moveDown'), icon: 'down' });
-    }
+    const movable = slot !== 'square';
+    const move: readonly RowMenuItem[] = [
+      ...(movable && index > 0
+        ? [
+            {
+              id: 'up',
+              label: this.i18n.translate('admin.common.moveUp'),
+              icon: 'up',
+            } satisfies RowMenuItem,
+          ]
+        : []),
+      ...(movable && !last
+        ? [
+            {
+              id: 'down',
+              label: this.i18n.translate('admin.common.moveDown'),
+              icon: 'down',
+            } satisfies RowMenuItem,
+          ]
+        : []),
+    ];
     const file: RowMenuItem[] = logo.fileName
       ? [{ id: 'download', label: this.i18n.translate('admin.cdVariants.download'), icon: 'download' }]
       : [];
@@ -270,10 +287,16 @@ export class AdminCdVariantsComponent {
   }
 
   onLogoMenu(item: RowMenuItem, variant: CdVariant, slot: CdLogoSlot, index: number, logo: CdVariantLogo): void {
-    if (item.id === 'up') this.moveLogo(variant, slot, index, -1);
-    if (item.id === 'down') this.moveLogo(variant, slot, index, 1);
-    if (item.id === 'download') this.download(logo);
-    if (item.id === 'remove') this.removeLogo(variant, logo);
+    switch (item.id) {
+      case 'up':
+        return this.moveLogo(variant, slot, index, -1);
+      case 'down':
+        return this.moveLogo(variant, slot, index, 1);
+      case 'download':
+        return this.download(logo);
+      case 'remove':
+        return this.removeLogo(variant, logo);
+    }
   }
 
   /** The server answers the file as `attachment`, so a plain link click downloads it. */
@@ -541,9 +564,8 @@ export class AdminCdVariantsComponent {
       error: (err: unknown) => {
         this.logoSaving.set(false);
         const status = errorStatus(err);
-        let key: TranslationKey = SQUARE_ERROR_KEYS[problemCode(err)] ?? 'admin.common.saveFailed';
-        if (key === 'admin.common.saveFailed' && status === 413) key = 'admin.cdVariants.logoTooLarge';
-        else if (key === 'admin.common.saveFailed' && status === 415) key = 'admin.cdVariants.logoType';
+        const key: TranslationKey =
+          SQUARE_ERROR_KEYS[problemCode(err)] ?? squareStatusKey(status);
         this.logoError.set(key);
         this.toast.error(this.i18n.translate(key, { min: this.minPx, max: SQUARE_LOGO_MAX_PX }));
       },
@@ -569,9 +591,8 @@ export class AdminCdVariantsComponent {
     const inSlot = this.logosOf(variant, slot);
     const target = index + delta;
     if (target < 0 || target >= inSlot.length) return;
-    const ordered = [...inSlot];
-    const [moved] = ordered.splice(index, 1);
-    ordered.splice(target, 0, moved);
+    const rest = inSlot.filter((_, i) => i !== index);
+    const ordered = [...rest.slice(0, target), inSlot[index], ...rest.slice(target)];
     const ids = ordered.map((l) => l.id);
     this.api.reorderCdVariantLogos(variant.id, slot, ids).subscribe({
       next: (logos) => {
@@ -585,5 +606,17 @@ export class AdminCdVariantsComponent {
       },
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
     });
+  }
+}
+
+/** The error of a failed square-logo upload by its HTTP status, when the server sent no code. */
+function squareStatusKey(status: number | null | undefined): TranslationKey {
+  switch (status) {
+    case 413:
+      return 'admin.cdVariants.logoTooLarge';
+    case 415:
+      return 'admin.cdVariants.logoType';
+    default:
+      return 'admin.common.saveFailed';
   }
 }

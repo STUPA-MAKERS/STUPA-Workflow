@@ -207,21 +207,23 @@ export class VotePanelComponent {
     const t = v.tally;
     const cast = t.voted ?? Object.values(t.counts).reduce((sum, n) => sum + n, 0);
     if (this.guestsVote()) {
-      const parts = [
+      const comp = this.composition();
+      return [
+        ...(comp ? [comp] : []),
         this.i18n.translate('guests.vote.castN', { n: cast }),
         this.i18n.translate('guests.vote.majorityOfCast'),
-      ];
-      const comp = this.composition();
-      if (comp) parts.unshift(comp);
-      return parts.join(' · ');
+      ].join(' · ');
     }
-    const parts = [this.i18n.translate('voting.beamer.votesOf', { cast, eligible: t.eligible })];
-    if ((v.quorum ?? v.config.quorum) && t.failedReason !== 'quorum') {
-      const state = this.i18n.translate(t.quorumMet ? 'vote.tally.quorumMet' : 'vote.tally.quorumMissed');
-      parts.push(`${this.i18n.translate('vote.tally.quorum')}: ${state}`);
-    }
-    return parts.join(' · ');
+    const votes = this.i18n.translate('voting.beamer.votesOf', { cast, eligible: t.eligible });
+    const showQuorum = (v.quorum ?? v.config.quorum) && t.failedReason !== 'quorum';
+    return showQuorum ? `${votes} · ${this.quorumText(t.quorumMet)}` : votes;
   });
+
+  /** "Quorum: erreicht" or "Quorum: nicht erreicht". */
+  private quorumText(met: boolean | null | undefined): string {
+    const state = this.i18n.translate(met ? 'vote.tally.quorumMet' : 'vote.tally.quorumMissed');
+    return `${this.i18n.translate('vote.tally.quorum')}: ${state}`;
+  }
 
   /** The answers of a poll: the ballots of its result, else the turnout. */
   protected readonly pollAnswered = computed(

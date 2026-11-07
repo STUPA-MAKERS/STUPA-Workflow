@@ -3,21 +3,21 @@ import type { Uuid } from '@core/api/models';
 
 /** Where a card that the keyboard holds is now, and where it came from. */
 export interface KeyDragPosition {
-  cardId: Uuid;
-  col: number;
-  index: number;
-  fromCol: number;
-  fromIndex: number;
+  readonly cardId: Uuid;
+  readonly col: number;
+  readonly index: number;
+  readonly fromCol: number;
+  readonly fromIndex: number;
 }
 
 /** The columns of the board that holds the card, as the keyboard drag needs them. */
 export interface KeyDragColumns {
   /** The number of columns. */
-  count: number;
+  readonly count: number;
   /** The length of the list of a column, with the held card at its provisional place. */
-  length(col: number): number;
+  readonly length: (col: number) => number;
   /** The number of cards in a column without the held card. */
-  others(col: number, cardId: Uuid): number;
+  readonly others: (col: number, cardId: Uuid) => number;
 }
 
 /**
@@ -28,11 +28,11 @@ export interface KeyDragColumns {
  * part of the drag.
  */
 export type KeyDragStep<T extends KeyDragPosition> =
-  | { kind: 'lift' }
-  | { kind: 'move' }
-  | { kind: 'drop'; at: T }
-  | { kind: 'cancel'; refocus: boolean }
-  | { kind: 'none' };
+  | { readonly kind: 'lift' }
+  | { readonly kind: 'move' }
+  | { readonly kind: 'drop'; readonly at: T }
+  | { readonly kind: 'cancel'; readonly refocus: boolean }
+  | { readonly kind: 'none' };
 
 /**
  * The keyboard drag of a kanban board: Space lifts a card, the arrows move it inside its

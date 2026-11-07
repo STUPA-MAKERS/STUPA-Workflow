@@ -13,8 +13,8 @@ import { type LoginSettings, MAX_SESSION_DAYS } from '../admin.models';
 
 /** The edit state. The fields hold the text of the inputs, so a bad entry stays visible. */
 interface Draft {
-  web: string;
-  pwa: string;
+  readonly web: string;
+  readonly pwa: string;
 }
 
 /** The body of the PUT. */

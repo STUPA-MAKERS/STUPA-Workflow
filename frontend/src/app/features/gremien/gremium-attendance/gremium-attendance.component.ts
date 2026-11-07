@@ -42,6 +42,7 @@ import {
   cellStrength,
   cellView,
   fileSlug,
+  groupInOrder,
   localized,
   monthAverages,
   oneDecimal,
@@ -54,6 +55,7 @@ import {
   toCsv,
 } from '../gremien.util';
 import { monthShort, monthYear } from '@shared/date-format';
+import { assertNever } from '@shared/util/immutable';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 const PRESETS: readonly RangePreset[] = ['last6', 'last12', 'last24', 'semester', 'prevSemester'];
@@ -168,13 +170,16 @@ export class GremiumAttendanceComponent {
 
   readonly roleOptions = computed<FilterSelectOption[]>(() => {
     const locale = this.i18n.uiLocale();
-    const roles = new Map<string, string>();
-    for (const r of this.data()?.rows ?? []) {
-      if (r.roleKey && !roles.has(r.roleKey)) roles.set(r.roleKey, localized(r.roleName, locale, r.roleKey));
-    }
+    const withRole = (this.data()?.rows ?? []).flatMap((row) =>
+      row.roleKey ? [{ key: row.roleKey, roleName: row.roleName }] : [],
+    );
+    const roles = groupInOrder(withRole, (r) => r.key);
     return [
       { value: '', label: this.i18n.translate('gremien.members.roleAll') },
-      ...[...roles].map(([value, label]) => ({ value, label })),
+      ...roles.map(({ key, first }) => ({
+        value: key,
+        label: localized(first.roleName, locale, key),
+      })),
     ];
   });
   readonly roleText = computed(() => {
@@ -320,30 +325,35 @@ export class GremiumAttendanceComponent {
     if (!data) return;
     const t = (k: TranslationKey) => this.i18n.translate(k);
     const locale = this.i18n.formatLocale();
-    const head = [t('gremien.attendance.member'), t('gremien.members.role')];
-    for (const m of data.months) {
+    const monthHeads = data.months.flatMap((m) => {
       const label = monthYear(m.month, locale);
-      head.push(
+      return [
         `${label} ${t('gremien.attendance.csvMeetings')}`,
         `${label} ${t('gremien.attendance.csvPresent')}`,
         `${label} ${t('gremien.attendance.csvExcused')}`,
         `${label} ${t('gremien.attendance.csvDelegated')}`,
-      );
-    }
-    head.push(
+      ];
+    });
+    const head = [
+      t('gremien.attendance.member'),
+      t('gremien.members.role'),
+      ...monthHeads,
       `${t('gremien.attendance.total')} ${t('gremien.attendance.csvPresent')}`,
       `${t('gremien.attendance.total')} ${t('gremien.attendance.csvMeetings')}`,
       `${t('gremien.attendance.total')} %`,
-    );
-    const body = this.rows().map((r) => {
-      const line: (string | number | null)[] = [r.name, r.role];
-      r.cells.forEach((c) => {
-        if (c.view.kind === 'na') line.push(null, null, null, null);
-        else line.push(c.view.held, c.view.present, c.view.excused, c.view.delegated);
-      });
-      line.push(r.totals.present, r.totals.held, r.totals.pct);
-      return line;
-    });
+    ];
+    const body = this.rows().map((r): readonly (string | number | null)[] => [
+      r.name,
+      r.role,
+      ...r.cells.flatMap((c) =>
+        c.view.kind === 'na'
+          ? [null, null, null, null]
+          : [c.view.held, c.view.present, c.view.excused, c.view.delegated],
+      ),
+      r.totals.present,
+      r.totals.held,
+      r.totals.pct,
+    ]);
     const range = this.range();
     downloadBlob(
       new Blob([toCsv([head, ...body])], { type: 'text/csv;charset=utf-8' }),
@@ -375,16 +385,29 @@ export class GremiumAttendanceComponent {
 
   /** "1 von 2 Sitzungen anwesend, 1 entschuldigt, 1 Stimme übertragen". */
   private summary(present: number, held: number, excused: number, delegated: number): string {
-    const parts = [this.i18n.translate('gremien.attendance.summary', { present, held })];
-    if (excused) parts.push(this.i18n.translate('gremien.attendance.cellExcused', { n: excused }));
-    if (delegated) parts.push(this.i18n.translate('gremien.attendance.cellDelegated', { n: delegated }));
+    const parts = [
+      this.i18n.translate('gremien.attendance.summary', { present, held }),
+      ...(excused ? [this.i18n.translate('gremien.attendance.cellExcused', { n: excused })] : []),
+      ...(delegated
+        ? [this.i18n.translate('gremien.attendance.cellDelegated', { n: delegated })]
+        : []),
+    ];
     return parts.join(', ');
   }
 
   private cellLabel(name: string, month: string, view: CellView): string {
     const when = monthYear(month, this.i18n.formatLocale());
-    if (view.kind === 'na') return this.i18n.translate('gremien.attendance.cellNa', { name, month: when });
-    if (view.kind === 'none') return this.i18n.translate('gremien.attendance.cellNone', { name, month: when });
-    return `${name}, ${when}: ${this.summary(view.present, view.held, view.excused, view.delegated)}`;
+    switch (view.kind) {
+      case 'na':
+        return this.i18n.translate('gremien.attendance.cellNa', { name, month: when });
+      case 'none':
+        return this.i18n.translate('gremien.attendance.cellNone', { name, month: when });
+      case 'count': {
+        const summary = this.summary(view.present, view.held, view.excused, view.delegated);
+        return `${name}, ${when}: ${summary}`;
+      }
+      default:
+        return assertNever(view.kind);
+    }
   }
 }

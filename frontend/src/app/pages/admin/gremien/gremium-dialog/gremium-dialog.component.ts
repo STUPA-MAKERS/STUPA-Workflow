@@ -40,21 +40,21 @@ export const MAX_DELEGATION_LEAD_MINUTES = 60 * 24 * 30;
 
 /** The form state of a gremium. */
 export interface GremiumForm {
-  name: string;
+  readonly name: string;
   /** Id of the chosen CD variant. `''` = none, which sends `null`. */
-  cdVariantId: string;
-  defaultLang: string;
-  allowVoteDelegation: boolean;
+  readonly cdVariantId: string;
+  readonly defaultLang: string;
+  readonly allowVoteDelegation: boolean;
   /** Lead time in minutes before the meeting start for non-pool delegations. */
-  delegationLeadMinutes: number;
+  readonly delegationLeadMinutes: number;
   /** Allow a delegation to a person outside the gremium and the pool. */
-  delegationAllowExternal: boolean;
+  readonly delegationAllowExternal: boolean;
   /** Default quorum in percent of the eligible voters. `null` = no quorum. */
-  quorumPercent: number | null;
+  readonly quorumPercent: number | null;
   /** Extra protocol recipients, one address per line. */
-  mailRecipients: string;
+  readonly mailRecipients: string;
   /** The final protocols show on the public protocol page. */
-  protocolsPublic: boolean;
+  readonly protocolsPublic: boolean;
 }
 
 export function emptyGremiumForm(): GremiumForm {
@@ -72,7 +72,7 @@ export function emptyGremiumForm(): GremiumForm {
 }
 
 /** Split the recipient text into addresses. A newline, a comma or a semicolon separates. */
-export function parseRecipients(raw: string): string[] {
+export function parseRecipients(raw: string): readonly string[] {
   return raw
     .split(/[\n,;]+/)
     .map((s) => s.trim())

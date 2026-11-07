@@ -37,8 +37,8 @@ import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.st
 
 /** Draft for a new global role. */
 interface RoleDraft {
-  key: string;
-  label: I18nMap;
+  readonly key: string;
+  readonly label: I18nMap;
 }
 
 /** The fixed global roles: the server refuses to delete them (409). */
@@ -228,11 +228,7 @@ export class AdminRolesComponent {
   protected readonly rolesDirty = computed(() => this.dirtyRoles().length > 0);
 
   private keepSaved(roles: Role[]): void {
-    this.savedRoles.update((m) => {
-      const next = new Map(m);
-      for (const r of roles) next.set(r.id, r);
-      return next;
-    });
+    this.savedRoles.update((m) => new Map([...m, ...roles.map((r) => [r.id, r] as const)]));
   }
 
   /**
@@ -245,16 +241,15 @@ export class AdminRolesComponent {
     if (!dirty.length || this.savingRoles() || !this.permissions().length) return;
     const catalogue = new Set(this.permissions());
     const jobs = dirty.map((role) => {
-      let job$: Observable<Role> = of(role);
-      if (this.permsChanged(role)) {
-        const permissions = role.permissions.filter((p) => catalogue.has(p));
-        job$ = this.api.saveRolePermissions(role.id, permissions);
-      }
-      if (this.nameChanged(role)) {
-        const label = this.nameDraft(role);
-        job$ = job$.pipe(switchMap(() => this.api.renameRole(role.id, label)));
-      }
-      return job$;
+      const perms$: Observable<Role> = this.permsChanged(role)
+        ? this.api.saveRolePermissions(
+            role.id,
+            role.permissions.filter((p) => catalogue.has(p)),
+          )
+        : of(role);
+      if (!this.nameChanged(role)) return perms$;
+      const label = this.nameDraft(role);
+      return perms$.pipe(switchMap(() => this.api.renameRole(role.id, label)));
     });
     this.savingRoles.set(true);
     forkJoin(jobs).subscribe({
@@ -263,11 +258,10 @@ export class AdminRolesComponent {
         const byId = new Map(saved.map((r) => [r.id, r]));
         this.roles.update((list) => list.map((r) => byId.get(r.id) ?? r));
         this.keepSaved(saved);
-        this.nameDrafts.update((m) => {
-          const next = { ...m };
-          for (const r of saved) delete next[r.id];
-          return next;
-        });
+        const savedIds = new Set(saved.map((r) => r.id));
+        this.nameDrafts.update((m) =>
+          Object.fromEntries(Object.entries(m).filter(([id]) => !savedIds.has(id))),
+        );
         this.toast.success(this.i18n.translate('admin.common.saved'));
       },
       error: () => {

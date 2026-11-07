@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from functools import partial, reduce
 from typing import Any
 from uuid import UUID
 
@@ -61,19 +62,41 @@ def _change_of(erased: ErasedCandidacy) -> _Change:
     return old, [line.strip() for line in _callout(erased.vote, erased.vote.config)]
 
 
-def _block_end(lines: list[str], start: int) -> int:
+def _block_end(lines: Sequence[str], start: int) -> int:
     """Return the index after the callout that opens at ``start``.
 
     The callout runs over the following ``>`` lines and ends before a line that is no
     quote or that opens the next callout.
     """
-    end = start + 1
-    while end < len(lines):
-        stripped = lines[end].strip()
-        if not stripped.startswith(">") or _OPENER.match(stripped):
-            break
-        end += 1
-    return end
+    ends = (
+        end
+        for end in range(start + 1, len(lines))
+        if not lines[end].strip().startswith(">") or _OPENER.match(lines[end].strip())
+    )
+    return next(ends, len(lines))
+
+
+def _indented(current: str, line: str) -> str:
+    """Return ``line`` with the indent of ``current``."""
+    return current[: len(current) - len(current.lstrip())] + line
+
+
+def _rewrite_one(
+    changes: Sequence[_Change], lines: tuple[str, ...], start: int
+) -> tuple[str, ...]:
+    """Replace the callout that opens at ``start`` when it equals an old callout."""
+    end = _block_end(lines, start)
+    block = [line.strip() for line in lines[start:end]]
+    new = next((new for old, new in changes if block == list(old)), None)
+    return (
+        lines
+        if new is None
+        else (
+            *lines[:start],
+            *(_indented(lines[start + j], line) for j, line in enumerate(new)),
+            *lines[start + len(new) :],
+        )
+    )
 
 
 def rewrite_callouts(text: str, changes: Sequence[_Change]) -> str:
@@ -81,24 +104,12 @@ def rewrite_callouts(text: str, changes: Sequence[_Change]) -> str:
 
     A callout matches only when all its lines (without the indent) equal the old
     callout. The indent of a line stays. A text without a matching callout comes back
-    unchanged.
+    unchanged. A callout never holds the opener of another one, so every opener line
+    starts a callout of its own.
     """
-    lines = text.split("\n")
-    i = 0
-    while i < len(lines):
-        if not _OPENER.match(lines[i].strip()):
-            i += 1
-            continue
-        end = _block_end(lines, i)
-        block = [line.strip() for line in lines[i:end]]
-        for old, new in changes:
-            if block == list(old):
-                for j, line in enumerate(new):
-                    current = lines[i + j]
-                    lines[i + j] = current[: len(current) - len(current.lstrip())] + line
-                break
-        i = end
-    return "\n".join(lines)
+    lines = tuple(text.split("\n"))
+    openers = (i for i, line in enumerate(lines) if _OPENER.match(line.strip()))
+    return "\n".join(reduce(partial(_rewrite_one, changes), openers, lines))
 
 
 async def erase_candidate_names(session: AsyncSession, erased: Sequence[ErasedCandidacy]) -> None:
@@ -108,13 +119,16 @@ async def erase_candidate_names(session: AsyncSession, erased: Sequence[ErasedCa
     meetings of the changed elections. An election without a meeting has no
     protocol. A stored PDF does not change.
     """
-    by_meeting: dict[UUID, list[_Change]] = {}
-    for item in erased:
-        if item.vote.meeting_id is None:
-            continue
-        change = _change_of(item)
-        if change[0] != change[1]:
-            by_meeting.setdefault(item.vote.meeting_id, []).append(change)
+    changes = [
+        (item.vote.meeting_id, _change_of(item))
+        for item in erased
+        if item.vote.meeting_id is not None
+    ]
+    changed = [(meeting_id, change) for meeting_id, change in changes if change[0] != change[1]]
+    by_meeting: dict[UUID, list[_Change]] = {
+        meeting_id: [change for other, change in changed if other == meeting_id]
+        for meeting_id, _ in changed
+    }
     if not by_meeting:
         return
     meeting_ids = list(by_meeting)

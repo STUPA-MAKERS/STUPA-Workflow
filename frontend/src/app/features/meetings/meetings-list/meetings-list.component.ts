@@ -118,7 +118,7 @@ export class MeetingsListComponent {
     { initialValue: null },
   );
 
-  readonly groups = computed<MeetingGroup[]>(() =>
+  readonly groups = computed<readonly MeetingGroup[]>(() =>
     overviewGroups(this.timeline.upcomingItems(), this.timeline.pastItems(), this.i18n.locale()),
   );
   readonly hasUpcoming = computed(() =>

@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import type { Observable } from 'rxjs';
 import type { ApiClient } from '@core/api/api-client.service';
 import type { TranslationKey } from '@core/i18n/translations';
+import { withEntry, withoutEntry } from '@shared/util/immutable';
 import type { ChatMessage, ChatSend } from './chat.models';
 
 /**
@@ -10,7 +11,7 @@ import type { ChatMessage, ChatSend } from './chat.models';
  */
 export function draftDropper(
   api: Pick<ApiClient, 'deleteDraftAttachment'>,
-): (ids: string[], token: string) => void {
+): (ids: readonly string[], token: string) => void {
   return (ids, token) => {
     for (const id of ids) api.deleteDraftAttachment(id, token).subscribe({ error: () => undefined });
   };
@@ -21,7 +22,7 @@ const FILES_MISSING = 'draft_attachments_missing';
 const FILES_GONE = { status: 422, error: { code: FILES_MISSING, errors: [] } };
 
 /** The draft ids a 422 `draft_attachments_missing` names (`attachmentIds.<id>`), else null. */
-export function missingFiles(err: unknown): Set<string> | null {
+export function missingFiles(err: unknown): ReadonlySet<string> | null {
   const e = err as { status?: unknown; error?: { code?: unknown; errors?: unknown } } | null;
   if (e?.status !== 422 || e.error?.code !== FILES_MISSING) return null;
   const errors = Array.isArray(e.error.errors) ? (e.error.errors as { field?: unknown }[]) : [];
@@ -91,22 +92,23 @@ export function sendErrorKey(err: unknown, fallback: TranslationKey): Translatio
  * as lost, so a retry sends the text alone and "Bearbeiten" comes back.
  */
 export class ChatOutbox<T> {
-  private readonly items = signal<ChatMessage[]>([]);
+  private readonly items = signal<readonly ChatMessage[]>([]);
   /** The pending and failed messages, in the order they were sent. */
   readonly messages = this.items.asReadonly();
-  private readonly requests = new Map<string, ChatSend>();
+  private requests: ReadonlyMap<string, ChatSend> = new Map();
   private seq = 0;
 
   constructor(
     private readonly post: (req: ChatSend) => Observable<T>,
     private readonly delivered: (result: T) => void,
     private readonly failed: (err: unknown) => void = () => undefined,
-    private readonly dropDrafts: (ids: string[], token: string) => void = () => undefined,
+    private readonly dropDrafts: (ids: readonly string[], token: string) => void = () => undefined,
   ) {}
 
   send(req: ChatSend): void {
-    const id = `pending-${++this.seq}`;
-    this.requests.set(id, req);
+    this.seq = this.seq + 1;
+    const id = `pending-${this.seq}`;
+    this.requests = withEntry(this.requests, id, req);
     this.items.update((list) => [
       ...list,
       {
@@ -139,14 +141,14 @@ export class ChatOutbox<T> {
   discard(id: string): void {
     const req = this.requests.get(id);
     if (!req) return;
-    this.requests.delete(id);
+    this.requests = withoutEntry(this.requests, id);
     if (req.attachmentIds?.length && req.draftToken) this.dropDrafts(req.attachmentIds, req.draftToken);
     this.items.update((list) => list.filter((m) => m.id !== id));
   }
 
   /** Forget every pending message, for example when the thread changes. */
   clear(): void {
-    this.requests.clear();
+    this.requests = new Map();
     this.items.set([]);
   }
 
@@ -157,7 +159,8 @@ export class ChatOutbox<T> {
   private run(id: string, req: ChatSend): void {
     this.post(req).subscribe({
       next: (result) => {
-        if (!this.requests.delete(id)) return;
+        if (!this.requests.has(id)) return;
+        this.requests = withoutEntry(this.requests, id);
         this.items.update((list) => list.filter((m) => m.id !== id));
         this.delivered(result);
       },
@@ -176,7 +179,7 @@ export class ChatOutbox<T> {
   /** The server lost these files: the bubble marks them, a retry sends the others. */
   private markLost(id: string, req: ChatSend, lost: ReadonlySet<string>): void {
     const ids = (req.attachmentIds ?? []).filter((a) => !lost.has(a));
-    this.requests.set(id, { ...req, attachmentIds: ids });
+    this.requests = withEntry(this.requests, id, { ...req, attachmentIds: ids });
     this.items.update((list) =>
       list.map((m) =>
         m.id === id

@@ -5,49 +5,49 @@ import type { TransitionDef } from '../admin.models';
  * A group is never a selection. A click on a group drills down into it.
  */
 export type Selection =
-  | { kind: 'state'; key: string }
-  | { kind: 'transition'; index: number }
+  | { readonly kind: 'state'; readonly key: string }
+  | { readonly kind: 'transition'; readonly index: number }
   | null;
 
 /** One rendered group box on the current drill-down level. */
 export interface GroupBox {
-  id: string;
-  name: string;
-  color: string | null;
-  multi: boolean;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+  readonly id: string;
+  readonly name: string;
+  readonly color: string | null;
+  readonly multi: boolean;
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
   /** Transitively contained state count (badge). */
-  count: number;
+  readonly count: number;
   /** Transitively contained state keys. A drag moves all of them. */
-  deepKeys: string[];
+  readonly deepKeys: readonly string[];
   /** Outgoing boundary-edge count. */
-  outCount: number;
+  readonly outCount: number;
   /** Y offsets of the outgoing dots (fixed spacing, centered). */
-  outDotYs: number[];
+  readonly outDotYs: readonly number[];
 }
 
 /** Visible end of an edge on the current drill-down level. */
 export type EndRef =
-  | { type: 'state'; key: string }
-  | { type: 'group'; id: string }
-  | { type: 'proxy'; pid: string };
+  | { readonly type: 'state'; readonly key: string }
+  | { readonly type: 'group'; readonly id: string }
+  | { readonly type: 'proxy'; readonly pid: string };
 
 export interface EdgeEnds {
-  src: EndRef;
-  dst: EndRef;
+  readonly src: EndRef;
+  readonly dst: EndRef;
 }
 
 /** Proxy node while drilled into a group: external source (left) or target (right). */
 export interface ProxyBox {
   /** Stable id: `state:<key>` | `group:<id>`. */
-  pid: string;
-  label: string;
-  isGroup: boolean;
-  x: number;
-  y: number;
+  readonly pid: string;
+  readonly label: string;
+  readonly isGroup: boolean;
+  readonly x: number;
+  readonly y: number;
 }
 
 /**
@@ -57,40 +57,40 @@ export interface ProxyBox {
  */
 export interface GuardGroup {
   /** Stable guard signature (`''` = no guard / catch-all). */
-  sig: string;
-  guard: TransitionDef['guard'] | null;
-  op: string;
-  value: string;
+  readonly sig: string;
+  readonly guard: TransitionDef['guard'] | null;
+  readonly op: string;
+  readonly value: string;
   /** Indices of the member transitions in the `transitions` array. */
-  indices: number[];
+  readonly indices: readonly number[];
 }
 
 /** Row of the incoming/outgoing transition lists for a selected state. */
 export interface TransitionListRow {
-  index: number;
-  from: string;
-  to: string;
-  label: string;
-  guard: string;
-  automatic: boolean;
-  branch: string | null;
+  readonly index: number;
+  readonly from: string;
+  readonly to: string;
+  readonly label: string;
+  readonly guard: string;
+  readonly automatic: boolean;
+  readonly branch: string | null;
 }
 
 export interface TransitionLists {
-  incoming: TransitionListRow[];
-  outgoing: TransitionListRow[];
+  readonly incoming: readonly TransitionListRow[];
+  readonly outgoing: readonly TransitionListRow[];
 }
 
 export interface Point {
-  x: number;
-  y: number;
+  readonly x: number;
+  readonly y: number;
 }
 
 export interface ViewRect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
 }
 
 export const NODE_W = 150;

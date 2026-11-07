@@ -138,7 +138,7 @@ export class SessionDockComponent {
   /** The row: its width decides `fold`. */
   private readonly bar = viewChild<ElementRef<HTMLElement>>('bar');
   /** The width the row needed at each fold, measured when it overflowed there. */
-  private readonly need = [0, 0, 0];
+  private need: readonly number[] = [0, 0, 0];
 
   constructor() {
     // Without tools (another item, a locked text) the row returns to the navigation.
@@ -176,13 +176,14 @@ export class SessionDockComponent {
       return;
     }
     if (fold === 2) return;
-    let cut = 0;
-    for (const text of Array.from(el.querySelectorAll<HTMLElement>('.sd__chipText'))) {
-      cut += Math.max(0, text.scrollWidth - text.clientWidth);
-    }
+    const texts = Array.from(el.querySelectorAll<HTMLElement>('.sd__chipText'));
+    const cut = texts.reduce(
+      (sum, text) => sum + Math.max(0, text.scrollWidth - text.clientWidth),
+      0,
+    );
     const need = el.scrollWidth + cut;
     if (need > el.clientWidth) {
-      this.need[fold] = need;
+      this.need = [...this.need.slice(0, fold), need, ...this.need.slice(fold + 1)];
       this.fold.set((fold + 1) as 1 | 2);
     }
   }

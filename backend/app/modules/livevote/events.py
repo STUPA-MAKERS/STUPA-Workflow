@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt
+from pydantic import Field, NonNegativeInt
 
 from app.modules.livevote.schemas import GuestsMode, MeetingGuestOut
 from app.modules.voting.schemas import (
@@ -30,18 +30,17 @@ from app.modules.voting.schemas import (
     VoteResultValue,
 )
 from app.shared.config_schemas import DateAnswer, ElectionConfig, PollConfig
+from app.shared.schemas import FrozenCamelModel
 
 if TYPE_CHECKING:
     from app.modules.voting.schemas import VoteOut
 
 
-class _CamelModel(BaseModel):
+class _EventModel(FrozenCamelModel, frozen=True):
     """Emit camelCase aliases in JSON and accept the field names too.
 
     The rest of the API uses the same convention.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     def dump(self) -> dict[str, object]:
         """Return a JSON-ready dict for `send_json`.
@@ -51,7 +50,7 @@ class _CamelModel(BaseModel):
         return self.model_dump(mode="json", by_alias=True)
 
 
-class MeetingStateEvent(_CamelModel):
+class MeetingStateEvent(_EventModel, frozen=True):
     """Current meeting state (beamer and voter)."""
 
     type: Literal["meeting_state"] = "meeting_state"
@@ -61,7 +60,7 @@ class MeetingStateEvent(_CamelModel):
     status: Literal["planned", "live", "closed"]
 
 
-class ViewersEvent(_CamelModel):
+class ViewersEvent(_EventModel, frozen=True):
     """Who has the meeting page open now.
 
     The event carries display names, deduplicated per user. The server sends it
@@ -72,7 +71,7 @@ class ViewersEvent(_CamelModel):
     viewers: list[str]
 
 
-class VoteOpenedEvent(_CamelModel):
+class VoteOpenedEvent(_EventModel, frozen=True):
     """A vote opened and the UI unlocks."""
 
     type: Literal["vote_opened"] = "vote_opened"
@@ -121,7 +120,7 @@ class VoteOpenedEvent(_CamelModel):
         )
 
 
-class VoteTallyEvent(_CamelModel):
+class VoteTallyEvent(_EventModel, frozen=True):
     """Live interim tally with aggregates only and never with names.
 
     For an open vote `counts` stays empty and `leading` stays `null`.
@@ -183,7 +182,7 @@ class VoteTallyEvent(_CamelModel):
         )
 
 
-class VoteClosedEvent(_CamelModel):
+class VoteClosedEvent(_EventModel, frozen=True):
     """A vote closed with the final aggregated result."""
 
     type: Literal["vote_closed"] = "vote_closed"
@@ -201,7 +200,7 @@ class VoteClosedEvent(_CamelModel):
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
 
-class VoteLotDrawnEvent(_CamelModel):
+class VoteLotDrawnEvent(_EventModel, frozen=True):
     """The lot of a tied election was drawn: the beamer and the room show it."""
 
     type: Literal["vote_lot_drawn"] = "vote_lot_drawn"
@@ -210,7 +209,7 @@ class VoteLotDrawnEvent(_CamelModel):
     election_result: ElectionResultOut = Field(alias="electionResult")
 
 
-class VoteCancelledEvent(_CamelModel):
+class VoteCancelledEvent(_EventModel, frozen=True):
     """A canceled vote has no result and fires no branch."""
 
     type: Literal["vote_cancelled"] = "vote_cancelled"
@@ -220,14 +219,14 @@ class VoteCancelledEvent(_CamelModel):
 GuestEventReason = Literal["public_off", "rotated", "meeting_closed"]
 
 
-class GuestRequestedEvent(_CamelModel):
+class GuestRequestedEvent(_EventModel, frozen=True):
     """A guest asks to join. Only a connection of the meeting lead gets it."""
 
     type: Literal["guest_requested"] = "guest_requested"
     guest: MeetingGuestOut
 
 
-class GuestUpdatedEvent(_CamelModel):
+class GuestUpdatedEvent(_EventModel, frozen=True):
     """A guest changed. Only a connection of the meeting lead gets it.
 
     ``guest.status == "expired"`` means the row is gone: a voided request. ``reason``
@@ -239,7 +238,7 @@ class GuestUpdatedEvent(_CamelModel):
     reason: GuestEventReason | None = None
 
 
-class GuestCountsEvent(_CamelModel):
+class GuestCountsEvent(_EventModel, frozen=True):
     """Public participation and the guest counts, never names.
 
     The member connections without ``canManage`` get ``joinCode`` as None and
@@ -254,7 +253,7 @@ class GuestCountsEvent(_CamelModel):
     pending_guests: int = Field(default=0, alias="pendingGuests")
 
 
-class GuestStatusEvent(_CamelModel):
+class GuestStatusEvent(_EventModel, frozen=True):
     """The own state of a guest on the guest channel."""
 
     type: Literal["guest_status"] = "guest_status"
@@ -264,7 +263,7 @@ class GuestStatusEvent(_CamelModel):
     reason: GuestEventReason | None = None
 
 
-class BodyDraftEvent(_CamelModel):
+class BodyDraftEvent(_EventModel, frozen=True):
     """The text of an agenda item while the protokollant types it (not saved yet).
 
     Only the voter channel passes it on. The beamer filter and the guest channel drop
@@ -278,7 +277,7 @@ class BodyDraftEvent(_CamelModel):
     seq: NonNegativeInt
 
 
-class AgendaChangedEvent(_CamelModel):
+class AgendaChangedEvent(_EventModel, frozen=True):
     """The saved text or the done mark of one agenda item changed.
 
     The event names the item, never the content: a client reads the agenda again
@@ -292,14 +291,14 @@ class AgendaChangedEvent(_CamelModel):
     agenda_item_id: UUID = Field(alias="agendaItemId")
 
 
-class ErrorEvent(_CamelModel):
+class ErrorEvent(_EventModel, frozen=True):
     """A WebSocket error, for example `not_eligible`, `read_only` or `not_open`."""
 
     type: Literal["error"] = "error"
     code: str
 
 
-class CastMessage(_CamelModel):
+class CastMessage(_EventModel, frozen=True):
     """A ballot cast over the WebSocket.
 
     The server checks the group, the unique constraint, the open state and the
@@ -315,13 +314,13 @@ class CastMessage(_CamelModel):
     as_delegation: bool = Field(default=False, alias="asDelegation")
 
 
-class SubscribeMessage(_CamelModel):
+class SubscribeMessage(_EventModel, frozen=True):
     """Request the current state, which keeps a reconnect consistent."""
 
     type: Literal["subscribe"]
 
 
-class BodyDraftMessage(_CamelModel):
+class BodyDraftMessage(_EventModel, frozen=True):
     """The protokollant sends the text of the open agenda item while typing.
 
     The server checks the protokollant of the live meeting, the agenda item and the

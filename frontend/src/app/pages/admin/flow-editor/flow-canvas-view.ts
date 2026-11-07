@@ -26,6 +26,7 @@ import {
   PROXY_H,
   PROXY_W,
   type EdgeEnds,
+  type EndRef,
   type GroupBox,
   type GuardGroup,
   type Point,
@@ -45,102 +46,105 @@ import {
 } from './flow-level.util';
 
 export interface CanvasNodeDot {
-  id: string;
-  branch: string | null;
-  guard: TransitionDef['guard'] | null;
-  cy: number;
-  label: string;
+  readonly id: string;
+  readonly branch: string | null;
+  readonly guard: TransitionDef['guard'] | null;
+  readonly cy: number;
+  readonly label: string;
 }
 
 export interface CanvasNode {
-  key: string;
-  label: string;
-  kind: string;
-  color: string | null;
-  isInitial: boolean;
+  readonly key: string;
+  readonly label: string;
+  readonly kind: string;
+  readonly color: string | null;
+  readonly isInitial: boolean;
   /** A terminal state: the node carries the tag "Endzustand" under its label. */
-  isTerminal: boolean;
+  readonly isTerminal: boolean;
   /** A vote state that takes its gremium from the cost center: the node carries the
    *  tag "Gremium: aus Kostenstelle" under its label. */
-  gremiumFromBudget: boolean;
-  selected: boolean;
-  multi: boolean;
+  readonly gremiumFromBudget: boolean;
+  readonly selected: boolean;
+  readonly multi: boolean;
   /** Not related to the focused state or transition: drawn faint. */
-  dim: boolean;
-  x: number;
-  y: number;
+  readonly dim: boolean;
+  readonly x: number;
+  readonly y: number;
   /** The width fits the label. */
-  w: number;
-  h: number;
-  dots: CanvasNodeDot[];
+  readonly w: number;
+  readonly h: number;
+  readonly dots: readonly CanvasNodeDot[];
 }
 
 export interface CanvasEdge {
-  index: number;
-  d: string;
+  readonly index: number;
+  readonly d: string;
   /** Centre of the label. */
-  mx: number;
-  my: number;
+  readonly mx: number;
+  readonly my: number;
   /** The label text; empty for a line without a label (a later member of a bundle). */
-  label: string;
+  readonly label: string;
   /** The line carries a label (a name or the bolt of an automatic transition). */
-  labeled: boolean;
-  automatic: boolean;
-  color: string | null;
-  selected: boolean;
+  readonly labeled: boolean;
+  readonly automatic: boolean;
+  readonly color: string | null;
+  readonly selected: boolean;
   /** Not related to the focused state or transition: drawn faint. */
-  dim: boolean;
+  readonly dim: boolean;
 }
 
 export interface FlowCanvasViewDeps {
-  graph: Signal<FlowGraph>;
-  currentGroupId: Signal<string | null>;
-  selection: Signal<Selection>;
-  multiSel: Signal<ReadonlySet<string>>;
-  multiSelGroups: Signal<ReadonlySet<string>>;
+  readonly graph: Signal<FlowGraph>;
+  readonly currentGroupId: Signal<string | null>;
+  readonly selection: Signal<Selection>;
+  readonly multiSel: Signal<ReadonlySet<string>>;
+  readonly multiSelGroups: Signal<ReadonlySet<string>>;
   /** The state under the pointer: it has the focus while no transition is selected. */
-  hover: Signal<string | null>;
+  readonly hover: Signal<string | null>;
   /**
    * The automatic layout of the level, once it answers. While a newer `layoutInput`
    * waits for its layout, the places of the last one stay and the lines are left out
    * (`routes` is empty): the transition indices of the old routes may be stale.
    */
-  layout: Signal<LevelLayout | null>;
-  stateLabel: (s: StateDef) => string;
-  guardDotLabel: (g: GuardGroup) => string;
+  readonly layout: Signal<LevelLayout | null>;
+  readonly stateLabel: (s: StateDef) => string;
+  readonly guardDotLabel: (g: GuardGroup) => string;
 }
 
 /** One visible transition between two boxes of the level. */
 interface LevelLink {
-  index: number;
-  t: TransitionDef;
-  src: string;
-  port: string;
+  readonly index: number;
+  readonly t: TransitionDef;
+  readonly src: string;
+  readonly port: string;
   /** Start of the line relative to the source box. */
-  sx: number;
-  sy: number;
-  dst: string;
+  readonly sx: number;
+  readonly sy: number;
+  readonly dst: string;
 }
 
 export interface FlowCanvasView {
-  positions: Signal<Record<string, Point>>;
-  groups: Signal<FlowGroup[]>;
-  groupById: Signal<Map<string, FlowGroup>>;
-  parentGroupId: Signal<Map<string, string>>;
-  stateOwnerId: Signal<Map<string, string>>;
-  currentGroup: Signal<FlowGroup | undefined>;
-  breadcrumbs: Signal<FlowGroup[]>;
-  visibleStates: Signal<StateDef[]>;
-  childGroups: Signal<FlowGroup[]>;
-  edgeEnds: Signal<(EdgeEnds | null)[]>;
-  groupBoxes: Signal<GroupBox[]>;
-  proxies: Signal<{ left: ProxyBox[]; right: ProxyBox[] }>;
-  nodes: Signal<CanvasNode[]>;
-  edges: Signal<CanvasEdge[]>;
+  readonly positions: Signal<Record<string, Point>>;
+  readonly groups: Signal<readonly FlowGroup[]>;
+  readonly groupById: Signal<ReadonlyMap<string, FlowGroup>>;
+  readonly parentGroupId: Signal<ReadonlyMap<string, string>>;
+  readonly stateOwnerId: Signal<ReadonlyMap<string, string>>;
+  readonly currentGroup: Signal<FlowGroup | undefined>;
+  readonly breadcrumbs: Signal<readonly FlowGroup[]>;
+  readonly visibleStates: Signal<readonly StateDef[]>;
+  readonly childGroups: Signal<readonly FlowGroup[]>;
+  readonly edgeEnds: Signal<readonly (EdgeEnds | null)[]>;
+  readonly groupBoxes: Signal<readonly GroupBox[]>;
+  readonly proxies: Signal<{
+    readonly left: readonly ProxyBox[];
+    readonly right: readonly ProxyBox[];
+  }>;
+  readonly nodes: Signal<readonly CanvasNode[]>;
+  readonly edges: Signal<readonly CanvasEdge[]>;
   /** What the automatic layout needs to place the level. */
-  layoutInput: Signal<LayoutInput>;
-  contentBounds: Signal<ViewRect>;
-  deepKeys: (groupId: string) => string[];
+  readonly layoutInput: Signal<LayoutInput>;
+  readonly contentBounds: Signal<ViewRect>;
+  readonly deepKeys: (groupId: string) => readonly string[];
 }
 
 /** Node height grows once the dots no longer fit the base height at fixed spacing. */
@@ -213,11 +217,11 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
     return id ? groupById().get(id) : undefined;
   });
 
-  const breadcrumbs = computed<FlowGroup[]>(() =>
+  const breadcrumbs = computed<readonly FlowGroup[]>(() =>
     breadcrumbPath(groupById(), parentGroupId(), deps.currentGroupId()),
   );
 
-  const deepKeys = (groupId: string): string[] => deepStateKeys(groupById(), groupId);
+  const deepKeys = (groupId: string): readonly string[] => deepStateKeys(groupById(), groupId);
 
   const visibleStates = computed(() => {
     const ctx = deps.currentGroupId();
@@ -284,83 +288,81 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
   });
 
   /** The outside ends while drilled in: sources (left column) and targets (right). */
-  const proxyIds = computed(() => {
-    const left: string[] = [];
-    const right: string[] = [];
-    if (deps.currentGroupId() === null) return { left, right };
-    for (const e of edgeEnds()) {
-      if (!e) continue;
-      if (e.src.type === 'proxy' && !left.includes(e.src.pid)) left.push(e.src.pid);
-      if (e.dst.type === 'proxy' && !right.includes(e.dst.pid)) right.push(e.dst.pid);
-    }
-    return { left, right };
-  });
+  const proxyIds = computed(
+    (): { readonly left: readonly string[]; readonly right: readonly string[] } => {
+      if (deps.currentGroupId() === null) return { left: [], right: [] };
+      const ends = edgeEnds().filter((e): e is EdgeEnds => !!e);
+      const proxyPid = (end: EndRef): readonly string[] => (end.type === 'proxy' ? [end.pid] : []);
+      return {
+        left: [...new Set(ends.flatMap((e) => proxyPid(e.src)))],
+        right: [...new Set(ends.flatMap((e) => proxyPid(e.dst)))],
+      };
+    },
+  );
 
   /**
    * Every visible transition with its source box, its dot and its target box. A state
    * starts the line at its branch dot (pass/fail) or at the dot of its guard group; a
    * group box has one dot per outgoing line, in the order of the transitions.
    */
-  const links = computed<LevelLink[]>(() => {
+  const links = computed<readonly LevelLink[]>(() => {
     const transitions = deps.graph().transitions ?? [];
     const ends = edgeEnds();
     const kindOf = new Map(deps.graph().states.map((s) => [s.key, s.kind] as const));
     const shapes = new Map(nodeShapes().map((n) => [n.s.key, n]));
     const groupsBy = new Map(groupShapes().map((b) => [b.g.id, b]));
-    const groupOutSeen = new Map<string, number>();
-    const out: LevelLink[] = [];
-    transitions.forEach((t, index) => {
+    /** The rank of a line among the earlier lines out of the same group box. */
+    const groupOutRank = (index: number, id: string): number =>
+      ends.slice(0, index).filter((e) => e?.src.type === 'group' && e.src.id === id).length;
+    const source = (
+      t: TransitionDef,
+      end: EndRef,
+      index: number,
+    ): Pick<LevelLink, 'src' | 'port' | 'sx' | 'sy'> | null => {
+      switch (end.type) {
+        case 'state': {
+          const n = shapes.get(t.from);
+          if (!n) return null;
+          const sy = outDotYFor(t.from, kindOf.get(t.from), t, transitions, positions(), n.h);
+          const id = t.branch ?? ((t.guard ? JSON.stringify(t.guard) : '') || 'out');
+          const dot = n.dots.find((d) => d.id === id) ?? n.dots.find((d) => d.cy === sy);
+          return { src: stateBox(t.from), port: dot?.id ?? 'out', sx: n.w, sy };
+        }
+        case 'group': {
+          const b = groupsBy.get(end.id);
+          if (!b) return null;
+          const j = groupOutRank(index, end.id);
+          return {
+            src: groupBox(end.id),
+            port: `o${j}`,
+            sx: GROUP_W,
+            sy: dotY(j, b.outCount, b.h),
+          };
+        }
+        case 'proxy':
+          return { src: proxyBox('l', end.pid), port: 'out', sx: PROXY_W, sy: PROXY_H / 2 };
+      }
+    };
+    const target = (t: TransitionDef, end: EndRef): string | null => {
+      switch (end.type) {
+        case 'state':
+          return shapes.has(t.to) ? stateBox(t.to) : null;
+        case 'group':
+          return groupsBy.has(end.id) ? groupBox(end.id) : null;
+        case 'proxy':
+          return proxyBox('r', end.pid);
+      }
+    };
+    return transitions.flatMap((t, index): readonly LevelLink[] => {
       const e = ends[index];
-      if (!e) return;
-      let src: string;
-      let port: string;
-      let sx: number;
-      let sy: number;
-      if (e.src.type === 'state') {
-        const n = shapes.get(t.from);
-        if (!n) return;
-        sy = outDotYFor(t.from, kindOf.get(t.from), t, transitions, positions(), n.h);
-        const id = t.branch ?? ((t.guard ? JSON.stringify(t.guard) : '') || 'out');
-        const dot = n.dots.find((d) => d.id === id) ?? n.dots.find((d) => d.cy === sy);
-        src = stateBox(t.from);
-        port = dot?.id ?? 'out';
-        sx = n.w;
-      } else if (e.src.type === 'group') {
-        const b = groupsBy.get(e.src.id);
-        if (!b) return;
-        const j = groupOutSeen.get(e.src.id) ?? 0;
-        groupOutSeen.set(e.src.id, j + 1);
-        src = groupBox(e.src.id);
-        port = `o${j}`;
-        sx = GROUP_W;
-        sy = dotY(j, b.outCount, b.h);
-      } else {
-        src = proxyBox('l', e.src.pid);
-        port = 'out';
-        sx = PROXY_W;
-        sy = PROXY_H / 2;
-      }
-      let dst: string;
-      if (e.dst.type === 'state') {
-        if (!shapes.has(t.to)) return;
-        dst = stateBox(t.to);
-      } else if (e.dst.type === 'group') {
-        if (!groupsBy.has(e.dst.id)) return;
-        dst = groupBox(e.dst.id);
-      } else {
-        dst = proxyBox('r', e.dst.pid);
-      }
-      out.push({ index, t, src, port, sx, sy, dst });
+      const from = e ? source(t, e.src, index) : null;
+      const dst = e && from ? target(t, e.dst) : null;
+      return from && dst !== null ? [{ index, t, ...from, dst }] : [];
     });
-    return out;
   });
 
   const layoutInput = computed<LayoutInput>(() => {
     const { left, right } = proxyIds();
-    const groupOut = new Map<string, number>();
-    for (const l of links()) {
-      if (l.src.startsWith('group:')) groupOut.set(l.src, (groupOut.get(l.src) ?? 0) + 1);
-    }
     return {
       boxes: [
         ...left.map((pid) => ({
@@ -403,7 +405,11 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
    * The focus: the selected transition, else the state under the pointer, else the
    * selected state. Lines and boxes outside it are drawn faint.
    */
-  const focus = computed<{ boxes: Set<string>; edge: number | null; state: string | null } | null>(() => {
+  const focus = computed<{
+    readonly boxes: ReadonlySet<string>;
+    readonly edge: number | null;
+    readonly state: string | null;
+  } | null>(() => {
     const sel = deps.selection();
     if (sel?.kind === 'transition') {
       const l = links().find((x) => x.index === sel.index);
@@ -412,12 +418,11 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
     const key = deps.hover() ?? (sel?.kind === 'state' ? sel.key : null);
     if (!key) return null;
     const box = stateBox(key);
-    const boxes = new Set([box]);
-    for (const l of links()) {
-      if (l.src === box) boxes.add(l.dst);
-      if (l.dst === box) boxes.add(l.src);
-    }
-    return { boxes, edge: null, state: box };
+    const linked = links().flatMap((l) => [
+      ...(l.src === box ? [l.dst] : []),
+      ...(l.dst === box ? [l.src] : []),
+    ]);
+    return { boxes: new Set([box, ...linked]), edge: null, state: box };
   });
 
   const placed = (id: string, fx: number, fy: number): Point => {
@@ -478,16 +483,9 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
   const proxies = computed<{ left: ProxyBox[]; right: ProxyBox[] }>(() => {
     const { left: leftIds, right: rightIds } = proxyIds();
     if (!leftIds.length && !rightIds.length) return { left: [], right: [] };
-    const xs: number[] = [];
-    const ys: number[] = [];
-    for (const n of nodes()) {
-      xs.push(n.x, n.x + n.w);
-      ys.push(n.y);
-    }
-    for (const b of groupBoxes()) {
-      xs.push(b.x, b.x + b.w);
-      ys.push(b.y);
-    }
+    const shapes = [...nodes(), ...groupBoxes()];
+    const xs = shapes.flatMap((n) => [n.x, n.x + n.w]);
+    const ys = shapes.map((n) => n.y);
     const minX = xs.length ? Math.min(...xs) : MARGIN;
     const maxX = xs.length ? Math.max(...xs) : MARGIN + NODE_W;
     const minY = ys.length ? Math.min(...ys) : MARGIN;
@@ -500,7 +498,7 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
       const s = deps.graph().states.find((x) => x.key === key);
       return { label: s ? deps.stateLabel(s) : key, isGroup: false };
     };
-    const make = (ids: string[], side: 'l' | 'r', x: number): ProxyBox[] =>
+    const make = (ids: readonly string[], side: 'l' | 'r', x: number): ProxyBox[] =>
       ids.map((pid, i) => ({ pid, ...label(pid), ...placed(proxyBox(side, pid), x, minY + i * PROXY_GAP) }));
     return {
       left: make(leftIds, 'l', minX - PROXY_COL_GAP),
@@ -513,11 +511,12 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
     const layout = deps.layout();
     const routes = layout?.routes;
     const f = focus();
-    const boxes = new Map<string, { x: number; y: number; h: number }>();
-    for (const n of nodes()) boxes.set(stateBox(n.key), n);
-    for (const b of groupBoxes()) boxes.set(groupBox(b.id), b);
-    for (const p of proxies().left) boxes.set(proxyBox('l', p.pid), { ...p, h: PROXY_H });
-    for (const p of proxies().right) boxes.set(proxyBox('r', p.pid), { ...p, h: PROXY_H });
+    const boxes = new Map<string, { readonly x: number; readonly y: number; readonly h: number }>([
+      ...nodes().map((n) => [stateBox(n.key), n] as const),
+      ...groupBoxes().map((b) => [groupBox(b.id), b] as const),
+      ...proxies().left.map((p) => [proxyBox('l', p.pid), { ...p, h: PROXY_H }] as const),
+      ...proxies().right.map((p) => [proxyBox('r', p.pid), { ...p, h: PROXY_H }] as const),
+    ]);
     const laidOut = links().filter(({ index }) => !layout || routes!.has(index));
     const out = laidOut.map(({ index, t, src, sx, sy, dst }) => {
       const route = routes?.get(index);
@@ -570,22 +569,16 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
    * renders 1:1, that is, the viewBox equals the size. One user unit is one pixel.
    */
   const contentBounds = computed<ViewRect>(() => {
-    const xs: number[] = [];
-    const ys: number[] = [];
-    for (const n of nodes()) {
-      const dotText = Math.max(0, ...n.dots.map((d) => (d.label ? textWidth(d.label, DOT_FONT) + 14 : 0)));
-      xs.push(n.x, n.x + n.w + dotText);
-      ys.push(n.y, n.y + n.h);
-    }
-    for (const b of groupBoxes()) {
-      xs.push(b.x, b.x + b.w);
-      ys.push(b.y, b.y + b.h);
-    }
+    const dotText = (n: CanvasNode): number =>
+      Math.max(0, ...n.dots.map((d) => (d.label ? textWidth(d.label, DOT_FONT) + 14 : 0)));
     const { left, right } = proxies();
-    for (const p of [...left, ...right]) {
-      xs.push(p.x, p.x + PROXY_W);
-      ys.push(p.y, p.y + PROXY_H);
-    }
+    const rects = [
+      ...nodes().map((n) => ({ x: n.x, y: n.y, w: n.w + dotText(n), h: n.h })),
+      ...groupBoxes(),
+      ...[...left, ...right].map((p) => ({ x: p.x, y: p.y, w: PROXY_W, h: PROXY_H })),
+    ];
+    const xs = rects.flatMap((b) => [b.x, b.x + b.w]);
+    const ys = rects.flatMap((b) => [b.y, b.y + b.h]);
     if (!xs.length) return { x: 0, y: 0, w: 480, h: 320 };
     const minX = Math.min(...xs) - MARGIN;
     const minY = Math.min(...ys) - MARGIN;

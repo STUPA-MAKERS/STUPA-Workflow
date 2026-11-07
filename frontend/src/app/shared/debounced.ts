@@ -2,7 +2,7 @@ import { DestroyRef, inject } from '@angular/core';
 import { LIVE_SEARCH_DEBOUNCE_MS } from '@stupa-makers/ui-kit';
 
 /** A function that runs only after a pause. Make it with {@link debounced}. */
-export interface Debounced<A extends unknown[]> {
+export interface Debounced<A extends readonly unknown[]> {
   /** Run after `ms` without a further call. A new call starts the wait again. */
   (...args: A): void;
   /** Drop the call that waits. */
@@ -18,7 +18,7 @@ export interface Debounced<A extends unknown[]> {
  * context (a field initializer or the constructor): a waiting call is dropped when the
  * injector is destroyed.
  */
-export function debounced<A extends unknown[]>(
+export function debounced<A extends readonly unknown[]>(
   fn: (...args: A) => void,
   ms: number = LIVE_SEARCH_DEBOUNCE_MS,
 ): Debounced<A> {

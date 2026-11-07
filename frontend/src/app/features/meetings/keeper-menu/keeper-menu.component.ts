@@ -22,11 +22,11 @@ import { personLabel } from '@shared/person-label.util';
 
 /** One member of the picker. */
 interface Candidate {
-  principalId: Uuid;
-  name: string;
+  readonly principalId: Uuid;
+  readonly name: string;
   /** "Anwesend · führt das Protokoll". */
-  sub: string;
-  current: boolean;
+  readonly sub: string;
+  readonly current: boolean;
 }
 
 /**

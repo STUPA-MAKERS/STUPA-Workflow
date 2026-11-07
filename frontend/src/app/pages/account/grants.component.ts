@@ -28,7 +28,7 @@ import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import { scopeLabel } from './scope-labels';
 
 /** What the confirmation dialog asks: revoke one grant, or all of them. */
-type Confirm = { kind: 'one'; grant: OAuthGrant } | { kind: 'all' };
+type Confirm = { readonly kind: 'one'; readonly grant: OAuthGrant } | { readonly kind: 'all' };
 
 /**
  * Account page "API-Zugang".

@@ -3,6 +3,9 @@ import { toFormatLocale } from '@core/i18n/i18n.service';
 import { flowColorKind } from '@shared/status-kind.util';
 import { formatBytes as formatBytesIn } from '@stupa-makers/ui-kit';
 
+/** The keys of `data` that may hold the title, in the order they are tried. */
+const TITLE_KEYS = ['title', 'name', 'subject', 'titel'] as const;
+
 /**
  * Derive the display title of an application from the free `data` fields.
  *
@@ -11,15 +14,14 @@ import { formatBytes as formatBytesIn } from '@stupa-makers/ui-kit';
  * caller passes the i18n "untitled" text as that fallback.
  */
 export function applicationTitle(
-  data: Record<string, unknown> | null | undefined,
+  data: Readonly<Record<string, unknown>> | null | undefined,
   fallback: string,
 ): string {
   if (!data) return fallback;
-  for (const key of ['title', 'name', 'subject', 'titel']) {
-    const value = data[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-  }
-  return fallback;
+  const title = TITLE_KEYS.map((key) => data[key]).find(
+    (value): value is string => typeof value === 'string' && value.trim() !== '',
+  );
+  return title?.trim() ?? fallback;
 }
 
 /**
@@ -41,18 +43,16 @@ export type TransitionLook = 'fill' | 'tonal' | 'danger';
  * destructive action and gets the outlined red look. The first other transition is the
  * main action (filled), the rest are tonal. The order of the server stays.
  */
-export function transitionLooks(transitions: readonly Transition[]): Map<string, TransitionLook> {
-  const looks = new Map<string, TransitionLook>();
-  let main = false;
-  for (const t of transitions) {
-    if (isRejection(t)) {
-      looks.set(t.id, 'danger');
-    } else {
-      looks.set(t.id, main ? 'tonal' : 'fill');
-      main = true;
-    }
-  }
-  return looks;
+export function transitionLooks(
+  transitions: readonly Transition[],
+): ReadonlyMap<string, TransitionLook> {
+  const mainIndex = transitions.findIndex((t) => !isRejection(t));
+  return new Map(
+    transitions.map((t, i): readonly [string, TransitionLook] => [
+      t.id,
+      isRejection(t) ? 'danger' : i === mainIndex ? 'fill' : 'tonal',
+    ]),
+  );
 }
 
 /** A transition whose colour reads as an error (red): a rejection or a cancel. */

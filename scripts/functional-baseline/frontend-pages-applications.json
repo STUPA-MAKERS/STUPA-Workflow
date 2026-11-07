@@ -1,12 +1,6 @@
 {
-  "frontend/src/app/pages/applications/agenda-dialog/agenda-dialog.component.ts": 7,
-  "frontend/src/app/pages/applications/application-reads.ts": 1,
-  "frontend/src/app/pages/applications/applications-detail.component.ts": 29,
-  "frontend/src/app/pages/applications/applications-list.component.ts": 30,
-  "frontend/src/app/pages/applications/applications-page.service.ts": 3,
-  "frontend/src/app/pages/applications/applications.util.ts": 6,
-  "frontend/src/app/pages/applications/attachments-panel.component.ts": 10,
-  "frontend/src/app/pages/applications/capture/application-capture.component.ts": 4,
-  "frontend/src/app/pages/applications/force-status-dialog/force-status-dialog.component.ts": 1,
-  "frontend/src/app/pages/applications/row-transitions-menu/row-transitions-menu.component.ts": 9
+  "frontend/src/app/pages/applications/applications-detail.component.ts": 3,
+  "frontend/src/app/pages/applications/applications-list.component.ts": 3,
+  "frontend/src/app/pages/applications/attachments-panel.component.ts": 2,
+  "frontend/src/app/pages/applications/capture/application-capture.component.ts": 1
 }

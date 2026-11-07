@@ -82,8 +82,7 @@ def test_validate_definition_rejects_bad_jsonlogic() -> None:
     FormFieldDef validates JsonLogic at build time, so the test bends the field after the
     build.
     """
-    f = _field("t", "text")
-    f.visible_if = {"system": ["rm", "-rf"]}
+    f = _field("t", "text").model_copy(update={"visible_if": {"system": ["rm", "-rf"]}})
     with pytest.raises(FormDefinitionError, match="invalid expression"):
         validate_definition([f])
 

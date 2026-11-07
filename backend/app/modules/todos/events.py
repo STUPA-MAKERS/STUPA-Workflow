@@ -19,7 +19,7 @@ decisions:
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -31,6 +31,7 @@ from app.modules.applications.models import Application, ApplicationDecision
 from app.modules.applications.service.service_base import _title_of
 from app.modules.budget.tree_models import BudgetExpense
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.todos.grouping import grouped
 from app.modules.todos.models import (
     LINK_COLUMNS,
     TodoBoard,
@@ -47,7 +48,7 @@ ONE_EVENT_KINDS: tuple[str, ...] = ("application", "expense", "invoice")
 _ZERO = Decimal("0.00")
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Totals:
     """The money of one Event."""
 
@@ -62,7 +63,7 @@ class Totals:
         return self.income - self.expenses
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Decision:
     """One row of the decisions of an Event."""
 
@@ -119,70 +120,124 @@ async def _links(
 
 async def totals(session: AsyncSession, card_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, Totals]:
     """The totals of each card, also for a card without links (all zero)."""
-    out = {card_id: Totals() for card_id in card_ids}
     if not card_ids:
-        return out
+        return {}
     links = await _links(session, card_ids, "application", "expense")
-    apps_of: dict[uuid.UUID, set[uuid.UUID]] = {}
-    expenses_of: dict[uuid.UUID, set[uuid.UUID]] = {}
-    for link in links:
-        if link.application_id is not None:
-            apps_of.setdefault(link.card_id, set()).add(link.application_id)
-        if link.expense_id is not None:
-            expenses_of.setdefault(link.card_id, set()).add(link.expense_id)
-    app_ids = {aid for ids in apps_of.values() for aid in ids}
-    if app_ids:
-        rows = await session.execute(
-            select(Application.id, Application.amount, ApplicationDecision.approved_amount)
-            .outerjoin(
-                ApplicationDecision,
-                and_(
-                    ApplicationDecision.application_id == Application.id,
-                    ApplicationDecision.superseded_at.is_(None),
-                ),
-            )
-            .where(Application.id.in_(app_ids))
+    apps_of = _id_sets(
+        (link.card_id, link.application_id) for link in links if link.application_id is not None
+    )
+    expenses_of = _id_sets(
+        (link.card_id, link.expense_id) for link in links if link.expense_id is not None
+    )
+    money, decided = await _application_money(
+        session, frozenset(aid for ids in apps_of.values() for aid in ids)
+    )
+    bookings = await _bookings(
+        session, frozenset(eid for ids in expenses_of.values() for eid in ids)
+    )
+    return {
+        card_id: _card_totals(
+            apps_of.get(card_id, frozenset()),
+            _counted(expenses_of.get(card_id, frozenset()), bookings),
+            money,
+            decided,
         )
-        money: dict[uuid.UUID, tuple[Decimal, Decimal | None]] = {}
-        decided: set[uuid.UUID] = set()
-        for app_id, amount, approved in rows.tuples().all():
-            money[app_id] = (amount or _ZERO, approved)
-        decided_rows = await session.scalars(
-            select(ApplicationDecision.application_id).where(
-                ApplicationDecision.application_id.in_(app_ids),
+        for card_id in card_ids
+    }
+
+
+type _Money = Mapping[uuid.UUID, tuple[Decimal, Decimal | None]]
+type _Booking = tuple[str, Decimal, uuid.UUID | None]
+
+
+def _id_sets(
+    pairs: Iterable[tuple[uuid.UUID, uuid.UUID]],
+) -> dict[uuid.UUID, frozenset[uuid.UUID]]:
+    """Group the target ids of the links by their card."""
+    return {card_id: frozenset(ids) for card_id, ids in grouped(pairs).items()}
+
+
+async def _application_money(
+    session: AsyncSession, app_ids: frozenset[uuid.UUID]
+) -> tuple[_Money, frozenset[uuid.UUID]]:
+    """The requested and approved amount of each Antrag, and the decided Anträge."""
+    if not app_ids:
+        return {}, frozenset()
+    rows = await session.execute(
+        select(Application.id, Application.amount, ApplicationDecision.approved_amount)
+        .outerjoin(
+            ApplicationDecision,
+            and_(
+                ApplicationDecision.application_id == Application.id,
                 ApplicationDecision.superseded_at.is_(None),
-            )
+            ),
         )
-        decided = set(decided_rows.all())
-        for card_id, ids in apps_of.items():
-            for app_id in ids:
-                amount, approved = money.get(app_id, (_ZERO, None))
-                out[card_id].requested += amount
-                if app_id in decided:
-                    out[card_id].approved += approved if approved is not None else amount
-    expense_ids = {eid for ids in expenses_of.values() for eid in ids}
-    if expense_ids:
-        rows = await session.execute(
-            select(
-                BudgetExpense.id,
-                BudgetExpense.kind,
-                BudgetExpense.amount,
-                BudgetExpense.parent_expense_id,
-            ).where(BudgetExpense.id.in_(expense_ids))
+        .where(Application.id.in_(app_ids))
+    )
+    money = {
+        app_id: (amount or _ZERO, approved) for app_id, amount, approved in rows.tuples().all()
+    }
+    decided_rows = await session.scalars(
+        select(ApplicationDecision.application_id).where(
+            ApplicationDecision.application_id.in_(app_ids),
+            ApplicationDecision.superseded_at.is_(None),
         )
-        facts = {eid: (kind, amount, parent) for eid, kind, amount, parent in rows.tuples().all()}
-        for card_id, ids in expenses_of.items():
-            for eid in ids:
-                if eid not in facts:
-                    continue
-                kind, amount, parent = facts[eid]
-                if parent is not None and parent in ids:
-                    continue
-                if kind == "income":
-                    out[card_id].income += amount
-                else:
-                    out[card_id].expenses += amount
-    return out
+    )
+    return money, frozenset(decided_rows.all())
+
+
+async def _bookings(
+    session: AsyncSession, expense_ids: frozenset[uuid.UUID]
+) -> Mapping[uuid.UUID, _Booking]:
+    """The kind, the amount and the parent of each Buchung."""
+    if not expense_ids:
+        return {}
+    rows = await session.execute(
+        select(
+            BudgetExpense.id,
+            BudgetExpense.kind,
+            BudgetExpense.amount,
+            BudgetExpense.parent_expense_id,
+        ).where(BudgetExpense.id.in_(expense_ids))
+    )
+    return {eid: (kind, amount, parent) for eid, kind, amount, parent in rows.tuples().all()}
+
+
+def _counted(
+    ids: frozenset[uuid.UUID], bookings: Mapping[uuid.UUID, _Booking]
+) -> tuple[tuple[str, Decimal], ...]:
+    """The kind and the amount of each linked Buchung that counts.
+
+    A sub-booking whose parent is linked too counts once, through the parent.
+    """
+    known = (bookings[eid] for eid in ids if eid in bookings)
+    return tuple(
+        (kind, amount) for kind, amount, parent in known if parent is None or parent not in ids
+    )
+
+
+def _card_totals(
+    app_ids: frozenset[uuid.UUID],
+    booked: Iterable[tuple[str, Decimal]],
+    money: _Money,
+    decided: frozenset[uuid.UUID],
+) -> Totals:
+    """The totals of one card from the money of its Anträge and its counted Buchungen."""
+    amounts = {app_id: money.get(app_id, (_ZERO, None)) for app_id in app_ids}
+    entries = tuple(booked)
+    return Totals(
+        requested=sum((amount for amount, _approved in amounts.values()), _ZERO),
+        approved=sum(
+            (
+                approved if approved is not None else amount
+                for app_id, (amount, approved) in amounts.items()
+                if app_id in decided
+            ),
+            _ZERO,
+        ),
+        expenses=sum((amount for kind, amount in entries if kind != "income"), _ZERO),
+        income=sum((amount for kind, amount in entries if kind == "income"), _ZERO),
+    )
 
 
 async def decisions(session: AsyncSession, card_id: uuid.UUID) -> list[Decision]:
@@ -191,83 +246,98 @@ async def decisions(session: AsyncSession, card_id: uuid.UUID) -> list[Decision]
     app_ids = {link.application_id for link in links if link.application_id is not None}
     item_ids = {link.agenda_item_id for link in links if link.agenda_item_id is not None}
     vote_ids = {link.vote_id for link in links if link.vote_id is not None}
-    out: list[Decision] = []
-    seen_votes: set[uuid.UUID] = set()
-    if app_ids:
-        rows = await session.execute(
-            select(Application, ApplicationDecision, Meeting.title)
-            .join(ApplicationDecision, ApplicationDecision.application_id == Application.id)
-            .outerjoin(Vote, Vote.id == ApplicationDecision.vote_id)
-            .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
-            .where(
-                Application.id.in_(app_ids),
-                ApplicationDecision.superseded_at.is_(None),
-            )
-        )
-        for app, decision, meeting_title in rows.tuples().all():
-            if decision.vote_id is not None:
-                seen_votes.add(decision.vote_id)
-            out.append(
-                Decision(
-                    kind="decision",
-                    title=_title_of(app.data) or "",
-                    decided_at=decision.decided_at,
-                    meeting_title=meeting_title,
-                    result="passed",
-                    amount=(
-                        decision.approved_amount
-                        if decision.approved_amount is not None
-                        else app.amount
-                    ),
-                    conditions=list(decision.conditions or []),
-                    target_id=app.id,
+    app_rows = (
+        (
+            await session.execute(
+                select(Application, ApplicationDecision, Meeting.title)
+                .join(ApplicationDecision, ApplicationDecision.application_id == Application.id)
+                .outerjoin(Vote, Vote.id == ApplicationDecision.vote_id)
+                .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
+                .where(
+                    Application.id.in_(app_ids),
+                    ApplicationDecision.superseded_at.is_(None),
                 )
             )
-    conditions: list[ColumnElement[bool]] = []
-    if item_ids:
-        conditions.append(Vote.agenda_item_id.in_(item_ids))
-    if vote_ids:
-        conditions.append(Vote.id.in_(vote_ids))
-    if conditions:
-        vote_rows = (
-            (
-                await session.execute(
-                    select(Vote, Meeting.title, MeetingAgendaItem.title)
-                    .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
-                    .outerjoin(MeetingAgendaItem, MeetingAgendaItem.id == Vote.agenda_item_id)
-                    .where(or_(*conditions), Vote.status == "closed")
-                )
-            )
-            .tuples()
-            .all()
         )
-        titles = await _application_titles(
-            session, {vote.application_id for vote, _m, _t in vote_rows if vote.application_id}
+        .tuples()
+        .all()
+        if app_ids
+        else ()
+    )
+    conditions = (
+        *((Vote.agenda_item_id.in_(item_ids),) if item_ids else ()),
+        *((Vote.id.in_(vote_ids),) if vote_ids else ()),
+    )
+    vote_rows = (
+        (
+            await session.execute(
+                select(Vote, Meeting.title, MeetingAgendaItem.title)
+                .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
+                .outerjoin(MeetingAgendaItem, MeetingAgendaItem.id == Vote.agenda_item_id)
+                .where(or_(*conditions), Vote.status == "closed")
+            )
         )
-        for vote, meeting_title, item_title in vote_rows:
-            if vote.id in seen_votes:
-                continue
-            seen_votes.add(vote.id)
-            title = (
-                vote.question
-                or (titles.get(vote.application_id) if vote.application_id else None)
-                or item_title
-                or ""
-            )
-            out.append(
-                Decision(
-                    kind="vote",
-                    title=title,
-                    decided_at=vote.closed_at,
-                    meeting_title=meeting_title,
-                    result=vote.result,
-                    amount=None,
-                    target_id=vote.id,
-                )
-            )
+        .tuples()
+        .all()
+        if conditions
+        else ()
+    )
+    titles = await _application_titles(
+        session, {vote.application_id for vote, _m, _t in vote_rows if vote.application_id}
+    )
+    seen = frozenset(d.vote_id for _app, d, _m in app_rows if d.vote_id is not None)
+    first = {vote.id: index for index, (vote, _m, _t) in reversed(tuple(enumerate(vote_rows)))}
+    fresh = (
+        row
+        for index, row in enumerate(vote_rows)
+        if first[row[0].id] == index and row[0].id not in seen
+    )
+    found = (
+        *(_app_decision(app, decision, meeting) for app, decision, meeting in app_rows),
+        *(_vote_decision(vote, meeting, item, titles) for vote, meeting, item in fresh),
+    )
     oldest = datetime.min.replace(tzinfo=UTC)
-    out.sort(key=lambda d: d.decided_at or oldest, reverse=True)
-    return out
+    return sorted(found, key=lambda d: d.decided_at or oldest, reverse=True)
+
+
+def _app_decision(
+    app: Application, decision: ApplicationDecision, meeting_title: str | None
+) -> Decision:
+    """The valid decision of a linked Antrag."""
+    return Decision(
+        kind="decision",
+        title=_title_of(app.data) or "",
+        decided_at=decision.decided_at,
+        meeting_title=meeting_title,
+        result="passed",
+        amount=(decision.approved_amount if decision.approved_amount is not None else app.amount),
+        conditions=list(decision.conditions or []),
+        target_id=app.id,
+    )
+
+
+def _vote_decision(
+    vote: Vote,
+    meeting_title: str | None,
+    item_title: str | None,
+    titles: Mapping[uuid.UUID, str],
+) -> Decision:
+    """A closed vote of a linked TOP or vote, titled by its question, Antrag or TOP."""
+    title = (
+        vote.question
+        or (titles.get(vote.application_id) if vote.application_id else None)
+        or item_title
+        or ""
+    )
+    return Decision(
+        kind="vote",
+        title=title,
+        decided_at=vote.closed_at,
+        meeting_title=meeting_title,
+        result=vote.result,
+        amount=None,
+        target_id=vote.id,
+    )
 
 
 async def _application_titles(session: AsyncSession, ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
@@ -321,10 +391,12 @@ async def check_one_event(
     Raises:
         ConflictError: ``event_link_taken`` (HTTP 409).
     """
-    by_kind: dict[str, set[uuid.UUID]] = {}
-    for kind, target_id in refs:
-        if kind in ONE_EVENT_KINDS:
-            by_kind.setdefault(kind, set()).add(target_id)
+    by_kind = {
+        kind: frozenset(ids)
+        for kind, ids in grouped(
+            (kind, target_id) for kind, target_id in refs if kind in ONE_EVENT_KINDS
+        ).items()
+    }
     if not by_kind:
         return
     conditions = [getattr(TodoLink, LINK_COLUMNS[kind]).in_(ids) for kind, ids in by_kind.items()]

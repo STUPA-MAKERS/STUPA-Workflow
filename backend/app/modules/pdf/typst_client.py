@@ -45,14 +45,18 @@ _ASSET_CONTENT_TYPE = "application/octet-stream"
 type _FilePart = tuple[str, tuple[str, bytes, str]]
 
 
-def _error_detail(response: httpx.Response) -> str:
-    """Pull the scrubbed ``{"error": …}`` reason from the error response (truncated)."""
+def _raw_detail(response: httpx.Response) -> str | None:
+    """Return the ``error`` value of a JSON body, or the raw text when the body is no JSON."""
     try:
         body = response.json()
-        detail = body.get("error") if isinstance(body, dict) else None
     except ValueError:
-        detail = response.text
-    detail = (detail or "").strip() or "no detail"
+        return response.text
+    return body.get("error") if isinstance(body, dict) else None
+
+
+def _error_detail(response: httpx.Response) -> str:
+    """Pull the scrubbed ``{"error": …}`` reason from the error response (truncated)."""
+    detail = (_raw_detail(response) or "").strip() or "no detail"
     return detail[:_MAX_ERROR_DETAIL]
 
 
@@ -94,19 +98,49 @@ def _config_part(config: Mapping[str, object] | None) -> dict[str, str]:
         ) from exc
 
 
-def _file_parts(markdown: str, assets: Mapping[str, bytes] | None) -> list[_FilePart]:
+def _file_parts(markdown: str, assets: Mapping[str, bytes] | None) -> tuple[_FilePart, ...]:
     """Build the ``source`` part and one ``assets`` part per uploaded file."""
-    parts: list[_FilePart] = [
-        (_SOURCE_FIELD, ("source.md", markdown.encode("utf-8"), _MARKDOWN_CONTENT_TYPE))
-    ]
-    parts.extend(
-        (_ASSETS_FIELD, (name, data, _ASSET_CONTENT_TYPE))
-        for name, data in (assets or {}).items()
+    source: _FilePart = (
+        _SOURCE_FIELD,
+        ("source.md", markdown.encode("utf-8"), _MARKDOWN_CONTENT_TYPE),
     )
-    return parts
+    return (
+        source,
+        *(
+            (_ASSETS_FIELD, (name, data, _ASSET_CONTENT_TYPE))
+            for name, data in (assets or {}).items()
+        ),
+    )
 
 
-@dataclass(slots=True)
+async def _post(
+    client: httpx.AsyncClient,
+    url: str,
+    params: Mapping[str, str],
+    markdown: str,
+    config: Mapping[str, object] | None,
+    assets: Mapping[str, bytes] | None,
+) -> httpx.Response:
+    """Post the render as multipart when a config or an asset needs it, else as the raw body."""
+    multipart = bool(config) or bool(assets)
+    return await (
+        client.post(
+            url,
+            params=params,
+            data=_config_part(config),
+            files=_file_parts(markdown, assets),
+        )
+        if multipart
+        else client.post(
+            url,
+            params=params,
+            content=markdown.encode("utf-8"),
+            headers={"Content-Type": _MARKDOWN_CONTENT_TYPE},
+        )
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class TypstClient:
     """Thin async HTTP client around the typst ``/render`` endpoint."""
 
@@ -138,27 +172,11 @@ class TypstClient:
             TypstError: The service refused or failed the render, or it returned a
                 body that is not a PDF.
         """
-        params: dict[str, str] = {}
-        if variant is not None:
-            params["variant"] = variant
+        params = {} if variant is None else {"variant": variant}
         url = self.base_url.rstrip("/") + "/render"
-        multipart = bool(config) or bool(assets)
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                if multipart:
-                    response = await client.post(
-                        url,
-                        params=params,
-                        data=_config_part(config),
-                        files=_file_parts(markdown, assets),
-                    )
-                else:
-                    response = await client.post(
-                        url,
-                        params=params,
-                        content=markdown.encode("utf-8"),
-                        headers={"Content-Type": _MARKDOWN_CONTENT_TYPE},
-                    )
+                response = await _post(client, url, params, markdown, config, assets)
         except httpx.HTTPError as exc:
             raise TypstError(f"typst unreachable ({type(exc).__name__})", retryable=True) from exc
 

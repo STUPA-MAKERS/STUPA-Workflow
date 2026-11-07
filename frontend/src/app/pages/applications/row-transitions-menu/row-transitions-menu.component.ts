@@ -38,11 +38,11 @@ export function rowForceItem(auth: AuthService, t: T): RowMenuItem | null {
 
 /** What the reader chose in the row menu. The list page carries it out. */
 export type RowAction =
-  | { kind: 'open' }
-  | { kind: 'archive' }
-  | { kind: 'force' }
-  | { kind: 'delete' }
-  | { kind: 'transition'; transition: Transition };
+  | { readonly kind: 'open' }
+  | { readonly kind: 'archive' }
+  | { readonly kind: 'force' }
+  | { readonly kind: 'delete' }
+  | { readonly kind: 'transition'; readonly transition: Transition };
 
 /**
  * The "more" menu of one row of the applications list.
@@ -90,11 +90,13 @@ export class RowTransitionsMenuComponent {
       icon: isRejection(tr) ? 'x' : tr.addsToAgenda ? 'cal' : 'play',
       danger: isRejection(tr),
     }));
-    const actions: RowMenuItem[] = [{ id: 'open', label: t('applications.row.open'), icon: 'ext' }];
     const archive = rowArchiveItem(this.auth, t, this.item());
-    if (archive) actions.push(archive);
     const force = rowForceItem(this.auth, t);
-    if (force) actions.push(force);
+    const actions: RowMenuItem[] = [
+      { id: 'open', label: t('applications.row.open'), icon: 'ext' },
+      ...(archive ? [archive] : []),
+      ...(force ? [force] : []),
+    ];
     const danger: RowMenuItem[] = this.auth.can('application.delete')
       ? [{ id: 'delete', label: t('applications.detail.delete'), icon: 'trash', danger: true }]
       : [];
@@ -109,7 +111,8 @@ export class RowTransitionsMenuComponent {
   protected onOpened(): void {
     this.transitions.set([]);
     if (!this.canTransition()) return;
-    const seq = ++this.seq;
+    this.seq = this.seq + 1;
+    const seq = this.seq;
     this.pending.set(true);
     this.api.transitions(this.item().id).subscribe({
       next: (list) => {

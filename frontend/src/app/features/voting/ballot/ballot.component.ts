@@ -63,25 +63,33 @@ export type BallotCaster = (choice: BallotPick, asDelegation: boolean) => Observ
 
 /** The error of a refused cast, as the HTTP client reports it. */
 export interface BallotCastError {
-  status?: number;
-  error?: ProblemDetail | null;
+  readonly status?: number;
+  readonly error?: ProblemDetail | null;
 }
 
 /** A refused cast, for the page to report and to reload the vote. */
 export interface BallotFailure {
-  asDelegation: boolean;
+  readonly asDelegation: boolean;
   /** 409 `already_voted`: the ballot exists already. The row locks. */
-  alreadyVoted: boolean;
-  error: BallotCastError;
+  readonly alreadyVoted: boolean;
+  readonly error: BallotCastError;
 }
 
 /** An accepted ballot. */
 export interface BallotCast {
-  choice: BallotPick;
-  asDelegation: boolean;
+  readonly choice: BallotPick;
+  readonly asDelegation: boolean;
 }
 
 const NOT_CAST: MyBallot = { cast: false, choice: null };
+
+/** The ballot of a row after the server accepted `choice` (`null`: secret, or not known). */
+function castBallot(choice: BallotPick | null): MyBallot {
+  if (typeof choice === 'string' || choice === null) return { cast: true, choice };
+  return isAnswers(choice)
+    ? { cast: true, choice: null, answers: { ...choice } }
+    : { cast: true, choice: null, choices: [...choice] };
+}
 
 /**
  * The ballot of one vote, in two steps: pick Ja, Nein or Enthaltung, then confirm with
@@ -395,17 +403,21 @@ export class BallotComponent {
   protected toggle(row: BallotRow, id: string): void {
     const state = row === 'own' ? this.ownState() : this.proxyState();
     if (!state || state.cast || this.pending() !== null) return;
-    let next: readonly string[];
-    if (!this.multiSeat()) {
-      next = [id];
-    } else {
-      const current = this.picks(row);
-      if (current.includes(id)) next = current.filter((c) => c !== id);
-      else if (current.length < this.seats()) next = [...current, id];
-      else return;
-    }
+    const next = this.togglePicks(row, id);
+    if (next === null) return;
     this.picked.update((p) => ({ ...p, [row]: next }));
     this.active.set(row);
+  }
+
+  /**
+   * The picks of a row after a click on a candidate: the candidate alone (one seat), the
+   * picks without it, the picks with it, or `null` when every seat has a name already.
+   */
+  private togglePicks(row: BallotRow, id: string): readonly string[] | null {
+    if (!this.multiSeat()) return [id];
+    const current = this.picks(row);
+    if (current.includes(id)) return current.filter((c) => c !== id);
+    return current.length < this.seats() ? [...current, id] : null;
   }
 
   /** "Enthaltung" / "Ganz enthalten": the row picks no candidate. */
@@ -473,10 +485,7 @@ export class BallotComponent {
   }
 
   private lock(row: BallotRow, choice: BallotPick | null): void {
-    let ballot: MyBallot;
-    if (typeof choice === 'string' || choice === null) ballot = { cast: true, choice };
-    else if (isAnswers(choice)) ballot = { cast: true, choice: null, answers: { ...choice } };
-    else ballot = { cast: true, choice: null, choices: [...choice] };
+    const ballot = castBallot(choice);
     this.local.update((l) => ({ ...l, [row]: ballot }));
     this.picked.update((p) => ({ ...p, [row]: null }));
   }

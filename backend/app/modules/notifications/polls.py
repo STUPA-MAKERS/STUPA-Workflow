@@ -102,10 +102,9 @@ async def eligible_members(session: AsyncSession, gremium_id: UUID) -> list[tupl
             )
         )
     ).all()
-    found: dict[str, str] = {}
-    for sub, email, perms in rows:
-        if "vote.cast" in (perms or []) and email:
-            found[str(sub)] = str(email)
+    found = {
+        str(sub): str(email) for sub, email, perms in rows if "vote.cast" in (perms or []) and email
+    }
     return sorted(found.items())
 
 
@@ -141,10 +140,9 @@ async def send_poll_mail(
     if vote.meeting_id is not None or vote.kind != "poll":
         return False
     gremium_id = UUID(vote.eligible_group)
-    members = await eligible_members(session, gremium_id)
-    if reminder:
-        answered = await _answered(session, vote.id)
-        members = [(sub, email) for sub, email in members if sub not in answered]
+    eligible = await eligible_members(session, gremium_id)
+    answered = await _answered(session, vote.id) if reminder else set[str]()
+    members = [(sub, email) for sub, email in eligible if sub not in answered]
     if not members:
         return False
     gremium_name = await session.scalar(select(Gremium.name).where(Gremium.id == gremium_id))
@@ -155,9 +153,9 @@ async def send_poll_mail(
         "closesAt": _end_text(vote.closes_at, settings),
     }
     service = NotificationService(session, queue=queue, settings=settings)
-    sent = False
-    for sub, email in members:
-        if await service.send_kind_mail(
+
+    async def send_to(sub: str, email: str) -> bool:
+        return await service.send_kind_mail(
             [email],
             kind=key,
             template_key=key,
@@ -166,9 +164,10 @@ async def send_poll_mail(
             context=context,
             idempotency_parts=(key, str(vote.id), sub),
             link=vote_link(settings, vote.id),
-        ):
-            sent = True
-    return sent
+        )
+
+    sent = [await send_to(sub, email) for sub, email in members]
+    return any(sent)
 
 
 async def notify_poll_started(

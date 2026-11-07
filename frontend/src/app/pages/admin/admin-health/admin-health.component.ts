@@ -20,28 +20,34 @@ export type HealthKind = 'ok' | 'warn' | 'error' | 'muted';
 
 /** One tile of "Zustand". */
 export interface HealthTile {
-  key: 'audit' | 'backup' | 'erasure';
-  link: string;
-  icon: IconName;
-  kind: HealthKind;
+  readonly key: 'audit' | 'backup' | 'erasure';
+  readonly link: string;
+  readonly icon: IconName;
+  readonly kind: HealthKind;
   /** Null while the data loads: the tile shows a placeholder line. */
-  title: string | null;
-  sub: string;
+  readonly title: string | null;
+  readonly sub: string;
   /** A second line in the danger colour, for example a failed newer backup. */
-  alert?: string;
+  readonly alert?: string;
 }
 
 /** The state of the audit tile. */
 type AuditState =
-  | { status: 'loading' }
-  | { status: 'stored'; check: AuditVerification }
-  | { status: 'live'; check: AuditChainCheck }
-  | { status: 'never' }
-  | { status: 'error' };
+  | { readonly status: 'loading' }
+  | { readonly status: 'stored'; readonly check: AuditVerification }
+  | { readonly status: 'live'; readonly check: AuditChainCheck }
+  | { readonly status: 'never' }
+  | { readonly status: 'error' };
 
-type BackupState = { status: 'loading' } | { status: 'ok'; list: BackupList } | { status: 'error' };
+type BackupState =
+  | { readonly status: 'loading' }
+  | { readonly status: 'ok'; readonly list: BackupList }
+  | { readonly status: 'error' };
 
-type ErasureState = { status: 'loading' } | { status: 'ok'; open: number } | { status: 'error' };
+type ErasureState =
+  | { readonly status: 'loading' }
+  | { readonly status: 'ok'; readonly open: number }
+  | { readonly status: 'error' };
 
 /**
  * "Zustand" at the top of the admin navigation: three tiles that each
@@ -82,13 +88,11 @@ export class AdminHealthComponent {
   private readonly backup = signal<BackupState>({ status: 'loading' });
   private readonly erasure = signal<ErasureState>({ status: 'loading' });
 
-  readonly tiles = computed<HealthTile[]>(() => {
-    const out: HealthTile[] = [];
-    if (this.canAudit) out.push(this.auditTile(this.audit()));
-    if (this.canBackup) out.push(this.backupTile(this.backup()));
-    if (this.canPrivacy) out.push(this.erasureTile(this.erasure()));
-    return out;
-  });
+  readonly tiles = computed<readonly HealthTile[]>(() => [
+    ...(this.canAudit ? [this.auditTile(this.audit())] : []),
+    ...(this.canBackup ? [this.backupTile(this.backup())] : []),
+    ...(this.canPrivacy ? [this.erasureTile(this.erasure())] : []),
+  ]);
 
   constructor() {
     if (this.canAudit) this.loadAudit();
@@ -168,8 +172,8 @@ export class AdminHealthComponent {
     const parts = [
       this.t(`admin.backups.kind.${shown.kind}` as TranslationKey),
       this.t(`admin.backups.status.${shown.status}` as TranslationKey),
+      ...(shown.sizeBytes != null ? [formatBytes(shown.sizeBytes, this.i18n.formatLocale())] : []),
     ];
-    if (shown.sizeBytes != null) parts.push(formatBytes(shown.sizeBytes, this.i18n.formatLocale()));
     const failed = newestBackup(state.list.items.filter((b) => b.status === 'failed'));
     const alert =
       failed && failed !== shown && time(failed) > time(shown)
@@ -211,15 +215,11 @@ function time(b: Backup): number {
 }
 
 /** The newest archive by creation time. The list order of the server is not relied on. */
-function newestBackup(items: Backup[]): Backup | null {
-  let best: Backup | null = null;
-  for (const b of items) {
-    if (!best || time(b) > time(best)) best = b;
-  }
-  return best;
+function newestBackup(items: readonly Backup[]): Backup | null {
+  return items.reduce<Backup | null>((best, b) => (!best || time(b) > time(best) ? b : best), null);
 }
 
 /** The newest finished archive (status `done`), or null. */
-function lastFinished(items: Backup[]): Backup | null {
+function lastFinished(items: readonly Backup[]): Backup | null {
   return newestBackup(items.filter((b) => b.status === 'done'));
 }

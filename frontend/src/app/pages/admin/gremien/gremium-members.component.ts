@@ -39,12 +39,12 @@ import { personLabel } from '@shared/person-label.util';
 
 /** One row of the member list. */
 interface Member {
-  id: string;
-  name: string;
-  email: string | null;
-  role: string;
+  readonly id: string;
+  readonly name: string;
+  readonly email: string | null;
+  readonly role: string;
   /** Sort rank of the role: board and manager first, `member` last. */
-  rank: number;
+  readonly rank: number;
 }
 
 /** The rows the list shows before "Alle n anzeigen". */
@@ -115,20 +115,19 @@ export class GremiumMembersComponent {
    * Only the active memberships count, so the header agrees with the gremien list.
    */
   readonly members = computed<Member[]>(() => {
-    const seen = new Set<string>();
-    const rows: Member[] = [];
-    for (const m of this.memberships()) {
-      if (!isActiveMembership(m) || seen.has(m.principalId)) continue;
-      seen.add(m.principalId);
-      const role = this.rolesById().get(m.gremiumRoleId);
-      rows.push({
-        id: m.principalId,
-        name: personLabel(m, this.i18n, { fallback: 'admin.gremien.unknownMember' }),
-        email: m.email ?? null,
-        role: role ? this.roleName(role) : '—',
-        rank: this.rank(role),
+    const active = this.memberships().filter(isActiveMembership);
+    const rows: Member[] = active
+      .filter((m, i) => active.findIndex((x) => x.principalId === m.principalId) === i)
+      .map((m) => {
+        const role = this.rolesById().get(m.gremiumRoleId);
+        return {
+          id: m.principalId,
+          name: personLabel(m, this.i18n, { fallback: 'admin.gremien.unknownMember' }),
+          email: m.email ?? null,
+          role: role ? this.roleName(role) : '—',
+          rank: this.rank(role),
+        };
       });
-    }
     return rows.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
   });
 

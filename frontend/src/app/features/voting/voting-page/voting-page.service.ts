@@ -2,6 +2,7 @@ import { DestroyRef, Injectable, NgZone, inject, signal } from '@angular/core';
 import { EMPTY, Observable, Subject, filter, fromEvent, interval, merge } from 'rxjs';
 import type { Uuid, VoteStatus } from '@core/api/models';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
+import { withEntry } from '@shared/util/immutable';
 
 /**
  * How often the page reads the votes again while the tab is visible. The socket of a
@@ -39,15 +40,15 @@ export function visibleTicks(zone?: NgZone, ms: number = VOTE_POLL_MS): Observab
 
 /** A pane changed a vote: a ballot, a delete, or a new state that the socket reported. */
 export interface VoteChange {
-  id: Uuid;
-  kind: 'cast' | 'deleted' | 'updated';
+  readonly id: Uuid;
+  readonly kind: 'cast' | 'deleted' | 'updated';
 }
 
 /** The vote in the detail pane, as the detail read it last. */
 export interface ShownVote {
-  id: Uuid;
-  meetingId: Uuid | null;
-  status: VoteStatus;
+  readonly id: Uuid;
+  readonly meetingId: Uuid | null;
+  readonly status: VoteStatus;
 }
 
 /**
@@ -94,7 +95,7 @@ export class VotingPageService {
     const known = this.sessions().get(meetingId);
     if (known) return known;
     const session = this.live.open(meetingId);
-    this.sessions.update((cur) => new Map(cur).set(meetingId, session));
+    this.sessions.update((cur) => withEntry(cur, meetingId, session));
     return session;
   }
 }

@@ -47,6 +47,7 @@ import {
   applyMove,
   dropMove,
   filterActive,
+  insertAt,
   insertTile,
   matchesFilter,
   moveErrorText,
@@ -56,11 +57,13 @@ import {
   replaceTile,
   sheetMove,
   sortedColumns,
+  withHeld,
   type BoardFilter,
 } from '../../../features/todos/todos.util';
 import { BOARD_ICON } from '../board-picker/todo-board-picker.component';
 import { DONE_PREVIEW } from '../board-view/todo-board-view.component';
 import { KanbanKeyDrag, type KeyDragPosition } from '../../../features/todos/kanban-key-drag';
+import { toggled } from '@shared/util/immutable';
 
 /** The ids of the collapsed rows, per browser ("Meine To-Dos" and "Alle" share them). */
 export const COLLAPSED_KEY = 'ap.todos.rows.collapsed';
@@ -72,9 +75,9 @@ export function rowDropId(columnId: Uuid): string {
 
 /** A card of another board (the personal board above the rows) landed in a row. */
 export interface RowDrop {
-  boardId: Uuid;
-  cardId: Uuid;
-  move: TodoCardMove;
+  readonly boardId: Uuid;
+  readonly cardId: Uuid;
+  readonly move: TodoCardMove;
 }
 
 /** How `boardRows` reads the cards. */
@@ -84,22 +87,22 @@ export interface RowOptions {
    * assigned to `me`, and a board without a card stays a row while no filter is on
    * (unless no board has a card at all).
    */
-  all?: boolean;
-  me?: Uuid | null;
+  readonly all?: boolean;
+  readonly me?: Uuid | null;
   /**
    * The labels of the label filter by id. Labels are per board, so a row keeps the cards
    * with a label of the same name (case-insensitive). Without it the filter compares ids.
    */
-  filterLabels?: ReadonlyMap<Uuid, TodoLabel>;
+  readonly filterLabels?: ReadonlyMap<Uuid, TodoLabel>;
 }
 
 /** A row as shown: the board, its columns in order and the cards that pass the filters. */
 export interface BoardRow {
-  board: TodoAssignedBoard;
-  columns: TodoColumn[];
-  cards: ReadonlyMap<Uuid, readonly TodoCardTile[]>;
-  labels: ReadonlyMap<Uuid, TodoLabel>;
-  count: number;
+  readonly board: TodoAssignedBoard;
+  readonly columns: readonly TodoColumn[];
+  readonly cards: ReadonlyMap<Uuid, readonly TodoCardTile[]>;
+  readonly labels: ReadonlyMap<Uuid, TodoLabel>;
+  readonly count: number;
 }
 
 /**
@@ -107,14 +110,14 @@ export interface BoardRow {
  * with the cards that pass the filters of the page, by column.
  */
 export interface RowLead {
-  board: TodoAssignedBoard;
-  cards: ReadonlyMap<Uuid, readonly TodoCardTile[]>;
+  readonly board: TodoAssignedBoard;
+  readonly cards: ReadonlyMap<Uuid, readonly TodoCardTile[]>;
 }
 
 /** The keyboard drag: the held card, its row and its place now. */
 /** A keyboard drag also knows the board of the held card. */
 interface KeyDrag extends KeyDragPosition {
-  boardId: Uuid;
+  readonly boardId: Uuid;
 }
 
 /**
@@ -128,37 +131,54 @@ export function boardRows(
   filter: BoardFilter,
   today: string,
   opts: RowOptions = {},
-): BoardRow[] {
-  const rows: BoardRow[] = [];
+): readonly BoardRow[] {
   const keepEmpty = !!opts.all && !filterActive(filter) && boards.some((b) => b.cards.length > 0);
   const byName = opts.filterLabels;
   const wanted = new Set(filter.labels.map((id) => byName?.get(id)?.name.toLowerCase() ?? ''));
-  for (const board of boards) {
-    const labels = new Map(board.labels.map((l) => [l.id, l]));
-    const mine = opts.all
-      ? board.cards.filter((c) => opts.me && c.assignees.some((a) => a.principalId === opts.me))
-      : board.cards;
-    const ctx = { today, mine: new Set(mine.map((c) => c.id)), labels };
-    let rowFilter = filter;
-    if (byName && filter.labels.length) {
-      const ids = board.labels.filter((l) => wanted.has(l.name.toLowerCase())).map((l) => l.id);
-      rowFilter = { ...filter, labels: ids.length ? ids : [''] };
-    }
-    const columns = sortedColumns(board.columns);
-    const cards = new Map<Uuid, TodoCardTile[]>(columns.map((c) => [c.id, []]));
-    let count = 0;
-    for (const card of board.cards) {
-      const list = cards.get(card.columnId);
-      if (!list || !matchesFilter(card, rowFilter, ctx)) continue;
-      list.push(card);
-      count++;
-    }
-    if (count || keepEmpty) rows.push({ board, columns, cards, labels, count });
-  }
-  return rows;
+  const byLabelName = !!byName && filter.labels.length > 0;
+  const filterOf = (board: TodoAssignedBoard): BoardFilter =>
+    byLabelName ? rowFilter(board, filter, wanted) : filter;
+  return boards
+    .map((board) => boardRow(board, filterOf(board), today, opts))
+    .filter((row) => row.count > 0 || keepEmpty);
 }
 
-function readCollapsed(): Set<Uuid> {
+/**
+ * The label filter of one board: its labels whose name is in `wanted`, or `['']` (no card
+ * passes) when the board has none of them, because label ids are per board.
+ */
+function rowFilter(
+  board: TodoAssignedBoard,
+  filter: BoardFilter,
+  wanted: ReadonlySet<string>,
+): BoardFilter {
+  const ids = board.labels.filter((l) => wanted.has(l.name.toLowerCase())).map((l) => l.id);
+  return { ...filter, labels: ids.length ? ids : [''] };
+}
+
+/** One row of `boardRows`: the columns in order and the cards of each that pass `filter`. */
+function boardRow(
+  board: TodoAssignedBoard,
+  filter: BoardFilter,
+  today: string,
+  opts: RowOptions,
+): BoardRow {
+  const labels = new Map(board.labels.map((l) => [l.id, l]));
+  const mine = opts.all
+    ? board.cards.filter((c) => opts.me && c.assignees.some((a) => a.principalId === opts.me))
+    : board.cards;
+  const ctx = { today, mine: new Set(mine.map((c) => c.id)), labels };
+  const columns = sortedColumns(board.columns);
+  const passes = (card: TodoCardTile, columnId: Uuid): boolean =>
+    card.columnId === columnId && matchesFilter(card, filter, ctx);
+  const cards = new Map<Uuid, readonly TodoCardTile[]>(
+    columns.map((col) => [col.id, board.cards.filter((card) => passes(card, col.id))]),
+  );
+  const count = [...cards.values()].reduce((n, list) => n + list.length, 0);
+  return { board, columns, cards, labels, count };
+}
+
+function readCollapsed(): ReadonlySet<Uuid> {
   try {
     const raw = localStorage.getItem(COLLAPSED_KEY);
     const ids: unknown = raw ? JSON.parse(raw) : [];
@@ -335,7 +355,7 @@ export class TodoBoardRowsComponent implements OnInit {
    * The sections as shown: the rows, and on the phone of "Meine To-Dos" the personal board
    * (`lead`) before them. The lead counts no match, because the page counts its cards.
    */
-  readonly sections = computed<BoardRow[]>(() => {
+  readonly sections = computed<readonly BoardRow[]>(() => {
     const rows = this.rows();
     const lead = this.lead();
     if (!lead) return rows;
@@ -506,14 +526,10 @@ export class TodoBoardRowsComponent implements OnInit {
   /** Take a card out of its row (it went onto the personal board); null when no row holds it. */
   take(cardId: Uuid): TodoCardTile | null {
     this.localWrites++;
-    for (const b of this.boards()) {
-      const card = b.cards.find((c) => c.id === cardId);
-      if (card) {
-        this.update(b.id, (x) => removeTile(x, cardId));
-        return card;
-      }
-    }
-    return null;
+    const board = this.boards().find((b) => b.cards.some((c) => c.id === cardId));
+    const card = board?.cards.find((c) => c.id === cardId) ?? null;
+    if (board) this.update(board.id, (x) => removeTile(x, cardId));
+    return card;
   }
 
   /** A card is held or a write is in flight: a live change waits. */
@@ -526,13 +542,11 @@ export class TodoBoardRowsComponent implements OnInit {
       for (const p of pings) this.liveRetry.next(p);
       return;
     }
-    let poll = false;
     for (const p of pings) {
-      if (p.type === 'board') poll = true;
-      else if (p.type === 'card_removed') this.dropCard(p.cardId, p.boardId);
-      else this.readTile(p);
+      if (p.type === 'card_removed') this.dropCard(p.cardId, p.boardId);
+      else if (p.type === 'card') this.readTile(p);
     }
-    if (poll) this.poll();
+    if (pings.some((p) => p.type === 'board')) this.poll();
   }
 
   /**
@@ -603,9 +617,7 @@ export class TodoBoardRowsComponent implements OnInit {
   }
 
   toggle(row: BoardRow): void {
-    const next = new Set(this.collapsed());
-    if (next.has(row.board.id)) next.delete(row.board.id);
-    else next.add(row.board.id);
+    const next = toggled(this.collapsed(), row.board.id);
     this.collapsed.set(next);
     writeCollapsed(next);
     if (this.kb()?.boardId === row.board.id) this.kb.set(null);
@@ -616,7 +628,7 @@ export class TodoBoardRowsComponent implements OnInit {
   }
 
   /** The cards of a column as shown: the keyboard drag and the done preview. */
-  list(row: BoardRow, col: TodoColumn): TodoCardTile[] {
+  list(row: BoardRow, col: TodoColumn): readonly TodoCardTile[] {
     return this.shown(row).get(col.id) ?? [];
   }
 
@@ -668,25 +680,14 @@ export class TodoBoardRowsComponent implements OnInit {
     this.expanded.update((set) => new Set([...set, col.id]));
   }
 
-  private shown(row: BoardRow): Map<Uuid, TodoCardTile[]> {
-    const lists = row.columns.map((c) => [...this.cardsIn(row, c.id)]);
+  private shown(row: BoardRow): ReadonlyMap<Uuid, readonly TodoCardTile[]> {
     const kb = this.kb();
     const held = kb?.boardId === row.board.id ? kb : null;
-    if (held) {
-      let card: TodoCardTile | undefined;
-      for (const list of lists) {
-        const i = list.findIndex((c) => c.id === held.cardId);
-        if (i >= 0) card = list.splice(i, 1)[0];
-      }
-      if (card) lists[held.col].splice(held.index, 0, card);
-    }
-    const out = new Map<Uuid, TodoCardTile[]>();
-    row.columns.forEach((col, i) => {
-      const list = lists[i];
-      const limit = col.isDone && !this.expanded().has(col.id) && !held ? DONE_PREVIEW : list.length;
-      out.set(col.id, list.slice(0, limit));
-    });
-    return out;
+    const cards = row.columns.map((c) => this.cardsIn(row, c.id));
+    const lists = held ? withHeld(cards, held) : cards;
+    const limit = (col: TodoColumn, list: readonly TodoCardTile[]): number =>
+      col.isDone && !this.expanded().has(col.id) && !held ? DONE_PREVIEW : list.length;
+    return new Map(row.columns.map((col, i) => [col.id, lists[i].slice(0, limit(col, lists[i]))]));
   }
 
   /** The rollback applies only when nothing else changed the row meanwhile. */
@@ -759,8 +760,8 @@ export class TodoBoardRowsComponent implements OnInit {
       this.transfer(from.id, row.board.id, held, dropMove(target, event.currentIndex, toCol));
       return;
     }
-    target.splice(event.currentIndex, 0, held);
-    this.move(row.board.id, cardId, moveRequest(target, event.currentIndex, toCol));
+    const placed = insertAt(target, event.currentIndex, held);
+    this.move(row.board.id, cardId, moveRequest(placed, event.currentIndex, toCol));
   }
 
   onTileKeyUp(event: KeyboardEvent): void {

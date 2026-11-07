@@ -30,10 +30,10 @@ import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models
 
 /** Edit state of the create dialog: title in DE and EN, Gremium, and budget flag. */
 interface NewForm {
-  nameDe: string;
-  nameEn: string;
-  gremiumId: string;
-  hasBudget: boolean;
+  readonly nameDe: string;
+  readonly nameEn: string;
+  readonly gremiumId: string;
+  readonly hasBudget: boolean;
 }
 
 function emptyForm(): NewForm {
