@@ -28,7 +28,7 @@ import {
   StickyBarComponent,
   SectionComponent,
 } from '@stupa-makers/ui-kit';
-import { fileSlug, localized, roleRank, toCsv } from '../gremien.util';
+import { fileSlug, groupInOrder, localized, roleRank, toCsv } from '../gremien.util';
 import { personLabel } from '@shared/person-label.util';
 
 export interface MemberGroup {
@@ -97,13 +97,13 @@ export class GremiumMembersComponent {
   /** The roles of the loaded members, in role order. */
   readonly roleOptions = computed<FilterSelectOption[]>(() => {
     const locale = this.i18n.uiLocale();
-    const roles = new Map<string, string>();
-    for (const m of this.sorted()) {
-      if (!roles.has(m.member.roleKey)) roles.set(m.member.roleKey, localized(m.member.roleName, locale, m.member.roleKey));
-    }
+    const roles = groupInOrder(this.sorted(), (m) => m.member.roleKey);
     return [
       { value: '', label: this.i18n.translate('gremien.members.roleAll') },
-      ...[...roles].map(([value, label]) => ({ value, label })),
+      ...roles.map(({ key, first }) => ({
+        value: key,
+        label: localized(first.member.roleName, locale, key),
+      })),
     ];
   });
   readonly roleText = computed(() => {
@@ -118,7 +118,7 @@ export class GremiumMembersComponent {
   );
 
   /** Every member in role order, then by name. */
-  private readonly sorted = computed<MemberRow[]>(() => {
+  private readonly sorted = computed<readonly MemberRow[]>(() => {
     const locale = this.i18n.locale();
     return this.members()
       .map((member) => ({ member, name: personLabel(member, this.i18n, { fallbackText: '—' }) }))
@@ -130,7 +130,7 @@ export class GremiumMembersComponent {
       );
   });
 
-  private readonly visible = computed<MemberRow[]>(() => {
+  private readonly visible = computed<readonly MemberRow[]>(() => {
     const role = this.role();
     const q = this.query().trim().toLocaleLowerCase(this.i18n.locale());
     return this.sorted().filter(
@@ -142,19 +142,14 @@ export class GremiumMembersComponent {
     );
   });
 
-  readonly groups = computed<MemberGroup[]>(() => {
+  readonly groups = computed<readonly MemberGroup[]>(() => {
     const locale = this.i18n.uiLocale();
-    const out: { key: string; label: string; rows: MemberRow[] }[] = [];
-    for (const row of this.visible()) {
-      const key = row.member.roleKey;
-      let group = out.find((g) => g.key === key);
-      if (!group) {
-        group = { key, label: localized(row.member.roleName, locale, key), rows: [] };
-        out.push(group);
-      }
-      group.rows.push(row);
-    }
-    return out;
+    const byRole = groupInOrder(this.visible(), (row) => row.member.roleKey);
+    return byRole.map(({ key, first, items }) => ({
+      key,
+      label: localized(first.member.roleName, locale, key),
+      rows: items,
+    }));
   });
 
   readonly filterActive = computed(() => !!this.role() || !!this.query().trim());
