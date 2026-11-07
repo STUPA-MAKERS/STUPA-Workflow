@@ -83,10 +83,11 @@ class TicketTodoBridge:
         actor = await self.todos.access.me(principal)
         if not cards or actor is None:
             return
-        moved = False
-        for card, board in sorted(cards, key=lambda pair: pair[1].id):
-            moved = await self.todos.complete(card, board, actor) or moved
-        if moved:
+        moved = [
+            await self.todos.complete(card, board, actor)
+            for card, board in sorted(cards, key=lambda pair: pair[1].id)
+        ]
+        if any(moved):
             await self.session.commit()
             if self.broker is not None:
                 await publish_pings(self.broker, self.todos.pings.drain())

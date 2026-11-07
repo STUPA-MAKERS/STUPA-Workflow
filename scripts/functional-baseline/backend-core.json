@@ -1,19 +1,6 @@
 {
-  "backend/app/deps.py": 1,
-  "backend/app/main.py": 5,
-  "backend/app/middleware.py": 3,
+  "backend/app/middleware.py": 1,
   "backend/app/settings.py": 1,
-  "backend/worker/backup.py": 6,
-  "backend/worker/deadlines.py": 5,
-  "backend/worker/files_drafts.py": 2,
-  "backend/worker/mail.py": 3,
-  "backend/worker/main.py": 1,
-  "backend/worker/polls.py": 1,
-  "backend/worker/protocol.py": 8,
-  "backend/worker/retention.py": 1,
-  "backend/worker/scan.py": 5,
-  "backend/worker/task_reminders.py": 5,
-  "backend/worker/tickets.py": 2,
-  "backend/worker/todos.py": 3,
-  "backend/worker/webhook.py": 1
+  "backend/worker/task_reminders.py": 2,
+  "backend/worker/tickets.py": 1
 }

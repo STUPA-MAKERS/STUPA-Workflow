@@ -32,7 +32,7 @@ logger = logging.getLogger("app.webhooks")
 _TRANSITION_EVENT = "application.transition"
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class WebhookActionDispatcher:
     """Handle `webhook` flow actions and ignore every other action type."""
 

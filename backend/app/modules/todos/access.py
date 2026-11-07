@@ -30,7 +30,9 @@ permission.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from collections.abc import Set as AbstractSet
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import ColumnElement, false, or_, select
@@ -78,7 +80,7 @@ def global_reach(board: TodoBoard, principal: Principal) -> bool:
     return board.kind == "gremium" or principal.scope_allows(board.permission or "")
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ReadScope:
     """The boards that one principal reads, as a SQL condition on ``todo_board``.
 
@@ -90,35 +92,40 @@ class ReadScope:
     """
 
     all_gremien: bool = False
-    gremium_ids: set[uuid.UUID] = field(default_factory=set)
+    gremium_ids: AbstractSet[uuid.UUID] = frozenset()
     owner_id: uuid.UUID | None = None
-    team_permissions: set[str] = field(default_factory=set)
+    team_permissions: AbstractSet[str] = frozenset()
     all_teams: bool = False
+
+    def _gremium_part(self) -> tuple[ColumnElement[bool], ...]:
+        if self.all_gremien:
+            return (TodoBoard.kind == "gremium",)
+        return (TodoBoard.gremium_id.in_(self.gremium_ids),) if self.gremium_ids else ()
+
+    def _team_part(self) -> tuple[ColumnElement[bool], ...]:
+        if self.all_teams:
+            return (TodoBoard.kind == "team",)
+        return (
+            ((TodoBoard.kind == "team") & TodoBoard.permission.in_(self.team_permissions),)
+            if self.team_permissions
+            else ()
+        )
 
     def condition(self) -> ColumnElement[bool]:
         """The ``WHERE`` part that keeps the readable boards."""
-        parts: list[ColumnElement[bool]] = []
-        if self.all_gremien:
-            parts.append(TodoBoard.kind == "gremium")
-        elif self.gremium_ids:
-            parts.append(TodoBoard.gremium_id.in_(self.gremium_ids))
-        if self.owner_id is not None:
-            parts.append(TodoBoard.owner_id == self.owner_id)
-        if self.all_teams:
-            parts.append(TodoBoard.kind == "team")
-        elif self.team_permissions:
-            parts.append(
-                (TodoBoard.kind == "team") & TodoBoard.permission.in_(self.team_permissions)
-            )
+        owner = (TodoBoard.owner_id == self.owner_id,) if self.owner_id is not None else ()
+        parts = (*self._gremium_part(), *owner, *self._team_part())
         return or_(*parts) if parts else false()
 
     def allows(self, board: TodoBoard) -> bool:
         """Tell if the board is in the scope (the same rule as ``condition``)."""
-        if board.kind == "gremium":
-            return self.all_gremien or board.gremium_id in self.gremium_ids
-        if board.kind == "personal":
-            return self.owner_id is not None and board.owner_id == self.owner_id
-        return self.all_teams or board.permission in self.team_permissions
+        match board.kind:
+            case "gremium":
+                return self.all_gremien or board.gremium_id in self.gremium_ids
+            case "personal":
+                return self.owner_id is not None and board.owner_id == self.owner_id
+            case _:
+                return self.all_teams or board.permission in self.team_permissions
 
 
 type _CacheKey = tuple[str, bool, frozenset[str] | None]
@@ -161,36 +168,49 @@ class BoardAccess:
         """
         if _cache_key(principal) in self._scopes:
             return self._scopes[_cache_key(principal)]
-        scope = ReadScope()
         everything = reads_all(principal)
         native = principal.scope_allows(TODO_WRITE)
-        if everything:
-            scope.all_gremien = True
-            scope.all_teams = principal.scope_permissions is None
-        if native:
-            if not scope.all_gremien:
-                gremien = await self._gremium_ids(principal, TODO_WRITE)
-                if isinstance(gremien, AllGremien):
-                    scope.all_gremien = True
-                else:
-                    scope.gremium_ids = gremien
-            scope.owner_id = await self.me(principal)
-        if not scope.all_teams and (native or everything):
-            permissions = (
-                await self.session.scalars(
-                    select(TodoBoard.permission)
-                    .where(TodoBoard.kind == "team", TodoBoard.permission.is_not(None))
-                    .distinct()
-                )
-            ).all()
-            scope.team_permissions = {
-                p
-                for p in permissions
-                if p
-                and ((native and principal.has(p)) or (everything and principal.scope_allows(p)))
-            }
+        all_teams = everything and principal.scope_permissions is None
+        gremien = (
+            await self._gremium_ids(principal, TODO_WRITE) if native and not everything else None
+        )
+        owner_id = await self.me(principal) if native else None
+        team_permissions = (
+            await self._team_permissions(principal, native=native, everything=everything)
+            if not all_teams and (native or everything)
+            else frozenset[str]()
+        )
+        some = frozenset() if gremien is None or isinstance(gremien, AllGremien) else gremien
+        scope = ReadScope(
+            all_gremien=everything or isinstance(gremien, AllGremien),
+            gremium_ids=some,
+            owner_id=owner_id,
+            team_permissions=team_permissions,
+            all_teams=all_teams,
+        )
         self._scopes[_cache_key(principal)] = scope
         return scope
+
+    async def _team_permissions(
+        self, principal: Principal, *, native: bool, everything: bool
+    ) -> frozenset[str]:
+        """The permissions of the team boards that the principal reaches.
+
+        Its own permissions by the native right, or the ones that its scope lets through
+        by a global key.
+        """
+        permissions = (
+            await self.session.scalars(
+                select(TodoBoard.permission)
+                .where(TodoBoard.kind == "team", TodoBoard.permission.is_not(None))
+                .distinct()
+            )
+        ).all()
+        return frozenset(
+            p
+            for p in permissions
+            if p and ((native and principal.has(p)) or (everything and principal.scope_allows(p)))
+        )
 
     async def _native(self, board: TodoBoard, principal: Principal) -> bool:
         """Tell if the principal works on the board by its own right (not ``todo.all``).
@@ -200,11 +220,13 @@ class BoardAccess:
         """
         if not principal.scope_allows(TODO_WRITE):
             return False
-        if board.kind == "gremium":
-            return board.gremium_id in await self._gremium_ids(principal, TODO_WRITE)
-        if board.kind == "personal":
-            return board.owner_id is not None and board.owner_id == await self.me(principal)
-        return board.permission is not None and principal.has(board.permission)
+        match board.kind:
+            case "gremium":
+                return board.gremium_id in await self._gremium_ids(principal, TODO_WRITE)
+            case "personal":
+                return board.owner_id is not None and board.owner_id == await self.me(principal)
+            case _:
+                return board.permission is not None and principal.has(board.permission)
 
     async def can_write(self, board: TodoBoard, principal: Principal) -> bool:
         """Tell if the principal works on the cards of the board (``todo.all`` included)."""
@@ -232,39 +254,46 @@ class BoardAccess:
 
     async def members(self, board: TodoBoard) -> list[TodoMember]:
         """Return the people that the board accepts as assignees, by name."""
-        if board.kind == "personal":
-            rows = (
-                await self.session.execute(
-                    select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email).where(
-                        PrincipalRow.id == board.owner_id
-                    )
-                )
-            ).all()
-        elif board.kind == "team":
-            rows = await permission_holders(self.session, board.permission or "")
-        else:
-            datetime.now(UTC)
-            rows = (
-                await self.session.execute(
-                    select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email)
-                    .join(GremiumMembership, GremiumMembership.principal_id == PrincipalRow.id)
-                    .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
-                    .where(
-                        GremiumMembership.gremium_id == board.gremium_id,
-                        GremiumRole.permissions.contains([TODO_WRITE]),
-                        PrincipalRow.active.is_(True),
-                        PrincipalRow.merged_into.is_(None),
-                    )
-                    .distinct()
-                )
-            ).all()
-        out: dict[uuid.UUID, TodoMember] = {}
-        for pid, name, email in rows:
-            ref = person_of(pid, name, email)
-            out[pid] = TodoMember(principal_id=pid, display_name=ref.display_name)
+        rows = await self._member_rows(board)
+        out = {
+            pid: TodoMember(principal_id=pid, display_name=person_of(pid, name, email).display_name)
+            for pid, name, email in rows
+        }
         return sorted(
             out.values(), key=lambda m: ((m.display_name or "").casefold(), str(m.principal_id))
         )
+
+    async def _member_rows(
+        self, board: TodoBoard
+    ) -> Sequence[tuple[uuid.UUID, str | None, str | None]]:
+        """The id, name and e-mail of each member of the board; one person can repeat."""
+        match board.kind:
+            case "personal":
+                return (
+                    await self.session.execute(
+                        select(
+                            PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email
+                        ).where(PrincipalRow.id == board.owner_id)
+                    )
+                ).all()
+            case "team":
+                return await permission_holders(self.session, board.permission or "")
+            case _:
+                datetime.now(UTC)
+                return (
+                    await self.session.execute(
+                        select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email)
+                        .join(GremiumMembership, GremiumMembership.principal_id == PrincipalRow.id)
+                        .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
+                        .where(
+                            GremiumMembership.gremium_id == board.gremium_id,
+                            GremiumRole.permissions.contains([TODO_WRITE]),
+                            PrincipalRow.active.is_(True),
+                            PrincipalRow.merged_into.is_(None),
+                        )
+                        .distinct()
+                    )
+                ).all()
 
     async def member_ids(self, board: TodoBoard) -> set[uuid.UUID]:
         """Return the ids of ``members``."""

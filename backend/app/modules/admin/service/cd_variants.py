@@ -179,7 +179,6 @@ class CdVariantService(ConfigServiceBase):
     async def list_variants(self) -> list[CdVariantOut]:
         """List the CD variants with their logos."""
         rows = (await self.session.scalars(select(CdVariant).order_by(CdVariant.name))).all()
-        by_variant: dict[uuid.UUID, list[CdVariantLogo]] = {row.id: [] for row in rows}
         logos = (
             await self.session.scalars(
                 select(CdVariantLogo).order_by(
@@ -187,11 +186,10 @@ class CdVariantService(ConfigServiceBase):
                 )
             )
         ).all()
-        for logo in logos:
-            bucket = by_variant.get(logo.variant_id)
-            if bucket is not None:
-                bucket.append(logo)
-        return [_variant_out(row, by_variant[row.id]) for row in rows]
+        return [
+            _variant_out(row, [logo for logo in logos if logo.variant_id == row.id])
+            for row in rows
+        ]
 
     async def list_variant_options(self) -> list[CdVariantOptionOut]:
         """Slim list for the Gremium dropdown: id, key and display name."""
@@ -319,12 +317,8 @@ class CdVariantService(ConfigServiceBase):
             await self.storage.put(object_key, data, mime)
         except StorageError as exc:
             raise ServiceUnavailableError("Object storage write failed.") from exc
-        replaced: list[CdVariantLogo] = []
-        if slot == "square":
-            replaced = await self._drop_square_logos(variant_id)
-            position = 0
-        else:
-            position = await self._next_position(variant_id, slot)
+        replaced = await self._drop_square_logos(variant_id) if slot == "square" else []
+        position = 0 if slot == "square" else await self._next_position(variant_id, slot)
         row = CdVariantLogo(
             variant_id=variant_id,
             slot=slot,
@@ -412,13 +406,15 @@ class CdVariantService(ConfigServiceBase):
         variant_id = await self.session.scalar(
             select(Gremium.cd_variant_id).where(Gremium.id == gremium_id)
         )
-        row: CdVariantLogo | None = None
-        if variant_id is not None:
-            row = await self.session.scalar(
+        row = (
+            await self.session.scalar(
                 select(CdVariantLogo).where(
                     CdVariantLogo.variant_id == variant_id, CdVariantLogo.slot == "square"
                 )
             )
+            if variant_id is not None
+            else None
+        )
         ref = _square_ref(row)
         if ref is None:
             raise NotFoundError(f"gremium {gremium_id} has no logo")

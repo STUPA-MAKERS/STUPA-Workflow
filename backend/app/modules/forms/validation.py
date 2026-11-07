@@ -44,18 +44,18 @@ import re
 from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from functools import reduce
 from typing import Any
 from uuid import UUID
 
-from app.shared.config_schemas import FormFieldDef
+from app.shared.config_schemas import FieldValidation, FormFieldDef
 from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic, validate_jsonlogic
 
 #: Field types with a numeric value, used by the promoted extraction and by min and max.
 _NUMERIC_TYPES = frozenset({"number", "currency"})
-_TEXT_TYPES = frozenset({"text", "textarea", "markdown"})
 
 _PATTERN_MAX_INPUT_LEN = 4096
 _PATTERN_MATCH_TIMEOUT_SECONDS = 1.0
@@ -116,7 +116,7 @@ class FormDefinitionError(Exception):
     """The form definition breaks a structural rule at the save gate."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FieldError:
     """A validation error for a concrete answer field."""
 
@@ -136,7 +136,7 @@ class AnswerValidationError(Exception):
         super().__init__(f"{len(self.errors)} field error(s)")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FormSection:
     """A section of the effective form.
 
@@ -210,9 +210,44 @@ def effective_form(type_fields: Sequence[FormFieldDef]) -> list[FormSection]:
     not create a title-only step.
     """
     sections = _split_sections(list(type_fields))
-    if not any(f.key == SYSTEM_TITLE_KEY for s in sections for f in s.fields):
-        sections[0].fields.insert(0, system_title_field())
-    return sections
+    has_title = any(f.key == SYSTEM_TITLE_KEY for s in sections for f in s.fields)
+    first = sections[0]
+    return (
+        sections
+        if has_title
+        else [replace(first, fields=[system_title_field(), *first.fields]), *sections[1:]]
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _SectionDraft:
+    """The state of the section split: the closed sections and the open one."""
+
+    closed: tuple[FormSection, ...]
+    key: str
+    label: dict[str, str] | None
+    fields: tuple[FormFieldDef, ...]
+
+    def section(self) -> FormSection:
+        """Return the open section as a closed one."""
+        return FormSection(key=self.key, fields=list(self.fields), label=self.label)
+
+
+def _section_step(draft: _SectionDraft, field: FormFieldDef) -> _SectionDraft:
+    """Add one field to the split, or open a new section at a marker.
+
+    A marker closes the open section only when it has fields.
+    """
+    match field.type:
+        case "section":
+            return _SectionDraft(
+                closed=(*draft.closed, draft.section()) if draft.fields else draft.closed,
+                key=field.key,
+                label=dict(field.label) if field.label else None,
+                fields=(),
+            )
+        case _:
+            return replace(draft, fields=(*draft.fields, field))
 
 
 def _split_sections(fields: Sequence[FormFieldDef]) -> list[FormSection]:
@@ -225,24 +260,40 @@ def _split_sections(fields: Sequence[FormFieldDef]) -> list[FormSection]:
     A marker closes the current section when it has fields. Otherwise the open section takes
     the label of the new marker (a leading or a consecutive marker).
     """
-    sections: list[FormSection] = []
-    cur_key = "main"
-    cur_label: dict[str, str] | None = None
-    cur_fields: list[FormFieldDef] = []
+    start = _SectionDraft(closed=(), key="main", label=None, fields=())
+    draft = reduce(_section_step, fields, start)
+    return (
+        [*draft.closed, draft.section()] if draft.fields or not draft.closed else list(draft.closed)
+    )
 
-    for f in fields:
-        if f.type == "section":
-            if cur_fields:
-                sections.append(FormSection(key=cur_key, fields=cur_fields, label=cur_label))
-                cur_fields = []
-            cur_key = f.key
-            cur_label = dict(f.label) if f.label else None
-            continue
-        cur_fields.append(f)
 
-    if cur_fields or not sections:
-        sections.append(FormSection(key=cur_key, fields=cur_fields, label=cur_label))
-    return sections
+@dataclass(frozen=True, slots=True)
+class _Computed:
+    """The values of the ``computed`` fields so far and the errors of their expressions."""
+
+    values: Mapping[str, Any]
+    errors: tuple[FieldError, ...]
+
+
+def _compute_step(
+    state: _Computed, key: str, expr: Mapping[str, Any], ctx: Mapping[str, Any]
+) -> _Computed:
+    """Evaluate one ``compute`` expression against ``ctx`` and the values computed so far."""
+    try:
+        value = eval_jsonlogic(expr, {**ctx, **state.values})
+    except JsonLogicError as exc:
+        error = FieldError(field=key, msg=f"compute failed: {exc}")
+        return replace(state, errors=(*state.errors, error))
+    return replace(state, values={**state.values, key: value})
+
+
+def _answer_errors(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
+    """Return the errors of one visible answer: ``required`` or the type check."""
+    return (
+        _value_errors(field, value)
+        if _is_present(value)
+        else _err_if(field.required, field.key, "required")
+    )
 
 
 def validate_answers(
@@ -267,41 +318,31 @@ def validate_answers(
         AnswerValidationError: At least one field is invalid. The error carries every
             collected field error.
     """
-    errors: list[FieldError] = []
-    result: dict[str, Any] = dict(data)
-
-    base_ctx: dict[str, Any] = {**(context or {}), **result}
-    for f in fields:
-        if f.type == "computed" and f.compute is not None:
-            try:
-                result[f.key] = eval_jsonlogic(f.compute, base_ctx)
-                base_ctx[f.key] = result[f.key]
-            except JsonLogicError as exc:
-                errors.append(FieldError(field=f.key, msg=f"compute failed: {exc}"))
-
-    eval_ctx: dict[str, Any] = {**(context or {}), **result}
-
-    cost_total = Decimal(0)
-    funding: tuple[FormFieldDef, Any] | None = None
-    for f in fields:
-        if f.type in ("computed", "section"):
-            continue
-        if not _is_visible(f, eval_ctx):
-            continue
-        value = data.get(f.key)
-        if not _is_present(value):
-            if f.required:
-                errors.append(FieldError(field=f.key, msg="required"))
-            continue
-        _validate_value(f, value, errors)
-        if f.type == "positions":
-            cost_total += positions_total(value) or Decimal(0)
-        elif f.type == "funding":
-            funding = (f, value)
-
-    if funding is not None:
-        _check_funding_total(funding[0], funding[1], cost_total, errors)
-
+    base_ctx = {**(context or {}), **data}
+    computed = reduce(
+        lambda state, pair: _compute_step(state, pair[0], pair[1], base_ctx),
+        ((f.key, f.compute) for f in fields if f.type == "computed" and f.compute is not None),
+        _Computed(values={}, errors=()),
+    )
+    result = {**data, **computed.values}
+    eval_ctx = {**(context or {}), **result}
+    checked = tuple(
+        f for f in fields if f.type not in ("computed", "section") and _is_visible(f, eval_ctx)
+    )
+    field_errors = tuple(e for f in checked for e in _answer_errors(f, data.get(f.key)))
+    collected = (*computed.errors, *field_errors)
+    present = tuple((f, data.get(f.key)) for f in checked if _is_present(data.get(f.key)))
+    cost_total = sum(
+        (positions_total(value) or Decimal(0) for f, value in present if f.type == "positions"),
+        Decimal(0),
+    )
+    fundings = tuple((f, value) for f, value in present if f.type == "funding")
+    funding_errors = (
+        _check_funding_total(fundings[-1][0], fundings[-1][1], cost_total, collected)
+        if fundings
+        else ()
+    )
+    errors = (*collected, *funding_errors)
     if errors:
         raise AnswerValidationError(errors)
     return result
@@ -334,100 +375,125 @@ def _is_visible(field: FormFieldDef, ctx: Mapping[str, Any]) -> bool:
         return True
 
 
+def _value_errors(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
+    """Return the errors of a present value against its field type."""
+    match field.type:
+        case "text" | "textarea" | "markdown":
+            return _validate_text(field, value)
+        case "number" | "currency":
+            return _validate_number(field, value)
+        case "funding":
+            return _validate_funding(field, value)
+        case "date":
+            return _validate_date(field, value)
+        case "select":
+            return _validate_select(field, value)
+        case "multiselect":
+            return _validate_multiselect(field, value)
+        case "gremium_select":
+            return _validate_uuid_ref(field, value, "gremium id")
+        case "budget_select":
+            return _validate_uuid_ref(field, value, "budget id")
+        case "email":
+            return _validate_email(field, value)
+        case "iban":
+            return _validate_iban(field, value)
+        case "daterange":
+            return _validate_daterange(field, value)
+        case "checkbox":
+            return _validate_checkbox(field, value)
+        case "file":
+            return _validate_file(field, value)
+        case "table":
+            return _validate_table(field, value)
+        case "positions":
+            return _validate_positions(field, value)
+        case _:
+            return _err(field.key, f"unknown field type: {field.type!r}")
+
+
 def _validate_value(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Validate a present value against its field type and append the errors."""
-    t = field.type
-    if t in _TEXT_TYPES:
-        _validate_text(field, value, errors)
-    elif t == "number" or t == "currency":
-        _validate_number(field, value, errors)
-    elif t == "funding":
-        _validate_funding(field, value, errors)
-    elif t == "date":
-        _validate_date(field, value, errors)
-    elif t == "select":
-        _validate_select(field, value, errors)
-    elif t == "multiselect":
-        _validate_multiselect(field, value, errors)
-    elif t == "gremium_select":
-        _validate_uuid_ref(field, value, errors, "gremium id")
-    elif t == "budget_select":
-        _validate_uuid_ref(field, value, errors, "budget id")
-    elif t == "email":
-        _validate_email(field, value, errors)
-    elif t == "iban":
-        _validate_iban(field, value, errors)
-    elif t == "daterange":
-        _validate_daterange(field, value, errors)
-    elif t == "checkbox":
-        _validate_checkbox(field, value, errors)
-    elif t == "file":
-        _validate_file(field, value, errors)
-    elif t == "table":
-        _validate_table(field, value, errors)
-    elif t == "positions":
-        _validate_positions(field, value, errors)
-    else:  # pragma: no cover via FormFieldDef.type (Literal) — defensively checked in tests
-        errors.append(FieldError(field=field.key, msg=f"unknown field type: {t!r}"))
+    errors.extend(_value_errors(field, value))
 
 
-def _err(errors: list[FieldError], key: str, msg: str) -> None:
-    errors.append(FieldError(field=key, msg=msg))
+def _err(key: str, msg: str) -> tuple[FieldError, ...]:
+    """Return one field error as a tuple, so the checks concatenate their results."""
+    return (FieldError(field=key, msg=msg),)
 
 
-def _validate_text(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
+def _err_if(condition: bool, key: str, msg: str) -> tuple[FieldError, ...]:
+    """Return one field error when ``condition`` holds, else no error."""
+    return _err(key, msg) if condition else ()
+
+
+def _validate_text(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     """Validate a text value against its length bounds and its pattern.
 
     A broken stored pattern or a ReDoS timeout gives a field error, not a hang or a 500.
     This is defense in depth, because the save gate already rejects an invalid pattern.
     """
     if not isinstance(value, str):
-        _err(errors, field.key, "must be a string")
-        return
+        return _err(field.key, "must be a string")
     v = field.validation
     if v is None:
-        return
-    if v.min_len is not None and len(value) < v.min_len:
-        _err(errors, field.key, f"shorter than minimum length {v.min_len}")
-    if v.max_len is not None and len(value) > v.max_len:
-        _err(errors, field.key, f"longer than maximum length {v.max_len}")
-    if v.pattern is not None:
-        try:
-            matched = _pattern_matches(v.pattern, value)
-        except _PatternMatchError:
-            _err(errors, field.key, "field has an invalid validation pattern")
-            return
-        if not matched:
-            _err(errors, field.key, "does not match required pattern")
+        return ()
+    return (
+        *_err_if(
+            v.min_len is not None and len(value) < v.min_len,
+            field.key,
+            f"shorter than minimum length {v.min_len}",
+        ),
+        *_err_if(
+            v.max_len is not None and len(value) > v.max_len,
+            field.key,
+            f"longer than maximum length {v.max_len}",
+        ),
+        *(_pattern_errors(field.key, v.pattern, value) if v.pattern is not None else ()),
+    )
 
 
-def _validate_number(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
+def _pattern_errors(key: str, pattern: str, value: str) -> tuple[FieldError, ...]:
+    """Match ``value`` against an admin pattern; a broken pattern or a timeout is an error."""
+    try:
+        matched = _pattern_matches(pattern, value)
+    except _PatternMatchError:
+        return _err(key, "field has an invalid validation pattern")
+    return _err_if(not matched, key, "does not match required pattern")
+
+
+def _validate_number(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     """Validate a finite number against its bounds.
 
     A comparison of NaN or Infinity with min or max raises ``decimal.InvalidOperation``, so
     the function rejects such a value first and the request gets 422 instead of 500.
     """
     if isinstance(value, bool) or not isinstance(value, (int, float, str, Decimal)):
-        _err(errors, field.key, "must be a number")
-        return
+        return _err(field.key, "must be a number")
     try:
         num = Decimal(str(value))
     except (InvalidOperation, ValueError):
-        _err(errors, field.key, "must be a number")
-        return
+        return _err(field.key, "must be a number")
     if not num.is_finite():
-        _err(errors, field.key, "must be a finite number")
-        return
+        return _err(field.key, "must be a finite number")
     v = field.validation
     if v is None:
-        return
-    if v.min is not None and num < Decimal(str(v.min)):
-        _err(errors, field.key, f"less than minimum {v.min}")
-    if v.max is not None and num > Decimal(str(v.max)):
-        _err(errors, field.key, f"greater than maximum {v.max}")
+        return ()
+    return (
+        *_err_if(
+            v.min is not None and num < Decimal(str(v.min)),
+            field.key,
+            f"less than minimum {v.min}",
+        ),
+        *_err_if(
+            v.max is not None and num > Decimal(str(v.max)),
+            field.key,
+            f"greater than maximum {v.max}",
+        ),
+    )
 
 
-def _validate_funding(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
+def _validate_funding(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     """Validate the requested funding: a finite number of 0 or more.
 
     0 is valid, because an applicant can ask for an approval without money.
@@ -435,70 +501,67 @@ def _validate_funding(field: FormFieldDef, value: object, errors: list[FieldErro
     The check against the cost total runs after all fields (`_check_funding_total`),
     because the positions can come after the funding field.
     """
-    before = len(errors)
-    _validate_number(field, value, errors)
-    if len(errors) == before and Decimal(str(value)) < 0:
-        _err(errors, field.key, "must not be negative")
+    return _validate_number(field, value) or _err_if(
+        Decimal(str(value)) < 0, field.key, "must not be negative"
+    )
 
 
 def _check_funding_total(
-    field: FormFieldDef, value: object, cost_total: Decimal, errors: list[FieldError]
-) -> None:
+    field: FormFieldDef, value: object, cost_total: Decimal, errors: Sequence[FieldError]
+) -> tuple[FieldError, ...]:
     """Report a requested funding above the cost total.
 
     The function skips a value that `_validate_funding` already rejected, so a bad
     value gives one error, not two.
     """
-    if any(e.field == field.key for e in errors):
-        return
-    if Decimal(str(value)) > cost_total:
-        _err(errors, field.key, f"greater than the cost total {cost_total}")
+    return _err_if(
+        not any(e.field == field.key for e in errors) and Decimal(str(value)) > cost_total,
+        field.key,
+        f"greater than the cost total {cost_total}",
+    )
 
 
-def _validate_date(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
+def _validate_date(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     if not isinstance(value, str):
-        _err(errors, field.key, "must be an ISO date string")
-        return
+        return _err(field.key, "must be an ISO date string")
     try:
         date.fromisoformat(value)
     except ValueError:
-        _err(errors, field.key, "must be an ISO date (YYYY-MM-DD)")
+        return _err(field.key, "must be an ISO date (YYYY-MM-DD)")
+    return ()
 
 
-def _option_values(field: FormFieldDef) -> set[str]:
-    return {o.value for o in field.options or []}
+def _option_values(field: FormFieldDef) -> frozenset[str]:
+    return frozenset(o.value for o in field.options or [])
 
 
-def _validate_select(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
+def _validate_select(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     """Validate a single option value.
 
     ``FieldOption.value`` is a str, so only a string can be a valid option. The isinstance
     check also stops a TypeError when the membership test gets an unhashable value.
     """
-    if not isinstance(value, str) or value not in _option_values(field):
-        _err(errors, field.key, "is not a valid option")
+    return _err_if(
+        not isinstance(value, str) or value not in _option_values(field),
+        field.key,
+        "is not a valid option",
+    )
 
 
-def _validate_multiselect(
-    field: FormFieldDef, value: object, errors: list[FieldError]
-) -> None:
+def _validate_multiselect(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     """Validate a list of option values.
 
     Each element must be a str before the membership test, because an unhashable element
     such as a dict or a list raises a TypeError and gives a 500.
     """
     if not isinstance(value, list):
-        _err(errors, field.key, "must be a list")
-        return
+        return _err(field.key, "must be a list")
     allowed = _option_values(field)
     invalid = [v for v in value if not isinstance(v, str) or v not in allowed]
-    if invalid:
-        _err(errors, field.key, f"contains invalid options: {invalid}")
+    return _err_if(bool(invalid), field.key, f"contains invalid options: {invalid}")
 
 
-def _validate_uuid_ref(
-    field: FormFieldDef, value: object, errors: list[FieldError], label: str
-) -> None:
+def _validate_uuid_ref(field: FormFieldDef, value: object, label: str) -> tuple[FieldError, ...]:
     """Check the value of a dynamic picker field as a well-formed UUID.
 
     The picker fields are `gremium_select` and `budget_select`. The server injects their
@@ -509,12 +572,12 @@ def _validate_uuid_ref(
     active cost center.
     """
     if not isinstance(value, str) or not value:
-        _err(errors, field.key, f"must be a {label}")
-        return
+        return _err(field.key, f"must be a {label}")
     try:
         UUID(value)
     except ValueError:
-        _err(errors, field.key, f"is not a valid {label}")
+        return _err(field.key, f"is not a valid {label}")
+    return ()
 
 
 #: Conservative e-mail pattern: one ``@``, no whitespace, a dot in the domain. It mirrors
@@ -522,9 +585,12 @@ def _validate_uuid_ref(
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def _validate_email(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
-    if not isinstance(value, str) or not _EMAIL_RE.match(value):
-        _err(errors, field.key, "is not a valid e-mail address")
+def _validate_email(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
+    return _err_if(
+        not isinstance(value, str) or not _EMAIL_RE.match(value),
+        field.key,
+        "is not a valid e-mail address",
+    )
 
 
 def _iban_mod97_ok(iban: str) -> bool:
@@ -544,49 +610,50 @@ def _iban_mod97_ok(iban: str) -> bool:
     return int("".join(str(int(ch, 36)) for ch in rearranged)) % 97 == 1
 
 
-def _validate_iban(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
+def _validate_iban(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     """Check the IBAN form and the ISO-7064 mod-97 checksum, not only a regex."""
-    if not isinstance(value, str) or not _iban_mod97_ok(value):
-        _err(errors, field.key, "is not a valid IBAN")
+    return _err_if(
+        not isinstance(value, str) or not _iban_mod97_ok(value),
+        field.key,
+        "is not a valid IBAN",
+    )
 
 
-def _validate_daterange(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
+def _validate_daterange(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     """Check a `daterange` value ``{"from": ISO, "to": ISO}`` with ``from <= to``."""
     if not isinstance(value, dict):
-        _err(errors, field.key, "must be an object with 'from' and 'to'")
-        return
+        return _err(field.key, "must be an object with 'from' and 'to'")
     raw_from, raw_to = value.get("from"), value.get("to")
     if not isinstance(raw_from, str) or not isinstance(raw_to, str):
-        _err(errors, field.key, "'from' and 'to' must be ISO date strings")
-        return
+        return _err(field.key, "'from' and 'to' must be ISO date strings")
     try:
         d_from = date.fromisoformat(raw_from)
         d_to = date.fromisoformat(raw_to)
     except ValueError:
-        _err(errors, field.key, "'from'/'to' must be ISO dates (YYYY-MM-DD)")
-        return
-    if d_from > d_to:
-        _err(errors, field.key, "'from' must not be after 'to'")
+        return _err(field.key, "'from'/'to' must be ISO dates (YYYY-MM-DD)")
+    return _err_if(d_from > d_to, field.key, "'from' must not be after 'to'")
 
 
-def _validate_checkbox(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
-    if not isinstance(value, bool):
-        _err(errors, field.key, "must be a boolean")
+def _validate_checkbox(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
+    return _err_if(not isinstance(value, bool), field.key, "must be a boolean")
 
 
-def _validate_file(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
+def _validate_file(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     """Validate the attachment references of a file field.
 
     The upload checks content, size and MIME type, so this function checks only the shape.
     """
-    if isinstance(value, str):
-        return
-    if isinstance(value, list) and all(isinstance(v, str) for v in value):
-        return
-    _err(errors, field.key, "must be an attachment reference (string or list of strings)")
+    is_reference = isinstance(value, str) or (
+        isinstance(value, list) and all(isinstance(v, str) for v in value)
+    )
+    return _err_if(
+        not is_reference,
+        field.key,
+        "must be an attachment reference (string or list of strings)",
+    )
 
 
-def _validate_table(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
+def _validate_table(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     """Validate the rows of a table field.
 
     The row cap does not use a falsy ``or``, because a configured ``maxRows=0`` is valid
@@ -594,18 +661,18 @@ def _validate_table(field: FormFieldDef, value: object, errors: list[FieldError]
     cap gets clamped to it.
     """
     if not isinstance(value, list):
-        _err(errors, field.key, "must be a list of rows")
-        return
+        return _err(field.key, "must be a list of rows")
     v = field.validation
-    configured = (
-        v.max_rows if (v is not None and v.max_rows is not None) else _DEFAULT_MAX_ROWS
-    )
+    configured = v.max_rows if (v is not None and v.max_rows is not None) else _DEFAULT_MAX_ROWS
     max_rows = min(configured, _DEFAULT_MAX_ROWS)
-    if len(value) > max_rows:
-        _err(errors, field.key, f"has more than {max_rows} rows")
-    for i, row in enumerate(value):
-        if not isinstance(row, dict):
-            _err(errors, field.key, f"row {i} must be an object")
+    return (
+        *_err_if(len(value) > max_rows, field.key, f"has more than {max_rows} rows"),
+        *(
+            FieldError(field=field.key, msg=f"row {i} must be an object")
+            for i, row in enumerate(value)
+            if not isinstance(row, dict)
+        ),
+    )
 
 
 #: Minimum offers when the builder sets none.
@@ -632,7 +699,40 @@ def _offer_value(offer: Mapping[str, Any]) -> Decimal | None:
     return num if num.is_finite() else None
 
 
-def _validate_positions(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
+@dataclass(frozen=True, slots=True)
+class _PositionRules:
+    """The resolved limits of a ``positions`` field, clamped to the engine caps."""
+
+    min_offers: int
+    allow_no_offers: bool
+    min_positions: int
+    max_positions: int
+    max_offers: int
+
+
+def _position_rules(v: FieldValidation | None) -> _PositionRules:
+    """Resolve the limits of a ``positions`` field from its builder values and the defaults."""
+    configured_positions = (
+        v.max_positions
+        if (v is not None and v.max_positions is not None)
+        else _DEFAULT_MAX_POSITIONS
+    )
+    configured_offers = (
+        v.max_offers if (v is not None and v.max_offers is not None) else _DEFAULT_MAX_OFFERS
+    )
+    return _PositionRules(
+        min_offers=(v.min_offers if v and v.min_offers else None) or _DEFAULT_MIN_OFFERS,
+        allow_no_offers=(
+            v.allow_no_offers if (v is not None and v.allow_no_offers is not None) else True
+        ),
+        min_positions=(v.min_positions if v and v.min_positions else None)
+        or _DEFAULT_MIN_POSITIONS,
+        max_positions=min(configured_positions, _DEFAULT_MAX_POSITIONS),
+        max_offers=min(configured_offers, _DEFAULT_MAX_OFFERS),
+    )
+
+
+def _validate_positions(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
     """Validate the cost positions of a field.
 
     The list needs at least ``minPositions`` positions. Each position needs at least
@@ -649,72 +749,114 @@ def _validate_positions(field: FormFieldDef, value: object, errors: list[FieldEr
     because a value above the cap would reopen unbounded growth.
     """
     if not isinstance(value, list):
-        _err(errors, field.key, "must be a list of positions")
-        return
-    v = field.validation
-    min_offers = (v.min_offers if v and v.min_offers else None) or _DEFAULT_MIN_OFFERS
-    allow_no_offers = (
-        v.allow_no_offers if (v is not None and v.allow_no_offers is not None) else True
+        return _err(field.key, "must be a list of positions")
+    rules = _position_rules(field.validation)
+    return (
+        *_err_if(
+            len(value) < rules.min_positions,
+            field.key,
+            f"needs at least {rules.min_positions} position(s)",
+        ),
+        *_err_if(
+            len(value) > rules.max_positions,
+            field.key,
+            f"has more than {rules.max_positions} position(s)",
+        ),
+        *(
+            e
+            for i, pos in enumerate(value)
+            for e in _position_errors(f"{field.key}[{i}]", pos, rules)
+        ),
     )
-    min_positions = (
-        v.min_positions if v and v.min_positions else None
-    ) or _DEFAULT_MIN_POSITIONS
-    configured_positions = (
-        v.max_positions
-        if (v is not None and v.max_positions is not None)
-        else _DEFAULT_MAX_POSITIONS
-    )
-    max_positions = min(configured_positions, _DEFAULT_MAX_POSITIONS)
-    configured_offers = (
-        v.max_offers if (v is not None and v.max_offers is not None) else _DEFAULT_MAX_OFFERS
-    )
-    max_offers = min(configured_offers, _DEFAULT_MAX_OFFERS)
 
-    if len(value) < min_positions:
-        _err(errors, field.key, f"needs at least {min_positions} position(s)")
-    if len(value) > max_positions:
-        _err(errors, field.key, f"has more than {max_positions} position(s)")
 
-    for i, pos in enumerate(value):
-        where = f"{field.key}[{i}]"
-        if not isinstance(pos, dict):
-            _err(errors, where, "must be an object")
-            continue
-        if not isinstance(pos.get("label"), str) or not pos["label"].strip():
-            _err(errors, where, "position needs a label")
-        no_offers = pos.get("noOffers") is True
-        if no_offers:
-            if not allow_no_offers:
-                _err(errors, where, "opting out of comparison offers is not allowed here")
-            reason = pos.get("noOffersReason")
-            if not isinstance(reason, str) or not reason.strip():
-                _err(errors, where, "opting out of comparison offers needs a reason")
-        offers = pos.get("offers")
-        if not isinstance(offers, list):
-            _err(errors, where, "offers must be a list")
-            continue
-        required_offers = 1 if no_offers else min_offers
-        if len(offers) < required_offers:
-            _err(errors, where, f"needs at least {required_offers} comparison offer(s)")
-        if len(offers) > max_offers:
-            _err(errors, where, f"has more than {max_offers} comparison offer(s)")
-        preferred_count = 0
-        for j, offer in enumerate(offers):
-            owhere = f"{where}.offers[{j}]"
-            if not isinstance(offer, dict):
-                _err(errors, owhere, "must be an object")
-                continue
-            if not isinstance(offer.get("label"), str) or not offer["label"].strip():
-                _err(errors, owhere, "offer needs a label")
-            num = _offer_value(offer)
-            if num is None:
-                _err(errors, owhere, "offer value must be a finite number")
-            elif num < 0:
-                _err(errors, owhere, "offer value must not be negative")
-            if offer.get("preferred") is True:
-                preferred_count += 1
-        if offers and preferred_count != 1:
-            _err(errors, where, "exactly one offer must be marked preferred")
+def _position_errors(where: str, pos: object, rules: _PositionRules) -> tuple[FieldError, ...]:
+    """Return the errors of one position: its label, the opt-out and its offers."""
+    if not isinstance(pos, dict):
+        return _err(where, "must be an object")
+    label = pos.get("label")
+    no_offers = pos.get("noOffers") is True
+    reason = pos.get("noOffersReason")
+    offers = pos.get("offers")
+    return (
+        *_err_if(not isinstance(label, str) or not label.strip(), where, "position needs a label"),
+        *_err_if(
+            no_offers and not rules.allow_no_offers,
+            where,
+            "opting out of comparison offers is not allowed here",
+        ),
+        *_err_if(
+            no_offers and (not isinstance(reason, str) or not reason.strip()),
+            where,
+            "opting out of comparison offers needs a reason",
+        ),
+        *(
+            _offers_errors(where, offers, rules, no_offers)
+            if isinstance(offers, list)
+            else _err(where, "offers must be a list")
+        ),
+    )
+
+
+def _offers_errors(
+    where: str, offers: Sequence[object], rules: _PositionRules, no_offers: bool
+) -> tuple[FieldError, ...]:
+    """Return the errors of the offers of one position: count, each offer, the preferred one."""
+    required_offers = 1 if no_offers else rules.min_offers
+    preferred_count = sum(
+        1 for offer in offers if isinstance(offer, dict) and offer.get("preferred") is True
+    )
+    return (
+        *_err_if(
+            len(offers) < required_offers,
+            where,
+            f"needs at least {required_offers} comparison offer(s)",
+        ),
+        *_err_if(
+            len(offers) > rules.max_offers,
+            where,
+            f"has more than {rules.max_offers} comparison offer(s)",
+        ),
+        *(
+            e
+            for j, offer in enumerate(offers)
+            for e in _offer_errors(f"{where}.offers[{j}]", offer)
+        ),
+        *_err_if(
+            bool(offers) and preferred_count != 1,
+            where,
+            "exactly one offer must be marked preferred",
+        ),
+    )
+
+
+def _offer_errors(where: str, offer: object) -> tuple[FieldError, ...]:
+    """Return the errors of one comparison offer: its label and its value."""
+    if not isinstance(offer, dict):
+        return _err(where, "must be an object")
+    label = offer.get("label")
+    num = _offer_value(offer)
+    return (
+        *_err_if(not isinstance(label, str) or not label.strip(), where, "offer needs a label"),
+        *(
+            _err(where, "offer value must be a finite number")
+            if num is None
+            else _err_if(num < 0, where, "offer value must not be negative")
+        ),
+    )
+
+
+def _preferred_value(pos: Mapping[str, Any]) -> Decimal | None:
+    """Return the value of the first preferred offer of a position, if it is valid."""
+    preferred = next(
+        (
+            offer
+            for offer in pos.get("offers") or []
+            if isinstance(offer, dict) and offer.get("preferred") is True
+        ),
+        None,
+    )
+    return _offer_value(preferred) if preferred is not None else None
 
 
 def positions_total(value: object) -> Decimal | None:
@@ -725,24 +867,42 @@ def positions_total(value: object) -> Decimal | None:
     """
     if not isinstance(value, list):
         return None
-    total = Decimal(0)
-    found = False
-    for pos in value:
-        if not isinstance(pos, dict):
-            continue
-        for offer in pos.get("offers") or []:
-            if isinstance(offer, dict) and offer.get("preferred") is True:
-                num = _offer_value(offer)
-                if num is not None:
-                    total += num
-                    found = True
-                break
-    return total if found else None
+    preferred = tuple(_preferred_value(pos) for pos in value if isinstance(pos, dict))
+    found = tuple(num for num in preferred if num is not None)
+    return sum(found, Decimal(0)) if found else None
 
 
-def extract_promoted(
-    fields: Sequence[FormFieldDef], data: Mapping[str, Any]
-) -> dict[str, Any]:
+def _promote(out: dict[str, Any], field: FormFieldDef, data: Mapping[str, Any]) -> dict[str, Any]:
+    """Add the promoted value of one field to ``out``.
+
+    A ``positions`` field adds its total to ``amount``. A ``funding`` field adds nothing
+    here, because `extract_promoted` sets it last.
+    """
+    match field.type:
+        case "funding":
+            return out
+        case "positions":
+            total = positions_total(data.get(field.key))
+            return (
+                out if total is None else {**out, "amount": out.get("amount", Decimal(0)) + total}
+            )
+        case _:
+            return _promote_flagged(out, field, data.get(field.key))
+
+
+def _promote_flagged(out: dict[str, Any], field: FormFieldDef, value: object) -> dict[str, Any]:
+    """Add the value of an ``isPromoted`` field to ``out`` under its target.
+
+    A numeric value must be a finite ``Decimal``; a bad one is left out.
+    """
+    target = field.promote_target
+    if not (field.is_promoted and target) or value is None:
+        return out
+    promoted = _finite_decimal(value) if field.type in _NUMERIC_TYPES else value
+    return out if promoted is None else {**out, target: promoted}
+
+
+def extract_promoted(fields: Sequence[FormFieldDef], data: Mapping[str, Any]) -> dict[str, Any]:
     """Pull the promoted field values from ``data`` into ``{promote_target: value}``.
 
     The function normalizes a numeric promoted field such as ``amount`` to ``Decimal``.
@@ -753,35 +913,11 @@ def extract_promoted(
     flag, and several `positions` fields add up. The amount is never NaN or Infinity,
     because such a value crashes a consumer.
     """
-    out: dict[str, Any] = {}
-    funding: Decimal | None = None
-    for f in fields:
-        if f.type == "funding":
-            funding = _finite_decimal(data.get(f.key))
-            continue
-        if f.type == "positions":
-            total = positions_total(data.get(f.key))
-            if total is not None:
-                out["amount"] = out.get("amount", Decimal(0)) + total
-            continue
-        if not (f.is_promoted and f.promote_target):
-            continue
-        value = data.get(f.key)
-        if value is None:
-            continue
-        if f.type in _NUMERIC_TYPES:
-            try:
-                num = Decimal(str(value))
-            except (InvalidOperation, ValueError):
-                continue
-            if not num.is_finite():
-                continue
-            out[f.promote_target] = num
-        else:
-            out[f.promote_target] = value
-    if funding is not None:
-        out["amount"] = funding
-    return out
+    start: dict[str, Any] = {}
+    promoted = reduce(lambda out, f: _promote(out, f, data), fields, start)
+    fundings = tuple(_finite_decimal(data.get(f.key)) for f in fields if f.type == "funding")
+    funding = fundings[-1] if fundings else None
+    return promoted if funding is None else {**promoted, "amount": funding}
 
 
 def _finite_decimal(value: object) -> Decimal | None:

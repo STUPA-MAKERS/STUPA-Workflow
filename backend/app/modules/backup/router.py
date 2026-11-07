@@ -127,7 +127,7 @@ async def list_backups(
     """List the catalogue, newest first, plus what this installation can do."""
     rows = await service.list(limit=min(limit, 200), offset=max(offset, 0))
     return BackupListOut(
-        items=[BackupOut.model_validate(row) for row in rows],
+        items=tuple(BackupOut.model_validate(row) for row in rows),
         enabled=service.settings.backup_enabled,
         restore_enabled=service.settings.backup_restore_enabled,
         retention_count=service.settings.backup_retention_count,
@@ -225,14 +225,14 @@ async def export_backup(
     )
     await session.commit()
 
+    length = {"Content-Length": str(row.size_bytes)} if row.size_bytes else {}
     headers = {
         "Content-Disposition": content_disposition(
             "attachment", download_name(row.created_at)
         ),
         "X-Content-Type-Options": "nosniff",
+        **length,
     }
-    if row.size_bytes:
-        headers["Content-Length"] = str(row.size_bytes)
     return StreamingResponse(stream, media_type=ARCHIVE_CONTENT_TYPE, headers=headers)
 
 

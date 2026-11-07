@@ -37,8 +37,8 @@ def _node_out(
         currency=b.currency,
         active=b.active,
         color=b.color,
-        acceptedStateKeys=list(b.accepted_state_keys or []),
-        deniedStateKeys=list(b.denied_state_keys or []),
+        acceptedStateKeys=tuple(b.accepted_state_keys or ()),
+        deniedStateKeys=tuple(b.denied_state_keys or ()),
         hiddenInBudget=bool(b.hidden_in_budget),
         viewGremiumId=b.view_gremium_id,
         decisionGremiumId=b.decision_gremium_id,
@@ -94,21 +94,17 @@ class NodeOps(BudgetTreeServiceBase):
                 errors=[{"field": "key", "msg": "must be alphanumeric (no '-')"}],
             )
 
-        if payload.parent_id is None:
-            if payload.gremium_id is not None:
-                gremium = (
-                    await self.session.execute(
-                        select(Gremium).where(Gremium.id == payload.gremium_id)
-                    )
-                ).scalar_one_or_none()
-                if gremium is None:
-                    raise NotFoundError(f"gremium {payload.gremium_id} not found")
-            parent_path = None
-            gremium_id = payload.gremium_id
-        else:
-            parent = await self._get_node(payload.parent_id)
-            parent_path = parent.path_key
-            gremium_id = parent.gremium_id
+        parent = await self._get_node(payload.parent_id) if payload.parent_id is not None else None
+        if parent is None and payload.gremium_id is not None:
+            gremium = (
+                await self.session.execute(
+                    select(Gremium).where(Gremium.id == payload.gremium_id)
+                )
+            ).scalar_one_or_none()
+            if gremium is None:
+                raise NotFoundError(f"gremium {payload.gremium_id} not found")
+        parent_path = parent.path_key if parent is not None else None
+        gremium_id = parent.gremium_id if parent is not None else payload.gremium_id
 
         if await self._sibling_exists(payload.parent_id, payload.key):
             raise ConflictError(
@@ -175,8 +171,9 @@ class NodeOps(BudgetTreeServiceBase):
         overwriting the changes of another user.
         """
         node = await self._get_node(budget_id)
-        provided = payload.model_dump(exclude_unset=True)
-        new_key = provided.pop("key", None)
+        dumped = payload.model_dump(exclude_unset=True)
+        new_key = dumped.get("key")
+        provided = {field: value for field, value in dumped.items() if field != "key"}
         if "decision_gremium_id" in provided:
             await self._check_decision_gremium(provided["decision_gremium_id"])
         stichtag_changed = (
@@ -186,10 +183,9 @@ class NodeOps(BudgetTreeServiceBase):
             "fiscal_start_day" in provided and provided["fiscal_start_day"] != node.fiscal_start_day
         )
         before: dict[str, object] = {
-            field: _json_safe(getattr(node, field)) for field in provided
+            **{field: _json_safe(getattr(node, field)) for field in provided},
+            **({"key": node.key} if new_key is not None else {}),
         }
-        if new_key is not None:
-            before["key"] = node.key
         for field, value in provided.items():
             setattr(node, field, value)
         if new_key is not None and new_key != node.key:
@@ -236,9 +232,9 @@ class NodeOps(BudgetTreeServiceBase):
                 f"budget key {new_key!r} already exists under this parent",
                 code="budget_key_exists",
             )
-        parent_path: str | None = None
-        if node.parent_id is not None:
-            parent_path = (await self._get_node(node.parent_id)).path_key
+        parent_path = (
+            (await self._get_node(node.parent_id)).path_key if node.parent_id is not None else None
+        )
         old_path = node.path_key
         new_path = tree_rules.compose_path_key(parent_path, new_key)
         descendants = (

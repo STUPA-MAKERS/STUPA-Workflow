@@ -86,29 +86,40 @@ async def _anonymize_due(
     A bad row is logged and does not abort the run.
     """
     ids = await _due_application_ids(maker)
-    count = 0
-    for application_id in ids:
-        try:
-            async with maker() as session:
-                files = FilesService(session, storage=storage)
-                await ApplicationsService(session).anonymize(
-                    application_id,
-                    files=files,
-                    actor=_RETENTION_ACTOR,
-                    commit=False,
-                )
-                await audit_record(
-                    session,
-                    actor=_RETENTION_ACTOR,
-                    action=AuditAction.RETENTION_ANONYMIZE,
-                    target_type="application",
-                    target_id=str(application_id),
-                )
-                await session.commit()
-            count += 1
-        except Exception:
-            logger.exception("retention anonymize failed (app=%s)", application_id)
-    return count
+    done = [await _anonymize_one(maker, storage, application_id) for application_id in ids]
+    return sum(done)
+
+
+async def _anonymize_one(
+    maker: async_sessionmaker[AsyncSession],
+    storage: ObjectStorage | None,
+    application_id: UUID,
+) -> bool:
+    """Anonymize one application in its own session; return whether it succeeded.
+
+    A failure logs and gives False, because one bad row must not abort the run.
+    """
+    try:
+        async with maker() as session:
+            files = FilesService(session, storage=storage)
+            await ApplicationsService(session).anonymize(
+                application_id,
+                files=files,
+                actor=_RETENTION_ACTOR,
+                commit=False,
+            )
+            await audit_record(
+                session,
+                actor=_RETENTION_ACTOR,
+                action=AuditAction.RETENTION_ANONYMIZE,
+                target_type="application",
+                target_id=str(application_id),
+            )
+            await session.commit()
+    except Exception:
+        logger.exception("retention anonymize failed (app=%s)", application_id)
+        return False
+    return True
 
 
 async def _purge_expired(

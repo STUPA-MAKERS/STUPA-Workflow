@@ -84,6 +84,28 @@ def _resolve_note(
     return existing.note if existing is not None else None
 
 
+def _attendance_out(
+    member: PrincipalRow,
+    rec: MeetingAttendance | None,
+    held: frozenset[str],
+    *,
+    is_self: bool,
+    can_write: bool,
+) -> AttendanceOut:
+    """Build one roster row; the note goes only to the member and to the lead."""
+    return AttendanceOut(
+        principalId=member.id,
+        displayName=member.display_name,
+        email=member.email,
+        status=rec.status if rec else None,  # type: ignore[arg-type]
+        source=rec.source if rec else None,  # type: ignore[arg-type]
+        note=rec.note if rec and (is_self or can_write) else None,
+        isSelf=is_self,
+        canKeepProtocol=KEEPER_PERMISSION in held,
+        canVote=VOTE_PERMISSION in held,
+    )
+
+
 class AttendanceService:
     """Read the roster of a meeting and change the attendance records."""
 
@@ -102,9 +124,12 @@ class AttendanceService:
         Raises:
             NotFoundError: No meeting has this id.
         """
-        stmt = select(Meeting).where(Meeting.id == meeting_id)
-        if for_write:
-            stmt = stmt.with_for_update(read=True).execution_options(populate_existing=True)
+        query = select(Meeting).where(Meeting.id == meeting_id)
+        stmt = (
+            query.with_for_update(read=True).execution_options(populate_existing=True)
+            if for_write
+            else query
+        )
         meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
@@ -186,25 +211,16 @@ class AttendanceService:
         )
         by_principal = {r.principal_id: r for r in records}
         perms = await member_permissions(self.session, meeting.gremium_id)
-        out: list[AttendanceOut] = []
-        for m in members:
-            rec = by_principal.get(m.id)
-            is_self = m.sub == requester_sub
-            held = perms.get(m.id, frozenset())
-            out.append(
-                AttendanceOut(
-                    principalId=m.id,
-                    displayName=m.display_name,
-                    email=m.email,
-                    status=rec.status if rec else None,  # type: ignore[arg-type]
-                    source=rec.source if rec else None,  # type: ignore[arg-type]
-                    note=rec.note if rec and (is_self or can_write) else None,
-                    isSelf=is_self,
-                    canKeepProtocol=KEEPER_PERMISSION in held,
-                    canVote=VOTE_PERMISSION in held,
-                )
+        return [
+            _attendance_out(
+                m,
+                by_principal.get(m.id),
+                perms.get(m.id, frozenset()),
+                is_self=m.sub == requester_sub,
+                can_write=can_write,
             )
-        return out
+            for m in members
+        ]
 
     async def _record(self, meeting_id: UUID, principal_id: UUID) -> MeetingAttendance | None:
         """Load the record of one member with a row lock.

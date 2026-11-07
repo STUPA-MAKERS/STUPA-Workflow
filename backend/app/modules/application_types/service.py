@@ -35,9 +35,12 @@ class ApplicationTypesService:
         admin: bool = False,
     ) -> Page[ApplicationTypeListItem]:
         """List the application types as a page (public view: offerable types only)."""
-        stmt: Select[ApplicationType] = select(ApplicationType)
-        if not include_inactive:
-            stmt = stmt.where(ApplicationType.active_form_version_id.is_not(None))
+        every: Select[ApplicationType] = select(ApplicationType)
+        stmt = (
+            every
+            if include_inactive
+            else every.where(ApplicationType.active_form_version_id.is_not(None))
+        )
 
         total = await self.session.scalar(select(func.count()).select_from(stmt.subquery()))
         rows = (

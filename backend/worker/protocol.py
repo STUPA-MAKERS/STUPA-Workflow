@@ -205,22 +205,32 @@ async def heal_public_protocols(ctx: dict[str, Any]) -> str:
     maker = _sessionmaker(ctx)
     async with maker() as session:
         gremien = await _service(ctx, session).gremien_missing_public()
-    done = failed = 0
-    for gremium_id in gremien:
-        try:
-            async with maker() as session:
-                result = await _service(ctx, session).backfill_public(
-                    gremium_id, retry_failed=False
-                )
-        except Exception:
-            logger.exception("public heal failed (gremium=%s)", gremium_id)
-            failed += 1
-            continue
-        done += result.done
-        failed += result.transient + result.failed
+    outcomes = [await _heal_one(ctx, maker, gremium_id) for gremium_id in gremien]
+    done = sum(d for d, _ in outcomes)
+    failed = sum(f for _, f in outcomes)
     if failed:
         logger.warning("public heal left %s protocols without a public version", failed)
     return f"gremien={len(gremien)} done={done} failed={failed}"
+
+
+async def _heal_one(
+    ctx: dict[str, Any], maker: async_sessionmaker[AsyncSession], gremium_id: UUID
+) -> tuple[int, int]:
+    """Run the backfill of one gremium in its own session.
+
+    Returns:
+        The count of built and of failed public versions. An error of the gremium counts
+        as one failure and only logs, so the other gremien still heal.
+    """
+    try:
+        async with maker() as session:
+            result = await _service(ctx, session).backfill_public(
+                gremium_id, retry_failed=False
+            )
+    except Exception:
+        logger.exception("public heal failed (gremium=%s)", gremium_id)
+        return (0, 1)
+    return (result.done, result.transient + result.failed)
 
 
 async def on_startup(ctx: dict[str, Any]) -> None:
@@ -230,6 +240,8 @@ async def on_startup(ctx: dict[str, Any]) -> None:
     both are built here.
     """
     settings = load_settings()
-    ctx["settings"] = settings
-    ctx["typst_client"] = build_typst_client(settings)
-    ctx["object_storage"] = build_object_storage(settings)
+    ctx.update(
+        settings=settings,
+        typst_client=build_typst_client(settings),
+        object_storage=build_object_storage(settings),
+    )

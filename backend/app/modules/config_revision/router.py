@@ -104,17 +104,18 @@ async def get_config_revision_diff(
     revision = await service.get(revision_id)
     if revision is None:
         raise NotFoundError(f"config revision {revision_id} not found")
-    prev_version: int | None = None
-    if revision.prev_revision_id is not None:
-        prev = await service.get(revision.prev_revision_id)
-        prev_version = prev.version if prev is not None else None
+    prev = (
+        await service.get(revision.prev_revision_id)
+        if revision.prev_revision_id is not None
+        else None
+    )
     diff = await service.diff(revision)
     return ConfigRevisionDiffOut(
         id=revision.id,
         entityType=revision.entity_type,
         entityId=revision.entity_id,
         version=revision.version,
-        prevVersion=prev_version,
+        prevVersion=prev.version if prev is not None else None,
         diff=diff,
     )
 

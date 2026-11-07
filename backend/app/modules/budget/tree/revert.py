@@ -41,22 +41,23 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         action = entry.action
         data = entry.data or {}
         target_id = entry.target_id or ""
-        if action == AuditAction.BUDGET_EXPENSE_CREATE:
-            await self._revert_expense_create(UUID(target_id), entry.id)
-        elif action == AuditAction.BUDGET_TRANSFER_CREATE:
-            await self._revert_transfer_create(UUID(target_id), entry.id)
-        elif action == AuditAction.BUDGET_NODE_CREATE:
-            await self._revert_node_create(UUID(target_id))
-        elif action == AuditAction.BUDGET_NODE_UPDATE:
-            await self._revert_node_update(UUID(target_id), data)
-        elif action == AuditAction.BUDGET_ALLOCATION_SET:
-            await self._revert_allocation_set(UUID(target_id), data, entry.id)
-        elif action == AuditAction.BUDGET_EXPENSE_UPDATE:
-            await self._revert_expense_update(UUID(target_id), data)
-        else:  # pragma: no cover - the dispatcher only passes revertable actions
-            raise ConflictError(
-                "This budget action cannot be reverted.", code="not_revertable"
-            )
+        match action:
+            case AuditAction.BUDGET_EXPENSE_CREATE:
+                await self._revert_expense_create(UUID(target_id), entry.id)
+            case AuditAction.BUDGET_TRANSFER_CREATE:
+                await self._revert_transfer_create(UUID(target_id), entry.id)
+            case AuditAction.BUDGET_NODE_CREATE:
+                await self._revert_node_create(UUID(target_id))
+            case AuditAction.BUDGET_NODE_UPDATE:
+                await self._revert_node_update(UUID(target_id), data)
+            case AuditAction.BUDGET_ALLOCATION_SET:
+                await self._revert_allocation_set(UUID(target_id), data, entry.id)
+            case AuditAction.BUDGET_EXPENSE_UPDATE:
+                await self._revert_expense_update(UUID(target_id), data)
+            case _:  # pragma: no cover - the dispatcher only passes revertable actions
+                raise ConflictError(
+                    "This budget action cannot be reverted.", code="not_revertable"
+                )
 
     async def _revert_expense_create(
         self, expense_id: UUID, reverted_audit_id: int
@@ -164,14 +165,15 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         Raises:
             ConflictError: `stale_revert` (409) when a value no longer matches.
         """
-        if not isinstance(after, dict):
-            return
-        for field, expected in after.items():
-            if not self._value_matches(_json_safe(getattr(obj, field, None)), expected):
-                raise ConflictError(
-                    "Changed since; revert the newer change first.",
-                    code="stale_revert",
-                )
+        stale = isinstance(after, dict) and any(
+            not self._value_matches(_json_safe(getattr(obj, field, None)), expected)
+            for field, expected in after.items()
+        )
+        if stale:
+            raise ConflictError(
+                "Changed since; revert the newer change first.",
+                code="stale_revert",
+            )
 
     async def _revert_node_update(self, budget_id: UUID, data: dict[str, Any]) -> None:
         """Write back the prior values that the cost-center update recorded."""
