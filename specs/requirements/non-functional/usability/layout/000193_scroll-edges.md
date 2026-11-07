@@ -2,7 +2,7 @@
 id: "000193"
 title: A scroll edge fades, or cuts at a line
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-07
 implementation:

@@ -2,7 +2,7 @@
 id: "000527"
 title: A list head is one glass surface over its rows
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-07
 implementation:
