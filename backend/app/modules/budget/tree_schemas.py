@@ -526,7 +526,7 @@ class InvoiceSegmentCounts(_CamelModel):
     paid: int
 
 
-class InvoicePage(Page[InvoiceOut]):
+class InvoicePage(Page[InvoiceOut], frozen=True):
     """One page of invoices plus the counts of the list segments."""
 
     counts: InvoiceSegmentCounts

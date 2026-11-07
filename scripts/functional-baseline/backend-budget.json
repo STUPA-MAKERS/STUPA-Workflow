@@ -13,5 +13,5 @@
   "backend/app/modules/budget/tree/view.py": 9,
   "backend/app/modules/budget/tree_router.py": 2,
   "backend/app/modules/budget/tree_rules.py": 14,
-  "backend/app/modules/budget/tree_schemas.py": 30
+  "backend/app/modules/budget/tree_schemas.py": 29
 }
