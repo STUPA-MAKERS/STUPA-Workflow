@@ -12,22 +12,21 @@ from __future__ import annotations
 from collections.abc import Iterable
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 from sqlalchemy import Select, String, or_, select
 from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import GroupMapping, Role, RoleAssignment, RolePermission
 from app.modules.auth.models import Principal as PrincipalRow
+from app.shared.schemas import FrozenCamelModel
 
 #: The key of the admin role. It holds every permission, so it counts as a holder.
 ADMIN_ROLE_KEY = "admin"
 
 
-class PersonRef(BaseModel):
+class PersonRef(FrozenCamelModel, frozen=True):
     """A person on a ticket, a note or an event. null/null is a deleted person."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     principal_id: UUID | None = Field(default=None, serialization_alias="principalId")
     display_name: str | None = Field(default=None, serialization_alias="displayName")
@@ -93,12 +92,14 @@ async def permission_holders(
             )
         ).all()
     )
-    holder = PrincipalRow.id.in_(assigned)
-    if groups:
-        holder = or_(holder, PrincipalRow.oidc_groups.has_any(array(groups, type_=String)))
-    stmt = select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email).where(
+    by_assignment = PrincipalRow.id.in_(assigned)
+    holder = (
+        or_(by_assignment, PrincipalRow.oidc_groups.has_any(array(groups, type_=String)))
+        if groups
+        else by_assignment
+    )
+    holders = select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email).where(
         PrincipalRow.active.is_(True), PrincipalRow.merged_into.is_(None), holder
     )
-    if principal_id is not None:
-        stmt = stmt.where(PrincipalRow.id == principal_id)
+    stmt = holders if principal_id is None else holders.where(PrincipalRow.id == principal_id)
     return [(pid, name, email) for pid, name, email in (await session.execute(stmt)).all()]

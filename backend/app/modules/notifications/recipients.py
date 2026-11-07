@@ -24,9 +24,10 @@ unconditionally. A member of a Gremium who can only read the application gets no
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import groupby
 from typing import Any
 
 from sqlalchemy import ColumnElement, Select, func, or_, select
@@ -140,7 +141,6 @@ async def _candidates_with_transition_permission(
         return []
     ids = {pid for pid, _sub, _email, _groups in seeds}
 
-    roles_by_pid: dict[uuid.UUID, set[str]] = {pid: set() for pid in ids}
     groups_by_pid: dict[uuid.UUID, set[str]] = {
         pid: set(groups) for pid, _sub, _email, groups in seeds
     }
@@ -151,26 +151,18 @@ async def _candidates_with_transition_permission(
             .where(RoleAssignment.principal_id.in_(ids))
         )
     ).all()
-    for pid, role_key in assignment_rows:
-        roles_by_pid[pid].add(role_key)
-
     all_groups: set[str] = set().union(*groups_by_pid.values())
-    if all_groups:
-        mapping_rows = (
+    mapping_rows = (
+        (
             await session.execute(
                 select(GroupMapping.oidc_group, Role.key)
                 .join(Role, Role.id == GroupMapping.role_id)
                 .where(GroupMapping.oidc_group.in_(all_groups))
             )
         ).all()
-        mapped_roles: dict[str, set[str]] = {}
-        for group, role_key in mapping_rows:
-            mapped_roles.setdefault(group, set()).add(role_key)
-        for pid, groups in groups_by_pid.items():
-            for group in groups:
-                roles_by_pid[pid].update(mapped_roles.get(group, ()))
-
-    committees_by_pid: dict[uuid.UUID, set[str]] = {pid: set() for pid in ids}
+        if all_groups
+        else []
+    )
     membership_rows = (
         await session.execute(
             select(GremiumMembership.principal_id, GremiumMembership.gremium_id).where(
@@ -178,19 +170,30 @@ async def _candidates_with_transition_permission(
             )
         )
     ).all()
-    for pid, membership_gremium in membership_rows:
-        committees_by_pid[pid].add(str(membership_gremium))
+    assigned = _grouped((pid, key) for pid, key in assignment_rows)
+    mapped = _grouped((group, key) for group, key in mapping_rows)
+    committees = _grouped((pid, str(gremium)) for pid, gremium in membership_rows)
 
     return [
         ActionableCandidate(
             principal_id=pid,
             sub=sub,
             email=email,
-            roles=frozenset(roles_by_pid[pid]),
-            committees=frozenset(committees_by_pid[pid]),
+            roles=assigned.get(pid, frozenset())
+            | frozenset(role for group in groups_by_pid[pid] for role in mapped.get(group, ())),
+            committees=committees.get(pid, frozenset()),
         )
         for pid, sub, email, _groups in seeds
     ]
+
+
+def _grouped[K, V](pairs: Iterable[tuple[K, V]]) -> dict[K, frozenset[V]]:
+    """Group ``(key, value)`` pairs into a map from each key to the set of its values."""
+    by_key = sorted(pairs, key=lambda pair: str(pair[0]))
+    return {
+        key: frozenset(value for _key, value in group)
+        for key, group in groupby(by_key, key=lambda pair: pair[0])
+    }
 
 
 def firable_candidates(
@@ -207,26 +210,28 @@ def firable_candidates(
     context of that candidate. A ``GuardError`` on a single transition counts as not
     firable. This fail-closed rule keeps one bad guard from breaking the whole dispatch.
     """
-    out: list[ActionableCandidate] = []
-    for candidate in candidates:
+
+    def can_fire(candidate: ActionableCandidate) -> bool:
         ctx = with_actor(
             base_ctx,
             roles=candidate.roles,
             committees=candidate.committees,
             is_applicant=created_by is not None and created_by == candidate.sub,
         )
-        for transition in transitions:
-            try:
-                fires = eval_guard(transition.guard, ctx)
-            except GuardError:
-                continue
-            if fires:
-                out.append(candidate)
-                break
-    return out
+        return any(_fires(transition, ctx) for transition in transitions)
+
+    return [candidate for candidate in candidates if can_fire(candidate)]
 
 
-@dataclass(slots=True)
+def _fires(transition: Transition, ctx: GuardContext) -> bool:
+    """Tell whether the guard of the transition passes; a ``GuardError`` counts as no."""
+    try:
+        return bool(eval_guard(transition.guard, ctx))
+    except GuardError:
+        return False
+
+
+@dataclass(frozen=True, slots=True)
 class RecipientResolver:
     """Resolve recipient specs against the DB."""
 
@@ -243,41 +248,46 @@ class RecipientResolver:
 
         An unknown or incomplete spec is ignored, so the rule stays valid.
         """
-        now = now or datetime.now(UTC)
-        out: set[str] = set()
-        for spec in specs:
-            kind = spec.get("kind")
-            ref = spec.get("ref")
-            if kind == "group" and ref:
-                out.update(await self._emails_for_group(str(ref)))
-            elif kind == "role" and ref:
-                out.update(await self._emails_for_role(str(ref)))
-            elif kind == "gremium" and ref:
-                out.update(await self._emails_for_gremium(str(ref)))
-            elif kind == "applicant" and application_id is not None:
-                email = await self._applicant_email(application_id)
-                if email:
-                    out.add(email)
-            elif kind == "email" and ref:
-                out.add(str(ref).strip())
-            elif kind == "voteGremium" and application_id is not None:
-                gid = await self.session.scalar(
-                    select(Application.vote_gremium_id).where(
-                        Application.id == application_id
-                    )
+        found = [await self._resolve_spec(spec, application_id) for spec in specs]
+        return sorted({e for emails in found for e in emails if e})
+
+    async def _resolve_spec(
+        self, spec: dict[str, Any], application_id: uuid.UUID | None
+    ) -> list[str]:
+        """Return the addresses of one spec; an unknown or incomplete spec gives none."""
+        match spec.get("kind"), spec.get("ref"), application_id:
+            case "group", ref, _ if ref:
+                return await self._emails_for_group(str(ref))
+            case "role", ref, _ if ref:
+                return await self._emails_for_role(str(ref))
+            case "gremium", ref, _ if ref:
+                return await self._emails_for_gremium(str(ref))
+            case "applicant", _, app_id if app_id is not None:
+                email = await self._applicant_email(app_id)
+                return [email] if email else []
+            case "email", ref, _ if ref:
+                return [str(ref).strip()]
+            case "voteGremium", _, app_id if app_id is not None:
+                vote_gid = await self.session.scalar(
+                    select(Application.vote_gremium_id).where(Application.id == app_id)
                 )
-                if gid is not None:
-                    out.update(await self._emails_for_gremium(str(gid)))
-            elif kind == "budgetGremium" and application_id is not None:
+                return (
+                    await self._emails_for_gremium(str(vote_gid)) if vote_gid is not None else []
+                )
+            case "budgetGremium", _, app_id if app_id is not None:
                 budget_id = await self.session.scalar(
-                    select(Application.budget_id).where(Application.id == application_id)
+                    select(Application.budget_id).where(Application.id == app_id)
                 )
-                gid = await effective_decision_gremium(self.session, budget_id)
-                if gid is not None:
-                    out.update(await self._emails_for_gremium(str(gid)))
-            elif kind == "permission" and ref:
-                out.update(await self._emails_for_permission(str(ref)))
-        return sorted(e for e in out if e)
+                budget_gid = await effective_decision_gremium(self.session, budget_id)
+                return (
+                    await self._emails_for_gremium(str(budget_gid))
+                    if budget_gid is not None
+                    else []
+                )
+            case "permission", ref, _ if ref:
+                return await self._emails_for_permission(str(ref))
+            case _:
+                return []
 
     async def _emails_for_group(self, group: str) -> list[str]:
         rows = (
@@ -438,16 +448,16 @@ async def _readers(
     from app.modules.applications.access import resolve_app_read
     from app.shared.errors import ForbiddenError
 
-    out: set[uuid.UUID] = set()
-    for pid, _email, principal in await _resolved_principals(
-        session, principal_ids, now
-    ):
+
+    async def can_read(principal: AuthPrincipal) -> bool:
         try:
             await resolve_app_read(session, application_id, principal, None)
         except ForbiddenError:
-            continue
-        out.add(pid)
-    return out
+            return False
+        return True
+
+    resolved = await _resolved_principals(session, principal_ids, now)
+    return {pid for pid, _email, principal in resolved if await can_read(principal)}
 
 
 async def _open_vote_casters(
@@ -476,14 +486,15 @@ async def _open_vote_casters(
         )
     ).all()
     voting = VotingService(session)
-    out: set[str] = set()
-    resolved = await _resolved_principals(session, list(member_ids), now)
-    for _pid, email, principal in resolved:
+
+    async def casts_any(principal: AuthPrincipal) -> bool:
         for vote in votes:
             if await voting.can_still_cast(vote, principal, now=now):
-                out.add(email)
-                break
-    return sorted(out)
+                return True
+        return False
+
+    resolved = await _resolved_principals(session, list(member_ids), now)
+    return sorted({email for _pid, email, principal in resolved if await casts_any(principal)})
 
 
 async def state_actionable(session: AsyncSession, state: State | None) -> bool:

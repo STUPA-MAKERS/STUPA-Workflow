@@ -159,15 +159,11 @@ def parse_scope(raw: str | None) -> list[str]:
     Raises:
         OAuthError: A scope is unknown. The error code is `invalid_scope`.
     """
-    if not raw or not raw.strip():
-        raw = DEFAULT_SCOPE
-    out: list[str] = []
-    for tok in raw.split():
-        if tok not in SCOPES:
-            raise OAuthError("invalid_scope", f"unknown scope: {tok}")
-        if tok not in out:
-            out.append(tok)
-    return out
+    requested = (raw if raw and raw.strip() else DEFAULT_SCOPE).split()
+    unknown = next((tok for tok in requested if tok not in SCOPES), None)
+    if unknown is not None:
+        raise OAuthError("invalid_scope", f"unknown scope: {unknown}")
+    return list(dict.fromkeys(requested))
 
 
 def scope_permissions(scopes: list[str]) -> frozenset[str]:
@@ -178,10 +174,8 @@ def scope_permissions(scopes: list[str]) -> frozenset[str]:
     contains one of them, and it holds for an admin. The scope cap in `Principal.has`
     stops the admin bypass.
     """
-    perms: set[str] = set()
-    for s in scopes:
-        perms |= SCOPES.get(s, frozenset())
-    return frozenset(perms - FORBIDDEN_PERMISSIONS)
+    granted = frozenset[str]().union(*(SCOPES.get(s, frozenset()) for s in scopes))
+    return granted - FORBIDDEN_PERMISSIONS
 
 
 def is_access_token(token: str) -> bool:

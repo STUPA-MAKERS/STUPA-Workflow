@@ -45,7 +45,7 @@ class VirusScanner(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ClamdScanner:
     """clamd backend over TCP INSTREAM.
 

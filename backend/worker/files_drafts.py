@@ -26,6 +26,7 @@ upload and the quarantine are already in the log.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
 
@@ -124,10 +125,31 @@ async def _remove_objects(ctx: dict[str, Any], keys: list[str]) -> None:
         logger.warning("no object storage: %d object(s) of purged drafts stay", len(keys))
         return
     for key in keys:
-        try:
-            await storage.remove(key)
-        except StorageError:
-            logger.warning("could not remove an object of a purged draft")
+        await _remove_object(storage, key)
+
+
+async def _remove_object(storage: ObjectStorage, key: str) -> None:
+    """Remove one object of a purged draft; a failure is only a warning."""
+    try:
+        await storage.remove(key)
+    except StorageError:
+        logger.warning("could not remove an object of a purged draft")
+
+
+async def _purged_batches(
+    ctx: dict[str, Any], maker: async_sessionmaker[AsyncSession], moment: datetime
+) -> AsyncIterator[int]:
+    """Purge batch after batch and yield the count of each.
+
+    The run stops after the first batch that is not full, because then no expired draft
+    is left.
+    """
+    while True:
+        count, keys = await _purge_batch(maker, moment)
+        await _remove_objects(ctx, keys)
+        yield count
+        if count < PURGE_BATCH:
+            return
 
 
 async def purge_draft_attachments(
@@ -140,13 +162,7 @@ async def purge_draft_attachments(
     """
     moment = now or datetime.now(UTC)
     maker = _sessionmaker(ctx)
-    purged = 0
-    while True:
-        count, keys = await _purge_batch(maker, moment)
-        await _remove_objects(ctx, keys)
-        purged += count
-        if count < PURGE_BATCH:
-            break
+    purged = sum([count async for count in _purged_batches(ctx, maker, moment)])
     tokens = await _purge_tokens(maker, moment)
     if purged or tokens:
         logger.info(
