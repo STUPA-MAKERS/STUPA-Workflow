@@ -161,13 +161,11 @@ class LiveVoteConnection:
             True when a token was free. On False the caller drops the frame.
         """
         now = time.monotonic()
-        elapsed = now - self._last_refill
+        refilled = min(_THROTTLE_BURST, self._tokens + (now - self._last_refill) * _THROTTLE_RATE)
+        allowed = refilled >= 1.0
         self._last_refill = now
-        self._tokens = min(_THROTTLE_BURST, self._tokens + elapsed * _THROTTLE_RATE)
-        if self._tokens < 1.0:
-            return False
-        self._tokens -= 1.0
-        return True
+        self._tokens = refilled - 1.0 if allowed else refilled
+        return allowed
 
     def _allow_draft(self) -> bool:
         """Count one body draft in the current one-second window.
@@ -177,10 +175,9 @@ class LiveVoteConnection:
             False the caller drops the draft without an answer.
         """
         now = time.monotonic()
-        if now - self._draft_window >= 1.0:
-            self._draft_window = now
-            self._draft_count = 0
-        self._draft_count += 1
+        fresh = now - self._draft_window >= 1.0
+        self._draft_window = now if fresh else self._draft_window
+        self._draft_count = (0 if fresh else self._draft_count) + 1
         return self._draft_count <= _DRAFT_MAX_PER_SECOND
 
     async def _send(self, payload: dict[str, object]) -> None:
@@ -365,13 +362,13 @@ class LiveVoteConnection:
         )
 
     async def _handle_message(self, raw: dict[str, object]) -> None:
-        kind = raw.get("type")
-        if kind == "subscribe":
-            await self._send_state()
-        elif kind == "cast":
-            await self._handle_cast(raw)
-        else:
-            await self._send_error("unknown_type")
+        match raw.get("type"):
+            case "subscribe":
+                await self._send_state()
+            case "cast":
+                await self._handle_cast(raw)
+            case _:
+                await self._send_error("unknown_type")
 
     def _filter(self, message: dict[str, object]) -> dict[str, object] | None:
         """Return the message as this connection may see it, or None to drop it.
@@ -420,6 +417,21 @@ class LiveVoteConnection:
             else:
                 await self._send_error("invalid_message")
 
+    async def _join_presence(self, channel: str) -> str | None:
+        """Register a voter connection and broadcast the roster.
+
+        A beamer does not count, because it is a display and not a person.
+
+        Returns:
+            The connection id in the roster, or None for a beamer.
+        """
+        if self.beamer:
+            return None
+        name = self.principal.display_name or self.principal.email or self.principal.sub
+        connection_id, names = PRESENCE.join(self.meeting_id, self.principal.sub, name)
+        await self.broker.publish(channel, ViewersEvent(viewers=names).dump())
+        return connection_id
+
     async def run(self) -> None:
         """Open the subscription and send the initial state.
 
@@ -441,11 +453,7 @@ class LiveVoteConnection:
         channel = meeting_channel(self.meeting_id)
         async with self.broker.subscribe(channel) as subscription:
             await self._send_state()
-            connection_id: str | None = None
-            if not self.beamer:
-                name = self.principal.display_name or self.principal.email or self.principal.sub
-                connection_id, names = PRESENCE.join(self.meeting_id, self.principal.sub, name)
-                await self.broker.publish(channel, ViewersEvent(viewers=names).dump())
+            connection_id = await self._join_presence(channel)
             pump = asyncio.create_task(self._pump(subscription))
             receive = asyncio.create_task(self._receive())
             try:
@@ -463,8 +471,8 @@ class LiveVoteConnection:
                 pump.cancel()
                 receive.cancel()
                 if connection_id is not None:
-                    names = PRESENCE.leave(self.meeting_id, connection_id)
+                    left = PRESENCE.leave(self.meeting_id, connection_id)
                     try:
-                        await self.broker.publish(channel, ViewersEvent(viewers=names).dump())
+                        await self.broker.publish(channel, ViewersEvent(viewers=left).dump())
                     except Exception:
                         logger.debug("viewers broadcast on leave failed", exc_info=True)

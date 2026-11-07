@@ -28,11 +28,13 @@ then rolls back, the protocol stays draft and the caller can repeat the call.
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date as _date
 from datetime import datetime
 from datetime import time as _time
+from typing import Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -143,7 +145,7 @@ _NON_PUBLIC_PLACEHOLDER = "*(nicht-öffentlicher Tagesordnungspunkt)*"
 _NON_PUBLIC_HEADING = "Nicht-öffentlicher Tagesordnungspunkt"
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class BackfillResult:
     """The counts of one public backfill run."""
 
@@ -152,7 +154,11 @@ class BackfillResult:
     failed: int = 0
 
 
-@dataclass(slots=True)
+#: The outcome of the public backfill of one protocol.
+BackfillOutcome = Literal["done", "transient", "failed"]
+
+
+@dataclass(frozen=True, slots=True)
 class HeaderMeta:
     """The person-related header data of one protocol variant.
 
@@ -161,15 +167,15 @@ class HeaderMeta:
     """
 
     protokollant: str | None = None
-    keepers: list[KeeperLine] = field(default_factory=list)
-    present: list[str] = field(default_factory=list)
-    excused: list[str] = field(default_factory=list)
-    absent: list[str] = field(default_factory=list)
+    keepers: Sequence[KeeperLine] = field(default_factory=list)
+    present: Sequence[str] = field(default_factory=list)
+    excused: Sequence[str] = field(default_factory=list)
+    absent: Sequence[str] = field(default_factory=list)
     present_count: int = 0
     excused_count: int = 0
     absent_count: int = 0
     guest_count: int = 0
-    datalines: list[str] = field(default_factory=list)
+    datalines: Sequence[str] = field(default_factory=list)
 
 
 class ProtocolService:
@@ -197,9 +203,12 @@ class ProtocolService:
         With `for_update`, the method locks the row (`SELECT … FOR UPDATE`) and
         reads the columns again, also when the session holds the row already.
         """
-        stmt = select(Protocol).where(Protocol.id == protocol_id)
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        base = select(Protocol).where(Protocol.id == protocol_id)
+        stmt = (
+            base.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else base
+        )
         protocol = (await self.session.execute(stmt)).scalar_one_or_none()
         if protocol is None:
             raise NotFoundError(f"protocol {protocol_id} not found")
@@ -284,15 +293,13 @@ class ProtocolService:
         Returns:
             The path, or `None` when no PDF exists or storage is off.
         """
-        if protocol.pdf_storage_key is not None and self.storage is not None:
-            return f"/api/protocols/{protocol.id}/pdf"
-        return None
+        stored = protocol.pdf_storage_key is not None and self.storage is not None
+        return f"/api/protocols/{protocol.id}/pdf" if stored else None
 
     def _public_pdf_path(self, protocol: Protocol) -> str | None:
         """Build the app-relative path of the redacted public variant."""
-        if protocol.public_pdf_storage_key is not None and self.storage is not None:
-            return f"/api/protocols/{protocol.id}/pdf/public"
-        return None
+        stored = protocol.public_pdf_storage_key is not None and self.storage is not None
+        return f"/api/protocols/{protocol.id}/pdf/public" if stored else None
 
     async def get_pdf_bytes(self, protocol_id: UUID) -> bytes:
         """Fetch the PDF bytes of the protocol from storage for the `/pdf` stream.
@@ -493,7 +500,7 @@ class ProtocolService:
         await self.session.commit()
 
     async def embed_votes(
-        self, protocol_id: UUID, vote_ids: list[UUID]
+        self, protocol_id: UUID, vote_ids: Sequence[UUID]
     ) -> ProtocolOut:
         """Append votes as snippets and write `protocol_vote_ref` (idempotent).
 
@@ -506,7 +513,7 @@ class ProtocolService:
         """
         protocol = await self._get(protocol_id)
         self._ensure_draft(protocol)
-        already = set(
+        already = frozenset(
             (
                 await self.session.execute(
                     select(ProtocolVoteRef.vote_id).where(
@@ -518,26 +525,12 @@ class ProtocolService:
             .all()
         )
         voting = VotingService(self.session)
-        snippets: list[str] = []
-        for vote_id in vote_ids:
-            if vote_id in already:
-                continue
-            await self._get_vote(vote_id, meeting_id=protocol.meeting_id)
-            already.add(vote_id)
-            inserted = (
-                await self.session.execute(
-                    pg_insert(ProtocolVoteRef)
-                    .values(protocol_id=protocol_id, vote_id=vote_id)
-                    .on_conflict_do_nothing(constraint="uq_protocol_vote_ref")
-                    .returning(ProtocolVoteRef.id)
-                )
-            ).first()
-            if inserted is None:
-                continue
-            view = await voting.get(vote_id)
-            snippets.append(
-                _snippet(view, _vote_title(view.application_id, view.question), tz=self._tz())
-            )
+        fresh = tuple(dict.fromkeys(v for v in vote_ids if v not in already))
+        embedded = [
+            await self._embed_one(protocol_id, protocol.meeting_id, vote_id, voting)
+            for vote_id in fresh
+        ]
+        snippets = [snippet for snippet in embedded if snippet is not None]
 
         if snippets:
             body = protocol.markdown.rstrip("\n")
@@ -546,6 +539,28 @@ class ProtocolService:
             await self.session.flush()
         await self.session.commit()
         return await self._to_out(protocol)
+
+    async def _embed_one(
+        self, protocol_id: UUID, meeting_id: UUID, vote_id: UUID, voting: VotingService
+    ) -> str | None:
+        """Check one vote, write its `protocol_vote_ref` and return its snippet.
+
+        Returns:
+            The snippet, or `None` when a parallel request wrote the ref first.
+        """
+        await self._get_vote(vote_id, meeting_id=meeting_id)
+        inserted = (
+            await self.session.execute(
+                pg_insert(ProtocolVoteRef)
+                .values(protocol_id=protocol_id, vote_id=vote_id)
+                .on_conflict_do_nothing(constraint="uq_protocol_vote_ref")
+                .returning(ProtocolVoteRef.id)
+            )
+        ).first()
+        if inserted is None:
+            return None
+        view = await voting.get(vote_id)
+        return _snippet(view, _vote_title(view.application_id, view.question), tz=self._tz())
 
     async def start_finalize(
         self, protocol_id: UUID, *, actor: str, public_withheld: bool | None = None
@@ -683,26 +698,13 @@ class ProtocolService:
         if protocol.status == "final":
             return await self._to_out(protocol)
 
-        uploads: list[tuple[str, bytes]] = []
         has_non_public = await self._has_non_public(protocol.meeting_id)
         gremium = await self.session.get(Gremium, protocol.gremium_id)
-        if has_non_public or bool(getattr(gremium, "protocols_public", False)):
-            internal_md = await self._build_document(protocol, public=False)
-            internal_pdf = await self._render_pdf(protocol, internal_md, public=False)
-            snapshot = PublicSnapshot()
-            public_md = await self._build_document(protocol, public=True, snapshot=snapshot)
-            public_pdf = await self._render_pdf(protocol, public_md, public=True)
-            if internal_pdf is not None:
-                uploads.append((protocol_storage_key(protocol.id), internal_pdf))
-            if public_pdf is not None:
-                uploads.append((protocol_public_storage_key(protocol.id), public_pdf))
-            apply_public_snapshot(protocol, snapshot, public_pdf)
-            mail_pdf = public_pdf if has_non_public else internal_pdf
-        else:
-            markdown = await self._build_document(protocol)
-            mail_pdf = await self._render_pdf(protocol, markdown)
-            if mail_pdf is not None:
-                uploads.append((protocol_storage_key(protocol.id), mail_pdf))
+        uploads, mail_pdf = (
+            await self._render_both(protocol, has_non_public=has_non_public)
+            if has_non_public or bool(getattr(gremium, "protocols_public", False))
+            else await self._render_internal(protocol)
+        )
         protocol.status = "final"
         protocol.sent_at = now
         await self.session.flush()
@@ -711,12 +713,43 @@ class ProtocolService:
         await self._send(protocol, mail_pdf)
         return await self._to_out(protocol)
 
+    async def _render_both(
+        self, protocol: Protocol, *, has_non_public: bool
+    ) -> tuple[tuple[tuple[str, bytes], ...], bytes | None]:
+        """Render the internal and the public PDF and store the public snapshot.
+
+        Returns:
+            The uploads, and the PDF for the mail: the public one when a non-public
+            item exists, else the internal one.
+        """
+        internal_md = await self._build_document(protocol, public=False)
+        internal_pdf = await self._render_pdf(protocol, internal_md, public=False)
+        snapshot = PublicSnapshot()
+        public_md = await self._build_document(protocol, public=True, snapshot=snapshot)
+        public_pdf = await self._render_pdf(protocol, public_md, public=True)
+        apply_public_snapshot(protocol, snapshot, public_pdf)
+        uploads = (
+            *_upload(protocol_storage_key(protocol.id), internal_pdf),
+            *_upload(protocol_public_storage_key(protocol.id), public_pdf),
+        )
+        return uploads, (public_pdf if has_non_public else internal_pdf)
+
+    async def _render_internal(
+        self, protocol: Protocol
+    ) -> tuple[tuple[tuple[str, bytes], ...], bytes | None]:
+        """Render the internal PDF only, which the mail then carries."""
+        markdown = await self._build_document(protocol)
+        pdf = await self._render_pdf(protocol, markdown)
+        return _upload(protocol_storage_key(protocol.id), pdf), pdf
+
     def _missing_public_clause(self) -> ColumnElement[bool]:
         """Return the rule "final, and the public version is missing"."""
-        cond = Protocol.public_content.is_(None)
-        if self.storage is not None and self.typst is not None:
-            cond = or_(cond, Protocol.public_pdf_storage_key.is_(None))
-        return and_(Protocol.status == "final", cond)
+        missing = Protocol.public_content.is_(None)
+        renders = self.storage is not None and self.typst is not None
+        return and_(
+            Protocol.status == "final",
+            or_(missing, Protocol.public_pdf_storage_key.is_(None)) if renders else missing,
+        )
 
     async def backfill_public(
         self, gremium_id: UUID, *, retry_failed: bool = True
@@ -737,27 +770,37 @@ class ProtocolService:
         Any exception of one protocol is caught and logged, because one bad protocol
         must not stop the job.
         """
-        stmt = select(Protocol.id).where(
+        base = select(Protocol.id).where(
             Protocol.gremium_id == gremium_id, self._missing_public_clause()
         )
-        if not retry_failed:
-            stmt = stmt.where(Protocol.public_render_failures < PUBLIC_RENDER_MAX_FAILURES)
+        stmt = (
+            base
+            if retry_failed
+            else base.where(Protocol.public_render_failures < PUBLIC_RENDER_MAX_FAILURES)
+        )
         ids = (await self.session.scalars(stmt.order_by(Protocol.created_at))).all()
-        result = BackfillResult()
-        for protocol_id in ids:
-            try:
-                await self._backfill_one(protocol_id)
-            except ServiceUnavailableError:
-                await self.session.rollback()
-                result.transient += 1
-            except Exception:
-                logger.exception("public backfill failed (protocol=%s)", protocol_id)
-                await self.session.rollback()
-                await self._count_render_failure(protocol_id)
-                result.failed += 1
-            else:
-                result.done += 1
-        return result
+        outcomes = Counter([await self._backfill_outcome(protocol_id) for protocol_id in ids])
+        return BackfillResult(
+            done=outcomes["done"], transient=outcomes["transient"], failed=outcomes["failed"]
+        )
+
+    async def _backfill_outcome(self, protocol_id: UUID) -> BackfillOutcome:
+        """Run the backfill of one protocol and classify its outcome.
+
+        A failure rolls the session back, so the next protocol starts clean. Any
+        exception is caught and logged, because one bad protocol must not stop the job.
+        """
+        try:
+            await self._backfill_one(protocol_id)
+        except ServiceUnavailableError:
+            await self.session.rollback()
+            return "transient"
+        except Exception:
+            logger.exception("public backfill failed (protocol=%s)", protocol_id)
+            await self.session.rollback()
+            await self._count_render_failure(protocol_id)
+            return "failed"
+        return "done"
 
     async def gremien_missing_public(self) -> list[UUID]:
         """List the public gremien with a final protocol that lacks its public version.
@@ -814,22 +857,27 @@ class ProtocolService:
             return
         snapshot = PublicSnapshot()
         markdown = await self._build_document(protocol, public=True, snapshot=snapshot)
-        uploads: list[tuple[str, bytes]] = []
-        pdf: bytes | None = None
-        if protocol.public_pdf_storage_key is None:
-            pdf = await self._render_pdf(protocol, markdown, public=True)
-            if pdf is not None:
-                uploads.append((protocol_public_storage_key(protocol.id), pdf))
-        elif protocol.public_pdf_size is None and self.storage is not None:
-            try:
-                pdf = await self.storage.get(protocol.public_pdf_storage_key)
-            except StorageError:
-                pdf = None
+        key = protocol.public_pdf_storage_key
+        pdf = (
+            await self._render_pdf(protocol, markdown, public=True)
+            if key is None
+            else (await self._stored_pdf(key) if protocol.public_pdf_size is None else None)
+        )
+        uploads = _upload(protocol_public_storage_key(protocol.id), pdf) if key is None else ()
         apply_public_snapshot(protocol, snapshot, pdf)
         protocol.public_render_failures = 0
         await self.session.flush()
         await self.session.commit()
         await self._store(uploads)
+
+    async def _stored_pdf(self, key: str) -> bytes | None:
+        """Read a stored PDF to learn its size, or `None` without storage or on an error."""
+        if self.storage is None:
+            return None
+        try:
+            return await self.storage.get(key)
+        except StorageError:
+            return None
 
     async def _build_document(
         self,
@@ -916,14 +964,14 @@ class ProtocolService:
 
     def _local_end_time(self, closed_at: object) -> _time | None:
         """Convert `meeting.closed_at` from UTC to local time for the end line."""
-        if not isinstance(closed_at, datetime):
-            return None
-        return closed_at.astimezone(self._tz()).time().replace(second=0, microsecond=0)
+        return (
+            closed_at.astimezone(self._tz()).time().replace(second=0, microsecond=0)
+            if isinstance(closed_at, datetime)
+            else None
+        )
 
     def _local_hhmm(self, value: datetime | None) -> str | None:
-        if value is None:
-            return None
-        return value.astimezone(self._tz()).strftime("%H:%M")
+        return None if value is None else value.astimezone(self._tz()).strftime("%H:%M")
 
     async def _keeper_lines(self, meeting: Meeting) -> list[KeeperLine]:
         """Build the header lines of the keeper periods that started.
@@ -965,21 +1013,23 @@ class ProtocolService:
         gremium_id = getattr(gremium, "id", None)
         if gremium_id is None:
             return None
-        if meeting is not None and getattr(meeting, "gremium_id", None) == gremium_id:
-            where = meeting_roster_filter(meeting)
-        else:
-            where = roster_filter(gremium_id)
+        where = (
+            meeting_roster_filter(meeting)
+            if meeting is not None and getattr(meeting, "gremium_id", None) == gremium_id
+            else roster_filter(gremium_id)
+        )
         members = (
             await self.session.scalar(
                 select(func.count()).select_from(PrincipalRow).where(where)
             )
         ) or 0
-        if members == 0:
-            return None
         percent = getattr(gremium, "quorum_percent", None)
-        if percent is not None:
-            return present_count * 100 >= percent * members
-        return present_count * 2 > members
+        quorate = (
+            present_count * 100 >= percent * members
+            if percent is not None
+            else present_count * 2 > members
+        )
+        return None if members == 0 else quorate
 
     async def _header_meta(self, meeting: Meeting | None, *, public: bool = False) -> HeaderMeta:
         """Resolve the protocol keepers and the attendance groups for the header.
@@ -1029,11 +1079,11 @@ class ProtocolService:
                 ],
             )
         keepers = await self._keeper_lines(meeting)
-        protokollant: str | None
-        if keepers:
-            protokollant = ", ".join(dict.fromkeys(k.name for k in keepers))
-        else:
-            protokollant = await self._legacy_protokollant(meeting)
+        protokollant = (
+            ", ".join(dict.fromkeys(k.name for k in keepers))
+            if keepers
+            else await self._legacy_protokollant(meeting)
+        )
         return HeaderMeta(
             protokollant=protokollant,
             keepers=keepers,
@@ -1115,88 +1165,103 @@ class ProtocolService:
             for item in items
             if (app_id := getattr(item, "application_id", None)) is not None
         ]
-        app_titles: dict[UUID, str | None] = {}
-        if app_ids:
-            app_titles = {
-                app_id: title_of(data)
-                for app_id, data in (
-                    await self.session.execute(
-                        select(Application.id, Application.data).where(
-                            Application.id.in_(app_ids)
-                        )
-                    )
-                ).all()
-            }
-        voting = VotingService(self.session)
-        blocks: list[str] = []
-        for number, item in enumerate(items, start=1):
-            app_id = getattr(item, "application_id", None)
-            own = item.title or (app_titles.get(app_id) if app_id is not None else None)
-            heading = (own or "Tagesordnungspunkt").strip()
-            if public and item.non_public:
-                block = [f"# {_NON_PUBLIC_HEADING}", _NON_PUBLIC_PLACEHOLDER]
-                blocks.append("\n\n".join(block))
-                if tops is not None:
-                    tops.append(PublicTop(number=number, title=None, nonPublic=True))
-                continue
-            block = [f"# {heading}"]
-            body = item.body.strip() if item.body and item.body.strip() else ""
-            votes = (
+        app_rows = (
+            (
                 await self.session.execute(
-                    select(Vote)
-                    .where(
-                        Vote.agenda_item_id == item.id,
-                        Vote.status != "cancelled",
-                    )
-                    .order_by(Vote.created_at)
+                    select(Application.id, Application.data).where(Application.id.in_(app_ids))
                 )
-            ).scalars().all()
-            views = [await voting.get(vote.id) for vote in votes]
-            marks = _repeat_marks(votes, views)
-            if public:
-                body = replace_vote_blocks(
-                    body,
-                    [
-                        (
-                            _snippet(view, "Beschlussfrage", tz=self._tz()),
-                            _snippet(view, "Beschlussfrage", public=True, tz=self._tz()),
-                        )
-                        for view in views
-                        if getattr(view, "kind", "motion") == "election"
-                    ],
+            ).all()
+            if app_ids
+            else []
+        )
+        app_titles = {app_id: title_of(data) for app_id, data in app_rows}
+        voting = VotingService(self.session)
+        assembled = [
+            await self._assemble_item(number, item, app_titles, voting, public=public)
+            for number, item in enumerate(items, start=1)
+        ]
+        if tops is not None:
+            tops.extend(top for _, top in assembled)
+        return "\n\n".join(block for block, _ in assembled) + "\n"
+
+    async def _assemble_item(
+        self,
+        number: int,
+        item: MeetingAgendaItem,
+        app_titles: Mapping[UUID, str | None],
+        voting: VotingService,
+        *,
+        public: bool,
+    ) -> tuple[str, PublicTop]:
+        """Build the Markdown block and the public TOP of one agenda item.
+
+        A non-public item of the public variant gets the neutral heading and the
+        placeholder, and its TOP keeps the number only.
+        """
+        app_id = getattr(item, "application_id", None)
+        own = item.title or (app_titles.get(app_id) if app_id is not None else None)
+        heading = (own or "Tagesordnungspunkt").strip()
+        return (
+            _redacted_item(number)
+            if public and item.non_public
+            else await self._item_with_votes(number, item, heading, voting, public=public)
+        )
+
+    async def _item_with_votes(
+        self,
+        number: int,
+        item: MeetingAgendaItem,
+        heading: str,
+        voting: VotingService,
+        *,
+        public: bool,
+    ) -> tuple[str, PublicTop]:
+        """Build the block of an agenda item from its body and its non-cancelled votes.
+
+        A vote whose snippet is already in the body gets no second box, and a repeated
+        vote gets its mark line, in the body or below its own box.
+        """
+        raw = item.body.strip() if item.body and item.body.strip() else ""
+        votes = (
+            await self.session.execute(
+                select(Vote)
+                .where(
+                    Vote.agenda_item_id == item.id,
+                    Vote.status != "cancelled",
                 )
-            snippets = [
-                _snippet(view, "Beschlussfrage", public=public, tz=self._tz()) for view in views
-            ]
-            found = votes_in_body(body, snippets)
-            body = mark_vote_blocks(
-                body,
-                [
-                    (snippet, marks[vote.id])
-                    for vote, snippet, in_text in zip(votes, snippets, found, strict=True)
-                    if in_text and vote.id in marks
-                ],
+                .order_by(Vote.created_at)
             )
-            snippets = [
-                f"{snippet}\n> {marks[vote.id]}" if vote.id in marks else snippet
-                for vote, snippet in zip(votes, snippets, strict=True)
-            ]
-            if body:
-                block.append(demote_headings(body))
-            top = PublicTop(number=number, title=heading, markdown=body or None)
-            for view, snippet, in_text in zip(views, snippets, found, strict=True):
-                decides = getattr(view, "kind", None) != "poll"
-                if getattr(view, "status", None) == "closed" and decides:
-                    decision = PublicDecision.from_vote(view)
-                    decision.in_text = in_text
-                    top.decisions.append(decision)
-                if in_text:
-                    continue
-                block.append(snippet)
-            blocks.append("\n\n".join(block))
-            if tops is not None:
-                tops.append(top)
-        return "\n\n".join(blocks) + "\n"
+        ).scalars().all()
+        views = [await voting.get(vote.id) for vote in votes]
+        marks = _repeat_marks(votes, views)
+        tz = self._tz()
+        body = replace_vote_blocks(raw, _election_pairs(views, tz)) if public else raw
+        plain = [_snippet(view, "Beschlussfrage", public=public, tz=tz) for view in views]
+        found = votes_in_body(body, plain)
+        marked = mark_vote_blocks(
+            body,
+            [
+                (snippet, marks[vote.id])
+                for vote, snippet, in_text in zip(votes, plain, found, strict=True)
+                if in_text and vote.id in marks
+            ],
+        )
+        snippets = [
+            f"{snippet}\n> {marks[vote.id]}" if vote.id in marks else snippet
+            for vote, snippet in zip(votes, plain, strict=True)
+        ]
+        decisions = [
+            PublicDecision.from_vote(view).model_copy(update={"in_text": in_text})
+            for view, in_text in zip(views, found, strict=True)
+            if getattr(view, "status", None) == "closed" and getattr(view, "kind", None) != "poll"
+        ]
+        block = [
+            f"# {heading}",
+            *([demote_headings(marked)] if marked else []),
+            *(snippet for snippet, in_text in zip(snippets, found, strict=True) if not in_text),
+        ]
+        top = PublicTop(number=number, title=heading, markdown=marked or None, decisions=decisions)
+        return "\n\n".join(block), top
 
     async def _render_pdf(
         self, protocol: Protocol, markdown: str, *, public: bool = False
@@ -1265,7 +1330,7 @@ class ProtocolService:
             protocol.pdf_storage_key = key
         return pdf
 
-    async def _store(self, uploads: list[tuple[str, bytes]]) -> None:
+    async def _store(self, uploads: Sequence[tuple[str, bytes]]) -> None:
         """Upload the rendered PDFs to object storage AFTER a successful commit.
 
         The MinIO object appears only now, so a failed commit leaves no orphaned
@@ -1307,63 +1372,59 @@ class ProtocolService:
         """
         if self.mail_queue is None:
             return
-        recipients = await self._recipients(protocol.gremium_id)
-        recipients = await filter_recipients_by_preference(
-            self.session, recipients, "protocol"
-        )
+        members = await self._recipients(protocol.gremium_id)
+        recipients = await filter_recipients_by_preference(self.session, members, "protocol")
         if not recipients:
             return
         gremium = await self.session.get(Gremium, protocol.gremium_id)
         gremium_name = gremium.name if gremium is not None else None
         meeting = await self.session.get(Meeting, protocol.meeting_id)
-        subject = "Sitzungsprotokoll"
-        if gremium_name:
-            subject += f" {gremium_name}"
-        if meeting is not None and meeting.date is not None:
-            subject += f" — {meeting.date.strftime('%d.%m.%Y')}"
-        lines = []
-        if meeting is not None:
-            lines.append(f"Sitzung: {meeting.title}")
-        if gremium_name:
-            lines.append(f"Gremium: {gremium_name}")
-        if meeting is not None and meeting.date is not None:
-            lines.append(f"Datum: {meeting.date.strftime('%d.%m.%Y')}")
-        intro = "Das Sitzungsprotokoll wurde finalisiert."
-        if pdf is not None:
-            intro = (
-                "Das Sitzungsprotokoll wurde finalisiert und liegt als PDF bei."
-            )
+        day = (
+            meeting.date.strftime("%d.%m.%Y")
+            if meeting is not None and meeting.date is not None
+            else None
+        )
+        subject = "Sitzungsprotokoll" + (f" {gremium_name}" if gremium_name else "") + (
+            f" — {day}" if day else ""
+        )
         settings = self.settings or get_settings()
         link = protocol_link(settings, protocol.meeting_id)
-        if (
+        public = (
             gremium is not None
             and bool(getattr(gremium, "protocols_public", False))
             and protocol.status == "final"
             and not protocol.public_withheld
             and protocol.public_content is not None
-        ):
-            lines.append(
-                "Öffentliche Fassung: "
-                + public_protocol_url(settings, protocol.id)
-            )
-        text = intro + ("\n\n" + "\n".join(lines) if lines else "") + "\n"
-        content = text_to_html(text)
-        text = append_link_text(text, link.url, link.label("de"))
-        attachments: tuple[MailAttachment, ...] = ()
-        if pdf is not None:
-            attachments = (
-                MailAttachment(
-                    filename=(
-                        protocol_pdf_filename(meeting.title, meeting_day(meeting))
-                        if meeting is not None
-                        else "Protokoll.pdf"
-                    ),
-                    mime="application/pdf",
-                    content=pdf,
-                ),
-            )
+        )
+        lines = [
+            *([f"Sitzung: {meeting.title}"] if meeting is not None else []),
+            *([f"Gremium: {gremium_name}"] if gremium_name else []),
+            *([f"Datum: {day}"] if day else []),
+            *(
+                ["Öffentliche Fassung: " + public_protocol_url(settings, protocol.id)]
+                if public
+                else []
+            ),
+        ]
+        intro = (
+            "Das Sitzungsprotokoll wurde finalisiert und liegt als PDF bei."
+            if pdf is not None
+            else "Das Sitzungsprotokoll wurde finalisiert."
+        )
+        body = intro + ("\n\n" + "\n".join(lines) if lines else "") + "\n"
+        text = append_link_text(body, link.url, link.label("de"))
+        filename = (
+            protocol_pdf_filename(meeting.title, meeting_day(meeting))
+            if meeting is not None
+            else "Protokoll.pdf"
+        )
+        attachments = (
+            (MailAttachment(filename=filename, mime="application/pdf", content=pdf),)
+            if pdf is not None
+            else ()
+        )
         html = render_layout(
-            content_html=content,
+            content_html=text_to_html(body),
             title=subject,
             site_name=settings.mail_from_name,
             base_url=settings.public_base_url,
@@ -1393,17 +1454,12 @@ class ProtocolService:
         non-NULL email. The extra addresses get the protocol in addition to the
         members, not instead of them.
         """
-        seen: dict[str, None] = {}
         members = await RecipientResolver(self.session).resolve(
             [{"kind": "gremium", "ref": str(gremium_id)}]
         )
-        for addr in members:
-            seen.setdefault(addr, None)
         gremium = await self.session.get(Gremium, gremium_id)
         extra = gremium.protocol_recipients if gremium is not None else None
-        for addr in extra or []:
-            seen.setdefault(addr, None)
-        return list(seen)
+        return list(dict.fromkeys([*members, *(extra or [])]))
 
     @staticmethod
     def _ensure_draft(protocol: Protocol) -> None:
@@ -1451,24 +1507,49 @@ def _snippet(
 
     ``tz`` is the local time zone of the dates of a date poll.
     """
-    if getattr(view, "kind", "motion") == "election" and view.election is not None:
-        return build_election_snippet(_election_snippet(view), public=public)
-    if getattr(view, "kind", "motion") == "poll" and view.poll is not None:
-        return build_poll_snippet(
-            poll_snippet_of(
-                view.poll,
-                view.poll_result if view.status == "closed" else None,
-                question=_with_attempt(view.question or "Umfrage", view),
-                tz=tz or ZoneInfo("Europe/Berlin"),
+    match getattr(view, "kind", "motion"):
+        case "election" if view.election is not None:
+            return build_election_snippet(_election_snippet(view), public=public)
+        case "poll" if view.poll is not None:
+            return build_poll_snippet(
+                poll_snippet_of(
+                    view.poll,
+                    view.poll_result if view.status == "closed" else None,
+                    question=_with_attempt(view.question or "Umfrage", view),
+                    tz=tz or ZoneInfo("Europe/Berlin"),
+                )
             )
+        case _:
+            return build_vote_snippet(
+                view.question or fallback,
+                view.tally.counts,
+                question=_with_attempt(view.question or fallback, view),
+                note=_guest_note(view),
+                conditions=passed_conditions(view),
+            )
+
+
+def _election_pairs(views: Sequence[VoteOut], tz: ZoneInfo) -> list[tuple[str, str]]:
+    """Pair the internal and the public callout of each election, for the public text."""
+    return [
+        (
+            _snippet(view, "Beschlussfrage", tz=tz),
+            _snippet(view, "Beschlussfrage", public=True, tz=tz),
         )
-    return build_vote_snippet(
-        view.question or fallback,
-        view.tally.counts,
-        question=_with_attempt(view.question or fallback, view),
-        note=_guest_note(view),
-        conditions=passed_conditions(view),
-    )
+        for view in views
+        if getattr(view, "kind", "motion") == "election"
+    ]
+
+
+def _redacted_item(number: int) -> tuple[str, PublicTop]:
+    """Return the block and the TOP of a non-public item in the public variant."""
+    block = "\n\n".join([f"# {_NON_PUBLIC_HEADING}", _NON_PUBLIC_PLACEHOLDER])
+    return block, PublicTop(number=number, title=None, nonPublic=True)
+
+
+def _upload(key: str, pdf: bytes | None) -> tuple[tuple[str, bytes], ...]:
+    """Return the upload of a rendered PDF, or none when storage is off."""
+    return ((key, pdf),) if pdf is not None else ()
 
 
 def _repeat_marks(votes: Sequence[Vote], views: Sequence[VoteOut]) -> dict[UUID, str]:
@@ -1477,12 +1558,12 @@ def _repeat_marks(votes: Sequence[Vote], views: Sequence[VoteOut]) -> dict[UUID,
     A vote counts as repeated once its repeat opened: a prepared repeat can still go
     away, and then the first result stands alone.
     """
-    marks: dict[UUID, str] = {}
-    for vote, view in zip(votes, views, strict=True):
-        source = getattr(vote, "repeat_of_id", None)
-        if source is not None and getattr(vote, "status", None) in ("open", "closed"):
-            marks[source] = repeat_mark(view)
-    return marks
+    return {
+        source: repeat_mark(view)
+        for vote, view in zip(votes, views, strict=True)
+        if (source := getattr(vote, "repeat_of_id", None)) is not None
+        and getattr(vote, "status", None) in ("open", "closed")
+    }
 
 
 def _with_attempt(question: str, view: VoteOut) -> str:
@@ -1499,10 +1580,12 @@ def _with_attempt(question: str, view: VoteOut) -> str:
 def repeat_mark(repeat: VoteOut) -> str:
     """Return the line that marks a repeated vote in the protocol."""
     attempt = getattr(repeat, "attempt", 2) or 2
-    if getattr(repeat, "kind", "motion") == "election":
-        number = (getattr(repeat, "round", 1) or 1) + attempt - 1
-        return f"Wiederholt, siehe {number}. Wahlgang."
-    return f"Wiederholt, siehe {attempt}. Abstimmung."
+    number = (getattr(repeat, "round", 1) or 1) + attempt - 1
+    return (
+        f"Wiederholt, siehe {number}. Wahlgang."
+        if getattr(repeat, "kind", "motion") == "election"
+        else f"Wiederholt, siehe {attempt}. Abstimmung."
+    )
 
 
 def _election_snippet(view: VoteOut) -> ElectionSnippet:
@@ -1536,12 +1619,12 @@ def election_snippet_of(
     elected = set(result.elected) if result is not None else set()
     names = {c.id: c.name for c in election.candidates}
     counts = result.counts if result is not None else {}
-    lines = [
+    listed = [
         ElectionLine(name=c.name, votes=counts.get(c.id, 0), elected=c.id in elected)
         for c in election.candidates
     ]
-    if result is not None and result.yes is None:
-        lines.sort(key=lambda line: -line.votes)
+    by_votes = result is not None and result.yes is None
+    lines = sorted(listed, key=lambda line: -line.votes) if by_votes else listed
     lot = result.lot if result is not None else None
     runoff = result.runoff if result is not None else None
     return ElectionSnippet(
@@ -1566,24 +1649,31 @@ _WEEKDAYS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 
 def poll_option_label(option: PollOption, tz: ZoneInfo) -> str:
     """Return the label of a poll option: its text, or „Di, 3.11. · 18:00–20:00“."""
-    if option.start is None:
-        return option.label or option.id
-    start = option.start.astimezone(tz)
-    text = f"{_WEEKDAYS[start.weekday()]}, {start.day}.{start.month}. · {start:%H:%M}"
-    if option.end is not None:
-        text += f"–{option.end.astimezone(tz):%H:%M}"
-    return text
+    return (
+        option.label or option.id
+        if option.start is None
+        else _date_label(option.start, option.end, tz)
+    )
+
+
+def _date_label(start_at: datetime, end_at: datetime | None, tz: ZoneInfo) -> str:
+    """Return the label of a date option: „Di, 3.11. · 18:00“, with the end when set."""
+    start = start_at.astimezone(tz)
+    end = f"–{end_at.astimezone(tz):%H:%M}" if end_at is not None else ""
+    return f"{_WEEKDAYS[start.weekday()]}, {start.day}.{start.month}. · {start:%H:%M}{end}"
 
 
 def poll_meta(config: PollConfig) -> str:
     """Return the kind line of a poll snippet."""
-    if config.mode == "date":
-        return "Terminumfrage"
-    if config.mode == "single":
-        return "Umfrage · Einzelwahl"
-    if config.max_choices is not None:
-        return f"Umfrage · Mehrfachwahl, höchstens {config.max_choices}"
-    return "Umfrage · Mehrfachwahl"
+    match (config.mode, config.max_choices):
+        case ("date", _):
+            return "Terminumfrage"
+        case ("single", _):
+            return "Umfrage · Einzelwahl"
+        case (_, None):
+            return "Umfrage · Mehrfachwahl"
+        case (_, most):
+            return f"Umfrage · Mehrfachwahl, höchstens {most}"
 
 
 def poll_snippet_of(
@@ -1592,23 +1682,10 @@ def poll_snippet_of(
     """Map a poll and its stored result on the protocol view (highest first)."""
     labels = {o.id: poll_option_label(o, tz) for o in config.options}
     date = config.mode == "date"
-    lines: list[PollLine] = []
-    if result is not None:
-        order = [oid for oid in result.order if oid in labels] or list(labels)
-        top = set(result.top)
-        lines = [
-            PollLine(
-                label=labels[oid],
-                count=result.counts.get(oid, 0),
-                maybe=(result.maybe or {}).get(oid, 0) if date else None,
-                top=oid in top,
-            )
-            for oid in order
-        ]
     return PollSnippet(
         question=(question or "Umfrage").strip() or "Umfrage",
         meta=poll_meta(config),
-        lines=lines,
+        lines=_poll_lines(result, labels, date=date) if result is not None else [],
         abstentions=None if date else (result.abstentions if result is not None else 0),
         ballots=result.ballots if result is not None else 0,
         date=date,
@@ -1616,12 +1693,33 @@ def poll_snippet_of(
     )
 
 
+def _poll_lines(
+    result: PollResultOut, labels: Mapping[str, str], *, date: bool
+) -> list[PollLine]:
+    """Map the stored result of a poll on its option lines, in the stored order."""
+    order = [oid for oid in result.order if oid in labels] or list(labels)
+    top = frozenset(result.top)
+    return [
+        PollLine(
+            label=labels[oid],
+            count=result.counts.get(oid, 0),
+            maybe=(result.maybe or {}).get(oid, 0) if date else None,
+            top=oid in top,
+        )
+        for oid in order
+    ]
+
+
 def _guest_note(view: VoteOut) -> str | None:
     """Return the base line of a vote with guests, or None for a members vote."""
-    if not view.guests_vote:
-        return None
-    return guest_vote_note(
-        view.tally.present_members, view.tally.present_guests, sum(view.tally.counts.values())
+    return (
+        guest_vote_note(
+            view.tally.present_members,
+            view.tally.present_guests,
+            sum(view.tally.counts.values()),
+        )
+        if view.guests_vote
+        else None
     )
 
 
@@ -1632,6 +1730,5 @@ def _vote_title(application_id: UUID | None, question: str | None = None) -> str
     a generic decision question without an application, the heading is the question
     itself. The protokollant can edit the heading in the editor.
     """
-    if application_id is not None:
-        return f"Abstimmung – Antrag {str(application_id)[:8]}"
-    return question.strip() if question and question.strip() else "Beschlussfrage"
+    plain = question.strip() if question and question.strip() else "Beschlussfrage"
+    return f"Abstimmung – Antrag {str(application_id)[:8]}" if application_id is not None else plain

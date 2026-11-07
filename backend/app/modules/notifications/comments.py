@@ -202,33 +202,34 @@ async def send_comment_notifications(
         return 0
     title = (data or {}).get("title")
     service = NotificationService(session, queue=queue, settings=settings)
+    to_applicant = author_kind == "principal"
 
     lang = (
         await resolve_application_lang(
             session, application_id=application_id, settings=settings
         )
-        if author_kind == "principal"
+        if to_applicant
         else settings.mail_default_lang
     )
 
     state = await session.get(State, state_id) if state_id is not None else None
-    status_label = ""
-    if state is not None and isinstance(state.label_i18n, dict) and state.label_i18n:
-        status_label = resolve_i18n(state.label_i18n, lang) or ""
+    labels = state.label_i18n if state is not None else None
+    status_label = (
+        (resolve_i18n(labels, lang) or "") if isinstance(labels, dict) and labels else ""
+    )
 
-    if author_kind == "principal":
-        author_label = (await gremium_actor_name(session, gremium_id) or "").strip()
-        fallback = _COMMITTEE_AUTHOR_FALLBACK
-    else:
-        author_label = (author_name or "").strip()
-        fallback = _APPLICANT_AUTHOR_FALLBACK
-    if not author_label:
-        author_label = pick_lang(fallback, lang)
+    named_author = (
+        (await gremium_actor_name(session, gremium_id) or "")
+        if to_applicant
+        else (author_name or "")
+    ).strip()
+    fallback = _COMMITTEE_AUTHOR_FALLBACK if to_applicant else _APPLICANT_AUTHOR_FALLBACK
+    author_label = named_author or pick_lang(fallback, lang)
 
     link = application_link(
         settings,
         application_id,
-        guest=author_kind == "principal" and created_by is None,
+        guest=to_applicant and created_by is None,
         comment_id=comment_id,
     )
     context: dict[str, object] = {
@@ -241,24 +242,23 @@ async def send_comment_notifications(
         "commentAuthorInitials": _initials(author_label),
     }
 
-    if author_kind == "principal":
-        recipients = await service.resolver.resolve(
+    resolved = (
+        await service.resolver.resolve(
             [{"kind": "applicant"}], application_id=application_id
         )
-        template_key = APPLICANT_TEMPLATE_KEY
-        builtin = (
-            _BUILTIN_APPLICANT_SUBJECT,
-            _BUILTIN_APPLICANT_BODY,
-            _BUILTIN_APPLICANT_BODY_HTML,
-        )
-    else:
-        recipients = await actionable_principal_emails(
+        if to_applicant
+        else await actionable_principal_emails(
             session, application_id=application_id, state=state
         )
-        template_key = TEAM_TEMPLATE_KEY
-        builtin = (_BUILTIN_TEAM_SUBJECT, _BUILTIN_TEAM_BODY, _BUILTIN_TEAM_BODY_HTML)
+    )
+    template_key = APPLICANT_TEMPLATE_KEY if to_applicant else TEAM_TEMPLATE_KEY
+    builtin = (
+        (_BUILTIN_APPLICANT_SUBJECT, _BUILTIN_APPLICANT_BODY, _BUILTIN_APPLICANT_BODY_HTML)
+        if to_applicant
+        else (_BUILTIN_TEAM_SUBJECT, _BUILTIN_TEAM_BODY, _BUILTIN_TEAM_BODY_HTML)
+    )
 
-    recipients = await filter_recipients_by_preference(session, recipients, "comment")
+    recipients = await filter_recipients_by_preference(session, resolved, "comment")
     if not recipients:
         logger.info("comment notification resolved no recipients — skipped")
         return 0

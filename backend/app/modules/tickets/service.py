@@ -26,16 +26,18 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal, Protocol
 
 from pydantic import JsonValue
-from sqlalchemy import ColumnElement, String, cast, delete, func, or_, select, update
+from sqlalchemy import ColumnElement, Select, String, cast, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
+from sqlalchemy.sql.elements import SQLCoreOperations
 
 from app.modules.applications.access import resolve_app_read
 from app.modules.applications.models import Application
@@ -116,6 +118,8 @@ SENDER_BLOCKED = "sender_blocked"
 
 #: What a block targets: an account id or a normalized e-mail address.
 BlockTarget = tuple[Literal["principal"], uuid.UUID] | tuple[Literal["email"], str]
+#: A text column that the search ``q`` reads.
+_Text = SQLCoreOperations[str | None]
 
 
 def normalize_email(value: str) -> str:
@@ -306,11 +310,13 @@ class TicketService:
         condition, so a block that swallows a report always shows on the ticket and
         lifts there.
         """
-        if reporter_id is not None:
-            return cls._account_condition(reporter_id)
-        if email:
-            return cls._email_condition(normalize_email(email))
-        return None
+        match reporter_id, email:
+            case (account, _) if account is not None:
+                return cls._account_condition(account)
+            case (None, address) if address:
+                return cls._email_condition(normalize_email(address))
+            case _:
+                return None
 
     @staticmethod
     def _account_condition(reporter_id: uuid.UUID) -> ColumnElement[bool]:
@@ -356,13 +362,13 @@ class TicketService:
 
         An anonymized ticket has no sender any more and gives None.
         """
-        if ticket.anonymized_at is not None:
-            return None
-        if ticket.reporter_principal_id is not None:
-            return ("principal", ticket.reporter_principal_id)
-        if ticket.reporter_email:
-            return ("email", normalize_email(ticket.reporter_email))
-        return None
+        match ticket.anonymized_at, ticket.reporter_principal_id, ticket.reporter_email:
+            case (None, account, _) if account is not None:
+                return ("principal", account)
+            case (None, None, address) if address:
+                return ("email", normalize_email(address))
+            case _:
+                return None
 
     @classmethod
     def _target_condition(cls, target: BlockTarget) -> ColumnElement[bool]:
@@ -397,16 +403,7 @@ class TicketService:
         ticket = await self._get(ticket_id)
         target = self._sender_target(ticket)
         me = await principal_id_of(self.session, principal.sub)
-        if target[0] == "principal":
-            is_self = me is not None and target[1] == me
-        else:
-            own = (
-                await self.session.scalar(select(PrincipalRow.email).where(PrincipalRow.id == me))
-                if me is not None
-                else None
-            )
-            is_self = own is not None and normalize_email(own) == target[1]
-        if is_self:
+        if await self._is_self(target, me):
             raise ValidationProblem(
                 "You cannot block yourself.",
                 code=SENDER_IS_SELF,
@@ -423,6 +420,21 @@ class TicketService:
         )
         await self.session.commit()
         return await self.detail(ticket.id, principal)
+
+    async def _is_self(self, target: BlockTarget, me: uuid.UUID | None) -> bool:
+        """Tell if a block target is the caller: the own account or the own address."""
+        match target:
+            case ("principal", account):
+                return me is not None and account == me
+            case ("email", address):
+                own = (
+                    await self.session.scalar(
+                        select(PrincipalRow.email).where(PrincipalRow.id == me)
+                    )
+                    if me is not None
+                    else None
+                )
+                return own is not None and normalize_email(own) == address
 
     async def unblock_sender(self, ticket_id: uuid.UUID, principal: Principal) -> TicketDetail:
         """Lift every block that holds back a ticket's sender; without one nothing changes.
@@ -451,11 +463,9 @@ class TicketService:
                 )
             ).all()
         )
-        people: set[uuid.UUID | None] = set()
-        for row in rows:
-            people.add(row.principal_id)
-            people.add(row.created_by)
-        accounts = await self._load_accounts(people)
+        accounts = await self._load_accounts(
+            {pid for row in rows for pid in (row.principal_id, row.created_by)}
+        )
         sources = {r.source_ticket_id for r in rows if r.source_ticket_id is not None}
         numbers: dict[uuid.UUID, int] = (
             {
@@ -469,34 +479,7 @@ class TicketService:
             if sources
             else {}
         )
-        out: list[TicketBlockedSender] = []
-        for row in rows:
-            account = accounts.get(row.principal_id) if row.principal_id is not None else None
-            source = numbers.get(row.source_ticket_id) if row.source_ticket_id else None
-            out.append(
-                TicketBlockedSender(
-                    id=row.id,
-                    kind="principal" if row.principal_id is not None else "email",
-                    person=(
-                        _person(accounts, row.principal_id)
-                        if row.principal_id is not None
-                        else None
-                    ),
-                    email=account.email if account is not None else row.email,
-                    blocked_by=(
-                        _person(accounts, row.created_by) if row.created_by is not None else None
-                    ),
-                    blocked_at=row.created_at,
-                    source_ticket=(
-                        TicketRef(id=row.source_ticket_id, number=format_number(source))
-                        if row.source_ticket_id is not None and source is not None
-                        else None
-                    ),
-                    hit_count=row.hit_count,
-                    last_hit_at=row.last_hit_at,
-                )
-            )
-        return out
+        return [_blocked_sender(row, accounts, numbers) for row in rows]
 
     async def delete_block(self, block_id: uuid.UUID) -> None:
         """Lift one block by its id.
@@ -532,31 +515,19 @@ class TicketService:
         and the name and e-mail of the reporter.
         """
         reporter = aliased(PrincipalRow)
-        conds: list[ColumnElement[bool]] = []
-        if statuses:
-            conds.append(Ticket.status.in_(list(statuses)))
-        if kinds:
-            conds.append(Ticket.kind.in_(list(kinds)))
-        if assignee == "none":
-            conds.append(Ticket.assignee_id.is_(None))
-        elif assignee == "me":
-            conds.append(Ticket.assignee_id == me)
-        elif assignee is not None:
-            conds.append(Ticket.assignee_id == assignee)
         term = (q or "").strip()
-        if term:
-            pattern = f"%{escape_like(term)}%"
-            matches: list[ColumnElement[bool]] = [
-                Ticket.title.ilike(pattern, escape="\\"),
-                Ticket.body.ilike(pattern, escape="\\"),
-                cast(Ticket.reporter_email, String).ilike(pattern, escape="\\"),
-                reporter.display_name.ilike(pattern, escape="\\"),
-                cast(reporter.email, String).ilike(pattern, escape="\\"),
-            ]
-            number = _NUMBER_RE.match(term)
-            if number is not None:
-                matches.append(Ticket.number == int(number.group(1)))
-            conds.append(or_(*matches))
+        texts = (
+            Ticket.title,
+            Ticket.body,
+            cast(Ticket.reporter_email, String),
+            reporter.display_name,
+            cast(reporter.email, String),
+        )
+        conds = (
+            *_status_kind_filter(statuses, kinds),
+            *_assignee_filter(assignee, me),
+            *_search_filter(term, texts),
+        )
         base = (
             select(Ticket)
             .outerjoin(reporter, reporter.id == Ticket.reporter_principal_id)
@@ -648,14 +619,7 @@ class TicketService:
                 )
             ).all()
         )
-        people: set[uuid.UUID | None] = {n.author_id for n in notes}
-        for note in notes:
-            people.update(mention_ids(note.mentions))
-        for event in events:
-            people.add(event.actor_id)
-            if event.kind == "assignee":
-                people.update(_ids_of(event.payload))
-        accounts = await self._accounts([ticket], extra=people)
+        accounts = await self._accounts([ticket], extra=_people_of(notes, events))
         readable = await self._readable_cards(events, principal)
         duplicate = (
             await self.session.get(Ticket, ticket.duplicate_of_id)
@@ -668,11 +632,11 @@ class TicketService:
             **item.model_dump(),
             body=ticket.body,
             context=dict(ticket.context or {}),
-            attachments=[
+            attachments=tuple(
                 TicketAttachment.of(a) for a in await self.files.list_for_ticket(ticket.id)
-            ],
-            notes=[_note_row(n, ticket, accounts, me, files.get(n.id, [])) for n in notes],
-            events=[_event_out(e, accounts, readable) for e in events],
+            ),
+            notes=tuple(_note_row(n, ticket, accounts, me, files.get(n.id, [])) for n in notes),
+            events=tuple(_event_out(e, accounts, readable) for e in events),
             duplicate_of=(
                 TicketRef(id=duplicate.id, number=format_number(duplicate.number))
                 if duplicate is not None
@@ -737,13 +701,17 @@ class TicketService:
                 code="assignee_not_allowed",
                 errors=[{"field": "assigneeId", "msg": "not a ticket manager"}],
             )
-        changed = False
-        if payload.status is not None and (
-            payload.status != ticket.status or duplicate is not None
-        ):
-            self._set_status(ticket, payload.status, duplicate, actor)
-            changed = True
-        if "assignee_id" in fields and payload.assignee_id != ticket.assignee_id:
+        status, kind = payload.status, payload.kind
+        new_status = (
+            status
+            if status is not None and (status != ticket.status or duplicate is not None)
+            else None
+        )
+        assignee_changes = "assignee_id" in fields and payload.assignee_id != ticket.assignee_id
+        new_kind = kind if kind is not None and kind != ticket.kind else None
+        if new_status is not None:
+            self._set_status(ticket, new_status, duplicate, actor)
+        if assignee_changes:
             self._event(
                 ticket,
                 "assignee",
@@ -754,12 +722,10 @@ class TicketService:
                 },
             )
             ticket.assignee_id = payload.assignee_id
-            changed = True
-        if payload.kind is not None and payload.kind != ticket.kind:
-            self._event(ticket, "kind", actor, {"from": ticket.kind, "to": payload.kind})
-            ticket.kind = payload.kind
-            changed = True
-        if changed:
+        if new_kind is not None:
+            self._event(ticket, "kind", actor, {"from": ticket.kind, "to": new_kind})
+            ticket.kind = new_kind
+        if new_status is not None or assignee_changes or new_kind is not None:
             ticket.updated_at = _now()
         await self.session.commit()
         if payload.complete_todos and self.todos is not None:
@@ -789,10 +755,10 @@ class TicketService:
         duplicate: Ticket | None,
         actor: uuid.UUID | None,
     ) -> None:
-        payload: dict[str, JsonValue] = {"from": ticket.status, "to": status}
-        if duplicate is not None:
-            payload["duplicateOf"] = format_number(duplicate.number)
-        self._event(ticket, "status", actor, payload)
+        marker: dict[str, JsonValue] = (
+            {"duplicateOf": format_number(duplicate.number)} if duplicate is not None else {}
+        )
+        self._event(ticket, "status", actor, {"from": ticket.status, "to": status, **marker})
         if status not in CLOSED_STATUSES:
             ticket.closed_at = None
         elif ticket.status not in CLOSED_STATUSES:
@@ -926,9 +892,9 @@ class TicketService:
         """
         note, me = await self._own_note(ticket_id, note_id, principal)
         self.added_mentions = []
-        if mentions is not None:
-            before = mention_ids(note.mentions)
-            wanted = await self._checked_mentions(mentions, before)
+        before = mention_ids(note.mentions)
+        wanted = await self._checked_mentions(mentions, before) if mentions is not None else None
+        if wanted is not None:
             self.added_mentions = new_mentions(wanted, before)
             note.mentions = stored_mentions(wanted)
         note.body = body
@@ -964,10 +930,8 @@ class TicketService:
     async def _note_out(
         self, note: TicketNote, me: uuid.UUID, ticket: Ticket, *, for_reporter: bool = False
     ) -> TicketNoteOut:
-        wanted: set[uuid.UUID | None] = {note.author_id}
-        if not for_reporter:
-            wanted.update(mention_ids(note.mentions))
-        accounts = await self._load_accounts(wanted)
+        mentioned = () if for_reporter else mention_ids(note.mentions)
+        accounts = await self._load_accounts({note.author_id, *mentioned})
         files = await self.files.message_attachments("ticket_note", [note.id])
         return _note_row(
             note, ticket, accounts, me, files.get(note.id, []), for_reporter=for_reporter
@@ -1009,25 +973,12 @@ class TicketService:
         ``q`` matches the title, the body and the number. Anonymized tickets have no
         reporter any more and never show.
         """
-        conds: list[ColumnElement[bool]] = [
+        conds = (
             Ticket.reporter_principal_id == me,
             Ticket.anonymized_at.is_(None),
-        ]
-        if statuses:
-            conds.append(Ticket.status.in_(list(statuses)))
-        if kinds:
-            conds.append(Ticket.kind.in_(list(kinds)))
-        term = (q or "").strip()
-        if term:
-            pattern = f"%{escape_like(term)}%"
-            matches: list[ColumnElement[bool]] = [
-                Ticket.title.ilike(pattern, escape="\\"),
-                Ticket.body.ilike(pattern, escape="\\"),
-            ]
-            number = _NUMBER_RE.match(term)
-            if number is not None:
-                matches.append(Ticket.number == int(number.group(1)))
-            conds.append(or_(*matches))
+            *_status_kind_filter(statuses, kinds),
+            *_search_filter((q or "").strip(), (Ticket.title, Ticket.body)),
+        )
         total = await self.session.scalar(select(func.count(Ticket.id)).where(*conds))
         rows = list(
             (
@@ -1083,14 +1034,14 @@ class TicketService:
         return ReporterTicketDetail(
             **_reporter_item(ticket).model_dump(),
             body=ticket.body,
-            attachments=[
+            attachments=tuple(
                 TicketAttachment.of(a) for a in await self.files.list_for_ticket(ticket.id)
-            ],
+            ),
             notes=[
                 _note_row(n, ticket, accounts, me, files.get(n.id, []), for_reporter=True)
                 for n in notes
             ],
-            events=[
+            events=tuple(
                 ReporterTicketEvent(
                     id=e.id,
                     kind="status",
@@ -1098,7 +1049,7 @@ class TicketService:
                     payload={k: v for k, v in (e.payload or {}).items() if k in ("from", "to")},
                 )
                 for e in events
-            ],
+            ),
             closed_at=ticket.closed_at,
             can_reply=not await self._sender_blocked(ticket),
         )
@@ -1222,12 +1173,11 @@ class TicketService:
         ticket.anonymized_at = _now()
 
     async def _get(self, ticket_id: uuid.UUID, *, lock: bool = False) -> Ticket:
-        if lock:
-            ticket = await self.session.get(
-                Ticket, ticket_id, with_for_update=True, populate_existing=True
-            )
-        else:
-            ticket = await self.session.get(Ticket, ticket_id)
+        ticket = await (
+            self.session.get(Ticket, ticket_id, with_for_update=True, populate_existing=True)
+            if lock
+            else self.session.get(Ticket, ticket_id)
+        )
         if ticket is None:
             raise NotFoundError(f"ticket {ticket_id} not found")
         return ticket
@@ -1239,15 +1189,16 @@ class TicketService:
         return me
 
     async def _accounts(
-        self, tickets: Sequence[Ticket], *, extra: set[uuid.UUID | None] | None = None
+        self, tickets: Sequence[Ticket], *, extra: Iterable[uuid.UUID | None] = ()
     ) -> dict[uuid.UUID, _Account]:
-        ids: set[uuid.UUID | None] = set(extra or set())
-        for ticket in tickets:
-            ids.add(ticket.reporter_principal_id)
-            ids.add(ticket.assignee_id)
-        return await self._load_accounts(ids)
+        return await self._load_accounts(
+            {
+                *extra,
+                *(pid for t in tickets for pid in (t.reporter_principal_id, t.assignee_id)),
+            }
+        )
 
-    async def _load_accounts(self, ids: set[uuid.UUID | None]) -> dict[uuid.UUID, _Account]:
+    async def _load_accounts(self, ids: Iterable[uuid.UUID | None]) -> dict[uuid.UUID, _Account]:
         wanted = {pid for pid in ids if pid is not None}
         if not wanted:
             return {}
@@ -1321,20 +1272,90 @@ class TicketService:
         return ContextTarget(kind="meeting", id=meeting.id, title=meeting.title)
 
 
+def _blocked_sender(
+    row: TicketSenderBlock, accounts: Mapping[uuid.UUID, _Account], numbers: Mapping[uuid.UUID, int]
+) -> TicketBlockedSender:
+    """Build the wire form of one block from the loaded accounts and ticket numbers."""
+    account = accounts.get(row.principal_id) if row.principal_id is not None else None
+    source = numbers.get(row.source_ticket_id) if row.source_ticket_id else None
+    return TicketBlockedSender(
+        id=row.id,
+        kind="principal" if row.principal_id is not None else "email",
+        person=_person(accounts, row.principal_id) if row.principal_id is not None else None,
+        email=account.email if account is not None else row.email,
+        blocked_by=_person(accounts, row.created_by) if row.created_by is not None else None,
+        blocked_at=row.created_at,
+        source_ticket=(
+            TicketRef(id=row.source_ticket_id, number=format_number(source))
+            if row.source_ticket_id is not None and source is not None
+            else None
+        ),
+        hit_count=row.hit_count,
+        last_hit_at=row.last_hit_at,
+    )
+
+
+def _status_kind_filter(
+    statuses: Sequence[str], kinds: Sequence[str]
+) -> tuple[ColumnElement[bool], ...]:
+    """Return the conditions of the ``status`` and ``kind`` filters; an empty one adds none."""
+    return (
+        *((Ticket.status.in_(list(statuses)),) if statuses else ()),
+        *((Ticket.kind.in_(list(kinds)),) if kinds else ()),
+    )
+
+
+def _assignee_filter(
+    assignee: AssigneeFilter | None, me: uuid.UUID | None
+) -> tuple[ColumnElement[bool], ...]:
+    """Return the condition of the ``assignee`` filter: ``none``, ``me``, an id or nothing."""
+    match assignee:
+        case None:
+            return ()
+        case "none":
+            return (Ticket.assignee_id.is_(None),)
+        case "me":
+            return (Ticket.assignee_id == me,)
+        case _:
+            return (Ticket.assignee_id == assignee,)
+
+
+def _search_filter(term: str, texts: Sequence[_Text]) -> tuple[ColumnElement[bool], ...]:
+    """Return the condition of ``q``: a text column contains it, or it names the number.
+
+    A blank term adds no condition.
+    """
+    pattern = f"%{escape_like(term)}%"
+    number = _NUMBER_RE.match(term)
+    by_number = (Ticket.number == int(number.group(1)),) if number is not None else ()
+    matches = (*(text.ilike(pattern, escape="\\") for text in texts), *by_number)
+    return (or_(*matches),) if term else ()
+
+
 def _id_or_none(value: uuid.UUID | None) -> str | None:
     return str(value) if value is not None else None
 
 
-def _ids_of(payload: dict[str, JsonValue]) -> set[uuid.UUID | None]:
-    out: set[uuid.UUID | None] = set()
-    for key in ("from", "to"):
-        raw = payload.get(key)
-        if isinstance(raw, str):
-            out.add(uuid.UUID(raw))
-    return out
+def _ids_of(payload: Mapping[str, JsonValue]) -> frozenset[uuid.UUID]:
+    raws = (payload.get("from"), payload.get("to"))
+    return frozenset(uuid.UUID(raw) for raw in raws if isinstance(raw, str))
 
 
-def _person(accounts: dict[uuid.UUID, _Account], principal_id: uuid.UUID | None) -> PersonRef:
+def _people_of(
+    notes: Sequence[TicketNote], events: Sequence[TicketEvent]
+) -> frozenset[uuid.UUID | None]:
+    """Return the accounts that a ticket detail names: authors, mentions, actors, assignees."""
+    return frozenset(
+        {
+            *(n.author_id for n in notes),
+            *(pid for n in notes for pid in mention_ids(n.mentions)),
+            *(e.actor_id for e in events),
+            *(pid for e in events if e.kind == "assignee" for pid in _ids_of(e.payload)),
+        }
+    )
+
+
+def _person(accounts: Mapping[uuid.UUID, _Account], principal_id: uuid.UUID | None) -> PersonRef:
     account = accounts.get(principal_id) if principal_id is not None else None
     if principal_id is None or account is None:
         return DELETED_PERSON
@@ -1357,14 +1378,11 @@ def _note_row(
     opens the avatar of that e-mail. For the same reason the reporter gets no
     mentions (an empty list).
     """
-    author = _person(accounts, note.author_id)
-    if for_reporter and note.author_id is not None:
-        account = accounts.get(note.author_id)
-        own = account is not None and note.author_id == me
-        author = PersonRef(
-            principal_id=note.author_id if own else None,
-            display_name=account.display_name if account is not None else None,
-        )
+    author = (
+        _reporter_view_author(note.author_id, accounts, me)
+        if for_reporter and note.author_id is not None
+        else _person(accounts, note.author_id)
+    )
     return TicketNoteOut(
         id=note.id,
         author=author,
@@ -1378,8 +1396,22 @@ def _note_row(
             note.author_id is not None and note.author_id == ticket.reporter_principal_id
         ),
         mentions=(
-            [] if for_reporter else [_person(accounts, pid) for pid in mention_ids(note.mentions)]
+            ()
+            if for_reporter
+            else tuple(_person(accounts, pid) for pid in mention_ids(note.mentions))
         ),
+    )
+
+
+def _reporter_view_author(
+    author_id: uuid.UUID, accounts: Mapping[uuid.UUID, _Account], me: uuid.UUID | None
+) -> PersonRef:
+    """Return a note author as the reporter sees it: the name, the id only of the own account."""
+    account = accounts.get(author_id)
+    own = account is not None and author_id == me
+    return PersonRef(
+        principal_id=author_id if own else None,
+        display_name=account.display_name if account is not None else None,
     )
 
 
@@ -1406,20 +1438,29 @@ async def reporter_reads_file(
     me = await principal_id_of(session, principal.sub)
     if me is None:
         return False
-    stmt = select(Ticket.id).where(
-        Ticket.reporter_principal_id == me, Ticket.anonymized_at.is_(None)
+    stmt = _file_owner_query(
+        select(Ticket.id).where(Ticket.reporter_principal_id == me, Ticket.anonymized_at.is_(None)),
+        kind=kind,
+        owner_id=owner_id,
     )
-    if kind == "ticket":
-        stmt = stmt.where(Ticket.id == owner_id)
-    elif kind == "ticket_note":
-        stmt = stmt.join(TicketNote, TicketNote.ticket_id == Ticket.id).where(
-            TicketNote.id == owner_id,
-            TicketNote.deleted_at.is_(None),
-            TicketNote.visibility == "public",
-        )
-    else:
-        return False
-    return (await session.scalar(stmt.limit(1))) is not None
+    return stmt is not None and (await session.scalar(stmt.limit(1))) is not None
+
+
+def _file_owner_query(
+    own_tickets: Select[uuid.UUID], *, kind: str, owner_id: uuid.UUID
+) -> Select[uuid.UUID] | None:
+    """Narrow the own tickets to the owner of a file; another ``kind`` gives None."""
+    match kind:
+        case "ticket":
+            return own_tickets.where(Ticket.id == owner_id)
+        case "ticket_note":
+            return own_tickets.join(TicketNote, TicketNote.ticket_id == Ticket.id).where(
+                TicketNote.id == owner_id,
+                TicketNote.deleted_at.is_(None),
+                TicketNote.visibility == "public",
+            )
+        case _:
+            return None
 
 
 async def has_reported_tickets(session: AsyncSession, sub: str) -> bool:
@@ -1467,25 +1508,42 @@ def _event_out(
 
     The card title of a ``todo_done`` event shows only to a reader of the board of the card.
     """
-    payload: dict[str, JsonValue] = dict(event.payload or {})
-    if event.kind == "todo_done" and _uuid_or_none(payload.get("cardId")) not in (
-        readable_cards or set()
-    ):
-        payload["cardTitle"] = None
-    if event.kind == "assignee":
-        for key in ("from", "to"):
-            raw = payload.get(key)
-            payload[key] = (
-                _person(accounts, uuid.UUID(raw)).model_dump(by_alias=True, mode="json")
-                if isinstance(raw, str)
-                else None
-            )
     return TicketEventOut(
         id=event.id,
         kind=event.kind,  # pyright: ignore[reportArgumentType]
         actor=_person(accounts, event.actor_id) if event.actor_id is not None else None,
         at=event.created_at,
-        payload=payload,
+        payload=_event_payload(event, accounts, readable_cards or frozenset()),
+    )
+
+
+def _event_payload(
+    event: TicketEvent,
+    accounts: Mapping[uuid.UUID, _Account],
+    readable_cards: AbstractSet[uuid.UUID],
+) -> dict[str, JsonValue]:
+    """Return the payload of an event as the detail shows it.
+
+    A ``todo_done`` event of an unreadable card loses its title, and an ``assignee``
+    event names people instead of ids.
+    """
+    payload: dict[str, JsonValue] = dict(event.payload or {})
+    match event.kind:
+        case "todo_done" if _uuid_or_none(payload.get("cardId")) not in readable_cards:
+            return {**payload, "cardTitle": None}
+        case "assignee":
+            people = {key: _person_json(accounts, payload.get(key)) for key in ("from", "to")}
+            return {**payload, **people}
+        case _:
+            return payload
+
+
+def _person_json(accounts: Mapping[uuid.UUID, _Account], raw: JsonValue) -> JsonValue:
+    """Return the JSON form of the person of an id in an event payload, else None."""
+    return (
+        _person(accounts, uuid.UUID(raw)).model_dump(by_alias=True, mode="json")
+        if isinstance(raw, str)
+        else None
     )
 
 
@@ -1493,11 +1551,10 @@ async def erase_sender_blocks(
     session: AsyncSession, *, principal_id: uuid.UUID | None = None, email: str | None = None
 ) -> None:
     """Delete the blocks of an account and of an address, without a commit (erasure)."""
-    conds: list[ColumnElement[bool]] = []
-    if principal_id is not None:
-        conds.append(TicketSenderBlock.principal_id == principal_id)
-    if email:
-        conds.append(TicketSenderBlock.email == normalize_email(email))
+    conds = (
+        *((TicketSenderBlock.principal_id == principal_id,) if principal_id is not None else ()),
+        *((TicketSenderBlock.email == normalize_email(email),) if email else ()),
+    )
     if conds:
         await session.execute(delete(TicketSenderBlock).where(or_(*conds)))
 
@@ -1506,9 +1563,10 @@ async def sender_blocks_of(
     session: AsyncSession, *, principal_id: uuid.UUID | None, email: str
 ) -> list[TicketSenderBlock]:
     """Return the blocks of an account and of an address, oldest first (Auskunft)."""
-    conds: list[ColumnElement[bool]] = [TicketSenderBlock.email == normalize_email(email)]
-    if principal_id is not None:
-        conds.append(TicketSenderBlock.principal_id == principal_id)
+    conds = (
+        TicketSenderBlock.email == normalize_email(email),
+        *((TicketSenderBlock.principal_id == principal_id,) if principal_id is not None else ()),
+    )
     return list(
         (
             await session.scalars(

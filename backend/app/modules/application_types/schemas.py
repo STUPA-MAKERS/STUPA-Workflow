@@ -15,7 +15,7 @@ from app.shared.paging import PageParams
 from app.shared.schemas import FrozenCamelModel
 
 
-class ApplicationTypeListQuery(PageParams):
+class ApplicationTypeListQuery(PageParams, frozen=True):
     """Query parameters of the list route: paging and `lang`.
 
     `extra="forbid"` rejects an unknown query parameter with 422 instead of a

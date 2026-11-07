@@ -10,10 +10,12 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
+
+from app.shared.schemas import FrozenModel
 
 
-class BackupOut(BaseModel):
+class BackupOut(FrozenModel, frozen=True):
     """One catalogue row as the admin page shows it."""
 
     model_config = ConfigDict(from_attributes=True)
@@ -34,10 +36,10 @@ class BackupOut(BaseModel):
     error: str | None = None
 
 
-class BackupListOut(BaseModel):
+class BackupListOut(FrozenModel, frozen=True):
     """The catalogue plus the capability flags the page needs to enable its buttons."""
 
-    items: list[BackupOut]
+    items: tuple[BackupOut, ...]
     #: False when no age recipient is configured. The page then explains why creating
     #: is off instead of offering a button that always fails.
     enabled: bool
@@ -47,20 +49,20 @@ class BackupListOut(BaseModel):
     retention_count: int = Field(serialization_alias="retentionCount")
 
 
-class BackupCreate(BaseModel):
+class BackupCreate(FrozenModel, frozen=True):
     """Body of `POST /admin/backups`."""
 
     note: str | None = Field(default=None, max_length=500)
 
 
-class BackupUpdate(BaseModel):
+class BackupUpdate(FrozenModel, frozen=True):
     """Body of `PATCH /admin/backups/{id}`: the note and the retention pin."""
 
     note: str | None = Field(default=None, max_length=500)
     pinned: bool | None = None
 
 
-class BackupRestoreBody(BaseModel):
+class BackupRestoreBody(FrozenModel, frozen=True):
     """Body of `POST /admin/backups/{id}/restore`.
 
     `confirm` must be the literal string `RESTORE`. The restore replaces the whole
@@ -70,7 +72,7 @@ class BackupRestoreBody(BaseModel):
     confirm: str
 
 
-class BackupJobOut(BaseModel):
+class BackupJobOut(FrozenModel, frozen=True):
     """What an enqueue returns: the row to poll."""
 
     id: UUID

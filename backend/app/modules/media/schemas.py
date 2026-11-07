@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel
+from app.shared.schemas import FrozenModel
 
 
-class MarkdownImageOut(BaseModel):
+class MarkdownImageOut(FrozenModel, frozen=True):
     """201 response of ``POST /media/images``.
 
     ``url`` is the canonical Markdown path of the image, ``/api/media/images/<id>``.
