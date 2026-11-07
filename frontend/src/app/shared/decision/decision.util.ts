@@ -13,9 +13,9 @@ export const MAX_CONDITION_LENGTH = 1000;
  * empty). `conditions` keeps empty rows while the user types; `toProposal` drops them.
  */
 export interface DecisionDraft {
-  enabled: boolean;
-  amount: string;
-  conditions: string[];
+  readonly enabled: boolean;
+  readonly amount: string;
+  readonly conditions: readonly string[];
 }
 
 /** The first problem of a draft, or null. The keys are i18n keys. */
@@ -53,7 +53,7 @@ function toNumber(value: string | null | undefined): number | null {
 }
 
 /** The conditions that count: trimmed, empty rows dropped. */
-export function cleanConditions(conditions: readonly string[]): string[] {
+export function cleanConditions(conditions: readonly string[]): readonly string[] {
   return conditions.map((c) => c.trim()).filter((c) => c.length > 0);
 }
 
@@ -151,10 +151,10 @@ export function decisionQuestion(
 /** The line of a status change that carried a decision, for the history. */
 export function decisionHistoryLine(
   decision: {
-    requestedAmount: string | null;
-    approvedAmount: string | null;
-    amountDeviates: boolean;
-    conditionCount: number;
+    readonly requestedAmount: string | null;
+    readonly approvedAmount: string | null;
+    readonly amountDeviates: boolean;
+    readonly conditionCount: number;
   },
   locale: string,
   currency: string | null,

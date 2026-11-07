@@ -32,9 +32,9 @@ import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.st
 
 /** The form state of the dialog. */
 interface RoleDraft {
-  key: string;
-  label: I18nMap;
-  permissions: string[];
+  readonly key: string;
+  readonly label: I18nMap;
+  readonly permissions: readonly string[];
 }
 
 /** The rights of a new role: a new role can vote. */
@@ -154,12 +154,10 @@ export class GremiumRoleDialogComponent {
   }
 
   protected togglePerm(p: string, on: boolean): void {
-    this.draft.update((d) => {
-      const set = new Set(d.permissions);
-      if (on) set.add(p);
-      else set.delete(p);
-      return { ...d, permissions: GREMIUM_PERMISSIONS.filter((x) => set.has(x)) };
-    });
+    this.draft.update((d) => ({
+      ...d,
+      permissions: GREMIUM_PERMISSIONS.filter((x) => (x === p ? on : d.permissions.includes(x))),
+    }));
   }
 
   protected close(): void {

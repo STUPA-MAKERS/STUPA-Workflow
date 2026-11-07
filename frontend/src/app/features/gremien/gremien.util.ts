@@ -67,6 +67,14 @@ export interface MonthRange {
   readonly to: string;
 }
 
+/** The first month of the semester that holds `today`. */
+function semesterStart(today: Date): string {
+  const m = today.getMonth() + 1;
+  const y = today.getFullYear();
+  if (m >= 4 && m <= 9) return `${y}-04`;
+  return m >= 10 ? `${y}-10` : `${y - 1}-10`;
+}
+
 /**
  * The months of a preset at `today`. A semester is the summer semester (April to
  * September) or the winter semester (October to March).
@@ -80,12 +88,8 @@ export function presetRange(preset: RangePreset, today: Date): MonthRange {
       return { from: shiftMonth(now, -23), to: now };
     case 'semester':
     case 'prevSemester': {
-      const m = today.getMonth() + 1;
-      const y = today.getFullYear();
-      let from: string;
-      if (m >= 4 && m <= 9) from = `${y}-04`;
-      else from = m >= 10 ? `${y}-10` : `${y - 1}-10`;
-      if (preset === 'prevSemester') from = shiftMonth(from, -6);
+      const current = semesterStart(today);
+      const from = preset === 'prevSemester' ? shiftMonth(current, -6) : current;
       return { from, to: shiftMonth(from, 5) };
     }
     default:
@@ -97,7 +101,9 @@ export function presetRange(preset: RangePreset, today: Date): MonthRange {
  * The semester of a range that starts in April or October: `{ summer, year }` with the
  * year of the start, else null.
  */
-export function semesterOf(range: MonthRange): { summer: boolean; year: number } | null {
+export function semesterOf(
+  range: MonthRange,
+): { readonly summer: boolean; readonly year: number } | null {
   const month = range.from.slice(5);
   if (shiftMonth(range.from, 5) !== range.to || (month !== '04' && month !== '10')) return null;
   return { summer: month === '04', year: Number(range.from.slice(0, 4)) };
@@ -150,13 +156,11 @@ export function rowTotals(
   row: GremiumAttendanceRow,
   months: readonly GremiumAttendanceMonth[],
 ): RowTotals {
-  let present = 0;
-  let held = 0;
-  row.cells.forEach((cell, i) => {
-    if (!cell.member) return;
-    present += cell.present;
-    held += months[i]?.meetings ?? 0;
-  });
+  const counted = row.cells.flatMap((cell, i) =>
+    cell.member ? [{ present: cell.present, held: months[i]?.meetings ?? 0 }] : [],
+  );
+  const present = counted.reduce((n, c) => n + c.present, 0);
+  const held = counted.reduce((n, c) => n + c.held, 0);
   return { present, held, pct: held ? Math.round((100 * present) / held) : null };
 }
 
@@ -210,19 +214,38 @@ export function sortRows(
 export function monthAverages(
   rows: readonly GremiumAttendanceRow[],
   months: readonly GremiumAttendanceMonth[],
-): { months: (number | null)[]; total: number | null } {
-  const sums = months.map(() => 0);
-  for (const row of rows) {
-    row.cells.forEach((cell, i) => {
-      if (i < sums.length) sums[i] += cell.present;
-    });
-  }
+): { readonly months: readonly (number | null)[]; readonly total: number | null } {
+  const presents = rows.flatMap((row) => row.cells.map((cell, i) => ({ i, n: cell.present })));
+  const sums = months.map((_, i) =>
+    presents.filter((p) => p.i === i).reduce((n, p) => n + p.n, 0),
+  );
   const meetings = months.reduce((n, m) => n + m.meetings, 0);
   const all = sums.reduce((n, s) => n + s, 0);
   return {
     months: months.map((m, i) => (m.meetings ? sums[i] / m.meetings : null)),
     total: meetings ? all / meetings : null,
   };
+}
+
+/** Items that share one key, in their original order. */
+export interface ItemGroup<T> {
+  readonly key: string;
+  /** The first item of the group: it gives the label of the group. */
+  readonly first: T;
+  readonly items: readonly T[];
+}
+
+/** The items grouped by `keyOf`, the groups in the order of their first item. */
+export function groupInOrder<T>(
+  items: readonly T[],
+  keyOf: (item: T) => string,
+): readonly ItemGroup<T>[] {
+  const keyed = items.map((item) => ({ item, key: keyOf(item) }));
+  const keys = [...new Set(keyed.map((k) => k.key))];
+  return keys.map((key) => {
+    const members = keyed.filter((k) => k.key === key).map((k) => k.item);
+    return { key, first: members[0], items: members };
+  });
 }
 
 /** A number with one decimal in the locale ("27,0"). */
@@ -241,8 +264,8 @@ export function oneDecimal(value: number, locale: string): string {
  */
 export function toCsv(rows: readonly (readonly (string | number | null | undefined)[])[]): string {
   const cell = (value: string | number | null | undefined): string => {
-    let s = value === null || value === undefined ? '' : String(value);
-    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    const raw = value === null || value === undefined ? '' : String(value);
+    const s = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
     return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return '﻿' + rows.map((r) => r.map(cell).join(';')).join('\r\n') + '\r\n';

@@ -60,22 +60,39 @@ async def post_message(
             400,
             f"{len(file_paths)} files; a message takes at most {MAX_MESSAGE_FILES}",
         )
-    parts = [_attachment_part(p, None) for p in file_paths]
-    ids: list[str] = []
-    token: str | None = None
+    parts = tuple(_attachment_part(p, None) for p in file_paths)
+    ids, token = await _upload(parts, (), None)
     try:
-        for name, data, mime in parts:
-            headers = {DRAFT_TOKEN_HEADER: token} if token is not None else {}
-            out = await api().post(
-                "/apply/attachments",
-                files={"file": (name, data, mime)},
-                headers=headers,
-            )
-            token = token or out["draftToken"]
-            ids.append(str(out["id"]))
         return await api().post(
-            path, json={**payload, "attachmentIds": ids, "draftToken": token}
+            path, json={**payload, "attachmentIds": list(ids), "draftToken": token}
         )
     except ApiError:
-        await _discard(ids, token)
+        await _discard(list(ids), token)
         raise
+
+
+async def _upload(
+    parts: tuple[tuple[str, bytes, str], ...], ids: tuple[str, ...], token: str | None
+) -> tuple[tuple[str, ...], str | None]:
+    """Upload the files one by one as drafts and return their ids and the draft token.
+
+    The first upload gets the draft token, and each later one sends it, so all the drafts
+    belong to one token. A failed upload deletes the drafts already uploaded.
+
+    Raises:
+        ApiError: The error of an upload.
+    """
+    if not parts:
+        return ids, token
+    name, data, mime = parts[0]
+    headers = {DRAFT_TOKEN_HEADER: token} if token is not None else {}
+    try:
+        out = await api().post(
+            "/apply/attachments",
+            files={"file": (name, data, mime)},
+            headers=headers,
+        )
+    except ApiError:
+        await _discard(list(ids), token)
+        raise
+    return await _upload(parts[1:], (*ids, str(out["id"])), token or out["draftToken"])

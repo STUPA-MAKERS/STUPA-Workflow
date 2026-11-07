@@ -69,6 +69,7 @@ class RevertResult:
     reverted_audit_id: int
 
 
+@dataclass(frozen=True, slots=True)
 class RevertService:
     """Run the audit-log revert, bound to an ``AsyncSession``.
 
@@ -76,12 +77,8 @@ class RevertService:
     state.
     """
 
-    def __init__(
-        self, session: AsyncSession, publisher: MeetingPublisher | None = None
-    ) -> None:
-        """Bind the service to a session and the meeting publisher."""
-        self.session = session
-        self.publisher = publisher
+    session: AsyncSession
+    publisher: MeetingPublisher | None = None
 
     async def revert(
         self,
@@ -219,12 +216,14 @@ class RevertService:
                 "This status change is not revertable.", code="not_revertable"
             )
         event_raw = data.get("statusEventId")
-        swap: DecisionSwap | None = None
-        if "decisionUndoneId" in data or "decisionRestoredId" in data:
-            swap = DecisionSwap(
+        swap = (
+            DecisionSwap(
                 undone_id=_uuid_or_none(data.get("decisionRestoredId")),
                 restored_id=_uuid_or_none(data.get("decisionUndoneId")),
             )
+            if "decisionUndoneId" in data or "decisionRestoredId" in data
+            else None
+        )
         await FlowService(self.session, publisher=self.publisher).revert_status(
             UUID(app_id),
             from_state_id=UUID(from_raw),

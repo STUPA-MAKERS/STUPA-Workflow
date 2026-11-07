@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any
+from itertools import groupby
+from typing import Any, Literal
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -26,6 +28,53 @@ def _natural_path_key(path_key: str) -> tuple[Any, ...]:
     position 0. A prefix path, that is a parent, sorts before its extensions.
     """
     return tuple((0, int(s)) if s.isdigit() else (1, s) for s in path_key.split("-"))
+
+
+def _spent_per_app(expense_rows: Sequence[Sequence[Any]]) -> dict[object, Decimal]:
+    """Sum the top-level expenses that are bound to an application, per application.
+
+    Income does not reduce the binding of an application, so only expenses count.
+    """
+    spent = sorted(
+        (
+            (app_id, amount or _ZERO)
+            for _path, _fy, amount, kind, app_id in expense_rows
+            if kind == "expense" and app_id is not None
+        ),
+        key=lambda pair: str(pair[0]),
+    )
+    return {
+        app_id: sum((amount for _, amount in group), _ZERO)
+        for app_id, group in groupby(spent, key=lambda pair: pair[0])
+    }
+
+
+def _share(
+    app_row: Sequence[Any],
+    top_config: dict[str, tuple[set[str], set[str]]],
+    spent_per_app: dict[object, Decimal],
+) -> tuple[Literal["bound", "denied", "requested"], object, str, Decimal]:
+    """Classify an application and compute the share it still binds or requests.
+
+    The first path segment selects the state keys of the top budget. A bound
+    application binds its approved amount, a requested one its requested amount, and
+    both are reduced by the expenses already booked on it, so an expense never
+    counts twice.
+    """
+    app_id, path, fy, amount, committed, state_key = app_row
+    accepted, denied = top_config.get(path.split("-")[0], (set(), set()))
+    bucket: Literal["bound", "denied", "requested"] = (
+        "bound" if state_key in accepted else ("denied" if state_key in denied else "requested")
+    )
+    base = committed if bucket == "bound" else amount
+    return bucket, fy, path, (base or _ZERO) - spent_per_app.get(app_id, _ZERO)
+
+
+def _positive_rows(
+    shares: Sequence[tuple[str, object, str, Decimal]], bucket: str
+) -> list[tuple[object, str, Decimal | None]]:
+    """Return the `(fy, path, amount)` rows of one bucket whose share is still positive."""
+    return [(fy, path, rest) for kind, fy, path, rest in shares if kind == bucket and rest > _ZERO]
 
 
 class TreeViewOps(BudgetTreeServiceBase):
@@ -78,8 +127,10 @@ class TreeViewOps(BudgetTreeServiceBase):
         Without a global ``budget.*`` permission only the assigned subtrees become
         roots: those whose ``view_gremium_id`` is one of the Gremien of the member.
         """
-        nodes = list((await self.session.execute(select(Budget))).scalars().all())
-        nodes.sort(key=lambda b: _natural_path_key(b.path_key))
+        nodes = sorted(
+            (await self.session.execute(select(Budget))).scalars().all(),
+            key=lambda b: _natural_path_key(b.path_key),
+        )
         allocs = (await self.session.execute(select(BudgetAllocation))).scalars().all()
         app_rows = (
             await self.session.execute(
@@ -114,33 +165,16 @@ class TreeViewOps(BudgetTreeServiceBase):
             )
         ).all()
 
-        spent_per_app: dict[object, Decimal] = {}
-        for _path, _fy, amount, kind, app_id in expense_rows:
-            if kind == "expense" and app_id is not None:
-                spent_per_app[app_id] = spent_per_app.get(app_id, _ZERO) + (amount or _ZERO)
-
+        spent_per_app = _spent_per_app(expense_rows)
         top_config: dict[str, tuple[set[str], set[str]]] = {
             n.path_key: (set(n.accepted_state_keys or []), set(n.denied_state_keys or []))
             for n in nodes
             if n.parent_id is None
         }
 
-        bound_rows: list[tuple[object, str, Decimal | None]] = []
-        requested_rows: list[tuple[object, str, Decimal | None]] = []
-        for app_id, path, fy, amount, committed, state_key in app_rows:
-            accepted, denied = top_config.get(path.split("-")[0], (set(), set()))
-            if state_key in accepted:
-                spent = spent_per_app.get(app_id, _ZERO)
-                remaining = (committed or _ZERO) - spent
-                if remaining > _ZERO:
-                    bound_rows.append((fy, path, remaining))
-            elif state_key in denied:
-                continue
-            else:
-                spent = spent_per_app.get(app_id, _ZERO)
-                remaining = (amount or _ZERO) - spent
-                if remaining > _ZERO:
-                    requested_rows.append((fy, path, remaining))
+        shares = tuple(_share(row, top_config, spent_per_app) for row in app_rows)
+        bound_rows = _positive_rows(shares, "bound")
+        requested_rows = _positive_rows(shares, "requested")
 
         expended_rows = [
             (fy, path, amount)
@@ -184,6 +218,9 @@ class TreeViewOps(BudgetTreeServiceBase):
             income_rows,
             gremium_id=gremium_id,
         )
-        if visible_gremium_ids is not None:
-            forest = tree_rules.scope_forest(forest, set(visible_gremium_ids))
-        return [BudgetTreeNodeOut.model_validate(d) for d in forest]
+        scoped = (
+            forest
+            if visible_gremium_ids is None
+            else tree_rules.scope_forest(forest, set(visible_gremium_ids))
+        )
+        return [BudgetTreeNodeOut.model_validate(d) for d in scoped]

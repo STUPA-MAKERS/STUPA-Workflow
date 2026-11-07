@@ -11,6 +11,7 @@ import {
   type TodoMember,
 } from '@core/api/todos.service';
 import { EMPTY, finalize, tap, type Observable } from 'rxjs';
+import { withEntry } from '@shared/util/immutable';
 
 /**
  * The read-ahead requests that run at once. The API serves one request after the other,
@@ -20,6 +21,18 @@ const READS = 2;
 
 type RowsSource = 'mine' | 'all';
 type Read = () => Observable<unknown>;
+
+/** A board read with its ETag. */
+interface HeldBoard {
+  readonly board: TodoBoard;
+  readonly etag: string | null;
+}
+
+/** The rows of "Alle" or "Meine To-Dos" with their ETag. */
+interface HeldRows {
+  readonly boards: readonly TodoAssignedBoard[];
+  readonly etag: string | null;
+}
 
 /**
  * The to-do reads of the page, the ones it made and the ones it made ahead: every board
@@ -45,57 +58,57 @@ export class TodoCacheService {
   private readonly auth = inject(AuthService);
   /** The person whose reads these are. */
   private owner: string | null = null;
-  private readonly boards = new Map<Uuid, { board: TodoBoard; etag: string | null }>();
-  private readonly people = new Map<Uuid, TodoMember[]>();
-  private readonly rowReads = new Map<RowsSource, { boards: TodoAssignedBoard[]; etag: string | null }>();
-  private readonly cards = new Map<Uuid, TodoCardDetail>();
+  private boards: ReadonlyMap<Uuid, HeldBoard> = new Map();
+  private people: ReadonlyMap<Uuid, readonly TodoMember[]> = new Map();
+  private rowReads: ReadonlyMap<RowsSource, HeldRows> = new Map();
+  private cards: ReadonlyMap<Uuid, TodoCardDetail> = new Map();
   /** The cards to read ahead: the shown board's (`soon`) before the rest (`later`). */
-  private soon: Uuid[] = [];
-  private later: Uuid[] = [];
+  private soon: readonly Uuid[] = [];
+  private later: readonly Uuid[] = [];
   /** The reads of the boards, their people and the rows, in order. */
-  private readonly tasks: Read[] = [];
-  private readonly reading = new Set<Uuid>();
+  private tasks: readonly Read[] = [];
+  private reading: ReadonlySet<Uuid> = new Set();
   private running = 0;
   private started = false;
 
   /** Stop the read-ahead of the page that closes; what was read stays. */
   leave(): void {
     this.started = false;
-    this.tasks.length = 0;
+    this.tasks = [];
     this.soon = [];
     this.later = [];
   }
 
-  board(id: Uuid): { board: TodoBoard; etag: string | null } | null {
+  board(id: Uuid): HeldBoard | null {
     this.own();
     return this.boards.get(id) ?? null;
   }
 
   putBoard(board: TodoBoard, etag: string | null): void {
     this.own();
-    this.boards.set(board.id, { board, etag });
+    this.boards = withEntry(this.boards, board.id, { board, etag });
     this.dropChanged(board.cards);
   }
 
-  members(boardId: Uuid): TodoMember[] | null {
+  members(boardId: Uuid): readonly TodoMember[] | null {
     this.own();
     return this.people.get(boardId) ?? null;
   }
 
-  putMembers(boardId: Uuid, list: TodoMember[]): void {
+  putMembers(boardId: Uuid, list: readonly TodoMember[]): void {
     this.own();
-    this.people.set(boardId, list);
+    this.people = withEntry(this.people, boardId, list);
   }
 
-  rows(source: RowsSource): { boards: TodoAssignedBoard[]; etag: string | null } | null {
+  rows(source: RowsSource): HeldRows | null {
     this.own();
     return this.rowReads.get(source) ?? null;
   }
 
-  putRows(source: RowsSource, boards: TodoAssignedBoard[], etag: string | null): void {
+  putRows(source: RowsSource, boards: readonly TodoAssignedBoard[], etag: string | null): void {
     this.own();
-    this.rowReads.set(source, { boards, etag });
-    for (const b of boards) this.dropChanged(b.cards);
+    this.rowReads = withEntry(this.rowReads, source, { boards, etag });
+    this.dropChanged(boards.flatMap((b) => b.cards));
   }
 
   card(id: Uuid): TodoCardDetail | null {
@@ -105,7 +118,7 @@ export class TodoCacheService {
 
   putCard(card: TodoCardDetail): void {
     this.own();
-    this.cards.set(card.id, card);
+    this.cards = withEntry(this.cards, card.id, card);
   }
 
   /**
@@ -118,40 +131,14 @@ export class TodoCacheService {
     this.own();
     if (this.started) return;
     this.started = true;
-    for (const id of ids) {
-      if (id === shown) continue;
-      if (!this.boards.has(id)) {
-        this.tasks.push(() =>
-          this.api.pollBoard(id, null).pipe(
-            tap(({ board, etag }) => {
-              if (!board || this.boards.has(id)) return;
-              this.putBoard(board, etag);
-              this.readCards(board.cards);
-            }),
-          ),
-        );
-      }
-      if (!this.people.has(id)) {
-        this.tasks.push(() =>
-          this.api.members(id).pipe(
-            tap((list) => {
-              if (!this.people.has(id)) this.putMembers(id, list);
-            }),
-          ),
-        );
-      }
-    }
-    for (const source of ['all', 'mine'] as const) {
-      this.tasks.push(() => {
-        if (this.rowReads.has(source)) return EMPTY;
-        const read = source === 'all' ? this.api.pollAllBoards(null) : this.api.pollMineBoards(null);
-        return read.pipe(
-          tap(({ boards, etag }) => {
-            if (boards && !this.rowReads.has(source)) this.putRows(source, [...boards], etag);
-          }),
-        );
-      });
-    }
+    const boardTasks = ids
+      .filter((id) => id !== shown)
+      .flatMap((id) => [
+        ...(this.boards.has(id) ? [] : [this.boardRead(id)]),
+        ...(this.people.has(id) ? [] : [this.membersRead(id)]),
+      ]);
+    const rowTasks = (['all', 'mine'] as const).map((source) => this.rowsRead(source));
+    this.tasks = [...this.tasks, ...boardTasks, ...rowTasks];
     this.pump();
   }
 
@@ -163,11 +150,46 @@ export class TodoCacheService {
     this.own();
     const ids = tiles.map((t) => t.id).filter((id) => !this.cards.has(id) && !this.reading.has(id));
     const fresh = new Set(ids);
-    this.soon = this.soon.filter((id) => !fresh.has(id));
-    this.later = this.later.filter((id) => !fresh.has(id));
-    if (soon) this.soon = [...ids, ...this.soon];
-    else this.later.push(...ids);
+    const waiting = this.soon.filter((id) => !fresh.has(id));
+    const rest = this.later.filter((id) => !fresh.has(id));
+    this.soon = soon ? [...ids, ...waiting] : waiting;
+    this.later = soon ? rest : [...rest, ...ids];
     this.pump();
+  }
+
+  /** The read of a board ahead; a board the page read meanwhile wins. */
+  private boardRead(id: Uuid): Read {
+    return () =>
+      this.api.pollBoard(id, null).pipe(
+        tap(({ board, etag }) => {
+          if (!board || this.boards.has(id)) return;
+          this.putBoard(board, etag);
+          this.readCards(board.cards);
+        }),
+      );
+  }
+
+  /** The read of the people of a board ahead; people the page read meanwhile win. */
+  private membersRead(id: Uuid): Read {
+    return () =>
+      this.api.members(id).pipe(
+        tap((list) => {
+          if (!this.people.has(id)) this.putMembers(id, list);
+        }),
+      );
+  }
+
+  /** The read of the rows ahead; nothing when the rows are held when the read starts. */
+  private rowsRead(source: RowsSource): Read {
+    return () => {
+      if (this.rowReads.has(source)) return EMPTY;
+      const read = source === 'all' ? this.api.pollAllBoards(null) : this.api.pollMineBoards(null);
+      return read.pipe(
+        tap(({ boards, etag }) => {
+          if (boards && !this.rowReads.has(source)) this.putRows(source, [...boards], etag);
+        }),
+      );
+    };
   }
 
   /** Forget the reads of another person: the one signed in changed. */
@@ -176,11 +198,11 @@ export class TodoCacheService {
     if (who === this.owner) return;
     this.owner = who;
     this.leave();
-    this.boards.clear();
-    this.people.clear();
-    this.rowReads.clear();
-    this.cards.clear();
-    this.reading.clear();
+    this.boards = new Map();
+    this.people = new Map();
+    this.rowReads = new Map();
+    this.cards = new Map();
+    this.reading = new Set();
   }
 
   private pump(): void {
@@ -204,36 +226,53 @@ export class TodoCacheService {
   private next(): Read | null {
     const soon = this.batch('soon');
     if (soon) return soon;
-    const task = this.tasks.shift();
-    if (task) return task;
-    return this.batch('later');
+    const [task, ...rest] = this.tasks;
+    this.tasks = rest;
+    return task ?? this.batch('later');
   }
 
   /** One request for the next `CARD_BATCH` cards of a line that are not held or in flight. */
   private batch(line: 'soon' | 'later'): Read | null {
-    let ids: Uuid[] = [];
-    while (!ids.length && this[line].length) {
-      ids = this[line].splice(0, CARD_BATCH).filter((id) => !this.cards.has(id) && !this.reading.has(id));
-    }
+    const ids = this.take(line);
     if (!ids.length) return null;
-    for (const id of ids) this.reading.add(id);
+    const batch = new Set(ids);
+    this.reading = new Set([...this.reading, ...ids]);
     return () =>
       this.api.cards(ids).pipe(
         tap((list) => {
-          for (const card of list) if (!this.cards.has(card.id)) this.cards.set(card.id, card);
+          const read = list.map((card) => [card.id, card] as const).reverse();
+          this.cards = new Map([...read, ...this.cards]);
         }),
         finalize(() => {
-          for (const id of ids) this.reading.delete(id);
+          this.reading = new Set([...this.reading].filter((id) => !batch.has(id)));
         }),
       );
   }
 
+  /**
+   * Take the next `CARD_BATCH` cards of a line that are not held or in flight; the chunks
+   * that hold none are dropped on the way, and an empty line gives none.
+   */
+  private take(line: 'soon' | 'later'): readonly Uuid[] {
+    const queue = this[line];
+    if (!queue.length) return [];
+    const fresh = (id: Uuid): boolean => !this.cards.has(id) && !this.reading.has(id);
+    const ids = queue.slice(0, CARD_BATCH).filter(fresh);
+    this[line] = queue.slice(CARD_BATCH);
+    return ids.length ? ids : this.take(line);
+  }
+
   /** Drop every detail that no longer matches its tile. */
   private dropChanged(tiles: readonly TodoCardTile[]): void {
-    for (const tile of tiles) {
-      const card = this.cards.get(tile.id);
-      if (card && !sameTile(card, tile)) this.cards.delete(tile.id);
-    }
+    const stale = new Set(
+      tiles
+        .filter((tile) => {
+          const card = this.cards.get(tile.id);
+          return card !== undefined && !sameTile(card, tile);
+        })
+        .map((tile) => tile.id),
+    );
+    if (stale.size) this.cards = new Map([...this.cards].filter(([id]) => !stale.has(id)));
   }
 }
 

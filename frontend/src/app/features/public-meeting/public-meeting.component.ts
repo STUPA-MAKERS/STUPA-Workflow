@@ -120,14 +120,14 @@ export class PublicMeetingComponent {
   protected readonly metaLine = computed(() => {
     const h = this.head();
     if (!h) return '';
-    const parts: string[] = [];
-    if (h.gremiumName) parts.push(h.gremiumName);
-    if (h.status === 'live' && h.startedAt) {
-      parts.push(this.i18n.translate('guests.page.since', { time: clock(h.startedAt, this.i18n.formatLocale()) }));
-    } else if (h.date) {
-      parts.push(this.dateText(h.date, h.startTime));
-    }
-    return parts.join(' · ');
+    const since = clock(h.startedAt, this.i18n.formatLocale());
+    const time =
+      h.status === 'live' && h.startedAt
+        ? [this.i18n.translate('guests.page.since', { time: since })]
+        : h.date
+          ? [this.dateText(h.date, h.startTime)]
+          : [];
+    return [...(h.gremiumName ? [h.gremiumName] : []), ...time].join(' · ');
   });
   /** The own name, or "Gast n". */
   protected readonly ownName = computed(() => {

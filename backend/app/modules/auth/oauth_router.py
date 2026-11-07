@@ -22,7 +22,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Query, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
@@ -30,7 +29,10 @@ from app.modules.admin.gremium_roles import active_gremium_roles
 from app.modules.auth import oauth, oauth_service, sessions
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthToken
+from app.modules.auth.oauth_service import IssuedTokens
+from app.settings import Settings
 from app.shared.errors import BadRequestError, ForbiddenError, NotFoundError, ProblemDetail
+from app.shared.schemas import FrozenModel
 
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 well_known_router = APIRouter(tags=["oauth"])
@@ -49,7 +51,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return dict.fromkeys(codes, _PROBLEM)
 
 
-class OAuthError(BaseModel):
+class OAuthError(FrozenModel, frozen=True):
     """RFC 6749 token error body with `error` and `error_description`.
 
     This body is not problem+json on purpose. OAuth and MCP clients expect exactly this
@@ -82,12 +84,9 @@ def _is_loopback_redirect(redirect_uri: str) -> bool:
 
 
 def _redirect_error(redirect_uri: str, *, error: str, state: str) -> RedirectResponse:
-    params = {"error": error}
-    if state:
-        params["state"] = state
-    sep = "&" if urlparse(redirect_uri).query else "?"
+    params = {"error": error, **({"state": state} if state else {})}
     return RedirectResponse(
-        f"{redirect_uri}{sep}{urlencode(params)}",
+        _loopback_redirect(redirect_uri, params),
         status_code=status.HTTP_302_FOUND,
     )
 
@@ -177,6 +176,51 @@ def _token_error(error: str, description: str, code: int = 400) -> JSONResponse:
     return JSONResponse({"error": error, "error_description": description}, status_code=code)
 
 
+async def _grant(
+    db: DbSession,
+    settings: Settings,
+    *,
+    grant_type: str,
+    code: str,
+    code_verifier: str,
+    redirect_uri: str,
+    refresh_token: str,
+    client_id: str,
+) -> IssuedTokens | None:
+    """Run the grant that `grant_type` names.
+
+    Returns:
+        The new token pair, or `None` for a grant type the server does not support.
+
+    Raises:
+        OAuthError: The code or the refresh token is refused.
+    """
+    now = datetime.now(UTC)
+    match grant_type:
+        case "authorization_code":
+            return await oauth_service.exchange_code(
+                db,
+                code=code,
+                code_verifier=code_verifier,
+                redirect_uri=redirect_uri,
+                client_id=client_id,
+                now=now,
+                access_ttl=settings.oauth_access_ttl_seconds,
+                refresh_ttl=settings.oauth_refresh_ttl_seconds,
+            )
+        case "refresh_token":
+            return await oauth_service.refresh_tokens(
+                db,
+                refresh_token=refresh_token,
+                client_id=client_id,
+                now=now,
+                access_ttl=settings.oauth_access_ttl_seconds,
+                refresh_ttl=settings.oauth_refresh_ttl_seconds,
+            )
+        case _:
+            return None
+
+
 @router.post(
     "/token",
     openapi_extra={"x-error-contract": "oauth"},
@@ -204,33 +248,22 @@ async def token(
         return _token_error("invalid_request", "OAuth is not configured.", 404)
     if client_id != settings.oauth_mcp_client_id:
         return _token_error("invalid_client", "unknown client_id.", 401)
-    now = datetime.now(UTC)
     try:
-        if grant_type == "authorization_code":
-            issued = await oauth_service.exchange_code(
-                db,
-                code=code,
-                code_verifier=code_verifier,
-                redirect_uri=redirect_uri,
-                client_id=client_id,
-                now=now,
-                access_ttl=settings.oauth_access_ttl_seconds,
-                refresh_ttl=settings.oauth_refresh_ttl_seconds,
-            )
-        elif grant_type == "refresh_token":
-            issued = await oauth_service.refresh_tokens(
-                db,
-                refresh_token=refresh_token,
-                client_id=client_id,
-                now=now,
-                access_ttl=settings.oauth_access_ttl_seconds,
-                refresh_ttl=settings.oauth_refresh_ttl_seconds,
-            )
-        else:
-            return _token_error("unsupported_grant_type", f"grant_type={grant_type!r}")
+        issued = await _grant(
+            db,
+            settings,
+            grant_type=grant_type,
+            code=code,
+            code_verifier=code_verifier,
+            redirect_uri=redirect_uri,
+            refresh_token=refresh_token,
+            client_id=client_id,
+        )
     except oauth.OAuthError as exc:
         await db.commit()
         return _token_error(exc.error, exc.description)
+    if issued is None:
+        return _token_error("unsupported_grant_type", f"grant_type={grant_type!r}")
     await db.commit()
     return JSONResponse(
         {
@@ -304,9 +337,9 @@ async def consent_request(
     }
 
 
-class _ConsentBody(BaseModel):
+class _ConsentBody(FrozenModel, frozen=True):
     approve: bool
-    scopes: list[str] = []
+    scopes: tuple[str, ...] = ()
     lifetime: str | None = None
 
 

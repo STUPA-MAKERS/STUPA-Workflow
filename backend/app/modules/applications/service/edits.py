@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Set
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -13,7 +14,7 @@ from app.modules.admin.models import ApplicationType
 from app.modules.applications.decision import CODE_AMOUNT_EXCEEDS
 from app.modules.applications.diff import DataDiff, compute_diff, is_empty_diff
 from app.modules.applications.models import MagicLink, SubmissionVersion
-from app.modules.applications.schemas import ApplicationOut, VersionOut
+from app.modules.applications.schemas import ActorOut, ApplicationOut, VersionOut
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
     _amount_currency,
@@ -81,19 +82,16 @@ class EditOps(ApplicationsServiceBase):
                 code="application_locked",
             )
 
-        fields = await self._pinned_fields(app)
-        if not any(f.key == SYSTEM_TITLE_KEY for f in fields):
-            fields = [system_title_field(), *fields]
+        pinned = await self._pinned_fields(app)
+        fields = (
+            pinned
+            if any(f.key == SYSTEM_TITLE_KEY for f in pinned)
+            else [system_title_field(), *pinned]
+        )
         app_type = await self.session.get(ApplicationType, app.type_id)
-        pii_keys: set[str] = set()
-        if preserve_pii:
-            pii_keys = await self._pii_keys_for_type(app.type_id)
-            stored = app.data or {}
-            data = {
-                **_without_keys(data, pii_keys),
-                **{k: v for k, v in stored.items() if k in pii_keys},
-            }
-        clean = _whitelist(fields, data)
+        pii_keys = await self._pii_keys_for_type(app.type_id) if preserve_pii else set[str]()
+        sent = _with_stored_pii(data, app.data or {}, pii_keys) if preserve_pii else data
+        clean = _whitelist(fields, sent)
         context = {"has_budget": app_type.has_budget if app_type is not None else False}
         try:
             validate_answers(fields, clean, context)
@@ -290,22 +288,43 @@ class EditOps(ApplicationsServiceBase):
             applicant_view=applicant_view,
             magic_link_view=magic_link_view,
         )
-        out: list[VersionOut] = []
-        for r in rows:
-            diff = _scrub_diff(r.diff, hidden) if r.diff else None
-            changed = sorted(
-                {k for bucket in (diff or {}).values() for k in (bucket or {})}
+        return [
+            _version_out(
+                r,
+                actors.get(r.changed_by) if r.changed_by else None,
+                hidden,
+                applicant_view=applicant_view,
             )
-            info = actors.get(r.changed_by) if r.changed_by else None
-            out.append(
-                VersionOut(
-                    version=r.version,
-                    data=None if applicant_view else _without_keys(r.data, hidden),
-                    diff=None if applicant_view else diff,  # type: ignore[arg-type] — stored DataDiff
-                    changedKeys=changed,
-                    changedBy=info.legacy(r.changed_by) if info and r.changed_by else None,
-                    changedByInfo=info,
-                    at=r.at,
-                )
-            )
-        return out
+            for r in rows
+        ]
+
+
+def _with_stored_pii(
+    sent: Mapping[str, Any], stored: Mapping[str, Any], pii_keys: Set[str]
+) -> dict[str, Any]:
+    """Return the sent data with the stored values of the ``isPII`` fields in their place."""
+    return {
+        **_without_keys(sent, pii_keys),
+        **{k: v for k, v in stored.items() if k in pii_keys},
+    }
+
+
+def _version_out(
+    row: SubmissionVersion,
+    info: ActorOut | None,
+    hidden: Set[str],
+    *,
+    applicant_view: bool,
+) -> VersionOut:
+    """Build one version of the history from its row and its resolved editor."""
+    diff = _scrub_diff(row.diff, hidden) if row.diff else None
+    changed = sorted({k for bucket in (diff or {}).values() for k in (bucket or {})})
+    return VersionOut(
+        version=row.version,
+        data=None if applicant_view else _without_keys(row.data, hidden),
+        diff=None if applicant_view else diff,  # type: ignore[arg-type] — stored DataDiff
+        changedKeys=tuple(changed),
+        changedBy=info.legacy(row.changed_by) if info and row.changed_by else None,
+        changedByInfo=info,
+        at=row.at,
+    )

@@ -79,7 +79,7 @@ class BulkObjectStorage(ObjectStorage, Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class MinioStorage:
     """MinIO/S3 backend.
 

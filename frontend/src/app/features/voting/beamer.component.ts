@@ -78,10 +78,12 @@ export class BeamerComponent implements OnDestroy {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly meeting = signal<Meeting | null>(null);
-  readonly agenda = signal<AgendaItem[]>([]);
+  readonly agenda = signal<readonly AgendaItem[]>([]);
   /** The vote on the screen as `GET /votes/{id}` gave it. */
   private readonly loaded = signal<Vote | null>(null);
   private requested: string | null = null;
+  /** The channel sent a meeting state before. The first one needs no reload of the meeting. */
+  private meetingStateSeen = false;
   /** The join link of a public meeting and the present members. */
   private readonly link = signal<JoinLink | null>(null);
   private readonly presentMembers = signal(0);
@@ -170,15 +172,13 @@ export class BeamerComponent implements OnDestroy {
     this.session = this.live.open(meetingId, { beamer: true });
     if (routeId) this.loadMeeting(routeId);
 
-    let first = true;
     effect(() => {
       const state = this.session.meeting();
       untracked(() => {
         if (!state || !routeId) return;
-        if (first) {
-          first = false;
-          return;
-        }
+        const first = !this.meetingStateSeen;
+        this.meetingStateSeen = true;
+        if (first) return;
         this.loadMeeting(routeId);
       });
     });

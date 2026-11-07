@@ -127,10 +127,10 @@ def _prefer_ipv4(ips: list[str]) -> str:
 
     A container often has no IPv6 route, so an IPv4 target connects more reliably.
     """
-    for ip in ips:
-        if isinstance(ipaddress.ip_address(ip), ipaddress.IPv4Address):
-            return ip
-    return ips[0]
+    return next(
+        (ip for ip in ips if isinstance(ipaddress.ip_address(ip), ipaddress.IPv4Address)),
+        ips[0],
+    )
 
 
 class HttpGravatarFetcher:
@@ -181,9 +181,11 @@ class HttpGravatarFetcher:
                 ip_url, host_header = pin_url(url, _prefer_ipv4(ips))
                 async with self._client_factory() as client:
                     request = client.build_request(
-                        "GET", ip_url, headers={"Host": host_header, "Accept": "image/*"}
+                        "GET",
+                        ip_url,
+                        headers={"Host": host_header, "Accept": "image/*"},
+                        extensions={"sni_hostname": GRAVATAR_HOST},
                     )
-                    request.extensions["sni_hostname"] = GRAVATAR_HOST
                     response = await client.send(request, stream=True)
                     try:
                         return await _read(response)

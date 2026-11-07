@@ -54,31 +54,31 @@ def client_ip(request: Request) -> str:
 
 
 def _redis_client(request: Request, settings: Settings) -> object:
-    state = request.app.state
-    client = getattr(state, "_antiabuse_redis", None)
-    if client is None:
-        import redis.asyncio as aioredis
+    cached = getattr(request.app.state, "_antiabuse_redis", None)
+    if cached is not None:
+        return cached
+    import redis.asyncio as aioredis
 
-        client = aioredis.from_url(
-            settings.redis_url,
-            socket_connect_timeout=0.5,
-            socket_timeout=0.5,
-        )
-        state._antiabuse_redis = client
+    client = aioredis.from_url(
+        settings.redis_url,
+        socket_connect_timeout=0.5,
+        socket_timeout=0.5,
+    )
+    request.app.state._antiabuse_redis = client
     return client
 
 
 def get_rate_limiter(request: Request, settings: SettingsDep) -> RateLimiter:
     """Return the app-wide rate limiter, a no-op one when rate limiting is off."""
-    state = request.app.state
-    limiter = getattr(state, "_rate_limiter", None)
-    if limiter is None:
-        limiter = (
-            RedisRateLimiter(_redis_client(request, settings))
-            if settings.rate_limit_enabled
-            else NullRateLimiter()
-        )
-        state._rate_limiter = limiter
+    cached = getattr(request.app.state, "_rate_limiter", None)
+    if cached is not None:
+        return cached
+    limiter = (
+        RedisRateLimiter(_redis_client(request, settings))
+        if settings.rate_limit_enabled
+        else NullRateLimiter()
+    )
+    request.app.state._rate_limiter = limiter
     return limiter
 
 
@@ -86,21 +86,24 @@ def get_altcha_verifier(
     request: Request, settings: SettingsDep
 ) -> AltchaVerifier | NullAltchaVerifier:
     """Return the app-wide ALTCHA verifier, a no-op one without a secret."""
-    state = request.app.state
-    verifier = getattr(state, "_altcha_verifier", None)
-    if verifier is None:
-        if settings.altcha_enabled:
-            assert settings.altcha_hmac_secret is not None
-            guard = RedisReplayGuard(_redis_client(request, settings))
-            verifier = AltchaVerifier(
-                settings.altcha_hmac_secret,
-                replay=guard,
-                replay_ttl_seconds=settings.altcha_challenge_ttl_seconds,
-            )
-        else:
-            verifier = NullAltchaVerifier()
-        state._altcha_verifier = verifier
+    cached = getattr(request.app.state, "_altcha_verifier", None)
+    if cached is not None:
+        return cached
+    verifier = _altcha_verifier(request, settings)
+    request.app.state._altcha_verifier = verifier
     return verifier
+
+
+def _altcha_verifier(request: Request, settings: Settings) -> AltchaVerifier | NullAltchaVerifier:
+    """Build the ALTCHA verifier of the settings: a no-op one when ALTCHA is off."""
+    if not settings.altcha_enabled:
+        return NullAltchaVerifier()
+    assert settings.altcha_hmac_secret is not None
+    return AltchaVerifier(
+        settings.altcha_hmac_secret,
+        replay=RedisReplayGuard(_redis_client(request, settings)),
+        replay_ttl_seconds=settings.altcha_challenge_ttl_seconds,
+    )
 
 
 RateLimiterDep = Annotated[RateLimiter, Depends(get_rate_limiter)]
@@ -198,8 +201,8 @@ def canonical_mail_key(email: str) -> str:
     local, sep, domain = normalized.rpartition("@")
     if not sep:
         return normalized.casefold()
-    local = local.split("+", 1)[0]
-    return f"{local.casefold()}@{domain.casefold()}"
+    mailbox = local.split("+", 1)[0]
+    return f"{mailbox.casefold()}@{domain.casefold()}"
 
 
 async def _json_field(request: Request, field: str) -> str | None:
@@ -328,12 +331,13 @@ async def rate_limit_attachments(
     """
     if _is_oauth_principal(principal):
         return
-    if principal is not None:
-        key = f"attachments:principal:{principal.sub}"
-    elif applicant is not None:
-        key = f"attachments:applicant:{applicant.application_id}"
-    else:
-        key = f"attachments:ip:{client_ip(request)}"
+    key = (
+        f"attachments:principal:{principal.sub}"
+        if principal is not None
+        else f"attachments:applicant:{applicant.application_id}"
+        if applicant is not None
+        else f"attachments:ip:{client_ip(request)}"
+    )
     await _enforce(
         limiter,
         key,

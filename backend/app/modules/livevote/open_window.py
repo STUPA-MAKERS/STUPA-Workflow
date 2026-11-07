@@ -115,12 +115,13 @@ class MeetingSettingsService:
 
     async def get(self) -> MeetingSettings:
         """Return the settings row. Create it with the defaults when it is missing."""
-        row = await self.session.get(MeetingSettings, 1)
-        if row is None:
-            row = _defaults()
-            row.updated_at = datetime.now(UTC)
-            self.session.add(row)
-            await self.session.flush()
+        stored = await self.session.get(MeetingSettings, 1)
+        if stored is not None:
+            return stored
+        row = _defaults()
+        row.updated_at = datetime.now(UTC)
+        self.session.add(row)
+        await self.session.flush()
         return row
 
     async def update(

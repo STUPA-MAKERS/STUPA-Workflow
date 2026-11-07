@@ -43,13 +43,16 @@ export function localToday(now: Date = new Date()): string {
 export function parseDay(value: DateValue): Date | null {
   if (value === null || value === undefined || value === '') return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-  let date: Date;
-  const day = typeof value === 'string' ? DAY.exec(value) : null;
-  const month = typeof value === 'string' && !day ? MONTH.exec(value) : null;
-  if (day) date = new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]), 12);
-  else if (month) date = new Date(Number(month[1]), Number(month[2]) - 1, 1, 12);
-  else date = new Date(value);
+  const date = parseDate(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** A string or a number as a `Date`: a plain day or a month at local noon, else a moment. */
+function parseDate(value: string | number): Date {
+  const day = typeof value === 'string' ? DAY.exec(value) : null;
+  if (day) return new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]), 12);
+  const month = typeof value === 'string' ? MONTH.exec(value) : null;
+  return month ? new Date(Number(month[1]), Number(month[2]) - 1, 1, 12) : new Date(value);
 }
 
 /** The number of the local calendar day of a date, for differences in whole days. */
@@ -65,11 +68,10 @@ const formats = new Map<string, Intl.DateTimeFormat>();
  */
 function dateFormat(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
   const key = `${locale}|${JSON.stringify(options)}`;
-  let f = formats.get(key);
-  if (!f) {
-    f = new Intl.DateTimeFormat(locale, options);
-    formats.set(key, f);
-  }
+  const cached = formats.get(key);
+  if (cached) return cached;
+  const f = new Intl.DateTimeFormat(locale, options);
+  formats.set(key, f);
   return f;
 }
 
@@ -135,9 +137,9 @@ export function shortDay(value: DateValue, locale: string, today: DateValue = ne
 /** The options of {@link weekdayDate}. */
 export interface WeekdayDateOptions {
   /** With the year (default) or without: "Di, 14.10.". */
-  year?: boolean;
+  readonly year?: boolean;
   /** With the clock time: "Di, 14.10.2026, 17:00". */
-  time?: boolean;
+  readonly time?: boolean;
 }
 
 /** "Di, 14.10.2026": the short weekday without its dot, then the date. */
@@ -157,7 +159,7 @@ export function weekdayDate(
 export function monthYear(
   value: DateValue,
   locale: string,
-  options: { utc?: boolean } = {},
+  options: { readonly utc?: boolean } = {},
 ): string {
   const d = parseDay(value);
   if (!d) return '';

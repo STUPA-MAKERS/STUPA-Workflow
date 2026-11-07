@@ -53,6 +53,19 @@ class PatternBroker(MeetingBroker, Protocol):
         ...
 
 
+def _without(
+    registry: dict[str, set[asyncio.Queue[dict[str, object]]]],
+    key: str,
+    queue: asyncio.Queue[dict[str, object]],
+) -> None:
+    """Remove a queue from the entry of `key`, and the entry once it holds no queue."""
+    remaining = registry.get(key, set()) - {queue}
+    if remaining:
+        registry.update({key: remaining})
+    else:
+        registry.pop(key, None)
+
+
 class _Hub:
     """Shared routing backend that maps a channel to its subscriber queues."""
 
@@ -66,11 +79,7 @@ class _Hub:
         return queue
 
     def unregister(self, channel: str, queue: asyncio.Queue[dict[str, object]]) -> None:
-        subs = self._channels.get(channel)
-        if subs is not None:
-            subs.discard(queue)
-            if not subs:
-                del self._channels[channel]
+        _without(self._channels, channel, queue)
 
     def register_pattern(self, pattern: str) -> asyncio.Queue[dict[str, object]]:
         queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
@@ -78,11 +87,7 @@ class _Hub:
         return queue
 
     def unregister_pattern(self, pattern: str, queue: asyncio.Queue[dict[str, object]]) -> None:
-        subs = self._patterns.get(pattern)
-        if subs is not None:
-            subs.discard(queue)
-            if not subs:
-                del self._patterns[pattern]
+        _without(self._patterns, pattern, queue)
 
     def fan_out(self, channel: str, message: dict[str, object]) -> None:
         for queue in set(self._channels.get(channel, ())):
@@ -149,9 +154,7 @@ class _RedisSubscription:
             if raw.get("type") != self._kind:
                 continue
             data = raw.get("data")
-            if isinstance(data, bytes):
-                data = data.decode("utf-8")
-            yield json.loads(data)
+            yield json.loads(data.decode("utf-8") if isinstance(data, bytes) else data)
 
 
 class RedisBroker:

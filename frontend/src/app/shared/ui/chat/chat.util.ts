@@ -26,8 +26,8 @@ export function toChatAttachments(
 
 /** A message on the wire with files: a comment, a note or a card comment. */
 interface WithFiles {
-  id: string;
-  attachments?: readonly MessageAttachment[] | null;
+  readonly id: string;
+  readonly attachments?: readonly MessageAttachment[] | null;
 }
 
 /**
@@ -36,8 +36,9 @@ interface WithFiles {
  * so the list keeps its own messages and only the scan state of their files changes.
  */
 export function withScanStates<T extends WithFiles>(current: readonly T[], fresh: readonly WithFiles[]): T[] {
-  const states = new Map<string, ScanState>();
-  for (const m of fresh) for (const f of m.attachments ?? []) states.set(f.id, f.scanState);
+  const states = new Map<string, ScanState>(
+    fresh.flatMap((m) => (m.attachments ?? []).map((f) => [f.id, f.scanState] as const)),
+  );
   return current.map((m) => {
     const files = m.attachments ?? [];
     if (!files.some((f) => (states.get(f.id) ?? f.scanState) !== f.scanState)) return m;
@@ -46,7 +47,7 @@ export function withScanStates<T extends WithFiles>(current: readonly T[], fresh
 }
 
 /** A delivered message joins the list once; a message with its id already there is replaced. */
-export function appendOnce<T extends { id: string }>(list: readonly T[], item: T): T[] {
+export function appendOnce<T extends { readonly id: string }>(list: readonly T[], item: T): T[] {
   return list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
 }
 
@@ -55,34 +56,34 @@ export const GROUP_WINDOW_MS = 5 * 60_000;
 
 /** A row of the rendered thread. */
 export type ChatItem =
-  | { kind: 'day'; key: string; label: string }
-  | { kind: 'new'; key: string; count: number }
-  | { kind: 'event'; key: string; text: string; at: string }
+  | { readonly kind: 'day'; readonly key: string; readonly label: string }
+  | { readonly kind: 'new'; readonly key: string; readonly count: number }
+  | { readonly kind: 'event'; readonly key: string; readonly text: string; readonly at: string }
   | {
-      kind: 'msg';
-      key: string;
-      msg: ChatMessage;
+      readonly kind: 'msg';
+      readonly key: string;
+      readonly msg: ChatMessage;
       /** The name above the first message of a group of another person. */
-      name: string | null;
+      readonly name: string | null;
       /** First message of its group: name and visibility label. */
-      head: boolean;
+      readonly head: boolean;
       /** Last message of its group: time and avatar. */
-      tail: boolean;
+      readonly tail: boolean;
       /** The visibility mark, only where a thread holds both kinds. */
-      mark: ChatVisibility | null;
+      readonly mark: ChatVisibility | null;
       /** The mark shows its label: first of a group, or the visibility changes in it. */
-      markLabel: boolean;
+      readonly markLabel: boolean;
     };
 
 export interface BuildOptions {
   /** Mark internal and public messages. */
-  marked: boolean;
+  readonly marked: boolean;
   /** Messages of others after this time are new. null: nothing is new. */
-  markerAt: string | null;
+  readonly markerAt: string | null;
   /** The label of a day separator. */
-  dayLabel: (date: Date) => string;
+  readonly dayLabel: (date: Date) => string;
   /** The shown name of a message's author. */
-  name: (msg: ChatMessage) => string | null;
+  readonly name: (msg: ChatMessage) => string | null;
 }
 
 /** A message the server has not confirmed yet. */
@@ -108,9 +109,47 @@ export function newCount(messages: readonly ChatMessage[], after: string | null)
   return messages.filter((m) => !m.own && !isPending(m) && Date.parse(m.at) > t).length;
 }
 
-type MsgItem = Extract<ChatItem, { kind: 'msg' }>;
+type MsgItem = Extract<ChatItem, { readonly kind: 'msg' }>;
 
-type Entry = { kind: 'msg'; msg: ChatMessage } | { kind: 'event'; event: ChatEvent };
+type Entry =
+  | { readonly kind: 'msg'; readonly msg: ChatMessage }
+  | { readonly kind: 'event'; readonly event: ChatEvent };
+
+/** The time of a thread entry. */
+function entryAt(entry: Entry): string {
+  return entry.kind === 'msg' ? entry.msg.at : entry.event.at;
+}
+
+/** The entries of a thread: sent messages and events by time, then the pending messages. */
+function threadEntries(
+  messages: readonly ChatMessage[],
+  events: readonly ChatEvent[],
+): readonly Entry[] {
+  const timed: readonly Entry[] = [
+    ...messages.filter((m) => !isPending(m)).map((msg) => ({ kind: 'msg' as const, msg })),
+    ...events.map((event) => ({ kind: 'event' as const, event })),
+  ];
+  return [
+    ...[...timed].sort((a, b) => Date.parse(entryAt(a)) - Date.parse(entryAt(b))),
+    ...messages.filter(isPending).map((msg) => ({ kind: 'msg' as const, msg })),
+  ];
+}
+
+/**
+ * The index of the entry that gets the "N neue" separator, or -1: the first message of
+ * another person that is newer than the marker, and only when something is new.
+ */
+function newIndex(entries: readonly Entry[], opts: BuildOptions, count: number): number {
+  if (opts.markerAt === null || count <= 0) return -1;
+  const marker = Date.parse(opts.markerAt);
+  return entries.findIndex(
+    (e) =>
+      e.kind === 'msg' &&
+      !e.msg.own &&
+      !isPending(e.msg) &&
+      new Date(e.msg.at).getTime() > marker,
+  );
+}
 
 /**
  * The rows of a thread: day separators, the "N neue" separator, events and messages in
@@ -121,69 +160,52 @@ export function buildItems(
   events: readonly ChatEvent[],
   opts: BuildOptions,
 ): ChatItem[] {
-  const timed: Entry[] = [
-    ...messages.filter((m) => !isPending(m)).map((msg) => ({ kind: 'msg' as const, msg })),
-    ...events.map((event) => ({ kind: 'event' as const, event })),
-  ];
-  const at = (e: Entry) => Date.parse(e.kind === 'msg' ? e.msg.at : e.event.at);
-  timed.sort((a, b) => at(a) - at(b));
-  const entries: Entry[] = [
-    ...timed,
-    ...messages.filter(isPending).map((msg) => ({ kind: 'msg' as const, msg })),
-  ];
-
+  const entries = threadEntries(messages, events);
   const count = newCount(messages, opts.markerAt);
-  const marker = opts.markerAt === null ? null : Date.parse(opts.markerAt);
-  let newShown = false;
-  let lastDay: string | null = null;
-  /** The previous message row, while nothing stands between it and the next one. */
-  let prev: MsgItem | null = null;
-  const items: ChatItem[] = [];
-
-  for (const entry of entries) {
-    const time = new Date(entry.kind === 'msg' ? entry.msg.at : entry.event.at);
-    const day = dayKey(time);
-    if (day !== lastDay) {
-      items.push({ kind: 'day', key: `day-${day}`, label: opts.dayLabel(time) });
-      lastDay = day;
-      prev = null;
-    }
-    if (entry.kind === 'event') {
-      items.push({ kind: 'event', key: `ev-${entry.event.id}`, text: entry.event.text, at: entry.event.at });
-      prev = null;
-      continue;
-    }
-    const msg = entry.msg;
-    if (
-      !newShown &&
-      marker !== null &&
-      count > 0 &&
-      !msg.own &&
-      !isPending(msg) &&
-      time.getTime() > marker
-    ) {
-      items.push({ kind: 'new', key: 'new', count });
-      newShown = true;
-      prev = null;
-    }
-    const joins =
+  const newAt = newIndex(entries, opts, count);
+  const days = entries.map((e) => dayKey(new Date(entryAt(e))));
+  const dayBreak = (i: number): boolean => i === 0 || days[i] !== days[i - 1];
+  /** The previous message, while nothing stands between it and the message at `i`. */
+  const prevMsg = (i: number): ChatMessage | null => {
+    const before = entries[i - 1];
+    return before?.kind === 'msg' && !dayBreak(i) && i !== newAt ? before.msg : null;
+  };
+  const joins = (i: number, msg: ChatMessage): boolean => {
+    const prev = prevMsg(i);
+    return (
       prev !== null &&
-      authorKey(prev.msg) === authorKey(msg) &&
-      time.getTime() - Date.parse(prev.msg.at) <= GROUP_WINDOW_MS;
-    if (prev !== null && joins) prev.tail = false;
-    const visChanged = prev !== null && (prev.msg.visibility ?? null) !== (msg.visibility ?? null);
-    const item: MsgItem = {
+      authorKey(prev) === authorKey(msg) &&
+      new Date(msg.at).getTime() - Date.parse(prev.at) <= GROUP_WINDOW_MS
+    );
+  };
+  const msgItem = (i: number, msg: ChatMessage): MsgItem => {
+    const prev = prevMsg(i);
+    const joined = joins(i, msg);
+    const next = entries[i + 1];
+    const visChanged = prev !== null && (prev.visibility ?? null) !== (msg.visibility ?? null);
+    return {
       kind: 'msg',
       key: `msg-${msg.id}`,
       msg,
       name: msg.own ? null : opts.name(msg),
-      head: !joins,
-      tail: true,
+      head: !joined,
+      tail: !(next?.kind === 'msg' && joins(i + 1, next.msg)),
       mark: opts.marked ? (msg.visibility ?? null) : null,
-      markLabel: !joins || visChanged,
+      markLabel: !joined || visChanged,
     };
-    items.push(item);
-    prev = item;
-  }
-  return items;
+  };
+  const row = (entry: Entry, i: number): ChatItem =>
+    entry.kind === 'event'
+      ? { kind: 'event', key: `ev-${entry.event.id}`, text: entry.event.text, at: entry.event.at }
+      : msgItem(i, entry.msg);
+  const dayRow = (entry: Entry, i: number): ChatItem => ({
+    kind: 'day',
+    key: `day-${days[i]}`,
+    label: opts.dayLabel(new Date(entryAt(entry))),
+  });
+  return entries.flatMap((entry, i): readonly ChatItem[] => [
+    ...(dayBreak(i) ? [dayRow(entry, i)] : []),
+    ...(i === newAt ? [{ kind: 'new' as const, key: 'new', count }] : []),
+    row(entry, i),
+  ]);
 }

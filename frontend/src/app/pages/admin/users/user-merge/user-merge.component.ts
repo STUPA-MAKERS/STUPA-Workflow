@@ -71,8 +71,8 @@ function isMergeErrorCode(code: string | undefined): code is MergeErrorCode {
 
 /** The problem body of a 409 `merge_conflict`. */
 interface ConflictProblem {
-  code?: string;
-  errors?: { field: string; msg: string }[] | null;
+  readonly code?: string;
+  readonly errors?: readonly { readonly field: string; readonly msg: string }[] | null;
 }
 
 /**
@@ -130,9 +130,7 @@ export class UserMergeComponent {
     run: (q) => this.api.listPrincipals(q),
     result: (list) => {
       const own = this.source()?.id;
-      this.candidates.set(
-        list.filter((p) => p.id !== own && !p.mergedIntoId).slice(0, PICK_LIMIT),
-      );
+      this.candidates.set(list.filter((p) => p.id !== own && !p.mergedIntoId).slice(0, PICK_LIMIT));
       this.searched.set(true);
     },
     error: () => {
@@ -155,7 +153,9 @@ export class UserMergeComponent {
   /** The areas with at least one row, in the order of the server. */
   protected readonly previewAreas = computed(() => withRows(this.preview()?.areas ?? []));
   protected readonly resultAreas = computed(() => withRows(this.result()?.areas ?? []));
-  protected readonly conflicts = computed<MergeConflict[]>(() => this.preview()?.conflicts ?? []);
+  protected readonly conflicts = computed<readonly MergeConflict[]>(
+    () => this.preview()?.conflicts ?? [],
+  );
   protected readonly canMerge = computed(
     () => !!this.preview()?.canMerge && this.understood() && !this.merging(),
   );
@@ -214,11 +214,15 @@ export class UserMergeComponent {
 
   /** "12 übertragen · 2 zusammengefasst": only the non-zero counts, one separator between. */
   protected counts(a: MergeAreaCount): string {
-    const parts: string[] = [];
-    if (a.rewritten) parts.push(this.i18n.translate('admin.users.merge.count.rewritten', { n: a.rewritten }));
-    if (a.combined) parts.push(this.i18n.translate('admin.users.merge.count.combined', { n: a.combined }));
-    if (a.removed) parts.push(this.i18n.translate('admin.users.merge.count.removed', { n: a.removed }));
-    return parts.join(' · ');
+    const counts = [
+      ['admin.users.merge.count.rewritten', a.rewritten],
+      ['admin.users.merge.count.combined', a.combined],
+      ['admin.users.merge.count.removed', a.removed],
+    ] as const;
+    return counts
+      .filter(([, n]) => n)
+      .map(([key, n]) => this.i18n.translate(key, { n }))
+      .join(' · ');
   }
 
   protected pick(target: AdminPrincipal): void {
@@ -314,6 +318,6 @@ export class UserMergeComponent {
   }
 }
 
-function withRows(areas: readonly MergeAreaCount[]): MergeAreaCount[] {
+function withRows(areas: readonly MergeAreaCount[]): readonly MergeAreaCount[] {
   return areas.filter((a) => a.rewritten || a.combined || a.removed);
 }

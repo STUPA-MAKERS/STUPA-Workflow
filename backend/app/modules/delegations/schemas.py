@@ -10,16 +10,12 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from app.shared.schemas import FrozenCamelModel
 
 
-class _CamelModel(BaseModel):
-    """Base model with camelCase JSON aliases and populate-by-name."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class DelegationCreate(_CamelModel):
+class DelegationCreate(FrozenCamelModel, frozen=True):
     """Delegation for one meeting.
 
     `delegateId` gets access to the meeting `meetingId`. With `delegateVoting`
@@ -38,7 +34,7 @@ class DelegationCreate(_CamelModel):
     delegator_id: UUID | None = Field(default=None, alias="delegatorId")
 
 
-class DelegationOut(_CamelModel):
+class DelegationOut(FrozenCamelModel, frozen=True):
     """Delegation view with resolved display names."""
 
     id: UUID
@@ -60,7 +56,7 @@ class DelegationOut(_CamelModel):
     direction: str | None = None
 
 
-class SubstituteCreate(_CamelModel):
+class SubstituteCreate(FrozenCamelModel, frozen=True):
     """Pool entry that lets a substitute represent a member.
 
     `substituteId` may represent `memberId` in the gremium with no lead-time
@@ -72,7 +68,7 @@ class SubstituteCreate(_CamelModel):
     substitute_id: UUID = Field(alias="substituteId")
 
 
-class SubstituteOut(_CamelModel):
+class SubstituteOut(FrozenCamelModel, frozen=True):
     """A substitute pool entry, with the member name for a member-bound entry."""
 
     id: UUID
@@ -83,7 +79,7 @@ class SubstituteOut(_CamelModel):
     substitute_name: str | None = Field(default=None, serialization_alias="substituteName")
 
 
-class RecipientOut(_CamelModel):
+class RecipientOut(FrozenCamelModel, frozen=True):
     """Delegation recipient that the typeahead can offer."""
 
     principal_id: UUID = Field(serialization_alias="principalId")
@@ -94,7 +90,7 @@ class RecipientOut(_CamelModel):
     is_member: bool = Field(serialization_alias="isMember")
 
 
-class MeetingDelegationContext(_CamelModel):
+class MeetingDelegationContext(FrozenCamelModel, frozen=True):
     """Data that the frontend needs for the set-up-delegation dialog."""
 
     meeting_id: UUID = Field(serialization_alias="meetingId")
@@ -118,7 +114,7 @@ class MeetingDelegationContext(_CamelModel):
     recipients: list[RecipientOut] = Field(default_factory=list)
 
 
-class VoteDelegationStatus(_CamelModel):
+class VoteDelegationStatus(FrozenCamelModel, frozen=True):
     """Delegation view of one vote for the caller, shown in the vote-cast banner."""
 
     #: The own vote for this ballot is delegated away. A cast would return 403.

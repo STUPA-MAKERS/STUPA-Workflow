@@ -148,8 +148,7 @@ export class HelpTicketsComponent {
 
   protected readonly monthOptions = computed<FilterSelectOption[]>(() => {
     const current = this.draft().retentionMonths;
-    const values = new Set(RETENTION_CHOICES);
-    if (current !== null) values.add(current);
+    const values = new Set([...RETENTION_CHOICES, ...(current !== null ? [current] : [])]);
     return [...values]
       .sort((a, b) => a - b)
       .map((n) => ({ value: String(n), label: this.monthsText(n) }));

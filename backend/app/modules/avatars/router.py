@@ -64,11 +64,11 @@ SizeQuery = Annotated[
 
 def get_avatar_cache(request: Request, settings: SettingsDep) -> AvatarCache:
     """Build the Redis avatar cache once per app and keep it on ``app.state``."""
-    state = request.app.state
-    cache = getattr(state, "_avatar_cache", None)
-    if cache is None:
-        cache = RedisAvatarCache(_redis_client(request, settings))
-        state._avatar_cache = cache
+    existing: AvatarCache | None = getattr(request.app.state, "_avatar_cache", None)
+    if existing is not None:
+        return existing
+    cache = RedisAvatarCache(_redis_client(request, settings))
+    request.app.state._avatar_cache = cache
     return cache
 
 

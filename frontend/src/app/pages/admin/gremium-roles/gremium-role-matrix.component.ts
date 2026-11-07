@@ -192,10 +192,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
     const on = box.checked;
     if (!this.canEdit() || this.busy().has(r.id)) return;
     const before = [...(r.permissions ?? [])];
-    const set = new Set(before);
-    if (on) set.add(p);
-    else set.delete(p);
-    const permissions = GREMIUM_PERMISSIONS.filter((x) => set.has(x));
+    const permissions = GREMIUM_PERMISSIONS.filter((x) => (x === p ? on : before.includes(x)));
     this.replace({ ...r, permissions });
     this.busy.update((b) => new Set(b).add(r.id));
     this.api.updateGremiumRole(r.id, { permissions }).subscribe({
@@ -213,11 +210,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
   }
 
   private done(id: string): void {
-    this.busy.update((b) => {
-      const next = new Set(b);
-      next.delete(id);
-      return next;
-    });
+    this.busy.update((b) => new Set([...b].filter((x) => x !== id)));
   }
 
   private replace(role: GremiumRole): void {

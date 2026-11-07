@@ -85,16 +85,16 @@ async def mentionable_people(session: AsyncSession, application_id: UUID) -> lis
     The caller checked that the application exists and that it reads the internal
     comments.
     """
-    rows: list[Row] = []
-    rows += await permission_holders(session, READ_PERMISSION)
-    rows += await permission_holders(session, READ_ALL_PERMISSION)
-    rows += await _committee_members(session, await committee_gremium_ids(session, application_id))
-    rows += await _creator_as_member(session, application_id)
-    people: dict[UUID, PersonRef] = {}
-    for pid, name, email in rows:
-        ref = person_of(pid, name, email)
-        if ref.principal_id is not None:
-            people[pid] = ref
+    readers = await permission_holders(session, READ_PERMISSION)
+    all_readers = await permission_holders(session, READ_ALL_PERMISSION)
+    gremien = await committee_gremium_ids(session, application_id)
+    members = await _committee_members(session, gremien)
+    creator = await _creator_as_member(session, application_id)
+    refs = (
+        (pid, person_of(pid, name, email))
+        for pid, name, email in (*readers, *all_readers, *members, *creator)
+    )
+    people = {pid: ref for pid, ref in refs if ref.principal_id is not None}
     return sorted(
         people.values(),
         key=lambda p: ((p.display_name or "").casefold(), str(p.principal_id)),

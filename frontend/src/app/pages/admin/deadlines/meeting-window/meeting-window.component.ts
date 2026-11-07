@@ -13,8 +13,8 @@ type Body = Pick<MeetingSettings, 'openLeadMinutes' | 'confirmLeadMinutes'>;
 
 /** The edit state. The fields hold the text of the inputs, so a bad entry stays visible. */
 interface Draft {
-  open: string;
-  confirm: string;
+  readonly open: string;
+  readonly confirm: string;
 }
 
 /** A whole number in [0, MAX_LEAD_MINUTES], else `null`. */
