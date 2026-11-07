@@ -71,7 +71,7 @@ export class PollEditorComponent {
   readonly newEnd = signal('');
   private nextKey = 1;
 
-  readonly modeOptions = computed<SegmentedOption[]>(() =>
+  readonly modeOptions = computed<readonly SegmentedOption[]>(() =>
     MODES.map((v) => ({ value: v, label: this.i18n.translate(`poll.mode.${v}`) })),
   );
   readonly mode = computed(() => this.draft().mode);
@@ -112,14 +112,14 @@ export class PollEditorComponent {
   addLabel(): void {
     if (!this.canAddLabel()) return;
     const label = this.newLabel().trim().slice(0, POLL_LABEL_MAX);
-    this.append({ key: this.nextKey++, label, date: '', start: '', end: '' });
+    this.append({ key: this.takeKey(), label, date: '', start: '', end: '' });
     this.newLabel.set('');
   }
 
   addDate(): void {
     if (!this.canAddDate()) return;
     this.append({
-      key: this.nextKey++,
+      key: this.takeKey(),
       label: '',
       date: this.newDate(),
       start: this.newStart(),
@@ -144,12 +144,19 @@ export class PollEditorComponent {
     return this.isDate() ? draftDateLabel(o, this.i18n.formatLocale()) : o.label;
   }
 
+  /** The next local key of a new row. */
+  private takeKey(): number {
+    const key = this.nextKey;
+    this.nextKey = key + 1;
+    return key;
+  }
+
   private append(option: PollOptionDraft): void {
     this.replace([...this.options(), option]);
   }
 
   /** Replace the options of the current mode; the other mode keeps its options. */
-  private replace(list: PollOptionDraft[]): void {
+  private replace(list: readonly PollOptionDraft[]): void {
     this.draft.update((d) => {
       const others = d.options.filter((o) => !draftOptions({ ...d, options: [o] }).length);
       return { ...d, options: [...others, ...list] };

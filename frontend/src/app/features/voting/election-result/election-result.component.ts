@@ -97,7 +97,7 @@ export class ElectionResultComponent {
   private readonly t = (key: TranslationKey, params?: Record<string, string | number>) =>
     this.i18n.translate(key, params);
 
-  protected readonly bars = computed<ElectionBar[]>(() =>
+  protected readonly bars = computed<readonly ElectionBar[]>(() =>
     electionBars(this.election(), this.electionResult(), this.counts(), this.t),
   );
   /** All votes and abstentions: the base of the bars. */
@@ -158,9 +158,14 @@ export class ElectionResultComponent {
   /** Ja and an elected candidate in the accent, Nein in the error colour, the
    *  abstentions grey, every other candidate in the second tone. */
   protected tone(bar: ElectionBar): SegTone {
-    if (bar.id === 'abstain') return 'muted';
-    if (bar.id === 'no') return 'error';
-    return bar.id === 'yes' || bar.elected ? 'filled' : 'second';
+    switch (bar.id) {
+      case 'abstain':
+        return 'muted';
+      case 'no':
+        return 'error';
+      default:
+        return bar.id === 'yes' || bar.elected ? 'filled' : 'second';
+    }
   }
 
   protected pct(bar: ElectionBar): number {

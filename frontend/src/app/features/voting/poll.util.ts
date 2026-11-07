@@ -50,7 +50,7 @@ export function pollAsElection(poll: PollConfig): ElectionConfig {
 
 /** The time zone of the meetings. A date option shows in it, as the protocol writes it. */
 export const POLL_TZ = 'Europe/Berlin';
-const WEEKDAYS_DE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const WEEKDAYS_DE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'] as const;
 
 /** The parts of an instant in the time zone of the meetings. */
 function berlinParts(iso: IsoDateTime): Record<string, string> {
@@ -84,12 +84,9 @@ export function dateOptionLabel(
   const weekday = locale.startsWith('de')
     ? (WEEKDAYS_DE[index] ?? '')
     : new Intl.DateTimeFormat(locale, { timeZone: POLL_TZ, weekday: 'short' }).format(new Date(start));
-  let text = `${weekday}, ${Number(s['day'])}.${Number(s['month'])}. · ${s['hour']}:${s['minute']}`;
-  if (end) {
-    const e = berlinParts(end);
-    text += `–${e['hour']}:${e['minute']}`;
-  }
-  return text;
+  const head = `${weekday}, ${Number(s['day'])}.${Number(s['month'])}. · ${s['hour']}:${s['minute']}`;
+  const e = end ? berlinParts(end) : null;
+  return e ? `${head}–${e['hour']}:${e['minute']}` : head;
 }
 
 /** The label of a poll option: its text, or its date. */
@@ -106,13 +103,19 @@ export function pollLabelOf(poll: PollConfig | null, id: string, locale: string)
 
 /** "Umfrage · Einzelwahl", "Umfrage · Mehrfachwahl, höchstens 2", "Terminumfrage". */
 export function pollCaption(poll: PollConfig, t: Translate): string {
-  if (poll.mode === 'date') return t('poll.mode.date');
-  if (poll.mode === 'single') return t('poll.caption', { mode: t('poll.mode.single') });
-  const mode =
-    poll.maxChoices != null
-      ? t('poll.mode.multiMax', { n: poll.maxChoices })
-      : t('poll.mode.multi');
-  return t('poll.caption', { mode });
+  switch (poll.mode) {
+    case 'date':
+      return t('poll.mode.date');
+    case 'single':
+      return t('poll.caption', { mode: t('poll.mode.single') });
+    case 'multi':
+      return t('poll.caption', {
+        mode:
+          poll.maxChoices != null
+            ? t('poll.mode.multiMax', { n: poll.maxChoices })
+            : t('poll.mode.multi'),
+      });
+  }
 }
 
 /** The label of a single or multi poll ballot: "A, B", or "Enthaltung". */
@@ -142,21 +145,26 @@ export function answersComplete(
 
 /** The status of a poll in a list or a card: "Umfrage offen", "Umfrage beendet". */
 export function pollStatus(status: VoteStatus | string): StatusView | null {
-  if (status === 'open') return { kind: 'accent', key: 'poll.status.open' };
-  if (status === 'closed') return { kind: 'accent', key: 'poll.status.closed' };
-  return null;
+  switch (status) {
+    case 'open':
+      return { kind: 'accent', key: 'poll.status.open' };
+    case 'closed':
+      return { kind: 'accent', key: 'poll.status.closed' };
+    default:
+      return null;
+  }
 }
 
 /** One row of a poll result. */
 export interface PollBar {
-  id: string;
-  label: string;
+  readonly id: string;
+  readonly label: string;
   /** The votes; a date poll: the Ja answers. */
-  count: number;
+  readonly count: number;
   /** A date poll: the Vielleicht answers. `null` otherwise. */
-  maybe: number | null;
+  readonly maybe: number | null;
   /** One of the options with the most votes (several on a tie). */
-  top: boolean;
+  readonly top: boolean;
 }
 
 /**
@@ -170,16 +178,13 @@ export function pollBars(
   counts: Readonly<Record<string, number>>,
   locale: string,
   t: Translate,
-): PollBar[] {
+): readonly PollBar[] {
   const date = poll.mode === 'date';
   const ids = poll.options.map((o) => o.id);
   const source = result?.counts ?? counts;
-  let order = (result?.order ?? []).filter((id) => ids.includes(id));
-  if (order.length !== ids.length) {
-    order = [...ids].sort((a, b) => (source[b] ?? 0) - (source[a] ?? 0));
-  }
+  const order = pollOrder(ids, result?.order ?? [], source);
   const top = new Set(result?.top ?? topOf(order, source));
-  const rows: PollBar[] = order.map((id) => ({
+  const rows: readonly PollBar[] = order.map((id) => ({
     id,
     label: pollLabelOf(poll, id, locale),
     count: source[id] ?? 0,
@@ -194,8 +199,26 @@ export function pollBars(
   ];
 }
 
+/**
+ * The order of the rows: the stored order when it names every option, else the options
+ * ranked by votes.
+ */
+function pollOrder(
+  ids: readonly string[],
+  stored: readonly string[],
+  source: Readonly<Record<string, number>>,
+): readonly string[] {
+  const order = stored.filter((id) => ids.includes(id));
+  return order.length === ids.length
+    ? order
+    : [...ids].sort((a, b) => (source[b] ?? 0) - (source[a] ?? 0));
+}
+
 /** The options with the most votes, none while no option has a vote. */
-function topOf(order: readonly string[], counts: Readonly<Record<string, number>>): string[] {
+function topOf(
+  order: readonly string[],
+  counts: Readonly<Record<string, number>>,
+): readonly string[] {
   const most = Math.max(0, ...order.map((id) => counts[id] ?? 0));
   return most > 0 ? order.filter((id) => (counts[id] ?? 0) === most) : [];
 }
@@ -203,20 +226,20 @@ function topOf(order: readonly string[], counts: Readonly<Record<string, number>
 /** One option in the editor: a text, or a date with a start and an optional end. */
 export interface PollOptionDraft {
   /** A local key for the list; the server gives the ids. */
-  key: number;
-  label: string;
+  readonly key: number;
+  readonly label: string;
   /** `YYYY-MM-DD`, `HH:MM`, `HH:MM` or `''` (date mode). */
-  date: string;
-  start: string;
-  end: string;
+  readonly date: string;
+  readonly start: string;
+  readonly end: string;
 }
 
 /** The poll as the editor holds it. */
 export interface PollDraft {
-  mode: PollMode;
+  readonly mode: PollMode;
   /** The stepper "Höchstens wählbar" of a multi poll. */
-  maxChoices: number;
-  options: PollOptionDraft[];
+  readonly maxChoices: number;
+  readonly options: readonly PollOptionDraft[];
 }
 
 export function emptyPollDraft(): PollDraft {
@@ -257,7 +280,7 @@ export function localMoment(date: string, time: string): IsoDateTime | null {
 }
 
 /** The options of the current mode: the texts, or the dates. */
-export function draftOptions(draft: PollDraft): PollOptionDraft[] {
+export function draftOptions(draft: PollDraft): readonly PollOptionDraft[] {
   const date = draft.mode === 'date';
   return draft.options.filter((o) => (date ? !!o.date && !!o.start : !!o.label.trim()));
 }
