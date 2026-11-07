@@ -8,7 +8,6 @@
   "frontend/src/app/pages/admin/branding/branding-editor.component.ts": 15,
   "frontend/src/app/pages/admin/cd-variants/cd-variants.component.ts": 2,
   "frontend/src/app/pages/admin/cd-variants/cd-variants.util.ts": 3,
-  "frontend/src/app/pages/admin/config/webhooks.component.ts": 4,
   "frontend/src/app/pages/admin/deadlines/deadlines.component.ts": 1,
   "frontend/src/app/pages/admin/delegations/substitute-pool.component.ts": 1,
   "frontend/src/app/pages/admin/flow-editor/flow-canvas-interaction.ts": 2,
