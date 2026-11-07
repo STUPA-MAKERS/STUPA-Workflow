@@ -2,7 +2,7 @@
 id: "000531"
 title: The page head stays in view under an open sheet
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-07
 tests:
