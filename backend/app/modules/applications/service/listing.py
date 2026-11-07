@@ -8,13 +8,25 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import ARRAY, ColumnElement, Text, and_, case, cast, false, func, or_, select
+from sqlalchemy import (
+    ARRAY,
+    ColumnElement,
+    Subquery,
+    Text,
+    and_,
+    case,
+    cast,
+    false,
+    func,
+    or_,
+    select,
+)
 from sqlalchemy.dialects.postgresql import JSONB, array
 from sqlalchemy.orm import InstrumentedAttribute
 
 from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Application
-from app.modules.applications.schemas import ApplicationListItem
+from app.modules.applications.schemas import ApplicationListItem, StateOut
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
     _title_of,
@@ -95,64 +107,44 @@ class ListingOps(ApplicationsServiceBase):
         relevant row first, and the chosen sort acts as a deterministic tiebreak. `created_to`
         is inclusive, so the filter ends at 00:00 UTC of the next day.
         """
-        filters: list[ColumnElement[bool]] = [Application.email_confirmed_at.is_not(None)]
         read_scope = await self._read_scope(owner_sub=owner_sub, committee_sub=committee_sub)
-        if read_scope is not None:
-            filters.append(read_scope)
-        if archived is False:
-            filters.append(Application.archived_at.is_(None))
-        elif archived is True:
-            filters.append(Application.archived_at.is_not(None))
-        if state_ids:
-            filters.append(Application.current_state_id.in_(set(state_ids)))
-        if gremium_id is not None:
-            filters.append(Application.gremium_id == gremium_id)
-        if type_id is not None:
-            filters.append(Application.type_id == type_id)
-        if budget_id is not None:
-            node_path = await self.session.scalar(
-                select(Budget.path_key).where(Budget.id == budget_id)
-            )
-            if node_path is None:
-                filters.append(false())
-            else:
-                descendants = select(Budget.id).where(
-                    or_(
-                        Budget.path_key == node_path,
-                        Budget.path_key.like(f"{node_path}-%"),
-                    )
-                )
-                filters.append(Application.budget_id.in_(descendants))
-        rank_expr: ColumnElement[Any] | None = None
-        if q and q.strip():
-            dialect = dialect_of(self.session)
-            search_col = self._search_text(
-                dialect,
-                hidden_keys=await self._all_pii_keys() if hide_pii_in_search else set(),
-                owner_sub=owner_sub,
-            )
-            where, rank_expr = trigram_rank(q, [search_col], dialect=dialect)
-            filters.append(where)
-        if amount_min is not None:
-            filters.append(Application.amount >= amount_min)
-        if amount_max is not None:
-            filters.append(Application.amount <= amount_max)
-        if created_from is not None:
-            filters.append(Application.created_at >= datetime.combine(created_from, time.min, UTC))
-        if created_to is not None:
-            end = datetime.combine(created_to + timedelta(days=1), time.min, UTC)
-            filters.append(Application.created_at < end)
+        budget_scope = await self._budget_scope(budget_id) if budget_id is not None else None
+        search = (
+            await self._search_filter(q, hide_pii_in_search=hide_pii_in_search, owner_sub=owner_sub)
+            if q and q.strip()
+            else None
+        )
+        optional = (
+            read_scope,
+            _archived_filter(archived),
+            Application.current_state_id.in_(set(state_ids)) if state_ids else None,
+            Application.gremium_id == gremium_id if gremium_id is not None else None,
+            Application.type_id == type_id if type_id is not None else None,
+            budget_scope,
+            search[0] if search is not None else None,
+            Application.amount >= amount_min if amount_min is not None else None,
+            Application.amount <= amount_max if amount_max is not None else None,
+            (
+                Application.created_at >= datetime.combine(created_from, time.min, UTC)
+                if created_from is not None
+                else None
+            ),
+            (
+                Application.created_at
+                < datetime.combine(created_to + timedelta(days=1), time.min, UTC)
+                if created_to is not None
+                else None
+            ),
+        )
+        filters = [
+            Application.email_confirmed_at.is_not(None),
+            *(clause for clause in optional if clause is not None),
+        ]
 
         since_sq = state_since_subquery()
-        sort_col: ColumnElement[Any] | InstrumentedAttribute[Any]
-        if sort == "amount":
-            sort_col = Application.amount
-        elif sort == "stateSince":
-            sort_col = func.coalesce(since_sq.c.since, Application.created_at)
-        else:
-            sort_col = Application.created_at
+        sort_col = _sort_column(sort, since_sq)
         ordering = (sort_col.asc() if order == "asc" else sort_col.desc()).nulls_last()
-        order_by = (rank_expr.desc(), ordering) if rank_expr is not None else (ordering,)
+        order_by = (search[1].desc(), ordering) if search is not None else (ordering,)
 
         total = await self.session.scalar(
             select(func.count()).select_from(Application).where(*filters)
@@ -167,26 +159,43 @@ class ListingOps(ApplicationsServiceBase):
                 .offset(offset)
             )
         ).all()
-        items: list[ApplicationListItem] = []
-        for app, since in rows:
-            state = await self._get_state(app.current_state_id)
-            items.append(
-                ApplicationListItem(
-                    id=app.id,
-                    typeId=app.type_id,
-                    title=_title_of(app.data),
-                    state=await self._state_out_resolved(state),
-                    gremiumId=app.gremium_id,
-                    amount=app.amount,
-                    approvedAmount=app.approved_amount,
-                    currency=app.currency,
-                    createdAt=app.created_at,
-                    updatedAt=app.updated_at,
-                    archivedAt=app.archived_at,
-                    stateSince=since or app.created_at,
-                )
+        items = [
+            _list_item(
+                app,
+                await self._state_out_resolved(await self._get_state(app.current_state_id)),
+                since or app.created_at,
+                archived_at=app.archived_at,
             )
+            for app, since in rows
+        ]
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
+
+    async def _budget_scope(self, budget_id: UUID) -> ColumnElement[bool]:
+        """Keep the applications in the subtree of a cost center, or none for an unknown one."""
+        node_path = await self.session.scalar(
+            select(Budget.path_key).where(Budget.id == budget_id)
+        )
+        if node_path is None:
+            return false()
+        descendants = select(Budget.id).where(
+            or_(
+                Budget.path_key == node_path,
+                Budget.path_key.like(f"{node_path}-%"),
+            )
+        )
+        return Application.budget_id.in_(descendants)
+
+    async def _search_filter(
+        self, q: str, *, hide_pii_in_search: bool, owner_sub: str | None
+    ) -> tuple[ColumnElement[bool], ColumnElement[Any]]:
+        """Build the fuzzy search of the list: the where clause and the rank expression."""
+        dialect = dialect_of(self.session)
+        search_col = self._search_text(
+            dialect,
+            hidden_keys=await self._all_pii_keys() if hide_pii_in_search else set(),
+            owner_sub=owner_sub,
+        )
+        return trigram_rank(q, [search_col], dialect=dialect)
 
     async def _read_scope(
         self, *, owner_sub: str | None, committee_sub: str | None
@@ -197,11 +206,11 @@ class ListingOps(ApplicationsServiceBase):
         (`committee_sub`, see `_committee_read_clauses`). None means no limit: the
         full view of `application.read`, `application.read_all` and admin.
         """
-        clauses: list[ColumnElement[bool]] = []
-        if owner_sub is not None:
-            clauses.append(Application.created_by == owner_sub)
-        if committee_sub is not None:
-            clauses.extend(await self._committee_read_clauses(committee_sub))
+        owner = (Application.created_by == owner_sub,) if owner_sub is not None else ()
+        committee = (
+            await self._committee_read_clauses(committee_sub) if committee_sub is not None else []
+        )
+        clauses = (*owner, *committee)
         return or_(*clauses) if clauses else None
 
     async def read_scope_for(self, principal: Principal) -> ColumnElement[bool] | None:
@@ -246,23 +255,14 @@ class ListingOps(ApplicationsServiceBase):
         creator reads the own PII. The projection cannot use the trigram index;
         the read scope of such a caller is small.
         """
-        full: ColumnElement[Any]
-        projected: ColumnElement[Any]
+        postgres = dialect == "postgresql"
         keys = sorted(hidden_keys)
-        if dialect == "postgresql":
-            full = func.app_search_text(Application.data)
-            if not keys:
-                return full
-            stripped = Application.data.op("-", return_type=JSONB)(
-                cast(array(keys, type_=Text), ARRAY(Text))
-            )
-            projected = func.app_search_text(stripped)
-        else:
-            full = cast(Application.data, Text)
-            if not keys:
-                return full
-            paths = ['$."' + k.replace('"', '\\"') + '"' for k in keys]
-            projected = cast(func.json_remove(Application.data, *paths), Text)
+        full: ColumnElement[Any] = (
+            func.app_search_text(Application.data) if postgres else cast(Application.data, Text)
+        )
+        if not keys:
+            return full
+        projected = _postgres_projection(keys) if postgres else _sqlite_projection(keys)
         if owner_sub is None:
             return projected
         return case((Application.created_by == owner_sub, full), else_=projected)
@@ -297,25 +297,12 @@ class ListingOps(ApplicationsServiceBase):
         member_ids = await gremium_reader_ids(self.session, sub)
         if not member_ids:
             return []
-        clauses: list[ColumnElement[bool]] = []
-
         root_paths = (
             await self.session.scalars(
                 select(Budget.path_key).where(Budget.view_gremium_id.in_(member_ids))
             )
         ).all()
-        if root_paths:
-            scoped = select(Budget.id).where(
-                or_(
-                    *[
-                        or_(Budget.path_key == rp, Budget.path_key.like(f"{rp}-%"))
-                        for rp in root_paths
-                    ]
-                )
-            )
-            clauses.append(Application.budget_id.in_(scoped))
-
-        clauses.append(Application.vote_gremium_id.in_(member_ids))
+        budget_scope = (_view_subtrees(root_paths),) if root_paths else ()
 
         from app.modules.livevote.models import Meeting
         from app.modules.voting.models import Vote
@@ -325,9 +312,11 @@ class ListingOps(ApplicationsServiceBase):
             .join(Meeting, Meeting.id == Vote.meeting_id)
             .where(Vote.application_id.is_not(None), Meeting.gremium_id.in_(member_ids))
         )
-        clauses.append(Application.id.in_(voted_app_ids))
-
-        return clauses
+        return [
+            *budget_scope,
+            Application.vote_gremium_id.in_(member_ids),
+            Application.id.in_(voted_app_ids),
+        ]
 
     async def name_maps(self, locale: str = "de") -> tuple[dict[UUID, str], dict[UUID, str]]:
         """Return `(type_names, gremium_names)` for the application xlsx export."""
@@ -382,34 +371,21 @@ class ListingOps(ApplicationsServiceBase):
             )
         ).all()
 
-        items: list[ApplicationListItem] = []
-        for app, state in rows:
-            if not (
-                await self._casts_in_open_vote(app.id, principal, now)
-                or await self._fires_task_transition(
-                    flow, app, principal, can_transition=can_transition
-                )
-            ):
-                continue
-            items.append(
-                ApplicationListItem(
-                    id=app.id,
-                    typeId=app.type_id,
-                    title=_title_of(app.data),
-                    state=await self._state_out_resolved(state),
-                    gremiumId=app.gremium_id,
-                    amount=app.amount,
-                    approvedAmount=app.approved_amount,
-                    currency=app.currency,
-                    createdAt=app.created_at,
-                    updatedAt=app.updated_at,
-                    stateSince=app.created_at,
-                )
+        tasks = [
+            (app, await self._state_out_resolved(state))
+            for app, state in rows
+            if await self._casts_in_open_vote(app.id, principal, now)
+            or await self._fires_task_transition(
+                flow, app, principal, can_transition=can_transition
             )
-        since_by_app = await self._state_since_map(item.id for item in items)
-        for item in items:
-            item.state_since = since_by_app.get(item.id, item.state_since)
-        return items
+        ]
+        since_by_app = await self._state_since_map(app.id for app, _ in tasks)
+        return [
+            _list_item(
+                app, state_out, since_by_app.get(app.id, app.created_at), archived_at=None
+            )
+            for app, state_out in tasks
+        ]
 
     async def _task_filters(
         self, principal: Principal, *, can_transition: bool
@@ -425,19 +401,13 @@ class ListingOps(ApplicationsServiceBase):
         from app.modules.flow.models import Transition
         from app.modules.voting.models import Vote
 
-        filters: list[ColumnElement[bool]] = [
-            Application.current_state_id.is_not(None),
-            Application.email_confirmed_at.is_not(None),
-        ]
         read_scope = await self.read_scope_for(principal)
-        if read_scope is not None:
-            filters.append(read_scope)
         open_vote = (
             select(Vote.id)
             .where(Vote.application_id == Application.id, Vote.status == "open")
             .exists()
         )
-        action_exit: ColumnElement[bool] = (
+        manual_exit: ColumnElement[bool] = (
             select(Transition.id)
             .where(
                 Transition.flow_version_id == Application.flow_version_id,
@@ -448,10 +418,17 @@ class ListingOps(ApplicationsServiceBase):
             )
             .exists()
         )
-        if not can_transition:
-            action_exit = and_(action_exit, Application.created_by == principal.sub)
-        filters.append(or_(open_vote, action_exit))
-        return filters
+        action_exit = (
+            manual_exit
+            if can_transition
+            else and_(manual_exit, Application.created_by == principal.sub)
+        )
+        return [
+            Application.current_state_id.is_not(None),
+            Application.email_confirmed_at.is_not(None),
+            *((read_scope,) if read_scope is not None else ()),
+            or_(open_vote, action_exit),
+        ]
 
     async def _casts_in_open_vote(
         self, application_id: UUID, principal: Principal, now: datetime
@@ -488,8 +465,82 @@ class ListingOps(ApplicationsServiceBase):
             t.requires_action for t in await flow.available_transitions(app.id, principal)
         ):
             return True
-        if app.created_by is None or app.created_by != principal.sub:
-            return False
-        return any(
+        own = app.created_by is not None and app.created_by == principal.sub
+        return own and any(
             t.requires_action for t in await flow.available_applicant_transitions(app.id)
         )
+
+
+def _archived_filter(archived: bool | None) -> ColumnElement[bool] | None:
+    """Keep the working list (False), the archive (True) or both (None)."""
+    match archived:
+        case False:
+            return Application.archived_at.is_(None)
+        case True:
+            return Application.archived_at.is_not(None)
+        case None:
+            return None
+
+
+def _sort_column(
+    sort: str, since_sq: Subquery
+) -> ColumnElement[Any] | InstrumentedAttribute[Any]:
+    """Return the column of a list sort key; an unknown key sorts by the creation time."""
+    match sort:
+        case "amount":
+            return Application.amount
+        case "stateSince":
+            return func.coalesce(since_sq.c.since, Application.created_at)
+        case _:
+            return Application.created_at
+
+
+def _postgres_projection(keys: Sequence[str]) -> ColumnElement[Any]:
+    """Return the search text of `data` without the top-level ``keys`` (Postgres)."""
+    stripped = Application.data.op("-", return_type=JSONB)(
+        cast(array(keys, type_=Text), ARRAY(Text))
+    )
+    return func.app_search_text(stripped)
+
+
+def _sqlite_projection(keys: Sequence[str]) -> ColumnElement[Any]:
+    """Return the text of `data` without the top-level ``keys`` (SQLite of the unit stubs)."""
+    paths = ['$."' + k.replace('"', '\\"') + '"' for k in keys]
+    return cast(func.json_remove(Application.data, *paths), Text)
+
+
+def _view_subtrees(root_paths: Sequence[str]) -> ColumnElement[bool]:
+    """Keep the applications in the subtree of one of the view cost centers."""
+    scoped = select(Budget.id).where(
+        or_(
+            *[
+                or_(Budget.path_key == rp, Budget.path_key.like(f"{rp}-%"))
+                for rp in root_paths
+            ]
+        )
+    )
+    return Application.budget_id.in_(scoped)
+
+
+def _list_item(
+    app: Application,
+    state: StateOut | None,
+    since: datetime,
+    *,
+    archived_at: datetime | None,
+) -> ApplicationListItem:
+    """Build one row of the list or of the tasks."""
+    return ApplicationListItem(
+        id=app.id,
+        typeId=app.type_id,
+        title=_title_of(app.data),
+        state=state,
+        gremiumId=app.gremium_id,
+        amount=app.amount,
+        approvedAmount=app.approved_amount,
+        currency=app.currency,
+        createdAt=app.created_at,
+        updatedAt=app.updated_at,
+        archivedAt=archived_at,
+        stateSince=since,
+    )

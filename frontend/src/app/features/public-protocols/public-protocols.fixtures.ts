@@ -27,7 +27,7 @@ export function summaryFixture(over: Partial<PublicProtocolSummary> = {}): Publi
 
 /** One page of the list, for the specs. */
 export function pageFixture(
-  items: PublicProtocolSummary[],
+  items: readonly PublicProtocolSummary[],
   total = items.length,
   offset = 0,
 ): PublicProtocolPage {

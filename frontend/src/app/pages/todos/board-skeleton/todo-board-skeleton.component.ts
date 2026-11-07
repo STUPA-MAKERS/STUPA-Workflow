@@ -4,13 +4,13 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /** One placeholder tile: a label line or not, one or two title lines, a fact bar. */
 interface SkelTile {
-  label: string | null;
-  title: readonly string[];
-  fact: string;
+  readonly label: string | null;
+  readonly title: readonly string[];
+  readonly fact: string;
 }
 
 /** Placeholder columns. Four, as a new board has; the widths are fixed per place. More columns repeat them. */
-const COLUMNS: readonly { name: string; tiles: readonly SkelTile[] }[] = [
+const COLUMNS: readonly { readonly name: string; readonly tiles: readonly SkelTile[] }[] = [
   {
     name: '3.5rem',
     tiles: [
@@ -53,7 +53,7 @@ const PHONE_TILES: readonly SkelTile[] = [
 ];
 
 /** The phone list of "Meine To-Dos" and "Alle": three board sections of full-width tiles. */
-const SECTIONS: readonly { name: string; tiles: readonly SkelTile[] }[] = [
+const SECTIONS: readonly { readonly name: string; readonly tiles: readonly SkelTile[] }[] = [
   {
     name: '7rem',
     tiles: [
@@ -75,8 +75,16 @@ const SECTIONS: readonly { name: string; tiles: readonly SkelTile[] }[] = [
   },
 ];
 
+/** One placeholder row of the list: the widths of its title, link, label and due date. */
+interface SkelRow {
+  readonly title: string;
+  readonly link: string;
+  readonly label: string;
+  readonly due: string;
+}
+
 /** The list shows two groups of rows; the widths are fixed per place. */
-const LIST_GROUPS: readonly { name: string; rows: readonly { title: string; link: string; label: string; due: string }[] }[] = [
+const LIST_GROUPS: readonly { readonly name: string; readonly rows: readonly SkelRow[] }[] = [
   {
     name: '3.5rem',
     rows: [

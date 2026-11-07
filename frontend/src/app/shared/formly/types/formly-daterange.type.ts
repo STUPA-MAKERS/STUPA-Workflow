@@ -7,8 +7,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /** Value of the `daterange` form-definition field: two ISO date strings. */
 interface DateRange {
-  from?: string;
-  to?: string;
+  readonly from?: string;
+  readonly to?: string;
 }
 
 /**

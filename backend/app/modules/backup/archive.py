@@ -32,8 +32,9 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import shutil
 import tarfile
-from collections.abc import Generator, Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import IO
@@ -71,7 +72,7 @@ class ArchiveManifest:
     created_at: str | None = None
     object_count: int = 0
     bucket: str | None = None
-    extra: dict[str, str] = field(default_factory=dict)
+    extra: Mapping[str, str] = field(default_factory=dict)
 
     def to_json(self) -> bytes:
         """Serialize deterministically, so an unchanged archive hashes the same."""
@@ -82,7 +83,7 @@ class ArchiveManifest:
             "createdAt": self.created_at,
             "objectCount": self.object_count,
             "bucket": self.bucket,
-            "extra": self.extra,
+            "extra": dict(self.extra),
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
 
@@ -142,15 +143,21 @@ def identity_from_str(value: str) -> x25519.Identity:
     Raises:
         ArchiveError: The value holds no usable age x25519 identity.
     """
-    for line in value.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        try:
-            return x25519.Identity.from_str(stripped)
-        except Exception:
-            continue
-    raise ArchiveError("the age identity file holds no usable private key")
+    stripped = (line.strip() for line in value.splitlines())
+    candidates = (line for line in stripped if line and not line.startswith("#"))
+    parsed = (_parse_identity(line) for line in candidates)
+    identity = next((found for found in parsed if found is not None), None)
+    if identity is None:
+        raise ArchiveError("the age identity file holds no usable private key")
+    return identity
+
+
+def _parse_identity(line: str) -> x25519.Identity | None:
+    """Parse one line as an age x25519 identity, or return ``None`` when it is none."""
+    try:
+        return x25519.Identity.from_str(line)
+    except Exception:
+        return None
 
 
 def write_tar(
@@ -177,15 +184,14 @@ def write_tar(
     Returns:
         The number of objects written.
     """
-    count = 0
+    pairs = tuple(objects)
     with tarfile.open(fileobj=target, mode="w") as tar:
         _add_stream(tar, ARCHIVE_DUMP_NAME, dump, _size_of(dump))
-        for key, reader in objects:
+        for key, reader in pairs:
             _add_stream(tar, f"{ARCHIVE_OBJECT_PREFIX}{key}", reader, _size_of(reader))
-            count += 1
-        manifest.object_count = count
+        manifest.object_count = len(pairs)
         _add_bytes(tar, ARCHIVE_MANIFEST_NAME, manifest.to_json())
-    return count
+    return len(pairs)
 
 
 def _size_of(handle: IO[bytes]) -> int:
@@ -200,15 +206,12 @@ def _tar_info(name: str, size: int) -> tarfile.TarInfo:
     """Build a member header with a fixed mode and no owner or time metadata.
 
     Zeroing the owner and the mtime keeps identical content producing identical bytes,
-    which is what makes the archive checksum meaningful across hosts.
+    which is what makes the archive checksum meaningful across hosts. `TarInfo.replace` takes
+    every field but the size, so the size is the one write on the fresh header.
     """
     info = tarfile.TarInfo(name=name)
     info.size = size
-    info.mode = 0o600
-    info.uid = info.gid = 0
-    info.uname = info.gname = ""
-    info.mtime = 0
-    return info
+    return info.replace(mode=0o600, uid=0, gid=0, uname="", gname="", mtime=0, deep=False)
 
 
 def _add_stream(tar: tarfile.TarFile, name: str, reader: IO[bytes], size: int) -> None:
@@ -231,14 +234,10 @@ def encrypt_stream(
     """
     source.seek(0)
     encrypt_io(source, target, [recipient])
+    checksum = sha256_of(target)
+    size = target.seek(0, io.SEEK_END)
     target.seek(0)
-    digest = hashlib.sha256()
-    size = 0
-    while chunk := target.read(_CHUNK):
-        digest.update(chunk)
-        size += len(chunk)
-    target.seek(0)
-    return digest.hexdigest(), size
+    return checksum, size
 
 
 def decrypt_stream(source: IO[bytes], target: IO[bytes], identity: x25519.Identity) -> None:
@@ -293,12 +292,10 @@ def extract_dump(tar: tarfile.TarFile, target: IO[bytes]) -> int:
         ArchiveError: The tar carries no dump.
     """
     handle = _member_handle(tar, ARCHIVE_DUMP_NAME)
-    size = 0
-    while chunk := handle.read(_CHUNK):
-        target.write(chunk)
-        size += len(chunk)
+    start = target.tell()
+    shutil.copyfileobj(handle, target, _CHUNK)
     target.flush()
-    return size
+    return target.tell() - start
 
 
 def iter_objects(tar: tarfile.TarFile) -> Iterator[tuple[str, bytes]]:
@@ -323,9 +320,12 @@ def iter_objects(tar: tarfile.TarFile) -> Iterator[tuple[str, bytes]]:
 
 def _safe_object_key(key: str) -> bool:
     """Reject an empty, absolute or traversing object key."""
-    if not key or key.startswith("/") or "\\" in key:
-        return False
-    return ".." not in key.split("/")
+    return (
+        bool(key)
+        and not key.startswith("/")
+        and "\\" not in key
+        and ".." not in key.split("/")
+    )
 
 
 def _member_handle(tar: tarfile.TarFile, name: str) -> IO[bytes]:

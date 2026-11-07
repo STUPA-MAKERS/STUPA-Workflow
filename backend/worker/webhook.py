@@ -29,7 +29,7 @@ logger = logging.getLogger("app.webhooks")
 
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Load the settings into the worker context."""
-    ctx["settings"] = load_settings()
+    ctx.update(settings=load_settings())
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:

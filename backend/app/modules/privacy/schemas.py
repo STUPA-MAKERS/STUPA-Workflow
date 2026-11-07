@@ -6,17 +6,15 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from app.shared.schemas import FrozenCamelModel
 
 SubjectType = Literal["applicant", "principal"]
 ErasureStatus = Literal["open", "executed", "rejected"]
 
 
-class _CamelModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class ErasureRequestOut(_CamelModel):
+class ErasureRequestOut(FrozenCamelModel, frozen=True):
     """An erasure request."""
 
     id: UUID
@@ -32,31 +30,31 @@ class ErasureRequestOut(_CamelModel):
     reason: str | None = None
 
 
-class ErasureRejectBody(_CamelModel):
+class ErasureRejectBody(FrozenCamelModel, frozen=True):
     """Rejection reason. The notification to the subject shows it."""
 
     reason: str | None = None
 
 
-class PrivacySettingsOut(_CamelModel):
+class PrivacySettingsOut(FrozenCamelModel, frozen=True):
     """The privacy settings."""
 
     default_retention_months: int = Field(alias="defaultRetentionMonths")
 
 
-class PrivacySettingsUpdate(_CamelModel):
+class PrivacySettingsUpdate(FrozenCamelModel, frozen=True):
     """New privacy settings."""
 
     default_retention_months: int = Field(alias="defaultRetentionMonths", ge=1)
 
 
-class EmailErasureBody(_CamelModel):
+class EmailErasureBody(FrozenCamelModel, frozen=True):
     """The address whose applications and ticket reports go."""
 
     email: str = Field(min_length=1)
 
 
-class EmailErasureOut(_CamelModel):
+class EmailErasureOut(FrozenCamelModel, frozen=True):
     """What the erasure of an address anonymized.
 
     ``principalId`` names an account under the address. Its erasure is a separate

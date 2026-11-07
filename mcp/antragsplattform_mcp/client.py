@@ -12,6 +12,7 @@ an empty tool error, and the platform can have applied a write that got no answe
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -40,13 +41,13 @@ def _transport_error(method: str, path: str, exc: httpx.TransportError) -> ApiEr
     detail = str(exc).strip()
     kind = type(exc).__name__
     reason = f"{kind}: {detail}" if detail else kind
-    message = f"no answer from the platform for {method} {path} ({reason})."
-    if method.upper() != "GET":
-        message += (
-            " The platform can have applied the change."
-            " Read the current state before you repeat the call."
-        )
-    return ApiError(0, message)
+    hint = (
+        " The platform can have applied the change."
+        " Read the current state before you repeat the call."
+        if method.upper() != "GET"
+        else ""
+    )
+    return ApiError(0, f"no answer from the platform for {method} {path} ({reason}).{hint}")
 
 
 def _safe_path(path: str) -> str:
@@ -70,14 +71,24 @@ def _safe_path(path: str) -> str:
     if "?" in path or "#" in path or "\\" in path:
         raise ApiError(400, f"illegal character in API path segment: {path!r}")
     segments = path.split("/")
-    encoded: list[str] = []
-    for seg in segments:
-        if seg in {".", ".."}:
-            raise ApiError(400, f"path traversal is not allowed: {path!r}")
-        # Encode any stray "/", "%" or whitespace that an id may carry. Plain route
-        # names and UUIDs stay untouched.
-        encoded.append(quote(seg, safe=""))
-    return "/".join(encoded)
+    if any(seg in {".", ".."} for seg in segments):
+        raise ApiError(400, f"path traversal is not allowed: {path!r}")
+    # Encode any stray "/", "%" or whitespace that an id may carry. Plain route
+    # names and UUIDs stay untouched.
+    return "/".join(quote(seg, safe="") for seg in segments)
+
+
+def _problem_message(resp: httpx.Response) -> Any:
+    """Return the problem-detail message of an error response, or its raw text."""
+    with contextlib.suppress(Exception):
+        body = resp.json()
+        return body.get("detail") or body.get("title") or resp.text
+    return resp.text
+
+
+def _split_headers(kwargs: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Split the `headers` keyword argument of a request from the other keyword arguments."""
+    return kwargs.get("headers", {}), {k: v for k, v in kwargs.items() if k != "headers"}
 
 
 class ApiClient:
@@ -96,19 +107,28 @@ class ApiClient:
     async def request(
         self, method: str, path: str, **kwargs: Any
     ) -> Any:
-        path = _safe_path(path)
+        safe = _safe_path(path)
+        extra, rest = _split_headers(kwargs)
         token = await self._token()
-        headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
+        headers = {"Authorization": f"Bearer {token}", **extra}
         try:
-            resp = await self._client.request(method, path, headers=headers, **kwargs)
-            if resp.status_code == 401:
-                # The server rejected the token. Get a fresh credential and retry once.
-                token = await self._token(force_login=True)
-                headers["Authorization"] = f"Bearer {token}"
-                resp = await self._client.request(method, path, headers=headers, **kwargs)
+            first = await self._client.request(method, safe, headers=headers, **rest)
+            # The server rejected the token. Get a fresh credential and retry once.
+            resp = (
+                await self._client.request(
+                    method, safe, headers=await self._fresh_headers(headers), **rest
+                )
+                if first.status_code == 401
+                else first
+            )
         except httpx.TransportError as exc:
-            raise _transport_error(method, path, exc) from exc
+            raise _transport_error(method, safe, exc) from exc
         return self._unwrap(resp)
+
+    async def _fresh_headers(self, headers: dict[str, Any]) -> dict[str, Any]:
+        """Return the headers with the bearer token of a forced new login."""
+        token = await self._token(force_login=True)
+        return {**headers, "Authorization": f"Bearer {token}"}
 
     @asynccontextmanager
     async def stream(
@@ -120,18 +140,18 @@ class ApiClient:
         of 400 or more reads the (small) error body and raises `ApiError`, so the caller
         only ever iterates a successful body.
         """
-        path = _safe_path(path)
+        safe = _safe_path(path)
+        extra, rest = _split_headers(kwargs)
         token = await self._token()
-        headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
-        async with self._client.stream(method, path, headers=headers, **kwargs) as resp:
+        headers = {"Authorization": f"Bearer {token}", **extra}
+        async with self._client.stream(method, safe, headers=headers, **rest) as resp:
             if resp.status_code != 401:
                 await self._raise_for_status(resp)
                 yield resp
                 return
         # The server rejected the token. Get a fresh credential and retry once.
-        token = await self._token(force_login=True)
-        headers["Authorization"] = f"Bearer {token}"
-        async with self._client.stream(method, path, headers=headers, **kwargs) as resp:
+        fresh = await self._fresh_headers(headers)
+        async with self._client.stream(method, safe, headers=fresh, **rest) as resp:
             await self._raise_for_status(resp)
             yield resp
 
@@ -144,13 +164,7 @@ class ApiClient:
     @staticmethod
     def _unwrap(resp: httpx.Response) -> Any:
         if resp.status_code >= 400:
-            message = resp.text
-            try:
-                body = resp.json()
-                message = body.get("detail") or body.get("title") or message
-            except Exception:
-                pass
-            raise ApiError(resp.status_code, message)
+            raise ApiError(resp.status_code, _problem_message(resp))
         if resp.status_code == 204 or not resp.content:
             return {"status": "ok"}
         try:

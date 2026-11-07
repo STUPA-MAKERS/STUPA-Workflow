@@ -9,13 +9,15 @@ export const QR_QUIET_ZONE = 4;
  * moved by the quiet zone. The server computes the matrix (segno); the client only draws it.
  */
 export function qrPath(qr: QrMatrix): string {
-  const parts: string[] = [];
-  qr.rows.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) {
-      if (row[x] === '1') parts.push(`M${x + QR_QUIET_ZONE} ${y + QR_QUIET_ZONE}h1v1h-1z`);
-    }
-  });
-  return parts.join('');
+  return qr.rows
+    .flatMap((row, y) =>
+      row
+        .split('')
+        .flatMap((cell, x) =>
+          cell === '1' ? [`M${x + QR_QUIET_ZONE} ${y + QR_QUIET_ZONE}h1v1h-1z`] : [],
+        ),
+    )
+    .join('');
 }
 
 /** "7KQ4MP" → "7KQ-4MP": the join code in two groups, easier to read aloud and to type. */

@@ -1,17 +1,20 @@
 """Wire models of the ticket module (camelCase JSON).
 
+Every model is frozen except ``NoteCreate`` and ``ReporterNoteCreate``, because their
+base ``MessageFilesIn`` is mutable and a frozen class cannot derive from a mutable one.
 Requests forbid extra fields. ``TicketCreate`` caps every string, because the route
 is public. The context fields are optional and capped one by one.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Literal
 from urllib.parse import urljoin, urlsplit
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, JsonValue, field_validator
+from pydantic import ConfigDict, EmailStr, Field, JsonValue, field_validator
 
 from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut, MessageFilesIn
 from app.settings import get_settings
@@ -19,6 +22,7 @@ from app.shared.altcha import AltchaSolutionStr
 from app.shared.i18n import Lang
 from app.shared.mentions import MAX_MENTIONS
 from app.shared.people import PersonRef
+from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 TicketKind = Literal["bug", "question", "idea"]
 TicketStatus = Literal["new", "in_progress", "done", "rejected"]
@@ -27,14 +31,6 @@ NoteVisibility = Literal["internal", "public"]
 
 #: The most draft attachments one report binds.
 MAX_TICKET_ATTACHMENTS = 5
-
-
-class _CamelModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class _CamelIn(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 def _origin(url: str) -> tuple[str, str] | None:
@@ -70,7 +66,7 @@ def platform_page_url(value: str | None) -> str | None:
     return None
 
 
-class TicketContext(_CamelIn):
+class TicketContext(FrozenStrictCamelModel, frozen=True):
     """The technical context of a report. Every field is optional.
 
     ``url`` keeps a platform page only (``platform_page_url``); any other value is
@@ -91,7 +87,7 @@ class TicketContext(_CamelIn):
         return platform_page_url(value)
 
 
-class TicketCreate(_CamelIn):
+class TicketCreate(FrozenStrictCamelModel, frozen=True):
     """A report. ``email`` and ``altcha`` are required without a session only."""
 
     kind: TicketKind
@@ -106,13 +102,13 @@ class TicketCreate(_CamelIn):
     altcha: AltchaSolutionStr | None = None
 
 
-class TicketCreated(_CamelModel):
+class TicketCreated(FrozenCamelModel, frozen=True):
     """The only answer to a report: the ticket number (``T-0042``)."""
 
     number: str
 
 
-class TicketReporter(_CamelModel):
+class TicketReporter(FrozenCamelModel, frozen=True):
     """The reporter. ``email`` is the account e-mail or the given e-mail."""
 
     principal_id: UUID | None = Field(default=None, serialization_alias="principalId")
@@ -121,7 +117,7 @@ class TicketReporter(_CamelModel):
     anonymized: bool = False
 
 
-class TicketListItem(_CamelModel):
+class TicketListItem(FrozenCamelModel, frozen=True):
     """A ticket row of the work list."""
 
     id: UUID
@@ -135,7 +131,7 @@ class TicketListItem(_CamelModel):
     updated_at: datetime = Field(serialization_alias="updatedAt")
 
 
-class TicketAttachment(_CamelModel):
+class TicketAttachment(FrozenCamelModel, frozen=True):
     """A file of the ticket report."""
 
     id: UUID
@@ -152,17 +148,17 @@ class TicketAttachment(_CamelModel):
         )
 
 
-class TicketEventOut(_CamelModel):
+class TicketEventOut(FrozenCamelModel, frozen=True):
     """An event of the ticket timeline."""
 
     id: UUID
     kind: TicketEventKind
     actor: PersonRef | None = None
     at: datetime
-    payload: dict[str, JsonValue] = Field(default_factory=dict)
+    payload: Mapping[str, JsonValue] = Field(default_factory=dict)
 
 
-class TicketNoteOut(_CamelModel):
+class TicketNoteOut(FrozenCamelModel, frozen=True):
     """A note or message of a ticket.
 
     Attributes:
@@ -179,17 +175,17 @@ class TicketNoteOut(_CamelModel):
     attachments: list[MessageAttachmentOut] = Field(default_factory=list)
     visibility: NoteVisibility = "internal"
     from_reporter: bool = Field(default=False, serialization_alias="fromReporter")
-    mentions: list[PersonRef] = Field(default_factory=list)
+    mentions: tuple[PersonRef, ...] = Field(default_factory=tuple)
 
 
-class TicketRef(_CamelModel):
+class TicketRef(FrozenCamelModel, frozen=True):
     """A reference to another ticket by id and number."""
 
     id: UUID
     number: str
 
 
-class ContextTarget(_CamelModel):
+class ContextTarget(FrozenCamelModel, frozen=True):
     """The application or meeting of ``context.route``, when the viewer reads it."""
 
     kind: Literal["application", "meeting"]
@@ -197,14 +193,14 @@ class ContextTarget(_CamelModel):
     title: str
 
 
-class TicketDetail(TicketListItem):
+class TicketDetail(TicketListItem, frozen=True):
     """A ticket with body, context, files, notes and events."""
 
     body: str
-    context: dict[str, JsonValue] = Field(default_factory=dict)
-    attachments: list[TicketAttachment] = Field(default_factory=list)
-    notes: list[TicketNoteOut] = Field(default_factory=list)
-    events: list[TicketEventOut] = Field(default_factory=list)
+    context: Mapping[str, JsonValue] = Field(default_factory=dict)
+    attachments: tuple[TicketAttachment, ...] = Field(default_factory=tuple)
+    notes: tuple[TicketNoteOut, ...] = Field(default_factory=tuple)
+    events: tuple[TicketEventOut, ...] = Field(default_factory=tuple)
     duplicate_of: TicketRef | None = Field(default=None, serialization_alias="duplicateOf")
     context_target: ContextTarget | None = Field(default=None, serialization_alias="contextTarget")
     open_todo_count: int = Field(default=0, serialization_alias="openTodoCount")
@@ -213,7 +209,7 @@ class TicketDetail(TicketListItem):
     sender_blocked: bool = Field(default=False, serialization_alias="senderBlocked")
 
 
-class TicketPatch(_CamelIn):
+class TicketPatch(FrozenStrictCamelModel, frozen=True):
     """A change of status, assignee or kind. ``assigneeId: null`` unassigns."""
 
     status: TicketStatus | None = None
@@ -223,13 +219,13 @@ class TicketPatch(_CamelIn):
     complete_todos: bool | None = Field(default=None, alias="completeTodos")
 
 
-class NoteBody(_CamelIn):
+class NoteBody(FrozenStrictCamelModel, frozen=True):
     """The edit of a message of the reporter: the text only. It keeps the mentions."""
 
     body: str = Field(min_length=1, max_length=10000)
 
 
-class NotePatch(NoteBody):
+class NotePatch(NoteBody, frozen=True):
     """The edit of a team note: the text and, optionally, the mentions.
 
     ``mentions`` null keeps the stored mentions; a list replaces them, with the rules
@@ -239,7 +235,7 @@ class NotePatch(NoteBody):
     mentions: list[UUID] | None = Field(default=None, max_length=MAX_MENTIONS)
 
 
-class NoteCreate(MessageFilesIn, _CamelIn):
+class NoteCreate(MessageFilesIn):
     """A new note. The body may be empty only with at least one file.
 
     ``visibility`` defaults to ``internal``; ``public`` lets the reporter account read it.
@@ -247,18 +243,22 @@ class NoteCreate(MessageFilesIn, _CamelIn):
     most 50, duplicates drop); another id gives 422 ``mention_not_member``.
     """
 
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
     body: str = Field(max_length=10000)
     visibility: NoteVisibility = "internal"
     mentions: list[UUID] = Field(default_factory=list, max_length=MAX_MENTIONS)
 
 
-class ReporterNoteCreate(MessageFilesIn, _CamelIn):
+class ReporterNoteCreate(MessageFilesIn):
     """A message of the reporter. It is always ``public`` and mentions nobody."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     body: str = Field(max_length=10000)
 
 
-class ReporterTicketItem(_CamelModel):
+class ReporterTicketItem(FrozenCamelModel, frozen=True):
     """A ticket in the list of its reporter: no reporter, no assignee."""
 
     id: UUID
@@ -270,30 +270,30 @@ class ReporterTicketItem(_CamelModel):
     updated_at: datetime = Field(serialization_alias="updatedAt")
 
 
-class ReporterTicketEvent(_CamelModel):
+class ReporterTicketEvent(FrozenCamelModel, frozen=True):
     """A status change as the reporter sees it: no actor."""
 
     id: UUID
     kind: Literal["status"]
     at: datetime
-    payload: dict[str, JsonValue] = Field(default_factory=dict)
+    payload: Mapping[str, JsonValue] = Field(default_factory=dict)
 
 
-class ReporterTicketDetail(ReporterTicketItem):
+class ReporterTicketDetail(ReporterTicketItem, frozen=True):
     """The own ticket of a reporter: the report, the public notes and the status changes.
 
     ``canReply`` is false while a sender block holds back the reporter.
     """
 
     body: str
-    attachments: list[TicketAttachment] = Field(default_factory=list)
+    attachments: tuple[TicketAttachment, ...] = Field(default_factory=tuple)
     notes: list[TicketNoteOut] = Field(default_factory=list)
-    events: list[ReporterTicketEvent] = Field(default_factory=list)
+    events: tuple[ReporterTicketEvent, ...] = Field(default_factory=tuple)
     closed_at: datetime | None = Field(default=None, serialization_alias="closedAt")
     can_reply: bool = Field(default=True, serialization_alias="canReply")
 
 
-class TicketBlockedSender(_CamelModel):
+class TicketBlockedSender(FrozenCamelModel, frozen=True):
     """One blocked sender. ``email`` is the stored address, or the account e-mail."""
 
     id: UUID
@@ -307,7 +307,7 @@ class TicketBlockedSender(_CamelModel):
     last_hit_at: datetime | None = Field(default=None, serialization_alias="lastHitAt")
 
 
-class TicketCounts(_CamelModel):
+class TicketCounts(FrozenCamelModel, frozen=True):
     """Ticket counts per status."""
 
     new: int = 0

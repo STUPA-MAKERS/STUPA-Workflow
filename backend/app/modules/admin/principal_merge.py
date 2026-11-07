@@ -52,7 +52,7 @@ merges into the source move on to the target, so a chain never has more than one
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -260,15 +260,23 @@ EXCLUDED_COLUMNS: dict[str, str] = {
 }
 
 
-@dataclass
+@dataclass(frozen=True)
 class _Counts:
+    """The counts of one area. No slots, because the audit data reads ``vars``."""
+
     rewritten: int = 0
     combined: int = 0
     removed: int = 0
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class _Tally:
+    """The counts per area that the steps of a preview or a merge add up.
+
+    The steps share one tally and each one adds its counts. ``add`` swaps in a new
+    ``_Counts`` for the area and never changes one in place.
+    """
+
     by_area: dict[MergeArea, _Counts] = field(
         default_factory=lambda: {a: _Counts() for a in AREAS}
     )
@@ -276,12 +284,16 @@ class _Tally:
     def add(
         self, area: MergeArea, *, rewritten: int = 0, combined: int = 0, removed: int = 0
     ) -> None:
+        """Add counts to one area."""
         c = self.by_area[area]
-        c.rewritten += rewritten
-        c.combined += combined
-        c.removed += removed
+        self.by_area[area] = _Counts(
+            rewritten=c.rewritten + rewritten,
+            combined=c.combined + combined,
+            removed=c.removed + removed,
+        )
 
     def out(self) -> list[MergeAreaOut]:
+        """Return the counts of every area in display order."""
         return [
             MergeAreaOut(
                 area=a, rewritten=c.rewritten, combined=c.combined, removed=c.removed
@@ -296,6 +308,15 @@ class _Tally:
             for a, c in self.by_area.items()
             if c.rewritten or c.combined or c.removed
         }
+
+
+def _permission_out(key: str, names: Mapping[UUID, str]) -> MergePermissionOut:
+    """Turn one effective right (``key`` or ``key@<gremium id>``) into its preview entry."""
+    match key.split("@", 1):
+        case [perm, gremium_id]:
+            return MergePermissionOut(key=perm, gremium=names.get(UUID(gremium_id)))
+        case _:
+            return MergePermissionOut(key="admin" if key == ALL_RIGHTS else key)
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -347,13 +368,12 @@ class PrincipalMergeService:
                 code="merge_same_principal",
                 errors=[{"field": "targetId", "msg": "equals the source"}],
             )
-        stmt = (
+        query = (
             select(PrincipalRow)
             .where(PrincipalRow.id.in_([source_id, target_id]))
             .order_by(PrincipalRow.id)
         )
-        if lock:
-            stmt = stmt.with_for_update()
+        stmt = query.with_for_update() if lock else query
         rows = {r.id: r for r in (await self.session.scalars(stmt)).all()}
         source = rows.get(source_id)
         target = rows.get(target_id)
@@ -420,7 +440,6 @@ class PrincipalMergeService:
         principal = await resolve_principal(self.session, row, now)
         if "admin" in principal.roles:
             return frozenset({ALL_RIGHTS})
-        keys = set(principal.permissions)
         rows = (
             await self.session.execute(
                 select(GremiumMembership.gremium_id, GremiumRole.permissions)
@@ -430,9 +449,10 @@ class PrincipalMergeService:
                 )
             )
         ).all()
-        for gremium_id, perms in rows:
-            keys.update(f"{p}@{gremium_id}" for p in perms or [])
-        return frozenset(keys)
+        gremium_keys = frozenset(
+            f"{p}@{gremium_id}" for gremium_id, perms in rows for p in perms or []
+        )
+        return frozenset(principal.permissions) | gremium_keys
 
     async def _privileges(
         self, source: PrincipalRow, target: PrincipalRow, actor: str
@@ -457,21 +477,17 @@ class PrincipalMergeService:
         have_actor = await self._effective(actor_row, now)
         covered = ALL_RIGHTS in have_actor or set(extra) <= have_actor
         gremium_ids = {UUID(k.split("@", 1)[1]) for k in extra if "@" in k}
-        names: dict[UUID, str] = {}
-        if gremium_ids:
-            names = dict((
-                    await self.session.execute(
-                        select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremium_ids))
-                    )
-                ).all())
-        out: list[MergePermissionOut] = []
-        for key in extra:
-            if "@" in key:
-                perm, gid = key.split("@", 1)
-                out.append(MergePermissionOut(key=perm, gremium=names.get(UUID(gid))))
-            else:
-                out.append(MergePermissionOut(key="admin" if key == ALL_RIGHTS else key))
-        return out, covered
+        names = await self._gremium_names(gremium_ids)
+        return [_permission_out(key, names) for key in extra], covered
+
+    async def _gremium_names(self, gremium_ids: set[UUID]) -> dict[UUID, str]:
+        """Return the name of each gremium. No id means no query."""
+        if not gremium_ids:
+            return {}
+        rows = await self.session.execute(
+            select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremium_ids))
+        )
+        return dict(rows.all())
 
     async def _conflicts(
         self, source: PrincipalRow, target: PrincipalRow
@@ -486,18 +502,16 @@ class PrincipalMergeService:
         same meeting (an equal one is a harmless duplicate); an open erasure request,
         because its execution would erase the account that it names.
         """
-        out: list[MergeConflictOut] = []
-
-        async def add(kind: MergeConflictKind, stmt: Select[Any]) -> None:
-            for (label,) in (await self.session.execute(stmt)).all():
-                out.append(MergeConflictOut(kind=kind, label=label))
+        async def found(kind: MergeConflictKind, stmt: Select[Any]) -> list[MergeConflictOut]:
+            rows = (await self.session.execute(stmt)).all()
+            return [MergeConflictOut(kind=kind, label=label) for (label,) in rows]
 
         old_sub, new_sub = source.sub, target.sub
         old, new = source.id, target.id
         vote_label = func.coalesce(Vote.question, Meeting.title)
 
         a, b = aliased(VotedMarker), aliased(VotedMarker)
-        await add(
+        ballots = await found(
             "ballot_same_vote",
             select(vote_label)
             .select_from(Vote)
@@ -514,25 +528,25 @@ class PrincipalMergeService:
 
         def deleg(**cols: object) -> ColumnElement[bool]:
             d = aliased(MeetingDelegation)
-            conds: list[ColumnElement[bool]] = [d.meeting_id == Meeting.id]
-            for name, value in cols.items():
-                conds.append(getattr(d, name) == value)
-            return exists().where(*conds)
+            return exists().where(
+                d.meeting_id == Meeting.id,
+                *(getattr(d, name) == value for name, value in cols.items()),
+            )
 
-        await add(
+        same_meeting = await found(
             "delegation_same_meeting",
             meeting_where(
                 deleg(delegator_principal_id=old), deleg(delegator_principal_id=new)
             ),
         )
-        await add(
+        vote_twice = await found(
             "delegation_vote_twice",
             meeting_where(
                 deleg(delegate_principal_id=old, delegate_voting=True),
                 deleg(delegate_principal_id=new, delegate_voting=True),
             ),
         )
-        await add(
+        chain = await found(
             "delegation_chain",
             meeting_where(
                 or_(
@@ -548,7 +562,7 @@ class PrincipalMergeService:
             ),
         )
         a_old, a_new = aliased(MeetingAttendance), aliased(MeetingAttendance)
-        await add(
+        attendance = await found(
             "attendance_differs",
             select(Meeting.title)
             .join(a_old, and_(a_old.meeting_id == Meeting.id, a_old.principal_id == old))
@@ -564,8 +578,8 @@ class PrincipalMergeService:
                 ErasureRequest.principal_id.in_([old, new]),
             )
         )
-        out.extend(MergeConflictOut(kind="erasure_open") for _ in range(open_erasures))
-        return out
+        erasures = [MergeConflictOut(kind="erasure_open") for _ in range(open_erasures)]
+        return [*ballots, *same_meeting, *vote_twice, *chain, *attendance, *erasures]
 
     async def _count(self, stmt: Select[Any]) -> int:
         return int(await self.session.scalar(stmt) or 0)
@@ -579,20 +593,22 @@ class PrincipalMergeService:
         rewritten.
         """
         for area, column in REMOVED_ROWS:
-            table = _table(column)
-            if apply:
-                n = _rowcount(
-                    await self.session.execute(delete(table).where(column == source.id))
-                )
-            else:
-                n = await self._count(
-                    select(func.count()).select_from(table).where(column == source.id)
-                )
-            tally.add(area, removed=n)
+            tally.add(area, removed=await self._remove(column, source.id, apply=apply))
         for area, column in SUB_COLUMNS:
             await self._rewrite(area, column, source.sub, target.sub, tally, apply=apply)
         for area, column in ID_COLUMNS:
             await self._rewrite(area, column, source.id, target.id, tally, apply=apply)
+
+    async def _remove(
+        self, column: InstrumentedAttribute[Any], old: UUID, *, apply: bool
+    ) -> int:
+        """Delete the rows whose ``column`` is ``old``, or count them. Return the number."""
+        table = _table(column)
+        return (
+            _rowcount(await self.session.execute(delete(table).where(column == old)))
+            if apply
+            else await self._count(select(func.count()).select_from(table).where(column == old))
+        )
 
     async def _rewrite(
         self,
@@ -605,8 +621,8 @@ class PrincipalMergeService:
         apply: bool,
     ) -> None:
         table = _table(column)
-        if apply:
-            n = _rowcount(
+        n = (
+            _rowcount(
                 await self.session.execute(
                     update(table)
                     .where(column == old)
@@ -614,8 +630,9 @@ class PrincipalMergeService:
                     .execution_options(synchronize_session=False)
                 )
             )
-        else:
-            n = await self._count(select(func.count()).select_from(table).where(column == old))
+            if apply
+            else await self._count(select(func.count()).select_from(table).where(column == old))
+        )
         tally.add(area, rewritten=n)
 
     async def _combine(
@@ -635,29 +652,54 @@ class PrincipalMergeService:
         ``duplicate`` is a condition on the source row (``column == old``): the target
         already has the same row. ``extra`` sets more columns on the rewritten rows.
         """
-        table = _table(column)
         dup = and_(column == old, duplicate)
-        if apply:
-            combined = _rowcount(
-                await self.session.execute(
-                    delete(table).where(dup).execution_options(synchronize_session=False)
-                )
-            )
-            rewritten = _rowcount(
-                await self.session.execute(
-                    update(table)
-                    .where(column == old)
-                    .values({column.key: new, **(extra or {})})
-                    .execution_options(synchronize_session=False)
-                )
-            )
-        else:
-            combined = await self._count(select(func.count()).select_from(table).where(dup))
-            total = await self._count(
-                select(func.count()).select_from(table).where(column == old)
-            )
-            rewritten = total - combined
+        rewritten, combined = (
+            await self._combine_apply(column, old, {column.key: new, **(extra or {})}, dup)
+            if apply
+            else await self._combine_count(column, old, dup)
+        )
         tally.add(area, rewritten=rewritten, combined=combined)
+
+    async def _combine_apply(
+        self,
+        column: InstrumentedAttribute[Any],
+        old: UUID,
+        values: dict[str, Any],
+        dup: ColumnElement[bool],
+    ) -> tuple[int, int]:
+        """Delete the duplicate rows, then rewrite the rest with ``values``.
+
+        Returns:
+            The rewritten and the combined row counts.
+        """
+        table = _table(column)
+        combined = _rowcount(
+            await self.session.execute(
+                delete(table).where(dup).execution_options(synchronize_session=False)
+            )
+        )
+        rewritten = _rowcount(
+            await self.session.execute(
+                update(table)
+                .where(column == old)
+                .values(values)
+                .execution_options(synchronize_session=False)
+            )
+        )
+        return rewritten, combined
+
+    async def _combine_count(
+        self, column: InstrumentedAttribute[Any], old: UUID, dup: ColumnElement[bool]
+    ) -> tuple[int, int]:
+        """Count the duplicate rows and the rest, and write nothing.
+
+        Returns:
+            The rewritten and the combined row counts.
+        """
+        table = _table(column)
+        combined = await self._count(select(func.count()).select_from(table).where(dup))
+        total = await self._count(select(func.count()).select_from(table).where(column == old))
+        return total - combined, combined
 
     async def _combined_tables(
         self, source: PrincipalRow, target: PrincipalRow, tally: _Tally, *, apply: bool
@@ -717,25 +759,26 @@ class PrincipalMergeService:
             and_(ds.member_principal_id == old, ds.substitute_principal_id == new),
             and_(ds.member_principal_id == new, ds.substitute_principal_id == old),
         )
-        if apply:
-            n = _rowcount(
+        self_entries = (
+            _rowcount(
                 await self.session.execute(
                     delete(ds).where(self_entry).execution_options(synchronize_session=False)
                 )
             )
-        else:
-            n = await self._count(select(func.count()).select_from(ds).where(self_entry))
-        tally.add("substitutes", combined=n)
-        other = aliased(DelegationSubstitute)
+            if apply
+            else await self._count(select(func.count()).select_from(ds).where(self_entry))
+        )
+        tally.add("substitutes", combined=self_entries)
+        member_other = aliased(DelegationSubstitute)
         await self._combine(
             "substitutes",
             ds.member_principal_id,
             old,
             new,
             exists().where(
-                other.gremium_id == ds.gremium_id,
-                other.member_principal_id == new,
-                other.substitute_principal_id == ds.substitute_principal_id,
+                member_other.gremium_id == ds.gremium_id,
+                member_other.member_principal_id == new,
+                member_other.substitute_principal_id == ds.substitute_principal_id,
             ),
             tally,
             apply=apply,
@@ -761,16 +804,18 @@ class PrincipalMergeService:
             apply=apply,
         )
 
-        other = aliased(DelegationSubstitute)
+        substitute_other = aliased(DelegationSubstitute)
         await self._combine(
             "substitutes",
             ds.substitute_principal_id,
             old,
             new,
             exists().where(
-                other.gremium_id == ds.gremium_id,
-                other.member_principal_id.is_not_distinct_from(ds.member_principal_id),
-                other.substitute_principal_id == new,
+                substitute_other.gremium_id == ds.gremium_id,
+                substitute_other.member_principal_id.is_not_distinct_from(
+                    ds.member_principal_id
+                ),
+                substitute_other.substitute_principal_id == new,
             ),
             tally,
             apply=apply,
@@ -827,12 +872,13 @@ class PrincipalMergeService:
                     .execution_options(synchronize_session=False)
                 )
             return
-        if apply:
-            moved = await fold_personal_board(self.session, mine, theirs)
-        else:
-            moved = await self._count(
+        moved = (
+            await fold_personal_board(self.session, mine, theirs)
+            if apply
+            else await self._count(
                 select(func.count()).select_from(TodoCard).where(TodoCard.board_id == mine)
             )
+        )
         tally.add("todos", rewritten=moved, combined=1)
 
     async def _source_row(

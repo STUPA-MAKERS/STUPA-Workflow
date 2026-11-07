@@ -36,9 +36,11 @@ logger = logging.getLogger("app.files")
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Load the settings, the scanner and the object storage into the worker context."""
     settings = load_settings()
-    ctx["settings"] = settings
-    ctx["scanner"] = build_scanner(settings)
-    ctx["object_storage"] = build_object_storage(settings)
+    ctx.update(
+        settings=settings,
+        scanner=build_scanner(settings),
+        object_storage=build_object_storage(settings),
+    )
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:

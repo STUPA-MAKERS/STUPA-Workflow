@@ -1,5 +1,3 @@
 {
-  "backend/app/modules/calendar/ics.py": 25,
-  "backend/app/modules/calendar/schemas.py": 1,
   "backend/app/modules/calendar/service.py": 1
 }

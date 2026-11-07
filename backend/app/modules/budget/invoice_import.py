@@ -58,7 +58,7 @@ class UnsupportedInvoiceCurrencyError(ValueError):
         self.currency = currency
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ParsedInvoice:
     """Header data read from the ZUGFeRD XML (all amounts in EUR)."""
 
@@ -113,9 +113,12 @@ def _extract_cii_xml(data: bytes) -> str:
     if not embedded:
         raise NotZugferdError("PDF has no embedded files")
 
-    chosen = next((embedded[n] for n in _CII_ATTACHMENT_NAMES if n in embedded), None)
-    if chosen is None:
-        chosen = next((emb for name, emb in embedded.items() if name.endswith(".xml")), None)
+    known = next((embedded[n] for n in _CII_ATTACHMENT_NAMES if n in embedded), None)
+    chosen = (
+        known
+        if known is not None
+        else next((emb for name, emb in embedded.items() if name.endswith(".xml")), None)
+    )
     if chosen is None:
         raise NotZugferdError("no embedded XML invoice found")
 
@@ -207,10 +210,10 @@ def _map(invoice: MinimumInvoice) -> ParsedInvoice:
     if currency != "EUR":
         raise UnsupportedInvoiceCurrencyError(currency)
 
-    gross = _amount(invoice.grand_total_amount)
-    if gross is None:
+    grand_total = _amount(invoice.grand_total_amount)
+    if grand_total is None:
         raise NotZugferdError("invoice without grand total amount")
-    gross = _require_sane_gross(gross)
+    gross = _require_sane_gross(grand_total)
 
     taxes = getattr(invoice, "tax_total_amounts", None) or []
     tax = sum((t.amount for t in taxes), Decimal(0)) if taxes else None
@@ -382,10 +385,10 @@ def _parse_cii_header(xml: str | bytes) -> ParsedInvoice:
         else None
     )
     net = _cii_decimal(_find_text(summation, _qn(_NS_RAM, "TaxBasisTotalAmount")))
-    gross = _cii_decimal(_find_text(summation, _qn(_NS_RAM, "GrandTotalAmount")))
-    if gross is None:
+    grand_total = _cii_decimal(_find_text(summation, _qn(_NS_RAM, "GrandTotalAmount")))
+    if grand_total is None:
         raise NotZugferdError("invoice without grand total amount")
-    gross = _require_sane_gross(gross)
+    gross = _require_sane_gross(grand_total)
 
     tax_elems = summation.findall(_qn(_NS_RAM, "TaxTotalAmount")) if summation is not None else []
     tax_values = [_cii_decimal(e.text) for e in tax_elems if e.text and e.text.strip()]

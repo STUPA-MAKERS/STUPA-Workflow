@@ -44,32 +44,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function asArgs(value: unknown): unknown[] {
+function asArgs(value: unknown): readonly unknown[] {
   return Array.isArray(value) ? value : [value];
 }
 
+/** A path step that found nothing. */
+const MISSING = Symbol('missing');
+
+/**
+ * One step of a `var` path: a key of an object or an index of an array. A step after a
+ * miss misses too, because `MISSING` is neither an object nor an array.
+ */
+function pathStep(current: unknown, part: string): unknown {
+  if (isRecord(current) && part in current) return current[part];
+  return Array.isArray(current) && /^\d+$/.test(part) && Number(part) < current.length
+    ? current[Number(part)]
+    : MISSING;
+}
+
 function resolveVar(path: unknown, ctx: Record<string, unknown>): unknown {
-  let p = path;
-  let fallback: unknown = null;
-  if (Array.isArray(p)) {
-    fallback = p.length > 1 ? p[1] : null;
-    p = p.length > 0 ? p[0] : '';
-  }
+  const p = Array.isArray(path) ? (path.length > 0 ? path[0] : '') : path;
+  const fallback = Array.isArray(path) && path.length > 1 ? path[1] : null;
   if (p === '' || p === null || p === undefined) return ctx;
   if (typeof p !== 'string') {
     throw new JsonLogicError(`var path must be a string, got ${typeof p}`);
   }
-  let current: unknown = ctx;
-  for (const part of p.split('.')) {
-    if (isRecord(current) && part in current) {
-      current = current[part];
-    } else if (Array.isArray(current) && /^\d+$/.test(part) && Number(part) < current.length) {
-      current = current[Number(part)];
-    } else {
-      return fallback;
-    }
-  }
-  return current;
+  const found = p.split('.').reduce<unknown>(pathStep, ctx);
+  return found === MISSING ? fallback : found;
 }
 
 function num(value: unknown): number {
@@ -148,7 +149,7 @@ export function evalJsonLogic(expr: unknown, ctx: Record<string, unknown> = {}):
   }
 }
 
-function requireArity(op: string, args: unknown[], n: number): void {
+function requireArity(op: string, args: readonly unknown[], n: number): void {
   if (args.length !== n) {
     throw new JsonLogicError(`'${op}' requires exactly ${n} operand(s)`);
   }

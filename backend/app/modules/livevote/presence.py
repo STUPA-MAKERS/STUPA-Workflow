@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class MeetingPresence:
     """Map `meeting_id` to `{connection_id: (sub, display_name)}`."""
 
@@ -32,7 +32,7 @@ class MeetingPresence:
             The connection id and the current list of names.
         """
         connection_id = uuid4().hex
-        self._viewers[meeting_id][connection_id] = (sub, name)
+        self._viewers[meeting_id].update({connection_id: (sub, name)})
         return connection_id, self.names(meeting_id)
 
     def leave(self, meeting_id: UUID, connection_id: str) -> list[str]:
@@ -41,19 +41,17 @@ class MeetingPresence:
         Returns:
             The current list of names.
         """
-        room = self._viewers.get(meeting_id)
-        if room is not None:
-            room.pop(connection_id, None)
-            if not room:
-                self._viewers.pop(meeting_id, None)
+        self._viewers.get(meeting_id, {}).pop(connection_id, None)
+        if not self._viewers.get(meeting_id, True):
+            self._viewers.pop(meeting_id, None)
         return self.names(meeting_id)
 
     def names(self, meeting_id: UUID) -> list[str]:
         """Return the sorted viewer display names, deduplicated per `sub`."""
-        seen: dict[str, str] = {}
-        for sub, name in self._viewers.get(meeting_id, {}).values():
-            seen.setdefault(sub, name)
-        return sorted(seen.values(), key=str.casefold)
+        entries = tuple(self._viewers.get(meeting_id, {}).values())
+        first_name = dict(reversed(entries))
+        subs = dict.fromkeys(sub for sub, _ in entries)
+        return sorted((first_name[sub] for sub in subs), key=str.casefold)
 
 
 #: One registry per API process. The WebSocket connections live in that process.

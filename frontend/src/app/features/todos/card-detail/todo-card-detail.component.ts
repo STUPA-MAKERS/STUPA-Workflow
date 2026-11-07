@@ -232,7 +232,7 @@ export class TodoCardDetailComponent {
   readonly loading = signal(true);
   readonly notFound = signal(false);
   readonly error = signal(false);
-  readonly members = signal<TodoMember[]>([]);
+  readonly members = signal<readonly TodoMember[]>([]);
   /** Phone: the sheet with the activity (the comments and the events) is open. */
   readonly activityOpen = signal(false);
   readonly busy = signal(false);
@@ -255,7 +255,7 @@ export class TodoCardDetailComponent {
   /** Counts the fresh loads: a write answer from before the card changed is dropped. */
   private gen = 0;
   /** The patches that wait for the answer of the one in flight, which carries the next version. */
-  private patchQueue: ((version: number) => void)[] = [];
+  private patchQueue: readonly ((version: number) => void)[] = [];
   private patching = false;
   private membersOf: Uuid | null = null;
   /** Counts the local changes of the card: a background read from before one is dropped. */
@@ -672,7 +672,9 @@ export class TodoCardDetailComponent {
         (card) => {
           after?.();
           this.patching = false;
-          this.patchQueue.shift()?.(card.version);
+          const [queued, ...rest] = this.patchQueue;
+          this.patchQueue = rest;
+          queued?.(card.version);
         },
         true,
         () => {
@@ -681,7 +683,7 @@ export class TodoCardDetailComponent {
         },
       );
     };
-    if (this.patching) this.patchQueue.push(run);
+    if (this.patching) this.patchQueue = [...this.patchQueue, run];
     else run(c.version);
   }
 
@@ -836,13 +838,10 @@ export class TodoCardDetailComponent {
     afterNextRender(
       () => {
         const root = this.host.nativeElement;
-        for (const sel of selectors) {
-          const el = root.querySelector<HTMLElement>(sel);
-          if (el) {
-            el.focus();
-            return;
-          }
-        }
+        const found = selectors
+          .map((sel) => root.querySelector<HTMLElement>(sel))
+          .find((el) => el !== null);
+        found?.focus();
       },
       { injector: this.injector },
     );
@@ -947,16 +946,16 @@ export class TodoCardDetailComponent {
   /** The event field in inline edit: place, participants or a new series. */
   readonly eventEdit = signal<'place' | 'participants' | 'series' | null>(null);
   readonly draft = signal('');
-  readonly series = signal<TodoEventSeries[]>([]);
+  readonly series = signal<readonly TodoEventSeries[]>([]);
   private seriesLoaded = false;
 
   /** The options of "Reihe": none, the series by name, and "Neue Reihe …". */
   readonly seriesOptions = computed<FilterSelectOption[]>(() => {
     const own = this.card()?.event;
-    const list = [...this.series()];
-    if (own?.seriesId && !list.some((s) => s.id === own.seriesId)) {
-      list.unshift({ id: own.seriesId, name: own.seriesName ?? '' });
-    }
+    const ownSeries = own?.seriesId ? { id: own.seriesId, name: own.seriesName ?? '' } : null;
+    const series = this.series();
+    const missing = ownSeries !== null && !series.some((s) => s.id === ownSeries.id);
+    const list = missing ? [ownSeries, ...series] : series;
     return [
       { value: '', label: this.t('todos.eventCard.noSeries') },
       ...list.map((s) => ({ value: s.id, label: s.name })),
@@ -1089,30 +1088,49 @@ export class TodoCardDetailComponent {
   /** "StuPa 3 · 01.11.2026 · 500,00 € · Auflage: …". */
   decisionSub(d: TodoEventDecision): string {
     const locale = this.i18n.formatLocale();
-    const parts = [d.meetingTitle, d.decidedAt ? dayMonthYear(d.decidedAt, locale) : null];
-    if (d.amount) parts.push(formatMoney(d.amount, locale));
-    for (const text of d.conditions) parts.push(this.t('todos.eventCard.condition', { text }));
+    const parts = [
+      d.meetingTitle,
+      d.decidedAt ? dayMonthYear(d.decidedAt, locale) : null,
+      d.amount ? formatMoney(d.amount, locale) : null,
+      ...d.conditions.map((text) => this.t('todos.eventCard.condition', { text })),
+    ];
     return parts.filter(Boolean).join(' · ');
   }
 
   /** "20.11.2026 · AStA · Saldo +312,00 €". */
   editionSub(e: TodoEventEdition): string {
-    const parts = [eventDays(e.startsOn, e.endsOn, this.i18n.formatLocale()), e.boardName];
-    if (e.archived) parts.push(this.t('todos.eventCard.archived'));
-    parts.push(this.t('todos.eventCard.balanceText', { amount: this.euro(e.totals.balance, true) }));
+    const parts = [
+      eventDays(e.startsOn, e.endsOn, this.i18n.formatLocale()),
+      e.boardName,
+      e.archived ? this.t('todos.eventCard.archived') : null,
+      this.t('todos.eventCard.balanceText', { amount: this.euro(e.totals.balance, true) }),
+    ];
     return parts.filter(Boolean).join(' · ');
   }
 
   onMenu(item: RowMenuItem): void {
-    if (item.id === 'openInBoard') this.openInBoard();
-    else if (item.id === 'done') this.toggleDone();
-    else if (item.id === 'move') this.moveOpen.set(true);
-    else if (item.id === 'rename') this.startTitle();
-    else if (item.id === 'transfer') this.transferOpen.set(true);
-    else if (item.id === 'archive') this.archive();
-    else if (item.id === 'restore') this.restore();
-    else if (item.id === 'makeEvent') this.makeEventAsk.set(true);
-    else if (item.id === 'followUp') this.followUp();
+    switch (item.id) {
+      case 'openInBoard':
+        return this.openInBoard();
+      case 'done':
+        return this.toggleDone();
+      case 'move':
+        return this.moveOpen.set(true);
+      case 'rename':
+        return this.startTitle();
+      case 'transfer':
+        return this.transferOpen.set(true);
+      case 'archive':
+        return this.archive();
+      case 'restore':
+        return this.restore();
+      case 'makeEvent':
+        return this.makeEventAsk.set(true);
+      case 'followUp':
+        return this.followUp();
+      default:
+        return;
+    }
   }
 
   /** Open the card in the drawer of its board ("Im Board öffnen" of the phone menu). */
