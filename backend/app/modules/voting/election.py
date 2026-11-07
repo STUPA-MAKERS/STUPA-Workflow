@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -164,16 +165,20 @@ async def release_runoff_link(session: AsyncSession, vote: Vote) -> None:
     )
 
 
+@dataclass(frozen=True, slots=True)
 class ElectionService:
-    """The lot and the runoff of an election, on the session of a ``VotingService``."""
+    """The lot and the runoff of an election, on the session of a ``VotingService``.
 
-    def __init__(
-        self, voting: VotingService, choose: Callable[[Sequence[str]], str] = secrets.choice
-    ) -> None:
-        """Bind the service to a voting service and the draw function of the lot."""
-        self.voting = voting
-        self.session = voting.session
-        self._choose = choose
+    ``choose`` is the draw function of the lot; a test passes a fixed chooser.
+    """
+
+    voting: VotingService
+    choose: Callable[[Sequence[str]], str] = secrets.choice
+
+    @property
+    def session(self) -> AsyncSession:
+        """The session of the voting service."""
+        return self.voting.session
 
     async def _closed_election(self, vote_id: UUID) -> tuple[Vote, ElectionResultOut]:
         """Lock a closed election and return it with its stored result.
@@ -209,8 +214,8 @@ class ElectionService:
             raise ConflictError("No lot is pending for this election.", code=NO_LOT_PENDING)
         if lot.drawn is not None:
             raise ConflictError("The lot was already drawn.", code=LOT_ALREADY_DRAWN)
-        drawn = tally_mod.draw_lot(lot.among, lot.seats, self._choose)
-        result = result.model_copy(
+        drawn = tally_mod.draw_lot(lot.among, lot.seats, self.choose)
+        decided = result.model_copy(
             update={
                 "elected": [*result.elected, *drawn],
                 "lot": lot.model_copy(
@@ -223,7 +228,7 @@ class ElectionService:
                 ),
             }
         )
-        vote.election_result = dump_result(result)
+        vote.election_result = dump_result(decided)
         vote.result = "elected"
         await audit_record(
             self.session,

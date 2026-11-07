@@ -132,13 +132,13 @@ async def send_todo_mail(
         return False
     assigned = mail.kind == "assigned"
     key = TODO_ASSIGNED_KEY if assigned else TODO_MENTIONED_KEY
+    excerpt: dict[str, object] = {} if assigned else {"excerpt": mail.excerpt or ""}
     context: dict[str, object] = {
         "cardTitle": card.title,
         "boardName": board.name,
         "actor": await _name(session, mail.actor_id),
+        **excerpt,
     }
-    if not assigned:
-        context["excerpt"] = mail.excerpt or ""
     return await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
         recipients,
         kind=key,
@@ -168,15 +168,17 @@ async def notify_todo_mails(
     Returns:
         The number of enqueued mails.
     """
-    sent = 0
-    for mail in mails:
+
+    async def send_one(mail: TodoMail) -> bool:
         try:
             async with _maker(sessionmaker)() as session:
-                if await send_todo_mail(session, queue=queue, settings=settings, mail=mail):
-                    sent += 1
+                return await send_todo_mail(session, queue=queue, settings=settings, mail=mail)
         except Exception:
             logger.exception("%s mail failed", mail.kind)
-    return sent
+            return False
+
+    sent = [await send_one(mail) for mail in mails]
+    return sum(sent)
 
 
 async def send_todo_due(

@@ -8,19 +8,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from app.shared.i18n import DEFAULT_LANG, Lang
 from app.shared.paging import PageParams
+from app.shared.schemas import FrozenCamelModel
 
 
-class _CamelModel(BaseModel):
-    """Base model that uses camelCase aliases in JSON and also accepts field names."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class ApplicationTypeListQuery(PageParams):
+class ApplicationTypeListQuery(PageParams, frozen=True):
     """Query parameters of the list route: paging and `lang`.
 
     `extra="forbid"` rejects an unknown query parameter with 422 instead of a
@@ -37,7 +32,7 @@ class ApplicationTypeListQuery(PageParams):
     lang: Lang = DEFAULT_LANG
 
 
-class ApplicationTypeListItem(_CamelModel):
+class ApplicationTypeListItem(FrozenCamelModel, frozen=True):
     """One application type in the list.
 
     `key` and `gremiumId` are admin-only. They stay `null` without the permission.

@@ -32,8 +32,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator, Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from dataclasses import dataclass, field
 from typing import Literal
 
 from sqlalchemy import ColumnElement, or_, select
@@ -97,26 +97,18 @@ def _is_infected(attachment: Attachment) -> bool:
     return attachment.scanned and attachment.scan_result not in (None, SCAN_RESULT_CLEAN)
 
 
+@dataclass(frozen=True, slots=True)
 class FilesService:
-    """Attachment operations bound to an ``AsyncSession``."""
+    """Attachment operations bound to an ``AsyncSession`` and the optional infrastructure.
 
-    def __init__(
-        self,
-        session: AsyncSession,
-        *,
-        storage: ObjectStorage | None = None,
-        queue: ScanQueue | None = None,
-        settings: Settings | None = None,
-    ) -> None:
-        """Bind the service to a session and the optional infrastructure.
+    Without ``storage`` an upload gives 503. Without ``queue`` a file stays quarantined.
+    Without ``settings`` the service reads ``get_settings()``.
+    """
 
-        Without ``storage`` an upload gives 503. Without ``queue`` a file stays quarantined.
-        Without ``settings`` the service reads ``get_settings()``.
-        """
-        self.session = session
-        self.storage = storage
-        self.queue = queue
-        self.settings = settings or get_settings()
+    session: AsyncSession
+    storage: ObjectStorage | None = field(default=None, kw_only=True)
+    queue: ScanQueue | None = field(default=None, kw_only=True)
+    settings: Settings = field(default_factory=get_settings, kw_only=True)
 
     @property
     def max_bytes(self) -> int:
@@ -427,10 +419,14 @@ class FilesService:
             "todo_comment",
             "comment",
         )
-        for kind, owner_id in zip(kinds, row, strict=True):
-            if owner_id is not None:
-                return AttachmentOwner(kind=kind, id=owner_id)
-        return None
+        return next(
+            (
+                AttachmentOwner(kind=kind, id=owner_id)
+                for kind, owner_id in zip(kinds, row, strict=True)
+                if owner_id is not None
+            ),
+            None,
+        )
 
     async def _get_owned(self, attachment_id: uuid.UUID) -> Attachment:
         """Load an attachment that a ticket or a message owns. Any other row gives 404.
@@ -488,11 +484,17 @@ class FilesService:
                 .order_by(Attachment.created_at, Attachment.id)
             )
         ).all()
-        out: dict[uuid.UUID, list[MessageAttachmentOut]] = {}
-        for row in rows:
-            owner_id = getattr(row, column.key)
-            out.setdefault(owner_id, []).append(message_attachment_out(row))
-        return out
+        owner_ids: tuple[uuid.UUID, ...] = tuple(
+            dict.fromkeys(getattr(row, column.key) for row in rows)
+        )
+        return {
+            owner_id: [
+                message_attachment_out(row)
+                for row in rows
+                if getattr(row, column.key) == owner_id
+            ]
+            for owner_id in owner_ids
+        }
 
     async def delete_for_messages(
         self, owner: MessageOwner, ids: Sequence[uuid.UUID], *, actor: str
@@ -589,12 +591,9 @@ class FilesService:
         the audit chain, so no row lock follows the chain lock (see
         ``lock_for_messages``).
         """
-        keys: list[str] = []
-        owners: list[tuple[uuid.UUID, dict[str, object]]] = []
+        keys = [a.storage_key for a in rows if a.storage_key is not None]
+        owners = tuple((a.id, _owner_data(a)) for a in rows)
         for attachment in rows:
-            if attachment.storage_key is not None:
-                keys.append(attachment.storage_key)
-            owners.append((attachment.id, _owner_data(attachment)))
             await self.session.delete(attachment)
         if owners:
             await self.session.flush()
@@ -755,19 +754,13 @@ class FilesService:
             logger.info("scan result for unknown attachment %s — skipped", attachment_id)
             return False
 
-        attachment.scanned = True
+        storage_key = attachment.storage_key
+        _record_verdict(attachment, verdict)
         if verdict.clean:
-            attachment.scan_result = SCAN_RESULT_CLEAN
             return await self._commit_scan(attachment_id)
 
-        signature = verdict.signature or "unknown"
-        attachment.scan_result = signature
-        storage_key = attachment.storage_key
-        attachment.storage_key = None
-        owner = _owner_data(attachment)
-        if not await self._commit_scan(
-            attachment_id, actor=actor, quarantine={**owner, "signature": signature}
-        ):
+        quarantine = {**_owner_data(attachment), "signature": _signature(verdict)}
+        if not await self._commit_scan(attachment_id, actor=actor, quarantine=quarantine):
             return False
         if self.storage is not None and storage_key is not None:
             try:
@@ -843,11 +836,29 @@ def upload_audit_data(attachment: Attachment) -> dict[str, object]:
 
 def _owner_data(attachment: Attachment) -> dict[str, object]:
     """Name the owner of an attachment in an audit entry: application, ticket, message or draft."""
-    for key in ("application_id", "ticket_id", "ticket_note_id", "todo_comment_id", "comment_id"):
-        value = getattr(attachment, key)
-        if value is not None:
-            return {key: str(value)}
-    return {"draft": True}
+    keys = ("application_id", "ticket_id", "ticket_note_id", "todo_comment_id", "comment_id")
+    values = ((key, getattr(attachment, key)) for key in keys)
+    owners: Iterator[dict[str, object]] = (
+        {key: str(value)} for key, value in values if value is not None
+    )
+    return next(owners, {"draft": True})
+
+
+def _signature(verdict: ScanVerdict) -> str:
+    """Return the signature that a finding records, ``unknown`` when ClamAV named none."""
+    return verdict.signature or "unknown"
+
+
+def _record_verdict(attachment: Attachment, verdict: ScanVerdict) -> None:
+    """Write the scan verdict into the ORM row.
+
+    A finding also clears ``storage_key``, so the download gates answer 410 for the row,
+    also when the removal of the object fails later.
+    """
+    attachment.scanned = True
+    attachment.scan_result = SCAN_RESULT_CLEAN if verdict.clean else _signature(verdict)
+    if not verdict.clean:
+        attachment.storage_key = None
 
 
 def _attachment_out(attachment: Attachment) -> AttachmentOut:

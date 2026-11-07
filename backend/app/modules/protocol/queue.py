@@ -38,7 +38,7 @@ class ProtocolRenderQueue(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ArqProtocolRenderQueue:
     """Queue for `render_protocol` jobs, backed by arq.
 

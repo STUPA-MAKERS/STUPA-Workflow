@@ -70,7 +70,7 @@ class DeliveryOutcome:
     defer: int | None = None
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class WebhookService:
     """Deliver outgoing webhooks: create the delivery rows and send them from the worker."""
     session: AsyncSession
@@ -191,12 +191,16 @@ class WebhookService:
 
         ip_url, host_header = pin_url(hook.url, ips[0])
         body = canonical_body(delivery.payload)
-        headers = build_headers(
+        signed = build_headers(
             hook.secret, body, event=delivery.event, timestamp=int(moment.timestamp())
         )
-        headers["Host"] = host_header
-        request = http_client.build_request("POST", ip_url, content=body, headers=headers)
-        request.extensions["sni_hostname"] = host_header.rsplit(":", 1)[0]
+        request = http_client.build_request(
+            "POST",
+            ip_url,
+            content=body,
+            headers={**signed, "Host": host_header},
+            extensions={"sni_hostname": host_header.rsplit(":", 1)[0]},
+        )
         try:
             status_code = await self._send_capped(http_client, request)
         except httpx.HTTPError as exc:
@@ -217,6 +221,10 @@ class WebhookService:
         cap protects the worker against an out-of-memory kill. The body content stays
         unused. The clean `aclose` keeps connection reuse intact.
 
+        `aiter_bytes` with a chunk size of `_MAX_RESPONSE_BYTES` buffers the stream until
+        it holds the cap or the stream ends, so reading its first chunk reads up to the
+        cap. A body without content gives no chunk at all, hence the default `b""`.
+
         The httpx timeout counts per read and restarts on every chunk. A malicious
         receiver could drip one byte per interval, hold the stream open without end and
         block the shared arq worker slot. That is a denial of service. Therefore
@@ -232,11 +240,7 @@ class WebhookService:
             async with asyncio.timeout(self.settings.webhook_timeout_seconds):
                 response = await http_client.send(request, stream=True)
                 try:
-                    read = 0
-                    async for chunk in response.aiter_bytes():
-                        read += len(chunk)
-                        if read >= _MAX_RESPONSE_BYTES:
-                            break
+                    await anext(response.aiter_bytes(_MAX_RESPONSE_BYTES), b"")
                     return response.status_code
                 finally:
                     await response.aclose()
@@ -258,21 +262,24 @@ class WebhookService:
         change it: the client follows no redirect, and a 4xx is a client or config
         error. A 5xx and a 1xx retry (§F/integrations/webhooks/000298).
         """
-        if 200 <= status_code < 300:
-            return await self._finish(
-                delivery, "ok", moment, response_code=status_code
-            )
-        if 300 <= status_code < 500:
-            logger.warning(
-                "webhook delivery %s dead — non-retryable %s",
-                delivery_id,
-                status_code,
-            )
-            return await self._finish(
-                delivery, "dead", moment, response_code=status_code,
-                attempts=delivery.attempts + 1,
-            )
-        return await self._fail(delivery, moment, response_code=status_code)
+        match status_code // 100:
+            case 2:
+                return await self._finish(delivery, "ok", moment, response_code=status_code)
+            case 3 | 4:
+                logger.warning(
+                    "webhook delivery %s dead — non-retryable %s",
+                    delivery_id,
+                    status_code,
+                )
+                return await self._finish(
+                    delivery,
+                    "dead",
+                    moment,
+                    response_code=status_code,
+                    attempts=delivery.attempts + 1,
+                )
+            case _:
+                return await self._fail(delivery, moment, response_code=status_code)
 
     async def _fail(
         self, delivery: WebhookDelivery, moment: dt.datetime, *, response_code: int | None
@@ -287,11 +294,9 @@ class WebhookService:
                 delivery, "dead", moment, response_code=response_code, attempts=attempts
             )
         defer = self.settings.webhook_retry_backoff_seconds * (2 ** (attempts - 1))
-        delivery.attempts = attempts
-        delivery.status = "failed"
-        delivery.last_at = moment
-        delivery.response_code = response_code
-        await self.session.commit()
+        await self._record(
+            delivery, "failed", moment, response_code=response_code, attempts=attempts
+        )
         return DeliveryOutcome(
             kind="retry", attempts=attempts, response_code=response_code, defer=defer
         )
@@ -306,12 +311,26 @@ class WebhookService:
         attempts: int | None = None,
     ) -> DeliveryOutcome:
         """Write the final state `ok` or `dead` and stop any further attempt."""
-        final_attempts = attempts if attempts is not None else delivery.attempts
-        delivery.attempts = final_attempts
-        delivery.status = kind
-        delivery.last_at = moment
-        delivery.response_code = response_code
-        await self.session.commit()
+        final_attempts = delivery.attempts if attempts is None else attempts
+        await self._record(
+            delivery, kind, moment, response_code=response_code, attempts=final_attempts
+        )
         return DeliveryOutcome(
             kind=kind, attempts=final_attempts, response_code=response_code
         )
+
+    async def _record(
+        self,
+        delivery: WebhookDelivery,
+        status: Literal["ok", "dead", "failed"],
+        moment: dt.datetime,
+        *,
+        response_code: int | None,
+        attempts: int,
+    ) -> None:
+        """Write the attempt result onto the delivery row and commit it."""
+        delivery.attempts = attempts
+        delivery.status = status
+        delivery.last_at = moment
+        delivery.response_code = response_code
+        await self.session.commit()
