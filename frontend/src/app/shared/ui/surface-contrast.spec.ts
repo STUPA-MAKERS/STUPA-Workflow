@@ -163,7 +163,7 @@ describe('a table on a shared sheet steps up one surface', () => {
     const sheet = kit('side-sheet/side-sheet.component.scss');
     expect(sheet).toContain("@use '../../styles/surface';");
     expect(sheet).toMatch(
-      /\n\.ss \{\s*@include surface\.context\(2\);[^}]*background: var\(--color-surface-2\);/,
+      /\n\.ss \{\s*@include surface\.context\(2\);[^}]*background: var\(--color-glass-2\);/,
     );
   });
 
