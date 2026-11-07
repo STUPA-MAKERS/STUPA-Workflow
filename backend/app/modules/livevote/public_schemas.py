@@ -14,7 +14,7 @@ from datetime import time as _time
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.modules.livevote.schemas import GuestsMode, GuestStatus, MeetingStatus, clean_guest_name
 from app.modules.voting.schemas import (
@@ -26,16 +26,11 @@ from app.modules.voting.schemas import (
 )
 from app.shared.altcha import AltchaSolutionStr
 from app.shared.config_schemas import DateAnswer, ElectionConfig, PollConfig, Quorum
+from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 
-class _CamelModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class GuestJoinBody(_CamelModel):
+class GuestJoinBody(FrozenStrictCamelModel, frozen=True):
     """``POST /public/meetings/join/{code}`` — ask to join with a name."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     display_name: str = Field(alias="displayName", max_length=400)
     #: The ALTCHA solution (base64 JSON). The dependency checks it before the route.
@@ -43,14 +38,13 @@ class GuestJoinBody(_CamelModel):
 
     @model_validator(mode="after")
     def _clean(self) -> GuestJoinBody:
-        self.display_name = clean_guest_name(self.display_name)
+        # A frozen model has no field setter, so the validator writes past it.
+        object.__setattr__(self, "display_name", clean_guest_name(self.display_name))
         return self
 
 
-class GuestBallotBody(_CamelModel):
+class GuestBallotBody(FrozenStrictCamelModel, frozen=True):
     """``POST /public/meetings/{code}/votes/{voteId}/ballot`` — the choice of a guest."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     #: A motion takes one option; an election with several candidates the list of the
     #: chosen candidate ids (at most 50 ids); a poll the chosen option ids, or one
@@ -71,7 +65,7 @@ class GuestBallotBody(_CamelModel):
         return v
 
 
-class PublicMeetingHead(_CamelModel):
+class PublicMeetingHead(FrozenCamelModel, frozen=True):
     """The head of a public meeting: what the join page shows."""
 
     code: str
@@ -84,7 +78,7 @@ class PublicMeetingHead(_CamelModel):
     guests_mode: GuestsMode = Field(alias="guestsMode")
 
 
-class GuestAgendaItem(_CamelModel):
+class GuestAgendaItem(FrozenCamelModel, frozen=True):
     """One agenda item in the guest view.
 
     A non-public item keeps its title but never its text.
@@ -101,7 +95,7 @@ class GuestAgendaItem(_CamelModel):
     done: bool = False
 
 
-class GuestTally(_CamelModel):
+class GuestTally(FrozenCamelModel, frozen=True):
     """The tally of a vote, as a guest sees it."""
 
     counts: dict[str, int]
@@ -113,7 +107,7 @@ class GuestTally(_CamelModel):
     present_guests: int | None = Field(default=None, alias="presentGuests")
 
 
-class GuestVote(_CamelModel):
+class GuestVote(FrozenCamelModel, frozen=True):
     """A vote of a public agenda item, as a guest sees it."""
 
     id: UUID
@@ -141,7 +135,7 @@ class GuestVote(_CamelModel):
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
 
-class GuestView(_CamelModel):
+class GuestView(FrozenCamelModel, frozen=True):
     """The participant view of an admitted guest: public items, votes, counts."""
 
     current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
@@ -151,7 +145,7 @@ class GuestView(_CamelModel):
     votes: list[GuestVote]
 
 
-class GuestMe(_CamelModel):
+class GuestMe(FrozenCamelModel, frozen=True):
     """The own state of a guest (``GET /public/meetings/{code}/me``)."""
 
     guest_id: UUID = Field(alias="guestId")
