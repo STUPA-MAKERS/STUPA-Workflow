@@ -35,7 +35,7 @@ class AltchaError(Exception):
     """The ALTCHA solution is missing, invalid, expired, or already used."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Challenge:
     """A server-signed proof-of-work challenge for the client."""
 
@@ -117,7 +117,7 @@ def _parse_expires(salt: str) -> int | None:
     return int(raw)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Solution:
     """A parsed proof-of-work solution.
 
@@ -246,11 +246,10 @@ class InMemoryReplayGuard:
         Each call drops the expired entries, so the store does not grow without a bound.
         """
         now = self._now()
-        self._seen = {k: exp for k, exp in self._seen.items() if exp > now}
-        if key in self._seen:
-            return True
-        self._seen[key] = now + ttl_seconds
-        return False
+        live = {k: exp for k, exp in self._seen.items() if exp > now}
+        replay = key in live
+        self._seen = live if replay else {**live, key: now + ttl_seconds}
+        return replay
 
 
 class RedisReplayGuard:

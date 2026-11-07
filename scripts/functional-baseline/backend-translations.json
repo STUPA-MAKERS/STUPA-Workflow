@@ -1,4 +1,3 @@
 {
-  "backend/app/modules/translations/schemas.py": 10,
-  "backend/app/modules/translations/service.py": 12
+  "backend/app/modules/translations/service.py": 4
 }

@@ -63,7 +63,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         trace_id = uuid.uuid4().hex
         request.state.trace_id = trace_id
         response = await call_next(request)
-        response.headers[TRACE_HEADER] = trace_id
+        response.headers.update({TRACE_HEADER: trace_id})
         return response
 
 
@@ -82,7 +82,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         for key, value in _SECURITY_HEADERS.items():
             response.headers.setdefault(key, value)
         if request.url.path.startswith(PUBLIC_API_PREFIX):
-            response.headers["X-Robots-Tag"] = "noindex"
+            response.headers.update({"X-Robots-Tag": "noindex"})
         return response
 
 

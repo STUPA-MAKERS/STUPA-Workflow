@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from app.shared.schemas import FrozenModel
 
 
-class CalendarFeedOut(BaseModel):
+class CalendarFeedOut(FrozenModel, frozen=True):
     """Personal iCal subscription URL.
 
     The value is `None` until the principal generates a token.

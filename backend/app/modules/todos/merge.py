@@ -15,7 +15,9 @@ comments, the application comments and the ticket notes.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+from itertools import accumulate
 from typing import Any, Literal, cast
 from uuid import UUID
 
@@ -23,6 +25,7 @@ from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.todos.grouping import grouped
 from app.modules.todos.lexorank import between
 from app.modules.todos.models import (
     TodoBoard,
@@ -70,6 +73,28 @@ async def _fold_labels(session: AsyncSession, source_id: UUID, target_id: UUID) 
     await session.flush()
 
 
+def _chain(last: str | None, count: int) -> tuple[str, ...]:
+    """Return ``count`` ascending ranks after ``last`` (``None``: an empty column)."""
+    if count == 0:
+        return ()
+    first = between(last, None)
+    return tuple(accumulate(range(count - 1), lambda rank, _: between(rank, None), initial=first))
+
+
+def _appended_ranks(columns: Sequence[UUID], last: Mapping[UUID, str | None]) -> tuple[str, ...]:
+    """Return the rank of each card that goes to the end of the column ``columns[i]``.
+
+    The cards of one column follow each other in the given order, after its last rank.
+    """
+    slots = grouped((column_id, index) for index, column_id in enumerate(columns))
+    rank_of = {
+        index: rank
+        for column_id, indexes in slots.items()
+        for index, rank in zip(indexes, _chain(last[column_id], len(indexes)), strict=True)
+    }
+    return tuple(rank_of[index] for index in range(len(columns)))
+
+
 async def fold_personal_board(session: AsyncSession, source_id: UUID, target_id: UUID) -> int:
     """Move every card of the board ``source_id`` into ``target_id``, then delete it.
 
@@ -86,15 +111,15 @@ async def fold_personal_board(session: AsyncSession, source_id: UUID, target_id:
             .order_by(TodoColumn.position, TodoCard.rank, TodoCard.id)
         )
     ).all()
-    last: dict[UUID, str | None] = {}
-    for column_id in (first, done):
-        last[column_id] = await session.scalar(
+    last = {
+        column_id: await session.scalar(
             select(func.max(TodoCard.rank)).where(TodoCard.column_id == column_id)
         )
-    for card, is_done in cards:
-        column_id = done if is_done else first
-        rank = between(last[column_id], None)
-        last[column_id] = rank
+        for column_id in (first, done)
+    }
+    columns = [done if is_done else first for _card, is_done in cards]
+    ranks = _appended_ranks(columns, last)
+    for (card, _is_done), column_id, rank in zip(cards, columns, ranks, strict=True):
         card.board_id = target_id
         card.column_id = column_id
         card.rank = rank

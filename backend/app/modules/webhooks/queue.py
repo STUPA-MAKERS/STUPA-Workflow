@@ -34,7 +34,7 @@ class WebhookQueue(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ArqWebhookQueue:
     """arq-backed queue that enqueues `deliver_webhook` with an idempotent job id.
 
