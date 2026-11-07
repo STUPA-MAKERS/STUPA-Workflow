@@ -85,27 +85,41 @@ async def anonymize_tickets(ctx: dict[str, Any], now: datetime | None = None) ->
     moment = now or datetime.now(UTC)
     maker = _sessionmaker(ctx)
     storage = _storage(ctx)
-    done = 0
-    for ticket_id in await _due(maker):
-        try:
-            async with maker() as session:
-                ticket = await session.get(Ticket, ticket_id, with_for_update=True)
-                if ticket is None or ticket.anonymized_at is not None:
-                    continue
-                files = FilesService(session, storage=storage)
-                await TicketService(session, files=files).anonymize(ticket, actor=_ACTOR)
-                ticket.anonymized_at = moment
-                await audit_record(
-                    session,
-                    actor=_ACTOR,
-                    action=AuditAction.ANONYMIZATION,
-                    target_type="ticket",
-                    target_id=str(ticket_id),
-                )
-                await session.commit()
-                done += 1
-        except Exception:
-            logger.exception("ticket anonymization failed for %s", ticket_id)
+    due = await _due(maker)
+    done = sum([await _anonymize_one(maker, storage, ticket_id, moment) for ticket_id in due])
     if done:
         logger.info("anonymized %d ticket(s)", done)
     return done
+
+
+async def _anonymize_one(
+    maker: async_sessionmaker[AsyncSession],
+    storage: ObjectStorage | None,
+    ticket_id: UUID,
+    moment: datetime,
+) -> bool:
+    """Anonymize one ticket under its row lock; return whether it was anonymized.
+
+    A ticket that is gone or already anonymized gives False. An error logs and gives
+    False, because one bad row must not stop the run.
+    """
+    try:
+        async with maker() as session:
+            ticket = await session.get(Ticket, ticket_id, with_for_update=True)
+            if ticket is None or ticket.anonymized_at is not None:
+                return False
+            files = FilesService(session, storage=storage)
+            await TicketService(session, files=files).anonymize(ticket, actor=_ACTOR)
+            ticket.anonymized_at = moment
+            await audit_record(
+                session,
+                actor=_ACTOR,
+                action=AuditAction.ANONYMIZATION,
+                target_type="ticket",
+                target_id=str(ticket_id),
+            )
+            await session.commit()
+            return True
+    except Exception:
+        logger.exception("ticket anonymization failed for %s", ticket_id)
+        return False
