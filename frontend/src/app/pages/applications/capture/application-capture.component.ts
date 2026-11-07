@@ -77,6 +77,21 @@ const ERROR_TEXTS: Record<string, TranslationKey> = {
 /** A plain e-mail check; the server validates the address again. */
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** The sections with every field of `fileKeys` in the first one drawn as draft files. */
+function withDraftFiles(
+  sections: readonly FormlyFieldConfig[],
+  fileKeys: ReadonlySet<string>,
+): FormlyFieldConfig[] {
+  const [first, ...rest] = sections;
+  if (!first?.fieldGroup) return [...sections];
+  const fieldGroup = first.fieldGroup.map((field) =>
+    typeof field.key === 'string' && fileKeys.has(field.key)
+      ? { ...field, type: FormlyDraftFilesType, className: 'fe-full' }
+      : field,
+  );
+  return [{ ...first, fieldGroup }, ...rest];
+}
+
 /**
  * "Antrag erfassen": capture an application on behalf of an applicant.
  *
@@ -296,7 +311,8 @@ export class ApplicationCaptureComponent {
     this.guestEmail.set(value);
     this.lookUpEmail.cancel();
     const email = value.trim();
-    const seq = ++this.emailSeq;
+    this.emailSeq = this.emailSeq + 1;
+    const seq = this.emailSeq;
     if (EMAIL.test(email)) this.lookUpEmail(email, seq);
   }
 
@@ -355,14 +371,8 @@ export class ApplicationCaptureComponent {
     const sections = toFormlySections(eff.sections, this.i18n.uiLocale(), {
       has_budget: eff.hasBudget,
     });
-    for (const field of sections[0]?.fieldGroup ?? []) {
-      if (typeof field.key === 'string' && fileKeys.has(field.key)) {
-        field.type = FormlyDraftFilesType;
-        field.className = 'fe-full';
-      }
-    }
     this.form = this.trackedGroup();
-    this.fields.set(sections);
+    this.fields.set(withDraftFiles(sections, fileKeys));
   }
 
   /** A form group that tells `canSubmit` about every change of Formly. */

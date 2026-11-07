@@ -84,7 +84,8 @@ export class ForceStatusDialogComponent {
     this.choice.set('');
     this.note.set('');
     this.states.set([]);
-    const seq = ++this.seq;
+    this.seq = this.seq + 1;
+    const seq = this.seq;
     this.api.flowStates(id).subscribe({
       next: (states) => {
         if (seq === this.seq) this.states.set(states);
