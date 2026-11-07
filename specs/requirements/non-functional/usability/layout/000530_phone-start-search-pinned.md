@@ -2,7 +2,7 @@
 id: "000530"
 title: The search bar of the start page stays at the top on the phone
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-07
 implementation:
