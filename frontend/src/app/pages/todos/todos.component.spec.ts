@@ -1514,6 +1514,7 @@ describe('TodosComponent', () => {
         const { cmp, harness } = await start('/todos/b-0', { board: personal(), rows: [other()] });
         const root = harness.routeNativeElement!;
         expect(cmp.phoneList()).toBe(true);
+        expect(cmp.phonePages()).toBe(false);
         expect(root.querySelector('app-todo-board-view')).toBeNull();
         expect(root.querySelector('.bv__dots')).toBeNull();
         expect(root.querySelector('.br__cols')).toBeNull();
@@ -1714,18 +1715,21 @@ describe('TodosComponent', () => {
 
       /**
        * The board is a pane page: on the phone it pulls the foot gap of the main column back, so
-       * the pages reach the bottom bar. A page does not fade, because the tab line and the bottom
-       * bar cut it.
+       * the pages reach the bottom bar. A page does not fade: it runs under the glass head and
+       * the tab line, and the bottom bar cuts it (spec 000527).
        */
       it('keeps the tab board for a gremium board and its list view', async () => {
         const { cmp, harness } = await start('/todos/b-1');
         expect(cmp.phoneList()).toBe(false);
+        expect(cmp.phonePages()).toBe(true);
+        expect(harness.routeNativeElement!.querySelector('.td__body')).toHaveClass('td__body--pages');
         expect(harness.routeNativeElement!.querySelector('.bv--phone')).not.toBeNull();
         expect(document.querySelector('app-todos')).toHaveClass('pane-page');
         expect(harness.routeNativeElement!.querySelector('.tp__page')).not.toHaveAttribute('appScrollFade');
         TestBed.resetTestingModule();
         const list = await start('/todos/b-0?view=list', { board: personal() });
         expect(list.cmp.phoneList()).toBe(false);
+        expect(list.cmp.phonePages()).toBe(false);
       });
     });
   });
