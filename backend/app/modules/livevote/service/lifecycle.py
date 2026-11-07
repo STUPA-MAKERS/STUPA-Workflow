@@ -14,6 +14,7 @@ handover ``now``, and the close ends the running period.
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -58,11 +59,21 @@ _AUDITED_FIELDS: tuple[tuple[str, str], ...] = (
 
 def _snapshot(meeting: Meeting) -> dict[str, str | None]:
     """Return the audited planning values of a meeting as JSON-safe strings."""
-    out: dict[str, str | None] = {}
-    for attr, key in _AUDITED_FIELDS:
-        value: Any = getattr(meeting, attr)
-        out[key] = None if value is None else str(value)
-    return out
+    values: tuple[tuple[str, Any], ...] = tuple(
+        (key, getattr(meeting, attr)) for attr, key in _AUDITED_FIELDS
+    )
+    return {key: None if value is None else str(value) for key, value in values}
+
+
+def _merged(first: GuestEvents | None, closed: GuestEvents | None) -> GuestEvents | None:
+    """Join the guest broadcasts of a patch: the close sends its own after the earlier ones."""
+    match (first, closed):
+        case (_, None):
+            return first
+        case (None, GuestEvents()):
+            return closed
+        case (GuestEvents(), GuestEvents()):
+            return replace(closed, updated=(*first.updated, *closed.updated))
 
 
 class LifecycleOps(HandoverOps):
@@ -186,8 +197,7 @@ class LifecycleOps(HandoverOps):
 
         The close drops the planned keeper period, cancels the drafts, which can never open,
         and removes the requests that never got admitted, the guest names and every guest
-        token. The voting service is imported locally, because it imports the flow engine,
-        which reaches back into this module.
+        token.
 
         Raises:
             ConflictError: The status change is not ``planned`` to ``live`` or ``live``
@@ -272,16 +282,13 @@ class LifecycleOps(HandoverOps):
             await self._apply_public(meeting, payload, principal, now) if wants_public else None
         )
         going_live = status_change and payload.status == "live"
-        handed_over = False
         if payload.active_application_id is not None:
             meeting.active_application_id = payload.active_application_id
-        if wants_now:
-            old_item = meeting.current_agenda_item_id
-            meeting.current_agenda_item_id = payload.current_agenda_item_id
-            if meeting.status == "live" and await self.activate_planned(
-                meeting, old_item, payload.current_agenda_item_id, principal.sub, now
-            ):
-                handed_over = True
+        moved_keeper = (
+            await self._move_current(meeting, payload.current_agenda_item_id, principal, now)
+            if wants_now
+            else False
+        )
         if payload.complete_agenda_item_id is not None:
             await AgendaService(self.session).set_done_in_tx(
                 meeting,
@@ -305,63 +312,28 @@ class LifecycleOps(HandoverOps):
             and meeting.end_time <= meeting.start_time
         ):
             raise BadRequestError("endTime must be after startTime")
-        if (
-            "protokollant_id" in payload.model_fields_set
-            and payload.protokollant_id != meeting.protokollant_id
-        ):
-            if await self._protocol_final(meeting.id):
-                raise ConflictError(
-                    "protocol is finalized — the protokollant can no longer change",
-                    code="protocol_finalized",
-                )
-            if meeting.status == "live":
-                if payload.protokollant_id is None:
-                    raise ConflictError(
-                        "a live meeting needs a protokollant — hand the minutes over instead",
-                        code="protokollant_required",
-                    )
-                previous = meeting.protokollant_id
-                await self.check_keeper(meeting.gremium_id, payload.protokollant_id)
-                await self.switch_now(meeting, payload.protokollant_id, now)
-                await self._audit_handover(
-                    meeting,
-                    principal.sub,
-                    mode="now",
-                    previous=previous,
-                    target=payload.protokollant_id,
-                )
-                handed_over = True
-            else:
-                meeting.protokollant_id = await self._resolve_protokollant(
-                    meeting.gremium_id, payload.protokollant_id
-                )
+        switched_keeper = await self._change_protokollant(meeting, payload, principal, now)
         if going_live and meeting.protokollant_id is None:
             raise ConflictError(
                 "assign a protokollant before starting the meeting",
                 code="protokollant_missing",
             )
-        cancelled: list[Vote] = []
         if going_live and meeting.started_at is None:
             meeting.started_at = now
         if going_live:
             await self.open_first_period(meeting, now)
-        if closing:
-            await self.close_periods(meeting, now)
-            meeting.closed_at = now
-            from app.modules.voting.service import VotingService
-
-            cancelled = await VotingService(self.session).cancel_drafts_for_meeting(
-                meeting.id, now=now, actor=principal.sub
-            )
-            closed_events = await GuestService(self.session).purge_on_close(meeting)
-            if guest_events is not None:
-                closed_events.updated[:0] = guest_events.updated
-            guest_events = closed_events
+        cancelled, closed_events = (
+            await self._close(meeting, principal.sub, now) if closing else ([], None)
+        )
+        all_guest_events = _merged(guest_events, closed_events)
         if payload.status is not None:
             meeting.status = payload.status
-        after = _snapshot(meeting)
-        if handed_over:
-            after["protokollantId"] = before["protokollantId"]
+        kept_keeper = (
+            {"protokollantId": before["protokollantId"]}
+            if moved_keeper or switched_keeper
+            else {}
+        )
+        after = {**_snapshot(meeting), **kept_keeper}
         changes = {
             key: {"from": before[key], "to": after[key]}
             for key in after
@@ -380,13 +352,87 @@ class LifecycleOps(HandoverOps):
         cancelled_events = await self._cancelled_events(cancelled)
         await self.session.commit()
         await self._publish_cancelled(cancelled_events)
-        if guest_events is not None:
-            await GuestService(self.session, self.publisher).publish(meeting.id, guest_events)
+        if all_guest_events is not None:
+            await GuestService(self.session, self.publisher).publish(meeting.id, all_guest_events)
         votes = (await self._votes_for([meeting.id], principal)).get(meeting.id, [])
         out = await self._emit(meeting, principal, votes=votes)
         if self.publisher is not None:
             await self.publisher.meeting_state(out)
         return out
+
+    async def _move_current(
+        self, meeting: Meeting, item_id: UUID | None, principal: Principal, now: datetime
+    ) -> bool:
+        """Set the current agenda item; a forward move in a live meeting starts the plan.
+
+        Returns:
+            True when the move handed the minutes over.
+        """
+        old_item = meeting.current_agenda_item_id
+        meeting.current_agenda_item_id = item_id
+        return meeting.status == "live" and await self.activate_planned(
+            meeting, old_item, item_id, principal.sub, now
+        )
+
+    async def _change_protokollant(
+        self, meeting: Meeting, payload: MeetingPatch, principal: Principal, now: datetime
+    ) -> bool:
+        """Apply a new protokollant of a patch: a handover ``now`` in a live meeting.
+
+        Returns:
+            True when the change handed the minutes over.
+        """
+        if not (
+            "protokollant_id" in payload.model_fields_set
+            and payload.protokollant_id != meeting.protokollant_id
+        ):
+            return False
+        if await self._protocol_final(meeting.id):
+            raise ConflictError(
+                "protocol is finalized — the protokollant can no longer change",
+                code="protocol_finalized",
+            )
+        if meeting.status == "live":
+            if payload.protokollant_id is None:
+                raise ConflictError(
+                    "a live meeting needs a protokollant — hand the minutes over instead",
+                    code="protokollant_required",
+                )
+            previous = meeting.protokollant_id
+            await self.check_keeper(meeting.gremium_id, payload.protokollant_id)
+            await self.switch_now(meeting, payload.protokollant_id, now)
+            await self._audit_handover(
+                meeting,
+                principal.sub,
+                mode="now",
+                previous=previous,
+                target=payload.protokollant_id,
+            )
+            return True
+        meeting.protokollant_id = await self._resolve_protokollant(
+            meeting.gremium_id, payload.protokollant_id
+        )
+        return False
+
+    async def _close(
+        self, meeting: Meeting, actor: str, now: datetime
+    ) -> tuple[list[Vote], GuestEvents]:
+        """Close a meeting: end the keeper periods, cancel the drafts, purge the guests.
+
+        The voting service is imported locally, because it imports the flow engine, which
+        reaches back into this module.
+
+        Returns:
+            The cancelled drafts and the guest broadcasts of the purge.
+        """
+        await self.close_periods(meeting, now)
+        meeting.closed_at = now
+        from app.modules.voting.service import VotingService
+
+        cancelled = await VotingService(self.session).cancel_drafts_for_meeting(
+            meeting.id, now=now, actor=actor
+        )
+        return cancelled, await GuestService(self.session).purge_on_close(meeting)
 
     async def _apply_public(
         self, meeting: Meeting, payload: MeetingPatch, principal: Principal, now: datetime
@@ -420,11 +466,13 @@ class LifecycleOps(HandoverOps):
         meeting.public_join = new_public
         meeting.guests_mode = new_mode
         guests = GuestService(self.session)
-        events = GuestEvents(counts=True)
         if new_public:
             await guests.ensure_code(meeting)
-        elif old_public:
-            events = await guests.switch_off(meeting, actor_sub=principal.sub, now=now)
+        events = (
+            await guests.switch_off(meeting, actor_sub=principal.sub, now=now)
+            if old_public and not new_public
+            else GuestEvents(counts=True)
+        )
         await audit_record(
             self.session,
             actor=principal.sub,
@@ -654,9 +702,8 @@ class LifecycleOps(HandoverOps):
             "finalizedProtocol": finalized,
             "deletedVotes": len(deleted_votes),
             "deletedVoteIds": [str(vote_id) for vote_id in deleted_votes],
+            **({} if reason is None else {"reason": reason}),
         }
-        if reason is not None:
-            data["reason"] = reason
         await audit_record(
             self.session,
             actor=principal.sub,

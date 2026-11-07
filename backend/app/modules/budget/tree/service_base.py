@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import or_, select
+from sqlalchemy import ColumnElement, Select, or_, select
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -41,13 +41,32 @@ def _json_safe(value: object) -> object:
 
     A ``datetime`` takes the ``date`` branch, because it is a subclass of ``date``.
     """
-    if isinstance(value, Decimal):
-        return str(value)
-    if isinstance(value, date):
-        return value.isoformat()
-    if isinstance(value, UUID):
-        return str(value)
-    return value
+    match value:
+        case Decimal() | UUID():
+            return str(value)
+        case date():
+            return value.isoformat()
+        case _:
+            return value
+
+
+def _applied(*clauses: ColumnElement[bool] | None) -> tuple[ColumnElement[bool], ...]:
+    """Keep the filter clauses that a request sets, in order.
+
+    `None` stands for a filter that the request leaves out. The test is `is not None`,
+    because the truth value of a SQL clause is undefined.
+    """
+    return tuple(clause for clause in clauses if clause is not None)
+
+
+def _subtree_ids(node: Budget) -> Select[UUID]:
+    """Select the ids of `node` and of every node below it, by the path-key prefix."""
+    return select(Budget.id).where(
+        or_(
+            Budget.path_key == node.path_key,
+            Budget.path_key.like(node.path_key + _SEP + "%"),
+        )
+    )
 
 
 class BudgetTreeServiceBase:

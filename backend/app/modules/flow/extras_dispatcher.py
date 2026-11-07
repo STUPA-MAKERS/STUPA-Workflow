@@ -49,7 +49,7 @@ logger = logging.getLogger("app.flow.actions")
 _FLOW_ACTOR = "system:flow"
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class FlowExtrasActionDispatcher:
     """`ActionDispatcher` for the budget and agenda actions.
 
@@ -68,16 +68,19 @@ class FlowExtrasActionDispatcher:
         """
         for action in actions:
             try:
-                if action.type == "addToNextSession":
-                    await self._add_to_next_session(action)
-                elif action.type == "assignBudget":
-                    await self._assign_budget(action)
-                elif action.type == "assignBudgetFromField":
-                    await self._assign_budget_from_field(action)
-                elif action.type == "assignBudgetFromApplicantGremium":
-                    await self._assign_budget_from_applicant_gremium(action)
-                elif action.type == "assignBudgetFromMap":
-                    await self._assign_budget_from_map(action)
+                match action.type:
+                    case "addToNextSession":
+                        await self._add_to_next_session(action)
+                    case "assignBudget":
+                        await self._assign_budget(action)
+                    case "assignBudgetFromField":
+                        await self._assign_budget_from_field(action)
+                    case "assignBudgetFromApplicantGremium":
+                        await self._assign_budget_from_applicant_gremium(action)
+                    case "assignBudgetFromMap":
+                        await self._assign_budget_from_map(action)
+                    case _:
+                        pass
             except Exception:
                 logger.exception(
                     "flow action %s failed (key=%s) — skipped",
@@ -184,32 +187,26 @@ class FlowExtrasActionDispatcher:
                     app.id,
                 )
                 return
-            stmt = select(Budget.id).where(
-                Budget.active.is_(True), Budget.decision_gremium_id.in_(gremien)
-            )
-            if parent_ref:
-                parent_id = _parse_budget_uuid(
-                    "assignBudgetFromApplicantGremium parentId", parent_ref
+            parent_path = await _parent_path(session, parent_ref) if parent_ref else None
+            if parent_ref and parent_path is None:
+                logger.warning(
+                    "assignBudgetFromApplicantGremium: parent %r missing — skipped",
+                    parent_ref,
                 )
-                parent_path = (
-                    await session.scalar(
-                        select(Budget.path_key).where(Budget.id == parent_id)
-                    )
-                    if parent_id is not None
-                    else None
-                )
-                if parent_path is None:
-                    logger.warning(
-                        "assignBudgetFromApplicantGremium: parent %r missing — skipped",
-                        parent_ref,
-                    )
-                    return
-                stmt = stmt.where(
+                return
+            subtree = (
+                (
                     or_(
                         Budget.path_key == parent_path,
                         Budget.path_key.like(parent_path + _SEP + "%"),
-                    )
+                    ),
                 )
+                if parent_path is not None
+                else ()
+            )
+            stmt = select(Budget.id).where(
+                Budget.active.is_(True), Budget.decision_gremium_id.in_(gremien), *subtree
+            )
             matches = list((await session.scalars(stmt)).all())
             if len(matches) != 1:
                 logger.info(
@@ -411,15 +408,31 @@ class FlowExtrasActionDispatcher:
     @staticmethod
     async def _top_level(session: AsyncSession, node: Budget) -> Budget:
         """Walk the parent chain up to the top-level node (`parent_id IS NULL`)."""
-        current = node
-        seen: set[UUID] = set()
-        while current.parent_id is not None and current.parent_id not in seen:
-            seen.add(current.id)
-            parent = await session.get(Budget, current.parent_id)
-            if parent is None:
-                break
-            current = parent
-        return current
+        return await _walk_up(session, node, frozenset())
+
+
+async def _walk_up(session: AsyncSession, node: Budget, seen: frozenset[UUID]) -> Budget:
+    """Return the top-level ancestor of `node`, one parent per call.
+
+    `seen` holds the nodes passed so far. A cycle or a missing parent stops the walk at the
+    current node, so broken data never loops.
+    """
+    parent = (
+        await session.get(Budget, node.parent_id)
+        if node.parent_id is not None and node.parent_id not in seen
+        else None
+    )
+    return node if parent is None else await _walk_up(session, parent, seen | {node.id})
+
+
+async def _parent_path(session: AsyncSession, parent_ref: object) -> str | None:
+    """Return the `path_key` of the `parentId` node, or `None` when it does not resolve."""
+    parent_id = _parse_budget_uuid("assignBudgetFromApplicantGremium parentId", parent_ref)
+    return (
+        await session.scalar(select(Budget.path_key).where(Budget.id == parent_id))
+        if parent_id is not None
+        else None
+    )
 
 
 async def _applicant_gremien(session: AsyncSession, sub: str | None) -> list[UUID]:

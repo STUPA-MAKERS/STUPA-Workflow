@@ -6,7 +6,7 @@ tie. The tests use no database and no clock, so they stay deterministic.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -14,7 +14,9 @@ from app.modules.voting.tally import (
     ABSTAIN,
     NO,
     YES,
+    MajorityRule,
     Outcome,
+    _majority,
     failed_reason,
     leading,
     result,
@@ -191,3 +193,12 @@ def test_failed_reason_majority_when_quorum_met_but_rejected() -> None:
 def test_failed_reason_none_when_passed_or_tie() -> None:
     assert failed_reason("passed", quorum_met=True) is None
     assert failed_reason("tie", quorum_met=False) is None
+
+
+def test_majority_refuses_an_unknown_rule() -> None:
+    """A rule outside ``MajorityRule`` never gets a result: the match refuses it.
+
+    ``VoteConfig`` validates the rule, so only a bypass of the types reaches this arm.
+    """
+    with pytest.raises(AssertionError):
+        _majority(cast("MajorityRule", "bogus"), 1, 0, 1)

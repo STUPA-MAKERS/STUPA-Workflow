@@ -12,13 +12,14 @@ leak no stack trace and no path outward.
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import JSONResponse
+
+from app.shared.schemas import FrozenModel
 
 logger = logging.getLogger("app.error")
 
@@ -67,20 +68,20 @@ STATUS_TITLE_MAP: dict[int, str] = {
 }
 
 
-class FieldError(BaseModel):
+class FieldError(FrozenModel, frozen=True):
     """Validation error of one field in a problem response."""
     field: str
     msg: str
 
 
-class ProblemDetail(BaseModel):
+class ProblemDetail(FrozenModel, frozen=True):
     """Error body of every 4xx and 5xx response (RFC 9457 problem+json)."""
     type: str
     title: str
     status: int
     code: str
     detail: str | None = None
-    errors: list[FieldError] | None = None
+    errors: tuple[FieldError, ...] | None = None
     traceId: str | None = None
 
 
@@ -121,8 +122,8 @@ class AppError(Exception):
         self.code = code or code_for(self.status)
         self.title = title or title_for(self.status)
         self.detail = detail
-        self.errors: list[FieldError] | None = (
-            [e if isinstance(e, FieldError) else FieldError(**e) for e in errors]
+        self.errors: tuple[FieldError, ...] | None = (
+            tuple(e if isinstance(e, FieldError) else FieldError(**e) for e in errors)
             if errors is not None
             else None
         )
@@ -222,11 +223,8 @@ def _trace_id(request: Request) -> str | None:
 def _problem_response(
     problem: ProblemDetail, extra_headers: dict[str, str] | None = None
 ) -> JSONResponse:
-    headers: dict[str, str] = {}
-    if problem.traceId:
-        headers["X-Trace-Id"] = problem.traceId
-    if extra_headers:
-        headers.update(extra_headers)
+    trace = {"X-Trace-Id": problem.traceId} if problem.traceId else {}
+    headers = {**trace, **(extra_headers or {})}
     return JSONResponse(
         status_code=problem.status,
         content=problem.model_dump(exclude_none=True),
@@ -240,7 +238,7 @@ async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 
 
 def _validation_problem(
-    request: Request, *, detail: str, errors: list[FieldError]
+    request: Request, *, detail: str, errors: Sequence[FieldError]
 ) -> JSONResponse:
     """Uniform 422 problem+json for any body/parameter validation."""
     problem = ProblemDetail(
@@ -249,7 +247,7 @@ def _validation_problem(
         status=422,
         code="validation_error",
         detail=detail,
-        errors=errors,
+        errors=tuple(errors),
         traceId=_trace_id(request),
     )
     return _problem_response(problem)
@@ -258,10 +256,10 @@ def _validation_problem(
 async def _validation_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    errors = [
+    errors = tuple(
         FieldError(field=".".join(str(p) for p in e["loc"]), msg=e["msg"])
         for e in exc.errors()
-    ]
+    )
     return _validation_problem(request, detail="Request validation failed.", errors=errors)
 
 
@@ -281,7 +279,7 @@ async def _http_exception_handler(
         return _validation_problem(
             request,
             detail="Request body could not be parsed.",
-            errors=[FieldError(field="body", msg="Request body could not be parsed.")],
+            errors=(FieldError(field="body", msg="Request body could not be parsed."),),
         )
     status = exc.status_code
     detail = exc.detail if isinstance(exc.detail, str) else None
@@ -334,18 +332,65 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 def _ensure_problem_components(schema: dict[str, object]) -> None:
     """Register ``ProblemDetail`` (+ ``FieldError``) in the components block (idempotent)."""
-    components = schema.setdefault("components", {})
+    schema.update(_with_problem_components(schema))
+
+
+def _with_problem_components(schema: Mapping[str, object]) -> dict[str, object]:
+    """Return ``schema`` with ``ProblemDetail`` (+ ``FieldError``) in its components block.
+
+    A schema that holds ``ProblemDetail`` already keeps its components as they are. A
+    component of the same name that the schema holds wins over the one of the model.
+    """
+    components = schema.get("components", {})
     assert isinstance(components, dict)
-    schemas = components.setdefault("schemas", {})
+    schemas = components.get("schemas", {})
     assert isinstance(schemas, dict)
+    return {
+        **schema,
+        "components": {**components, "schemas": _with_problem_schemas(schemas)},
+    }
+
+
+def _with_problem_schemas(schemas: Mapping[str, object]) -> dict[str, object]:
+    """Return the component schemas with ``ProblemDetail`` and its ``$defs`` added."""
     if "ProblemDetail" in schemas:
-        return
-    model = ProblemDetail.model_json_schema(
-        ref_template="#/components/schemas/{model}"
+        return dict(schemas)
+    model = ProblemDetail.model_json_schema(ref_template="#/components/schemas/{model}")
+    definitions: dict[str, object] = model.get("$defs", {})
+    body = {key: value for key, value in model.items() if key != "$defs"}
+    added = {name: d for name, d in definitions.items() if name not in schemas}
+    return {**schemas, **added, "ProblemDetail": body}
+
+
+def _problem_operation(operation: object, problem_content: object) -> object:
+    """Return an operation whose 4xx and 5xx responses document problem+json.
+
+    An operation with ``x-error-contract: oauth`` stays as it is. An operation with a
+    request body gets a 422, because an unparseable body can give one.
+    """
+    if not isinstance(operation, dict) or operation.get("x-error-contract") == "oauth":
+        return operation
+    responses = operation.get("responses", {})
+    with_422 = (
+        {**responses, "422": responses.get("422", {"description": "Validation Error"})}
+        if "requestBody" in operation and isinstance(responses, dict)
+        else responses
     )
-    for name, definition in model.pop("$defs", {}).items():
-        schemas.setdefault(name, definition)
-    schemas["ProblemDetail"] = model
+    return {**operation, "responses": _problem_responses(with_422, problem_content)}
+
+
+def _problem_responses(responses: object, problem_content: object) -> object:
+    """Return the responses with the problem+json content on every 4xx and 5xx response."""
+    if not isinstance(responses, dict):
+        return responses
+    return {
+        code: (
+            {**response, "content": problem_content}
+            if str(code)[0] in {"4", "5"} and isinstance(response, dict)
+            else response
+        )
+        for code, response in responses.items()
+    }
 
 
 def use_problem_json_contract(app: FastAPI) -> None:
@@ -367,8 +412,7 @@ def use_problem_json_contract(app: FastAPI) -> None:
     def custom_openapi() -> dict[str, object]:
         if app.openapi_schema:
             return app.openapi_schema
-        schema = generate()
-        _ensure_problem_components(schema)
+        schema = _with_problem_components(generate())
         problem_content = {
             "application/problem+json": {
                 "schema": {"$ref": "#/components/schemas/ProblemDetail"}
@@ -376,21 +420,15 @@ def use_problem_json_contract(app: FastAPI) -> None:
         }
         paths = schema.get("paths", {})
         assert isinstance(paths, dict)
-        for operations in paths.values():
-            for operation in operations.values():
-                if not isinstance(operation, dict):
-                    continue
-                if operation.get("x-error-contract") == "oauth":
-                    continue
-                responses = operation.setdefault("responses", {})
-                if "requestBody" in operation and isinstance(responses, dict):
-                    responses.setdefault(
-                        "422", {"description": "Validation Error"}
-                    )
-                for code, response in responses.items():
-                    if str(code)[0] in {"4", "5"} and isinstance(response, dict):
-                        response["content"] = problem_content
-        app.openapi_schema = schema
-        return schema
+        problem_paths = {
+            path: {
+                method: _problem_operation(operation, problem_content)
+                for method, operation in operations.items()
+            }
+            for path, operations in paths.items()
+        }
+        contract = {**schema, "paths": problem_paths} if "paths" in schema else schema
+        app.openapi_schema = contract
+        return contract
 
     app.openapi = custom_openapi
