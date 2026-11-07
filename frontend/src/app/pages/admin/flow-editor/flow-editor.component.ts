@@ -576,7 +576,7 @@ export class FlowEditorComponent {
     return this.opts.guardValueHint(op);
   }
 
-  protected guardGroupsFor(fromKey: string): GuardGroup[] {
+  protected guardGroupsFor(fromKey: string): readonly GuardGroup[] {
     return groupsOf(this.graph().transitions ?? [], fromKey);
   }
 
@@ -775,7 +775,7 @@ export class FlowEditorComponent {
     return actionParamOf(act, key);
   }
 
-  protected recipientsOf(act: ActionDef): NotifyRecipient[] {
+  protected recipientsOf(act: ActionDef): readonly NotifyRecipient[] {
     return recipientsOf(act);
   }
 
