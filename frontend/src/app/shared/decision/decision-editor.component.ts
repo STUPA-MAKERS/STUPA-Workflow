@@ -87,8 +87,8 @@ export class DecisionEditorComponent {
   }
 
   setCondition(index: number, text: string): void {
-    const conditions = [...this.draft().conditions];
-    conditions[index] = text;
+    const old = this.draft().conditions;
+    const conditions = [...old.slice(0, index), text, ...old.slice(index + 1)];
     this.patch({ conditions });
   }
 

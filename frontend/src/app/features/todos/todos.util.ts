@@ -9,6 +9,7 @@ import type {
   TodoLabel,
   TodoLabelColor,
   TodoLink,
+  TodoLinkDetail,
   TodoLinkKind,
   TodoLinkTarget,
   TodoVoteResult,
@@ -20,6 +21,7 @@ import { dayMonth, dayMonthYear, daysUntil, parseDay, shortDay, weekdayDate, wee
 import { resolveI18n } from '@shared/forms/i18n-text';
 import type { IconName } from '@stupa-makers/ui-kit';
 import { personName } from '@shared/person-label.util';
+import { assertNever } from '@shared/util/immutable';
 
 /** The fixed label palette of the server, in the order of the settings dialog. */
 export const LABEL_COLORS: readonly TodoLabelColor[] = ['green', 'blue', 'violet', 'amber', 'red', 'gray'];
@@ -85,10 +87,10 @@ export type DueTone = 'overdue' | 'soon' | 'normal';
 
 export interface DueInfo {
   /** "14.10." */
-  date: string;
+  readonly date: string;
   /** "überfällig", "heute", "morgen" or null. */
-  note: string | null;
-  tone: DueTone;
+  readonly note: string | null;
+  readonly tone: DueTone;
 }
 
 /**
@@ -106,11 +108,18 @@ export function dueInfo(day: string, today: string, locale: string, t: Translate
 /** "in 19 Tagen", "heute", "morgen", "gestern", "vor 3 Tagen". */
 export function relativeDays(day: string, today: string, t: Translate): string {
   const n = daysUntil(day, today);
-  if (n === null) return '';
-  if (n === 0) return t('todos.due.today');
-  if (n === 1) return t('todos.due.tomorrow');
-  if (n === -1) return t('todos.due.yesterday');
-  return n > 0 ? t('todos.due.inDays', { n }) : t('todos.due.daysAgo', { n: -n });
+  switch (n) {
+    case null:
+      return '';
+    case 0:
+      return t('todos.due.today');
+    case 1:
+      return t('todos.due.tomorrow');
+    case -1:
+      return t('todos.due.yesterday');
+    default:
+      return n > 0 ? t('todos.due.inDays', { n }) : t('todos.due.daysAgo', { n: -n });
+  }
 }
 
 /** The title of a link, or "<Kind> (kein Zugriff)". */
@@ -121,76 +130,99 @@ export function linkTitle(link: Pick<TodoLink, 'kind' | 'accessible' | 'title'>,
   return link.title;
 }
 
+/** A part of a link line that is present: neither null nor undefined. */
+const isPart = (part: string | null | undefined): part is string =>
+  part !== null && part !== undefined;
+
+/** The TOP position of an agenda item, unless the title already starts with it. */
+function topPart(position: number | null | undefined, title: string, t: Translate): string | null {
+  const top = position ? t('todos.link.top', { n: position }) : null;
+  return top && !title.startsWith(`${top}:`) && title !== top ? top : null;
+}
+
+/** A number of a link (invoice, ticket), unless the title already starts with it. */
+const numberPart = (num: string | null | undefined, title: string): string | null =>
+  num && !title.startsWith(num) ? num : null;
+
+/** The facts of a link of `kind` after its kind label; a falsy entry is left out. */
+function linkFacts(
+  kind: TodoLinkKind,
+  d: TodoLinkDetail,
+  title: string,
+  locale: string,
+  lang: string,
+  t: Translate,
+): readonly (string | null | undefined)[] {
+  switch (kind) {
+    case 'application':
+      return [d.stateLabel ? resolveI18n(d.stateLabel, lang) : null];
+    case 'meeting':
+      return [d.date ? weekdayDate(d.date, locale) : null];
+    case 'agenda_item':
+      return [d.meetingTitle, topPart(d.position, title, t)];
+    case 'vote': {
+      const status = d.voteStatus ? t(VOTE_STATUS_LABEL[d.voteStatus]) : null;
+      return [d.meetingTitle, d.voteResult ? t(VOTE_RESULT_LABEL[d.voteResult]) : status];
+    }
+    case 'invoice': {
+      const counterparty = d.counterparty !== title ? d.counterparty : null;
+      const date = d.date ? weekdayDate(d.date, locale) : null;
+      const amount = d.amount ? formatMoney(d.amount, locale) : date;
+      return [numberPart(d.number, title), counterparty, amount];
+    }
+    case 'expense':
+      return [d.costCentre, d.amount ? formatMoney(d.amount, locale) : null];
+    case 'ticket':
+      return [
+        numberPart(d.number, title),
+        d.status ? t(TICKET_STATUS_LABEL[d.status] ?? 'tickets.status.new') : null,
+      ];
+    case 'todo':
+      return [d.boardName, d.columnName];
+    case 'gremium':
+      return [];
+    default:
+      return assertNever(kind);
+  }
+}
+
 /**
  * The facts of a link below its title: "TOP · 33. Sitzung · TOP 2". A number or a TOP
  * position that the title already starts with is not repeated.
  */
 export function linkSub(
-  link: (Pick<TodoLink, 'kind' | 'detail' | 'accessible'> & { title?: string | null }) | TodoLinkTarget,
+  link:
+    | (Pick<TodoLink, 'kind' | 'detail' | 'accessible'> & { readonly title?: string | null })
+    | TodoLinkTarget,
   locale: string,
   lang: string,
   t: Translate,
 ): string {
-  const parts = [t(LINK_KIND_LABEL[link.kind])];
+  const kind = t(LINK_KIND_LABEL[link.kind]);
   const d = link.detail;
-  if (!d || ('accessible' in link && !link.accessible)) return parts[0];
-  const title = link.title ?? '';
-  switch (link.kind) {
-    case 'application':
-      if (d.stateLabel) parts.push(resolveI18n(d.stateLabel, lang));
-      break;
-    case 'meeting':
-      if (d.date) parts.push(weekdayDate(d.date, locale));
-      break;
-    case 'agenda_item':
-      if (d.meetingTitle) parts.push(d.meetingTitle);
-      if (d.position) {
-        const top = t('todos.link.top', { n: d.position });
-        if (!title.startsWith(`${top}:`) && title !== top) parts.push(top);
-      }
-      break;
-    case 'vote':
-      if (d.meetingTitle) parts.push(d.meetingTitle);
-      if (d.voteResult) parts.push(t(VOTE_RESULT_LABEL[d.voteResult]));
-      else if (d.voteStatus) parts.push(t(VOTE_STATUS_LABEL[d.voteStatus]));
-      break;
-    case 'invoice':
-      if (d.number && !title.startsWith(d.number)) parts.push(d.number);
-      if (d.counterparty && d.counterparty !== title) parts.push(d.counterparty);
-      if (d.amount) parts.push(formatMoney(d.amount, locale));
-      else if (d.date) parts.push(weekdayDate(d.date, locale));
-      break;
-    case 'expense':
-      if (d.costCentre) parts.push(d.costCentre);
-      if (d.amount) parts.push(formatMoney(d.amount, locale));
-      break;
-    case 'ticket':
-      if (d.number && !title.startsWith(d.number)) parts.push(d.number);
-      if (d.status) parts.push(t(TICKET_STATUS_LABEL[d.status] ?? 'tickets.status.new'));
-      break;
-    case 'todo':
-      if (d.boardName) parts.push(d.boardName);
-      if (d.columnName) parts.push(d.columnName);
-      break;
-  }
-  return parts.filter(Boolean).join(' · ');
+  const hidden = !d || ('accessible' in link && !link.accessible);
+  const facts = hidden ? [] : linkFacts(link.kind, d, link.title ?? '', locale, lang, t);
+  return hidden ? kind : [kind, ...facts].filter(Boolean).join(' · ');
+}
+
+/** The day and weekday of a meeting or agenda item link ("Di, 03.11."), else null. */
+function linkDay(link: TodoLink, today: string, locale: string): string | null {
+  const day =
+    (link.kind === 'meeting' || link.kind === 'agenda_item') && link.detail?.date
+      ? parseDay(link.detail.date)
+      : null;
+  return day ? `${weekdayName(day, locale)}, ${shortDay(day, locale, today)}` : null;
 }
 
 /** The link line of a tile: "Sitzung · Sondersitzung Haushalt 2027 · Di, 03.11.". */
 export function linkLine(link: TodoLink, today: string, locale: string, t: Translate): string {
   const kind = t(LINK_KIND_LABEL[link.kind]);
-  if (!link.accessible || !link.title) return linkTitle(link, t);
-  const parts = [kind];
-  if (link.kind === 'ticket' && link.detail?.number) parts.push(link.detail.number);
-  parts.push(link.title);
-  if ((link.kind === 'invoice' || link.kind === 'expense') && link.detail?.amount) {
-    parts.push(formatMoney(link.detail.amount, locale));
-  }
-  if ((link.kind === 'meeting' || link.kind === 'agenda_item') && link.detail?.date) {
-    const d = parseDay(link.detail.date);
-    if (d) parts.push(`${weekdayName(d, locale)}, ${shortDay(d, locale, today)}`);
-  }
-  return parts.join(' · ');
+  const number = link.kind === 'ticket' && link.detail?.number ? link.detail.number : null;
+  const money = link.kind === 'invoice' || link.kind === 'expense';
+  const amount = money && link.detail?.amount ? formatMoney(link.detail.amount, locale) : null;
+  return !link.accessible || !link.title
+    ? linkTitle(link, t)
+    : [kind, number, link.title, amount, linkDay(link, today, locale)].filter(isPart).join(' · ');
 }
 
 /** The text of an event in the activity ("Selin Yıldız hat die Karte … verschoben"). */
@@ -250,17 +282,17 @@ export function eventText(event: TodoEvent, locale: string, t: Translate): strin
 
 /** The filters of the board and the list view; all run in the browser. */
 export interface BoardFilter {
-  q: string;
+  readonly q: string;
   /** '' all, 'me' my cards, 'none' nobody, else a principal id. */
-  assignee: string;
-  labels: readonly string[];
+  readonly assignee: string;
+  readonly labels: readonly string[];
   /** '' all, 'overdue', 'week' (within 7 days, overdue included), 'none' without a date. */
-  due: '' | 'overdue' | 'week' | 'none';
+  readonly due: '' | 'overdue' | 'week' | 'none';
   /**
    * '' all cards, 'events' only Events, 'archive' the Events with the archived ones
    * ("Veranstaltungen mit Archiv"); the page reads those from the archive.
    */
-  kind: '' | 'events' | 'archive';
+  readonly kind: '' | 'events' | 'archive';
 }
 
 export const NO_FILTER: BoardFilter = { q: '', assignee: '', labels: [], due: '', kind: '' };
@@ -273,7 +305,11 @@ export function filterActive(f: BoardFilter): boolean {
 export function matchesFilter(
   card: TodoCardTile,
   f: BoardFilter,
-  ctx: { today: string; mine: ReadonlySet<Uuid>; labels: ReadonlyMap<Uuid, TodoLabel> },
+  ctx: {
+    readonly today: string;
+    readonly mine: ReadonlySet<Uuid>;
+    readonly labels: ReadonlyMap<Uuid, TodoLabel>;
+  },
 ): boolean {
   if (f.kind && !card.event) return false;
   if (f.assignee === 'me' && !ctx.mine.has(card.id)) return false;
@@ -304,12 +340,40 @@ export function matchesFilter(
 }
 
 /** The columns by position. */
-export function sortedColumns<T extends { position: number }>(columns: readonly T[]): T[] {
+export function sortedColumns<T extends { readonly position: number }>(
+  columns: readonly T[],
+): readonly T[] {
   return [...columns].sort((a, b) => a.position - b.position);
 }
 
+/** A new list with `item` at `index` of `list` (the place `splice(index, 0, item)` puts it). */
+export function insertAt<T>(list: readonly T[], index: number, item: T): readonly T[] {
+  return [...list.slice(0, index), item, ...list.slice(index)];
+}
+
+/**
+ * The column lists with the held card of a keyboard drag taken out of its column and put
+ * at its place now (`col`, `index`); the lists as they are when no list holds it.
+ */
+export function withHeld(
+  lists: readonly (readonly TodoCardTile[])[],
+  held: { readonly cardId: Uuid; readonly col: number; readonly index: number },
+): readonly (readonly TodoCardTile[])[] {
+  const card = lists
+    .map((list) => list.find((c) => c.id === held.cardId))
+    .filter((c): c is TodoCardTile => c !== undefined)
+    .at(-1);
+  const without = (list: readonly TodoCardTile[]): readonly TodoCardTile[] => {
+    const i = list.findIndex((c) => c.id === held.cardId);
+    return i >= 0 ? [...list.slice(0, i), ...list.slice(i + 1)] : list;
+  };
+  const put = (list: readonly TodoCardTile[], i: number): readonly TodoCardTile[] =>
+    card && i === held.col ? insertAt(list, held.index, card) : list;
+  return card ? lists.map(without).map(put) : lists;
+}
+
 /** The cards of a column in board order (the server sends them by rank). */
-export function cardsOf(board: TodoBoard, columnId: Uuid): TodoCardTile[] {
+export function cardsOf(board: TodoBoard, columnId: Uuid): readonly TodoCardTile[] {
   return board.cards.filter((c) => c.columnId === columnId);
 }
 
@@ -361,19 +425,27 @@ export function applyMove<B extends TileBoard>(board: B, cardId: Uuid, move: Tod
   if (!card) return board;
   const moved: TodoCardTile = { ...card, columnId: move.columnId };
   const rest = board.cards.filter((c) => c.id !== cardId);
-  let at = -1;
-  if (move.afterId) {
-    const i = rest.findIndex((c) => c.id === move.afterId);
-    if (i >= 0) at = i + 1;
-  } else if (move.beforeId) {
-    at = rest.findIndex((c) => c.id === move.beforeId);
-  }
-  if (at < 0) {
-    const last = rest.map((c) => c.columnId).lastIndexOf(move.columnId);
-    at = last >= 0 ? last + 1 : rest.length;
-  }
+  const anchor = anchorIndex(rest, move);
+  const at = anchor >= 0 ? anchor : endOfColumn(rest, move.columnId);
   const cards = [...rest.slice(0, at), moved, ...rest.slice(at)];
   return { ...board, cards, columns: recount(board, cards) };
+}
+
+/**
+ * The index in `rest` where a move puts its card: after `afterId`, else at `beforeId`, or -1
+ * when the move names no neighbor that `rest` holds.
+ */
+function anchorIndex(rest: readonly TodoCardTile[], move: TodoCardMove): number {
+  const after = move.afterId ? rest.findIndex((c) => c.id === move.afterId) : -1;
+  const afterAt = after >= 0 ? after + 1 : -1;
+  const before = move.beforeId ? rest.findIndex((c) => c.id === move.beforeId) : -1;
+  return move.afterId ? afterAt : before;
+}
+
+/** The index after the last card of `columnId` in `rest`, or the end of `rest` without one. */
+function endOfColumn(rest: readonly TodoCardTile[], columnId: Uuid): number {
+  const last = rest.map((c) => c.columnId).lastIndexOf(columnId);
+  return last >= 0 ? last + 1 : rest.length;
 }
 
 /** Put a server tile into the board (a move answer, a new card). */
@@ -399,7 +471,11 @@ export function placeTile<B extends TileBoard>(board: B, tile: TodoCardTile): B 
 }
 
 /** The board after a card of another board landed on it, before the server answers. */
-export function insertTile<B extends TileBoard & { id: Uuid }>(board: B, tile: TodoCardTile, move: TodoCardMove): B {
+export function insertTile<B extends TileBoard & { readonly id: Uuid }>(
+  board: B,
+  tile: TodoCardTile,
+  move: TodoCardMove,
+): B {
   const base = { ...board, cards: [...board.cards.filter((c) => c.id !== tile.id), { ...tile, boardId: board.id }] };
   return applyMove(base, tile.id, move);
 }
@@ -416,7 +492,7 @@ export function canTransfer(from: TodoBoardKind, to: TodoBoardKind): boolean {
 
 /** The parts of a CDK drag that `dropEnter` reads (the element of the list it comes from). */
 interface DragSource {
-  dropContainer: { element: { nativeElement: HTMLElement } };
+  readonly dropContainer: { readonly element: { readonly nativeElement: HTMLElement } };
 }
 
 /**
@@ -482,10 +558,12 @@ export function defaultBoard(
 }
 
 /** An app route of a link ("/meetings/m-1?item=a-1") as router path and query. */
-export function splitUrl(url: string): { path: string; query: Record<string, string> } {
+export function splitUrl(url: string): {
+  readonly path: string;
+  readonly query: Readonly<Record<string, string>>;
+} {
   const [path, search = ''] = url.split('?');
-  const query: Record<string, string> = {};
-  new URLSearchParams(search).forEach((value, key) => (query[key] = value));
+  const query = Object.fromEntries(new URLSearchParams(search));
   return { path, query };
 }
 

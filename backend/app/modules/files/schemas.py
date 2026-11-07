@@ -12,7 +12,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
+
+from app.shared.schemas import FrozenCamelModel, FrozenModel
 
 if TYPE_CHECKING:
     from app.modules.files.models import Attachment
@@ -25,7 +27,7 @@ MAX_MESSAGE_ATTACHMENTS = 5
 ScanState = Literal["scanning", "clean", "quarantined"]
 
 
-class AttachmentOut(BaseModel):
+class AttachmentOut(FrozenModel, frozen=True):
     """Attachment metadata."""
 
     id: UUID
@@ -35,7 +37,7 @@ class AttachmentOut(BaseModel):
     scanned: bool
 
 
-class DraftAttachmentOut(AttachmentOut):
+class DraftAttachmentOut(AttachmentOut, frozen=True):
     """201 response of ``POST /apply/attachments``.
 
     ``draftToken`` is the token of the draft. The first upload issues it, every later
@@ -47,7 +49,7 @@ class DraftAttachmentOut(AttachmentOut):
     draftExpiresAt: datetime
 
 
-class SignedUrlOut(BaseModel):
+class SignedUrlOut(FrozenModel, frozen=True):
     """App-relative download route that the authorization layer gates.
 
     ``url`` is the ``/api/attachments/{id}/download`` route. It carries no token and no
@@ -60,10 +62,8 @@ class SignedUrlOut(BaseModel):
     expiresIn: int
 
 
-class MessageAttachmentOut(BaseModel):
+class MessageAttachmentOut(FrozenCamelModel, frozen=True):
     """The file of a chat message, with its scan state."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     id: UUID
     filename: str
@@ -78,15 +78,24 @@ def message_attachment_out(row: Attachment) -> MessageAttachmentOut:
     ``scanned`` false gives ``scanning``. A clean scan with an object gives ``clean``.
     Anything else (a finding, or a removed object) gives ``quarantined``.
     """
-    if not row.scanned:
-        state: ScanState = "scanning"
-    elif row.scan_result == "clean" and row.storage_key is not None:
-        state = "clean"
-    else:
-        state = "quarantined"
     return MessageAttachmentOut(
-        id=row.id, filename=row.filename, mime=row.mime, size=row.size, scan_state=state
+        id=row.id,
+        filename=row.filename,
+        mime=row.mime,
+        size=row.size,
+        scan_state=_scan_state(row),
     )
+
+
+def _scan_state(row: Attachment) -> ScanState:
+    """Return the wire scan state of a row (see ``message_attachment_out``)."""
+    match (row.scanned, row.scan_result == "clean" and row.storage_key is not None):
+        case (False, _):
+            return "scanning"
+        case (True, True):
+            return "clean"
+        case (True, False):
+            return "quarantined"
 
 
 class MessageFilesIn(BaseModel):

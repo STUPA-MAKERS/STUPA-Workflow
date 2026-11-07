@@ -54,9 +54,9 @@ const NEW_SERIES = '__new';
 
 /** A link the new card takes along; `label` is its text in the chip. */
 export interface NewTodoLink {
-  kind: TodoLinkKind;
-  targetId: Uuid;
-  label: string;
+  readonly kind: TodoLinkKind;
+  readonly targetId: Uuid;
+  readonly label: string;
 }
 
 /**

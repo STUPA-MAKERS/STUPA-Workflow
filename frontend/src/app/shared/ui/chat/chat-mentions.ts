@@ -1,11 +1,12 @@
 import { computed, signal } from '@angular/core';
 import type { PersonRef } from '@core/api/models';
+import { tagPieces } from '@shared/markdown/linkify';
 import { escapeHtml } from '@shared/markdown/markdown.util';
 
 /** A person the composer offers after "@": someone who can read the thread. */
 export interface ChatPerson {
-  principalId: string;
-  displayName: string;
+  readonly principalId: string;
+  readonly displayName: string;
 }
 
 /** The most people the picker lists at once. */
@@ -15,12 +16,11 @@ const MAX_QUERY = 40;
 
 /** The people of a reference list that have an id and a name. */
 export function chatPeople(refs: readonly PersonRef[] | null | undefined): ChatPerson[] {
-  const out: ChatPerson[] = [];
-  for (const r of refs ?? []) {
-    if (r.principalId && r.displayName)
-      out.push({ principalId: r.principalId, displayName: r.displayName });
-  }
-  return out;
+  return (refs ?? []).flatMap((r) =>
+    r.principalId && r.displayName
+      ? [{ principalId: r.principalId, displayName: r.displayName }]
+      : [],
+  );
 }
 
 /** A name for the search: lower case, without accents; the dotless "ı" reads as "i". */
@@ -33,7 +33,10 @@ function fold(s: string): string {
  * The "@" starts a word (start of the text, after white space or an opening bracket),
  * and the search holds no line break and no second "@". null: no search is open.
  */
-export function mentionQuery(text: string, caret: number): { start: number; query: string } | null {
+export function mentionQuery(
+  text: string,
+  caret: number,
+): { readonly start: number; readonly query: string } | null {
   const before = text.slice(0, caret);
   const at = before.lastIndexOf('@');
   if (at < 0) return null;
@@ -51,24 +54,30 @@ export function matchPeople(
   people: readonly ChatPerson[],
   query: string,
   max = MENTION_MAX_OPTIONS,
-): ChatPerson[] {
+): readonly ChatPerson[] {
   const q = fold(query.trimEnd());
-  const ranked: { p: ChatPerson; rank: number }[] = [];
-  for (const p of people) {
-    const name = fold(p.displayName);
-    let rank = -1;
-    if (name.startsWith(q)) rank = 0;
-    else if (name.split(/\s+/).some((w) => w.startsWith(q))) rank = 1;
-    else if (q.length > 1 && name.includes(q)) rank = 2;
-    if (rank >= 0) ranked.push({ p, rank });
-  }
-  ranked.sort(
-    (a, b) =>
-      a.rank - b.rank ||
-      a.p.displayName.localeCompare(b.p.displayName) ||
-      a.p.principalId.localeCompare(b.p.principalId),
-  );
-  return ranked.slice(0, max).map((r) => r.p);
+  const ranked = people
+    .map((p) => ({ p, rank: matchRank(fold(p.displayName), q) }))
+    .filter((r) => r.rank >= 0);
+  return [...ranked]
+    .sort(
+      (a, b) =>
+        a.rank - b.rank ||
+        a.p.displayName.localeCompare(b.p.displayName) ||
+        a.p.principalId.localeCompare(b.p.principalId),
+    )
+    .slice(0, max)
+    .map((r) => r.p);
+}
+
+/**
+ * How well a folded name matches the folded search: 0 when it starts with it, 1 when a
+ * later word does, 2 when it holds a search of two or more characters, -1 when not at all.
+ */
+function matchRank(name: string, q: string): number {
+  if (name.startsWith(q)) return 0;
+  if (name.split(/\s+/).some((w) => w.startsWith(q))) return 1;
+  return q.length > 1 && name.includes(q) ? 2 : -1;
 }
 
 /** Put "@Name " in place of the search from `start` to the caret. */
@@ -77,7 +86,7 @@ export function insertMention(
   start: number,
   caret: number,
   name: string,
-): { text: string; caret: number } {
+): { readonly text: string; readonly caret: number } {
   const after = text.slice(caret);
   const insert = `@${name}${after.startsWith(' ') ? '' : ' '}`;
   const next = text.slice(0, start) + insert + after;
@@ -88,7 +97,7 @@ export function insertMention(
  * The names longest first, so "@Anna Maria" wins over "@Anna" at the same place. Of two
  * people with the same name, a person in `picked` comes first.
  */
-function byLength(people: readonly ChatPerson[], picked: readonly string[]): ChatPerson[] {
+function byLength(people: readonly ChatPerson[], picked: readonly string[]): readonly ChatPerson[] {
   const rank = (p: ChatPerson): number => (picked.includes(p.principalId) ? 0 : 1);
   return [...people].sort(
     (a, b) => b.displayName.length - a.displayName.length || rank(a) - rank(b),
@@ -110,23 +119,26 @@ export function mentionIds(
   people: readonly ChatPerson[],
   picked: readonly string[] = [],
 ): string[] {
-  const found: { at: number; id: string }[] = [];
-  const taken: [number, number][] = [];
-  for (const p of byLength(people, picked)) {
+  const candidates = byLength(people, picked).flatMap((p) => {
     const token = `@${p.displayName}`;
-    let at = body.indexOf(token);
-    while (at >= 0) {
-      const end = at + token.length;
-      const free = (at === 0 || !/[\p{L}\p{N}]/u.test(body[at - 1])) && endsName(body, end);
-      if (free && !taken.some(([s, e]) => at < e && end > s)) {
-        taken.push([at, end]);
-        found.push({ at, id: p.principalId });
-      }
-      at = body.indexOf(token, at + 1);
-    }
-  }
-  found.sort((a, b) => a.at - b.at);
-  return [...new Set(found.map((f) => f.id))];
+    return [...body.matchAll(new RegExp(`(?=${escapeRe(token)})`, 'g'))]
+      .map((m) => ({ at: m.index, end: m.index + token.length, id: p.principalId }))
+      .filter(
+        ({ at, end }) => (at === 0 || !/[\p{L}\p{N}]/u.test(body[at - 1])) && endsName(body, end),
+      );
+  });
+  const found = candidates.reduce<readonly MentionHit[]>(
+    (taken, c) => (taken.some((t) => c.at < t.end && c.end > t.at) ? taken : [...taken, c]),
+    [],
+  );
+  return [...new Set([...found].sort((a, b) => a.at - b.at).map((f) => f.id))];
+}
+
+/** A place in the text that names a person: from `at` to `end`. */
+interface MentionHit {
+  readonly at: number;
+  readonly end: number;
+  readonly id: string;
 }
 
 function escapeRe(s: string): string {
@@ -145,16 +157,9 @@ export function highlightMentions(html: string, names: readonly string[]): strin
     `(^|[^\\p{L}\\p{N}])@(${wanted.map((n) => escapeRe(escapeHtml(n))).join('|')})(?![\\p{L}\\p{N}])`,
     'gu',
   );
-  let depth = 0;
-  return html
-    .split(/(<[^>]+>)/)
-    .map((part) => {
-      if (part.startsWith('<')) {
-        if (/^<(a|code|pre)\b/.test(part)) depth++;
-        else if (/^<\/(a|code|pre)>/.test(part)) depth--;
-        return part;
-      }
-      if (depth > 0) return part;
+  return tagPieces(html)
+    .map(({ part, depth }) => {
+      if (part.startsWith('<') || depth > 0) return part;
       return part.replace(
         re,
         (_m, lead: string, name: string) => `${lead}<span class="chat__mention">@${name}</span>`,
@@ -170,11 +175,11 @@ export function highlightMentions(html: string, names: readonly string[]): strin
  */
 export class MentionPicker {
   private readonly people = signal<readonly ChatPerson[]>([]);
-  private readonly search = signal<{ start: number; query: string } | null>(null);
+  private readonly search = signal<{ readonly start: number; readonly query: string } | null>(null);
   /** Escape closed the list for this "@": it opens again at the next "@". */
   private dismissedAt: number | null = null;
   /** The ids of the people chosen in the list since the last `reset`. */
-  private chosen: string[] = [];
+  private chosen: readonly string[] = [];
   readonly active = signal(0);
 
   readonly options = computed(() => {
@@ -256,11 +261,15 @@ export class MentionPicker {
   }
 
   /** The text with the chosen person in place of the search, and the new caret. */
-  apply(text: string, person: ChatPerson): { text: string; caret: number } | null {
+  apply(
+    text: string,
+    person: ChatPerson,
+  ): { readonly text: string; readonly caret: number } | null {
     const s = this.search();
     if (!s) return null;
     this.close();
-    if (!this.chosen.includes(person.principalId)) this.chosen.push(person.principalId);
+    if (!this.chosen.includes(person.principalId))
+      this.chosen = [...this.chosen, person.principalId];
     return insertMention(text, s.start, s.start + 1 + s.query.length, person.displayName);
   }
 }

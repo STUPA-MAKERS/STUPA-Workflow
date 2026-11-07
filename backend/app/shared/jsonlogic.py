@@ -16,12 +16,17 @@ The whitelist `JSONLOGIC_OPERATORS` derives from the `_EVALUATORS` dispatch tabl
 
 from __future__ import annotations
 
+import math
 import operator
 from collections.abc import Callable, Container, Mapping
+from functools import reduce
 
 #: Maximum nesting depth of an expression. It protects the evaluator and the validator
 #: against a RecursionError on deeply nested input, far above any real expression.
 _MAX_DEPTH = 64
+
+#: The result of a path segment that does not resolve.
+_MISSING = object()
 
 type _Evaluator = Callable[[list[object]], object]
 
@@ -41,23 +46,34 @@ def _resolve_var(path: object, ctx: Mapping[str, object]) -> object:
     The form `[path, default]` sets the fallback. A path that does not resolve returns
     that fallback, which is `None` when the caller gives none.
     """
-    default: object = None
-    if isinstance(path, list):
-        default = path[1] if len(path) > 1 else None
-        path = path[0] if path else ""
-    if path == "" or path is None:
+    target, default = _var_spec(path)
+    if target == "" or target is None:
         return ctx
-    if not isinstance(path, str):
-        raise JsonLogicError(f"var path must be a string, got {type(path).__name__}")
-    current: object = ctx
-    for part in path.split("."):
-        if isinstance(current, dict) and part in current:
-            current = current[part]
-        elif isinstance(current, list) and part.isdigit() and int(part) < len(current):
-            current = current[int(part)]
-        else:
-            return default
-    return current
+    if not isinstance(target, str):
+        raise JsonLogicError(f"var path must be a string, got {type(target).__name__}")
+    root: object = ctx
+    resolved = reduce(_step, target.split("."), root)
+    return default if resolved is _MISSING else resolved
+
+
+def _var_spec(path: object) -> tuple[object, object]:
+    """Split the argument of `var` into the path and the fallback (`None` without one)."""
+    match path:
+        case list():
+            return (path[0] if path else "", path[1] if len(path) > 1 else None)
+        case _:
+            return path, None
+
+
+def _step(current: object, part: str) -> object:
+    """Go down one path segment; a segment that does not resolve gives `_MISSING`."""
+    match current:
+        case dict() if part in current:
+            return current[part]
+        case list() if part.isdigit() and int(part) < len(current):
+            return current[int(part)]
+        case _:
+            return _MISSING
 
 
 def _num(value: object) -> float:
@@ -133,10 +149,7 @@ def _eval_add(args: list[object]) -> float:
 def _eval_multiply(args: list[object]) -> float:
     if not args:
         raise JsonLogicError("'*' requires at least 1 operand")
-    product = 1.0
-    for a in args:
-        product *= _num(a)
-    return product
+    return math.prod((_num(a) for a in args), start=1.0)
 
 
 #: Operator to a pure function over the evaluated arguments. ``var`` is not here, because

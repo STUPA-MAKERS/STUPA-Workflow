@@ -9,17 +9,14 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
 from app.modules.applications.diff import DataDiff
 from app.modules.config_revision.models import ConfigRevision
+from app.shared.schemas import FrozenCamelModel
 
 
-class _CamelModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class ConfigRevisionOut(_CamelModel):
+class ConfigRevisionOut(FrozenCamelModel, frozen=True):
     """One config snapshot (sidebar row)."""
 
     id: UUID
@@ -54,7 +51,7 @@ class ConfigRevisionOut(_CamelModel):
         )
 
 
-class ConfigRevisionDiffOut(_CamelModel):
+class ConfigRevisionDiffOut(FrozenCamelModel, frozen=True):
     """Field diff of a snapshot against its predecessor."""
 
     id: UUID

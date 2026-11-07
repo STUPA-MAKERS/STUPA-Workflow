@@ -37,7 +37,7 @@ const ID_LIKE = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 export interface ActorLabelOptions {
   /** The label of the applicant. Default "Antragsteller:in"; the status page uses "Du". */
-  applicantKey?: TranslationKey;
+  readonly applicantKey?: TranslationKey;
 }
 
 /** The label of a system key; an unknown key gives the plain "System". */

@@ -34,21 +34,31 @@ def _record(item: object) -> dict[str, str] | None:
     return {str(k): v for k, v in fields if isinstance(v, str)}
 
 
+def _records(value: object) -> list[dict[str, str]]:
+    """Return the records of a list value, or none for a scalar or a list of strings."""
+    match value:
+        case list():
+            items = cast("list[object]", value)
+            return [r for r in (_record(item) for item in items) if r is not None]
+        case _:
+            return []
+
+
+def _plain(value: str | list[object]) -> str | list[str]:
+    """Return a plain value: the string itself, or the strings of a list."""
+    return value if isinstance(value, str) else [item for item in value if isinstance(item, str)]
+
+
 def _coerce(raw: object) -> tuple[Meta, Records]:
     if not isinstance(raw, dict):
         return {}, {}
-    meta: Meta = {}
-    records: Records = {}
-    for key, value in cast("dict[object, object]", raw).items():
-        if isinstance(value, str):
-            meta[str(key)] = value
-        elif isinstance(value, list):
-            items = cast("list[object]", value)
-            rows = [r for r in (_record(item) for item in items) if r is not None]
-            if rows:
-                records[str(key)] = rows
-            else:
-                meta[str(key)] = [item for item in items if isinstance(item, str)]
+    pairs = tuple((str(key), value) for key, value in cast("dict[object, object]", raw).items())
+    records: Records = {key: rows for key, value in pairs if (rows := _records(value))}
+    meta: Meta = {
+        key: _plain(cast("str | list[object]", value))
+        for key, value in pairs
+        if isinstance(value, str | list) and key not in records
+    }
     return meta, records
 
 

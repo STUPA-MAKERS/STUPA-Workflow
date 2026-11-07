@@ -27,6 +27,7 @@ import re
 import shutil
 import signal
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -70,7 +71,8 @@ class TypstCompiler:
     timeout_s: float
 
     def _command(self, root: Path, output: Path) -> list[str]:
-        cmd = [
+        fonts = (arg for font_dir in self.font_dirs for arg in ("--font-path", str(font_dir)))
+        return [
             self.binary,
             "compile",
             "--root",
@@ -84,12 +86,12 @@ class TypstCompiler:
             str(root / ".no-package-cache"),
             "--diagnostic-format",
             "short",
+            *fonts,
+            str(root / "main.typ"),
+            str(output),
         ]
-        for font_dir in self.font_dirs:
-            cmd += ["--font-path", str(font_dir)]
-        return [*cmd, str(root / "main.typ"), str(output)]
 
-    def _prepare(self, root: Path, doc: dict[str, object], assets: dict[str, bytes]) -> None:
+    def _prepare(self, root: Path, doc: dict[str, object], assets: Mapping[str, bytes]) -> None:
         shutil.copyfile(self.template_dir / "main.typ", root / "main.typ")
         (root / "tpl").symlink_to(self.template_dir, target_is_directory=True)
         (root / "hsrt").symlink_to(self.hsrt_dir, target_is_directory=True)
@@ -101,7 +103,7 @@ class TypstCompiler:
                 raise CompileError(f"invalid asset name {name!r}")
             (asset_dir / name).write_bytes(data)
 
-    async def compile(self, doc: dict[str, object], assets: dict[str, bytes]) -> bytes:
+    async def compile(self, doc: dict[str, object], assets: Mapping[str, bytes]) -> bytes:
         """Compile the document tree to PDF bytes.
 
         Raises:

@@ -39,17 +39,32 @@ def _delivery_reason_class(status: str, response_code: int | None) -> str:
     ``unreachable_or_blocked``, which hides the blocked IP. ``failed`` without a
     response still retries and maps to ``transient_transport_error``.
     """
-    if status == "ok":
-        return "delivered"
-    if status == "pending":
-        return "in_progress"
-    if response_code is None:
-        return "transient_transport_error" if status == "failed" else "unreachable_or_blocked"
-    if 400 <= response_code < 500:
-        return "rejected_by_target"
-    if response_code >= 500:
-        return "target_server_error"
-    return "unknown"
+    match (status, response_code):
+        case ("ok", _):
+            return "delivered"
+        case ("pending", _):
+            return "in_progress"
+        case ("failed", None):
+            return "transient_transport_error"
+        case (_, None):
+            return "unreachable_or_blocked"
+        case (_, code) if 400 <= code < 500:
+            return "rejected_by_target"
+        case (_, code) if code >= 500:
+            return "target_server_error"
+        case _:
+            return "unknown"
+
+
+def _last_state(status: str) -> str:
+    """Map the four DB states to the three admin states."""
+    match status:
+        case "ok":
+            return "sent"
+        case "dead":
+            return "dead"
+        case _:
+            return "pending"
 
 
 def _delivery_status_out(
@@ -66,15 +81,9 @@ def _delivery_status_out(
             last_state="never",
             reason_class="no_deliveries",
         )
-    if row.status == "ok":
-        last_state = "sent"
-    elif row.status == "dead":
-        last_state = "dead"
-    else:
-        last_state = "pending"
     return WebhookDeliveryStatusOut(
         webhook_id=webhook_id,
-        last_state=last_state,
+        last_state=_last_state(row.status),
         reason_class=_delivery_reason_class(row.status, row.response_code),
         response_code=row.response_code,
         attempts=row.attempts,
@@ -194,16 +203,19 @@ class WebhookOps(ConfigServiceBase):
         webhooks = (
             await self.session.scalars(select(Webhook).order_by(Webhook.name))
         ).all()
-        out: list[WebhookDeliveryStatusOut] = []
-        for hook in webhooks:
-            latest = await self.session.scalar(
-                select(WebhookDelivery)
-                .where(WebhookDelivery.webhook_id == hook.id)
-                .order_by(
-                    WebhookDelivery.last_at.desc().nullslast(),
-                    WebhookDelivery.id.desc(),
-                )
-                .limit(1)
+        return [
+            _delivery_status_out(hook.id, await self._latest_delivery(hook.id))
+            for hook in webhooks
+        ]
+
+    async def _latest_delivery(self, webhook_id: UUID) -> WebhookDelivery | None:
+        """Return the newest delivery of a webhook by ``last_at``, then by insert order."""
+        return await self.session.scalar(
+            select(WebhookDelivery)
+            .where(WebhookDelivery.webhook_id == webhook_id)
+            .order_by(
+                WebhookDelivery.last_at.desc().nullslast(),
+                WebhookDelivery.id.desc(),
             )
-            out.append(_delivery_status_out(hook.id, latest))
-        return out
+            .limit(1)
+        )

@@ -364,12 +364,12 @@ export class ChatComponent {
 
   /** The ids of the files of sent messages that are in the scan, sorted and joined. */
   private readonly scanning = computed(() => {
-    const ids: string[] = [];
-    for (const m of this.messages()) {
-      if (isPending(m)) continue;
-      for (const f of m.attachments ?? []) if (!f.lost && f.scanState === 'scanning') ids.push(f.id);
-    }
-    return ids.sort().join(' ');
+    return this.messages()
+      .filter((m) => !isPending(m))
+      .flatMap((m) => (m.attachments ?? []).filter((f) => !f.lost && f.scanState === 'scanning'))
+      .map((f) => f.id)
+      .sort()
+      .join(' ');
   });
   /** The scanning files the current back-off waits for. */
   private scanIds = new Set<string>();
@@ -467,7 +467,7 @@ export class ChatComponent {
     if (wait === undefined) return;
     this.scanTimer = setTimeout(() => {
       this.scanTimer = null;
-      this.scanStep++;
+      this.scanStep = this.scanStep + 1;
       this.refresh.emit();
       this.armScanWatch();
     }, wait);
@@ -480,12 +480,12 @@ export class ChatComponent {
 
   /** The time of the newest sent message, or null. */
   private newestAt(): string | null {
-    let newest: string | null = null;
-    for (const m of this.messages()) {
-      if (isPending(m)) continue;
-      if (newest === null || Date.parse(m.at) > Date.parse(newest)) newest = m.at;
-    }
-    return newest;
+    return this.messages()
+      .filter((m) => !isPending(m))
+      .reduce<string | null>(
+        (newest, m) => (newest === null || Date.parse(m.at) > Date.parse(newest) ? m.at : newest),
+        null,
+      );
   }
 
   protected authorName(msg: ChatMessage): string | null {
@@ -501,12 +501,15 @@ export class ChatComponent {
     if (dayKey(date) === dayKey(yesterday)) return this.i18n.translate('chat.yesterday');
     const locale = this.i18n.formatLocale();
     const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(date).replace(/\.$/, '');
-    const opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit' };
     const sameYear = date.getFullYear() === today.getFullYear();
-    if (!sameYear) opts.year = 'numeric';
-    let day = new Intl.DateTimeFormat(locale, opts).format(date);
-    if (sameYear && locale.startsWith('de') && !day.endsWith('.')) day = `${day}.`;
-    return `${weekday}, ${day}`;
+    const opts: Intl.DateTimeFormatOptions = {
+      day: '2-digit',
+      month: '2-digit',
+      ...(sameYear ? {} : { year: 'numeric' }),
+    };
+    const day = new Intl.DateTimeFormat(locale, opts).format(date);
+    const dotted = sameYear && locale.startsWith('de') && !day.endsWith('.') ? `${day}.` : day;
+    return `${weekday}, ${dotted}`;
   }
 
   /** "PNG · 96 KB": the file type from the name, then the size. */
@@ -634,22 +637,28 @@ export class ChatComponent {
     const files = this.drafts.usable();
     if (!body && !files.length) return;
     const vis = this.visibility();
-    const req: ChatSend = vis ? { body, visibility: vis } : { body };
     const mentions = mentionIds(body, this.composerPeople(), this.composerMentions.picked());
-    if (mentions.length) req.mentions = mentions;
     this.composerMentions.reset();
-    if (files.length) {
-      req.attachmentIds = files.map((f) => f.id);
-      req.draftToken = this.drafts.token();
-      req.files = files.map((f) => ({
-        id: f.id,
-        filename: f.filename,
-        mime: f.mime,
-        size: f.size,
-        scanState: f.scanState,
-        url: chatFileUrl(this.apiBase, f.id),
-      }));
-    }
+    const withFiles = files.length
+      ? {
+          attachmentIds: files.map((f) => f.id),
+          draftToken: this.drafts.token(),
+          files: files.map((f) => ({
+            id: f.id,
+            filename: f.filename,
+            mime: f.mime,
+            size: f.size,
+            scanState: f.scanState,
+            url: chatFileUrl(this.apiBase, f.id),
+          })),
+        }
+      : {};
+    const req: ChatSend = {
+      body,
+      ...(vis ? { visibility: vis } : {}),
+      ...(mentions.length ? { mentions } : {}),
+      ...withFiles,
+    };
     this.send.emit(req);
     this.drafts.clear();
     this.onDraft('');
@@ -730,14 +739,11 @@ export class ChatComponent {
     }
     const maxBytes = this.drafts.limits().maxFileBytes;
     const mb = Math.round(maxBytes / (1024 * 1024));
-    const take: File[] = [];
-    for (const file of list.slice(0, Math.max(0, room))) {
-      if (file.size > maxBytes) {
-        this.toast.error(`${file.name}: ${this.i18n.translate('chat.error.fileTooLarge', { mb })}`);
-      } else {
-        take.push(file);
-      }
+    const offered = list.slice(0, Math.max(0, room));
+    for (const file of offered.filter((f) => f.size > maxBytes)) {
+      this.toast.error(`${file.name}: ${this.i18n.translate('chat.error.fileTooLarge', { mb })}`);
     }
+    const take = offered.filter((f) => f.size <= maxBytes);
     if (!take.length) return;
     const done = this.drafts.upload(take);
     this.leaveFullAttach();

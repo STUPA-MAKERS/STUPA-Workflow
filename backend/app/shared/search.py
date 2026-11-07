@@ -63,10 +63,7 @@ def trigram_rank(
     if dialect == "postgresql":
         sims = [func.word_similarity(needle, func.coalesce(col, "")) for col in columns]
         rank_expr: ColumnElement[Any] = func.greatest(*sims) if len(sims) > 1 else sims[0]
-        where_clause = rank_expr > threshold
-        return where_clause, rank_expr
+        return rank_expr > threshold, rank_expr
     like = f"%{escape_like(needle)}%"
-    where_clause = or_(
-        *[func.coalesce(col, "").ilike(like, escape="\\") for col in columns]
-    )
-    return where_clause, literal(0.0)
+    matches = or_(*[func.coalesce(col, "").ilike(like, escape="\\") for col in columns])
+    return matches, literal(0.0)

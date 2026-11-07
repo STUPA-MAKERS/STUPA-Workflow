@@ -4,14 +4,17 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _title_of
 from app.modules.audit.actions import AuditAction
-from app.modules.budget.tree.service_base import BudgetTreeServiceBase
+from app.modules.budget.tree.service_base import (
+    BudgetTreeServiceBase,
+    _applied,
+    _subtree_ids,
+)
 from app.modules.budget.tree_models import Budget
-from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import (
     AssignBudgetOut,
     AssignBudgetRequest,
@@ -34,9 +37,8 @@ class AssignmentOps(BudgetTreeServiceBase):
         `for_update` locks the row. The cost-center change uses it, so a concurrent
         state change into a vote state waits (and then finds another cost center).
         """
-        stmt = select(Application).where(Application.id == application_id)
-        if for_update:
-            stmt = stmt.with_for_update()
+        base = select(Application).where(Application.id == application_id)
+        stmt = base.with_for_update() if for_update else base
         app = (await self.session.execute(stmt)).scalar_one_or_none()
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
@@ -53,12 +55,6 @@ class AssignmentOps(BudgetTreeServiceBase):
         filters the result. The newest application comes first.
         """
         node = await self._get_node(budget_id)
-        subtree = select(Budget.id).where(
-            or_(
-                Budget.path_key == node.path_key,
-                Budget.path_key.like(node.path_key + _SEP + "%"),
-            )
-        )
         stmt = (
             select(
                 Application,
@@ -68,11 +64,16 @@ class AssignmentOps(BudgetTreeServiceBase):
             )
             .join(Budget, Budget.id == Application.budget_id)
             .outerjoin(State, State.id == Application.current_state_id)
-            .where(Application.budget_id.in_(subtree))
+            .where(
+                Application.budget_id.in_(_subtree_ids(node)),
+                *_applied(
+                    Application.fiscal_year_id == fiscal_year_id
+                    if fiscal_year_id is not None
+                    else None
+                ),
+            )
             .order_by(Application.created_at.desc())
         )
-        if fiscal_year_id is not None:
-            stmt = stmt.where(Application.fiscal_year_id == fiscal_year_id)
         rows = (await self.session.execute(stmt)).all()
         return [
             BudgetApplicationOut(
@@ -126,32 +127,27 @@ class AssignmentOps(BudgetTreeServiceBase):
                 code="budget_locked_by_vote",
             )
         await self._require_open_fiscal_year(app.fiscal_year_id)
-        if payload.budget_id is None:
-            app.budget_id = None
-            app.fiscal_year_id = None
-            await self._audit(
-                AuditAction.BUDGET_ASSIGN,
-                target_type="application",
-                target_id=str(app.id),
-                data={"budgetId": None, "fiscalYearId": None},
-            )
-            await fill_snapshot(self.session, app)
-            await self.session.commit()
-            return AssignBudgetOut(applicationId=app.id, budgetId=None, fiscalYearId=None)
-
-        node = await self._get_node(payload.budget_id)
-        fy_id = await self._resolve_fiscal_year(node, payload.fiscal_year_id)
-        app.budget_id = node.id
+        node = await self._get_node(payload.budget_id) if payload.budget_id is not None else None
+        budget_id = node.id if node is not None else None
+        fy_id = (
+            await self._resolve_fiscal_year(node, payload.fiscal_year_id)
+            if node is not None
+            else None
+        )
+        app.budget_id = budget_id
         app.fiscal_year_id = fy_id
         await self._audit(
             AuditAction.BUDGET_ASSIGN,
             target_type="application",
             target_id=str(app.id),
-            data={"budgetId": str(node.id), "fiscalYearId": str(fy_id)},
+            data={
+                "budgetId": str(budget_id) if budget_id is not None else None,
+                "fiscalYearId": str(fy_id) if fy_id is not None else None,
+            },
         )
         await fill_snapshot(self.session, app)
         await self.session.commit()
-        return AssignBudgetOut(applicationId=app.id, budgetId=node.id, fiscalYearId=fy_id)
+        return AssignBudgetOut(applicationId=app.id, budgetId=budget_id, fiscalYearId=fy_id)
 
     async def move_fiscal_year(
         self, application_id: UUID, payload: MoveFiscalYearRequest

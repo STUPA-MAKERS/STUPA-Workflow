@@ -10,18 +10,13 @@ from __future__ import annotations
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
 from app.shared.i18n import I18nMap
+from app.shared.schemas import FrozenCamelModel
 
 
-class _CamelModel(BaseModel):
-    """Base model with camelCase JSON aliases and population by field name."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class MailTemplateCreate(_CamelModel):
+class MailTemplateCreate(FrozenCamelModel, frozen=True):
     """A new mail template."""
 
     key: str = Field(min_length=1)
@@ -31,7 +26,7 @@ class MailTemplateCreate(_CamelModel):
     placeholders: dict[str, str] = Field(default_factory=dict)
 
 
-class MailTemplateUpdate(_CamelModel):
+class MailTemplateUpdate(FrozenCamelModel, frozen=True):
     """Partial update of a template (key stays immutable)."""
 
     subject_i18n: I18nMap | None = Field(default=None, alias="subjectI18n")
@@ -40,7 +35,7 @@ class MailTemplateUpdate(_CamelModel):
     placeholders: dict[str, str] | None = None
 
 
-class MailTemplateUpsert(_CamelModel):
+class MailTemplateUpsert(FrozenCamelModel, frozen=True):
     """Create or update an override by ``key``.
 
     The editor saves builtin templates and override templates the same way. A builtin
@@ -53,7 +48,7 @@ class MailTemplateUpsert(_CamelModel):
     body_html_i18n: I18nMap = Field(default_factory=dict, alias="bodyHtmlI18n")
 
 
-class MailTemplateOut(_CamelModel):
+class MailTemplateOut(FrozenCamelModel, frozen=True):
     """Template as shown in the editor: a DB override or a builtin default.
 
     Attributes:
@@ -70,14 +65,14 @@ class MailTemplateOut(_CamelModel):
     source: Literal["override", "builtin"] = "override"
 
 
-class MailPreviewRequest(_CamelModel):
+class MailPreviewRequest(FrozenCamelModel, frozen=True):
     """Preview request: render a template with sample context and language."""
 
     lang: str = "de"
     context: dict[str, object] = Field(default_factory=dict)
 
 
-class MailPreviewPayloadRequest(_CamelModel):
+class MailPreviewPayloadRequest(FrozenCamelModel, frozen=True):
     """Preview from an editor draft (no persisted id)."""
 
     subject_i18n: I18nMap = Field(alias="subjectI18n")
@@ -87,7 +82,7 @@ class MailPreviewPayloadRequest(_CamelModel):
     context: dict[str, object] = Field(default_factory=dict)
 
 
-class MailPreviewOut(_CamelModel):
+class MailPreviewOut(FrozenCamelModel, frozen=True):
     """Rendered preview."""
 
     subject: str
@@ -96,20 +91,20 @@ class MailPreviewOut(_CamelModel):
     lang: str
 
 
-class NotificationPreferenceOut(_CamelModel):
+class NotificationPreferenceOut(FrozenCamelModel, frozen=True):
     """Effective switch for one notification kind."""
 
     kind: str
     enabled: bool
 
 
-class NotificationPreferencesUpdate(_CamelModel):
+class NotificationPreferencesUpdate(FrozenCamelModel, frozen=True):
     """Bulk update of the own notification switches."""
 
-    preferences: list[NotificationPreferenceOut]
+    preferences: tuple[NotificationPreferenceOut, ...]
 
 
-class NotificationSettingsOut(_CamelModel):
+class NotificationSettingsOut(FrozenCamelModel, frozen=True):
     """Platform-wide notification config (single row).
 
     Attributes:
@@ -121,7 +116,7 @@ class NotificationSettingsOut(_CamelModel):
     task_reminder_repeat_days: int = Field(alias="taskReminderRepeatDays", ge=0)
 
 
-class NotificationSettingsUpdate(_CamelModel):
+class NotificationSettingsUpdate(FrozenCamelModel, frozen=True):
     """Partial update of the platform config (only set fields change)."""
 
     task_reminder_enabled: bool | None = Field(
