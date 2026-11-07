@@ -38,10 +38,5 @@ def image_ids_in(*texts: str | None) -> list[UUID]:
 
     The order is the order of the first appearance, and every id comes once.
     """
-    seen: dict[UUID, None] = {}
-    for text in texts:
-        if not text:
-            continue
-        for match in _REF_RE.finditer(text):
-            seen.setdefault(UUID(match.group(1)), None)
-    return list(seen)
+    found = (UUID(match.group(1)) for text in texts if text for match in _REF_RE.finditer(text))
+    return list(dict.fromkeys(found))
