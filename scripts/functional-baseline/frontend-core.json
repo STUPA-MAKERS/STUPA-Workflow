@@ -1,6 +1,4 @@
 {
-  "frontend/src/app/layout/breadcrumbs.component.ts": 13,
-  "frontend/src/app/layout/nav.service.ts": 13,
   "frontend/src/app/shared/actor-label.util.ts": 1,
   "frontend/src/app/shared/date-format.ts": 6,
   "frontend/src/app/shared/debounced.ts": 4,

@@ -59,24 +59,24 @@ export type NavKey =
 
 /** One entry of the navigation rail and of the phone bar. */
 export interface NavItem {
-  key: NavKey;
-  path: string;
-  labelKey: TranslationKey;
-  icon: IconName;
+  readonly key: NavKey;
+  readonly path: string;
+  readonly labelKey: TranslationKey;
+  readonly icon: IconName;
   /** Visible when the principal has at least one of these permissions (empty = any session). */
-  permissions: string[];
+  readonly permissions: readonly string[];
   /** Also visible with one of these gremium permissions in any gremium. */
-  gremiumPermissions?: string[];
+  readonly gremiumPermissions?: readonly string[];
   /** Also visible to a member of any gremium. */
-  inAnyCommittee?: boolean;
+  readonly inAnyCommittee?: boolean;
   /** Also visible with a scoped budget view. */
-  scopedBudgetView?: boolean;
+  readonly scopedBudgetView?: boolean;
   /** Also visible to a principal who reported a ticket. */
-  reportedTickets?: boolean;
+  readonly reportedTickets?: boolean;
   /** Match the active route exactly. */
-  exact?: boolean;
+  readonly exact?: boolean;
   /** `end` entries sit at the foot of the rail, after the spacer. */
-  place: 'main' | 'end';
+  readonly place: 'main' | 'end';
 }
 
 /**

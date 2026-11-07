@@ -67,7 +67,7 @@ export function countEntries(vote: MeetingVote): { key: string; value: number }[
 }
 
 /** Selectable options of a vote. The fallback is the set of tally keys. */
-export function voteOptionsFor(vote: MeetingVote): string[] {
+export function voteOptionsFor(vote: MeetingVote): readonly string[] {
   return vote.options.length ? vote.options : Object.keys(vote.counts ?? {});
 }
 

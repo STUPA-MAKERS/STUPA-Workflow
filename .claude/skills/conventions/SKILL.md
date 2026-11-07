@@ -77,8 +77,10 @@ Read them before you change code. In short:
 `no-param-reassign`, `switch-exhaustiveness-check` as warnings on `src/**` (no specs).
 `scripts/check_functional.py` counts the violations per file against
 `scripts/functional-baseline/<area>.json` (one file per backend module and frontend folder); CI
-(`functional` job, and the ratchet step of `fe-unit`) fails when a count differs. After you lower a
-count, run:
+(`functional` job, and the ratchet step of `fe-unit`) fails when a count differs. A readonly
+type change needs `npm run build` too: only the Angular template type check finds a template that
+writes into a readonly field or passes a readonly array to a mutable input; `npm run typecheck`
+does not. After you lower a count, run:
 
 ```sh
 python3 scripts/check_functional.py --write                     # backend, mcp, typst

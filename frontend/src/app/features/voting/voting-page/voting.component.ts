@@ -198,7 +198,7 @@ export class VotingComponent implements OnDestroy {
    */
   readonly reloading = signal(false);
   readonly error = signal(false);
-  readonly items = signal<VoteListItem[]>([]);
+  readonly items = signal<readonly VoteListItem[]>([]);
   readonly total = signal(0);
   /** Fetch sequence number. The handler drops a late answer of an older request. */
   private fetchSeq = 0;
@@ -511,7 +511,10 @@ export class VotingComponent implements OnDestroy {
    * filter hid before is not new. This finds the votes no channel reports, a poll of a
    * Gremium or a vote of a meeting that started after the page loaded.
    */
-  private trackOpen(mode: 'initial' | 'refresh' | 'more', items: VoteListItem[]): VoteListItem | null {
+  private trackOpen(
+    mode: 'initial' | 'refresh' | 'more',
+    items: readonly VoteListItem[],
+  ): VoteListItem | null {
     const known = mode === 'initial' || !this.seenOpen ? null : this.seenOpen;
     const open = items.filter((i) => i.status === 'open');
     const fresh = known
@@ -521,7 +524,7 @@ export class VotingComponent implements OnDestroy {
     return mode === 'refresh' ? fresh : null;
   }
 
-  private collectGremien(items: VoteListItem[]): void {
+  private collectGremien(items: readonly VoteListItem[]): void {
     const next = new Map(this.seenGremien());
     let changed = false;
     for (const item of items) {
@@ -656,7 +659,7 @@ export class VotingComponent implements OnDestroy {
   }
 
   /** Follow the meeting of every open meeting vote of the list. */
-  private followOpen(items: VoteListItem[]): void {
+  private followOpen(items: readonly VoteListItem[]): void {
     for (const item of items) {
       if (item.status === 'open' && item.meetingId) this.page.follow(item.meetingId);
     }

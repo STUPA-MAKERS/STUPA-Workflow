@@ -82,6 +82,7 @@ import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
 import { applicationReads } from './application-reads';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
+import { withoutKey } from '@shared/util/immutable';
 
 /**
  * One filter of the list.
@@ -239,7 +240,7 @@ export class ApplicationsListComponent {
   readonly reloading = signal(false);
   readonly error = signal(false);
   /** Accumulated applications across all loaded pages so far (infinite scroll). */
-  readonly items = signal<ApplicationListItem[]>([]);
+  readonly items = signal<readonly ApplicationListItem[]>([]);
   readonly total = signal(0);
   private nextOffset = 0;
   /** Fetch sequence number. The fetch handler drops late responses from old filters. */
@@ -648,10 +649,8 @@ export class ApplicationsListComponent {
       this.exporting,
       () => {
         const query = this.buildQuery(0);
-        delete query.limit;
-        delete query.offset;
-        delete query.mine;
-        return this.api.exportApplicationsXlsx(query);
+        const unpaged = withoutKey(withoutKey(withoutKey(query, 'limit'), 'offset'), 'mine');
+        return this.api.exportApplicationsXlsx(unpaged);
       },
       'applications.xlsx',
       () => this.toast.error(this.i18n.translate('applications.list.exportError')),
@@ -991,7 +990,7 @@ export class ApplicationsListComponent {
   }
 
   /** Merge the real states of the loaded applications into the status options. */
-  private collectStates(items: ApplicationListItem[]): void {
+  private collectStates(items: readonly ApplicationListItem[]): void {
     const next = new Map(this.seenStates());
     let changed = false;
     for (const item of items) {

@@ -32,16 +32,16 @@ function day(days: number): string {
 }
 
 interface ClosedMeeting {
-  meeting: MeetingOutWire;
-  agenda: {
-    id: string;
-    applicationId: string | null;
-    title: string | null;
-    body: string;
-    position: number;
-    nonPublic?: boolean;
+  readonly meeting: MeetingOutWire;
+  readonly agenda: readonly {
+    readonly id: string;
+    readonly applicationId: string | null;
+    readonly title: string | null;
+    readonly body: string;
+    readonly position: number;
+    readonly nonPublic?: boolean;
   }[];
-  protocol: ProtocolOutWire;
+  readonly protocol: ProtocolOutWire;
 }
 
 const QUESTION = 'Soll der Antrag „Beispielantrag Sommerfest“ wie beschrieben gefördert werden?';
@@ -51,7 +51,7 @@ function closedMeeting(
   days: number,
   title: string,
   final: boolean,
-  gremium: { id: string; name: string },
+  gremium: { readonly id: string; readonly name: string },
 ): ClosedMeeting {
   const prefix = id.slice(-2);
   const top = (n: number) => `ag-c${prefix}-${n}`;
@@ -155,10 +155,16 @@ function closedMeeting(
 const STUPA = { id: 'g0000000-0000-0000-0000-000000000001', name: 'Studierendenparlament' };
 const HHA = { id: 'g0000000-0000-0000-0000-000000000002', name: 'Haushaltsausschuss' };
 
-const CLOSED: Record<string, ClosedMeeting> = {
+let CLOSED: Readonly<Record<string, ClosedMeeting>> = {
   [CLOSED_DRAFT_ID]: closedMeeting(CLOSED_DRAFT_ID, -9, '33. Sitzung des Studierendenparlaments', false, STUPA),
   [CLOSED_FINAL_ID]: closedMeeting(CLOSED_FINAL_ID, -16, '11. Sitzung des Haushaltsausschusses', true, HHA),
 };
+
+/** Store the changed state of a closed demo meeting and return it. */
+function putClosed(id: string, next: ClosedMeeting): ClosedMeeting {
+  CLOSED = { ...CLOSED, [id]: next };
+  return next;
+}
 
 /** GET of a closed demo meeting: the meeting, its agenda or its protocol. */
 export function closedMeetingGet(id: string, path: string): unknown {
@@ -177,15 +183,15 @@ export function closedMeetingWrite(id: string, method: string, path: string, bod
   const item = /\/agenda\/([^/]+)$/.exec(path);
   if (method === 'PATCH' && item) {
     const patch = (body as { body?: string; nonPublic?: boolean } | null) ?? {};
-    c.agenda = c.agenda.map((a) => (a.id === item[1] ? { ...a, ...patch } : a));
-    return c.agenda.map((a) => ({ ...a }));
+    const agenda = c.agenda.map((a) => (a.id === item[1] ? { ...a, ...patch } : a));
+    return putClosed(id, { ...c, agenda }).agenda.map((a) => ({ ...a }));
   }
   if (method === 'PATCH' && /\/protocols\/[^/]+$/.test(path)) {
-    c.protocol = { ...c.protocol, markdown: (body as { markdown?: string } | null)?.markdown ?? '' };
-    return { ...c.protocol };
+    const markdown = (body as { markdown?: string } | null)?.markdown ?? '';
+    return { ...putClosed(id, { ...c, protocol: { ...c.protocol, markdown } }).protocol };
   }
   if (method === 'POST' && path.endsWith('/finalize')) {
-    c.protocol = {
+    const protocol: ProtocolOutWire = {
       ...c.protocol,
       status: 'final',
       pdfUrl: 'https://files.example/s/protokoll-intern.pdf',
@@ -194,7 +200,7 @@ export function closedMeetingWrite(id: string, method: string, path: string, bod
         : null,
       sentAt: new Date().toISOString(),
     };
-    return { ...c.protocol };
+    return { ...putClosed(id, { ...c, protocol }).protocol };
   }
   return undefined;
 }

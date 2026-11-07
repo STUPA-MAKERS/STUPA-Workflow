@@ -151,7 +151,7 @@ export function electionBars(
 }
 
 /** The candidates of a lot that is still pending, else none. */
-function pendingLot(result: ElectionResult | null): string[] {
+function pendingLot(result: ElectionResult | null): readonly string[] {
   const lot = result?.lot;
   return lot && !lot.drawn ? lot.among : [];
 }

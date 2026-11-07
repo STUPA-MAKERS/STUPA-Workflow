@@ -18,9 +18,9 @@ export type IsoDateTime = string;
 
 /** A person on a card, a ticket, a note or an event. null/null = deleted person. */
 export interface PersonRef {
-  principalId: Uuid | null;
+  readonly principalId: Uuid | null;
   /** The name, else the account e-mail, else null. */
-  displayName: string | null;
+  readonly displayName: string | null;
 }
 
 /**
@@ -30,81 +30,85 @@ export interface PersonRef {
 export type Lang = string;
 
 /** Configurable multilingual text (`*_i18n` JSONB). */
-export type I18nMap = Record<string, string>;
+export type I18nMap = Readonly<Record<string, string>>;
 
 /** One maintained footer link: a label per locale plus its target. */
 export interface PublicFooterLink {
-  label: I18nMap;
-  url: string;
+  readonly label: I18nMap;
+  readonly url: string;
 }
 
 /** Public branding config of the active site version. It needs no authentication.
  *  The type stays loose on purpose. The frontend reads only what it shows: the free
  *  texts (for example `applyInfo`), the app name and the footer. */
 export interface PublicSiteConfig {
-  version: number;
+  readonly version: number;
   /**
    * Hours a guest has to confirm the email before the platform discards the
    * application (admin setting `guest_application_settings.confirm_ttl_hours`).
    */
-  confirmTtlHours?: number;
+  readonly confirmTtlHours?: number;
   /**
    * Lifetime of a new magic link in days (admin setting
    * `guest_application_settings.link_ttl_days`). `null`: the link does not expire.
    */
-  linkTtlDays?: number | null;
+  readonly linkTtlDays?: number | null;
   /** Upload limits of the wizard: one file, and all draft files of a draft token. */
-  attachmentLimits?: AttachmentLimits | null;
-  branding?: {
+  readonly attachmentLimits?: AttachmentLimits | null;
+  readonly branding?: {
     /** Configured app name (language neutral). Empty falls back to i18n or the default. */
-    appName?: string;
+    readonly appName?: string;
     /** Short name for the PWA icon. Empty falls back to the default. */
-    appShortName?: string;
+    readonly appShortName?: string;
     /** Footer copyright line per locale. Empty falls back to the co-branding text. */
-    copyright?: I18nMap;
+    readonly copyright?: I18nMap;
     /** Footer legal links. Empty shows no legal link. */
-    legalLinks?: PublicFooterLink[];
-    freetexts?: Partial<
-      Record<
-        | 'loginHint'
-        | 'welcome'
-        | 'support'
-        | 'emailFooter'
-        | 'applyInfo'
-        | 'submittedInternal'
-        | 'submittedExternal',
-        I18nMap
+    readonly legalLinks?: readonly PublicFooterLink[];
+    readonly freetexts?: Readonly<
+      Partial<
+        Record<
+          | 'loginHint'
+          | 'welcome'
+          | 'support'
+          | 'emailFooter'
+          | 'applyInfo'
+          | 'submittedInternal'
+          | 'submittedExternal',
+          I18nMap
+        >
       >
     >;
     /** Show the Gravatar images of the avatars (through the API proxy). Missing = on. */
-    gravatarEnabled?: boolean;
+    readonly gravatarEnabled?: boolean;
     /** The accent colour of the app (`#rrggbb`). Missing or null = the built-in accent. */
-    accentColor?: string | null;
+    readonly accentColor?: string | null;
     /** The uploaded logos by slot. A missing slot shows the built-in logo. */
-    logos?: Partial<Record<'wordmark' | 'imagemark' | 'favicon', { url: string }>>;
+    readonly logos?: Readonly<
+      Partial<Record<'wordmark' | 'imagemark' | 'favicon', { readonly url: string }>>
+    >;
   } | null;
   /** The handbook link of the help menu. Missing on an older server. */
-  help?: { wikiUrl: string };
+  readonly help?: { readonly wikiUrl: string };
   /** Visitors without a session may send a ticket ("Problem melden"). */
-  tickets?: { publicEnabled: boolean };
+  readonly tickets?: { readonly publicEnabled: boolean };
 }
 
 /** Upload limits of the wizard (`attachmentLimits` of the public site config). */
 export interface AttachmentLimits {
-  maxFileBytes: number;
-  maxDraftFiles: number;
-  maxDraftBytes: number;
+  readonly maxFileBytes: number;
+  readonly maxDraftFiles: number;
+  readonly maxDraftBytes: number;
 }
 
 /** Uniform problem object (close to RFC 9457). */
 export interface ProblemDetail {
-  type: string;
-  title: string;
-  status: number;
-  code: string;
-  detail?: string;
-  errors?: { field: string; msg: string }[];
-  traceId?: string;
+  readonly type: string;
+  readonly title: string;
+  readonly status: number;
+  readonly code: string;
+  readonly detail?: string;
+  readonly errors?: { readonly field: string; readonly msg: string }[];
+  readonly traceId?: string;
 }
 
 /**
@@ -115,45 +119,45 @@ export interface ProblemDetail {
  */
 /** Small gremium reference. It names one membership of a principal. */
 export interface GremiumRef {
-  id: Uuid;
-  name: string;
-  slug: string;
+  readonly id: Uuid;
+  readonly name: string;
+  readonly slug: string;
 }
 
 export interface Principal {
-  sub: Uuid;
-  email?: string | null;
-  display_name?: string | null;
-  roles: string[];
-  permissions: string[];
-  groups: string[];
+  readonly sub: Uuid;
+  readonly email?: string | null;
+  readonly display_name?: string | null;
+  readonly roles: readonly string[];
+  readonly permissions: readonly string[];
+  readonly groups: readonly string[];
   /** Gremien the principal belongs to. This drives the "My gremien" view. */
-  gremien?: GremiumRef[];
+  readonly gremien?: GremiumRef[];
   /** Gremien the principal manages through a gremium role with `session.manage`. */
-  session_manage_gremien?: Uuid[];
+  readonly session_manage_gremien?: readonly Uuid[];
   /** Gremium id to the gremium permissions of the active role in that gremium
    *  (`session.manage`, `protocol.write`, `protocol.finalize`, `vote.manage`,
    *  `vote.cast`). */
-  gremium_permissions?: Record<Uuid, string[]>;
+  readonly gremium_permissions?: Readonly<Record<Uuid, readonly string[]>>;
   /** At least one cost center belongs to a gremium of this principal. */
-  has_scoped_budget_view?: boolean;
+  readonly has_scoped_budget_view?: boolean;
   /** The principal is in at least one substitute pool. The meeting timeline shows. */
-  in_substitute_pool?: boolean;
+  readonly in_substitute_pool?: boolean;
   /** The principal reported a ticket that is not anonymized: the tab "Tickets" shows. */
-  has_reported_tickets?: boolean;
+  readonly has_reported_tickets?: boolean;
 }
 
 /** Response of POST /api/auth/logout. An RP-initiated OIDC logout URL, or null. */
 export interface LogoutOut {
-  logout_url: string | null;
+  readonly logout_url: string | null;
 }
 
 /** Uniform list envelope (offset paging). */
 export interface Page<T> {
-  items: T[];
-  total: number;
-  limit: number;
-  offset: number;
+  readonly items: readonly T[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
 }
 
 export interface ApplicationListQuery {
@@ -161,84 +165,84 @@ export interface ApplicationListQuery {
    * Flow state UUIDs. The request repeats `state` once per value, and the list keeps
    * the applications in any of these states.
    */
-  state?: readonly string[];
-  gremium?: Uuid;
-  type?: Uuid;
+  readonly state?: readonly string[];
+  readonly gremium?: Uuid;
+  readonly type?: Uuid;
   /** Cost center in the budget tree. The filter includes the subtree. */
-  budget?: Uuid;
-  q?: string;
-  amountMin?: number;
-  amountMax?: number;
-  createdFrom?: string;
-  createdTo?: string;
+  readonly budget?: Uuid;
+  readonly q?: string;
+  readonly amountMin?: number;
+  readonly amountMax?: number;
+  readonly createdFrom?: string;
+  readonly createdTo?: string;
   /** `stateSince`: the time of the last status change, the date a row of "Meine Anträge"
    *  shows. */
-  sort?: 'createdAt' | 'amount' | 'stateSince';
-  order?: 'asc' | 'desc';
+  readonly sort?: 'createdAt' | 'amount' | 'stateSince';
+  readonly order?: 'asc' | 'desc';
   /** Own applications only. It forces the owner filter even with `application.read`. */
-  mine?: boolean;
+  readonly mine?: boolean;
   /**
    * Archived rows. `'false'` (the server default) hides them, `'true'` shows only those,
    * `'all'` shows both. A tri-state rather than a boolean, because "only the archived
    * ones" and "both" are different questions.
    */
-  archived?: 'false' | 'true' | 'all';
-  limit?: number;
-  offset?: number;
+  readonly archived?: 'false' | 'true' | 'all';
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 /** `StateOut`. The `label` is an i18n map. */
 export interface StateOutWire {
-  id: Uuid;
-  key: string;
-  label: I18nMap;
+  readonly id: Uuid;
+  readonly key: string;
+  readonly label: I18nMap;
   /** Optional display color of the state badge, as hex. */
-  color?: string | null;
-  editAllowed: boolean;
+  readonly color?: string | null;
+  readonly editAllowed: boolean;
   /** State kind: normal|vote. */
-  kind?: string;
+  readonly kind?: string;
 }
 
 /** `ApplicantOut`. It holds PII. The backend fills it only for an authorized reader. */
 export interface ApplicantOutWire {
-  email?: string | null;
-  name?: string | null;
-  anonymized: boolean;
+  readonly email?: string | null;
+  readonly name?: string | null;
+  readonly anonymized: boolean;
 }
 
 /** `ApplicationOut`. The application detail. */
 export interface ApplicationOutWire {
-  id: Uuid;
-  typeId: Uuid;
-  state?: StateOutWire | null;
-  gremiumId?: Uuid | null;
-  budgetId?: Uuid | null;
-  fiscalYearId?: Uuid | null;
-  amount?: string | null;
-  currency?: string | null;
-  data: Record<string, unknown>;
-  version: number;
-  lang?: string | null;
-  createdAt: IsoDateTime;
-  updatedAt: IsoDateTime;
-  applicant?: ApplicantOutWire | null;
-  canEdit?: boolean;
-  canEditLocked?: boolean;
-  isOwner?: boolean;
-  archivedAt?: IsoDateTime | null;
+  readonly id: Uuid;
+  readonly typeId: Uuid;
+  readonly state?: StateOutWire | null;
+  readonly gremiumId?: Uuid | null;
+  readonly budgetId?: Uuid | null;
+  readonly fiscalYearId?: Uuid | null;
+  readonly amount?: string | null;
+  readonly currency?: string | null;
+  readonly data: Readonly<Record<string, unknown>>;
+  readonly version: number;
+  readonly lang?: string | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+  readonly applicant?: ApplicantOutWire | null;
+  readonly canEdit?: boolean;
+  readonly canEditLocked?: boolean;
+  readonly isOwner?: boolean;
+  readonly archivedAt?: IsoDateTime | null;
   /** Time of the last status change. */
-  stateSince?: IsoDateTime | null;
+  readonly stateSince?: IsoDateTime | null;
   /**
    * The `isPII` field keys that the server removed from `data` for this reader.
    * Empty for a reader with the PII right.
    */
-  hiddenKeys?: string[];
+  readonly hiddenKeys?: readonly string[];
   /** Set when a person captured the application on behalf of the applicant. */
-  capture?: ApplicationCapture | null;
+  readonly capture?: ApplicationCapture | null;
   /** The amount that the cost center binds. `null` means as requested. */
-  approvedAmount?: string | null;
+  readonly approvedAmount?: string | null;
   /** The valid decision, or `null` before one. */
-  decision?: ApplicationDecision | null;
+  readonly decision?: ApplicationDecision | null;
 }
 
 /**
@@ -247,9 +251,9 @@ export interface ApplicationOutWire {
  */
 export interface DecisionProposal {
   /** Decimal string with a dot (`"800.00"`). `null` means as requested. */
-  approvedAmount: string | null;
+  readonly approvedAmount: string | null;
   /** The conditions (Auflagen), at most 20, each 1 to 1000 characters. */
-  conditions: string[];
+  readonly conditions: readonly string[];
 }
 
 /**
@@ -258,24 +262,24 @@ export interface DecisionProposal {
  * are `null` there.
  */
 export interface ApplicationDecision {
-  requestedAmount: string | null;
+  readonly requestedAmount: string | null;
   /** `null` means as requested. */
-  approvedAmount: string | null;
-  amountDeviates: boolean;
-  conditions: string[];
-  decidedAt: IsoDateTime;
-  voteId: Uuid | null;
-  gremiumName: string | null;
-  meetingTitle: string | null;
-  agendaPosition: number | null;
+  readonly approvedAmount: string | null;
+  readonly amountDeviates: boolean;
+  readonly conditions: readonly string[];
+  readonly decidedAt: IsoDateTime;
+  readonly voteId: Uuid | null;
+  readonly gremiumName: string | null;
+  readonly meetingTitle: string | null;
+  readonly agendaPosition: number | null;
 }
 
 /** `TimelineDecisionOut`. The decision that a status change carried. */
 export interface TimelineDecision {
-  requestedAmount: string | null;
-  approvedAmount: string | null;
-  amountDeviates: boolean;
-  conditionCount: number;
+  readonly requestedAmount: string | null;
+  readonly approvedAmount: string | null;
+  readonly amountDeviates: boolean;
+  readonly conditionCount: number;
 }
 
 /**
@@ -284,19 +288,19 @@ export interface TimelineDecision {
  * Gremium instead of the member.
  */
 export interface ApplicationCapture {
-  capturedBy: ActorInfo | null;
-  capturedAt: IsoDateTime;
+  readonly capturedBy: ActorInfo | null;
+  readonly capturedAt: IsoDateTime;
   /** The date on which the application came in (`YYYY-MM-DD`). */
-  receivedOn: string | null;
+  readonly receivedOn: string | null;
   /** The free-text intake channel ("Eingang"), for example "per PDF". */
-  intake: string | null;
+  readonly intake: string | null;
 }
 
 /** `ApplicantCandidateOut`. An account that the capture dialog offers as applicant. */
 export interface ApplicantCandidate {
-  id: Uuid;
-  displayName: string | null;
-  email: string | null;
+  readonly id: Uuid;
+  readonly displayName: string | null;
+  readonly email: string | null;
 }
 
 /**
@@ -305,40 +309,40 @@ export interface ApplicantCandidate {
  * `applicantEmail`).
  */
 export interface OnBehalfApplication {
-  typeId: Uuid;
-  data: Record<string, unknown>;
-  applicantPrincipalId?: Uuid | null;
-  applicantName?: string | null;
-  applicantEmail?: string | null;
+  readonly typeId: Uuid;
+  readonly data: Readonly<Record<string, unknown>>;
+  readonly applicantPrincipalId?: Uuid | null;
+  readonly applicantName?: string | null;
+  readonly applicantEmail?: string | null;
   /** `YYYY-MM-DD`; the server defaults to today. */
-  receivedOn?: string | null;
-  intake?: string | null;
-  lang: Lang;
-  attachmentIds?: Uuid[];
-  draftToken?: string | null;
+  readonly receivedOn?: string | null;
+  readonly intake?: string | null;
+  readonly lang: Lang;
+  readonly attachmentIds?: readonly Uuid[];
+  readonly draftToken?: string | null;
 }
 
 /** `ApplicationListItem`. A list entry without `data` and without `applicant`. */
 export interface ApplicationListItemWire {
-  id: Uuid;
-  typeId: Uuid;
-  title?: string | null;
-  state?: StateOutWire | null;
-  gremiumId?: Uuid | null;
-  amount?: string | null;
+  readonly id: Uuid;
+  readonly typeId: Uuid;
+  readonly title?: string | null;
+  readonly state?: StateOutWire | null;
+  readonly gremiumId?: Uuid | null;
+  readonly amount?: string | null;
   /** The approved amount. `null` means as requested. */
-  approvedAmount?: string | null;
-  currency?: string | null;
-  createdAt: IsoDateTime;
-  updatedAt: IsoDateTime;
-  archivedAt?: IsoDateTime | null;
+  readonly approvedAmount?: string | null;
+  readonly currency?: string | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+  readonly archivedAt?: IsoDateTime | null;
   /** Time of the last status change. */
-  stateSince?: IsoDateTime | null;
+  readonly stateSince?: IsoDateTime | null;
 }
 
 /** `ApplicationCreated`. The 201 response of `POST /applications`. It holds only the id. */
 export interface ApplicationCreatedWire {
-  applicationId: Uuid;
+  readonly applicationId: Uuid;
 }
 
 /** Attendance status of a member in a meeting. `absent` means absent without an excuse. */
@@ -349,75 +353,75 @@ export type SelfAttendanceStatus = 'present' | 'excused';
 
 /** A current gremium member. This is a protokollant candidate for a new meeting. */
 export interface MeetingMember {
-  principalId: Uuid;
-  displayName: string | null;
-  email: string | null;
+  readonly principalId: Uuid;
+  readonly displayName: string | null;
+  readonly email: string | null;
   /** The member holds `protocol.write` in the gremium and can keep the minutes. */
-  canKeepProtocol?: boolean;
+  readonly canKeepProtocol?: boolean;
 }
 
 /** `AttendanceOut`. Attendance of a gremium member. GET/PUT/DELETE …/attendance. */
 export interface Attendance {
-  principalId: Uuid;
-  displayName: string | null;
-  email: string | null;
+  readonly principalId: Uuid;
+  readonly displayName: string | null;
+  readonly email: string | null;
   /** `null` = not recorded yet ("open"). */
-  status: AttendanceStatus | null;
+  readonly status: AttendanceStatus | null;
   /** Who set the record. A `lead` record wins: the member cannot change it. */
-  source: 'self' | 'lead' | null;
+  readonly source: 'self' | 'lead' | null;
   /**
    * The reason of an excuse. The server sends it only to the member and to the
    * meeting lead (`canWrite`). All other readers get `null`.
    */
-  note: string | null;
+  readonly note: string | null;
   /** True if this row is the requesting user. It enables self-marking. */
-  isSelf: boolean;
+  readonly isSelf: boolean;
   /** The member holds `protocol.write` in the gremium and can keep the minutes. */
-  canKeepProtocol?: boolean;
+  readonly canKeepProtocol?: boolean;
   /**
    * The member has an own vote now (gremium permission `vote.cast`). Only such a member
    * can be substituted. An older server leaves the flag out.
    */
-  canVote?: boolean;
+  readonly canVote?: boolean;
 }
 
 /** `AgendaItemOut`. An agenda item holds a linked application or free text. */
 export interface AgendaItem {
-  id: Uuid;
+  readonly id: Uuid;
   /** `null` for a free-text agenda item (no application). */
-  applicationId: Uuid | null;
+  readonly applicationId: Uuid | null;
   /** The to-do card that the item was made from, or `null`. */
-  todoId?: Uuid | null;
+  readonly todoId?: Uuid | null;
   /** The own title of the item, else the title of its application. */
-  title: string | null;
+  readonly title: string | null;
   /** The title of the application. `null` for a free-text item. */
-  applicationTitle?: string | null;
+  readonly applicationTitle?: string | null;
   /** Markdown text of this agenda item. Each item has its own editor. */
-  body?: string | null;
-  position: number;
+  readonly body?: string | null;
+  readonly position: number;
   /** Non-public. The public protocol PDF redacts this agenda item. */
-  nonPublic?: boolean;
+  readonly nonPublic?: boolean;
   /** The done mark ("TOP abhaken"): the time of the tick, or `null`. Set by hand only. */
-  doneAt?: string | null;
-  stateLabel?: I18nMap | null;
+  readonly doneAt?: string | null;
+  readonly stateLabel?: I18nMap | null;
   /** The requested amount of the application, for the decision proposal. */
-  amount?: string | null;
+  readonly amount?: string | null;
 }
 
 /** `AssignableApplicationOut`. An application in a vote state that is not on the agenda. */
 export interface AssignableApplication {
-  applicationId: Uuid;
-  title: string | null;
-  stateLabel?: I18nMap | null;
+  readonly applicationId: Uuid;
+  readonly title: string | null;
+  readonly stateLabel?: I18nMap | null;
 }
 
 /** `AltchaChallengeOut`. A server-signed proof-of-work challenge. GET /altcha/challenge. */
 export interface AltchaChallenge {
-  algorithm: string;
-  challenge: string;
-  salt: string;
-  signature: string;
-  maxnumber: number;
+  readonly algorithm: string;
+  readonly challenge: string;
+  readonly salt: string;
+  readonly signature: string;
+  readonly maxnumber: number;
 }
 
 /**
@@ -431,32 +435,32 @@ export interface AltchaChallenge {
 export type ActorKind = 'principal' | 'applicant' | 'system' | 'gremium' | 'deleted';
 
 export interface ActorInfo {
-  kind: ActorKind;
-  key?: string | null;
-  displayName?: string | null;
+  readonly kind: ActorKind;
+  readonly key?: string | null;
+  readonly displayName?: string | null;
   /** Only for `principal`: the account id, for the avatar. Never in the applicant view. */
-  principalId?: Uuid | null;
+  readonly principalId?: Uuid | null;
 }
 
 /** `TimelineEventOut`. A status transition in the timeline. */
 export interface TimelineEventOutWire {
-  fromStateId?: Uuid | null;
-  toStateId: Uuid;
-  toState?: StateOutWire | null;
+  readonly fromStateId?: Uuid | null;
+  readonly toStateId: Uuid;
+  readonly toState?: StateOutWire | null;
   /** Label of the fired transition. Null for the creation and for a revert. */
-  transitionLabel?: I18nMap | null;
+  readonly transitionLabel?: I18nMap | null;
   /** In the applicant view, the Gremium for every action of a member. */
-  actor?: string | null;
+  readonly actor?: string | null;
   /** The resolved actor. The UI renders this and never the raw `actor`. */
-  actorInfo?: ActorInfo | null;
-  at: IsoDateTime;
-  note?: string | null;
+  readonly actorInfo?: ActorInfo | null;
+  readonly at: IsoDateTime;
+  readonly note?: string | null;
   /** The vote whose close fired the event. Null in the applicant view. */
-  voteId?: Uuid | null;
+  readonly voteId?: Uuid | null;
   /** A vote close fired the event, and the vote went with its meeting. */
-  voteDeleted?: boolean;
+  readonly voteDeleted?: boolean;
   /** The decision that this status change carried. */
-  decision?: TimelineDecision | null;
+  readonly decision?: TimelineDecision | null;
 }
 
 export type CommentVisibility = 'internal' | 'public';
@@ -464,57 +468,57 @@ export type CommentAuthorKind = 'principal' | 'applicant';
 
 /** `CommentOut`. The backend field names are `author`, `authorKind`, `visibility`, `at`. */
 export interface CommentOutWire {
-  id: Uuid;
-  author?: string | null;
-  authorKind: CommentAuthorKind;
+  readonly id: Uuid;
+  readonly author?: string | null;
+  readonly authorKind: CommentAuthorKind;
   /** The resolved author. The UI renders this and never the raw `author`. */
-  authorInfo?: ActorInfo | null;
-  body: string;
-  visibility: CommentVisibility;
-  at: IsoDateTime;
+  readonly authorInfo?: ActorInfo | null;
+  readonly body: string;
+  readonly visibility: CommentVisibility;
+  readonly at: IsoDateTime;
   /** True if the viewer wrote this comment. The server decides. It aligns the chat. */
-  isOwn?: boolean;
+  readonly isOwn?: boolean;
   /** When the text was last changed; null or absent for a comment never edited. */
-  editedAt?: IsoDateTime | null;
+  readonly editedAt?: IsoDateTime | null;
   /** The files of the comment, oldest first; absent on an older server. */
-  attachments?: MessageAttachment[];
+  readonly attachments?: readonly MessageAttachment[];
   /** The people the comment mentions; empty in the applicant view, absent on an older server. */
-  mentions?: PersonRef[];
+  readonly mentions?: readonly PersonRef[];
 }
 
 /** `ApplicationTypeListItem`. */
 export interface ApplicationTypeListItemWire {
-  id: Uuid;
-  name: string;
-  hasBudget: boolean;
-  active: boolean;
-  activeFormVersionId?: Uuid | null;
+  readonly id: Uuid;
+  readonly name: string;
+  readonly hasBudget: boolean;
+  readonly active: boolean;
+  readonly activeFormVersionId?: Uuid | null;
   /** Extra admin fields. The backend fills them only for an authorized reader. */
-  key?: string | null;
-  gremiumId?: Uuid | null;
+  readonly key?: string | null;
+  readonly gremiumId?: Uuid | null;
 }
 
 /** `TransitionOut`. The `label` is an i18n map. */
 export interface TransitionOutWire {
-  id: Uuid;
-  fromStateId: Uuid;
-  toStateId: Uuid;
-  label: I18nMap;
+  readonly id: Uuid;
+  readonly fromStateId: Uuid;
+  readonly toStateId: Uuid;
+  readonly label: I18nMap;
   /** Optional color for the decision button. */
-  color?: string | null;
+  readonly color?: string | null;
   /** The transition carries an `addToNextSession` action into a vote state, so a
    *  fire takes a `meetingId`. */
-  addsToAgenda?: boolean;
+  readonly addsToAgenda?: boolean;
   /** The gremium whose planned meetings the agenda dialog offers. */
-  agendaGremiumId?: Uuid | null;
+  readonly agendaGremiumId?: Uuid | null;
   /** The target is an accepted state of the cost center, so a fire takes a decision. */
-  allowsDecision?: boolean;
+  readonly allowsDecision?: boolean;
 }
 
 /** A field change in the version diff (`FieldChange`). */
 export interface FieldChangeWire {
-  old: unknown;
-  new: unknown;
+  readonly old: unknown;
+  readonly new: unknown;
 }
 
 /**
@@ -525,9 +529,9 @@ export interface FieldChangeWire {
  * cell diff. That also works for heterogeneous tables and objects.
  */
 export interface DataDiffWire {
-  added: Record<string, unknown>;
-  removed: Record<string, unknown>;
-  changed: Record<string, FieldChangeWire>;
+  readonly added: Readonly<Record<string, unknown>>;
+  readonly removed: Readonly<Record<string, unknown>>;
+  readonly changed: Readonly<Record<string, FieldChangeWire>>;
 }
 
 /**
@@ -538,14 +542,14 @@ export interface DataDiffWire {
  * `isPII` field in `data`, `diff` and `changedKeys`.
  */
 export interface VersionOutWire {
-  version: number;
-  data?: Record<string, unknown> | null;
-  diff?: DataDiffWire | null;
-  changedKeys?: string[];
-  changedBy?: string | null;
+  readonly version: number;
+  readonly data?: Readonly<Record<string, unknown>> | null;
+  readonly diff?: DataDiffWire | null;
+  readonly changedKeys?: readonly string[];
+  readonly changedBy?: string | null;
   /** The resolved editor. The UI renders this and never the raw `changedBy`. */
-  changedByInfo?: ActorInfo | null;
-  at: IsoDateTime;
+  readonly changedByInfo?: ActorInfo | null;
+  readonly at: IsoDateTime;
 }
 
 /**
@@ -557,11 +561,11 @@ export interface VersionOutWire {
  * time: 200 against 409.
  */
 export interface AttachmentOutWire {
-  id: Uuid;
-  filename: string;
-  mime: string;
-  size: number;
-  scanned: boolean;
+  readonly id: Uuid;
+  readonly filename: string;
+  readonly mime: string;
+  readonly size: number;
+  readonly scanned: boolean;
 }
 
 /**
@@ -569,8 +573,8 @@ export interface AttachmentOutWire {
  * attachment fields stay snake_case like `AttachmentOut`; the token fields are camelCase.
  */
 export interface DraftAttachmentOutWire extends AttachmentOutWire {
-  draftToken: string;
-  draftExpiresAt: IsoDateTime;
+  readonly draftToken: string;
+  readonly draftExpiresAt: IsoDateTime;
 }
 
 /**
@@ -579,111 +583,111 @@ export interface DraftAttachmentOutWire extends AttachmentOutWire {
  * is not a URL expiry.
  */
 export interface SignedUrlOutWire {
-  url: string;
-  expiresIn: number;
+  readonly url: string;
+  readonly expiresIn: number;
 }
 
 /** Body for `POST /applications` (`ApplicationCreate`, by_alias). */
 export interface ApplicationCreateBody {
-  typeId: Uuid;
-  data: Record<string, unknown>;
+  readonly typeId: Uuid;
+  readonly data: Readonly<Record<string, unknown>>;
   /**
    * Optional. For a logged-in user the backend takes the identity from the account. For an
    * anonymous submission the server requires this field and `applicantName`.
    */
-  applicantEmail?: string | null;
-  applicantName?: string | null;
-  lang: Lang;
-  altcha?: string | null;
+  readonly applicantEmail?: string | null;
+  readonly applicantName?: string | null;
+  readonly lang: Lang;
+  readonly altcha?: string | null;
   /** Draft uploads of the wizard to bind. Needs `draftToken`. */
-  attachmentIds?: Uuid[];
+  readonly attachmentIds?: readonly Uuid[];
   /** The token of the draft uploads. */
-  draftToken?: string | null;
+  readonly draftToken?: string | null;
 }
 
 /** Body for `POST /applications/{id}/comments` (`CommentCreate`). */
 export interface CommentCreateBody extends MessageFiles {
-  body: string;
-  visibility: CommentVisibility;
+  readonly body: string;
+  readonly visibility: CommentVisibility;
   /** The ids of the people the text mentions; only a member sends them. */
-  mentions?: Uuid[];
+  readonly mentions?: readonly Uuid[];
 }
 
 /** Body for `POST /applications/{id}/transition` (`TransitionRequest`). */
 export interface TransitionRequestBody {
-  transitionId: Uuid;
-  note?: string | null;
+  readonly transitionId: Uuid;
+  readonly note?: string | null;
   /**
    * The meeting whose agenda gets the application. Only for a transition with
    * `addsToAgenda`; the meeting must be planned and belong to `agendaGremiumId`, else
    * the server answers 422 `agenda_meeting_invalid`.
    */
-  meetingId?: Uuid | null;
+  readonly meetingId?: Uuid | null;
   /** The new agenda item is not public (NÖ). Only with `meetingId`. */
-  nonPublic?: boolean;
+  readonly nonPublic?: boolean;
   /** The decision. Only for a transition with `allowsDecision`, else 422. */
-  decision?: DecisionProposal | null;
+  readonly decision?: DecisionProposal | null;
 }
 
 /** `POST /applications/{id}/force-status`. A privileged direct status override.
  *  `note` holds the reason and is mandatory. The change skips the flow. The audit
  *  log records it. */
 export interface ForceStatusBody {
-  stateId: Uuid;
-  note: string;
+  readonly stateId: Uuid;
+  readonly note: string;
 }
 
 /** `TransitionResult`. The 200 response of a transition that succeeded. */
 export interface TransitionResult {
-  newStateId: Uuid;
-  statusEventId: Uuid;
-  dispatchedActions: string[];
+  readonly newStateId: Uuid;
+  readonly statusEventId: Uuid;
+  readonly dispatchedActions: readonly string[];
 }
 
 /** Application status with the label resolved for the current `lang`. */
 export interface ApplicationState {
-  id: Uuid;
-  key: string;
-  label: string;
+  readonly id: Uuid;
+  readonly key: string;
+  readonly label: string;
   /** Optional display color of the state badge, as hex. */
-  color?: string | null;
-  editAllowed: boolean;
+  readonly color?: string | null;
+  readonly editAllowed: boolean;
   /** State kind: normal|vote. */
-  kind: string;
+  readonly kind: string;
 }
 
 export interface Applicant {
-  email: string | null;
-  name: string | null;
-  anonymized: boolean;
+  readonly email: string | null;
+  readonly name: string | null;
+  readonly anonymized: boolean;
 }
 
 export interface Application {
-  id: Uuid;
-  typeId: Uuid;
-  state: ApplicationState | null;
-  gremiumId: Uuid | null;
+  readonly id: Uuid;
+  readonly typeId: Uuid;
+  readonly state: ApplicationState | null;
+  readonly gremiumId: Uuid | null;
   /** The gremium that decides the current vote (snapshot on entry of a vote state). */
-  voteGremiumId?: Uuid | null;
-  budgetId: Uuid | null;
-  fiscalYearId: Uuid | null;
-  amount: string | null;
-  currency: string | null;
-  data: Record<string, unknown>;
-  version: number;
-  lang: string | null;
-  createdAt: IsoDateTime;
-  updatedAt: IsoDateTime;
-  applicant: Applicant | null;
+  readonly voteGremiumId?: Uuid | null;
+  readonly budgetId: Uuid | null;
+  readonly fiscalYearId: Uuid | null;
+  readonly amount: string | null;
+  readonly currency: string | null;
+  readonly data: Readonly<Record<string, unknown>>;
+  readonly version: number;
+  readonly lang: string | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
+  readonly applicant: Applicant | null;
   /** True if the requester may edit or delete. A manager, a holder of
    *  `application.edit_any` or the creator may. */
-  canEdit: boolean;
+  readonly canEdit: boolean;
   /** True if the requester holds `application.edit_any`: a state with `editAllowed`
    *  false does not lock the edit for this requester. */
-  canEditLocked: boolean;
+  readonly canEditLocked: boolean;
   /** True if the requester is the creator, that is the applicant. It gates the
    *  anonymization request under GDPR Art. 17. Only the data subject may ask. */
-  isOwner: boolean;
+  readonly isOwner: boolean;
   /**
    * When it was archived, or null. A timestamp rather than a flag, so the view can say
    * WHEN without a second field.
@@ -691,104 +695,104 @@ export interface Application {
    * Archiving is not anonymisation: the record is complete and readable, it has only
    * left the working list. `be-privacy` owns the DSGVO erasure people confuse this with.
    */
-  archivedAt: IsoDateTime | null;
+  readonly archivedAt: IsoDateTime | null;
   /** Time of the last status change, for "since" on the status page. */
-  stateSince?: IsoDateTime | null;
+  readonly stateSince?: IsoDateTime | null;
   /**
    * The `isPII` field keys that the server removed from `data`. The edit form
    * leaves out these fields. A key that is only missing from `data` was never
    * answered, and the field stays editable.
    */
-  hiddenKeys?: string[];
+  readonly hiddenKeys?: readonly string[];
   /** Set when a person captured the application on behalf of the applicant. */
-  capture?: ApplicationCapture | null;
+  readonly capture?: ApplicationCapture | null;
   /** The amount that the cost center binds. `null` means as requested. */
-  approvedAmount?: string | null;
+  readonly approvedAmount?: string | null;
   /** The valid decision, or `null` before one. */
-  decision?: ApplicationDecision | null;
+  readonly decision?: ApplicationDecision | null;
 }
 
 export interface ApplicationListItem {
-  id: Uuid;
-  typeId: Uuid;
-  title: string | null;
-  state: ApplicationState | null;
-  gremiumId: Uuid | null;
-  amount: string | null;
+  readonly id: Uuid;
+  readonly typeId: Uuid;
+  readonly title: string | null;
+  readonly state: ApplicationState | null;
+  readonly gremiumId: Uuid | null;
+  readonly amount: string | null;
   /** The approved amount. `null` means as requested. */
-  approvedAmount?: string | null;
-  currency: string | null;
-  createdAt: IsoDateTime;
-  updatedAt: IsoDateTime;
+  readonly approvedAmount?: string | null;
+  readonly currency: string | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
   /** Set when the row is archived, so a combined list can mark it. */
-  archivedAt: IsoDateTime | null;
+  readonly archivedAt: IsoDateTime | null;
   /** Time of the last status change, for "waiting since". */
-  stateSince?: IsoDateTime | null;
+  readonly stateSince?: IsoDateTime | null;
 }
 
 /** Result of `POST /applications`, frontend view. */
 export interface ApplicationCreated {
-  applicationId: Uuid;
+  readonly applicationId: Uuid;
 }
 
 /** Timeline entry, frontend view. The `label` comes from `toState`. */
 export interface TimelineEntry {
-  toStateId: Uuid;
-  toState: ApplicationState | null;
-  label: string;
+  readonly toStateId: Uuid;
+  readonly toState: ApplicationState | null;
+  readonly label: string;
   /** Label of the fired transition, resolved to the locale. */
-  transitionLabel?: string | null;
-  actor: string | null;
-  actorInfo?: ActorInfo | null;
-  at: IsoDateTime;
-  note: string | null;
+  readonly transitionLabel?: string | null;
+  readonly actor: string | null;
+  readonly actorInfo?: ActorInfo | null;
+  readonly at: IsoDateTime;
+  readonly note: string | null;
   /** The vote whose close fired the event, for the link to it. */
-  voteId: Uuid | null;
+  readonly voteId: Uuid | null;
   /** The vote that fired the event was deleted with its meeting. */
-  voteDeleted: boolean;
+  readonly voteDeleted: boolean;
   /** The decision that this status change carried. */
-  decision?: TimelineDecision | null;
+  readonly decision?: TimelineDecision | null;
 }
 
 /** Comment, frontend view. `isPublic` comes from `visibility`. */
 export interface ApplicationComment {
-  id: Uuid;
-  author: string | null;
-  authorKind: CommentAuthorKind;
-  authorInfo?: ActorInfo | null;
-  body: string;
-  visibility: CommentVisibility;
-  isPublic: boolean;
+  readonly id: Uuid;
+  readonly author: string | null;
+  readonly authorKind: CommentAuthorKind;
+  readonly authorInfo?: ActorInfo | null;
+  readonly body: string;
+  readonly visibility: CommentVisibility;
+  readonly isPublic: boolean;
   /** True if the viewer wrote this comment. Own messages go right, others left and gray. */
-  isOwn: boolean;
-  at: IsoDateTime;
+  readonly isOwn: boolean;
+  readonly at: IsoDateTime;
   /** When the text was last changed: the chat says "bearbeitet". */
-  editedAt?: IsoDateTime | null;
+  readonly editedAt?: IsoDateTime | null;
   /** The files of the comment, oldest first. */
-  attachments: MessageAttachment[];
+  readonly attachments: readonly MessageAttachment[];
   /** The people the comment mentions. */
-  mentions: PersonRef[];
+  readonly mentions: readonly PersonRef[];
 }
 
 /** Application type, frontend view, for the wizard selection. */
 export interface ApplicationType {
-  id: Uuid;
-  name: string;
-  active: boolean;
-  hasBudget: boolean;
-  activeFormVersionId: Uuid | null;
-  key: string | null;
-  gremiumId: Uuid | null;
+  readonly id: Uuid;
+  readonly name: string;
+  readonly active: boolean;
+  readonly hasBudget: boolean;
+  readonly activeFormVersionId: Uuid | null;
+  readonly key: string | null;
+  readonly gremiumId: Uuid | null;
 }
 
 /** Available transition, frontend view, with the `label` resolved. */
 export interface Transition {
-  id: Uuid;
-  fromStateId: Uuid;
-  toStateId: Uuid;
-  label: string;
+  readonly id: Uuid;
+  readonly fromStateId: Uuid;
+  readonly toStateId: Uuid;
+  readonly label: string;
   /** Optional color for the decision button. `null` selects the default. */
-  color: string | null;
+  readonly color: string | null;
   /**
    * The transition puts the application on the agenda of a meeting and leads into a
    * vote state, so the server takes a chosen meeting. The detail and the row menu
@@ -796,44 +800,47 @@ export interface Transition {
    * action leads into a normal state is `false` here and fires as a plain transition;
    * the server action then picks the next planned meeting.
    */
-  addsToAgenda: boolean;
+  readonly addsToAgenda: boolean;
   /** The gremium whose planned meetings the agenda dialog offers, or null. */
-  agendaGremiumId: Uuid | null;
+  readonly agendaGremiumId: Uuid | null;
   /**
    * The target is an accepted state of the cost center. The detail and the row
    * menu then open the decision dialog, which can approve with deviations.
    */
-  allowsDecision?: boolean;
+  readonly allowsDecision?: boolean;
 }
 
 /** A changed field cell, frontend view. The `key` comes out of the diff map. */
 export interface FieldChange {
-  key: string;
-  old: unknown;
-  new: unknown;
+  readonly key: string;
+  readonly old: unknown;
+  readonly new: unknown;
 }
 
 /**
  * Version diff, frontend view. The backend sends the maps `added`, `removed` and
  * `changed`. This shape turns them into lists that carry the key. A template can
  * then render them directly with `@for`.
+ *
+ * The lists stay mutable arrays, because `ConfigDiffData` of the ui-kit, which the diff view
+ * takes as input, declares mutable arrays.
  */
 export interface DataDiff {
-  added: { key: string; value: unknown }[];
-  removed: { key: string; value: unknown }[];
-  changed: FieldChange[];
+  readonly added: { readonly key: string; readonly value: unknown }[];
+  readonly removed: { readonly key: string; readonly value: unknown }[];
+  readonly changed: FieldChange[];
 }
 
 /** A submission version, frontend view, for the history and diff view. */
 export interface ApplicationVersion {
-  version: number;
-  data: Record<string, unknown>;
-  diff: DataDiff | null;
+  readonly version: number;
+  readonly data: Readonly<Record<string, unknown>>;
+  readonly diff: DataDiff | null;
   /** Keys of the changed fields. The applicant view gets only these. */
-  changedKeys?: string[];
-  changedBy: string | null;
-  changedByInfo?: ActorInfo | null;
-  at: IsoDateTime;
+  readonly changedKeys?: readonly string[];
+  readonly changedBy: string | null;
+  readonly changedByInfo?: ActorInfo | null;
+  readonly at: IsoDateTime;
 }
 
 /**
@@ -850,53 +857,53 @@ export type ScanState = 'scanning' | 'clean' | 'quarantined';
  * server sets `scanState`: only a `clean` file downloads, streamed through the API.
  */
 export interface MessageAttachment {
-  id: Uuid;
-  filename: string;
-  mime: string;
-  size: number;
-  scanState: ScanState;
+  readonly id: Uuid;
+  readonly filename: string;
+  readonly mime: string;
+  readonly size: number;
+  readonly scanState: ScanState;
 }
 
 /** The files of a message create: draft ids of `POST /apply/attachments` and their token. */
 export interface MessageFiles {
   /** At most 5. */
-  attachmentIds?: Uuid[];
+  readonly attachmentIds?: readonly Uuid[];
   /** Required with `attachmentIds`. */
-  draftToken?: string | null;
+  readonly draftToken?: string | null;
 }
 
 /** Attachment, frontend view. `scanState` is derived. */
 export interface Attachment {
-  id: Uuid;
-  filename: string;
-  mime: string;
-  size: number;
-  scanned: boolean;
-  scanState: ScanState;
+  readonly id: Uuid;
+  readonly filename: string;
+  readonly mime: string;
+  readonly size: number;
+  readonly scanned: boolean;
+  readonly scanState: ScanState;
 }
 
 /** Signed download URL, frontend view. */
 export interface SignedUrl {
-  url: string;
-  expiresIn: number;
+  readonly url: string;
+  readonly expiresIn: number;
 }
 
 /** Frontend input for a new application. It maps to `ApplicationCreateBody`. */
 export interface NewApplication {
-  typeId: Uuid;
-  data: Record<string, unknown>;
+  readonly typeId: Uuid;
+  readonly data: Readonly<Record<string, unknown>>;
   /**
    * Null for a logged-in user, like `applicantName`. The backend takes the identity and the
    * altcha itself.
    */
-  applicantEmail?: string | null;
-  applicantName?: string | null;
-  lang: Lang;
-  altcha?: string | null;
+  readonly applicantEmail?: string | null;
+  readonly applicantName?: string | null;
+  readonly lang: Lang;
+  readonly altcha?: string | null;
   /** Draft uploads of the wizard to bind. */
-  attachmentIds?: Uuid[];
+  readonly attachmentIds?: readonly Uuid[];
   /** The token of the draft uploads; required with `attachmentIds`. */
-  draftToken?: string | null;
+  readonly draftToken?: string | null;
 }
 
 /**
@@ -904,14 +911,14 @@ export interface NewApplication {
  * belongs to (`null` = the general block "Anhänge").
  */
 export interface DraftAttachment extends Attachment {
-  fieldKey: string | null;
+  readonly fieldKey: string | null;
 }
 
 /** The result of `POST /apply/attachments`: the draft and its (new) token. */
 export interface DraftUpload {
-  attachment: Attachment;
-  draftToken: string;
-  draftExpiresAt: IsoDateTime;
+  readonly attachment: Attachment;
+  readonly draftToken: string;
+  readonly draftExpiresAt: IsoDateTime;
 }
 
 /**
@@ -950,64 +957,64 @@ export type FieldType =
  * options of `budget_select`, so the form shows the cost centres as a tree.
  */
 export interface FieldOption {
-  value: string;
-  label: I18nMap;
+  readonly value: string;
+  readonly label: I18nMap;
   /** The value of the parent cost centre, or null for a top-level one. */
-  parentId?: string | null;
+  readonly parentId?: string | null;
   /** The path segment of the cost centre. */
-  key?: string | null;
+  readonly key?: string | null;
   /** The own display colour of the cost centre, or null. */
-  color?: string | null;
+  readonly color?: string | null;
 }
 
 export interface FieldValidation {
-  min?: number;
-  max?: number;
-  minLen?: number;
-  maxLen?: number;
-  pattern?: string;
-  fileTypes?: string[];
-  maxSizeMB?: number;
-  maxRows?: number;
+  readonly min?: number;
+  readonly max?: number;
+  readonly minLen?: number;
+  readonly maxLen?: number;
+  readonly pattern?: string;
+  readonly fileTypes?: readonly string[];
+  readonly maxSizeMB?: number;
+  readonly maxRows?: number;
   /** `positions`. The minimum comparison offers per position and the minimum
    *  number of positions. */
-  minOffers?: number;
-  minPositions?: number;
+  readonly minOffers?: number;
+  readonly minPositions?: number;
   /** `positions`. Allow the opt-out of comparison offers for one position. The
    *  user ticks a checkbox and must give a reason. Then one offer is enough. If
    *  unset, the opt-out is allowed. */
-  allowNoOffers?: boolean;
+  readonly allowNoOffers?: boolean;
 }
 
 /** A field definition of the effective form. It is camelCase like the OpenAPI by_alias. */
 export interface FormFieldDef {
-  key: string;
-  type: FieldType;
-  label: I18nMap;
-  help?: I18nMap;
-  required?: boolean;
-  validation?: FieldValidation;
-  options?: FieldOption[];
-  visibleIf?: Record<string, unknown>;
-  compute?: Record<string, unknown>;
-  isPII?: boolean;
-  isPromoted?: boolean;
-  promoteTarget?: string;
+  readonly key: string;
+  readonly type: FieldType;
+  readonly label: I18nMap;
+  readonly help?: I18nMap;
+  readonly required?: boolean;
+  readonly validation?: FieldValidation;
+  readonly options?: readonly FieldOption[];
+  readonly visibleIf?: Readonly<Record<string, unknown>>;
+  readonly compute?: Readonly<Record<string, unknown>>;
+  readonly isPII?: boolean;
+  readonly isPromoted?: boolean;
+  readonly promoteTarget?: string;
 }
 
 export interface FormSection {
-  key: string;
-  label: I18nMap;
-  fields: FormFieldDef[];
+  readonly key: string;
+  readonly label: I18nMap;
+  readonly fields: readonly FormFieldDef[];
 }
 
 /** Effective form definition. GET /api/application-types/{id}/form. */
 export interface EffectiveForm {
-  applicationTypeId: Uuid;
-  formVersionId: Uuid;
+  readonly applicationTypeId: Uuid;
+  readonly formVersionId: Uuid;
   /** Drives `visibleIf: has_budget`. Comes from the type, as the server's own check does. */
-  hasBudget: boolean;
-  sections: FormSection[];
+  readonly hasBudget: boolean;
+  readonly sections: readonly FormSection[];
 }
 
 /**
@@ -1017,9 +1024,9 @@ export interface EffectiveForm {
  * HttpOnly cookie. The body carries no session token. JavaScript never sees one.
  */
 export interface MagicLinkVerifyResult {
-  application_id: Uuid;
+  readonly application_id: Uuid;
   /** Always `edit`: the applicant session has no scope. */
-  scope: 'edit';
+  readonly scope: 'edit';
 }
 
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
@@ -1042,65 +1049,69 @@ export type DateAnswer = 'yes' | 'maybe' | 'no';
 /** One option of a poll: a text (`label`), or a date with a start and an optional end.
  *  The server gives the ids (`o1`..`on`). */
 export interface PollOption {
-  id: string;
-  label?: string | null;
-  start?: IsoDateTime | null;
-  end?: IsoDateTime | null;
+  readonly id: string;
+  readonly label?: string | null;
+  readonly start?: IsoDateTime | null;
+  readonly end?: IsoDateTime | null;
 }
 
 /** The config of a poll (`PollConfig`). */
 export interface PollConfig {
-  mode: PollMode;
-  options: PollOption[];
+  readonly mode: PollMode;
+  readonly options: readonly PollOption[];
   /** A multi poll: the most options of one ballot. `null` = every option. */
-  maxChoices?: number | null;
-  secret: boolean;
-  guestsVote?: boolean;
+  readonly maxChoices?: number | null;
+  readonly secret: boolean;
+  readonly guestsVote?: boolean;
 }
 
 /** The counts of a poll (`PollResultOut`): stored at the close, live once revealed. */
 export interface PollResult {
   /** Votes per option id. A date poll counts the Ja answers here. */
-  counts: Record<string, number>;
+  readonly counts: Readonly<Record<string, number>>;
   /** A date poll: the Vielleicht answers per option id. */
-  maybe?: Record<string, number> | null;
-  abstentions: number;
-  ballots: number;
+  readonly maybe?: Readonly<Record<string, number>> | null;
+  readonly abstentions: number;
+  readonly ballots: number;
   /** The option ids, highest first. */
-  order: string[];
+  readonly order: readonly string[];
   /** The options with the most votes (every tied one); empty without a vote. */
-  top: string[];
+  readonly top: readonly string[];
 }
 
 /** The body of a new poll (`PollIn`): the options as the creator types them. */
 export interface PollIn {
-  mode: PollMode;
-  options: { label?: string; start?: IsoDateTime; end?: IsoDateTime }[];
-  maxChoices?: number | null;
+  readonly mode: PollMode;
+  readonly options: readonly {
+    readonly label?: string;
+    readonly start?: IsoDateTime;
+    readonly end?: IsoDateTime;
+  }[];
+  readonly maxChoices?: number | null;
 }
 
 /** `POST /votes`: a poll of a Gremium, without a meeting. */
 export interface PollCreateBody extends PollIn {
-  kind: 'poll';
-  eligibleGroup: Uuid;
-  question: string;
-  secret: boolean;
+  readonly kind: 'poll';
+  readonly eligibleGroup: Uuid;
+  readonly question: string;
+  readonly secret: boolean;
   /** The planned end, at least one hour ahead. */
-  closesAt: IsoDateTime;
+  readonly closesAt: IsoDateTime;
   /** Keep the poll a draft; otherwise it opens at once. */
-  draft: boolean;
+  readonly draft: boolean;
 }
 
 /** One candidate of a personnel election. The server gives the ids (`c1`..`cn`). */
 export interface ElectionCandidate {
-  id: string;
-  name: string;
+  readonly id: string;
+  readonly name: string;
   /** The account of the candidate, or `null` for a free name. */
-  principalId?: Uuid | null;
+  readonly principalId?: Uuid | null;
   /** The DSGVO erasure removed the name (`name` then holds the German placeholder
    *  "Gelöscht"): the UI shows `election.candidate.erased` instead. Only the server
    *  sets it. */
-  erased?: boolean;
+  readonly erased?: boolean;
 }
 
 /**
@@ -1109,65 +1120,65 @@ export interface ElectionCandidate {
  * Ja/Nein/Enthaltung ballot.
  */
 export interface ElectionConfig {
-  seats: number;
-  candidates: ElectionCandidate[];
-  secret: boolean;
-  quorum?: Quorum | null;
-  abstainCountsQuorum?: boolean;
-  guestsVote?: boolean;
+  readonly seats: number;
+  readonly candidates: readonly ElectionCandidate[];
+  readonly secret: boolean;
+  readonly quorum?: Quorum | null;
+  readonly abstainCountsQuorum?: boolean;
+  readonly guestsVote?: boolean;
 }
 
 /** The runoff that a tie at the seat boundary needs. `voteId` is set once it exists. */
 export interface ElectionRunoff {
-  candidateIds: string[];
-  seats: number;
-  voteId?: Uuid | null;
+  readonly candidateIds: readonly string[];
+  readonly seats: number;
+  readonly voteId?: Uuid | null;
 }
 
 /** The lot of a tie. `drawn` is `null` while the lot is pending. */
 export interface ElectionLot {
-  among: string[];
-  seats: number;
-  drawn: string[] | null;
-  at?: IsoDateTime | null;
-  by?: string | null;
-  byName?: string | null;
+  readonly among: readonly string[];
+  readonly seats: number;
+  readonly drawn: readonly string[] | null;
+  readonly at?: IsoDateTime | null;
+  readonly by?: string | null;
+  readonly byName?: string | null;
 }
 
 /** The stored result of a closed election (`ElectionResultOut`). */
 export interface ElectionResult {
   /** Votes per candidate id (`yes`/`no` for a single candidate). */
-  counts: Record<string, number>;
-  abstentions: number;
-  ballots: number;
-  yes?: number | null;
-  no?: number | null;
+  readonly counts: Readonly<Record<string, number>>;
+  readonly abstentions: number;
+  readonly ballots: number;
+  readonly yes?: number | null;
+  readonly no?: number | null;
   /** The elected candidate ids, best first. */
-  elected: string[];
-  runoff?: ElectionRunoff | null;
-  lot?: ElectionLot | null;
+  readonly elected: readonly string[];
+  readonly runoff?: ElectionRunoff | null;
+  readonly lot?: ElectionLot | null;
 }
 
 /** The election fields of a vote and the poll fields. A motion has
  *  `kind: 'motion'` and no others. */
 export interface ElectionFields {
-  kind?: VoteKind;
-  election?: ElectionConfig | null;
-  electionResult?: ElectionResult | null;
+  readonly kind?: VoteKind;
+  readonly election?: ElectionConfig | null;
+  readonly electionResult?: ElectionResult | null;
   /** The election that this runoff continues. */
-  parentVoteId?: Uuid | null;
+  readonly parentVoteId?: Uuid | null;
   /** 1 for the first round, 2 for the first runoff. */
-  round?: number;
+  readonly round?: number;
   /** A poll: its mode and options. */
-  poll?: PollConfig | null;
+  readonly poll?: PollConfig | null;
   /** A poll: the counts once closed, or while open once revealed. */
-  pollResult?: PollResult | null;
+  readonly pollResult?: PollResult | null;
 }
 
 /** Quorum threshold. */
 export interface Quorum {
-  type: 'count' | 'percent';
-  value: number;
+  readonly type: 'count' | 'percent';
+  readonly value: number;
 }
 
 /**
@@ -1177,13 +1188,13 @@ export interface Quorum {
  * rejection.
  */
 export interface VoteConfig {
-  options: string[];
-  majorityRule: MajorityRule;
-  quorum?: Quorum | null;
-  abstainCountsQuorum?: boolean;
-  secret?: boolean;
+  readonly options: readonly string[];
+  readonly majorityRule: MajorityRule;
+  readonly quorum?: Quorum | null;
+  readonly abstainCountsQuorum?: boolean;
+  readonly secret?: boolean;
   /** Admitted guests of a public meeting vote too: no quorum, majority of the cast votes. */
-  guestsVote?: boolean;
+  readonly guestsVote?: boolean;
 }
 
 /**
@@ -1192,13 +1203,13 @@ export interface VoteConfig {
  * is always `null` and only `cast` tells that the caller voted.
  */
 export interface MyBallot {
-  cast: boolean;
-  choice: string | null;
+  readonly cast: boolean;
+  readonly choice: string | null;
   /** The chosen candidate ids of an open election ballot, or the chosen option
    *  ids of an open single or multi poll. */
-  choices?: string[] | null;
+  readonly choices?: readonly string[] | null;
   /** The answers of an open date poll ballot. */
-  answers?: Record<string, DateAnswer> | null;
+  readonly answers?: Readonly<Record<string, DateAnswer>> | null;
 }
 
 /**
@@ -1206,28 +1217,28 @@ export interface MyBallot {
  * returns only `counts`. It never returns an individual voter.
  */
 export interface Tally {
-  counts: Record<string, number>;
-  eligible: number;
-  quorumMet: boolean;
-  leading: string | null;
-  result?: VoteResult | null;
+  readonly counts: Readonly<Record<string, number>>;
+  readonly eligible: number;
+  readonly quorumMet: boolean;
+  readonly leading: string | null;
+  readonly result?: VoteResult | null;
   /** Turnout: the ballots cast so far. The server always sends it, also while the
    *  counts stay hidden. */
-  voted?: number;
+  readonly voted?: number;
   /** The present members of the meeting (the reveal denominator). It is 0 for a vote
    *  without a meeting and for a closed vote. */
-  present?: number;
+  readonly present?: number;
   /** `counts` and `leading` are visible: the vote is closed, or it is open, not secret
    *  and every present member voted (a vote without a meeting is always visible).
    *  Otherwise `counts` is empty. */
-  revealed?: boolean;
+  readonly revealed?: boolean;
   /** Why a closed vote failed: `quorum` or `majority`. `null` while open, on a pass and
    *  on a tie. */
-  failedReason?: 'quorum' | 'majority' | null;
+  readonly failedReason?: 'quorum' | 'majority' | null;
   /** The present members and the admitted guests: live while open, fixed at the close.
    *  `null` for a vote that closed before public meetings existed. */
-  presentMembers?: number | null;
-  presentGuests?: number | null;
+  readonly presentMembers?: number | null;
+  readonly presentGuests?: number | null;
 }
 
 /**
@@ -1237,49 +1248,49 @@ export interface Tally {
  * `vote.option.*`.
  */
 export interface Vote extends ElectionFields {
-  id: Uuid;
+  readonly id: Uuid;
   /** `null` marks a motion on a free-text agenda item, with no application. */
-  applicationId: Uuid | null;
+  readonly applicationId: Uuid | null;
   /** The meeting that holds the vote. `null` marks a standalone (async) vote.
    *  A meeting-bound vote is deleted through its meeting, never through
    *  `DELETE /votes/{id}` (that route answers 409). */
-  meetingId?: Uuid | null;
+  readonly meetingId?: Uuid | null;
   /** The agenda item of a meeting vote. The page reads its number ("TOP 3") from the
    *  agenda. */
-  agendaItemId?: Uuid | null;
+  readonly agendaItemId?: Uuid | null;
   /** The motion of a meeting vote. A standalone vote often has none. */
-  question?: string | null;
-  eligibleGroup: string;
-  config: VoteConfig;
-  status: VoteStatus;
-  opensAt: IsoDateTime | null;
+  readonly question?: string | null;
+  readonly eligibleGroup: string;
+  readonly config: VoteConfig;
+  readonly status: VoteStatus;
+  readonly opensAt: IsoDateTime | null;
   /** The planned end of the cast window (a deadline), not the real end. */
-  closesAt: IsoDateTime | null;
-  result: VoteResult | null;
-  secret: boolean;
+  readonly closesAt: IsoDateTime | null;
+  readonly result: VoteResult | null;
+  readonly secret: boolean;
   /** Copies of `config.majorityRule` and `config.quorum` for the vote card. */
-  majorityRule?: MajorityRule;
-  quorum?: Quorum | null;
+  readonly majorityRule?: MajorityRule;
+  readonly quorum?: Quorum | null;
   /** The real moment when the vote opened. */
-  openedAt?: IsoDateTime | null;
+  readonly openedAt?: IsoDateTime | null;
   /** The real moment when the vote ended (close or cancel). `null` while it runs. */
-  closedAt?: IsoDateTime | null;
-  tally: Tally;
+  readonly closedAt?: IsoDateTime | null;
+  readonly tally: Tally;
   /** The own ballot of the caller. Only `GET /votes/{id}` sets it. */
-  myBallot?: MyBallot | null;
+  readonly myBallot?: MyBallot | null;
   /** Admitted guests vote too: no quorum, the majority of the cast votes decides. */
-  guestsVote?: boolean;
+  readonly guestsVote?: boolean;
   /** The caller cast the ballot of a delegator in this vote. Only `GET /votes/{id}`
    *  sets it. */
-  representedCast?: boolean;
+  readonly representedCast?: boolean;
   /** The caller may open, close, cancel and delete the vote: the admin role, or the
    *  gremium permission `vote.manage` or `session.manage` in the gremium of the vote.
    *  Only `GET /votes/{id}` sets it. */
-  canManage?: boolean;
+  readonly canManage?: boolean;
   /** The caller may cast an own ballot: the gremium permission `vote.cast` in the
    *  gremium of the vote, in a browser session. A delegated ballot has its own check.
    *  Only `GET /votes/{id}` sets it. */
-  canCast?: boolean;
+  readonly canCast?: boolean;
 }
 
 /**
@@ -1290,26 +1301,26 @@ export interface Vote extends ElectionFields {
  * without a meeting. `gremiumName` is `null` when the vote names no gremium.
  */
 export interface VoteListItem {
-  id: Uuid;
-  question: string | null;
-  status: VoteStatus;
-  result: VoteResult | null;
-  secret: boolean;
-  kind?: VoteKind;
-  applicationId: Uuid | null;
-  meetingId: Uuid | null;
-  meetingTitle: string | null;
-  agendaItemId: Uuid | null;
-  agendaPosition: number | null;
-  gremiumId: Uuid | null;
-  gremiumName: string | null;
-  createdAt: IsoDateTime;
-  openedAt: IsoDateTime | null;
-  closedAt: IsoDateTime | null;
+  readonly id: Uuid;
+  readonly question: string | null;
+  readonly status: VoteStatus;
+  readonly result: VoteResult | null;
+  readonly secret: boolean;
+  readonly kind?: VoteKind;
+  readonly applicationId: Uuid | null;
+  readonly meetingId: Uuid | null;
+  readonly meetingTitle: string | null;
+  readonly agendaItemId: Uuid | null;
+  readonly agendaPosition: number | null;
+  readonly gremiumId: Uuid | null;
+  readonly gremiumName: string | null;
+  readonly createdAt: IsoDateTime;
+  readonly openedAt: IsoDateTime | null;
+  readonly closedAt: IsoDateTime | null;
   /** The planned end of the cast window, not the real end. */
-  closesAt: IsoDateTime | null;
-  canCast: boolean;
-  myBallot: MyBallot;
+  readonly closesAt: IsoDateTime | null;
+  readonly canCast: boolean;
+  readonly myBallot: MyBallot;
 }
 
 /**
@@ -1317,13 +1328,13 @@ export interface VoteListItem {
  * drafts. `q` searches the question and the meeting title.
  */
 export interface VoteListQuery {
-  status?: VoteStatus[];
-  gremiumId?: Uuid;
-  q?: string;
+  readonly status?: readonly VoteStatus[];
+  readonly gremiumId?: Uuid;
+  readonly q?: string;
   /** Only the motions, the elections or the polls. */
-  kind?: VoteKind;
-  limit?: number;
-  offset?: number;
+  readonly kind?: VoteKind;
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 /** A ballot: one option, the chosen ids of an election or a poll (`[]` = abstention),
@@ -1333,7 +1344,7 @@ export type BallotChoice = string | readonly string[] | Readonly<Record<string, 
 /** Response to an accepted ballot. POST /api/votes/{id}/ballot. A ballot never
  *  changes after the cast: a second cast gives 409 `already_voted`. */
 export interface BallotResult {
-  status: 'cast';
+  readonly status: 'cast';
 }
 
 /**
@@ -1343,19 +1354,19 @@ export interface BallotResult {
  * move the application by hand.
  */
 export interface VoteClosed {
-  id: Uuid;
-  meetingId?: Uuid | null;
-  applicationId?: Uuid | null;
+  readonly id: Uuid;
+  readonly meetingId?: Uuid | null;
+  readonly applicationId?: Uuid | null;
   /** `null` for a poll: a poll only counts. */
-  result: VoteResult | null;
-  tally: Tally;
-  kind?: VoteKind;
-  electionResult?: ElectionResult | null;
-  pollResult?: PollResult | null;
-  closedAt?: IsoDateTime | null;
-  firedTransitionId?: Uuid | null;
-  newStateId?: Uuid | null;
-  branchFired: boolean;
+  readonly result: VoteResult | null;
+  readonly tally: Tally;
+  readonly kind?: VoteKind;
+  readonly electionResult?: ElectionResult | null;
+  readonly pollResult?: PollResult | null;
+  readonly closedAt?: IsoDateTime | null;
+  readonly firedTransitionId?: Uuid | null;
+  readonly newStateId?: Uuid | null;
+  readonly branchFired: boolean;
 }
 
 /** Meeting status. The backend enum is `planned|live|closed`. */
@@ -1365,50 +1376,50 @@ export type MeetingVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 
 /** `MeetingVoteOut`. A vote summary in the meeting state. GET /meetings/{id}. */
 export interface MeetingVoteOutWire extends ElectionFields {
-  id: Uuid;
+  readonly id: Uuid;
   /** `null` marks a generic motion on a free-text agenda item, with no application. */
-  applicationId?: Uuid | null;
+  readonly applicationId?: Uuid | null;
   /** The agenda item the vote belongs to. The frontend groups by it. */
-  agendaItemId?: Uuid | null;
+  readonly agendaItemId?: Uuid | null;
   /** Application title. The backend supplies it. Otherwise read it from the application. */
-  title?: string | null;
+  readonly title?: string | null;
   /** Motion of the live vote. The protocol needs it. */
-  question?: string | null;
+  readonly question?: string | null;
   /** Options a voter can pick. */
-  options?: string[] | null;
-  status: MeetingVoteStatus;
+  readonly options?: readonly string[] | null;
+  readonly status: MeetingVoteStatus;
   /** Final result, for example `accepted` or `rejected`. Set only after `closed`. */
-  result?: string | null;
-  counts?: Record<string, number> | null;
-  leading?: string | null;
-  closesAt?: IsoDateTime | null;
-  voted?: number | null;
-  present?: number | null;
-  revealed?: boolean | null;
+  readonly result?: string | null;
+  readonly counts?: Readonly<Record<string, number>> | null;
+  readonly leading?: string | null;
+  readonly closesAt?: IsoDateTime | null;
+  readonly voted?: number | null;
+  readonly present?: number | null;
+  readonly revealed?: boolean | null;
   /** Reason for the rejection. `quorum` means the vote missed the quorum.
    *  `majority` means the vote missed the majority. */
-  failedReason?: 'quorum' | 'majority' | null;
-  majorityRule?: MajorityRule;
-  secret?: boolean;
-  quorum?: Quorum | null;
+  readonly failedReason?: 'quorum' | 'majority' | null;
+  readonly majorityRule?: MajorityRule;
+  readonly secret?: boolean;
+  readonly quorum?: Quorum | null;
   /** The real open time and the real end time (close or cancel). */
-  openedAt?: IsoDateTime | null;
-  closedAt?: IsoDateTime | null;
+  readonly openedAt?: IsoDateTime | null;
+  readonly closedAt?: IsoDateTime | null;
   /** The own ballot of the caller. A secret vote gives only `cast`. */
-  myBallot?: MyBallot | null;
+  readonly myBallot?: MyBallot | null;
   /** The caller cast the ballot of a delegator in this vote. */
-  representedCast?: boolean;
+  readonly representedCast?: boolean;
   /** Admitted guests vote too (public meeting): no quorum. */
-  guestsVote?: boolean;
+  readonly guestsVote?: boolean;
   /** Present members and admitted guests (live while open, fixed at the close). */
-  presentMembers?: number | null;
-  presentGuests?: number | null;
+  readonly presentMembers?: number | null;
+  readonly presentGuests?: number | null;
   /** The decision proposal of an application vote. */
-  proposal?: DecisionProposal | null;
+  readonly proposal?: DecisionProposal | null;
   /** A repeat ("Erneut abstimmen"): the closed vote of the same agenda item it repeats. */
-  repeatOfId?: Uuid | null;
+  readonly repeatOfId?: Uuid | null;
   /** The number of the vote in its repeat chain: 1 for a first vote, 2 for the first repeat. */
-  attempt?: number;
+  readonly attempt?: number;
 }
 
 /** `MeetingOut`. Meeting state and votes. GET /meetings/{id}. */
@@ -1418,282 +1429,282 @@ export interface MeetingVoteOutWire extends ElectionFields {
  * are 1-based numbers in the current agenda order, `null` without an item.
  */
 export interface KeeperPeriod {
-  principalId: Uuid;
-  name: string | null;
-  fromAt: IsoDateTime | null;
-  toAt: IsoDateTime | null;
-  fromAgendaItemId: Uuid | null;
-  toAgendaItemId: Uuid | null;
-  fromPosition: number | null;
-  toPosition: number | null;
+  readonly principalId: Uuid;
+  readonly name: string | null;
+  readonly fromAt: IsoDateTime | null;
+  readonly toAt: IsoDateTime | null;
+  readonly fromAgendaItemId: Uuid | null;
+  readonly toAgendaItemId: Uuid | null;
+  readonly fromPosition: number | null;
+  readonly toPosition: number | null;
 }
 
 /** How the minutes change hands: at once, or with the next agenda item. */
 export type HandoverMode = 'now' | 'next_item';
 
 export interface MeetingOutWire {
-  id: Uuid;
-  title: string;
-  date?: string | null;
-  startTime?: string | null;
-  endTime?: string | null;
-  status: MeetingStatus;
-  activeApplicationId?: Uuid | null;
+  readonly id: Uuid;
+  readonly title: string;
+  readonly date?: string | null;
+  readonly startTime?: string | null;
+  readonly endTime?: string | null;
+  readonly status: MeetingStatus;
+  readonly activeApplicationId?: Uuid | null;
   /** The agenda item the room handles now. */
-  currentAgendaItemId?: Uuid | null;
+  readonly currentAgendaItemId?: Uuid | null;
   /** Number (1-based, in agenda order) and title of the current agenda item. */
-  currentAgendaItem?: CurrentAgendaItem | null;
+  readonly currentAgendaItem?: CurrentAgendaItem | null;
   /** Number of items on the agenda. */
-  agendaItemCount?: number;
+  readonly agendaItemCount?: number;
   /** The real start. `null` before the start and for an older meeting. */
-  startedAt?: IsoDateTime | null;
+  readonly startedAt?: IsoDateTime | null;
   /** The close sets it. */
-  closedAt?: IsoDateTime | null;
-  gremiumId?: Uuid | null;
-  gremiumName?: string | null;
-  votes: MeetingVoteOutWire[];
+  readonly closedAt?: IsoDateTime | null;
+  readonly gremiumId?: Uuid | null;
+  readonly gremiumName?: string | null;
+  readonly votes: readonly MeetingVoteOutWire[];
   /** The linked protocol, if it already exists. */
-  protocolId?: Uuid | null;
-  createdAt: IsoDateTime;
-  protokollantId?: Uuid | null;
-  protokollantName?: string | null;
+  readonly protocolId?: Uuid | null;
+  readonly createdAt: IsoDateTime;
+  readonly protokollantId?: Uuid | null;
+  readonly protokollantName?: string | null;
   /** True if the requesting user is the assigned protokollant. The server resolves it. */
-  isProtokollant?: boolean;
+  readonly isProtokollant?: boolean;
   /** Master flag. True if the user may run the meeting: protocol, agenda, status. */
-  canControl?: boolean;
+  readonly canControl?: boolean;
   /** Manage the meeting: create it, plan it and assign the protokollant. */
-  canManage?: boolean;
+  readonly canManage?: boolean;
   /** Write the protocol and the agenda. The assigned protokollant or a manager may. */
-  canWrite?: boolean;
+  readonly canWrite?: boolean;
   /** Open and close motions. */
-  canManageVotes?: boolean;
+  readonly canManageVotes?: boolean;
   /** Eligible to vote in this meeting. The user needs a role with `vote.cast`. */
-  canVote?: boolean;
+  readonly canVote?: boolean;
   /** Finalize and send the protocol: write access plus the gremium permission
    *  `protocol.finalize`. */
-  canFinalize?: boolean;
+  readonly canFinalize?: boolean;
   /** Delete the meeting: `canManage`, and `meeting.delete_finalized` for a final protocol. */
-  canDelete?: boolean;
+  readonly canDelete?: boolean;
   /** The periods of the protocol keepers, running and ended, in time order. */
-  keeperPeriods?: KeeperPeriod[];
+  readonly keeperPeriods?: readonly KeeperPeriod[];
   /** The handover planned for the next agenda item. */
-  plannedHandover?: KeeperPeriod | null;
+  readonly plannedHandover?: KeeperPeriod | null;
   /** Public participation over a QR code is on. */
-  publicJoin?: boolean;
+  readonly publicJoin?: boolean;
   /** Admitted guests vote (`vote`) or only follow the meeting (`watch`). */
-  guestsMode?: GuestsMode;
+  readonly guestsMode?: GuestsMode;
   /** The join code (`7KQ4MP`); the server sends it to the meeting lead only. */
-  joinCode?: string | null;
+  readonly joinCode?: string | null;
   /** The guests admitted now. */
-  admittedGuests?: number;
+  readonly admittedGuests?: number;
   /** The open join requests; the meeting lead only, else 0. */
-  pendingGuests?: number;
+  readonly pendingGuests?: number;
   /** Public participation is possible: only a gremium without a quorum allows it. */
-  publicJoinAllowed?: boolean;
+  readonly publicJoinAllowed?: boolean;
   /** The earliest open of a planned meeting with a date (UTC), else `null`. */
-  opensAt?: IsoDateTime | null;
+  readonly opensAt?: IsoDateTime | null;
   /** Before this point the open needs `confirmEarly` (UTC), else `null`. */
-  confirmUntil?: IsoDateTime | null;
+  readonly confirmUntil?: IsoDateTime | null;
 }
 
 /** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
 export interface ProtocolOutWire {
-  id: Uuid;
-  meetingId: Uuid;
-  markdown: string;
+  readonly id: Uuid;
+  readonly meetingId: Uuid;
+  readonly markdown: string;
   /** `rendering` means finalize ran. The worker renders the PDF in the background. */
-  status: 'draft' | 'rendering' | 'final';
+  readonly status: 'draft' | 'rendering' | 'final';
   /** Result link after `finalize`. The PDF sits in MinIO. */
-  pdfUrl?: string | null;
+  readonly pdfUrl?: string | null;
   /** Redacted public variant. It exists only if an agenda item is non-public. */
-  publicPdfUrl?: string | null;
-  sentAt?: IsoDateTime | null;
+  readonly publicPdfUrl?: string | null;
+  readonly sentAt?: IsoDateTime | null;
   /** The protocol is held back from the public protocol page. */
-  publicWithheld?: boolean;
+  readonly publicWithheld?: boolean;
   /** The gremium publishes its final protocols on the public protocol page. */
-  gremiumProtocolsPublic?: boolean;
+  readonly gremiumProtocolsPublic?: boolean;
 }
 
 /** Body for `POST /meetings` (`MeetingCreate`). */
 export interface MeetingCreateBody {
-  title: string;
-  gremiumId?: Uuid | null;
+  readonly title: string;
+  readonly gremiumId?: Uuid | null;
   /** Planned meeting date (`YYYY-MM-DD`), optional. */
-  date?: string | null;
+  readonly date?: string | null;
   /** Planned time (`HH:mm`), optional. */
-  startTime?: string | null;
+  readonly startTime?: string | null;
   /** Planned end time (`HH:mm`), optional. It must be after `startTime`. */
-  endTime?: string | null;
+  readonly endTime?: string | null;
   /** Assigned protokollant, optional. The person must be a member of the gremium. */
-  protokollantId?: Uuid | null;
+  readonly protokollantId?: Uuid | null;
   /** Public participation over a QR code. */
-  publicJoin?: boolean;
-  guestsMode?: GuestsMode;
+  readonly publicJoin?: boolean;
+  readonly guestsMode?: GuestsMode;
 }
 
 /** Body for `PATCH /meetings/{id}`. Status, active application, date or protokollant. */
 export interface MeetingPatchBody {
-  status?: MeetingStatus;
-  activeApplicationId?: Uuid | null;
+  readonly status?: MeetingStatus;
+  readonly activeApplicationId?: Uuid | null;
   /** The agenda item the room handles now. `null` clears it. Protokollant or session lead. */
-  currentAgendaItemId?: Uuid | null;
+  readonly currentAgendaItemId?: Uuid | null;
   /**
    * "Nächster TOP": the item that the room leaves. The server ticks it in the same
    * request. Only together with `currentAgendaItemId`.
    */
-  completeAgendaItemId?: Uuid;
+  readonly completeAgendaItemId?: Uuid;
   /** New title (1 to 200 characters). Planned or live only: a closed meeting gives 409. */
-  title?: string;
+  readonly title?: string;
   /** Planned meeting date (`YYYY-MM-DD`). Use it to schedule a planned meeting. */
-  date?: string | null;
+  readonly date?: string | null;
   /** Planned time (`HH:mm`). */
-  startTime?: string | null;
+  readonly startTime?: string | null;
   /** Planned end time (`HH:mm`). */
-  endTime?: string | null;
+  readonly endTime?: string | null;
   /** (Re)assign the protokollant. */
-  protokollantId?: Uuid | null;
+  readonly protokollantId?: Uuid | null;
   /** Public participation on or off. Off voids the requests and ends the guests. */
-  publicJoin?: boolean;
+  readonly publicJoin?: boolean;
   /** Guests vote or only follow. `watch` gives 409 `guest_vote_open` while a guest vote runs. */
-  guestsMode?: GuestsMode;
+  readonly guestsMode?: GuestsMode;
   /** Confirms an early open (`status: 'live'` before `confirmUntil`). */
-  confirmEarly?: boolean;
+  readonly confirmEarly?: boolean;
 }
 
 /** Body for `POST /protocols/{id}/votes`. It embeds votes. */
 export interface ProtocolVotesBody {
-  voteIds: Uuid[];
+  readonly voteIds: readonly Uuid[];
 }
 
 /** `CalendarFeedOut`. The own iCal subscription URL. `url` is null until a token exists. */
 export interface CalendarFeed {
-  url: string | null;
+  readonly url: string | null;
 }
 
 /** Vote summary, frontend view. It normalizes the `null` defaults. */
 export interface MeetingVote extends ElectionFields {
-  id: Uuid;
+  readonly id: Uuid;
   /** `null` marks a generic motion on a free-text agenda item. */
-  applicationId: Uuid | null;
+  readonly applicationId: Uuid | null;
   /** The agenda item the vote belongs to. */
-  agendaItemId: Uuid | null;
-  title: string | null;
-  question: string | null;
-  options: string[];
-  status: MeetingVoteStatus;
-  result: string | null;
-  counts: Record<string, number> | null;
-  leading: string | null;
-  closesAt: IsoDateTime | null;
+  readonly agendaItemId: Uuid | null;
+  readonly title: string | null;
+  readonly question: string | null;
+  readonly options: readonly string[];
+  readonly status: MeetingVoteStatus;
+  readonly result: string | null;
+  readonly counts: Readonly<Record<string, number>> | null;
+  readonly leading: string | null;
+  readonly closesAt: IsoDateTime | null;
   /** Participation progress: members who voted against members present.
    *  `revealed` tells whether `counts` and `leading` are visible. If not, the
    *  frontend shows the progress only. */
-  voted: number;
-  present: number;
-  revealed: boolean;
+  readonly voted: number;
+  readonly present: number;
+  readonly revealed: boolean;
   /** Reason for the rejection. `quorum` means the vote missed the quorum.
    *  `majority` means the vote missed the majority. */
-  failedReason: 'quorum' | 'majority' | null;
+  readonly failedReason: 'quorum' | 'majority' | null;
   /** The own ballot of the caller. A secret vote gives only `cast`. `null` when the
    *  server sent none (for example a broadcast). */
-  myBallot?: MyBallot | null;
+  readonly myBallot?: MyBallot | null;
   /** The rules of the vote, for the vote card. A vote that a WS event added
    *  before the next GET has none of them. */
-  majorityRule?: MajorityRule;
-  secret?: boolean;
-  quorum?: Quorum | null;
+  readonly majorityRule?: MajorityRule;
+  readonly secret?: boolean;
+  readonly quorum?: Quorum | null;
   /** The real open time, and the real end time (close or cancel). */
-  openedAt?: IsoDateTime | null;
-  closedAt?: IsoDateTime | null;
+  readonly openedAt?: IsoDateTime | null;
+  readonly closedAt?: IsoDateTime | null;
   /** Admitted guests vote too: no quorum, majority of the cast votes. */
-  guestsVote?: boolean;
+  readonly guestsVote?: boolean;
   /** Present members and admitted guests ("19 Mitglieder + 7 Gäste anwesend"). */
-  presentMembers?: number | null;
-  presentGuests?: number | null;
+  readonly presentMembers?: number | null;
+  readonly presentGuests?: number | null;
   /** The decision proposal of an application vote, for the edit of a prepared vote. */
-  proposal?: DecisionProposal | null;
+  readonly proposal?: DecisionProposal | null;
   /** A repeat ("Erneut abstimmen"): the closed vote of the same agenda item it repeats. */
-  repeatOfId?: Uuid | null;
+  readonly repeatOfId?: Uuid | null;
   /** The number of the vote in its repeat chain: 2 for the first repeat. */
-  attempt?: number;
+  readonly attempt?: number;
 }
 
 /** The agenda item the room handles now, as `MeetingOut.currentAgendaItem` sends it. */
 export interface CurrentAgendaItem {
   /** 1-based number in the agenda order ("TOP 3"). */
-  position: number;
-  title: string | null;
+  readonly position: number;
+  readonly title: string | null;
 }
 
 /** Meeting, frontend view. */
 export interface Meeting {
-  id: Uuid;
-  title: string;
+  readonly id: Uuid;
+  readonly title: string;
   /** Planned meeting date (`YYYY-MM-DD`) or `null`. */
-  date: string | null;
+  readonly date: string | null;
   /** Planned time (`HH:mm`) or `null`. */
-  startTime: string | null;
+  readonly startTime: string | null;
   /** Planned end time (`HH:mm`) or `null`. */
-  endTime: string | null;
-  status: MeetingStatus;
-  activeApplicationId: Uuid | null;
+  readonly endTime: string | null;
+  readonly status: MeetingStatus;
+  readonly activeApplicationId: Uuid | null;
   /** The agenda item the room handles now ("Jetzt"). Followers and the beamer follow it. */
-  currentAgendaItemId: Uuid | null;
+  readonly currentAgendaItemId: Uuid | null;
   /** Number (1-based, in agenda order) and title of the current agenda item. */
-  currentAgendaItem?: CurrentAgendaItem | null;
+  readonly currentAgendaItem?: CurrentAgendaItem | null;
   /** Number of items on the agenda. */
-  agendaItemCount?: number;
+  readonly agendaItemCount?: number;
   /** The real start. The start sets it once. `null` before the start, and for a
    *  meeting that started before the field existed: show the planned start then. */
-  startedAt?: IsoDateTime | null;
+  readonly startedAt?: IsoDateTime | null;
   /** The close sets it. */
-  closedAt?: IsoDateTime | null;
-  gremiumId: Uuid | null;
+  readonly closedAt?: IsoDateTime | null;
+  readonly gremiumId: Uuid | null;
   /** Name of the gremium. The timeline shows it. */
-  gremiumName: string | null;
-  votes: MeetingVote[];
-  protocolId: Uuid | null;
-  createdAt: IsoDateTime;
-  protokollantId: Uuid | null;
-  protokollantName: string | null;
+  readonly gremiumName: string | null;
+  readonly votes: readonly MeetingVote[];
+  readonly protocolId: Uuid | null;
+  readonly createdAt: IsoDateTime;
+  readonly protokollantId: Uuid | null;
+  readonly protokollantName: string | null;
   /** True if the logged-in user is the assigned protokollant of this meeting. */
-  isProtokollant: boolean;
+  readonly isProtokollant: boolean;
   /** Master flag. True if the user may run the meeting: protocol, agenda, status. */
-  canControl: boolean;
+  readonly canControl: boolean;
   /** Manage the meeting: create it, plan it and assign the protokollant. */
-  canManage: boolean;
+  readonly canManage: boolean;
   /** Write the protocol and the agenda. The assigned protokollant or a manager may. */
-  canWrite: boolean;
+  readonly canWrite: boolean;
   /** Open and close motions. */
-  canManageVotes: boolean;
+  readonly canManageVotes: boolean;
   /** Eligible to vote in this meeting. */
-  canVote: boolean;
+  readonly canVote: boolean;
   /** Finalize and send the protocol: write access plus the gremium permission
    *  `protocol.finalize`. */
-  canFinalize: boolean;
+  readonly canFinalize: boolean;
   /** Delete the meeting: `canManage`, and `meeting.delete_finalized` for a final protocol.
    *  The server sets it, because the client does not know the protocol status. */
-  canDelete: boolean;
+  readonly canDelete: boolean;
   /** The periods of the protocol keepers, running and ended, in time order. */
-  keeperPeriods: KeeperPeriod[];
+  readonly keeperPeriods: readonly KeeperPeriod[];
   /** The handover planned for the next agenda item, or `null`. */
-  plannedHandover: KeeperPeriod | null;
+  readonly plannedHandover: KeeperPeriod | null;
   /** Public participation over a QR code is on. */
-  publicJoin: boolean;
+  readonly publicJoin: boolean;
   /** Admitted guests vote or only follow the meeting. */
-  guestsMode: GuestsMode;
+  readonly guestsMode: GuestsMode;
   /** The join code, for the meeting lead only (`null` for everybody else). */
-  joinCode: string | null;
+  readonly joinCode: string | null;
   /** The guests admitted now. */
-  admittedGuests: number;
+  readonly admittedGuests: number;
   /** The open join requests (meeting lead only, else 0). */
-  pendingGuests: number;
+  readonly pendingGuests: number;
   /** Public participation is possible: only a gremium without a quorum allows it. */
-  publicJoinAllowed: boolean;
+  readonly publicJoinAllowed: boolean;
   /** The earliest open of a planned meeting with a date (ISO, UTC), else `null`. */
-  opensAt: IsoDateTime | null;
+  readonly opensAt: IsoDateTime | null;
   /** Before this point the open is early and needs a confirmation (ISO, UTC), else `null`. */
-  confirmUntil: IsoDateTime | null;
+  readonly confirmUntil: IsoDateTime | null;
 }
 
 /** Direction of the meeting timeline relative to *now*. */
@@ -1701,33 +1712,33 @@ export type TimelineDirection = 'past' | 'upcoming';
 
 /** `MeetingPage`. A cursor page of the timeline, wire form. */
 export interface MeetingPageWire {
-  items: MeetingOutWire[];
-  nextCursor?: string | null;
+  readonly items: readonly MeetingOutWire[];
+  readonly nextCursor?: string | null;
 }
 
 /** Meeting timeline page, frontend view. `nextCursor === null` marks the end. */
 export interface MeetingPage {
-  items: Meeting[];
-  nextCursor: string | null;
+  readonly items: readonly Meeting[];
+  readonly nextCursor: string | null;
 }
 
 /** Protocol, frontend view. `isFinal` and `isLocked` come from `status`. */
 export interface Protocol {
-  id: Uuid;
-  meetingId: Uuid;
-  markdown: string;
-  status: 'draft' | 'rendering' | 'final';
-  isFinal: boolean;
+  readonly id: Uuid;
+  readonly meetingId: Uuid;
+  readonly markdown: string;
+  readonly status: 'draft' | 'rendering' | 'final';
+  readonly isFinal: boolean;
   /** Not editable. The protocol is final, or the worker renders it (`rendering`). */
-  isLocked: boolean;
-  pdfUrl: string | null;
+  readonly isLocked: boolean;
+  readonly pdfUrl: string | null;
   /** Redacted public variant for non-public agenda items. Otherwise null. */
-  publicPdfUrl: string | null;
-  sentAt: IsoDateTime | null;
+  readonly publicPdfUrl: string | null;
+  readonly sentAt: IsoDateTime | null;
   /** Held back from the public protocol page (only matters for a public gremium). */
-  publicWithheld?: boolean;
+  readonly publicWithheld?: boolean;
   /** The gremium publishes its final protocols on the public protocol page. */
-  gremiumProtocolsPublic?: boolean;
+  readonly gremiumProtocolsPublic?: boolean;
 }
 
 /**
@@ -1735,8 +1746,8 @@ export interface Protocol {
  * offers it as self service.
  */
 export interface NotificationPreference {
-  kind: string;
-  enabled: boolean;
+  readonly kind: string;
+  readonly enabled: boolean;
 }
 
 /**
@@ -1744,41 +1755,41 @@ export interface NotificationPreference {
  * offers the grants as self service.
  */
 export interface OAuthGrant {
-  id: string;
-  clientId: string;
-  scope: string;
-  createdAt: IsoDateTime | null;
+  readonly id: string;
+  readonly clientId: string;
+  readonly scope: string;
+  readonly createdAt: IsoDateTime | null;
   /**
    * Every new token expires (90 days at most). `null` comes only from a token of the time
    * before the cap; the pages show a dash, never "Läuft nie ab".
    */
-  accessExpiresAt: IsoDateTime | null;
-  refreshExpiresAt: IsoDateTime | null;
+  readonly accessExpiresAt: IsoDateTime | null;
+  readonly refreshExpiresAt: IsoDateTime | null;
 }
 
 /** MCP setup snippet and metadata. GET /mcp/config. */
 export interface McpSetup {
-  mcpServers: Record<string, unknown>;
-  baseUrl: string;
-  clientId: string;
-  scopesSupported: string[];
-  install: string;
-  note: string;
+  readonly mcpServers: Readonly<Record<string, unknown>>;
+  readonly baseUrl: string;
+  readonly clientId: string;
+  readonly scopesSupported: readonly string[];
+  readonly install: string;
+  readonly note: string;
 }
 
 /** A scope row in the consent screen. `held` means the user holds the permission. */
 export interface ConsentScope {
-  key: string;
-  held: boolean;
+  readonly key: string;
+  readonly held: boolean;
 }
 
 /** Pending authorize request for the consent screen. */
 export interface ConsentRequest {
-  clientId: string;
-  canUseMcp: boolean;
-  requestedScopes: ConsentScope[];
-  lifetimes: string[];
-  defaultLifetime: string;
+  readonly clientId: string;
+  readonly canUseMcp: boolean;
+  readonly requestedScopes: readonly ConsentScope[];
+  readonly lifetimes: readonly string[];
+  readonly defaultLifetime: string;
 }
 
 /** What kind of record a search hit points at. Stable keys, never translated text. */
@@ -1802,22 +1813,22 @@ export type SearchKind =
  * an app-relative route the client has.
  */
 export interface SearchHit {
-  kind: SearchKind;
-  id: string;
-  title: string;
-  subtitle: string | null;
-  url: string;
+  readonly kind: SearchKind;
+  readonly id: string;
+  readonly title: string;
+  readonly subtitle: string | null;
+  readonly url: string;
   /** Applications only. The row badges it, so an archived hit is not read as current. */
-  archived?: boolean;
+  readonly archived?: boolean;
 }
 
 /** Everything found for one query, in one round trip. */
 export interface SearchResults {
-  hits: SearchHit[];
+  readonly hits: readonly SearchHit[];
   /** At least one source had more matches than its cap, so this is not everything. */
-  truncated: boolean;
+  readonly truncated: boolean;
   /** Sources that errored. The search degrades rather than returning nothing. */
-  failed: string[];
+  readonly failed: readonly string[];
 }
 
 /** Admitted guests vote (`vote`) or only follow the meeting (`watch`). */
@@ -1828,107 +1839,107 @@ export type GuestStatus = 'pending' | 'admitted' | 'rejected' | 'removed' | 'lef
 
 /** `MeetingGuest`: one join request or guest, for the meeting lead. */
 export interface MeetingGuest {
-  id: Uuid;
+  readonly id: Uuid;
   /** The pseudonym number ("Gast 3"), 1-based per meeting. */
-  number: number;
+  readonly number: number;
   /** `null` once pseudonymized (left, withdrawn, protocol final): show "Gast {number}". */
-  displayName: string | null;
+  readonly displayName: string | null;
   /** `expired` comes only with a `guest_updated` event: the row is gone (a voided request). */
-  status: GuestStatus | 'expired';
-  requestedAt: IsoDateTime;
-  decidedAt: IsoDateTime | null;
-  decidedByName: string | null;
-  admittedAt: IsoDateTime | null;
+  readonly status: GuestStatus | 'expired';
+  readonly requestedAt: IsoDateTime;
+  readonly decidedAt: IsoDateTime | null;
+  readonly decidedByName: string | null;
+  readonly admittedAt: IsoDateTime | null;
 }
 
 /** The QR matrix without a quiet zone: `size` rows of `size` characters `0`/`1`. */
 export interface QrMatrix {
-  size: number;
-  rows: string[];
+  readonly size: number;
+  readonly rows: readonly string[];
 }
 
 /** `JoinLink`: the join code, the absolute join URL and its QR matrix. */
 export interface JoinLink {
-  joinCode: string;
-  joinUrl: string;
-  qr: QrMatrix;
+  readonly joinCode: string;
+  readonly joinUrl: string;
+  readonly qr: QrMatrix;
 }
 
 /** `PublicMeetingHead`: what the join page shows before the admission. */
 export interface PublicMeetingHead {
-  code: string;
-  title: string;
-  gremiumName: string | null;
-  date: string | null;
-  startTime: string | null;
-  status: MeetingStatus;
-  startedAt: IsoDateTime | null;
-  guestsMode: GuestsMode;
+  readonly code: string;
+  readonly title: string;
+  readonly gremiumName: string | null;
+  readonly date: string | null;
+  readonly startTime: string | null;
+  readonly status: MeetingStatus;
+  readonly startedAt: IsoDateTime | null;
+  readonly guestsMode: GuestsMode;
 }
 
 /** One agenda item of the guest view. A non-public item carries its title, never a body. */
 export interface GuestAgendaItem {
-  id: Uuid;
-  position: number;
-  title: string | null;
-  kind: 'application' | 'freetext';
-  nonPublic: boolean;
-  body: string | null;
+  readonly id: Uuid;
+  readonly position: number;
+  readonly title: string | null;
+  readonly kind: 'application' | 'freetext';
+  readonly nonPublic: boolean;
+  readonly body: string | null;
   /** The done mark ("TOP abhaken"). Always `false` for a non-public item. */
-  done: boolean;
+  readonly done: boolean;
 }
 
 /** One vote of a public item, as an admitted guest sees it. */
 export interface GuestVote extends ElectionFields {
-  id: Uuid;
-  agendaItemId: Uuid | null;
-  question: string | null;
-  options: string[];
-  status: 'open' | 'closed';
-  secret: boolean;
-  majorityRule: MajorityRule;
-  guestsVote: boolean;
-  quorum: Quorum | null;
-  openedAt: IsoDateTime | null;
-  closedAt: IsoDateTime | null;
-  result: VoteResult | null;
-  failedReason: 'quorum' | 'majority' | null;
-  tally: {
-    counts: Record<string, number>;
-    voted: number;
-    present: number;
-    revealed: boolean;
-    leading: string | null;
-    presentMembers: number | null;
-    presentGuests: number | null;
+  readonly id: Uuid;
+  readonly agendaItemId: Uuid | null;
+  readonly question: string | null;
+  readonly options: readonly string[];
+  readonly status: 'open' | 'closed';
+  readonly secret: boolean;
+  readonly majorityRule: MajorityRule;
+  readonly guestsVote: boolean;
+  readonly quorum: Quorum | null;
+  readonly openedAt: IsoDateTime | null;
+  readonly closedAt: IsoDateTime | null;
+  readonly result: VoteResult | null;
+  readonly failedReason: 'quorum' | 'majority' | null;
+  readonly tally: {
+    readonly counts: Readonly<Record<string, number>>;
+    readonly voted: number;
+    readonly present: number;
+    readonly revealed: boolean;
+    readonly leading: string | null;
+    readonly presentMembers: number | null;
+    readonly presentGuests: number | null;
   };
-  myBallot: MyBallot;
-  canCast: boolean;
+  readonly myBallot: MyBallot;
+  readonly canCast: boolean;
 }
 
 /** The participant view of an admitted guest. */
 export interface GuestView {
-  currentAgendaItemId: Uuid | null;
-  presentMembers: number;
-  admittedGuests: number;
-  agenda: GuestAgendaItem[];
-  votes: GuestVote[];
+  readonly currentAgendaItemId: Uuid | null;
+  readonly presentMembers: number;
+  readonly admittedGuests: number;
+  readonly agenda: readonly GuestAgendaItem[];
+  readonly votes: readonly GuestVote[];
 }
 
 /** `GuestMe`: the own request or participation of this device. */
 export interface GuestMe {
-  guestId: Uuid;
-  number: number;
-  displayName: string | null;
-  status: GuestStatus;
+  readonly guestId: Uuid;
+  readonly number: number;
+  readonly displayName: string | null;
+  readonly status: GuestStatus;
   /** Seconds until a new request is possible (rejected, removed), else `null`. */
-  retryAfter: number | null;
-  meeting: PublicMeetingHead;
-  view: GuestView | null;
+  readonly retryAfter: number | null;
+  readonly meeting: PublicMeetingHead;
+  readonly view: GuestView | null;
 }
 
 /** `GET /gremien/{id}/meeting-defaults`: what a new meeting of the gremium allows. */
 export interface MeetingDefaults {
-  publicJoinAllowed: boolean;
-  quorumPercent: number | null;
+  readonly publicJoinAllowed: boolean;
+  readonly quorumPercent: number | null;
 }

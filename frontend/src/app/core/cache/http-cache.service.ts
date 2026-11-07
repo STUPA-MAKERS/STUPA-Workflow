@@ -2,8 +2,8 @@ import { Injectable } from '@angular/core';
 
 /** One cached response, with the time it arrived. */
 interface Entry {
-  body: unknown;
-  at: number;
+  readonly body: unknown;
+  readonly at: number;
 }
 
 /**

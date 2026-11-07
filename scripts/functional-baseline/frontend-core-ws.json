@@ -1,7 +1,5 @@
 {
-  "frontend/src/app/core/ws/live-vote.service.ts": 1,
-  "frontend/src/app/core/ws/mock-live-vote.source.ts": 8,
-  "frontend/src/app/core/ws/todo-live.service.ts": 12,
-  "frontend/src/app/core/ws/ws-messages.ts": 96,
-  "frontend/src/app/core/ws/ws.service.ts": 9
+  "frontend/src/app/core/ws/mock-live-vote.source.ts": 3,
+  "frontend/src/app/core/ws/todo-live.service.ts": 6,
+  "frontend/src/app/core/ws/ws.service.ts": 6
 }

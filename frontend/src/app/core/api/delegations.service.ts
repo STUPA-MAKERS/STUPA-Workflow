@@ -39,14 +39,14 @@ export interface Delegation {
 
 /** Body for POST /delegations. */
 export interface DelegationInput {
-  meetingId: Uuid;
-  delegateId: Uuid;
-  delegateVoting: boolean;
+  readonly meetingId: Uuid;
+  readonly delegateId: Uuid;
+  readonly delegateVoting: boolean;
   /**
    * The meeting lead enters a substitute for this missing member while the meeting is
    * live. Omit it to delegate for yourself.
    */
-  delegatorId?: Uuid;
+  readonly delegatorId?: Uuid;
 }
 
 /** Selectable recipient (typeahead source). */
@@ -96,9 +96,9 @@ export interface DelegationSubstitute {
 
 /** Body for POST /delegations/substitutes. */
 export interface SubstituteInput {
-  gremiumId: Uuid;
-  memberId?: Uuid | null;
-  substituteId: Uuid;
+  readonly gremiumId: Uuid;
+  readonly memberId?: Uuid | null;
+  readonly substituteId: Uuid;
 }
 
 @Injectable({ providedIn: 'root' })

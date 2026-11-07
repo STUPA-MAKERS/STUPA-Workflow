@@ -451,7 +451,7 @@ export class MeetingsComponent {
     return countEntries(vote);
   }
 
-  voteOptionsFor(vote: MeetingVote): string[] {
+  voteOptionsFor(vote: MeetingVote): readonly string[] {
     return voteOptionsFor(vote);
   }
 }

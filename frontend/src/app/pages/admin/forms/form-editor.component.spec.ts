@@ -202,6 +202,32 @@ describe('FormEditorComponent', () => {
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
   });
 
+  it('sets question fields and one option label without touching the others', async () => {
+    const { c } = await setup(
+      draft([
+        {
+          key: 'pick',
+          type: 'select',
+          label: { de: 'Wahl', en: '' },
+          options: [
+            { value: 'a', label: { de: 'A', en: '' } },
+            { value: 'b', label: { de: 'B', en: '' } },
+          ],
+        },
+        { key: 'note', type: 'text', label: { de: 'Notiz', en: '' } },
+      ]),
+    );
+    const before = c.groups()[0].fields[1];
+    c.setQuestion({ gi: 0, qi: 0 }, { help: { de: 'Hilfe', en: '' } });
+    c.setOptionLabel({ gi: 0, qi: 0 }, 1, { de: 'Bé', en: 'B' });
+    c.setOptionLabel({ gi: 0, qi: 1 }, 0, { de: 'X', en: '' });
+    const [pick, note] = c.groups()[0].fields;
+    expect(pick.help).toEqual({ de: 'Hilfe', en: '' });
+    expect(pick.options.map((o: { label: I18nMap }) => o.label['de'])).toEqual(['A', 'Bé']);
+    expect(note.options).toEqual([]);
+    expect(c.groups()[0].fields[1]).not.toBe(before);
+  });
+
   it('defaults the promoted field metric to a valid target (amount)', async () => {
     const { fixture } = await setup(
       draft([{ key: 'sum', type: 'currency', label: { de: 'Summe', en: '' } }]),

@@ -142,32 +142,35 @@ export function fundingProblem(
  * `positions` or `funding` field promotes into `amount` automatically, without a flag.
  */
 export function normalizeFormField(field: FormFieldDef): FormFieldDef {
-  const out: FormFieldDef = { key: field.key, type: field.type, label: field.label };
-  if (field.help && Object.keys(field.help).length > 0) out.help = field.help;
-  if (field.required) out.required = true;
-  if (field.validation && Object.values(field.validation).some((v) => v != null && v !== '')) {
-    out.validation = field.validation;
-  }
-  if (field.options && field.options.length > 0) out.options = field.options;
-  if (field.visibleIf) out.visibleIf = field.visibleIf;
-  if (field.compute) out.compute = field.compute;
-  if (field.isPII) out.isPII = true;
-  if (field.isPromoted && (field.type === 'number' || field.type === 'currency')) {
-    out.isPromoted = true;
-    if (field.promoteTarget) out.promoteTarget = field.promoteTarget;
-  }
-  return out;
+  const hasValidation =
+    !!field.validation && Object.values(field.validation).some((v) => v != null && v !== '');
+  const promoted = !!field.isPromoted && (field.type === 'number' || field.type === 'currency');
+  return {
+    key: field.key,
+    type: field.type,
+    label: field.label,
+    ...(field.help && Object.keys(field.help).length > 0 ? { help: field.help } : {}),
+    ...(field.required ? { required: true } : {}),
+    ...(hasValidation ? { validation: field.validation } : {}),
+    ...(field.options && field.options.length > 0 ? { options: field.options } : {}),
+    ...(field.visibleIf ? { visibleIf: field.visibleIf } : {}),
+    ...(field.compute ? { compute: field.compute } : {}),
+    ...(field.isPII ? { isPII: true } : {}),
+    ...(promoted ? { isPromoted: true } : {}),
+    ...(promoted && field.promoteTarget ? { promoteTarget: field.promoteTarget } : {}),
+  };
 }
 
 export function blankField(type: FieldType = 'text', key = ''): FormFieldDef {
-  const field: FormFieldDef = { key, type, label: { de: '', en: '' } };
-  if (type === 'select' || type === 'multiselect') {
-    field.options = [{ value: '', label: { de: '', en: '' } }];
-  }
-  if (type === 'computed') {
-    field.compute = { var: '' };
-  }
-  return field;
+  return {
+    key,
+    type,
+    label: { de: '', en: '' },
+    ...(type === 'select' || type === 'multiselect'
+      ? { options: [{ value: '', label: { de: '', en: '' } }] }
+      : {}),
+    ...(type === 'computed' ? { compute: { var: '' } } : {}),
+  };
 }
 
 export function blankOption(): { value: string; label: { de: string; en: string } } {

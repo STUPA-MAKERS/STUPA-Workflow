@@ -39,16 +39,16 @@ export function toFormatLocale(locale: string): string {
 
 /** An active extra UI language: its BCP 47 code and its native name. */
 export interface UiLanguage {
-  code: string;
-  name: string;
+  readonly code: string;
+  readonly name: string;
 }
 
 /** `GET /i18n`: the resolved UI locale, the active extra languages and the overrides. */
 export interface I18nBundle {
-  locale: string;
-  languages: UiLanguage[];
+  readonly locale: string;
+  readonly languages: readonly UiLanguage[];
   /** Locale → key → text, for each locale of the fallback chain of `locale`. */
-  overrides: Record<string, Record<string, string>>;
+  readonly overrides: Record<string, Record<string, string>>;
 }
 
 /**
@@ -63,7 +63,7 @@ export function baseLocale(uiLocale: string): Locale {
  * The locales whose texts `uiLocale` shows, the first one first: DE alone, EN then DE, an
  * extra language then EN then DE. The server resolves the same chain.
  */
-export function fallbackChain(uiLocale: string): string[] {
+export function fallbackChain(uiLocale: string): readonly string[] {
   if (uiLocale === DEFAULT_LOCALE) return [DEFAULT_LOCALE];
   if (uiLocale === 'en') return ['en', DEFAULT_LOCALE];
   return [uiLocale, 'en', DEFAULT_LOCALE];
@@ -114,7 +114,7 @@ export class I18nService {
   /** `Intl` tag of the active locale (`de-DE` / `en-GB`). See {@link toFormatLocale}. */
   readonly formatLocale = computed(() => FORMAT_LOCALES[this.locale()]);
 
-  private readonly _languages = signal<UiLanguage[]>([]);
+  private readonly _languages = signal<readonly UiLanguage[]>([]);
 
   /** The active extra languages, in the order of the server. */
   readonly extraLanguages = this._languages.asReadonly();
@@ -212,14 +212,10 @@ export class I18nService {
   translate(key: TranslationKey, params?: Record<string, string | number>): string {
     const overrides = this._overrides();
     const catalogs = CATALOG as Record<string, Partial<Record<TranslationKey, string>> | undefined>;
-    let raw: string = key;
-    for (const loc of fallbackChain(this._uiLocale())) {
-      const text = overrides[loc]?.[key] ?? catalogs[loc]?.[key];
-      if (text !== undefined) {
-        raw = text;
-        break;
-      }
-    }
+    const found = fallbackChain(this._uiLocale())
+      .map((loc) => overrides[loc]?.[key] ?? catalogs[loc]?.[key])
+      .find((text) => text !== undefined);
+    const raw = found ?? key;
     return params ? this.interpolate(raw, params) : raw;
   }
 

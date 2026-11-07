@@ -287,7 +287,7 @@ export class TodoBoardRowsComponent implements OnInit {
    */
   readonly matches = output<number>();
 
-  readonly boards = signal<TodoAssignedBoard[]>([]);
+  readonly boards = signal<readonly TodoAssignedBoard[]>([]);
   readonly collapsed = signal<ReadonlySet<Uuid>>(readCollapsed());
   /** Done columns opened past the preview, by column id. */
   readonly expanded = signal<ReadonlySet<Uuid>>(new Set());
@@ -373,7 +373,9 @@ export class TodoBoardRowsComponent implements OnInit {
     });
     effect(() => {
       const boards = this.boards();
-      if (untracked(this.ready)) untracked(() => this.cache?.putRows(this.source(), boards, this.etag));
+      if (untracked(this.ready)) {
+        untracked(() => this.cache?.putRows(this.source(), [...boards], this.etag));
+      }
     });
     effect(() => {
       const ids = this.dropIds();

@@ -129,11 +129,8 @@ export function handoverPreview(
           },
         ]
       : [];
-  const running = periods.find((p) => p.toAt === null);
-  if (running) {
-    running.toAt = nowIso;
-    running.toPosition = pos;
-  }
+  const running = periods.findIndex((p) => p.toAt === null);
+  if (running >= 0) periods[running] = { ...periods[running], toAt: nowIso, toPosition: pos };
   periods.push({
     principalId: next.principalId,
     name: next.name,

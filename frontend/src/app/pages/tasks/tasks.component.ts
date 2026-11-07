@@ -170,7 +170,7 @@ export class TasksComponent {
   readonly detailOpen = computed(() => this.selectedId() !== null || this.selectedTodo() !== null);
 
   /** The open cards assigned to me; a failed request leaves the group out. */
-  readonly todos = signal<TodoMineItem[]>([]);
+  readonly todos = signal<readonly TodoMineItem[]>([]);
   private todoSeq = 0;
   readonly show = signal<TasksShow>('all');
   readonly due = signal<TasksDue>('');

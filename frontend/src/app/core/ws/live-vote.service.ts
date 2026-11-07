@@ -119,6 +119,13 @@ export class LiveVoteSession {
       case 'error':
         this.errorCode.set(m.code);
         break;
+      case 'guest_requested':
+      case 'guest_updated':
+      case 'guest_status':
+      case 'viewers':
+      case 'body_draft':
+      case 'agenda_changed':
+        break;
     }
   }
 

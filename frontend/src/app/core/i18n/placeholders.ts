@@ -2,7 +2,7 @@
 const PLACEHOLDER = /\{(\w+)\}/g;
 
 /** The placeholder names of `text`, sorted and without repeats. */
-export function placeholdersOf(text: string): string[] {
+export function placeholdersOf(text: string): readonly string[] {
   return [...new Set([...text.matchAll(PLACEHOLDER)].map((m) => m[1]))].sort();
 }
 

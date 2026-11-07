@@ -159,14 +159,14 @@ export class TicketsComponent {
       (this.assigneeFilter() ? 1 : 0),
   );
 
-  readonly items = signal<TicketListItem[]>([]);
+  readonly items = signal<readonly TicketListItem[]>([]);
   readonly total = signal(0);
   readonly loading = signal(true);
   readonly error = signal(false);
   readonly loadingMore = signal(false);
   /** The closed tickets of the default view: their number, and the rows once shown. */
   readonly closedTotal = signal(0);
-  readonly closedItems = signal<TicketListItem[] | null>(null);
+  readonly closedItems = signal<readonly TicketListItem[] | null>(null);
   readonly closedLoading = signal(false);
   private seq = 0;
 
