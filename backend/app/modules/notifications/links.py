@@ -81,10 +81,8 @@ def application_link(
     """
     if guest:
         return MailLink(f"{_base(settings)}/antrag/{application_id}", "application")
-    url = f"{_base(settings)}/applications/{application_id}"
-    if comment_id is not None:
-        url += f"#comment-{comment_id}"
-    return MailLink(url, "application")
+    fragment = f"#comment-{comment_id}" if comment_id is not None else ""
+    return MailLink(f"{_base(settings)}/applications/{application_id}{fragment}", "application")
 
 
 def task_link(settings: Settings, application_id: UUID | str) -> MailLink:
@@ -119,10 +117,8 @@ def ticket_link(
 
     ``note_id`` adds the fragment ``#note-{id}``, which opens the ticket at that note.
     """
-    url = f"{_base(settings)}/tickets/{ticket_id}"
-    if note_id is not None:
-        url += f"#note-{note_id}"
-    return MailLink(url, "ticket")
+    fragment = f"#note-{note_id}" if note_id is not None else ""
+    return MailLink(f"{_base(settings)}/tickets/{ticket_id}{fragment}", "ticket")
 
 
 def todo_link(settings: Settings, card_id: UUID | str) -> MailLink:

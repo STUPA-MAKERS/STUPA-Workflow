@@ -7,10 +7,10 @@ import { MeetingSessionService } from '../meeting-session.service';
 
 /** The state line of the bar. */
 interface BarState {
-  icon: IconName;
-  tone: 'muted' | 'accent';
-  label: TranslationKey;
-  text: TranslationKey;
+  readonly icon: IconName;
+  readonly tone: 'muted' | 'accent';
+  readonly label: TranslationKey;
+  readonly text: TranslationKey;
 }
 
 /**

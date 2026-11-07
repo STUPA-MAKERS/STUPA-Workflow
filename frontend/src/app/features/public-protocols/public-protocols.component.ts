@@ -45,11 +45,11 @@ export const SEARCH_DEBOUNCE = 300;
 
 /** The protocols of one semester. */
 interface SemesterGroup {
-  key: string;
-  label: string;
+  readonly key: string;
+  readonly label: string;
   /** The number of protocols of the semester under the current filters. */
-  count: number;
-  items: PublicProtocolSummary[];
+  readonly count: number;
+  readonly items: readonly PublicProtocolSummary[];
 }
 
 /**
@@ -103,7 +103,7 @@ export class PublicProtocolsComponent {
 
   protected readonly gremien = signal<PublicGremium[]>([]);
   protected readonly semesters = signal<PublicSemester[]>([]);
-  protected readonly items = signal<PublicProtocolSummary[]>([]);
+  protected readonly items = signal<readonly PublicProtocolSummary[]>([]);
   protected readonly total = signal(0);
   protected readonly loading = signal(true);
   protected readonly loadingMore = signal(false);
@@ -157,19 +157,15 @@ export class PublicProtocolsComponent {
   );
 
   /** The loaded protocols by semester, in the order of the list. */
-  protected readonly groups = computed<SemesterGroup[]>(() => {
+  protected readonly groups = computed<readonly SemesterGroup[]>(() => {
     const counts = new Map(this.semesters().map((s) => [s.key, s.count]));
-    const groups: SemesterGroup[] = [];
-    for (const p of this.items()) {
-      let group = groups.find((g) => g.key === p.semester);
-      if (!group) {
-        group = { key: p.semester, label: this.semesterName(p.semester), count: 0, items: [] };
-        groups.push(group);
-      }
-      group.items.push(p);
-    }
-    for (const g of groups) g.count = counts.get(g.key) ?? g.items.length;
-    return groups;
+    const items = this.items();
+    const keys = [...new Set(items.map((p) => p.semester))];
+    return keys.map((key) => {
+      const rows = items.filter((p) => p.semester === key);
+      const count = counts.get(key) ?? rows.length;
+      return { key, label: this.semesterName(key), count, items: rows };
+    });
   });
 
   constructor() {
@@ -224,7 +220,8 @@ export class PublicProtocolsComponent {
 
   /** Load the first page again; `withSemesters` also reloads the semester counts. */
   private reload(withSemesters = true): void {
-    const seq = ++this.seq;
+    this.seq += 1;
+    const seq = this.seq;
     this.loading.set(true);
     this.loadingMore.set(false);
     this.error.set(false);
@@ -278,36 +275,36 @@ export class PublicProtocolsComponent {
   }
 
   /** "2 Beschlüsse · 1 nicht-öffentlicher TOP ausgelassen". */
-  protected countsLine(p: PublicProtocolSummary): string[] {
+  protected countsLine(p: PublicProtocolSummary): readonly string[] {
     const { decisions, nonPublic } = topCounts(p.tops);
-    const parts = [
+    const decided =
       decisions === 0
         ? this.i18n.translate('publicProtocols.card.noDecision')
         : this.i18n.translate(
             decisions === 1 ? 'publicProtocols.card.decision' : 'publicProtocols.card.decisions',
             { n: decisions },
-          ),
-    ];
-    if (nonPublic > 0) {
-      parts.push(
-        this.i18n.translate(
-          nonPublic === 1 ? 'publicProtocols.card.skippedOne' : 'publicProtocols.card.skipped',
-          { n: nonPublic },
-        ),
-      );
-    }
-    return parts;
+          );
+    const skipped =
+      nonPublic > 0
+        ? [
+            this.i18n.translate(
+              nonPublic === 1 ? 'publicProtocols.card.skippedOne' : 'publicProtocols.card.skipped',
+              { n: nonPublic },
+            ),
+          ]
+        : [];
+    return [decided, ...skipped];
   }
 
   /** "PDF · 212 KB · finalisiert 02.10.2026". */
   protected pdfMeta(p: PublicProtocolSummary): string {
-    const parts = ['PDF'];
-    if (p.pdfSize !== null) parts.push(formatBytes(p.pdfSize, this.i18n.formatLocale(), 'file'));
+    const locale = this.i18n.formatLocale();
+    const size = p.pdfSize !== null ? [formatBytes(p.pdfSize, locale, 'file')] : [];
     const finalized = dayMonthYear(p.finalizedAt, this.i18n.formatLocale());
-    if (finalized) {
-      parts.push(this.i18n.translate('publicProtocols.card.finalized', { date: finalized }));
-    }
-    return parts.join(' · ');
+    const date = finalized
+      ? [this.i18n.translate('publicProtocols.card.finalized', { date: finalized })]
+      : [];
+    return ['PDF', ...size, ...date].join(' · ');
   }
 
   protected pdfUrl(p: PublicProtocolSummary): string {

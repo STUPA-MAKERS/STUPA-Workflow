@@ -11,16 +11,16 @@
 /** The options of {@link formatMoney}. */
 export interface MoneyOptions {
   /** The ISO currency. Null or '' falls back to EUR. */
-  currency?: string | null;
+  readonly currency?: string | null;
   /** Whole currency units: "1.235 €" (charts, the cost-centre tree). */
-  whole?: boolean;
+  readonly whole?: boolean;
   /** Cents only where they are not zero: "42 €", but "1.234,50 €". */
-  short?: boolean;
+  readonly short?: boolean;
   /**
    * The sign in front of the magnitude: "+12,50 €", "−12,50 €" (a real minus). Zero gets
    * no sign.
    */
-  signed?: boolean;
+  readonly signed?: boolean;
 }
 
 /** A value as a finite number, or null for no value or one that is no number. */

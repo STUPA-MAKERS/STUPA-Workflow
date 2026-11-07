@@ -65,9 +65,9 @@ export type StepKey = 'type' | 'details' | 'contact' | 'review';
 
 /** The autosave of one application type (`sessionStorage`, this tab). */
 interface StoredAnswers {
-  v: 1;
-  model: Record<string, unknown>;
-  step: StepKey;
+  readonly v: 1;
+  readonly model: Readonly<Record<string, unknown>>;
+  readonly step: StepKey;
 }
 
 /** The key prefix of the autosave per application type. */
@@ -258,7 +258,7 @@ export class ApplyWizardComponent {
     );
   });
   /** The `file` fields: their values are draft ids of this tab, not for the autosave. */
-  private readonly fileKeys = computed<Set<string>>(
+  private readonly fileKeys = computed<ReadonlySet<string>>(
     () =>
       new Set(
         (this.effForm()?.sections ?? [])
@@ -565,15 +565,15 @@ export class ApplyWizardComponent {
 
   /** The answers to send: file fields keep only the files the server still holds. */
   private submitData(): Record<string, unknown> {
-    const data: Record<string, unknown> = { ...this.model };
+    const model = this.model;
     const usable = new Set(this.drafts.attachmentIds());
-    for (const key of this.fileKeys()) {
-      const value = data[key];
-      if (!Array.isArray(value)) continue;
+    const files = [...this.fileKeys()].flatMap((key) => {
+      const value = model[key];
+      if (!Array.isArray(value)) return [];
       const kept = value.filter((id) => typeof id === 'string' && usable.has(id));
-      data[key] = kept.length ? kept : null;
-    }
-    return data;
+      return [[key, kept.length ? kept : null] as const];
+    });
+    return { ...model, ...Object.fromEntries(files) };
   }
 
   /**
@@ -655,10 +655,7 @@ export class ApplyWizardComponent {
     const typeId = this.typeId();
     if (!key || !typeId || !this.effForm()) return;
     const skip = new Set([...this.piiDefs().map((f) => f.key), ...this.fileKeys()]);
-    const model: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(this.model)) {
-      if (!skip.has(k)) model[k] = v;
-    }
+    const model = Object.fromEntries(Object.entries(this.model).filter(([k]) => !skip.has(k)));
     if (!Object.values(model).some(hasAnswer)) {
       this.dropDraft(key, typeId);
       return;
@@ -690,12 +687,8 @@ export class ApplyWizardComponent {
   private restoreDraft(id: Uuid): void {
     const raw = readStorage(`${DRAFT_PREFIX}${id}`);
     if (!raw) return;
-    let draft: Partial<StoredAnswers>;
-    try {
-      draft = JSON.parse(raw) as Partial<StoredAnswers>;
-    } catch {
-      return;
-    }
+    const draft = parseDraft(raw);
+    if (draft === undefined) return;
     if (draft.model && typeof draft.model === 'object') {
       const skip = new Set([...this.piiDefs().map((f) => f.key), ...this.fileKeys()]);
       for (const [k, v] of Object.entries(draft.model)) {
@@ -705,13 +698,12 @@ export class ApplyWizardComponent {
       this.saved.set(true);
     }
     const keys = this.stepKeys();
-    let target = draft.step ? keys.indexOf(draft.step) : -1;
-    if (target < 0) return;
+    const stored = draft.step ? keys.indexOf(draft.step) : -1;
+    if (stored < 0) return;
     const contact = keys.indexOf('contact');
-    if (contact >= 0 && target > contact && !this.loggedIn() && this.contactForm.invalid) {
-      target = contact;
-    }
-    this.activeIndex.set(target);
+    const skipsContact =
+      contact >= 0 && stored > contact && !this.loggedIn() && this.contactForm.invalid;
+    this.activeIndex.set(skipsContact ? contact : stored);
   }
 
   /** Remove the autosave of every type and the last type. */
@@ -719,11 +711,9 @@ export class ApplyWizardComponent {
     if (this.autosaveTimer) clearTimeout(this.autosaveTimer);
     this.autosaveTimer = null;
     try {
-      const keys: string[] = [];
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key?.startsWith(DRAFT_PREFIX)) keys.push(key);
-      }
+      const keys = Array.from({ length: sessionStorage.length }, (_, i) =>
+        sessionStorage.key(i),
+      ).filter((key): key is string => !!key?.startsWith(DRAFT_PREFIX));
       for (const key of keys) sessionStorage.removeItem(key);
     } catch {
       /* storage blocked: nothing to clear */
@@ -744,11 +734,11 @@ export class ApplyWizardComponent {
         return this.list(labels);
       }
       case 'contact': {
-        const parts = this.loggedIn()
+        const names = this.loggedIn()
           ? []
           : [this.i18n.translate('apply.contact.name'), this.i18n.translate('apply.contact.email')];
-        for (const f of this.piiDefs()) parts.push(resolveI18n(f.label, this.i18n.uiLocale()));
-        return this.list(parts);
+        const pii = this.piiDefs().map((f) => resolveI18n(f.label, this.i18n.uiLocale()));
+        return this.list([...names, ...pii]);
       }
       default:
         return this.i18n.translate('apply.steps.reviewHint');
@@ -756,7 +746,7 @@ export class ApplyWizardComponent {
   }
 
   /** "A, B und C" in the active language. */
-  private list(parts: string[]): string {
+  private list(parts: readonly string[]): string {
     if (parts.length < 2) return parts[0] ?? '';
     return new Intl.ListFormat(this.i18n.formatLocale(), { type: 'conjunction' }).format(parts);
   }
@@ -769,6 +759,15 @@ export class ApplyWizardComponent {
       );
       el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
     });
+  }
+}
+
+/** The stored autosave, or `undefined` when its text is no JSON. */
+function parseDraft(raw: string): Partial<StoredAnswers> | undefined {
+  try {
+    return JSON.parse(raw) as Partial<StoredAnswers>;
+  } catch {
+    return undefined;
   }
 }
 

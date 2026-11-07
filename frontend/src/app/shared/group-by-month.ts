@@ -1,13 +1,14 @@
 import { type DateValue, monthYear, parseDay } from './date-format';
+import { runs } from './util/immutable';
 
 /** A group of list rows: the rows of one month, or one group without a heading. */
 export interface MonthGroup<T> {
   /** `YYYY-MM` of the rows, also the track key. `''` for the rows without a date, `all`
    *  for the single group of a list that is not by date. */
-  key: string;
+  readonly key: string;
   /** "September 2026", or empty without a month. */
-  label: string;
-  items: T[];
+  readonly label: string;
+  readonly items: T[];
 }
 
 /** The options of {@link groupByMonth}. */
@@ -17,7 +18,7 @@ export interface GroupByMonthOptions {
    * is September everywhere). Without it, the month is the local month of the reader, the
    * same day the date column shows.
    */
-  utc?: boolean;
+  readonly utc?: boolean;
 }
 
 /** The `YYYY-MM` month of a value, or `''` for no or an invalid value. */
@@ -47,15 +48,10 @@ export function groupByMonth<T>(
   locale: string,
   options: GroupByMonthOptions = {},
 ): MonthGroup<T>[] {
-  const groups: MonthGroup<T>[] = [];
-  for (const row of rows) {
-    const key = monthKey(dateOf(row), options.utc ?? false);
-    const last = groups[groups.length - 1];
-    if (last && last.key === key) {
-      last.items.push(row);
-      continue;
-    }
-    groups.push({ key, label: key ? monthYear(key, locale) : '', items: [row] });
-  }
-  return groups;
+  const keyed = rows.map((row) => ({ row, key: monthKey(dateOf(row), options.utc ?? false) }));
+  return runs(keyed, (a, b) => a.key === b.key).map(([first, ...rest]) => ({
+    key: first.key,
+    label: first.key ? monthYear(first.key, locale) : '',
+    items: [first, ...rest].map((x) => x.row),
+  }));
 }

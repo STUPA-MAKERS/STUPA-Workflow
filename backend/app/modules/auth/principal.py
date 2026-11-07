@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class Principal:
     """An OIDC member or admin with resolved RBAC roles, permissions and groups."""
 
@@ -59,7 +59,7 @@ class Principal:
         return group in self.groups
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class Applicant:
     """Magic-link applicant, bound to exactly one `application_id`.
 

@@ -75,14 +75,14 @@ export class DecisionSectionComponent {
   /** "Studierendenparlament, 34. Sitzung, TOP 6" (the applicant view: the Gremium only). */
   readonly source = computed(() => {
     const d = this.decision();
-    const parts: string[] = [];
-    if (d.gremiumName) parts.push(d.gremiumName);
-    if (!this.applicant()) {
-      if (d.meetingTitle) parts.push(d.meetingTitle);
-      if (d.agendaPosition !== null) {
-        parts.push(this.i18n.translate('decision.sourceTop', { n: d.agendaPosition }));
-      }
-    }
+    const member = !this.applicant();
+    const parts = [
+      ...(d.gremiumName ? [d.gremiumName] : []),
+      ...(member && d.meetingTitle ? [d.meetingTitle] : []),
+      ...(member && d.agendaPosition !== null
+        ? [this.i18n.translate('decision.sourceTop', { n: d.agendaPosition })]
+        : []),
+    ];
     return parts.join(', ');
   });
 

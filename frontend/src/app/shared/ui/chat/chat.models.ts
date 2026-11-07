@@ -8,62 +8,62 @@ export type ChatMessageState = 'sent' | 'sending' | 'failed';
 
 /** A file on a message. The url streams through the API, never a presigned URL. */
 export interface ChatAttachment {
-  id: string;
-  filename: string;
-  mime: string;
-  size: number;
-  url: string;
+  readonly id: string;
+  readonly filename: string;
+  readonly mime: string;
+  readonly size: number;
+  readonly url: string;
   /** Only a clean file is a link. Absent: clean. */
-  scanState?: ScanState;
+  readonly scanState?: ScanState;
   /** The send named the draft as missing (422): the server no longer has it. */
-  lost?: boolean;
+  readonly lost?: boolean;
 }
 
 /** One message of a thread. */
 export interface ChatMessage {
   /** The server id, or a client id while the message is pending. */
-  id: string;
+  readonly id: string;
   /** null: the applicant or the system, shown without an avatar. */
-  author: PersonRef | null;
+  readonly author: PersonRef | null;
   /** Overrides the name, for example the Gremium in the applicant view. */
-  authorLabel?: string | null;
+  readonly authorLabel?: string | null;
   /** Markdown. */
-  body: string;
-  at: IsoDateTime;
-  editedAt?: IsoDateTime | null;
-  own: boolean;
+  readonly body: string;
+  readonly at: IsoDateTime;
+  readonly editedAt?: IsoDateTime | null;
+  readonly own: boolean;
   /**
    * May the viewer edit and delete the message. Unset: only an own message. A
    * moderator (`application.manage` on application comments) also changes others.
    */
-  canEdit?: boolean;
-  visibility?: ChatVisibility | null;
-  attachments?: ChatAttachment[];
-  state?: ChatMessageState;
+  readonly canEdit?: boolean;
+  readonly visibility?: ChatVisibility | null;
+  readonly attachments?: readonly ChatAttachment[];
+  readonly state?: ChatMessageState;
   /** The people the message mentions: their "@Name" is marked in the text. */
-  mentions?: readonly PersonRef[];
+  readonly mentions?: readonly PersonRef[];
 }
 
 /** A status change or another event: small text in the middle of the thread. */
 export interface ChatEvent {
-  id: string;
-  at: IsoDateTime;
-  text: string;
+  readonly id: string;
+  readonly at: IsoDateTime;
+  readonly text: string;
 }
 
 /** The `send` output. `visibility` is set only when the thread offers a choice. */
 export interface ChatSend {
   /** May be '' when the message has files. */
-  body: string;
+  readonly body: string;
   visibility?: ChatVisibility;
   /** The ids of the people the text names as "@Name"; set only when it names someone. */
-  mentions?: string[];
+  readonly mentions?: string[];
   /** The draft ids of the composer files; set only when the composer holds files. */
-  attachmentIds?: string[];
+  readonly attachmentIds?: string[];
   /** The draft token of those files. */
-  draftToken?: string | null;
+  readonly draftToken?: string | null;
   /** The composer files, for the pending bubble of `ChatOutbox`. */
-  files?: ChatAttachment[];
+  readonly files?: readonly ChatAttachment[];
 }
 
 /**
@@ -71,14 +71,14 @@ export interface ChatSend {
  * calls `restore`, which opens the edit again with the new text.
  */
 export interface ChatEdit {
-  id: string;
-  body: string;
+  readonly id: string;
+  readonly body: string;
   /** The ids of the people the new text names as "@Name"; unset where the chat has no list. */
-  mentions?: string[];
-  restore?: () => void;
+  readonly mentions?: string[];
+  readonly restore?: () => void;
 }
 
 /** The `delete` and `retry` outputs. */
 export interface ChatRef {
-  id: string;
+  readonly id: string;
 }

@@ -16,54 +16,60 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { clock } from '@shared/date-format';
+import { toggled } from '@shared/util/immutable';
 
 /** One changed field of an event, for example of a new version. */
 export interface HistoryChange {
   /** The colour of the tag: `warn` for a change, `accent` for an addition, `error` for a
    *  removal. */
-  kind: StatusKind;
+  readonly kind: StatusKind;
   /** "Geändert", "Hinzugefügt", "Entfernt". */
-  tag: string;
+  readonly tag: string;
   /** The name of the field. */
-  label: string;
+  readonly label: string;
   /** The value before, struck through. Leave it out for a field without a short text. */
-  old?: string | null;
+  readonly old?: string | null;
   /** The value after. */
-  new?: string | null;
+  readonly new?: string | null;
   /**
    * The long values of the change (a text, the cost positions, a table), one block each.
    * The line then has a button that opens them below it ("Werte anzeigen"). A block
    * keeps its line breaks. Leave out a side that does not exist, for example `old` for
    * an added field.
    */
-  detail?: { old?: string | null; new?: string | null } | null;
+  readonly detail?: { readonly old?: string | null; readonly new?: string | null } | null;
 }
 
 /** One event of a history. */
 export interface HistoryEntry {
   /** When it happened (ISO 8601). */
-  at: string;
-  icon: IconName;
+  readonly at: string;
+  readonly icon: IconName;
   /** What happened: the new status, or the event ("Version 2 gespeichert"). */
-  title: string;
+  readonly title: string;
   /** The colour of a status title. Leave it out for an event that is not a status. */
-  kind?: StatusKind | null;
+  readonly kind?: StatusKind | null;
   /** Who did it: a person, or the gremium for the applicant. */
-  actor?: string | null;
+  readonly actor?: string | null;
   /** One more line, for example the transition ("Übergang „Prüfung beginnen“"). A line
    *  break in the text starts a new line. */
-  body?: string | null;
+  readonly body?: string | null;
   /** The changed fields, one line each, below the body. */
-  changes?: readonly HistoryChange[] | null;
+  readonly changes?: readonly HistoryChange[] | null;
   /** A link below the body, for example to the vote that decided the status. */
-  link?: { label: string; route: readonly string[] } | null;
+  readonly link?: { readonly label: string; readonly route: readonly string[] } | null;
 }
 
 interface HistoryDay {
   /** `y-m-d`, or `none` for the entries without a valid date. */
-  key: string;
-  label: string;
-  entries: (HistoryEntry & { meta: string })[];
+  readonly key: string;
+  readonly label: string;
+  readonly entries: readonly (HistoryEntry & { readonly meta: string })[];
+}
+
+/** The meta line of a dated event: the actor, then the time. */
+function entryMeta(actor: string | null | undefined, time: string): string {
+  return [actor, time].filter((p) => !!p).join(' · ');
 }
 
 let nextId = 0;
@@ -109,12 +115,7 @@ export class HistoryComponent {
 
   /** Open or close the values of a change. */
   protected toggle(key: string): void {
-    this.opened.update((cur) => {
-      const next = new Set(cur);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    this.opened.update((cur) => toggled(cur, key));
   }
 
   /**
@@ -122,7 +123,9 @@ export class HistoryComponent {
    * wrapped line stays in its column (the offers below a cost position). A tab counts as
    * four spaces.
    */
-  protected lines(text: string | null | undefined): { text: string; indent: number }[] {
+  protected lines(
+    text: string | null | undefined,
+  ): readonly { readonly text: string; readonly indent: number }[] {
     return (text ?? '').split('\n').map((line) => {
       const lead = /^[ \t]*/.exec(line)?.[0] ?? '';
       return {
@@ -138,42 +141,35 @@ export class HistoryComponent {
   }
 
   /** `new Date(null)` is 1970, so a missing value counts as invalid before the parse. */
-  protected readonly days = computed<HistoryDay[]>(() => {
+  protected readonly days = computed<readonly HistoryDay[]>(() => {
     const locale = this.i18n.formatLocale();
     const thisYear = new Date().getFullYear();
-    const dated: { e: HistoryEntry; d: Date }[] = [];
-    const undated: HistoryEntry[] = [];
-    for (const e of this.entries()) {
-      const d = e.at ? new Date(e.at) : new Date(NaN);
-      if (Number.isNaN(d.getTime())) undated.push(e);
-      else dated.push({ e, d });
-    }
-    const sorted = dated.sort((a, b) => b.d.getTime() - a.d.getTime());
-
-    const days: HistoryDay[] = [];
-    for (const { e, d } of sorted) {
-      const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-      let day = days[days.length - 1];
-      if (day?.key !== key) {
-        const label = d.toLocaleDateString(locale, {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          ...(d.getFullYear() === thisYear ? {} : { year: 'numeric' }),
-        });
-        day = { key, label, entries: [] };
-        days.push(day);
-      }
-      const meta = [e.actor, clock(d, locale)].filter((p) => !!p).join(' · ');
-      day.entries.push({ ...e, meta });
-    }
-    if (undated.length > 0) {
-      days.push({
-        key: 'none',
-        label: this.i18n.translate('ui.history.noDate'),
-        entries: undated.map((e) => ({ ...e, meta: e.actor ?? '' })),
+    const parsed = this.entries().map((e) => ({ e, d: e.at ? new Date(e.at) : new Date(NaN) }));
+    const undated = parsed.filter(({ d }) => Number.isNaN(d.getTime())).map(({ e }) => e);
+    const sorted = parsed
+      .filter(({ d }) => !Number.isNaN(d.getTime()))
+      .sort((a, b) => b.d.getTime() - a.d.getTime());
+    const keyOf = (d: Date): string => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    const dayLabel = (d: Date): string =>
+      d.toLocaleDateString(locale, {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        ...(d.getFullYear() === thisYear ? {} : { year: 'numeric' }),
       });
-    }
-    return days;
+    const days = [...new Set(sorted.map(({ d }) => keyOf(d)))].map((key): HistoryDay => {
+      const group = sorted.filter(({ d }) => keyOf(d) === key);
+      return {
+        key,
+        label: dayLabel(group[0].d),
+        entries: group.map(({ e, d }) => ({ ...e, meta: entryMeta(e.actor, clock(d, locale)) })),
+      };
+    });
+    const none: HistoryDay = {
+      key: 'none',
+      label: this.i18n.translate('ui.history.noDate'),
+      entries: undated.map((e) => ({ ...e, meta: e.actor ?? '' })),
+    };
+    return undated.length > 0 ? [...days, none] : days;
   });
 }

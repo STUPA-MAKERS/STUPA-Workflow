@@ -11,11 +11,13 @@ import type { LinkedLead } from '../todos/linked-list/todo-linked-list.component
  */
 export function topApplicationLead(top: AgendaItem | null, i18n: I18nService): LinkedLead | null {
   if (!top?.applicationId) return null;
-  const parts = [i18n.translate('meetings.agenda.kindApplication')];
   const state = resolveI18n(top.stateLabel, i18n.uiLocale());
-  if (state) parts.push(state);
   const amount = formatMoney(top.amount, i18n.formatLocale());
-  if (amount) parts.push(amount);
+  const parts = [
+    i18n.translate('meetings.agenda.kindApplication'),
+    ...(state ? [state] : []),
+    ...(amount ? [amount] : []),
+  ];
   return {
     icon: 'file',
     title: top.applicationTitle || top.title || i18n.translate('meetings.agenda.untitled'),

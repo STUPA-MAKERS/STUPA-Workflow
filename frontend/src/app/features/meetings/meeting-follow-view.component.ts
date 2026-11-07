@@ -241,19 +241,21 @@ export class MeetingFollowViewComponent {
   protected readonly subLine = computed(() => {
     const m = this.meeting();
     const locale = this.i18n.formatLocale();
-    const parts: string[] = [];
-    if (m.gremiumName) parts.push(m.gremiumName);
-    if (m.date) parts.push(this.dateText(m.date));
     const started = clock(m.startedAt, locale);
-    if (m.status === 'live' && started) {
-      parts.push(this.i18n.translate('meetings.page.since', { time: started }));
-    } else if (m.status === 'closed' && started) {
-      const closed = clock(m.closedAt, locale);
-      parts.push(closed ? `${started}–${closed}` : started);
-    } else if (m.startTime) {
-      parts.push(shortTime(m.startTime));
-    }
-    return parts.join(' · ');
+    const closed = clock(m.closedAt, locale);
+    const time =
+      m.status === 'live' && started
+        ? [this.i18n.translate('meetings.page.since', { time: started })]
+        : m.status === 'closed' && started
+          ? [closed ? `${started}–${closed}` : started]
+          : m.startTime
+            ? [shortTime(m.startTime)]
+            : [];
+    return [
+      ...(m.gremiumName ? [m.gremiumName] : []),
+      ...(m.date ? [this.dateText(m.date)] : []),
+      ...time,
+    ].join(' · ');
   });
 
   /** The phone keeps the time alone below the title: "seit 18:04". */

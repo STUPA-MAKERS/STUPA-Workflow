@@ -71,7 +71,7 @@ export class PublicProtocolDetailComponent {
       ),
   );
 
-  protected partsOf(top: PublicTop): TopPart[] {
+  protected partsOf(top: PublicTop): readonly TopPart[] {
     return this.parts().get(top.number) ?? [];
   }
 

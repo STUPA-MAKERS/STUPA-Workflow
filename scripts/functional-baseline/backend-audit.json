@@ -1,4 +1,3 @@
 {
-  "backend/app/modules/audit/schemas.py": 7,
-  "backend/app/modules/audit/service.py": 101
+  "backend/app/modules/audit/service.py": 2
 }

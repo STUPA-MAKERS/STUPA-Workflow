@@ -31,7 +31,7 @@ class MailQueue(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ArqMailQueue:
     """arq-backed queue: `send_mail` job with an idempotent job id.
 
@@ -53,7 +53,7 @@ class ArqMailQueue:
             logger.info("mail enqueue deduped (key=%s)", msg.idempotency_key)
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class DirectMailQueue:
     """Inline send for tests and dev: call the sender directly, without Redis.
 

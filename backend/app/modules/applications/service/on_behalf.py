@@ -10,6 +10,7 @@ start. It only adds the capture columns and a second audit entry.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -28,6 +29,25 @@ from app.shared.search import escape_like
 
 if TYPE_CHECKING:
     from app.modules.flow.dispatch import ActionDispatcher
+
+@dataclass(frozen=True, slots=True)
+class _ResolvedApplicant:
+    """The applicant of a capture.
+
+    Attributes:
+        principal_id: The applicant account, or None for a guest.
+        owner_sub: The ``sub`` of that account, the ``created_by`` of the application.
+        email: The e-mail for the mail to the applicant.
+        name: The name of the applicant, or None.
+        matched_by_email: The guest e-mail belongs to that active account.
+    """
+
+    principal_id: UUID | None
+    owner_sub: str | None
+    email: str
+    name: str | None
+    matched_by_email: bool
+
 
 #: The most accounts that the applicant search returns.
 APPLICANT_SEARCH_LIMIT = 20
@@ -89,25 +109,14 @@ class OnBehalfOps(CreateOps):
                 code="received_on_too_old",
                 errors=[{"field": "receivedOn", "msg": "must not lie more than a year back"}],
             )
-        owner_sub: str | None = None
-        matched = False
-        principal_id = payload.applicant_principal_id
-        if principal_id is not None:
-            owner_sub, email, name = await self._applicant_account(principal_id)
-        else:
-            email = str(payload.applicant_email)
-            name = (payload.applicant_name or "").strip()
-            match = await self._active_account_by_email(email)
-            if match is not None:
-                principal_id, owner_sub, email, name = match
-                matched = True
+        applicant = await self._resolve_applicant(payload)
         intake = (payload.intake or "").strip() or None
         create = ApplicationCreate.model_validate(
             {
                 "typeId": payload.type_id,
                 "data": payload.data,
-                "applicantEmail": email,
-                "applicantName": name or None,
+                "applicantEmail": applicant.email,
+                "applicantName": applicant.name or None,
                 "lang": payload.lang,
                 "attachmentIds": payload.attachment_ids,
                 "draftToken": payload.draft_token,
@@ -120,12 +129,32 @@ class OnBehalfOps(CreateOps):
             email_confirmed=True,
             draft_pepper=draft_pepper,
             capture=Capture(
-                owner_sub=owner_sub,
-                applicant_principal_id=principal_id,
+                owner_sub=applicant.owner_sub,
+                applicant_principal_id=applicant.principal_id,
                 received_on=received_on,
                 intake=intake,
-                matched_by_email=matched,
+                matched_by_email=applicant.matched_by_email,
             ),
+        )
+
+    async def _resolve_applicant(self, payload: OnBehalfCreate) -> _ResolvedApplicant:
+        """Resolve the applicant: the named account, the account of the guest e-mail, or the guest.
+
+        Raises:
+            ValidationProblem: the named account is unknown, inactive or has no e-mail.
+        """
+        principal_id = payload.applicant_principal_id
+        if principal_id is not None:
+            sub, email, name = await self._applicant_account(principal_id)
+            return _ResolvedApplicant(principal_id, sub, email, name, matched_by_email=False)
+        guest_email = str(payload.applicant_email)
+        match = await self._active_account_by_email(guest_email)
+        if match is None:
+            guest_name = (payload.applicant_name or "").strip()
+            return _ResolvedApplicant(None, None, guest_email, guest_name, matched_by_email=False)
+        account_id, account_sub, account_email, account_name = match
+        return _ResolvedApplicant(
+            account_id, account_sub, account_email, account_name, matched_by_email=True
         )
 
     async def _applicant_account(self, principal_id: UUID) -> tuple[str, str, str | None]:

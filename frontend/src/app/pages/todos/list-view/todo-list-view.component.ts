@@ -18,21 +18,22 @@ import { TodoLabelComponent } from '../../../features/todos/card-facts/todo-labe
 import { TodoDueComponent } from '../../../features/todos/card-facts/todo-due.component';
 import { TodoAssigneesComponent } from '../../../features/todos/card-facts/todo-assignees.component';
 import { personName } from '@shared/person-label.util';
+import { toggled } from '@shared/util/immutable';
 
 export type DueSort = 'none' | 'asc' | 'desc';
 
 interface ListRow {
-  card: TodoCardTile;
-  link: string | null;
-  labels: TodoLabel[];
-  due: DueInfo | null;
-  names: string[];
-  ids: (Uuid | null)[];
+  readonly card: TodoCardTile;
+  readonly link: string | null;
+  readonly labels: readonly TodoLabel[];
+  readonly due: DueInfo | null;
+  readonly names: readonly string[];
+  readonly ids: readonly (Uuid | null)[];
 }
 
 interface ListGroup {
-  column: TodoColumn;
-  rows: ListRow[];
+  readonly column: TodoColumn;
+  readonly rows: readonly ListRow[];
 }
 
 /**
@@ -65,7 +66,7 @@ export class TodoListViewComponent {
   /** Open groups among the done columns (they start folded). */
   readonly openDone = signal<ReadonlySet<Uuid>>(new Set());
 
-  readonly groups = computed<ListGroup[]>(() => {
+  readonly groups = computed<readonly ListGroup[]>(() => {
     const locale = this.i18n.formatLocale();
     const today = this.today();
     return sortedColumns(this.board().columns).map((column) => {
@@ -81,7 +82,7 @@ export class TodoListViewComponent {
     });
   });
 
-  private sorted(rows: ListRow[]): ListRow[] {
+  private sorted(rows: readonly ListRow[]): readonly ListRow[] {
     const dir = this.sort();
     if (dir === 'none') return rows;
     return [...rows].sort((a, b) => {
@@ -108,11 +109,6 @@ export class TodoListViewComponent {
   }
 
   toggleGroup(group: ListGroup): void {
-    this.openDone.update((set) => {
-      const next = new Set(set);
-      if (next.has(group.column.id)) next.delete(group.column.id);
-      else next.add(group.column.id);
-      return next;
-    });
+    this.openDone.update((set) => toggled(set, group.column.id));
   }
 }

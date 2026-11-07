@@ -46,7 +46,7 @@ export function candidateNames(
   election: ElectionConfig | null,
   ids: readonly string[],
   t: Translate,
-): string[] {
+): readonly string[] {
   return ids.map((id) => candidateName(election, id, t));
 }
 
@@ -86,9 +86,10 @@ export function electionCountText(
   t: Translate,
 ): string {
   const free = (election?.seats ?? 1) - picks.length;
-  const parts: string[] = [];
-  if (picks.length > 0) parts.push(namesText(picks.length, t));
-  if (free > 0) parts.push(abstentionsText(free, t));
+  const parts = [
+    ...(picks.length > 0 ? [namesText(picks.length, t)] : []),
+    ...(free > 0 ? [abstentionsText(free, t)] : []),
+  ];
   return parts.join(', ');
 }
 
@@ -99,12 +100,12 @@ export function seatsText(n: number, t: Translate): string {
 
 /** One bar of an election result. */
 export interface ElectionBar {
-  id: string;
-  label: string;
-  count: number;
-  elected: boolean;
+  readonly id: string;
+  readonly label: string;
+  readonly count: number;
+  readonly elected: boolean;
   /** In the tie at the seat boundary: a runoff or the lot decides. */
-  tied: boolean;
+  readonly tied: boolean;
 }
 
 /**
@@ -116,7 +117,7 @@ export function electionBars(
   result: ElectionResult | null,
   counts: Readonly<Record<string, number>>,
   t: Translate,
-): ElectionBar[] {
+): readonly ElectionBar[] {
   if (!election) return [];
   const elected = new Set(result?.elected ?? []);
   const tied = new Set([...(result?.runoff?.candidateIds ?? []), ...pendingLot(result)]);
@@ -129,14 +130,15 @@ export function electionBars(
       tied: false,
     }));
   }
-  const rows = election.candidates.map((c) => ({
-    id: c.id,
-    label: candidateLabel(c, t),
-    count: result?.counts[c.id] ?? counts[c.id] ?? 0,
-    elected: elected.has(c.id),
-    tied: tied.has(c.id),
-  }));
-  rows.sort((a, b) => b.count - a.count);
+  const rows = election.candidates
+    .map((c) => ({
+      id: c.id,
+      label: candidateLabel(c, t),
+      count: result?.counts[c.id] ?? counts[c.id] ?? 0,
+      elected: elected.has(c.id),
+      tied: tied.has(c.id),
+    }))
+    .sort((a, b) => b.count - a.count);
   const abstain = result?.abstentions ?? counts[ELECTION_ABSTAIN] ?? 0;
   return [
     ...rows,
@@ -193,7 +195,6 @@ export function electionCaption(
   return `${head} · ${seatsText(seats, t)}`;
 }
 
-/** The status of a closed election: "Gewählt", "Stichwahl", "Los steht aus", "Niemand gewählt". */
 /**
  * The status of a closed vote in a list row: an election reads its result with
  * `electionStatus` ("Gewählt", "Stichwahl", "Los"), a motion with `voteResultStatus`.
@@ -202,9 +203,16 @@ export function closedStatus(kind: VoteKind | null | undefined, result: VoteResu
   return kind === 'election' ? electionStatus(result) : voteResultStatus(result);
 }
 
+/** The status of a closed election: "Gewählt", "Stichwahl", "Los steht aus", "Niemand gewählt". */
 export function electionStatus(result: VoteResult | string | null): StatusView {
-  if (result === 'elected') return { kind: 'accent', key: 'election.status.elected' };
-  if (result === 'runoff') return { kind: 'warn', key: 'election.status.runoff' };
-  if (result === 'tie') return { kind: 'warn', key: 'election.status.tie' };
-  return { kind: 'error', key: 'election.status.rejected' };
+  switch (result) {
+    case 'elected':
+      return { kind: 'accent', key: 'election.status.elected' };
+    case 'runoff':
+      return { kind: 'warn', key: 'election.status.runoff' };
+    case 'tie':
+      return { kind: 'warn', key: 'election.status.tie' };
+    default:
+      return { kind: 'error', key: 'election.status.rejected' };
+  }
 }

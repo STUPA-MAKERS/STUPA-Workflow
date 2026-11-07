@@ -52,16 +52,17 @@ class GuestSettingsService:
 
     async def get(self) -> GuestApplicationSettings:
         """Return the settings row. Create it with the defaults when it is missing."""
-        row = await self.session.get(GuestApplicationSettings, 1)
-        if row is None:
-            row = GuestApplicationSettings(
-                id=1,
-                confirm_ttl_hours=DEFAULT_CONFIRM_TTL_HOURS,
-                link_ttl_days=None,
-                updated_at=datetime.now(UTC),
-            )
-            self.session.add(row)
-            await self.session.flush()
+        existing = await self.session.get(GuestApplicationSettings, 1)
+        if existing is not None:
+            return existing
+        row = GuestApplicationSettings(
+            id=1,
+            confirm_ttl_hours=DEFAULT_CONFIRM_TTL_HOURS,
+            link_ttl_days=None,
+            updated_at=datetime.now(UTC),
+        )
+        self.session.add(row)
+        await self.session.flush()
         return row
 
     async def update(

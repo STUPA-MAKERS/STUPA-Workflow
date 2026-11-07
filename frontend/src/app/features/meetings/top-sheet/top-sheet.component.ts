@@ -59,9 +59,9 @@ const NO_FORMATS: ReadonlySet<MarkdownFormat> = new Set();
 
 /** A button of the format bar. */
 interface FormatTool {
-  format: MarkdownFormat;
-  icon: IconName;
-  label: TranslationKey;
+  readonly format: MarkdownFormat;
+  readonly icon: IconName;
+  readonly label: TranslationKey;
 }
 
 const TOOLS: readonly FormatTool[] = [
@@ -201,6 +201,8 @@ export class TopSheetComponent {
    * for a rename from its row menu, so the heading shows the field only for its own rename.
    */
   private readonly renamingHere = signal<Uuid | null>(null);
+  /** The rename of `renamingHere` reached the agenda; its end clears `renamingHere`. */
+  private renameStarted = false;
   private readonly titleInput = viewChild<ElementRef<HTMLInputElement>>('titleInput');
 
   /** The title of the open item can change here. */
@@ -227,14 +229,13 @@ export class TopSheetComponent {
       el.focus();
       el.select();
     });
-    let started = false;
     effect(() => {
       const id = this.renamingTopId();
       const here = untracked(this.renamingHere);
       if (here !== null && id === here) {
-        started = true;
-      } else if (started) {
-        started = false;
+        this.renameStarted = true;
+      } else if (this.renameStarted) {
+        this.renameStarted = false;
         this.renamingHere.set(null);
       }
     });
@@ -405,10 +406,8 @@ export class TopSheetComponent {
 
 /** A short hash of a text (FNV-1a, 32 bit), so that a document key changes with it. */
 function textHash(text: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
+  const hash = text
+    .split('')
+    .reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 0x01000193), 0x811c9dc5);
   return `${text.length}.${(hash >>> 0).toString(36)}`;
 }

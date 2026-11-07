@@ -35,14 +35,15 @@ builder (`backend/app/modules/protocol/markdown.py`):
 from __future__ import annotations
 
 import functools
+import itertools
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Final, cast
 
 import marko
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Iterator, Mapping
+    from collections.abc import Collection, Iterator, Mapping, Sequence
 
     from .frontmatter import Meta
 
@@ -111,6 +112,73 @@ _ELECTION_PART_RE: Final = re.compile(r"^(.*):\s*(\d+)$")
 _ELECTION_OTHERS_RE: Final = re.compile(r"^(\d+) weitere Kandidierende$")
 
 
+@dataclass(frozen=True, slots=True)
+class _ElectionScan:
+    """What the lines of an election have said so far."""
+
+    rows: tuple[tuple[str, int], ...] = ()
+    abstentions: int | None = None
+    elected_raw: str | None = None
+    others: int = 0
+    lot: str | None = None
+    notes: tuple[str, ...] = ()
+
+
+def _election_votes(scan: _ElectionScan, line: str) -> _ElectionScan:
+    """Read the votes per candidate (`Anna: 5 · Ben: 3 · Enthaltungen: 1`)."""
+    parts = (_ELECTION_PART_RE.match(part) for part in re.split(r"\s+·\s+", line))
+    matches = [match for match in parts if match is not None]
+    abstained = [int(m.group(2)) for m in matches if m.group(1) == "Enthaltungen"]
+    return replace(
+        scan,
+        rows=tuple((m.group(1), int(m.group(2))) for m in matches if m.group(1) != "Enthaltungen"),
+        abstentions=abstained[-1] if abstained else scan.abstentions,
+    )
+
+
+def _election_line(scan: _ElectionScan, line: str) -> _ElectionScan:
+    """Read one line of an election after the seat line."""
+    others = _ELECTION_OTHERS_RE.match(line)
+    match line:
+        case _ if line.startswith("Gewählt:"):
+            return replace(scan, elected_raw=line.removeprefix("Gewählt:").strip())
+        case _ if others:
+            return replace(scan, others=int(others.group(1)))
+        case "Durch Los entschieden.":
+            return replace(scan, lot="drawn")
+        case _ if line.rstrip(".") == "Gleichstand: das Los steht aus":
+            return replace(scan, lot="pending")
+        case _ if not scan.rows and _ELECTION_VOTES_RE.match(line):
+            return _election_votes(scan, line)
+        case _:
+            return replace(scan, notes=(*scan.notes, line))
+
+
+def _pick_elected(raw: str, names: Sequence[str]) -> list[str]:
+    """Find the known names in the `Gewählt:` text.
+
+    The longer name goes first, so a name with ", " stays whole.
+    """
+
+    def pick(found: tuple[tuple[str, ...], str], name: str) -> tuple[tuple[str, ...], str]:
+        picked, rest = found
+        return ((*picked, name), rest.replace(name, "", 1)) if name in rest else found
+
+    longest_first = sorted(names, key=lambda name: -len(name))
+    return list(functools.reduce(pick, longest_first, ((), raw))[0])
+
+
+def _elected(raw: str | None, names: Sequence[str]) -> list[str]:
+    """Read the elected people: the known candidates, else the comma list of the public form."""
+    match raw:
+        case None | "niemand":
+            return []
+        case _ if names:
+            return _pick_elected(raw, names)
+        case _:
+            return [name.strip() for name in raw.split(",") if name.strip()]
+
+
 def _election(lines: list[str]) -> Node | None:
     """Read a personnel election from the lines after the question.
 
@@ -119,60 +187,23 @@ def _election(lines: list[str]) -> Node | None:
     the public form writes the elected people and `n weitere Kandidierende`. The
     editor reads the same lines (`parseElection` of the ui-kit). A callout without
     the seat line, or with a single candidate (its Ja/Nein line), is no ranking.
+    Only the first line of votes counts; a later one is a note.
     """
     meta = next((line for line in lines if _ELECTION_META_RE.match(line)), None)
     if meta is None or any(line.startswith("Kandidatur:") for line in lines):
         return None
-    rows: list[dict[str, object]] = []
-    abstentions: int | None = None
-    elected_raw: str | None = None
-    others = 0
-    lot: str | None = None
-    notes: list[str] = []
-    for line in lines:
-        if line is meta:
-            continue
-        others_match = _ELECTION_OTHERS_RE.match(line)
-        if line.startswith("Gewählt:"):
-            elected_raw = line.removeprefix("Gewählt:").strip()
-        elif others_match:
-            others = int(others_match.group(1))
-        elif line == "Durch Los entschieden.":
-            lot = "drawn"
-        elif line.rstrip(".") == "Gleichstand: das Los steht aus":
-            lot = "pending"
-        elif not rows and _ELECTION_VOTES_RE.match(line):
-            for part in re.split(r"\s+·\s+", line):
-                match = _ELECTION_PART_RE.match(part)
-                if match is None:
-                    continue
-                if match.group(1) == "Enthaltungen":
-                    abstentions = int(match.group(2))
-                else:
-                    rows.append({"name": match.group(1), "votes": int(match.group(2))})
-        else:
-            notes.append(line)
-    elected: list[str] = []
-    if elected_raw is not None and elected_raw != "niemand":
-        rest = elected_raw
-        # Match the known names first, so a name with ", " stays whole.
-        for row in sorted(rows, key=lambda r: -len(str(r["name"]))):
-            if str(row["name"]) in rest:
-                elected.append(str(row["name"]))
-                rest = rest.replace(str(row["name"]), "", 1)
-        if not rows:
-            elected = [name.strip() for name in elected_raw.split(",") if name.strip()]
-    for row in rows:
-        row["elected"] = row["name"] in elected
-    rows.sort(key=lambda r: (-cast("int", r["votes"]), not r["elected"]))
+    rest = [line for line in lines if line is not meta]
+    scan = functools.reduce(_election_line, rest, _ElectionScan())
+    elected = _elected(scan.elected_raw, [name for name, _ in scan.rows])
+    rows = [{"name": name, "votes": votes, "elected": name in elected} for name, votes in scan.rows]
     return {
         "meta": meta,
-        "rows": rows,
-        "abstentions": abstentions,
+        "rows": sorted(rows, key=lambda r: (-cast("int", r["votes"]), not r["elected"])),
+        "abstentions": scan.abstentions,
         "elected": [] if rows else elected,
-        "others": others,
-        "lot": lot,
-        "notes": notes,
+        "others": scan.others,
+        "lot": scan.lot,
+        "notes": list(scan.notes),
     }
 
 
@@ -192,19 +223,52 @@ def _top_labels(top: str, labels: list[str]) -> set[str]:
     """
     ordered = sorted(set(labels), key=len, reverse=True)
 
+    def attempt(label: str, rest: str) -> tuple[str, ...] | None:
+        tail = split(rest[len(label) + 2 :]) if rest.startswith(label + ", ") else None
+        return (label,) if rest == label else (None if tail is None else (label, *tail))
+
     # The cache keeps the search linear in the places of `top`, whatever the labels.
     @functools.cache
-    def split(rest: str) -> list[str] | None:
-        for label in ordered:
-            if rest == label:
-                return [label]
-            if rest.startswith(label + ", "):
-                tail = split(rest[len(label) + 2 :])
-                if tail is not None:
-                    return [label, *tail]
-        return None
+    def split(rest: str) -> tuple[str, ...] | None:
+        attempts = (attempt(label, rest) for label in ordered)
+        return next((found for found in attempts if found is not None), None)
 
-    return set(split(top) or []) if top else set()
+    return set(split(top) or ()) if top else set()
+
+
+@dataclass(frozen=True, slots=True)
+class _PollScan:
+    """What the lines of a poll have said so far."""
+
+    rows: tuple[tuple[str, int, int | None], ...] = ()
+    abstentions: int | None = None
+    top: str = ""
+    footer: str | None = None
+    notes: tuple[str, ...] = ()
+
+
+def _poll_line(scan: _PollScan, line: str, *, date: bool) -> _PollScan:
+    """Read one line of a poll after the kind line."""
+    top = _POLL_TOP_RE.match(line)
+    row = _POLL_ROW_RE.match(line)
+    ballots = _POLL_BALLOTS_RE.match(line) if row is None else None
+    match line:
+        case _ if top:
+            return replace(scan, top=top.group(1).strip())
+        case _ if ballots:
+            # The footer comes from the number, so the rest of an old stored line drops.
+            n = int(ballots.group(1))
+            return replace(scan, footer=f"{n} {'Antwort' if n == 1 else 'Antworten'}")
+        case _ if line == _POLL_LEGEND:
+            return scan
+        case _ if row and row.group(1) == "Enthaltungen" and not row.group(3):
+            return replace(scan, abstentions=int(row.group(2)))
+        case _ if row and (row.group(3) is not None) == date:
+            maybe = row.group(3)
+            entry = (row.group(1), int(row.group(2)), int(maybe) if maybe is not None else None)
+            return replace(scan, rows=(*scan.rows, entry))
+        case _:
+            return replace(scan, notes=(*scan.notes, line))
 
 
 def _poll(lines: list[str]) -> Node | None:
@@ -223,45 +287,20 @@ def _poll(lines: list[str]) -> Node | None:
         return None
     meta = lines[0]
     date = meta == "Terminumfrage"
-    rows: list[dict[str, object]] = []
-    abstentions: int | None = None
-    top = ""
-    footer: str | None = None
-    notes: list[str] = []
-    for line in lines[1:]:
-        top_match = _POLL_TOP_RE.match(line)
-        row_match = _POLL_ROW_RE.match(line)
-        if top_match:
-            top = top_match.group(1).strip()
-        elif row_match is None and (ballots := _POLL_BALLOTS_RE.match(line)):
-            # The footer comes from the number, so the rest of an old stored line drops.
-            n = int(ballots.group(1))
-            footer = f"{n} {'Antwort' if n == 1 else 'Antworten'}"
-        elif line == _POLL_LEGEND:
-            continue
-        elif row_match and row_match.group(1) == "Enthaltungen" and not row_match.group(3):
-            abstentions = int(row_match.group(2))
-        elif row_match and (row_match.group(3) is not None) == date:
-            maybe = row_match.group(3)
-            rows.append(
-                {
-                    "label": row_match.group(1),
-                    "count": int(row_match.group(2)),
-                    "maybe": int(maybe) if maybe is not None else None,
-                }
-            )
-        else:
-            notes.append(line)
-    best = _top_labels(top, [str(row["label"]) for row in rows])
-    for row in rows:
-        row["top"] = row["label"] in best
+    scan = functools.reduce(
+        lambda acc, line: _poll_line(acc, line, date=date), lines[1:], _PollScan()
+    )
+    best = _top_labels(scan.top, [label for label, _, _ in scan.rows])
     return {
         "kind": "date" if date else "multi" if "Mehrfachwahl" in meta else "single",
         "meta": meta,
-        "rows": rows,
-        "abstentions": abstentions,
-        "footer": footer,
-        "notes": notes,
+        "rows": [
+            {"label": label, "count": count, "maybe": maybe, "top": label in best}
+            for label, count, maybe in scan.rows
+        ],
+        "abstentions": scan.abstentions,
+        "footer": scan.footer,
+        "notes": list(scan.notes),
     }
 
 
@@ -276,12 +315,8 @@ IMAGE_ASSET_RE: Final[re.Pattern[str]] = re.compile(rf"^img-({_UUID})\.(?:png|jp
 
 def image_assets(assets: Collection[str]) -> dict[str, str]:
     """Map the uuid of each uploaded image asset to its asset name."""
-    out: dict[str, str] = {}
-    for name in assets:
-        match = IMAGE_ASSET_RE.fullmatch(name)
-        if match is not None:
-            out[match.group(1)] = name
-    return out
+    matches = (IMAGE_ASSET_RE.fullmatch(name) for name in assets)
+    return {match.group(1): match.group(0) for match in matches if match is not None}
 
 
 # -- inline text: shortcodes, math, arrows ----------------------------------
@@ -350,38 +385,46 @@ def _text(value: str) -> Node:
 
 def _prose(text: str) -> Iterator[Node]:
     """Split prose into text runs and math-font symbol nodes."""
-    for index, piece in enumerate(_SYMBOL_SPLIT_RE.split(text)):
-        if not piece:
-            continue
-        if index % 2:
-            yield {"t": "sym", "v": _ARROWS.get(piece, piece)}
-        else:
-            yield _text(piece)
+    return (
+        {"t": "sym", "v": _ARROWS.get(piece, piece)} if index % 2 else _text(piece)
+        for index, piece in enumerate(_SYMBOL_SPLIT_RE.split(text))
+        if piece
+    )
 
 
 def _as_list(value: str | list[str] | None) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return value
-    return [v.strip() for v in value.split(",") if v.strip()]
+    match value:
+        case None:
+            return []
+        case list():
+            return value
+        case str():
+            return [v.strip() for v in value.split(",") if v.strip()]
 
 
 def _lookup(meta: Meta, name: str) -> str | list[str] | None:
-    for key in _FIELD_ALIASES.get(name, (name,)):
-        if key in meta:
-            return meta[key]
-    return None
+    return next((meta[key] for key in _FIELD_ALIASES.get(name, (name,)) if key in meta), None)
 
 
 def _count(args: Mapping[str, str], *keys: str) -> int:
-    for key in keys:
-        if key in args:
-            try:
-                return int(args[key])
-            except ValueError:
-                return 0
-    return 0
+    key = next((key for key in keys if key in args), None)
+    if key is None:
+        return 0
+    try:
+        return int(args[key])
+    except ValueError:
+        return 0
+
+
+def _vote_shortcode(rest: str) -> Node:
+    """Build the tally of a `{{vote ja=1 nein=2 enthaltung=0}}` marker."""
+    args = dict(tok.split("=", 1) for tok in rest.split() if "=" in tok)
+    return {
+        "t": "vote",
+        "yes": _count(args, "ja", "yes"),
+        "no": _count(args, "nein", "no"),
+        "abstain": _count(args, "enthaltung", "enth", "abstain"),
+    }
 
 
 def _shortcode(inner: str, meta: Meta) -> list[Node]:
@@ -390,38 +433,32 @@ def _shortcode(inner: str, meta: Meta) -> list[Node]:
     An unknown shortcode comes back as literal text, braces included, so a
     typo stays visible in the PDF.
     """
-    name, _, rest = inner.strip().partition(" ")
-    name = name.lower()
-    rest = rest.strip()
-    if name == "time" and rest:
-        return [{"t": "time", "v": rest}]
-    if name == "vote":
-        args = dict(tok.split("=", 1) for tok in rest.split() if "=" in tok)
-        return [
-            {
-                "t": "vote",
-                "yes": _count(args, "ja", "yes"),
-                "no": _count(args, "nein", "no"),
-                "abstain": _count(args, "enthaltung", "enth", "abstain"),
-            }
-        ]
-    if name == "count":
-        return [_text(str(len(_as_list(_lookup(meta, rest.lower())))))]
-    if name in _FIELD_ALIASES:
-        value = _lookup(meta, name)
-        if name in _LIST_FIELDS:
-            return [_text(", ".join(_as_list(value)))]
-        return [_text(value if isinstance(value, str) else "")]
-    return [_text("{{" + inner + "}}")]
+    head, _, tail = inner.strip().partition(" ")
+    name = head.lower()
+    rest = tail.strip()
+    match name:
+        case "time" if rest:
+            return [{"t": "time", "v": rest}]
+        case "vote":
+            return [_vote_shortcode(rest)]
+        case "count":
+            return [_text(str(len(_as_list(_lookup(meta, rest.lower())))))]
+        case _ if name in _LIST_FIELDS:
+            return [_text(", ".join(_as_list(_lookup(meta, name))))]
+        case _ if name in _FIELD_ALIASES:
+            value = _lookup(meta, name)
+            return [_text(value if isinstance(value, str) else "")]
+        case _:
+            return [_text("{{" + inner + "}}")]
 
 
 def _inline_text(text: str, meta: Meta) -> Iterator[Node]:
     """Expand the shortcodes of a text run and split the rest into prose."""
-    for index, piece in enumerate(SHORTCODE_RE.split(text)):
-        if index % 2:
-            yield from _shortcode(piece, meta)
-        elif piece:
-            yield from _prose(piece)
+    return (
+        node
+        for index, piece in enumerate(SHORTCODE_RE.split(text))
+        for node in (_shortcode(piece, meta) if index % 2 else _prose(piece))
+    )
 
 
 # -- marko helpers ----------------------------------------------------------
@@ -448,14 +485,37 @@ def _source_text(node: object) -> str | None:
     it, so the function puts it back. A node with structure returns `None`,
     and a formula never crosses such a node.
     """
-    kind = _kind(node)
-    if kind == "RawText":
-        return _leaf(node)
-    if kind == "Literal":
-        return "\\" + (_leaf(node) or "")
-    if kind == "LineBreak":
-        return "\n"
-    return None
+    match _kind(node):
+        case "RawText":
+            return _leaf(node)
+        case "Literal":
+            return "\\" + (_leaf(node) or "")
+        case "LineBreak":
+            return "\n"
+        case _:
+            return None
+
+
+@dataclass(frozen=True, slots=True)
+class _FenceScan:
+    """The fence state after one line, and whether that line stays."""
+
+    in_code: bool = False
+    open_fences: int = 0
+    keep: bool = True
+
+
+def _fence_line(scan: _FenceScan, line: str) -> _FenceScan:
+    """Advance the fence state over one line."""
+    match line:
+        case _ if _CODE_FENCE_RE.match(line):
+            return replace(scan, in_code=not scan.in_code, keep=True)
+        case _ if not scan.in_code and _ANTRAG_OPEN_RE.match(line):
+            return replace(scan, open_fences=scan.open_fences + 1, keep=False)
+        case _ if not scan.in_code and scan.open_fences and _FENCE_CLOSE_RE.match(line):
+            return replace(scan, open_fences=scan.open_fences - 1, keep=False)
+        case _:
+            return replace(scan, keep=True)
 
 
 def strip_antrag_fences(markdown: str) -> str:
@@ -464,74 +524,79 @@ def strip_antrag_fences(markdown: str) -> str:
     Only a closing `:::` that belongs to an open application fence goes. Any
     other `:::` line stays text.
     """
-    out: list[str] = []
-    in_code = False
-    open_fences = 0
-    for line in markdown.split("\n"):
-        if _CODE_FENCE_RE.match(line):
-            in_code = not in_code
-        elif not in_code and _ANTRAG_OPEN_RE.match(line):
-            open_fences += 1
-            continue
-        elif not in_code and open_fences and _FENCE_CLOSE_RE.match(line):
-            open_fences -= 1
-            continue
-        out.append(line)
-    return "\n".join(out)
+    lines = markdown.split("\n")
+    scans = itertools.accumulate(lines, _fence_line, initial=_FenceScan())
+    kept = zip(lines, itertools.islice(scans, 1, None), strict=True)
+    return "\n".join(line for line, scan in kept if scan.keep)
 
 
 # -- the converter ----------------------------------------------------------
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class _Converter:
+    """Convert marko nodes at one nesting depth and list level.
+
+    The converter is a value: a nested node gets a copy one level deeper, so
+    the depth and the list levels need no bookkeeping on the way back up.
+    """
+
     meta: Meta
     # uuid -> asset name of the uploaded images.
     images: Mapping[str, str]
-    _depth: int = 0
-    _ul: int = 0
-    _ol: int = 0
+    depth: int = 0
+    ul: int = 0
+    ol: int = 0
 
-    def _enter(self) -> None:
-        self._depth += 1
-        if self._depth > MAX_DEPTH:
+    def _enter(self) -> _Converter:
+        """Return the converter one nesting level deeper.
+
+        Raises:
+            ConversionError: The Markdown nests deeper than `MAX_DEPTH`.
+        """
+        if self.depth + 1 > MAX_DEPTH:
             raise ConversionError(f"the Markdown nests deeper than {MAX_DEPTH} levels")
-
-    def _leave(self) -> None:
-        self._depth -= 1
+        return replace(self, depth=self.depth + 1)
 
     # -- inline ------------------------------------------------------------
 
     def inline(self, node: object) -> list[Node]:
         kind = _kind(node)
         text = _leaf(node)
-        if kind == "CodeSpan":
-            return [{"t": "code", "v": text or ""}]
-        if kind in ("RawText", "Literal"):
-            return list(_inline_text(text or "", self.meta))
-        if kind == "InlineHTML":
-            return [_text(text or "")]
-        if kind == "LineBreak":
-            soft = bool(getattr(node, "soft", False))
-            return [_text(" ")] if soft else [{"t": "br"}]
-        self._enter()
-        try:
-            if kind == "StrongEmphasis":
+        match kind:
+            case "CodeSpan":
+                return [{"t": "code", "v": text or ""}]
+            case "RawText" | "Literal":
+                return list(_inline_text(text or "", self.meta))
+            case "InlineHTML":
+                return [_text(text or "")]
+            case "LineBreak":
+                soft = bool(getattr(node, "soft", False))
+                return [_text(" ")] if soft else [{"t": "br"}]
+            case _:
+                return self._enter()._nested_inline(node, kind)
+
+    def _nested_inline(self, node: object, kind: str) -> list[Node]:
+        """Convert an inline node that holds other inline nodes."""
+        match kind:
+            case "StrongEmphasis":
                 return [{"t": "strong", "c": self.inlines(node)}]
-            if kind == "Emphasis":
+            case "Emphasis":
                 return [{"t": "emph", "c": self.inlines(node)}]
-            if kind == "Strikethrough":
+            case "Strikethrough":
                 return [{"t": "strike", "c": self.inlines(node)}]
-            if kind in ("Link", "AutoLink", "Url"):
+            case "Link" | "AutoLink" | "Url":
                 dest = str(getattr(node, "dest", ""))
-                if EXTERNAL_URL_RE.match(dest):
-                    return [{"t": "link", "url": dest, "c": self.inlines(node)}]
-                return self.inlines(node)
-            if kind == "Image":
+                external = EXTERNAL_URL_RE.match(dest)
+                return (
+                    [{"t": "link", "url": dest, "c": self.inlines(node)}]
+                    if external
+                    else self.inlines(node)
+                )
+            case "Image":
                 return [self._image(node)]
-            return self.inlines(node)
-        finally:
-            self._leave()
+            case _:
+                return self.inlines(node)
 
     def _image(self, node: object) -> Node:
         """Build an image node: the uploaded asset, else the alt text only.
@@ -555,44 +620,67 @@ class _Converter:
 
         A formula can span several marko nodes, as soon as its body holds an
         escape. The method rebuilds the source of the plain children, finds
-        the formulas in it and converts the rest the ordinary way.
+        the formulas in it and converts the rest the ordinary way. A node with
+        structure stands in the source as a newline. A formula holds no
+        newline, so it never spans such a node; its span ends at -1.
         """
-        spans: list[tuple[object, int, int]] = []
-        source = ""
-        for child in kids:
-            text = _source_text(child)
-            # A node with structure stands in the source as a newline. A
-            # formula holds no newline, so it never spans such a node.
-            plain = text if text is not None else "\n"
-            end = len(source) + len(plain) if text is not None else -1
-            spans.append((child, len(source), end))
-            source += plain
+        texts = [_source_text(child) for child in kids]
+        plains = ["\n" if text is None else text for text in texts]
+        starts = itertools.accumulate((len(plain) for plain in plains), initial=0)
+        spans = [
+            (child, start, start + len(plain) if text is not None else -1)
+            for child, text, plain, start in zip(kids, texts, plains, starts, strict=False)
+        ]
+        source = "".join(plains)
         formulas = [(m.start(), m.end(), m.group(1)) for m in MATH_RE.finditer(source)]
-        out: list[Node] = []
         if not formulas:
-            for child in kids:
-                out.extend(self.inline(child))
-            return out
-        for child, start, end in spans:
-            if end < 0:
-                out.extend(self.inline(child))
-                continue
-            cursor = start
-            for first, last, tex in formulas:
-                if last <= cursor or first >= end:
-                    continue
-                if first > cursor:
-                    out.extend(_inline_text(source[cursor:first], self.meta))
-                if first >= start:
-                    out.append({"t": "math", "tex": tex})
-                cursor = max(cursor, last)
-            if cursor >= end:
-                continue
-            if cursor == start:
-                out.extend(self.inline(child))
-            else:
-                out.extend(_inline_text(source[cursor:end], self.meta))
-        return out
+            return [out for child in kids for out in self.inline(child)]
+        return [
+            out
+            for child, start, end in spans
+            for out in self._span_nodes(child, start, end, source, formulas)
+        ]
+
+    def _span_nodes(
+        self,
+        child: object,
+        start: int,
+        end: int,
+        source: str,
+        formulas: Sequence[tuple[int, int, str]],
+    ) -> list[Node]:
+        """Convert one inline child whose source is `source[start:end]`.
+
+        A formula that overlaps the child becomes a math node in the child where
+        it starts. The text between the formulas stays prose. A child that no
+        formula touches converts the ordinary way.
+        """
+        if end < 0:
+            return self.inline(child)
+        hits = [(first, last, tex) for first, last, tex in formulas if last > start and first < end]
+        # The formulas do not overlap, so the prose before each one starts where the last ended.
+        cursors = [start, *(last for _, last, _ in hits)]
+        pieces = [
+            out
+            for (first, _, tex), cursor in zip(hits, cursors, strict=False)
+            for out in self._formula_nodes(source[cursor:first], tex, first >= start)
+        ]
+        cursor = cursors[-1]
+        tail = (
+            []
+            if cursor >= end
+            else self.inline(child)
+            if cursor == start
+            else list(_inline_text(source[cursor:end], self.meta))
+        )
+        return [*pieces, *tail]
+
+    def _formula_nodes(self, before: str, tex: str, starts_here: bool) -> list[Node]:
+        """Convert the prose in front of a formula, then the formula if it starts here."""
+        return [
+            *_inline_text(before, self.meta),
+            *([{"t": "math", "tex": tex}] if starts_here else []),
+        ]
 
     # -- blocks ------------------------------------------------------------
 
@@ -601,71 +689,66 @@ class _Converter:
         if kind in ("BlankLine", "LinkRefDef", "HTMLBlock"):
             # A link definition and raw HTML print nothing.
             return []
-        self._enter()
-        try:
-            return self._block(node, kind)
-        finally:
-            self._leave()
+        return self._enter()._block(node, kind)
 
     def _block(self, node: object, kind: str) -> list[Node]:
-        if kind in ("Heading", "SetextHeading"):
-            level = int(getattr(node, "level", 1))
-            return [{"t": "heading", "level": level, "c": self.inlines(node)}]
-        if kind == "Paragraph":
-            display = self._display_math(node)
-            if display is not None:
-                return [display]
-            content = _trim(self.inlines(node))
-            if len(content) == 1 and content[0].get("t") == "image" and "asset" in content[0]:
-                # A paragraph of one image is a block image, centered and scaled.
-                return [{"t": "figure", "asset": content[0]["asset"], "alt": content[0]["alt"]}]
-            return [{"t": "par", "c": content}]
-        if kind == "List":
-            # LaTeX counts the itemize and the enumerate depth apart: a bullet
-            # list inside a numbered list still takes the first bullet.
-            ordered = bool(getattr(node, "ordered", False))
-            level = self._ol if ordered else self._ul
-            if ordered:
-                self._ol += 1
-            else:
-                self._ul += 1
-            try:
-                items = [
-                    self.blocks(_children(c)) for c in _children(node) if _kind(c) == "ListItem"
-                ]
-            finally:
-                if ordered:
-                    self._ol -= 1
-                else:
-                    self._ul -= 1
-            return [
-                {
-                    "t": "list",
-                    "ordered": ordered,
-                    "start": int(getattr(node, "start", 1) or 1),
-                    "olevel" if ordered else "ulevel": level,
-                    "items": items,
-                }
-            ]
-        if kind == "Quote":
-            return self._quote(node)
-        if kind in ("FencedCode", "CodeBlock"):
-            text = _leaf(node)
-            if text is None:
-                kids = _children(node)
-                text = _leaf(kids[0]) if kids else ""
-            return [{"t": "codeblock", "v": (text or "").rstrip("\n")}]
-        if kind == "ThematicBreak":
-            return [{"t": "rule"}]
-        if kind == "Table":
-            return self._table(node)
-        return self.blocks(_children(node))
+        match kind:
+            case "Heading" | "SetextHeading":
+                level = int(getattr(node, "level", 1))
+                return [{"t": "heading", "level": level, "c": self.inlines(node)}]
+            case "Paragraph":
+                return [self._paragraph(node)]
+            case "List":
+                return [self._list(node)]
+            case "Quote":
+                return self._quote(node)
+            case "FencedCode" | "CodeBlock":
+                return [self._codeblock(node)]
+            case "ThematicBreak":
+                return [{"t": "rule"}]
+            case "Table":
+                return self._table(node)
+            case _:
+                return self.blocks(_children(node))
+
+    def _paragraph(self, node: object) -> Node:
+        """Build a paragraph: a display formula, a block image, or a run of inline nodes."""
+        display = self._display_math(node)
+        if display is not None:
+            return display
+        content = _trim(self.inlines(node))
+        if len(content) == 1 and content[0].get("t") == "image" and "asset" in content[0]:
+            # A paragraph of one image is a block image, centered and scaled.
+            return {"t": "figure", "asset": content[0]["asset"], "alt": content[0]["alt"]}
+        return {"t": "par", "c": content}
+
+    def _list(self, node: object) -> Node:
+        """Build a bullet or a numbered list.
+
+        LaTeX counts the itemize and the enumerate depth apart: a bullet list
+        inside a numbered list still takes the first bullet.
+        """
+        ordered = bool(getattr(node, "ordered", False))
+        level = self.ol if ordered else self.ul
+        nested = replace(self, ol=self.ol + 1) if ordered else replace(self, ul=self.ul + 1)
+        items = [nested.blocks(_children(c)) for c in _children(node) if _kind(c) == "ListItem"]
+        return {
+            "t": "list",
+            "ordered": ordered,
+            "start": int(getattr(node, "start", 1) or 1),
+            "olevel" if ordered else "ulevel": level,
+            "items": items,
+        }
+
+    def _codeblock(self, node: object) -> Node:
+        """Build a code block from the text of a fenced or an indented block."""
+        kids = _children(node)
+        leaf = _leaf(node)
+        text = leaf if leaf is not None else (_leaf(kids[0]) if kids else "")
+        return {"t": "codeblock", "v": (text or "").rstrip("\n")}
 
     def blocks(self, nodes: list[object]) -> list[Node]:
-        out: list[Node] = []
-        for node in nodes:
-            out.extend(self.block(node))
-        return out
+        return [out for node in nodes for out in self.block(node)]
 
     def _display_math(self, node: object) -> Node | None:
         parts = [_source_text(c) for c in _children(node)]
@@ -702,22 +785,26 @@ class _Converter:
 
     def _quote(self, node: object) -> list[Node]:
         kids = _children(node)
-        marker = self._marker(kids)
-        if marker is None:
-            return [{"t": "quote", "c": self.blocks(kids)}]
-        name, rest = marker
-        if name in _VOTE_MARKERS:
-            return [self._vote(kids)]
-        if name in _SIGNATURE_MARKERS:
-            return [self._signature_callout(kids)]
+        match self._marker(kids):
+            case None:
+                return [{"t": "quote", "c": self.blocks(kids)}]
+            case (name, _) if name in _VOTE_MARKERS:
+                return [self._vote(kids)]
+            case (name, _) if name in _SIGNATURE_MARKERS:
+                return [self._signature_callout(kids)]
+            case (name, rest):
+                return [self._labelled(kids, name, rest)]
+
+    def _labelled(self, kids: list[object], name: str, rest: str) -> Node:
+        """Build a callout box. Its bold label and the rest of the marker line open the body."""
         box, label = _LABELLED[name]
         first = cast("list[object]", _children(kids[0]))
-        head: list[Node] = [{"t": "strong", "c": [_text(label)]}] if label else []
-        head.extend(_inline_text(rest, self.meta))
-        head.extend(self._inline_nodes(first[1:]))
-        return [
-            {"t": "callout", "kind": box, "c": [{"t": "par", "c": head}, *self.blocks(kids[1:])]}
+        head: list[Node] = [
+            *([{"t": "strong", "c": [_text(label)]}] if label else []),
+            *_inline_text(rest, self.meta),
+            *self._inline_nodes(first[1:]),
         ]
+        return {"t": "callout", "kind": box, "c": [{"t": "par", "c": head}, *self.blocks(kids[1:])]}
 
     def _marker(self, kids: list[object]) -> tuple[str, str] | None:
         """Read the callout marker of a quote: `(NAME, rest of the first text)`."""
@@ -741,18 +828,20 @@ class _Converter:
         The first line loses the callout marker. A line break and a paragraph
         boundary both end a line.
         """
-        lines: list[list[object]] = [[]]
-        for kid in kids:
-            if _kind(kid) != "Paragraph":
-                continue
-            if lines[-1]:
-                lines.append([])
-            for inline in _children(kid):
-                if _kind(inline) == "LineBreak":
-                    lines.append([])
-                else:
-                    lines[-1].append(inline)
-        return [line for line in lines if line]
+        return [
+            line
+            for kid in kids
+            if _kind(kid) == "Paragraph"
+            for line in _split_at_breaks(_children(kid))
+            if line
+        ]
+
+    def _vote_line(self, index: int, line: list[object]) -> list[Node]:
+        """Convert one body line of a tally box. The first line drops the callout marker."""
+        if index == 0:
+            marker_text = CALLOUT_RE.sub("", _leaf(line[0]) or "", count=1)
+            return [*_inline_text(marker_text, self.meta), *self._inline_nodes(line[1:])]
+        return self._inline_nodes(line)
 
     def _vote(self, kids: list[object]) -> Node:
         """Build a tally box. The tally line gives the counts, the rest is the body.
@@ -761,55 +850,61 @@ class _Converter:
         has no Ja/Nein/Enthaltung counts. `counts` is then false, and the template
         draws the body without the three boxes. An election also gets `election`
         (see `_election`), and the template draws its ranking. A poll gets `poll`
-        (see `_poll`), and the template draws its options the same way.
+        (see `_poll`), and the template draws its options the same way. The template
+        draws the ranking of both, so only the question stays a body line.
         """
         lines = self._callout_lines(kids)
-        texts = ["".join(_plain(n) for n in line) for line in lines]
-        if texts:
-            texts[0] = CALLOUT_RE.sub("", texts[0], count=1)
+        texts = _unmarked(["".join(_plain(n) for n in line) for line in lines])
         tally = next((t.strip() for t in texts if _is_tally_line(t)), "")
-        body: list[list[Node]] = []
-        for index, (line, text) in enumerate(zip(lines, texts, strict=True)):
-            if not text.strip() or _is_tally_line(text):
-                continue
-            if index == 0:
-                marker_text = CALLOUT_RE.sub("", _leaf(line[0]) or "", count=1)
-                nodes = [*_inline_text(marker_text, self.meta), *self._inline_nodes(line[1:])]
-            else:
-                nodes = self._inline_nodes(line)
-            body.append(_trim(nodes))
-        node: Node = {
+        body = [
+            _trim(self._vote_line(index, line))
+            for index, (line, text) in enumerate(zip(lines, texts, strict=True))
+            if text.strip() and not _is_tally_line(text)
+        ]
+        rest = [t.strip() for t in texts[1:] if t.strip()]
+        election = None if tally else _election(rest)
+        poll = None if tally or election is not None else _poll(rest)
+        ranking: Node = (
+            {"election": election}
+            if election is not None
+            else {"poll": poll}
+            if poll is not None
+            else {}
+        )
+        return {
             "t": "tally",
             "yes": _tally(tally, "yes"),
             "no": _tally(tally, "no"),
             "abstain": _tally(tally, "abstain"),
             "counts": bool(tally),
-            "lines": body,
+            "lines": body[:1] if ranking else body,
+            **ranking,
         }
-        rest = [t.strip() for t in texts[1:] if t.strip()]
-        election = None if tally else _election(rest)
-        poll = None if tally or election is not None else _poll(rest)
-        if election is not None:
-            # The template draws the ranking; only the question stays a body line.
-            node["election"] = election
-            node["lines"] = body[:1]
-        elif poll is not None:
-            node["poll"] = poll
-            node["lines"] = body[:1]
-        return node
 
     def _signature_callout(self, kids: list[object]) -> Node:
         """Build a signature block from its `Rolle: Name` lines."""
-        lines = ["".join(_plain(n) for n in line) for line in self._callout_lines(kids)]
-        if lines:
-            lines[0] = CALLOUT_RE.sub("", lines[0], count=1)
-        signers: list[list[str]] = []
-        for entry in lines:
-            line = entry.strip()
-            if line:
-                role, _, person = line.partition(":")
-                signers.append([role.strip(), person.strip()])
-        return {"t": "signatures", "signers": signers}
+        lines = _unmarked(["".join(_plain(n) for n in line) for line in self._callout_lines(kids)])
+        entries = (entry.strip() for entry in lines)
+        parts = (line.partition(":") for line in entries if line)
+        return {
+            "t": "signatures",
+            "signers": [[role.strip(), person.strip()] for role, _, person in parts],
+        }
+
+
+def _split_at_breaks(inlines: list[object]) -> list[list[object]]:
+    """Split a run of inline nodes at each line break; the breaks drop."""
+    breaks = [index for index, node in enumerate(inlines) if _kind(node) == "LineBreak"]
+    bounds = zip([-1, *breaks], [*breaks, len(inlines)], strict=True)
+    return [inlines[after + 1 : until] for after, until in bounds]
+
+
+def _unmarked(texts: list[str]) -> list[str]:
+    """Drop the callout marker from the first of the plain text lines."""
+    return [
+        CALLOUT_RE.sub("", text, count=1) if index == 0 else text
+        for index, text in enumerate(texts)
+    ]
 
 
 def _plain(node: object) -> str:
@@ -820,15 +915,22 @@ def _plain(node: object) -> str:
     return "".join(_plain(c) for c in _children(node))
 
 
+def _trim_text(node: Node, *, first: bool, last: bool) -> Node:
+    """Strip the outer whitespace of a text node at the start or the end of a run."""
+    if node.get("t") != "text" or not (first or last):
+        return node
+    value = str(node["v"])
+    left = value.lstrip() if first else value
+    return _text(left.rstrip() if last else left)
+
+
 def _trim(nodes: list[Node]) -> list[Node]:
     """Strip the leading and the trailing whitespace of an inline run."""
-    out = list(nodes)
-    if out and out[0].get("t") == "text":
-        value = str(out[0]["v"]).lstrip()
-        out[0] = _text(value) if value else {"t": "text", "v": ""}
-    if out and out[-1].get("t") == "text":
-        out[-1] = _text(str(out[-1]["v"]).rstrip())
-    return [n for n in out if not (n.get("t") == "text" and n.get("v") == "")]
+    trimmed = (
+        _trim_text(node, first=index == 0, last=index == len(nodes) - 1)
+        for index, node in enumerate(nodes)
+    )
+    return [n for n in trimmed if not (n.get("t") == "text" and n.get("v") == "")]
 
 
 def convert_body(markdown: str, meta: Meta, assets: Collection[str] = ()) -> list[Node]:

@@ -148,7 +148,7 @@ class MailSender(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class CapturingMailSender:
     """Test and dev sender: collect the mails instead of sending them (no SMTP)."""
 
@@ -164,7 +164,7 @@ class CapturingMailSender:
         )
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class SmtpMailSender:
     """Real async SMTP sending (aiosmtplib). The password is never logged.
 

@@ -64,26 +64,38 @@ def _jpeg_size(data: bytes) -> tuple[int, int] | None:
     return None
 
 
+def _vp8_size(data: bytes) -> tuple[int, int] | None:
+    if len(data) < 30 or data[23:26] != _VP8_START_CODE:
+        return None
+    return (
+        int.from_bytes(data[26:28], "little") & _FOURTEEN_BITS,
+        int.from_bytes(data[28:30], "little") & _FOURTEEN_BITS,
+    )
+
+
+def _vp8l_size(data: bytes) -> tuple[int, int] | None:
+    if len(data) < 25 or data[20] != _VP8L_SIGNATURE:
+        return None
+    bits = int.from_bytes(data[21:25], "little")
+    return (bits & _FOURTEEN_BITS) + 1, ((bits >> 14) & _FOURTEEN_BITS) + 1
+
+
+def _vp8x_size(data: bytes) -> tuple[int, int] | None:
+    if len(data) < 30:
+        return None
+    return int.from_bytes(data[24:27], "little") + 1, int.from_bytes(data[27:30], "little") + 1
+
+
 def _webp_size(data: bytes) -> tuple[int, int] | None:
-    chunk = data[12:16]
-    if chunk == b"VP8 ":
-        if len(data) < 30 or data[23:26] != _VP8_START_CODE:
+    match data[12:16]:
+        case b"VP8 ":
+            return _vp8_size(data)
+        case b"VP8L":
+            return _vp8l_size(data)
+        case b"VP8X":
+            return _vp8x_size(data)
+        case _:
             return None
-        width = int.from_bytes(data[26:28], "little") & _FOURTEEN_BITS
-        height = int.from_bytes(data[28:30], "little") & _FOURTEEN_BITS
-        return width, height
-    if chunk == b"VP8L":
-        if len(data) < 25 or data[20] != _VP8L_SIGNATURE:
-            return None
-        bits = int.from_bytes(data[21:25], "little")
-        return (bits & _FOURTEEN_BITS) + 1, ((bits >> 14) & _FOURTEEN_BITS) + 1
-    if chunk == b"VP8X":
-        if len(data) < 30:
-            return None
-        width = int.from_bytes(data[24:27], "little") + 1
-        height = int.from_bytes(data[27:30], "little") + 1
-        return width, height
-    return None
 
 
 def raster_dimensions(data: bytes) -> tuple[int, int] | None:

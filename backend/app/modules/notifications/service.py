@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
@@ -50,6 +51,9 @@ from app.modules.notifications.schemas import (
 from app.modules.notifications.templating import RenderedMail, TemplateRenderError, render_mail
 from app.settings import Settings, get_settings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+
+if TYPE_CHECKING:
+    from app.modules.notifications.templates_catalogue import MailTemplateSpec
 
 logger = logging.getLogger("app.notifications")
 
@@ -178,25 +182,14 @@ class NotificationService:
             t.key: t
             for t in (await self.session.scalars(select(MailTemplate))).all()
         }
-        out: list[MailTemplateOut] = []
-        for spec in TEMPLATE_CATALOGUE:
-            row = rows.get(spec.key)
-            if row is not None:
-                out.append(_template_out(row, source="override"))
-            else:
-                out.append(
-                    MailTemplateOut(
-                        id=None,
-                        key=spec.key,
-                        subject_i18n=spec.subject_i18n,
-                        body_i18n=spec.body_i18n,
-                        body_html_i18n={},
-                        placeholders=spec.placeholders,
-                        source="builtin",
-                    )
-                )
+        listed = [
+            _template_out(rows[spec.key], source="override")
+            if spec.key in rows
+            else _builtin_out(spec)
+            for spec in TEMPLATE_CATALOGUE
+        ]
         return [
-            *out,
+            *listed,
             *(
                 _template_out(rows[key], source="override")
                 for key in sorted(rows)
@@ -224,20 +217,23 @@ class NotificationService:
                 errors=[{"field": "key", "msg": f"unknown: {payload.key}"}],
             )
         inserting = existing is None
-        if existing is None:
-            spec = CATALOGUE_BY_KEY[payload.key]
-            existing = MailTemplate(
+        row = (
+            MailTemplate(
                 key=payload.key,
                 subject_i18n=payload.subject_i18n,
                 body_i18n=payload.body_i18n,
                 body_html_i18n=payload.body_html_i18n,
-                placeholders=spec.placeholders,
+                placeholders=CATALOGUE_BY_KEY[payload.key].placeholders,
             )
-            self.session.add(existing)
+            if existing is None
+            else existing
+        )
+        if inserting:
+            self.session.add(row)
         else:
-            existing.subject_i18n = payload.subject_i18n
-            existing.body_i18n = payload.body_i18n
-            existing.body_html_i18n = payload.body_html_i18n
+            row.subject_i18n = payload.subject_i18n
+            row.body_i18n = payload.body_i18n
+            row.body_html_i18n = payload.body_html_i18n
         try:
             await self.session.commit()
         except IntegrityError as exc:
@@ -248,7 +244,7 @@ class NotificationService:
                     code="mail_template_exists",
                 ) from exc
             raise
-        return _template_out(existing, source="override")
+        return _template_out(row, source="override")
 
     async def reset_template(self, key: str) -> MailTemplateOut:
         """Delete the override and restore the builtin default."""
@@ -261,15 +257,7 @@ class NotificationService:
         if existing is not None:
             await self.session.delete(existing)
             await self.session.commit()
-        return MailTemplateOut(
-            id=None,
-            key=spec.key,
-            subject_i18n=spec.subject_i18n,
-            body_i18n=spec.body_i18n,
-            body_html_i18n={},
-            placeholders=spec.placeholders,
-            source="builtin",
-        )
+        return _builtin_out(spec)
 
     async def update_template(
         self, template_id: uuid.UUID, payload: MailTemplateUpdate
@@ -349,12 +337,13 @@ class NotificationService:
         row is missing.
         """
         row = await self.session.get(NotificationSettings, 1)
-        if row is None:
-            row = NotificationSettings(id=1)
-            self.session.add(row)
-            await self.session.commit()
-            await self.session.refresh(row)
-        return row
+        if row is not None:
+            return row
+        created = NotificationSettings(id=1)
+        self.session.add(created)
+        await self.session.commit()
+        await self.session.refresh(created)
+        return created
 
     async def update_notification_settings(
         self,
@@ -398,16 +387,18 @@ class NotificationService:
         kind without a stored row has its default (`kinds.kind_default`).
         """
         principal_id = await self._principal_id(principal_sub)
-        stored: dict[str, bool] = {}
-        if principal_id is not None:
-            rows = (
+        rows = (
+            (
                 await self.session.execute(
                     select(
                         NotificationPreference.kind, NotificationPreference.enabled
                     ).where(NotificationPreference.principal_id == principal_id)
                 )
             ).all()
-            stored = dict(rows)
+            if principal_id is not None
+            else []
+        )
+        stored: dict[str, bool] = dict(rows)
         return [(k, stored.get(k, kind_default(k))) for k in NOTIFICATION_KINDS]
 
     async def set_preferences(
@@ -431,17 +422,19 @@ class NotificationService:
             row = await self.session.get(
                 NotificationPreference, (principal_id, kind)
             )
-            if enabled == kind_default(kind):
-                if row is not None:
-                    await self.session.delete(row)
-            elif row is None:
-                self.session.add(
-                    NotificationPreference(
-                        principal_id=principal_id, kind=kind, enabled=enabled
+            match enabled == kind_default(kind), row:
+                case True, None:
+                    pass
+                case True, NotificationPreference() as stale:
+                    await self.session.delete(stale)
+                case False, None:
+                    self.session.add(
+                        NotificationPreference(
+                            principal_id=principal_id, kind=kind, enabled=enabled
+                        )
                     )
-                )
-            else:
-                row.enabled = enabled
+                case False, NotificationPreference() as stored:
+                    stored.enabled = enabled
         await self.session.commit()
         return await self.get_preferences(principal_sub)
 
@@ -480,18 +473,16 @@ class NotificationService:
         The context defaults ``link`` to an empty string, so a template that uses ``{{
         link }}`` stays safe under StrictUndefined.
         """
-        recipients = await filter_recipients_by_preference(
-            self.session, recipients, kind
-        )
-        if not recipients:
+        wanted = await filter_recipients_by_preference(self.session, recipients, kind)
+        if not wanted:
             return False
-        context = {"link": link.url if link is not None else "", **context}
+        full_context = {"link": link.url if link is not None else "", **context}
         tpl = await self._get_template_by_key(template_key)
         if tpl is not None:
             return await self._render_and_enqueue(
                 tpl,
-                recipients,
-                context=context,
+                wanted,
+                context=full_context,
                 lang=lang,
                 idempotency_parts=idempotency_parts,
                 reason=kind,
@@ -502,7 +493,7 @@ class NotificationService:
                 subject_i18n=builtin_subject,
                 body_i18n=builtin_body,
                 body_html_i18n=builtin_html,
-                context=context,
+                context=full_context,
                 lang=lang or self.settings.mail_default_lang,
                 default_lang=self.settings.mail_default_lang,
             )
@@ -510,7 +501,7 @@ class NotificationService:
             logger.warning("builtin template %r render failed: %s", template_key, exc)
             return False
         return await self._enqueue(
-            self._message(rendered, recipients, kind, idempotency_parts, link)
+            self._message(rendered, wanted, kind, idempotency_parts, link)
         )
 
     async def handle_notify_action(
@@ -544,56 +535,28 @@ class NotificationService:
         get distinct keys.
         """
         specs = _as_specs(action.get("recipients", []))
-        context = dict(context or {})
-        context.setdefault("applicationTitle", "")
-        context.setdefault("status", "")
+        full_context = {"applicationTitle": "", "status": "", **(context or {})}
         template_key = action.get("templateKey") or action.get("template_key")
-        applicant_specs = [s for s in specs if s.get("kind") == "applicant"]
-        team_specs = [s for s in specs if s.get("kind") != "applicant"]
-        if template_key and not (applicant_specs and team_specs):
-            return await self._notify_send(
-                template_key=str(template_key),
-                specs=specs,
+        sends = _notify_sends(
+            str(template_key) if template_key else None,
+            specs,
+            applicant_link=applicant_link,
+            team_link=team_link,
+        )
+        counts = [
+            await self._notify_send(
+                template_key=send.template_key,
+                specs=send.specs,
                 application_id=application_id,
-                context=context,
+                context=full_context,
                 lang=lang,
                 idempotency_base=idempotency_base,
-                link=applicant_link if applicant_specs else team_link,
+                link=send.link,
+                audience=send.audience,
             )
-        if template_key:
-            count = 0
-            for audience, partition, link in (
-                ("applicant", applicant_specs, applicant_link),
-                ("team", team_specs, team_link),
-            ):
-                count += await self._notify_send(
-                    template_key=str(template_key),
-                    specs=partition,
-                    application_id=application_id,
-                    context=context,
-                    lang=lang,
-                    idempotency_base=idempotency_base,
-                    link=link,
-                    audience=audience,
-                )
-            return count
-        count = 0
-        for partition_key, partition, link in (
-            (DEFAULT_NOTIFY_TEMPLATE_KEY, applicant_specs, applicant_link),
-            (TEAM_NOTIFY_TEMPLATE_KEY, team_specs, team_link),
-        ):
-            if not partition:
-                continue
-            count += await self._notify_send(
-                template_key=partition_key,
-                specs=partition,
-                application_id=application_id,
-                context=context,
-                lang=lang,
-                idempotency_base=idempotency_base,
-                link=link,
-            )
-        return count
+            for send in sends
+        ]
+        return sum(counts)
 
     async def _notify_send(
         self,
@@ -621,25 +584,24 @@ class NotificationService:
 
         spec = CATALOGUE_BY_KEY.get(template_key)
         reason = spec.kind if spec is not None else DEFAULT_NOTIFY_TEMPLATE_KEY
-        recipients = await self.resolver.resolve(specs, application_id=application_id)
+        resolved = await self.resolver.resolve(specs, application_id=application_id)
         recipients = await filter_recipients_by_preference(
-            self.session, recipients, _filter_kind(reason, specs)
+            self.session, resolved, _filter_kind(reason, specs)
         )
         if not recipients:
             logger.info("notify action resolved no recipients — skipped")
             return 0
-        idem = _idem_parts(
-            idempotency_base, "notify", str(application_id or ""), template_key
+        idem = (
+            *_idem_parts(idempotency_base, "notify", str(application_id or ""), template_key),
+            *((audience,) if audience is not None else ()),
         )
-        if audience is not None:
-            idem = (*idem, audience)
-        context = {"link": link.url if link is not None else "", **context}
+        full_context = {"link": link.url if link is not None else "", **context}
         tpl = await self._get_template_by_key(template_key)
         if tpl is not None:
             ok = await self._render_and_enqueue(
                 tpl,
                 recipients,
-                context=context,
+                context=full_context,
                 lang=lang,
                 idempotency_parts=idem,
                 reason=reason,
@@ -649,7 +611,7 @@ class NotificationService:
         rendered = render_mail(
             subject_i18n=spec.subject_i18n if spec else _BUILTIN_NOTIFY_SUBJECT,
             body_i18n=spec.body_i18n if spec else _BUILTIN_NOTIFY_BODY,
-            context=context,
+            context=full_context,
             lang=lang or self.settings.mail_default_lang,
             default_lang=self.settings.mail_default_lang,
         )
@@ -668,16 +630,17 @@ class NotificationService:
         default, as every other mail does.
         """
         tpl = await self._get_template_by_key(MAGIC_LINK_TEMPLATE_KEY)
-        if tpl is not None:
-            rendered = self._render(tpl, context={"link": link}, lang=lang)
-        else:
-            rendered = render_mail(
+        rendered = (
+            self._render(tpl, context={"link": link}, lang=lang)
+            if tpl is not None
+            else render_mail(
                 subject_i18n=_BUILTIN_MAGIC_LINK_SUBJECT,
                 body_i18n=_BUILTIN_MAGIC_LINK_BODY,
                 context={"link": link},
                 lang=lang or self.settings.mail_default_lang,
                 default_lang=self.settings.mail_default_lang,
             )
+        )
         msg = MailMessage(
             to=(email,),
             subject=rendered.subject,
@@ -742,9 +705,11 @@ class NotificationService:
         The HTML comes from the text before the link line, so the HTML shows the link
         as a button only.
         """
-        text = rendered.text
-        if link is not None:
-            text = append_link_text(text, link.url, link.label(rendered.lang))
+        text = (
+            append_link_text(rendered.text, link.url, link.label(rendered.lang))
+            if link is not None
+            else rendered.text
+        )
         return MailMessage(
             to=tuple(recipients),
             subject=rendered.subject,
@@ -861,6 +826,50 @@ def _filter_kind(reason: str, specs: list[dict[str, Any]]) -> str:
     return reason
 
 
+@dataclass(frozen=True, slots=True)
+class _NotifySend:
+    """One send of a ``notify`` action: a template, its specs, its link and its audience."""
+
+    template_key: str
+    specs: list[dict[str, Any]]
+    link: MailLink | None
+    audience: str | None = None
+
+
+def _notify_sends(
+    template_key: str | None,
+    specs: list[dict[str, Any]],
+    *,
+    applicant_link: MailLink | None,
+    team_link: MailLink | None,
+) -> tuple[_NotifySend, ...]:
+    """Split a ``notify`` action into its sends.
+
+    An explicit template to one audience is one send. An explicit template to applicants
+    and team is two sends, each with its own link and the audience in its idempotency
+    parts. Without a template, applicants get the applicant default and every other
+    recipient the team default, and an empty partition sends nothing.
+    """
+    applicant_specs = [s for s in specs if s.get("kind") == "applicant"]
+    team_specs = [s for s in specs if s.get("kind") != "applicant"]
+    match template_key, bool(applicant_specs and team_specs):
+        case str() as key, False:
+            return (
+                _NotifySend(key, specs, applicant_link if applicant_specs else team_link),
+            )
+        case str() as key, True:
+            return (
+                _NotifySend(key, applicant_specs, applicant_link, "applicant"),
+                _NotifySend(key, team_specs, team_link, "team"),
+            )
+        case None, _:
+            defaults = (
+                _NotifySend(DEFAULT_NOTIFY_TEMPLATE_KEY, applicant_specs, applicant_link),
+                _NotifySend(TEAM_NOTIFY_TEMPLATE_KEY, team_specs, team_link),
+            )
+            return tuple(send for send in defaults if send.specs)
+
+
 def _idem_parts(base: str | None, *parts: str) -> tuple[str, ...]:
     """Build the idempotency parts with an optional base (for example a flow-action key)."""
     return (base, *parts) if base else parts
@@ -869,6 +878,19 @@ def _idem_parts(base: str | None, *parts: str) -> tuple[str, ...]:
 def _as_specs(raw: list[Any]) -> list[dict[str, Any]]:
     """Keep only the dict entries of the raw recipient data (JSONB list)."""
     return [r for r in raw if isinstance(r, dict)]
+
+
+def _builtin_out(spec: MailTemplateSpec) -> MailTemplateOut:
+    """Return the editor view of a catalogue builtin without an override."""
+    return MailTemplateOut(
+        id=None,
+        key=spec.key,
+        subject_i18n=spec.subject_i18n,
+        body_i18n=spec.body_i18n,
+        body_html_i18n={},
+        placeholders=spec.placeholders,
+        source="builtin",
+    )
 
 
 def _template_out(tpl: MailTemplate, *, source: str = "override") -> MailTemplateOut:

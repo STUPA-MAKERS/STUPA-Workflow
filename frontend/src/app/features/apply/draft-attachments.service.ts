@@ -12,28 +12,28 @@ import { AltchaService } from './altcha.service';
 /** One draft file of the wizard: the server row, plus a mark when the server lost it. */
 export interface DraftFile extends DraftAttachment {
   /** The submit named it as missing, expired or infected (422); upload it again. */
-  failed?: boolean;
+  readonly failed?: boolean;
 }
 
 /** A file on its way to the server. */
 export interface PendingUpload {
-  key: number;
-  filename: string;
-  size: number;
-  fieldKey: string | null;
+  readonly key: number;
+  readonly filename: string;
+  readonly size: number;
+  readonly fieldKey: string | null;
 }
 
 /** A file the wizard could not upload, with the reason as a translation key. */
 export interface UploadFailure {
-  filename: string;
-  reason: TranslationKey;
+  readonly filename: string;
+  readonly reason: TranslationKey;
 }
 
 /** What the draft keeps in `sessionStorage`. */
 interface StoredDraft {
-  token: string;
-  expiresAt: string | null;
-  files: DraftFile[];
+  readonly token: string;
+  readonly expiresAt: string | null;
+  readonly files: readonly DraftFile[];
 }
 
 /** The key in `sessionStorage`. The token never goes into `localStorage`, a URL or a log. */
@@ -112,9 +112,9 @@ export class DraftAttachmentsService {
   private queue: Promise<unknown> = Promise.resolve();
 
   /** The uploaded files, oldest first. */
-  readonly files = signal<DraftFile[]>([]);
+  readonly files = signal<readonly DraftFile[]>([]);
   /** The files on their way to the server. */
-  readonly pending = signal<PendingUpload[]>([]);
+  readonly pending = signal<readonly PendingUpload[]>([]);
   /** True while an upload runs. */
   readonly busy = computed(() => this.pending().length > 0);
   /** The limits of the server (or the backend defaults until the config loads). */
@@ -137,12 +137,12 @@ export class DraftAttachmentsService {
   }
 
   /** The ids to bind on the submit: every file the server still holds. */
-  attachmentIds(): Uuid[] {
+  attachmentIds(): readonly Uuid[] {
     return this.usable().map((f) => f.id);
   }
 
   /** The files of one field (`null` = the general block). */
-  filesOf(fieldKey: string | null): DraftFile[] {
+  filesOf(fieldKey: string | null): readonly DraftFile[] {
     return this.files().filter((f) => f.fieldKey === fieldKey);
   }
 
@@ -248,28 +248,38 @@ export class DraftAttachmentsService {
    * draft, so every file gets it. Returns the ids that are now failed (empty for any
    * other problem).
    */
-  markFailed(problem: ProblemDetail | null | undefined): Uuid[] {
+  markFailed(problem: ProblemDetail | null | undefined): readonly Uuid[] {
     if (!problem) return [];
-    let ids: Uuid[] = [];
+    const ids = this.failedIds(problem);
     if (problem.code === TOKEN_INVALID) {
-      ids = this.usable().map((f) => f.id);
       this._token.set(null);
       this.expiresAt = null;
-    } else if (problem.code === MISSING) {
-      const named = new Set(
-        (problem.errors ?? [])
-          .map((e) => /^attachmentIds\.(.+)$/.exec(e.field)?.[1])
-          .filter((id): id is string => !!id),
-      );
-      ids = this.usable()
-        .filter((f) => named.has(f.id))
-        .map((f) => f.id);
     }
     if (!ids.length) return [];
     const lost = new Set(ids);
     this.files.update((list) => list.map((f) => (lost.has(f.id) ? { ...f, failed: true } : f)));
     this.store();
     return ids;
+  }
+
+  /** The usable files that a 422 of the submit names as lost: every one for a dead token. */
+  private failedIds(problem: ProblemDetail): readonly Uuid[] {
+    switch (problem.code) {
+      case TOKEN_INVALID:
+        return this.usable().map((f) => f.id);
+      case MISSING: {
+        const named = new Set(
+          (problem.errors ?? [])
+            .map((e) => /^attachmentIds\.(.+)$/.exec(e.field)?.[1])
+            .filter((id): id is string => !!id),
+        );
+        return this.usable()
+          .filter((f) => named.has(f.id))
+          .map((f) => f.id);
+      }
+      default:
+        return [];
+    }
   }
 
   /**
@@ -291,7 +301,7 @@ export class DraftAttachmentsService {
   async discard(): Promise<void> {
     const token = this._token();
     const ids = this.attachmentIds();
-    this.generation++;
+    this.generation = this.generation + 1;
     this.pending.set([]);
     this.forget();
     await this.deleteQuietly(ids, token);
@@ -303,7 +313,7 @@ export class DraftAttachmentsService {
   }
 
   /** Delete drafts on the server; a failed delete is ignored (the draft expires). */
-  private async deleteQuietly(ids: Uuid[], token = this._token()): Promise<void> {
+  private async deleteQuietly(ids: readonly Uuid[], token = this._token()): Promise<void> {
     if (!token || !ids.length) return;
     await Promise.all(
       ids.map((id) =>
@@ -391,14 +401,18 @@ export class DraftAttachmentsService {
     }
   }
 
+  /** The stored draft text, or null when there is none or the storage throws. */
+  private readStored(): string | null {
+    try {
+      return sessionStorage.getItem(this.storageKey);
+    } catch {
+      return null;
+    }
+  }
+
   private restore(): void {
     if (!this.persist) return;
-    let raw: string | null = null;
-    try {
-      raw = sessionStorage.getItem(this.storageKey);
-    } catch {
-      return;
-    }
+    const raw = this.readStored();
     if (!raw) return;
     try {
       const draft = JSON.parse(raw) as Partial<StoredDraft>;
@@ -416,6 +430,7 @@ export class DraftAttachmentsService {
   }
 }
 
+/** One file of a stored draft has the fields the list needs. */
 function isDraftFile(value: unknown): value is DraftFile {
   const f = value as Partial<DraftFile> | null;
   return !!f && typeof f.id === 'string' && typeof f.filename === 'string' && typeof f.size === 'number';

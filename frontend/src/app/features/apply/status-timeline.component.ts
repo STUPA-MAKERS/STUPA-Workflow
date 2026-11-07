@@ -37,6 +37,7 @@ import type {
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
 import { toFormlySections } from '@shared/forms/formly-mapper';
 import { resolveI18n } from '@shared/forms/i18n-text';
+import { withoutKey } from '@shared/util/immutable';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
 import { actorLabel } from '@shared/actor-label.util';
 import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
@@ -274,11 +275,8 @@ export class StatusTimelineComponent {
   /** The labels of the form fields, for the changed fields of a version. */
   private readonly labels = computed(() => {
     const lang = this.i18n.uiLocale();
-    const map = new Map<string, string>();
-    for (const s of this.effForm()?.sections ?? []) {
-      for (const f of s.fields) map.set(f.key, resolveI18n(f.label, lang));
-    }
-    return map;
+    const fields = (this.effForm()?.sections ?? []).flatMap((s) => s.fields);
+    return new Map(fields.map((f) => [f.key, resolveI18n(f.label, lang)] as const));
   });
 
   /**
@@ -287,28 +285,29 @@ export class StatusTimelineComponent {
    * its number and the names of the changed fields. The applicant's own entries
    * read "Du"; the server names the Gremium for the others.
    */
-  readonly historyEntries = computed<HistoryEntry[]>(() => {
+  readonly historyEntries = computed<readonly HistoryEntry[]>(() => {
     const t = (key: TranslationKey, params?: Record<string, string | number>) =>
       this.i18n.translate(key, params);
     const actor = (info: ActorInfo | null | undefined, legacy: string | null): string | null =>
       actorLabel(info, legacy, t, { applicantKey: 'status.history.you' });
     const events = [...this.timeline()].sort((a, b) => a.at.localeCompare(b.at));
-    const entries: HistoryEntry[] = events.map((e, i) => {
-      const lines: string[] = [];
-      if (e.transitionLabel) {
-        lines.push(t('applications.history.transition', { label: e.transitionLabel }));
-      }
-      if (e.note) lines.push(this.noteText(e.note));
-      if (e.decision) {
-        const line = decisionHistoryLine(
-          e.decision,
-          this.i18n.formatLocale(),
-          this.application()?.currency ?? 'EUR',
-          t,
-        );
-        if (line) lines.push(line);
-      }
-      if (e.voteDeleted) lines.push(t('applications.history.voteDeleted'));
+    const statusEntries: readonly HistoryEntry[] = events.map((e, i) => {
+      const decision = e.decision
+        ? decisionHistoryLine(
+            e.decision,
+            this.i18n.formatLocale(),
+            this.application()?.currency ?? 'EUR',
+            t,
+          )
+        : null;
+      const lines = [
+        ...(e.transitionLabel
+          ? [t('applications.history.transition', { label: e.transitionLabel })]
+          : []),
+        ...(e.note ? [this.noteText(e.note)] : []),
+        ...(decision ? [decision] : []),
+        ...(e.voteDeleted ? [t('applications.history.voteDeleted')] : []),
+      ];
       return {
         at: e.at,
         icon: i === 0 ? 'send' : 'flow',
@@ -318,20 +317,21 @@ export class StatusTimelineComponent {
         body: lines.join('\n') || null,
       };
     });
-    for (const v of this.versions()) {
-      if (v.version === 1 && events.length) continue;
-      const changed = (v.changedKeys ?? []).map((k) => this.labels().get(k) ?? k);
-      entries.push({
-        at: v.at,
-        icon: 'edit',
-        title: t('status.history.version', { version: v.version }),
-        actor: actor(v.changedByInfo, v.changedBy),
-        body: changed.length
-          ? t('status.history.changed', { fields: changed.join(', ') })
-          : null,
+    const versionEntries = this.versions()
+      .filter((v) => !(v.version === 1 && events.length))
+      .map((v): HistoryEntry => {
+        const changed = (v.changedKeys ?? []).map((k) => this.labels().get(k) ?? k);
+        return {
+          at: v.at,
+          icon: 'edit',
+          title: t('status.history.version', { version: v.version }),
+          actor: actor(v.changedByInfo, v.changedBy),
+          body: changed.length
+            ? t('status.history.changed', { fields: changed.join(', ') })
+            : null,
+        };
       });
-    }
-    return entries;
+    return [...statusEntries, ...versionEntries];
   });
 
   /**
@@ -629,9 +629,7 @@ export class StatusTimelineComponent {
 
   /** The applicant writes public comments only; the files go along. */
   sendComment(req: ChatSend): void {
-    const comment: ChatSend = { ...req };
-    delete comment.visibility;
-    this.outbox.send(comment);
+    this.outbox.send(withoutKey(req, 'visibility'));
   }
 
   retryComment(ref: ChatRef): void {

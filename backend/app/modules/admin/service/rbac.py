@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import ColumnElement, delete, or_, select
 
 from app.modules.admin.principal_revoke import (
     has_groups_filter,
@@ -80,6 +80,16 @@ def _mapping_out(row: GroupMapping) -> GroupMappingOut:
     )
 
 
+def _search_clause(query: str) -> ColumnElement[bool]:
+    """Match ``query`` as a case-insensitive substring of the sub, the e-mail or the name."""
+    like = f"%{escape_like(query)}%"
+    return or_(
+        Principal.sub.ilike(like, escape="\\"),
+        Principal.email.ilike(like, escape="\\"),
+        Principal.display_name.ilike(like, escape="\\"),
+    )
+
+
 class RbacOps(ConfigServiceBase):
     """Roles, role assignments, principals and OIDC group mappings."""
 
@@ -87,15 +97,12 @@ class RbacOps(ConfigServiceBase):
         """List the global roles with their permissions."""
         roles = (await self.session.scalars(select(Role).order_by(Role.key))).all()
         perms = (await self.session.scalars(select(RolePermission))).all()
-        by_role: dict[UUID, list[str]] = {}
-        for p in perms:
-            by_role.setdefault(p.role_id, []).append(p.permission)
         return [
             RoleOut(
                 id=r.id,
                 key=r.key,
                 label=r.name_i18n,
-                permissions=sorted(by_role.get(r.id, [])),
+                permissions=sorted(p.permission for p in perms if p.role_id == r.id),
             )
             for r in roles
         ]
@@ -212,41 +219,40 @@ class RbacOps(ConfigServiceBase):
         The search escapes the LIKE metacharacters, because otherwise ``%`` and ``_``
         act as wildcards and allow wildcard injection or an index bypass.
         """
-        stmt = select(Principal)
-        for clause in (
-            last_login_filter(last_login_before, include_never),
-            has_groups_filter(has_groups),
-        ):
-            if clause is not None:
-                stmt = stmt.where(clause)
-        if query:
-            like = f"%{escape_like(query)}%"
-            stmt = stmt.where(
-                or_(
-                    Principal.sub.ilike(like, escape="\\"),
-                    Principal.email.ilike(like, escape="\\"),
-                    Principal.display_name.ilike(like, escape="\\"),
-                )
+        filters = tuple(
+            clause
+            for clause in (
+                last_login_filter(last_login_before, include_never),
+                has_groups_filter(has_groups),
             )
-        stmt = stmt.order_by(Principal.display_name, Principal.sub).limit(limit)
+            if clause is not None
+        )
+        search = (_search_clause(query),) if query else ()
+        stmt = (
+            select(Principal)
+            .where(*filters, *search)
+            .order_by(Principal.display_name, Principal.sub)
+            .limit(limit)
+        )
         rows = (await self.session.scalars(stmt)).all()
         ids = [r.id for r in rows]
-        by_principal: dict[UUID, list[RoleAssignmentRow]] = {}
-        if ids:
-            assignments = (
+        assignments = (
+            (
                 await self.session.scalars(
-                    select(RoleAssignmentRow).where(
-                        RoleAssignmentRow.principal_id.in_(ids)
-                    )
+                    select(RoleAssignmentRow).where(RoleAssignmentRow.principal_id.in_(ids))
                 )
             ).all()
-            for a in assignments:
-                by_principal.setdefault(a.principal_id, []).append(a)
+            if ids
+            else []
+        )
         access = await principals_with_access(self.session, ids)
         merged_names = await self._merged_names(rows)
         return [
             _principal_out(
-                r, by_principal.get(r.id, []), merged_names, has_access=r.id in access
+                r,
+                [a for a in assignments if a.principal_id == r.id],
+                merged_names,
+                has_access=r.id in access,
             )
             for r in rows
         ]

@@ -21,11 +21,11 @@ import { MeetingGuestsService, guestName } from '../meeting-guests.service';
 import { clock } from '@shared/date-format';
 
 interface GuestRow {
-  g: MeetingGuest;
-  name: string;
-  sub: string;
-  status: { kind: StatusKind; key: TranslationKey };
-  menu: RowMenuSection[];
+  readonly g: MeetingGuest;
+  readonly name: string;
+  readonly sub: string;
+  readonly status: { readonly kind: StatusKind; readonly key: TranslationKey };
+  readonly menu: readonly RowMenuSection[];
 }
 
 /**
@@ -80,8 +80,8 @@ export class GuestListComponent {
     const t = (k: TranslationKey, p?: Record<string, string | number>) => this.i18n.translate(k, p);
     const name = guestName(g, t);
     const time = clock(g.admittedAt ?? g.decidedAt, this.i18n.formatLocale());
-    const sub = [t('guests.list.admittedAt', { time })];
-    if (g.decidedByName && g.status === 'admitted') sub.push(g.decidedByName);
+    const decider = g.decidedByName && g.status === 'admitted' ? [g.decidedByName] : [];
+    const sub = [t('guests.list.admittedAt', { time }), ...decider];
     const closed = this.meeting().status === 'closed';
     const menu: RowMenuSection[] =
       g.status === 'admitted' && !closed
