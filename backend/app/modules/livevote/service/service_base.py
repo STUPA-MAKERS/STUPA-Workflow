@@ -35,6 +35,27 @@ AgendaSummary = tuple[int, CurrentAgendaItemOut | None]
 #: Per meeting: the admitted and the pending guests.
 GuestCounts = tuple[int, int]
 
+#: The current agenda item of a meeting: its position, application and own title.
+_Hit = tuple[int, UUID | None, str | None]
+
+
+def _current_item(
+    hit: _Hit | None, app_titles: dict[UUID, str | None]
+) -> CurrentAgendaItemOut | None:
+    """Describe the current agenda item; an item without an own title takes the application's."""
+    match hit:
+        case None:
+            return None
+        case (position, application_id, title):
+            return CurrentAgendaItemOut(
+                position=position,
+                title=(
+                    app_titles.get(application_id)
+                    if application_id is not None and not title
+                    else title
+                ),
+            )
+
 
 class MeetingServiceBase:
     """Meeting operations bound to one `AsyncSession` and an optional publisher."""
@@ -148,11 +169,14 @@ class MeetingServiceBase:
                 .group_by(MeetingGuest.meeting_id, MeetingGuest.status)
             )
         ).all()
-        out: dict[UUID, GuestCounts] = {}
-        for meeting_id, status, n in rows:
-            admitted, pending = out.get(meeting_id, (0, 0))
-            out[meeting_id] = (n, pending) if status == "admitted" else (admitted, n)
-        return out
+        by_status = {(meeting_id, status): n for meeting_id, status, n in rows}
+        return {
+            meeting_id: (
+                by_status.get((meeting_id, "admitted"), 0),
+                by_status.get((meeting_id, "pending"), 0),
+            )
+            for meeting_id in dict.fromkeys(meeting_id for meeting_id, _, _ in rows)
+        }
 
     async def _agenda_summaries(self, meetings: Sequence[Meeting]) -> dict[UUID, AgendaSummary]:
         """Count the agenda items of each meeting and describe its current item.
@@ -177,34 +201,37 @@ class MeetingServiceBase:
             )
         ).all()
         current = {m.id: m.current_agenda_item_id for m in meetings}
-        counts: dict[UUID, int] = {}
-        hits: dict[UUID, tuple[int, UUID | None, str | None]] = {}
-        for meeting_id, item_id, application_id, title in rows:
-            counts[meeting_id] = counts.get(meeting_id, 0) + 1
-            if item_id == current.get(meeting_id):
-                hits[meeting_id] = (counts[meeting_id], application_id, title)
-        app_ids = {app_id for _, app_id, _ in hits.values() if app_id is not None}
-        app_titles: dict[UUID, str | None] = {}
-        if app_ids:
-            app_titles = {
-                app_id: title_of(data)
-                for app_id, data in (
-                    await self.session.execute(
-                        select(Application.id, Application.data).where(Application.id.in_(app_ids))
-                    )
-                ).all()
-            }
-        out: dict[UUID, AgendaSummary] = {}
-        for meeting in meetings:
-            hit = hits.get(meeting.id)
-            item: CurrentAgendaItemOut | None = None
-            if hit is not None:
-                position, application_id, title = hit
-                if application_id is not None and not title:
-                    title = app_titles.get(application_id)
-                item = CurrentAgendaItemOut(position=position, title=title)
-            out[meeting.id] = (counts.get(meeting.id, 0), item)
-        return out
+        by_meeting = {
+            meeting_id: [row for row in rows if row[0] == meeting_id]
+            for meeting_id in dict.fromkeys(row[0] for row in rows)
+        }
+        hits: dict[UUID, _Hit] = {
+            meeting_id: (position, application_id, title)
+            for meeting_id, items in by_meeting.items()
+            for position, (_, item_id, application_id, title) in enumerate(items, start=1)
+            if item_id == current.get(meeting_id)
+        }
+        app_titles = await self._application_titles(
+            {app_id for _, app_id, _ in hits.values() if app_id is not None}
+        )
+        return {
+            meeting.id: (
+                len(by_meeting.get(meeting.id, ())),
+                _current_item(hits.get(meeting.id), app_titles),
+            )
+            for meeting in meetings
+        }
+
+    async def _application_titles(self, app_ids: set[UUID]) -> dict[UUID, str | None]:
+        """Return the title of each application, or nothing for no application."""
+        if not app_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(Application.id, Application.data).where(Application.id.in_(app_ids))
+            )
+        ).all()
+        return {app_id: title_of(data) for app_id, data in rows}
 
     async def _principal_id(self, sub: str) -> UUID | None:
         """Return the `principal.id` for an OIDC `sub`, used for the protokollant check."""
@@ -240,9 +267,12 @@ class MeetingServiceBase:
         Raises:
             NotFoundError: No meeting has this id.
         """
-        stmt = select(Meeting).where(Meeting.id == meeting_id)
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        query = select(Meeting).where(Meeting.id == meeting_id)
+        stmt = (
+            query.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else query
+        )
         meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")

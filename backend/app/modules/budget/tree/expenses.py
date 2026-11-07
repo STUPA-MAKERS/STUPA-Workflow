@@ -6,23 +6,57 @@ import uuid
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy import Text as _Text
+from sqlalchemy import func, select
 
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _title_of
 from app.modules.audit.actions import AuditAction
-from app.modules.budget.tree.service_base import BudgetTreeServiceBase, _json_safe
+from app.modules.budget.tree.service_base import (
+    BudgetTreeServiceBase,
+    _applied,
+    _json_safe,
+    _subtree_ids,
+)
 from app.modules.budget.tree_models import (
     Budget,
     BudgetExpense,
     Invoice,
 )
-from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import ExpenseCreate, ExpenseOut, ExpenseUpdate
 from app.shared.errors import NotFoundError, ValidationProblem
 from app.shared.paging import Page
 from app.shared.search import dialect_of, trigram_rank
+
+
+def _expense_changes(payload: ExpenseUpdate, target: Budget | None) -> dict[str, object]:
+    """Map the fields that an expense patch sets to the column values it writes.
+
+    The amount and the description ignore an explicit null, because both columns are
+    required. A move to `target` also takes over its currency. Every other set field is
+    written as it is, so an explicit null clears it.
+    """
+    fields = payload.model_fields_set
+    optional = (
+        "invoice_date",
+        "payment_date",
+        "correspondent",
+        "note",
+        "reference_number",
+        "payment_method",
+        "category",
+        "invoice_id",
+    )
+    return {
+        **({"amount": payload.amount} if "amount" in fields and payload.amount is not None else {}),
+        **(
+            {"description": payload.description}
+            if "description" in fields and payload.description is not None
+            else {}
+        ),
+        **({"budget_id": target.id, "currency": target.currency} if target is not None else {}),
+        **{name: getattr(payload, name) for name in optional if name in fields},
+    }
 
 
 class ExpenseOps(BudgetTreeServiceBase):
@@ -110,28 +144,11 @@ class ExpenseOps(BudgetTreeServiceBase):
         With ``commit=False`` the caller bundles the booking and its follow-up mutations
         in one transaction.
         """
-        app_title: str | None = None
-        if payload.application_id is not None:
-            app = await self.session.get(Application, payload.application_id)
-            if app is None:
-                raise NotFoundError(f"application {payload.application_id} not found")
-            if app.budget_id is None or app.fiscal_year_id is None:
-                raise ValidationProblem(
-                    "Application has no budget/fiscal year assigned.",
-                    errors=[{"field": "applicationId", "msg": "no budget assigned"}],
-                )
-            node = await self._get_node(app.budget_id)
-            fy_id = app.fiscal_year_id
-            await self._require_open_fiscal_year(fy_id)
-            app_title = _title_of(app.data)
-        else:
-            if payload.budget_id is None:
-                raise ValidationProblem(
-                    "budgetId is required for a standalone booking.",
-                    errors=[{"field": "budgetId", "msg": "required"}],
-                )
-            node = await self._get_node(payload.budget_id)
-            fy_id = await self._resolve_fiscal_year(node, payload.fiscal_year_id)
+        node, fy_id, app_title = (
+            await self._bound_target(payload.application_id)
+            if payload.application_id is not None
+            else await self._standalone_target(payload)
+        )
         expense = BudgetExpense(
             id=uuid.uuid4(),
             budget_id=node.id,
@@ -175,6 +192,43 @@ class ExpenseOps(BudgetTreeServiceBase):
             app_title,
             actor_name=names.get(expense.actor or ""),
         )
+
+    async def _bound_target(self, application_id: UUID) -> tuple[Budget, UUID, str | None]:
+        """Return the cost center, the fiscal year and the title of a bound booking.
+
+        A bound booking inherits the cost center and the fiscal year from its
+        application.
+
+        Raises:
+            NotFoundError: The application does not exist.
+            ValidationProblem: The application has no cost center or fiscal year.
+            ConflictError: `fiscal_year_closed` (409).
+        """
+        app = await self.session.get(Application, application_id)
+        if app is None:
+            raise NotFoundError(f"application {application_id} not found")
+        if app.budget_id is None or app.fiscal_year_id is None:
+            raise ValidationProblem(
+                "Application has no budget/fiscal year assigned.",
+                errors=[{"field": "applicationId", "msg": "no budget assigned"}],
+            )
+        node = await self._get_node(app.budget_id)
+        await self._require_open_fiscal_year(app.fiscal_year_id)
+        return node, app.fiscal_year_id, _title_of(app.data)
+
+    async def _standalone_target(self, payload: ExpenseCreate) -> tuple[Budget, UUID, None]:
+        """Return the cost center and the resolved fiscal year of a standalone booking.
+
+        Raises:
+            ValidationProblem: `budgetId` is missing, or no fiscal year resolves (422).
+        """
+        if payload.budget_id is None:
+            raise ValidationProblem(
+                "budgetId is required for a standalone booking.",
+                errors=[{"field": "budgetId", "msg": "required"}],
+            )
+        node = await self._get_node(payload.budget_id)
+        return node, await self._resolve_fiscal_year(node, payload.fiscal_year_id), None
 
     async def _require_invoice(self, invoice_id: UUID) -> None:
         """Make sure that the invoice of a booking exists.
@@ -221,47 +275,32 @@ class ExpenseOps(BudgetTreeServiceBase):
             raise NotFoundError(f"budget expense {expense_id} not found")
         await self._require_open_fiscal_year(expense.fiscal_year_id)
         fields = payload.model_fields_set
-        child_n = 0
-        if "amount" in fields and payload.amount is not None:
-            child_n = (await self._child_counts([expense_id])).get(expense_id, 0)
-            if child_n > 0:
-                raise ValidationProblem(
-                    "The amount of a booking with sub-bookings is the sum of its sub-bookings.",
-                    code="subbooking_parent_amount_readonly",
-                )
+        sets_amount = "amount" in fields and payload.amount is not None
+        child_n = (
+            (await self._child_counts([expense_id])).get(expense_id, 0) if sets_amount else 0
+        )
+        if child_n > 0:
+            raise ValidationProblem(
+                "The amount of a booking with sub-bookings is the sum of its sub-bookings.",
+                code="subbooking_parent_amount_readonly",
+            )
         if expense.parent_expense_id is not None and "budget_id" in fields:
             raise ValidationProblem(
                 "A sub-booking inherits its cost-centre from its parent.",
                 code="subbooking_inherited_field",
             )
         before: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
-        if "amount" in fields and payload.amount is not None:
-            expense.amount = payload.amount
-        if "description" in fields and payload.description is not None:
-            expense.description = payload.description
-        if "budget_id" in fields and payload.budget_id is not None:
-            target = await self._get_node(payload.budget_id)
+        target = (
+            await self._get_node(payload.budget_id)
+            if "budget_id" in fields and payload.budget_id is not None
+            else None
+        )
+        if target is not None:
             await self._resolve_fiscal_year(target, expense.fiscal_year_id)
-            expense.budget_id = target.id
-            expense.currency = target.currency
-        if "invoice_date" in fields:
-            expense.invoice_date = payload.invoice_date
-        if "payment_date" in fields:
-            expense.payment_date = payload.payment_date
-        if "correspondent" in fields:
-            expense.correspondent = payload.correspondent
-        if "note" in fields:
-            expense.note = payload.note
-        if "reference_number" in fields:
-            expense.reference_number = payload.reference_number
-        if "payment_method" in fields:
-            expense.payment_method = payload.payment_method
-        if "category" in fields:
-            expense.category = payload.category
-        if "invoice_id" in fields:
-            expense.invoice_id = payload.invoice_id
-            if payload.invoice_id is not None:
-                await self._require_invoice(payload.invoice_id)
+        for name, value in _expense_changes(payload, target).items():
+            setattr(expense, name, value)
+        if "invoice_id" in fields and payload.invoice_id is not None:
+            await self._require_invoice(payload.invoice_id)
         after: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
         await self._audit(
             AuditAction.BUDGET_EXPENSE_UPDATE,
@@ -279,10 +318,12 @@ class ExpenseOps(BudgetTreeServiceBase):
             await self._recompute_parent_amount(expense.parent_expense_id)
         await self.session.commit()
         node = await self._get_node(expense.budget_id)
-        app_title: str | None = None
-        if expense.application_id is not None:
-            app = await self.session.get(Application, expense.application_id)
-            app_title = _title_of(app.data) if app is not None else None
+        app = (
+            await self.session.get(Application, expense.application_id)
+            if expense.application_id is not None
+            else None
+        )
+        app_title = _title_of(app.data) if app is not None else None
         names = await self._actor_names({expense.actor} if expense.actor else set())
         return self._expense_out(
             expense,
@@ -341,27 +382,9 @@ class ExpenseOps(BudgetTreeServiceBase):
         The sort column comes from a whitelist, and the default is newest first. Empty
         values of the nullable date columns go last in both directions.
         """
-        filters: list[ColumnElement[bool]] = [BudgetExpense.parent_expense_id.is_(None)]
-        if expense_id is not None:
-            filters.append(BudgetExpense.id == expense_id)
-        if budget_id is not None:
-            node = await self._get_node(budget_id)
-            subtree = select(Budget.id).where(
-                or_(
-                    Budget.path_key == node.path_key,
-                    Budget.path_key.like(node.path_key + _SEP + "%"),
-                )
-            )
-            filters.append(BudgetExpense.budget_id.in_(subtree))
-        if fiscal_year_id is not None:
-            filters.append(BudgetExpense.fiscal_year_id == fiscal_year_id)
-        if kind is not None:
-            filters.append(BudgetExpense.kind == kind)
-        if application_id is not None:
-            filters.append(BudgetExpense.application_id == application_id)
-        rank_expr = None
-        if q and q.strip():
-            where, rank_expr = trigram_rank(
+        node = await self._get_node(budget_id) if budget_id is not None else None
+        search = (
+            trigram_rank(
                 q,
                 [
                     BudgetExpense.description,
@@ -375,15 +398,33 @@ class ExpenseOps(BudgetTreeServiceBase):
                 ],
                 dialect=dialect_of(self.session),
             )
-            filters.append(where)
-        if amount_min is not None:
-            filters.append(BudgetExpense.amount >= amount_min)
-        if amount_max is not None:
-            filters.append(BudgetExpense.amount <= amount_max)
-        if created_from:
-            filters.append(func.date(BudgetExpense.created_at) >= created_from)
-        if created_to:
-            filters.append(func.date(BudgetExpense.created_at) <= created_to)
+            if q and q.strip()
+            else None
+        )
+        rank_expr = search[1] if search is not None else None
+        filters = (
+            BudgetExpense.parent_expense_id.is_(None),
+            *_applied(
+                BudgetExpense.id == expense_id if expense_id is not None else None,
+                BudgetExpense.budget_id.in_(_subtree_ids(node)) if node is not None else None,
+                (
+                    BudgetExpense.fiscal_year_id == fiscal_year_id
+                    if fiscal_year_id is not None
+                    else None
+                ),
+                BudgetExpense.kind == kind if kind is not None else None,
+                (
+                    BudgetExpense.application_id == application_id
+                    if application_id is not None
+                    else None
+                ),
+                search[0] if search is not None else None,
+                BudgetExpense.amount >= amount_min if amount_min is not None else None,
+                BudgetExpense.amount <= amount_max if amount_max is not None else None,
+                func.date(BudgetExpense.created_at) >= created_from if created_from else None,
+                func.date(BudgetExpense.created_at) <= created_to if created_to else None,
+            ),
+        )
 
         sort_map = {
             "amount": BudgetExpense.amount,
@@ -394,11 +435,14 @@ class ExpenseOps(BudgetTreeServiceBase):
         direction = sort_col.asc() if order == "asc" else sort_col.desc()
         ordering = direction.nulls_last() if sort in ("invoiceDate", "paymentDate") else direction
 
-        count_stmt = select(func.count()).select_from(BudgetExpense)
-        if rank_expr is not None:
-            count_stmt = count_stmt.outerjoin(
+        count_base = select(func.count()).select_from(BudgetExpense)
+        count_stmt = (
+            count_base.outerjoin(
                 Application, Application.id == BudgetExpense.application_id
             ).outerjoin(Invoice, Invoice.id == BudgetExpense.invoice_id)
+            if rank_expr is not None
+            else count_base
+        )
         total = await self.session.scalar(count_stmt.where(*filters))
         order_by = (
             (rank_expr.desc(), ordering, BudgetExpense.created_at.desc())
@@ -506,7 +550,7 @@ class ExpenseOps(BudgetTreeServiceBase):
                 BudgetExpense.parent_expense_id == parent_id
             )
         )
-        if total and Decimal(total) > 0:
-            parent = await self.session.get(BudgetExpense, parent_id)
-            if parent is not None:
-                parent.amount = Decimal(total)
+        amount = Decimal(total or 0)
+        parent = await self.session.get(BudgetExpense, parent_id) if amount > 0 else None
+        if parent is not None:
+            parent.amount = amount

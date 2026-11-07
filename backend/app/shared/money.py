@@ -25,9 +25,6 @@ def format_money(value: Decimal, currency: str, lang: str) -> str:
 
 def _group(digits: str, sep: str) -> str:
     """Thousands separators, right to left."""
-    out = ""
-    for i, ch in enumerate(reversed(digits)):
-        if i and i % 3 == 0:
-            out = sep + out
-        out = ch + out
-    return out
+    head = len(digits) % 3 or 3
+    groups = (digits[:head], *(digits[i : i + 3] for i in range(head, len(digits), 3)))
+    return sep.join(groups)
