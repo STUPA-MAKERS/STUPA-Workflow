@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import cast
 from uuid import UUID
@@ -13,7 +14,7 @@ from sqlalchemy import ColumnElement, case, exists, func, not_, select
 
 from app.modules.audit.actions import AuditAction
 from app.modules.budget.invoice_import import parse_zugferd_pdf
-from app.modules.budget.tree.service_base import BudgetTreeServiceBase
+from app.modules.budget.tree.service_base import BudgetTreeServiceBase, _applied
 from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
 from app.modules.budget.tree_schemas import (
     InvoiceBookingOut,
@@ -56,6 +57,46 @@ def _validate_invoice_file_token(token: str) -> str:
     if not token.startswith(_INVOICE_FILE_PREFIX) or ".." in token:
         raise ValidationProblem("invalid invoice file token")
     return token
+
+
+def _booking_out(booking: BudgetExpense, path_key: str, budget_name: str) -> InvoiceBookingOut:
+    """Map a booking that references an invoice to its list shape."""
+    return InvoiceBookingOut(
+        id=booking.id,
+        budgetId=booking.budget_id,
+        pathKey=path_key,
+        budgetName=budget_name,
+        fiscalYearId=booking.fiscal_year_id,
+        kind=booking.kind,  # type: ignore[arg-type]
+        amount=booking.amount,
+        description=booking.description,
+        paymentDate=booking.payment_date,
+        parentExpenseId=booking.parent_expense_id,
+        createdAt=booking.created_at,
+    )
+
+
+def _invoice_changes(payload: InvoiceUpdate) -> dict[str, object]:
+    """Map the fields that an invoice patch sets to the column values it writes.
+
+    The gross amount and the status ignore an explicit null, because both columns are
+    required. Every other set field is written as it is, so an explicit null clears it.
+    """
+    fields = payload.model_fields_set
+    optional = ("number", "issue_date", "due_date", "supplier", "net_amount", "tax_amount", "note")
+    return {
+        **{name: getattr(payload, name) for name in optional if name in fields},
+        **(
+            {"gross_amount": payload.gross_amount}
+            if "gross_amount" in fields and payload.gross_amount is not None
+            else {}
+        ),
+        **(
+            {"status": payload.status}
+            if "status" in fields and payload.status is not None
+            else {}
+        ),
+    }
 
 
 class InvoiceOps(BudgetTreeServiceBase):
@@ -111,40 +152,29 @@ class InvoiceOps(BudgetTreeServiceBase):
             The bookings per invoice id. An invoice without a visible booking is
             absent from the map.
         """
-        if not invoice_ids:
+        if not invoice_ids or (visible is not None and not visible):
             return {}
         stmt = (
             select(BudgetExpense, Budget.path_key, Budget.name)
             .join(Budget, Budget.id == BudgetExpense.budget_id)
-            .where(BudgetExpense.invoice_id.in_(invoice_ids))
+            .where(
+                BudgetExpense.invoice_id.in_(invoice_ids),
+                *_applied(BudgetExpense.budget_id.in_(visible) if visible is not None else None),
+            )
         )
-        if visible is not None:
-            if not visible:
-                return {}
-            stmt = stmt.where(BudgetExpense.budget_id.in_(visible))
         rows = (
             await self.session.execute(
                 stmt.order_by(BudgetExpense.created_at, BudgetExpense.id)
             )
         ).all()
-        linked: dict[UUID, list[InvoiceBookingOut]] = {}
-        for booking, path_key, budget_name in rows:
-            linked.setdefault(cast("UUID", booking.invoice_id), []).append(
-                InvoiceBookingOut(
-                    id=booking.id,
-                    budgetId=booking.budget_id,
-                    pathKey=path_key,
-                    budgetName=budget_name,
-                    fiscalYearId=booking.fiscal_year_id,
-                    kind=booking.kind,  # type: ignore[arg-type]
-                    amount=booking.amount,
-                    description=booking.description,
-                    paymentDate=booking.payment_date,
-                    parentExpenseId=booking.parent_expense_id,
-                    createdAt=booking.created_at,
-                )
-            )
-        return linked
+        bookings = tuple(
+            (cast("UUID", booking.invoice_id), _booking_out(booking, path_key, budget_name))
+            for booking, path_key, budget_name in rows
+        )
+        return {
+            inv_id: [out for owner, out in bookings if owner == inv_id]
+            for inv_id in dict.fromkeys(owner for owner, _ in bookings)
+        }
 
     async def _invoice_with_bookings(
         self, inv: Invoice, visible_gremium_ids: set[UUID] | None
@@ -160,10 +190,10 @@ class InvoiceOps(BudgetTreeServiceBase):
         A booking on a cost centre outside the scope of a gremium-scoped reader does not
         count, so that the segment of an invoice matches the ``linkedBookings`` it shows.
         """
-        conditions: list[ColumnElement[bool]] = [BudgetExpense.invoice_id == Invoice.id]
-        if visible is not None:
-            conditions.append(BudgetExpense.budget_id.in_(visible))
-        return exists().where(*conditions)
+        return exists().where(
+            BudgetExpense.invoice_id == Invoice.id,
+            *_applied(BudgetExpense.budget_id.in_(visible) if visible is not None else None),
+        )
 
     async def list_invoices_paged(
         self,
@@ -210,37 +240,39 @@ class InvoiceOps(BudgetTreeServiceBase):
         ISO. The segment filters apply after the counts, so a count covers its own
         segment under every other filter.
         """
-        filters = []
-        if invoice_id is not None:
-            filters.append(Invoice.id == invoice_id)
-        rank_expr = None
-        if q and q.strip():
-            where, rank_expr = trigram_rank(
+        search = (
+            trigram_rank(
                 q,
                 [Invoice.number, Invoice.supplier, Invoice.note],
                 dialect=dialect_of(self.session),
             )
-            filters.append(where)
-        if gross_min is not None:
-            filters.append(Invoice.gross_amount >= gross_min)
-        if gross_max is not None:
-            filters.append(Invoice.gross_amount <= gross_max)
-        if issue_from:
-            filters.append(Invoice.issue_date >= func.date(issue_from))
-        if issue_to:
-            filters.append(Invoice.issue_date <= func.date(issue_to))
-        if due_from:
-            filters.append(Invoice.due_date >= func.date(due_from))
-        if due_to:
-            filters.append(Invoice.due_date <= func.date(due_to))
+            if q and q.strip()
+            else None
+        )
+        rank_expr = search[1] if search is not None else None
+        base_filters = _applied(
+            Invoice.id == invoice_id if invoice_id is not None else None,
+            search[0] if search is not None else None,
+            Invoice.gross_amount >= gross_min if gross_min is not None else None,
+            Invoice.gross_amount <= gross_max if gross_max is not None else None,
+            Invoice.issue_date >= func.date(issue_from) if issue_from else None,
+            Invoice.issue_date <= func.date(issue_to) if issue_to else None,
+            Invoice.due_date >= func.date(due_from) if due_from else None,
+            Invoice.due_date <= func.date(due_to) if due_to else None,
+        )
 
         visible = await self._visible_ids(visible_gremium_ids)
         booked_clause = self._booked_clause(visible)
-        counts = await self._segment_counts(filters, booked_clause)
-        if status is not None:
-            filters.append(Invoice.status == status)
-        if booked is not None:
-            filters.append(booked_clause if booked else not_(booked_clause))
+        counts = await self._segment_counts(base_filters, booked_clause)
+        segment = (
+            None
+            if booked is None
+            else (booked_clause if booked else not_(booked_clause))
+        )
+        filters = (
+            *base_filters,
+            *_applied(Invoice.status == status if status is not None else None, segment),
+        )
 
         total = await self.session.scalar(
             select(func.count()).select_from(Invoice).where(*filters)
@@ -262,7 +294,7 @@ class InvoiceOps(BudgetTreeServiceBase):
         )
 
     async def _segment_counts(
-        self, filters: list[ColumnElement[bool]], booked_clause: ColumnElement[bool]
+        self, filters: Sequence[ColumnElement[bool]], booked_clause: ColumnElement[bool]
     ) -> InvoiceSegmentCounts:
         """Count the invoices of each list segment in one query."""
         is_open = Invoice.status == "open"
@@ -307,6 +339,15 @@ class InvoiceOps(BudgetTreeServiceBase):
         out. The client sends the file name back, so the name gets the display-name rule
         again.
         """
+        stored_file = (
+            {
+                "file_object_key": _validate_invoice_file_token(payload.file_token),
+                "file_name": sanitize_display_name(payload.file_name, default="beleg.pdf"),
+                "file_mime": payload.file_mime,
+            }
+            if payload.file_token is not None
+            else {}
+        )
         inv = Invoice(
             number=payload.number,
             issue_date=payload.issue_date,
@@ -318,11 +359,8 @@ class InvoiceOps(BudgetTreeServiceBase):
             note=payload.note,
             status=payload.status,
             actor=actor,
+            **stored_file,
         )
-        if payload.file_token is not None:
-            inv.file_object_key = _validate_invoice_file_token(payload.file_token)
-            inv.file_name = sanitize_display_name(payload.file_name, default="beleg.pdf")
-            inv.file_mime = payload.file_mime
         self.session.add(inv)
         await self.session.flush()
         await self._audit(
@@ -477,24 +515,8 @@ class InvoiceOps(BudgetTreeServiceBase):
         if inv is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
         fields = payload.model_fields_set
-        if "number" in fields:
-            inv.number = payload.number
-        if "issue_date" in fields:
-            inv.issue_date = payload.issue_date
-        if "due_date" in fields:
-            inv.due_date = payload.due_date
-        if "supplier" in fields:
-            inv.supplier = payload.supplier
-        if "net_amount" in fields:
-            inv.net_amount = payload.net_amount
-        if "tax_amount" in fields:
-            inv.tax_amount = payload.tax_amount
-        if "gross_amount" in fields and payload.gross_amount is not None:
-            inv.gross_amount = payload.gross_amount
-        if "note" in fields:
-            inv.note = payload.note
-        if "status" in fields and payload.status is not None:
-            inv.status = payload.status
+        for name, value in _invoice_changes(payload).items():
+            setattr(inv, name, value)
         await self._audit(
             AuditAction.BUDGET_INVOICE_UPDATE,
             target_type="invoice",

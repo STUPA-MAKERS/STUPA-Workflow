@@ -159,9 +159,13 @@ def issue_oidc_tx(
     return_to: str | None = None,
 ) -> str:
     """Sign the OIDC transaction cookie: state, PKCE verifier, nonce and client."""
-    data = {"state": state, "verifier": verifier, "nonce": nonce, "client": client}
-    if return_to:
-        data["return_to"] = return_to
+    data = {
+        "state": state,
+        "verifier": verifier,
+        "nonce": nonce,
+        "client": client,
+        **({"return_to": return_to} if return_to else {}),
+    }
     return _serializer(secret, _OIDC_TX_SALT).dumps(data)
 
 
@@ -207,14 +211,14 @@ def load_oidc_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None
         return None
     if not isinstance(data, dict) or not {"state", "verifier", "nonce"} <= set(data):
         return None
-    tx = {k: str(data[k]) for k in ("state", "verifier", "nonce")}
     client = data.get("client")
-    tx["client"] = client if client in SESSION_CLIENTS else SESSION_CLIENT_WEB
     return_to = data.get("return_to")
     checked = safe_return_to(return_to) if isinstance(return_to, str) else None
-    if checked:
-        tx["return_to"] = checked
-    return tx
+    return {
+        **{k: str(data[k]) for k in ("state", "verifier", "nonce")},
+        "client": client if client in SESSION_CLIENTS else SESSION_CLIENT_WEB,
+        **({"return_to": checked} if checked else {}),
+    }
 
 
 #: OAuth AS transaction cookie. It carries the authorize request of an MCP login across
@@ -299,9 +303,8 @@ async def create_principal_session(
         refresh_token=refresh_token,
         id_token=id_token,
         client=client,
+        **({"revalidated_at": now} if now is not None else {}),
     )
-    if now is not None:
-        row.revalidated_at = now
     db.add(row)
     await db.flush()
     return _sign_sid(secret, sid)

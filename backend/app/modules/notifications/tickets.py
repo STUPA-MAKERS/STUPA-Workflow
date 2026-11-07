@@ -258,6 +258,12 @@ async def notify_ticket_received(
         return False
 
 
+async def _note_filenames(session: AsyncSession, note: TicketNote) -> list[str]:
+    """Return the file names of the attachments of a ticket note."""
+    files = await FilesService(session).message_attachments("ticket_note", [note.id])
+    return [a.filename for a in files.get(note.id, [])]
+
+
 async def notify_ticket_note(
     *,
     queue: MailQueue | None,
@@ -288,10 +294,11 @@ async def notify_ticket_note(
                 or ticket.reporter_principal_id is None
             ):
                 return False
-            message = note.body
-            if not message.strip():
-                files = await FilesService(session).message_attachments("ticket_note", [note.id])
-                message = ", ".join(a.filename for a in files.get(note.id, []))
+            message = (
+                note.body
+                if note.body.strip()
+                else ", ".join(await _note_filenames(session, note))
+            )
             if not message.strip():
                 return False
             if note.author_id == ticket.reporter_principal_id:

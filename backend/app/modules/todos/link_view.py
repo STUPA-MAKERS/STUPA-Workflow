@@ -21,7 +21,8 @@ team, and the gremium page has its own gate.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
@@ -49,7 +50,15 @@ SHOWN_FIELD_TYPES: frozenset[str] = frozenset(
 #: The answers that the sheet already shows in its title.
 SKIPPED_FIELD_KEYS: frozenset[str] = frozenset({"title"})
 
-type Built = tuple[list[TodoViewFact], list[TodoViewRow]]
+#: The display format of an answer by its field type; every other type is plain text.
+ANSWER_FORMATS: Mapping[str, str] = {
+    "currency": "money",
+    "date": "date",
+    "textarea": "markdown",
+    "markdown": "markdown",
+}
+
+type Built = tuple[tuple[TodoViewFact, ...], list[TodoViewRow]]
 
 
 def _fact(key: str, value: object, fmt: str = "text") -> TodoViewFact | None:
@@ -60,26 +69,35 @@ def _fact(key: str, value: object, fmt: str = "text") -> TodoViewFact | None:
     return TodoViewFact(key=key, value=text, format=fmt)  # type: ignore[arg-type]
 
 
-def _facts(*items: TodoViewFact | None) -> list[TodoViewFact]:
-    return [item for item in items if item is not None]
+def _facts(*items: TodoViewFact | None) -> tuple[TodoViewFact, ...]:
+    return tuple(item for item in items if item is not None)
+
+
+def _answer_text(value: object) -> str | None:
+    """The text of a form answer: a list joined by commas, None for an object."""
+    match value:
+        case list():
+            return ", ".join(str(v) for v in value)
+        case dict():
+            return None
+        case _:
+            return str(value)
 
 
 def _answer(field: FormField, value: Any) -> TodoViewFact | None:  # noqa: ANN401
     """The fact of one form answer, or None for an empty or unshown value."""
     if field.type not in SHOWN_FIELD_TYPES or value is None or value in ("", []):
         return None
-    if isinstance(value, list):
-        text = ", ".join(str(v) for v in value)
-    elif isinstance(value, dict):
-        return None
-    else:
-        text = str(value)
-    fmt = {"currency": "money", "date": "date", "textarea": "markdown", "markdown": "markdown"}
-    return TodoViewFact(
-        key=field.key,
-        label={str(k): str(v) for k, v in (field.label_i18n or {}).items()},
-        value=text,
-        format=fmt.get(field.type, "text"),  # type: ignore[arg-type]
+    text = _answer_text(value)
+    return (
+        TodoViewFact(
+            key=field.key,
+            label={str(k): str(v) for k, v in (field.label_i18n or {}).items()},
+            value=text,
+            format=ANSWER_FORMATS.get(field.type, "text"),  # type: ignore[arg-type]
+        )
+        if text is not None
+        else None
     )
 
 
@@ -87,13 +105,12 @@ def _money(value: Decimal | None) -> str | None:
     return str(value) if value is not None else None
 
 
+@dataclass(frozen=True, slots=True)
 class LinkViewer:
-    """Build the read sheet of one link target."""
+    """Build the read sheet of one link target with the session and the link resolver."""
 
-    def __init__(self, session: AsyncSession, links: LinkResolver) -> None:
-        """Bind the viewer to a session and the link resolver of the request."""
-        self.session = session
-        self.links = links
+    session: AsyncSession
+    links: LinkResolver
 
     async def view(self, kind: str, target_id: uuid.UUID, principal: Principal) -> TodoLinkView:
         """Return the sheet of the target.
@@ -128,7 +145,7 @@ class LinkViewer:
     async def _application(self, target_id: uuid.UUID) -> Built:
         app = await self.session.get(Application, target_id)
         if app is None:  # pragma: no cover - the resolver found it
-            return [], []
+            return (), []
         hidden = await pii_keys_for_type(self.session, app.type_id)
         fields = (
             await self.session.scalars(
@@ -161,7 +178,7 @@ class LinkViewer:
             )
         ).first()
         if row is None:  # pragma: no cover - the resolver found it
-            return [], []
+            return (), []
         meeting, gremium = row
         start = meeting.start_time
         items = (
@@ -196,7 +213,7 @@ class LinkViewer:
     async def _agenda_item(self, target_id: uuid.UUID) -> Built:
         item = await self.session.get(MeetingAgendaItem, target_id)
         if item is None:  # pragma: no cover - the resolver found it
-            return [], []
+            return (), []
         votes = (
             await self.session.scalars(
                 select(Vote).where(Vote.agenda_item_id == item.id).order_by(Vote.created_at)
@@ -213,7 +230,7 @@ class LinkViewer:
     async def _vote(self, target_id: uuid.UUID) -> Built:
         vote = await self.session.get(Vote, target_id)
         if vote is None:  # pragma: no cover - the resolver found it
-            return [], []
+            return (), []
         return (
             _facts(
                 _fact("voteStatus", vote.status),
@@ -226,7 +243,7 @@ class LinkViewer:
     async def _invoice(self, target_id: uuid.UUID) -> Built:
         inv = await self.session.get(Invoice, target_id)
         if inv is None:  # pragma: no cover - the resolver found it
-            return [], []
+            return (), []
         return (
             _facts(
                 _fact("number", inv.number),
@@ -251,7 +268,7 @@ class LinkViewer:
             )
         ).first()
         if row is None:  # pragma: no cover - the resolver found it
-            return [], []
+            return (), []
         exp, path_key, budget_name = row
         return (
             _facts(
@@ -279,7 +296,7 @@ class LinkViewer:
             )
         ).first()
         if row is None:  # pragma: no cover - the resolver found it
-            return [], []
+            return (), []
         card, _board, _column = row
         items = (
             await self.session.scalars(

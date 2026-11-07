@@ -1,9 +1,4 @@
 {
-  "backend/app/modules/protocol/erasure.py": 7,
-  "backend/app/modules/protocol/filename.py": 5,
-  "backend/app/modules/protocol/markdown.py": 89,
-  "backend/app/modules/protocol/public.py": 26,
-  "backend/app/modules/protocol/queue.py": 1,
-  "backend/app/modules/protocol/schemas.py": 5,
-  "backend/app/modules/protocol/service.py": 65
+  "backend/app/modules/protocol/public.py": 3,
+  "backend/app/modules/protocol/service.py": 16
 }
