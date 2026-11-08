@@ -185,8 +185,8 @@ async def test_preview_counts_every_area() -> None:
     """Count every area in the preview.
 
     The fake count also answers the two open erasure requests. Four sub columns count,
-    among them application_decision.decided_by and application_link.linked_by. The notifications have two duplicates of
-    two rows, so nothing is left to rewrite. The preview never locks, writes or commits.
+    among them application_decision.decided_by and application_link.linked_by. The
+    notifications have two duplicates of two rows, so nothing is left to rewrite. The preview never locks, writes or commits.
     """
     session = _Session(_pair(calendar_token="tok"), count=2)
     out = await _svc(session).preview(OLD, NEW, actor="admin")
