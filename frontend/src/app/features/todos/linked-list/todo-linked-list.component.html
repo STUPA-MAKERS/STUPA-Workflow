@@ -1,4 +1,4 @@
-@if (cards().length || lead()) {
+@if (cards().length || lead() || rows().length) {
   <app-section class="tl" [headingId]="headingId()" [heading]="'todos.linked.title' | t" [hideHeading]="!showTitle()">
     <ul class="rowgroup tl__list">
       @if (lead(); as l) {
@@ -9,6 +9,15 @@
             <span class="tl__sub">{{ l.sub }}</span>
           </span>
           <app-icon class="tl__icon" name="ext" [size]="18" />
+        </li>
+      }
+      @for (row of rows(); track $index) {
+        <li class="tl__row" data-testid="tl-row">
+          <app-icon class="tl__icon" [name]="row.icon" [size]="18" />
+          <span class="tl__text">
+            <a class="tl__link" [routerLink]="row.link">{{ row.title }}</a>
+            <span class="tl__sub">{{ row.sub }}</span>
+          </span>
         </li>
       }
       @for (card of cards(); track card.id) {

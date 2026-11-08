@@ -137,7 +137,10 @@
     [class.ccs__opt--active]="c.index === active()"
     [style.--ccs-depth]="c.depth"
     [attr.aria-selected]="c.id === value()"
+    tabindex="-1"
+    (mousedown)="$event.preventDefault()"
     (click)="choose(c)"
+    (keydown.enter)="choose(c)"
     (pointermove)="hover(c)"
   >
     @if (c.id) {

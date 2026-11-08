@@ -416,9 +416,11 @@
           [id]="p.optionId(i)"
           [class.chat__mentionOpt--active]="i === p.active()"
           [attr.aria-selected]="i === p.active()"
+          tabindex="-1"
           (mousedown)="$event.preventDefault()"
           (mouseenter)="p.active.set(i)"
           (click)="pickMention(p, o)"
+          (keydown.enter)="pickMention(p, o)"
         >
           <app-avatar
             size="sm"

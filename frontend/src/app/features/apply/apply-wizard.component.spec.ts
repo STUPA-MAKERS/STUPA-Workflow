@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
-import type { ApplicationType, EffectiveForm, ProblemDetail } from '@core/api/models';
+import type { ApplicationListItem, ApplicationType, EffectiveForm, ProblemDetail } from '@core/api/models';
 import { BrandingService } from '@core/branding/branding.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -74,6 +74,19 @@ const PRINCIPAL = {
   groups: [],
 };
 
+const PRED: ApplicationListItem = {
+  id: 'p-1',
+  typeId: 't1',
+  title: 'Sommerfest 2025',
+  state: null,
+  gremiumId: null,
+  amount: null,
+  currency: null,
+  createdAt: '2025-05-12T10:00:00Z',
+  updatedAt: '2025-05-12T10:00:00Z',
+  archivedAt: null,
+};
+
 function fakeDrafts(files: DraftFile[] = []) {
   const list = signal<DraftFile[]>(files);
   const usable = computed(() => list().filter((f) => !f.failed));
@@ -126,6 +139,7 @@ interface SetupOpts {
   freetexts?: Record<string, Record<string, string>>;
   /** The query params of the route, for example `{ type: 't1' }`. */
   query?: Record<string, string>;
+  prefill?: jest.Mock;
 }
 
 async function setup(opts: SetupOpts = {}) {
@@ -138,6 +152,8 @@ async function setup(opts: SetupOpts = {}) {
     createApplication: create as unknown as ApiClient['createApplication'],
     me: (() => (opts.loggedIn ? of(PRINCIPAL) : throwError(() => ({ status: 401 })))) as unknown as ApiClient['me'],
     altchaChallenge: () => of(null),
+    applicationPrefill: (opts.prefill ?? jest.fn(() => of({ typeId: 't1', data: {} }))) as unknown as ApiClient['applicationPrefill'],
+    listApplications: (() => of({ items: [], nextCursor: null })) as unknown as ApiClient['listApplications'],
   };
   const branding = {
     freetexts: signal(opts.freetexts ?? {}),
@@ -332,6 +348,50 @@ describe('ApplyWizardComponent', () => {
     expect(s.navigate).toHaveBeenCalledWith(['/apply/confirmation'], { queryParams: { id: 'app-1' } });
     expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
     expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+  });
+
+  /** A Vorgänger fills the form, shows in the review and goes with the submit. */
+  it('prefills from a Vorgänger and sends it with the submit', async () => {
+    const prefill = jest.fn(() => of({ typeId: 't1', data: { title: 'Sommerfest' } }));
+    const s = await setup({ form: PLAIN, loggedIn: true, prefill });
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
+    await pickType(s);
+    expect(screen.getByRole('combobox', { name: 'Vorgänger' })).toBeInTheDocument();
+    s.comp.choosePredecessor(PRED);
+    s.fixture.detectChanges();
+    expect(prefill).toHaveBeenCalledWith('p-1');
+    expect(s.toast.show).toHaveBeenCalledWith('Angaben aus dem Vorgänger übernommen');
+    expect(s.comp.predecessor()).toEqual({ id: 'p-1', title: 'Sommerfest 2025' });
+    s.comp.next();
+    s.fixture.detectChanges();
+    expect(field(/Titel/).value).toBe('Sommerfest');
+    s.comp.next();
+    s.fixture.detectChanges();
+    expect(screen.getAllByText('Sommerfest 2025').length).toBeGreaterThan(0);
+    s.comp.submit();
+    expect(s.create).toHaveBeenCalledWith(expect.objectContaining({ predecessorId: 'p-1' }));
+  });
+
+  it('names a Vorgänger without a title and drops it when the prefill fails', async () => {
+    const prefill = jest.fn(() => throwError(() => ({ status: 403 })));
+    const s = await setup({ form: PLAIN, loggedIn: true, prefill });
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
+    await pickType(s);
+    s.comp.choosePredecessor({ ...PRED, title: null });
+    expect(s.comp.predecessor()).toBeNull();
+    expect(s.toast.error).toHaveBeenCalledWith('Der Vorgänger konnte nicht geändert werden.');
+  });
+
+  it('ignores a prefill of another type and clears the Vorgänger on demand', async () => {
+    const prefill = jest.fn(() => of({ typeId: 't9', data: { title: 'Fremd' } }));
+    const s = await setup({ form: PLAIN, loggedIn: true, prefill });
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
+    await pickType(s);
+    s.comp.choosePredecessor({ ...PRED, title: null });
+    expect(s.comp.predecessor()).toEqual({ id: 'p-1', title: 'Ohne Titel' });
+    expect(s.toast.show).not.toHaveBeenCalled();
+    s.comp.clearPredecessor();
+    expect(s.comp.predecessor()).toBeNull();
   });
 
   it('clears the autosave of every type on the submit', async () => {

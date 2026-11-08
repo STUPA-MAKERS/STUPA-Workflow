@@ -52,6 +52,16 @@
         }
         @if (loadingForm()) {
           <app-skeleton variant="lines" [count]="3" [label]="'apply.form.loading' | t" />
+        } @else if (loggedIn() && effForm() && typeId(); as type) {
+          <app-section class="wz__block wz__predecessor" [heading]="'applications.predecessor.title' | t">
+            <app-predecessor-field
+              inputId="wz-predecessor"
+              [typeId]="type"
+              [picked]="predecessor()?.title ?? null"
+              (choose)="choosePredecessor($event)"
+              (cleared)="clearPredecessor()"
+            />
+          </app-section>
         }
         @if (applyInfoHtml()) {
           <div class="wz__info" [innerHTML]="applyInfoHtml()"></div>
@@ -125,6 +135,13 @@
                 <app-field-row [label]="'apply.contact.email' | t">{{ reviewEmail() }}</app-field-row>
               </app-field-group>
             </app-section>
+            @if (predecessor(); as pred) {
+              <app-section class="wz__block" [heading]="'applications.predecessor.title' | t">
+                <app-field-group>
+                  <app-field-row [label]="'applications.predecessor.field' | t">{{ pred.title }}</app-field-row>
+                </app-field-group>
+              </app-section>
+            }
             @if (drafts.usable().length) {
               <app-section class="wz__block" [heading]="'apply.files.title' | t">
                 <ul class="rowgroup wz__fileList">

@@ -206,3 +206,36 @@ def test_signatures_never_split_across_pages(tmp_path: Path) -> None:
     lines = _lines(_render(source, None), tmp_path)
     heading_page = _find(lines, "Unterschriften")[0]
     assert _find(lines, "Vorstand")[0] == heading_page
+
+
+def test_protocol_is_pdf_ua_1_with_title_and_language() -> None:
+    """The PDF declares PDF/UA-1, a title and German (§ NF/accessibility/documents/000524)."""
+    pdf = _render((FIXTURES / "protocol-full.md").read_text(), None)
+    assert b"pdfuaid:part" in pdf
+    assert b"/Lang (de)" in pdf or b"/Lang(de)" in pdf
+    assert b"/Title" in pdf
+
+
+def test_decorative_image_and_formula_pass_pdf_ua() -> None:
+    """An image without alt text is an artifact, and a formula has its source as alt text.
+
+    § NF/accessibility/documents/000524
+    """
+    image_id = "0b7c6f0e-3a51-4c3e-9b8e-6f1d2a3b4c5d"
+    name = f"img-{image_id}.png"
+    source = (
+        f"---\ngremium: StuPa\n---\n\n# Bericht\n\n![](/api/media/images/{image_id})\n\n$a^2$\n"
+    )
+    doc = build_document(source, variant="protocol-stupa", assets=[name])
+    assert asyncio.run(default_compiler().compile(doc, {name: _png()})).startswith(b"%PDF")
+
+
+def test_skipped_heading_level_keeps_the_top_numbers(tmp_path: Path) -> None:
+    """A `###` after `#` passes PDF/UA-1 and leaves the next TOP number as it was.
+
+    § NF/accessibility/documents/000524
+    """
+    source = "---\ngremium: StuPa\n---\n\n# Eins\n\n### Unter\n\nText.\n\n## Zwei\n\nText.\n"
+    lines = _lines(_render(source, None), tmp_path)
+    assert any(line[3].startswith("TOP 1.1") and "Zwei" in line[3] for line in lines)
+    assert not any(line[3].startswith("TOP") and "Unter" in line[3] for line in lines)

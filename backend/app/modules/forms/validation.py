@@ -348,6 +348,14 @@ def validate_answers(
     return result
 
 
+def value_is_valid(field: FormFieldDef, value: object) -> bool:
+    """Tell whether a present value passes the type check of its field.
+
+    An absent value is not valid, because a prefill copies only a real answer.
+    """
+    return _is_present(value) and not _value_errors(field, value)
+
+
 def _is_present(value: object) -> bool:
     """Report a value as present when it is not ``None`` and not empty.
 

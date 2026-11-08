@@ -18,6 +18,7 @@ from app.modules.applications.models import (
     SubmissionVersion,
 )
 from app.modules.applications.schemas import ApplicationCreate
+from app.modules.applications.service.links import check_predecessor, write_link
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
     _amount_currency,
@@ -107,6 +108,11 @@ class CreateOps(ApplicationsServiceBase):
         (the capturing person) writes version 1 and the first status event, and the
         create writes a second audit entry ``application_create_on_behalf``.
 
+        ``payload.predecessorId`` names the Vorgänger. The router has checked that the
+        caller reads it. The create checks the type (`check_predecessor`) before the first
+        write and writes the link, its history entry and ``application_link_set`` in the
+        same transaction.
+
         ``draft_pepper`` is the pepper of the draft-token hash
         (``MAGIC_LINK_SECRET``). The router passes the value of its settings.
         ``None`` reads it from ``get_settings``.
@@ -132,6 +138,10 @@ class CreateOps(ApplicationsServiceBase):
         effective = await forms.get_effective_form(payload.type_id)
         fields = [f for section in effective.sections for f in section.fields]
 
+        if payload.predecessor_id is not None:
+            await check_predecessor(
+                self.session, type_id=payload.type_id, predecessor_id=payload.predecessor_id
+            )
         context = {"has_budget": app_type.has_budget}
         try:
             validate_answers(fields, payload.data, context)
@@ -217,6 +227,13 @@ class CreateOps(ApplicationsServiceBase):
                 "attachments": len(set(payload.attachment_ids)),
             },
         )
+        if payload.predecessor_id is not None:
+            await write_link(
+                self.session,
+                application_id=app.id,
+                predecessor_id=payload.predecessor_id,
+                actor=actor,
+            )
         if capture is not None:
             await audit_record(
                 self.session,

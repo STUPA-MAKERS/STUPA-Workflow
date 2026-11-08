@@ -47,9 +47,11 @@ Groups of ``PUBLIC_ROUTES`` and why each one is public:
 
 Groups of ``OPTIONAL_PRINCIPAL_ROUTES`` and who checks the caller:
 
-- Application, its form, timeline, versions, comments, transitions, erasure request
-  and attachments: a staff session or the magic-link session of the applicant; the
-  applications and files services refuse a caller with neither.
+- Application, its form, timeline, versions, comments, transitions, erasure request,
+  attachments, links, Vorgänger and prefill: a staff session or the magic-link session
+  of the applicant; the applications and files services refuse a caller with neither.
+  The prefill also refuses the magic-link session, and a Vorgänger change needs the
+  edit right on both applications.
 - Attachment by id and its download: the files service applies the same read rule.
 - Markdown images: the upload refuses a caller without an upload right, the read
   needs a session of either kind.
@@ -153,6 +155,10 @@ OPTIONAL_PRINCIPAL_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("GET", "/api/applications/{application_id}/applicant-transitions"),
         ("POST", "/api/applications/{application_id}/applicant-transition"),
         ("GET", "/api/applications/{application_id}/attachments"),
+        ("GET", "/api/applications/{application_id}/links"),
+        ("PUT", "/api/applications/{application_id}/predecessor"),
+        ("DELETE", "/api/applications/{application_id}/predecessor"),
+        ("GET", "/api/applications/{application_id}/prefill"),
         ("POST", "/api/applications/{application_id}/attachments"),
         ("GET", "/api/attachments/{attachment_id}"),
         ("GET", "/api/attachments/{attachment_id}/download"),

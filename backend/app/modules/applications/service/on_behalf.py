@@ -120,6 +120,7 @@ class OnBehalfOps(CreateOps):
                 "lang": payload.lang,
                 "attachmentIds": payload.attachment_ids,
                 "draftToken": payload.draft_token,
+                "predecessorId": payload.predecessor_id,
             }
         )
         return await self.create(

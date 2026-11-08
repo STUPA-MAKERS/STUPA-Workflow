@@ -111,7 +111,7 @@
         </ng-template>
         <ng-template appCell="actions" let-row>
           @let n = $any(row).node;
-          <span class="bt__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+          <span class="bt__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
             <app-row-menu
               [label]="('budget.tree.rowActions' | t) + ': ' + n.name"
               [sections]="rowMenu()"
@@ -366,7 +366,7 @@
           }
         </ng-template>
         <ng-template appCell="actions" let-fy>
-          <span class="bt__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+          <span class="bt__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
             <app-row-menu
               [label]="('budget.tree.rowActions' | t) + ': ' + $any(fy).display"
               [sections]="fyMenu($any(fy))"

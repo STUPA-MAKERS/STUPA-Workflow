@@ -18,6 +18,8 @@ import type {
   ApplicationCreateBody,
   ApplicationCreated,
   ApplicationCreatedWire,
+  ApplicationLinks,
+  ApplicationLinksWire,
   ApplicationListItem,
   ApplicationListItemWire,
   ApplicationOutWire,
@@ -29,6 +31,8 @@ import type {
   AttachmentOutWire,
   CommentOutWire,
   ElectionFields,
+  LinkedApplication,
+  LinkedApplicationWire,
   ApplicationComment,
   DataDiff,
   DataDiffWire,
@@ -377,5 +381,33 @@ export function toApplicationCreateBody(input: NewApplication): ApplicationCreat
     ...(input.attachmentIds?.length && input.draftToken
       ? { attachmentIds: input.attachmentIds, draftToken: input.draftToken }
       : {}),
+    ...(input.predecessorId ? { predecessorId: input.predecessorId } : {}),
+  };
+}
+
+/** Map a linked application of `GET /applications/{id}/links`. */
+export function mapLinkedApplication(wire: LinkedApplicationWire, lang: string): LinkedApplication {
+  return {
+    id: wire.id,
+    title: wire.title ?? null,
+    state: mapState(wire.state, lang),
+    createdAt: wire.createdAt,
+    archived: wire.archived ?? false,
+  };
+}
+
+/** Map `GET /applications/{id}/links`: the Vorgänger, the Folgeanträge and the history. */
+export function mapApplicationLinks(wire: ApplicationLinksWire, lang: string): ApplicationLinks {
+  const linked = (w: LinkedApplicationWire | null | undefined): LinkedApplication | null =>
+    w ? mapLinkedApplication(w, lang) : null;
+  return {
+    predecessor: linked(wire.predecessor),
+    successors: (wire.successors ?? []).map((w) => mapLinkedApplication(w, lang)),
+    events: (wire.events ?? []).map((e) => ({
+      action: e.action,
+      at: e.at,
+      actorInfo: e.actorInfo ?? null,
+      predecessor: linked(e.predecessor),
+    })),
   };
 }

@@ -1,0 +1,27 @@
+<app-autocomplete
+  [inputId]="inputId()"
+  name="predecessor"
+  [label]="'applications.predecessor.field' | t"
+  [placeholder]="'applications.predecessor.search' | t"
+  [clearLabel]="'applications.predecessor.clear' | t"
+  [query]="query()"
+  [options]="hits()"
+  [open]="open()"
+  [picked]="picked()"
+  (queryChange)="onQuery($event)"
+  (choose)="pick($event)"
+  (cleared)="clear()"
+>
+  <app-icon acPickedIcon name="file" [size]="16" />
+  <ng-template let-a>
+    <span class="pf__option">
+      <span class="pf__title">{{ a.title || ('applications.predecessor.untitled' | t) }}</span>
+      <span class="pf__meta">
+        {{ a.createdAt | ldate: 'mediumDate' }}
+        @if (a.state) {
+          · {{ a.state.label }}
+        }
+      </span>
+    </span>
+  </ng-template>
+</app-autocomplete>
