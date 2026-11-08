@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/angular';
 import { ImageThumbComponent, inlineUrl, isThumbImage } from './image-thumb.component';
+import { runAxe } from '../../../../testing/a11y';
 
 describe('image thumb helpers', () => {
   it('accepts clean raster images only', () => {
@@ -36,5 +37,14 @@ describe('ImageThumbComponent', () => {
     fireEvent.error(view.fixture.nativeElement.querySelector('img'));
     view.detectChanges();
     expect(view.fixture.nativeElement.querySelector('.thumb__icon')).not.toBeNull();
+  });
+
+  /** § NF/accessibility/conformance/000493 */
+  it('has no axe violations with the image and with the fallback icon', async () => {
+    const view = await render(ImageThumbComponent, { inputs: { src: '/x?inline=1', alt: 'Foto' } });
+    expect(await runAxe(view.container)).toHaveNoViolations();
+    fireEvent.error(screen.getByRole('img', { name: 'Foto' }));
+    view.detectChanges();
+    expect(await runAxe(view.container)).toHaveNoViolations();
   });
 });

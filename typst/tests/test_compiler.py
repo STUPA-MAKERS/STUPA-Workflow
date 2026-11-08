@@ -74,6 +74,17 @@ printf '%%PDF-fake' > "$last"
     assert pdf == b"%PDF-fake"
 
 
+def test_compile_enforces_pdf_ua_1(tmp_path: Path) -> None:
+    """The compile asks typst for PDF/UA-1 (§ NF/accessibility/documents/000524)."""
+    script = r"""
+for a in "$@"; do last="$a"; done
+case " $* " in *" --pdf-standard ua-1 "*) ;; *) exit 9 ;; esac
+printf '%%PDF-fake' > "$last"
+"""
+    comp = _compiler(tmp_path, _fake_binary(tmp_path, script))
+    assert asyncio.run(comp.compile({"title": "x"}, {})) == b"%PDF-fake"
+
+
 def test_compile_error_carries_the_scrubbed_message(tmp_path: Path) -> None:
     script = 'echo "error: bad thing in $PWD/main.typ" >&2; exit 1\n'
     comp = _compiler(tmp_path, _fake_binary(tmp_path, script))

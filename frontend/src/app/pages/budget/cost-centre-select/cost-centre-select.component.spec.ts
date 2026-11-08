@@ -138,7 +138,7 @@ describe('CostCentreSelectComponent', () => {
     const { field, view, host } = await setup();
     expect(field()).toHaveTextContent('Kostenstelle wählen …');
     expect(field()).toHaveAttribute('aria-expanded', 'false');
-    expect(field()).toHaveAttribute('aria-required', 'true');
+    expect(field()).toHaveAccessibleName(/Pflichtfeld/);
     host.value.set('erst');
     view.fixture.detectChanges();
     expect(field()).toHaveAccessibleName(/Kostenstelle.*Erstsemesterparty VSM-6-60-120/);

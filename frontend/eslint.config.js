@@ -76,6 +76,8 @@ module.exports = tseslint.config(
     rules: {
       '@angular-eslint/template/eqeqeq': 'error',
       '@angular-eslint/template/banana-in-box': 'error',
+      // § NF/accessibility/conformance/000492: every accessibility rule as an error.
+      ...angularTemplate.configs.accessibility.rules,
     },
   },
 );

@@ -1,5 +1,6 @@
 import { render } from '@testing-library/angular';
 import { QrCodeComponent, formatJoinCode, qrPath } from './qr-code.component';
+import { runAxe } from '../../../../testing/a11y';
 
 describe('QrCodeComponent', () => {
   const qr = { size: 2, rows: ['10', '01'] };
@@ -23,5 +24,11 @@ describe('QrCodeComponent', () => {
     expect(formatJoinCode('7KQ4MP')).toBe('7KQ-4MP');
     expect(formatJoinCode('ABC')).toBe('ABC');
     expect(formatJoinCode(null)).toBe('');
+  });
+
+  /** § NF/accessibility/conformance/000493 */
+  it('has no axe violations', async () => {
+    const { container } = await render(QrCodeComponent, { inputs: { qr, label: 'QR-Code für die Sitzung' } });
+    expect(await runAxe(container)).toHaveNoViolations();
   });
 });

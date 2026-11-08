@@ -96,6 +96,16 @@
             [ngModel]="typeId()"
             (ngModelChange)="selectType($event)"
           />
+          @if (effForm() && typeId()) {
+            <app-predecessor-field
+              class="cap__predecessor"
+              inputId="cap-predecessor"
+              [typeId]="typeId()"
+              [picked]="predecessor()?.title ?? null"
+              (choose)="choosePredecessor($event)"
+              (cleared)="predecessor.set(null)"
+            />
+          }
           <div class="ff__grid">
             <app-datepicker
               name="receivedOn"
