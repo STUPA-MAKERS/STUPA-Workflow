@@ -3920,7 +3920,7 @@
   "applications.predecessor.none": "Keiner",
   "applications.predecessor.change": "Ändern",
   "applications.predecessor.link": "Verknüpfen",
-  "applications.predecessor.successors": "Folgeanträge",
+  "applications.predecessor.successor": "Folgeantrag",
   "applications.predecessor.dialogTitle": "Vorgänger verknüpfen",
   "applications.predecessor.remove": "Vorgänger entfernen",
   "applications.predecessor.linked": "Vorgänger verknüpft",

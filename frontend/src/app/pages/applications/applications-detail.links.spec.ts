@@ -154,9 +154,14 @@ describe('ApplicationsDetailComponent — Folgeanträge', () => {
 
   it('shows the Vorgänger, the Folgeanträge and the link entries of the history', async () => {
     const { cmp } = await loaded(LINKS);
-    expect(screen.getByRole('link', { name: 'Sommerfest 2025' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Sommerfest 2025' })).toHaveLength(2);
     expect(screen.getByTestId('ad-predecessor')).toHaveTextContent('Ändern');
-    expect(screen.getByText('Folgeanträge')).toBeInTheDocument();
+    const rows = screen.getAllByTestId('tl-row');
+    expect(rows.map((r) => r.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+      'Sommerfest 2025Vorgänger · Eingereicht',
+      'Ohne TitelFolgeantrag',
+    ]);
+    expect(cmp.linkedRows()[1].link).toEqual(['/applications', 's-1']);
     const links = cmp.historyEntries().filter((e) => e.icon === 'link');
     expect(links.map((e) => [e.title, e.body, e.actor ?? null])).toEqual([
       ['Vorgänger verknüpft', 'Sommerfest 2025', 'Mara Keller'],
@@ -171,7 +176,7 @@ describe('ApplicationsDetailComponent — Folgeanträge', () => {
     await loaded(EMPTY);
     expect(screen.getByTestId('ad-predecessor')).toHaveTextContent('Verknüpfen');
     expect(screen.getByText('Keiner')).toBeInTheDocument();
-    expect(screen.queryByText('Folgeanträge')).toBeNull();
+    expect(screen.queryByTestId('tl-row')).toBeNull();
   });
 
   it('hides the Vorgänger row without the edit right and without a Vorgänger', async () => {

@@ -350,19 +350,10 @@
             }
           </app-field-row>
         }
-        @if (l.successors.length) {
-          <app-field-row [label]="'applications.predecessor.successors' | t">
-            <span class="ad__links">
-              @for (s of l.successors; track s.id) {
-                <a class="ad__mail" [routerLink]="['/applications', s.id]">{{ s.title || ('applications.list.untitled' | t) }}</a>
-              }
-            </span>
-          </app-field-row>
-        }
       }
     </app-field-group>
   </app-section>
-  <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" />
+  <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" [rows]="linkedRows()" />
 </ng-template>
 
 <ng-template #answers let-application>

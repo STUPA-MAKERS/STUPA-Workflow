@@ -3920,7 +3920,7 @@
   "applications.predecessor.none": "None",
   "applications.predecessor.change": "Change",
   "applications.predecessor.link": "Link",
-  "applications.predecessor.successors": "Follow-up applications",
+  "applications.predecessor.successor": "Follow-up application",
   "applications.predecessor.dialogTitle": "Link previous application",
   "applications.predecessor.remove": "Remove previous application",
   "applications.predecessor.linked": "Previous application linked",

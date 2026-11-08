@@ -29,6 +29,7 @@ import type {
   ApplicationComment,
   ApplicationLinks,
   ApplicationListItem,
+  LinkedApplication,
   ApplicationType,
   ApplicationVersion,
   FormFieldDef,
@@ -100,7 +101,10 @@ import { DecisionSectionComponent } from '@shared/decision/decision-section.comp
 import { decisionHistoryLine } from '@shared/decision/decision.util';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
-import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
+import {
+  type LinkedLead,
+  TodoLinkedListComponent,
+} from '../../features/todos/linked-list/todo-linked-list.component';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
@@ -470,6 +474,26 @@ export class ApplicationsDetailComponent {
    * edit right on the Vorgänger and answers 403 without it.
    */
   readonly canLink = computed(() => !!this.app()?.canEdit);
+  /**
+   * The Vorgänger and the Folgeanträge as rows of "Verknüpft". The server sends only the
+   * Anträge the reader may open; an Antrag can have many Folgeanträge, so they show only
+   * there, while the Vorgänger also has its row in the details.
+   */
+  readonly linkedRows = computed<readonly LinkedLead[]>(() => {
+    const l = this.links();
+    if (!l) return [];
+    const t = (key: TranslationKey) => this.i18n.translate(key);
+    const row = (a: LinkedApplication, kind: string): LinkedLead => ({
+      icon: 'file',
+      title: a.title || t('applications.list.untitled'),
+      sub: [kind, a.state?.label].filter((x): x is string => !!x).join(' · '),
+      link: ['/applications', a.id],
+    });
+    return [
+      ...(l.predecessor ? [row(l.predecessor, t('applications.predecessor.field'))] : []),
+      ...l.successors.map((s) => row(s, t('applications.predecessor.successor'))),
+    ];
+  });
   readonly archiving = signal(false);
 
   /**
