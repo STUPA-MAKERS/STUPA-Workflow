@@ -1,4 +1,4 @@
-import { CdkDrag, CdkDropList, CdkDropListGroup, type CdkDragDrop, type CdkDragEnter } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDropList, CdkDropListGroup, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import { CdkScrollable } from '@angular/cdk/scrolling';
 import {
   ChangeDetectionStrategy,
@@ -166,8 +166,8 @@ export class TodoBoardViewComponent {
   readonly kb = this.keyDrag.held;
   /** A touch lifts a card after this long press, so a swipe over the cards scrolls; a mouse lifts it at once. */
   protected readonly dragDelay = { touch: 400, mouse: 0 };
-  /** The pointer drag: the column the card left and the column it is over. */
-  readonly ptr = signal<{ from: Uuid; over: Uuid } | null>(null);
+  /** The column a pointer drag started in; null without a pointer drag. */
+  readonly ptr = signal<Uuid | null>(null);
   /** A card is held, by pointer or keyboard: the page holds a live read until it lands. */
   readonly dragging = computed(() => this.ptr() !== null || this.kb() !== null);
   readonly announce = signal('');
@@ -206,12 +206,7 @@ export class TodoBoardViewComponent {
   onDragStart(col: TodoColumn): void {
     haptic('lift');
     this.cancelKeyDrag();
-    this.ptr.set({ from: col.id, over: col.id });
-  }
-
-  onEnter(event: CdkDragEnter<Uuid>): void {
-    const over = event.container.data;
-    this.ptr.update((p) => (p ? { ...p, over } : p));
+    this.ptr.set(col.id);
   }
 
   list(col: TodoColumn): readonly TodoCardTile[] {

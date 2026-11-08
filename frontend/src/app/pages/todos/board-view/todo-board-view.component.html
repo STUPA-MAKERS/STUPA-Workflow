@@ -81,7 +81,6 @@
           [cdkDropListConnectedTo]="canWrite() ? connectTo() : []"
           [cdkDropListEnterPredicate]="enter()"
           [attr.data-board-kind]="board().kind"
-          (cdkDropListEntered)="onEnter($event)"
           (cdkDropListDropped)="drop($event)"
         >
           @for (card of list(col); track card.id; let i = $index) {

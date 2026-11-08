@@ -359,6 +359,17 @@ describe('DashboardComponent', () => {
       expect(cmp(fixture).tabs().every((t: object) => !('count' in t))).toBe(true);
     });
 
+    it('asks the open tab again on a retry, and the named tab when one is given', async () => {
+      const { fixture, http } = await setup(MEMBER, { tasks: 'error', mine: 'error' });
+      cmp(fixture).retryTab();
+      answer(http.expectOne((r) => r.url.endsWith('/api/applications/tasks')), TASKS);
+      cmp(fixture).retryTab('mine');
+      answer(http.expectOne((r) => r.url.endsWith('/api/applications')), MINE);
+      fixture.detectChanges();
+      expect(cmp(fixture).taskRows().length).toBeGreaterThan(0);
+      expect(cmp(fixture).mineRows().length).toBeGreaterThan(0);
+    });
+
     /** The user has own applications, so there is no card "Antrag stellen". */
     it('shows the empty state of each tab', async () => {
       const { fixture } = await setup(MEMBER, { tasks: [] });

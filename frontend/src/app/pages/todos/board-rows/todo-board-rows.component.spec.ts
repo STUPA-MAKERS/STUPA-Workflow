@@ -424,6 +424,8 @@ describe('TodoBoardRowsComponent', () => {
     expect(cmp.list(r, r.columns[0]).map((c) => c.id)).toEqual(['k-1', 'k-2']);
     expect(cmp.list(r, { id: 'c-x', name: 'X', position: 9, isDone: false, cardCount: 0 })).toEqual([]);
     expect(cmp.more(r, { id: 'c-x', name: 'X', position: 9, isDone: true, cardCount: 0 })).toBe(0);
+    cmp.kb.set(null);
+    expect(cmp.more(r, { id: 'c-x', name: 'X', position: 9, isDone: true, cardCount: 0 })).toBe(0);
   });
 
   it('ends a keyboard drag on a row that left the rows without a word', async () => {
@@ -669,7 +671,7 @@ describe('TodoBoardRowsComponent', () => {
     it('waits while a card is held, the page holds or a move is in flight', async () => {
       const move = new Subject<TodoCardTile>();
       const { cmp, api, live, settle, fixture } = await setup({ cardTile, move: () => move, inputs: { me: 'me' } });
-      cmp.ptr.set({ from: 'c-1', over: 'c-1' });
+      cmp.ptr.set('c-1');
       live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
       await wait(settle);
       expect(api.cardTile).not.toHaveBeenCalled();
@@ -693,7 +695,7 @@ describe('TodoBoardRowsComponent', () => {
       const { cmp, api, live, settle } = await setup({ cardTile: () => answer, inputs: { me: 'me' } });
       live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
       await wait(settle);
-      cmp.ptr.set({ from: 'c-1', over: 'c-1' });
+      cmp.ptr.set('c-1');
       answer.next(tile({ id: 'k-1', columnId: 'c-2', assignees: [ME] }));
       cmp.ptr.set(null);
       await wait(settle);

@@ -258,6 +258,14 @@ describe('TodoBoardViewComponent', () => {
    * card keeps the drag, and one on another card ends it. Without a drag a pointer or a focus
    * changes nothing.
    */
+  it('ends a keyboard drag on a pointer whose target is no element', async () => {
+    const { cmp, key } = await setup();
+    await key('Raum buchen', ' ');
+    expect(cmp.kb()).not.toBeNull();
+    cmp.leaveDrag({ target: null } as unknown as Event);
+    expect(cmp.kb()).toBeNull();
+  });
+
   it('ends a keyboard drag when the focus or a pointer goes elsewhere', async () => {
     const { cmp, on, key, fixture, container } = await setup();
     const elsewhere = document.createElement('button');

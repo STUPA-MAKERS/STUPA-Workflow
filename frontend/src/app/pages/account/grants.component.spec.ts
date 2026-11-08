@@ -232,6 +232,12 @@ describe('AccountGrantsComponent', () => {
     dl.mockRestore();
   });
 
+  it('has no MCP config text before the setup loaded', async () => {
+    const { cmp } = await setup({ canMcp: true });
+    cmp.setup.set(null);
+    expect(cmp.setupJson()).toBe('');
+  });
+
   it('copies the MCP config and says so', async () => {
     const writeText = jest.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
