@@ -89,10 +89,10 @@
                 @if (qi > 0) { <hr class="fe__divider" aria-hidden="true" /> }
                 <div class="fe__pv-field">
                   @if (field.type !== 'markdown' || infoHelp(field)) {
-                    <label class="fe__pv-label">
+                    <p class="fe__pv-label">
                       {{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}
                       @if (field.required) { <span class="fe__req" aria-hidden="true">*</span> }
-                    </label>
+                    </p>
                   }
                   @if (field.type !== 'markdown' && resolved(field.help)) { <p class="fe__pv-help">{{ resolved(field.help) }}</p> }
                   @switch (field.type) {
@@ -238,8 +238,10 @@
                 [class.fe__card--sel]="isSelected(gi, qi)"
                 [attr.data-q]="gi + ':' + qi"
                 [attr.aria-label]="resolved(field.label) || ('admin.forms.untitledQuestion' | t)"
+                tabindex="-1"
                 (focusin)="focusCard(pos)"
                 (click)="focusCard(pos)"
+                (keydown.enter)="focusCard(pos)"
               >
                 <div class="fe__cardHead">
                   <h3 class="cap fe__cardTitle ell">{{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}</h3>
@@ -452,6 +454,7 @@
   <div
     class="fe__menu"
     role="menu"
+    tabindex="-1"
     [attr.aria-label]="'admin.form.typeMenu' | t"
     [style.left.px]="menuPos().left"
     [style.top.px]="menuPos().top"

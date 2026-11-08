@@ -1,10 +1,12 @@
 import { computed, signal } from '@angular/core';
-import { Subject, of, throwError } from 'rxjs';
+import { type Observable, Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
 import type {
   ApplicantCandidate,
+  ApplicationListItem,
+  ApplicationPrefill,
   ApplicationType,
   EffectiveForm,
   OnBehalfApplication,
@@ -71,12 +73,26 @@ function fakeDrafts(files: DraftFile[] = []) {
   };
 }
 
+const PRED: ApplicationListItem = {
+  id: 'p-1',
+  typeId: 't1',
+  title: 'Sommerfest 2025',
+  state: null,
+  gremiumId: null,
+  amount: null,
+  currency: null,
+  createdAt: '2025-05-12T10:00:00Z',
+  updatedAt: '2025-05-12T10:00:00Z',
+  archivedAt: null,
+};
+
 interface Opts {
   search?: jest.Mock;
   create?: jest.Mock;
   effectiveForm?: jest.Mock;
   drafts?: ReturnType<typeof fakeDrafts>;
   layout?: 'pane' | 'page' | 'sheet';
+  prefill?: jest.Mock;
 }
 
 async function setup(opts: Opts = {}) {
@@ -90,6 +106,8 @@ async function setup(opts: Opts = {}) {
     searchOnBehalfApplicants: search as unknown as ApiClient['searchOnBehalfApplicants'],
     createApplicationOnBehalf: create as unknown as ApiClient['createApplicationOnBehalf'],
     effectiveForm: effectiveForm as unknown as ApiClient['effectiveForm'],
+    applicationPrefill: (opts.prefill ?? jest.fn(() => of({ typeId: 't1', data: {} }))) as unknown as ApiClient['applicationPrefill'],
+    listApplications: (() => of({ items: [], nextCursor: null })) as unknown as ApiClient['listApplications'],
   };
   const created = jest.fn();
   const closed = jest.fn();
@@ -254,6 +272,43 @@ describe('ApplicationCaptureComponent', () => {
     expect(s.comp.effForm()).toBeNull();
     expect(s.comp.loadingForm()).toBe(false);
     expect(s.toast.error).toHaveBeenCalled();
+  });
+
+  /** A Vorgänger fills the form and goes with the capture; a new type drops it. */
+  it('prefills from a Vorgänger and sends it with the capture', async () => {
+    const prefill = jest.fn(() => of({ typeId: 't1', data: { title: 'Sommerfest' } }));
+    const s = await setup({ prefill });
+    s.comp.pick(ANNA);
+    s.comp.selectType('t1');
+    s.flush();
+    await s.fixture.whenStable();
+    s.comp.choosePredecessor({ ...PRED, title: null });
+    s.flush();
+    expect(prefill).toHaveBeenCalledWith('p-1');
+    expect(s.comp.predecessor()).toEqual({ id: 'p-1', title: 'Ohne Titel' });
+    expect(s.comp.model['title']).toBe('Sommerfest');
+    expect(s.toast.show).toHaveBeenCalledWith('Angaben aus dem Vorgänger übernommen');
+    s.comp.form.get('title')?.setValue('Sommerfest');
+    s.flush();
+    s.comp.submit(new Event('submit'));
+    expect(s.create.mock.calls[0][0]).toMatchObject({ predecessorId: 'p-1' });
+  });
+
+  it('drops a Vorgänger whose prefill fails and ignores one of another type', async () => {
+    const prefill = jest.fn<Observable<ApplicationPrefill>, []>(() => throwError(() => ({ status: 403 })));
+    const s = await setup({ prefill });
+    s.comp.selectType('t1');
+    s.flush();
+    await s.fixture.whenStable();
+    s.comp.choosePredecessor(PRED);
+    expect(s.comp.predecessor()).toBeNull();
+    expect(s.toast.error).toHaveBeenCalledWith('Der Vorgänger konnte nicht geändert werden.');
+    prefill.mockImplementation(() => of({ typeId: 't9', data: { title: 'Fremd' } }));
+    s.comp.choosePredecessor(PRED);
+    expect(s.comp.predecessor()).toEqual({ id: 'p-1', title: 'Sommerfest 2025' });
+    expect(s.comp.model['title']).toBeUndefined();
+    s.comp.selectType('t2');
+    expect(s.comp.predecessor()).toBeNull();
   });
 
   it('captures for an account and emits the new id', async () => {

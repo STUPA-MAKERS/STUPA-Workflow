@@ -3,8 +3,20 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { fireEvent, render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { By } from '@angular/platform-browser';
+import type { Type } from '@angular/core';
+import { budgetOptionTree } from '@shared/forms/budget-options';
 import { provideFormly } from '../formly.providers';
+import { FormlyInputType } from '../formly-input.type';
+import { FormlyBudgetSelectType } from './formly-budget-select.type';
+import { FormlyCheckboxType } from './formly-checkbox.type';
+import { FormlyDateRangeType } from './formly-daterange.type';
+import { FormlyDisplayType } from './formly-display.type';
+import { FormlyMultiCheckboxType } from './formly-multicheckbox.type';
+import { FormlySelectType } from './formly-select.type';
+import { FormlyTextareaType } from './formly-textarea.type';
 import { pickOption } from '../../../../testing/select';
+import { runAxe } from '../../../../testing/a11y';
 
 @Component({
   standalone: true,
@@ -122,5 +134,38 @@ describe('Formly field types', () => {
     const v = host.model['costs'] as { offers: { value: number; preferred: boolean }[] }[];
     const pref = v[0].offers.find((o) => o.preferred);
     expect(pref?.value).toBe(500);
+  });
+
+  const OPTIONS = [
+    { value: 'a', label: 'Alpha' },
+    { value: 'b', label: 'Beta' },
+  ];
+  const NODES = budgetOptionTree([{ value: 'a', label: { de: 'AStA (VS)' }, key: 'VS', color: '#5fb37a' }], 'de');
+  const TYPES: [Type<unknown>, FormlyFieldConfig][] = [
+    [FormlyInputType, { key: 'v', type: 'input', props: { label: 'Name' } }],
+    [FormlyTextareaType, { key: 'v', type: 'textarea', props: { label: 'Notiz' } }],
+    [FormlySelectType, { key: 'v', type: 'select', props: { label: 'Kategorie', options: OPTIONS } }],
+    [FormlyBudgetSelectType, { key: 'v', type: 'budget_select', props: { label: 'Kostenstelle', nodes: NODES } }],
+    [FormlyCheckboxType, { key: 'v', type: 'checkbox', props: { label: 'Einverstanden' } }],
+    [FormlyMultiCheckboxType, { key: 'v', type: 'multicheckbox', props: { label: 'Wahl', options: OPTIONS } }],
+    [FormlyDisplayType, { key: 'v', type: 'display', props: { label: 'Info', text: 'Bitte beachten.' } }],
+    [FormlyDateRangeType, { key: 'v', type: 'daterange', props: { label: 'Zeitraum' } }],
+  ];
+
+  /** § NF/accessibility/conformance/000493: each type, plain and as a touched required field. */
+  describe.each(TYPES)('%p', (type, field) => {
+    it.each([false, true])('has no axe violations (required and touched: %s)', async (invalid) => {
+      const props = { ...field.props, required: invalid };
+      const { container, fixture } = await render(HostComponent, {
+        providers: [provideFormly()],
+        componentProperties: { fields: [{ ...field, props }], model: {} },
+      });
+      if (invalid) {
+        fixture.componentInstance.form.markAllAsTouched();
+        fixture.detectChanges();
+      }
+      expect(fixture.debugElement.query(By.directive(type))).not.toBeNull();
+      expect(await runAxe(container)).toHaveNoViolations();
+    });
   });
 });

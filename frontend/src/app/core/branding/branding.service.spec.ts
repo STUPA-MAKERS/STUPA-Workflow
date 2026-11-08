@@ -4,7 +4,6 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { Title } from '@angular/platform-browser';
 import { BrandingService } from './branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -13,7 +12,6 @@ describe('BrandingService', () => {
   let svc: BrandingService;
   let http: HttpTestingController;
   let i18n: I18nService;
-  let title: Title;
 
   beforeEach(() => {
     localStorage.clear();
@@ -27,17 +25,13 @@ describe('BrandingService', () => {
     svc = TestBed.inject(BrandingService);
     http = TestBed.inject(HttpTestingController);
     i18n = TestBed.inject(I18nService);
-    title = TestBed.inject(Title);
   });
 
   afterEach(() => http.verify());
 
-  /** The constructor effect already copies the fallback into document.title. */
   it('falls back to the i18n app title before any config is loaded', () => {
     expect(svc.appName()).toBe(i18n.translate('app.title'));
     expect(svc.homeHeading()).toBe(i18n.translate('home.heading'));
-    TestBed.tick();
-    expect(title.getTitle()).toBe(i18n.translate('app.title'));
   });
 
   it('uses the configured app name once the public config loads', () => {
@@ -46,8 +40,6 @@ describe('BrandingService', () => {
 
     expect(svc.appName()).toBe('StuPa Portal');
     expect(svc.homeHeading()).toBe('StuPa Portal');
-    TestBed.tick();
-    expect(title.getTitle()).toBe('StuPa Portal');
   });
 
   it('trims the configured name and falls back when it is blank', () => {

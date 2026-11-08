@@ -4,8 +4,14 @@ title: Every route passes an axe check in both themes
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/src/app/axe-routes.contract.spec.ts:axeRouteSweep"
+implementation:
+  - frontend/e2e/06-axe.spec.ts
+  - frontend/e2e/axe-routes.ts
+  - .github/workflows/ci.yml
+  - scripts/e2e.sh
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

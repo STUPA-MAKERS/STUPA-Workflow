@@ -53,6 +53,7 @@
   <div
     class="cal__grid"
     role="grid"
+    tabindex="-1"
     [attr.aria-label]="monthText()"
     [attr.aria-busy]="loading() ? 'true' : null"
     [style.--cal-weeks]="weeks().length"

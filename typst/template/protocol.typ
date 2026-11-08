@@ -97,9 +97,11 @@
   Skyline: "/hsrt/assets/images/Skyline.svg",
 )
 
+// A logo is decoration: the title data names the gremium in text. PDF/UA-1
+// needs an alt text or an artifact for each image, so a logo is an artifact.
 #let logo(entry, height) = {
   let path = if "asset" in entry { "/assets/" + entry.asset } else { vendored-logos.at(entry.name) }
-  image(path, height: height)
+  pdf.artifact(image(path, height: height))
 }
 
 // A row of logos on one center line, `gap` apart (the tikz node chain).
@@ -108,6 +110,14 @@
   spacing: gap,
   ..entries.map(e => box(height: height, align(horizon, logo(e, height)))),
 )
+
+// An image with its alt text. An empty alt text marks a decorative image,
+// which PDF/UA-1 takes only as an artifact.
+#let alt-image(path, alt, ..args) = if alt == "" {
+  pdf.artifact(image(path, ..args))
+} else {
+  image(path, alt: alt, ..args)
+}
 
 // -- inline content -----------------------------------------------------------
 
@@ -151,21 +161,25 @@
     } else if t == "br" {
       linebreak()
     } else if t == "sym" {
-      math.equation(block: false, math-symbols.at(n.v, default: n.v))
+      math.equation(block: false, alt: n.v, math-symbols.at(n.v, default: n.v))
     } else if t == "math" {
-      mi(n.tex)
+      // PDF/UA-1 needs an alt text for each formula: the LaTeX source.
+      {
+        set math.equation(alt: n.tex)
+        mi(n.tex)
+      }
     } else if t == "time" {
       // pytex asked for the FontAwesome 5 `clock`, which FontAwesome 4 lacks,
       // so only the space in front of the time remains.
       text(fill: palette.hanblue)[ #strong(n.v)]
     } else if t == "vote" {
-      let dot = math.equation(block: false, sym.dot.c)
+      let dot = math.equation(block: false, alt: "·", sym.dot.c)
       strong[Abstimmung: ]
       text(fill: vote-color(n.yes, n.no))[Ja #n.yes #dot Nein #n.no #dot Enthaltung #n.abstain]
     } else if t == "image" {
       if "asset" in n {
         // An uploaded image inside a line: two lines high, aspect kept.
-        box(baseline: 20%, image("/assets/" + n.asset, height: 2em, alt: n.alt))
+        box(baseline: 20%, alt-image("/assets/" + n.asset, n.alt, height: 2em))
       } else {
         emph[\[#n.alt\]]
       }
@@ -516,7 +530,7 @@
   let natural = measure(image(path))
   let ratio = if natural.height > 0pt { natural.width / natural.height } else { 1 }
   let width = calc.min(region.width, natural.width, 12cm * ratio)
-  align(center, block(breakable: false, image(path, width: width, alt: n.alt)))
+  align(center, block(breakable: false, alt-image(path, n.alt, width: width)))
 })
 
 #let code-block(n) = {
@@ -545,6 +559,22 @@
   )
 }
 
+// PDF/UA-1 refuses a heading that skips a level, for example `###` after `#`.
+// Such a heading takes the next free level and keeps its look: it gets no
+// number, and the heading counter goes back to its value from before, so the
+// TOP numbers of the next headings do not move.
+#let tagged-heading(level, body) = context {
+  let before = query(selector(heading).before(here()))
+  let free = if before.len() == 0 { 1 } else { before.last().level + 1 }
+  if level <= free {
+    heading(level: level, body)
+  } else {
+    let saved = counter(heading).get()
+    heading(level: free, numbering: none, body)
+    counter(heading).update((..) => saved)
+  }
+}
+
 #let blocks(nodes, in-item: false) = {
   let prev = none
   let i = 0
@@ -563,7 +593,7 @@
       par(text(font: head-font, weight: "bold", inline(n.c)) + h(1em) + inline(rest))
       if rest != () { i += 1 }
     } else if n.t == "heading" {
-      heading(level: n.level, inline(n.c))
+      tagged-heading(n.level, inline(n.c))
     } else if n.t == "par" {
       par(inline(n.c))
     } else if n.t == "list" {
@@ -603,7 +633,10 @@
     } else if n.t == "figure" {
       figure-block(n)
     } else if n.t == "mathblock" {
-      mitex(n.tex)
+      {
+        set math.equation(alt: n.tex)
+        mitex(n.tex)
+      }
     } else if n.t == "signatures" {
       signatures(n.signers)
     }
@@ -614,7 +647,7 @@
 
 // -- pages --------------------------------------------------------------------
 
-#let skyline = place(bottom + left, image(vendored-logos.Skyline, width: 1.5 * 210mm))
+#let skyline = place(bottom + left, pdf.artifact(image(vendored-logos.Skyline, width: 1.5 * 210mm)))
 
 #let title-page(doc) = page(
   margin: 2cm,

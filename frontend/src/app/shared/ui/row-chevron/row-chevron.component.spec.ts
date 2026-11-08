@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render } from '@testing-library/angular';
 import { RowChevronComponent } from './row-chevron.component';
+import { runAxe } from '../../../../testing/a11y';
 
 describe('RowChevronComponent', () => {
   it('is a decorative right arrow, 17px by default', async () => {
@@ -20,5 +21,11 @@ describe('RowChevronComponent', () => {
     const scss = readFileSync(join(__dirname, 'row-chevron.component.scss'), 'utf8');
     expect(scss).toContain('margin-inline-end: calc(-1 * var(--space-2))');
     expect(scss).toContain('color: var(--color-text-muted)');
+  });
+
+  /** § NF/accessibility/conformance/000493 */
+  it('has no axe violations', async () => {
+    const { container } = await render(`<app-row-chevron />`, { imports: [RowChevronComponent] });
+    expect(await runAxe(container)).toHaveNoViolations();
   });
 });

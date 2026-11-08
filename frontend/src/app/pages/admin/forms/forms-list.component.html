@@ -45,7 +45,7 @@
         </ng-template>
         <ng-template appCell="actions" let-t>
           @if (canDelete()) {
-            <span class="fl__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+            <span class="fl__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
               <app-row-menu
                 [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
                 [sections]="rowMenu()"

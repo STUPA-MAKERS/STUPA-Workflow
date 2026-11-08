@@ -329,9 +329,31 @@
           </app-button>
         }
       </app-field-row>
+      @if (links(); as l) {
+        @if (l.predecessor || canLink()) {
+          <app-field-row [label]="'applications.predecessor.field' | t">
+            @if (l.predecessor; as p) {
+              <a class="ad__mail" [routerLink]="['/applications', p.id]">{{ p.title || ('applications.list.untitled' | t) }}</a>
+            } @else {
+              {{ 'applications.predecessor.none' | t }}
+            }
+            @if (canLink()) {
+              <app-button
+                trail
+                variant="text"
+                size="sm"
+                data-testid="ad-predecessor"
+                (click)="predecessorOpen.set(true)"
+              >
+                {{ (l.predecessor ? 'applications.predecessor.change' : 'applications.predecessor.link') | t }}
+              </app-button>
+            }
+          </app-field-row>
+        }
+      }
     </app-field-group>
   </app-section>
-  <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" />
+  <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" [rows]="linkedRows()" />
 </ng-template>
 
 <ng-template #answers let-application>
@@ -423,6 +445,28 @@
       [disabled]="budgetChoice() === (app()?.budgetId ?? '') && fiscalChoice() === (app()?.fiscalYearId ?? '')"
       (click)="assignBudget()"
     >{{ 'applications.budget.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<app-dialog
+  [open]="predecessorOpen()"
+  [title]="'applications.predecessor.dialogTitle' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="predecessorOpen.set(false)"
+>
+  @if (app(); as a) {
+    <app-predecessor-field
+      inputId="ad-predecessor-search"
+      [typeId]="a.typeId"
+      [excludeId]="a.id"
+      (choose)="setPredecessor($event)"
+    />
+  }
+  <div dialog-footer>
+    @if (links()?.predecessor) {
+      <app-button variant="danger" [loading]="linking()" (click)="removePredecessor()">{{ 'applications.predecessor.remove' | t }}</app-button>
+    }
+    <app-button variant="text" (click)="predecessorOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
   </div>
 </app-dialog>
 

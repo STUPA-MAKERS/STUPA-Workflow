@@ -186,7 +186,7 @@ function flushAll(http: HttpTestingController, id = 'app-1', form = true, over: 
 function flushAttachments(http: HttpTestingController) {
   flushTypes(http);
   for (const req of http.match(
-    (r) => r.method === 'GET' && /\/(attachments|timeline|mentionable)$/.test(r.url),
+    (r) => r.method === 'GET' && /\/(attachments|timeline|mentionable|links)$/.test(r.url),
   )) {
     req.flush([]);
   }

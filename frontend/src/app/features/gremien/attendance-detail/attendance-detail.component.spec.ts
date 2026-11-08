@@ -71,6 +71,23 @@ describe('AttendanceDetailComponent', () => {
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
 
+  /** A close before the next frame leaves the focus where the close put it. */
+  it('takes the focus on the frame after the open (spec 000513)', async () => {
+    const view = await setup();
+    restore = view.restore;
+    await view.openWith(ONE);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(screen.getByRole('dialog')).toHaveFocus();
+    view.cmp.close();
+    view.fixture.detectChanges();
+    view.anchor.focus();
+    await view.openWith(ONE);
+    view.cmp.close();
+    view.fixture.detectChanges();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(view.anchor).toHaveFocus();
+  });
+
   /** A second close does nothing. */
   it('closes on Escape and gives the focus back to the cell', async () => {
     const view = await setup();
