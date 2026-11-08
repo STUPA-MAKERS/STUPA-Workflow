@@ -37,6 +37,7 @@ import {
   type MarkdownFormat,
   type MarkdownImageUploader,
 } from '@stupa-makers/ui-kit/markdown-editor';
+import { ImageAltService } from '@shared/markdown/image-alt.service';
 import { MediaApiService } from '@shared/markdown/media-api.service';
 import {
   MarkdownImageUploadDirective,
@@ -71,11 +72,6 @@ const TOOLS: readonly FormatTool[] = [
   { format: 'bulletList', icon: 'list', label: 'meetings.editor.list' },
   { format: 'blockquote', icon: 'quote', label: 'meetings.editor.quote' },
 ];
-
-/** The file name without its extension, as the alt text of an uploaded image. */
-function altOf(file: File): string {
-  return file.name.replace(/\.[^.]*$/, '');
-}
 
 /**
  * The sheet of the open agenda item: "TOP 3 · Antrag", the title, the rows of the
@@ -282,9 +278,12 @@ export class TopSheetComponent {
    * a sheet that never uploads needs no HTTP client. An error shows as a toast.
    */
   protected readonly imageUpload: MarkdownImageUploader = async (file) => {
+    // The alt text comes first (app spec 000506). A cancel inserts nothing and needs no toast.
+    const alt = await this.injector.get(ImageAltService).ask(file);
+    if (alt === null) throw new Error('cancelled');
     try {
       const image = await firstValueFrom(this.injector.get(MediaApiService).uploadImage(file));
-      return { src: `/api/media/images/${image.id}`, alt: altOf(file) };
+      return { src: `/api/media/images/${image.id}`, alt };
     } catch (err) {
       this.toast.error(this.i18n.translate(imageUploadErrorKey((err as { status?: number } | null)?.status)));
       throw err;

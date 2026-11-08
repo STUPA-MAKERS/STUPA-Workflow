@@ -4,8 +4,11 @@ title: A chart has a text alternative
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/src/app/pages/budget/budget-sunburst.component.spec.ts:BudgetSunburstComponent"
+implementation:
+  - frontend/src/app/pages/budget/budget-sunburst.component.html
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

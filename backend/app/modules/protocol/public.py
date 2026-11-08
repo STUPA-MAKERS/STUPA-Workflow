@@ -263,6 +263,9 @@ class PublicProtocolDetail(FrozenCamelModel, frozen=True):
     semester: str
     finalized_at: Any = Field(default=None, alias="finalizedAt")
     gremium: PublicGremiumRef
+    #: The content language of the protocol text: the default language of the gremium.
+    #: The page puts it on the text as `lang` when it is not the UI language (spec 000523).
+    lang: str = "de"
     tops: list[PublicTopOut]
     markdown: str | None = None
     attendance: PublicAttendance
@@ -488,6 +491,7 @@ class PublicProtocolService:
             semester=semester_of(meeting_day(meeting)),
             finalizedAt=protocol.sent_at,
             gremium=self._ref(gremium),
+            lang=gremium.default_lang,
             tops=[
                 PublicTopOut(
                     number=t.number,

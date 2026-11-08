@@ -15,15 +15,15 @@ import { SectionComponent } from '@stupa-makers/ui-kit';
   imports: [SectionComponent],
   template: `
     @if (isHeading) {
-      <app-section class="display__heading" [heading]="props.label || text">
+      <app-section class="display__heading" [heading]="props.label || text" [headingLang]="props['textLang'] ?? null">
         @if (props.description) {
-          <p class="display__headingSub">{{ props.description }}</p>
+          <p class="display__headingSub" [attr.lang]="props['textLang'] ?? null">{{ props.description }}</p>
         }
       </app-section>
     } @else {
       <div class="display" [class.display--computed]="isComputed">
         @if (props.label) {
-          <span class="display__label">{{ props.label }}</span>
+          <span class="display__label" [attr.lang]="props['textLang'] ?? null">{{ props.label }}</span>
         }
         <p class="display__value">{{ text }}</p>
       </div>

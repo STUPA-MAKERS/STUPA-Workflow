@@ -1,0 +1,24 @@
+<app-dialog
+  [open]="true"
+  [title]="'markdown.image.alt.title' | t"
+  [subtitle]="fileName()"
+  [closeLabel]="'action.close' | t"
+  (closed)="cancel()"
+>
+  <form class="iad" (submit)="$event.preventDefault(); confirm()">
+    <app-input
+      name="alt"
+      [label]="'markdown.image.alt.label' | t"
+      [required]="!decorative()"
+      [disabled]="decorative()"
+      [error]="tried() && !valid() ? ('markdown.image.alt.required' | t) : ''"
+      [ngModel]="decorative() ? '' : text()"
+      (ngModelChange)="text.set($event)"
+    />
+    <app-checkbox name="decorative" [ngModel]="decorative()" (ngModelChange)="decorative.set($event)">{{
+      'markdown.image.alt.decorative' | t
+    }}</app-checkbox>
+  </form>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" (click)="confirm()">{{ 'markdown.image.alt.confirm' | t }}</app-button>
+</app-dialog>

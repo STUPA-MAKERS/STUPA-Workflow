@@ -56,6 +56,42 @@ describe('AnswerViewComponent', () => {
    * The long text is a row of its own between the two grids, rendered as Markdown. Amounts and
    * IBANs use the mono face, other values not.
    */
+  /**
+   * App spec 000523: the free text of an English application carries `lang="en"` in the
+   * German UI. A form text in a fallback language carries its language, and text in the UI
+   * language carries none.
+   */
+  it('marks content and form texts in another language with lang', async () => {
+    const fields: FormFieldDef[] = [
+      { key: 'name', type: 'text', label: { de: 'Name' } },
+      { key: 'long', type: 'textarea', label: { de: 'Beschreibung' } },
+      { key: 'kind', type: 'select', label: { en: 'Kind' }, options: [{ value: 'a', label: { en: 'Trip' } }] },
+      { key: 'n', type: 'number', label: { de: 'Anzahl' } },
+      { key: 'rows', type: 'table', label: { de: 'Tabelle' } },
+      { key: 'odd', type: 'table', label: { de: 'Liste' } },
+    ];
+    const sections: FormSection[] = [{ key: 'main', label: { en: 'Project' }, fields }];
+    const data = { name: 'Summer party', long: 'Some text', kind: 'a', n: 3, rows: [{ a: 'x' }], odd: 'y', extra: 'z' };
+    const { container } = await view(sections, data, { contentLang: 'en' });
+    const langOf = (label: string) => screen.getByText(label).closest('app-field-row')?.querySelector('.fld__value > *')?.getAttribute('lang') ?? null;
+    expect(screen.getByRole('heading', { name: 'Project' })).toHaveAttribute('lang', 'en');
+    expect(screen.getByText('Kind')).toHaveAttribute('lang', 'en');
+    expect(screen.getByText('Name')).not.toHaveAttribute('lang');
+    expect(langOf('Name')).toBe('en');
+    expect(langOf('Beschreibung')).toBe('en');
+    expect(langOf('Kind')).toBe('en');
+    expect(langOf('Anzahl')).toBeNull();
+    expect(langOf('Liste')).toBe('en');
+    expect(langOf('extra')).toBe('en');
+    expect(container.querySelector('table')).toHaveAttribute('lang', 'en');
+    expect(screen.getByText('Tabelle')).not.toHaveAttribute('lang');
+  });
+
+  it('marks nothing when the application is in the UI language', async () => {
+    const { container } = await view(one([{ key: 'name', type: 'text', label: { de: 'Name' } }]), { name: 'Fest' }, { contentLang: 'de' });
+    expect(container.querySelector('[lang]')).toBeNull();
+  });
+
   it('puts short fields side by side and a long text over the full width as Markdown', async () => {
     const { container } = await view(
       one([

@@ -26,6 +26,7 @@ import type { BudgetTreeNode } from '../../../pages/budget/budget-tree.api';
         [nodes]="nodes"
         [value]="value"
         [label]="props.label ?? ''"
+        [textLang]="props['textLang'] ?? null"
         [required]="!!props.required"
         [invalid]="showError"
         [placeholder]="props.placeholder || ('formly.select.placeholder' | t)"
@@ -37,7 +38,7 @@ import type { BudgetTreeNode } from '../../../pages/budget/budget-tree.api';
           {{ props['errorText'] ?? ('formly.select.error' | t) }}
         </p>
       } @else if (props.description) {
-        <p class="fbs__msg fbs__msg--hint">{{ props.description }}</p>
+        <p class="fbs__msg fbs__msg--hint" [attr.lang]="props['textLang'] ?? null">{{ props.description }}</p>
       }
     </div>
   `,

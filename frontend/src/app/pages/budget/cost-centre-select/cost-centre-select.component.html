@@ -22,7 +22,7 @@
   </button>
 } @else {
   <div class="ccs__box" [class.ccs__box--open]="open()" [class.ccs__box--invalid]="invalid()">
-    <span class="ccs__label" [id]="labelId()"
+    <span class="ccs__label" [id]="labelId()" [attr.lang]="textLang()"
       >{{ label() }}
       @if (required()) {
         <span class="ccs__req" aria-hidden="true"> *</span>

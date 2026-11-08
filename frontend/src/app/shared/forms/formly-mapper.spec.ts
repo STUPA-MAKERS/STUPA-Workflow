@@ -484,3 +484,46 @@ describe('toFormlySections', () => {
     expect(group.fieldGroup?.map((f) => f.key ?? f.props?.label)).toEqual(['M', 'a']);
   });
 });
+
+describe('FormTextLanguage', () => {
+  const sections: readonly FormSection[] = [
+    {
+      key: 's',
+      label: { de: 'Abschnitt' },
+      fields: [
+        { key: 'name', type: 'text', label: { de: 'Name', en: 'Name' } },
+        { key: 'note', type: 'text', label: { de: 'Notiz' } },
+        {
+          key: 'kind',
+          type: 'select',
+          label: { en: 'Kind' },
+          options: [
+            { value: 'a', label: { de: 'Fest' } },
+            { value: 'b', label: { de: 'Party', en: 'Party' } },
+          ],
+        },
+      ],
+    },
+  ];
+
+  /** A text in a fallback language carries that language; a text in the UI language does not. */
+  it('marks every label and option in a fallback language with its lang', () => {
+    const [group] = toFormlySections(sections, 'en');
+    const fields = group.fieldGroup ?? [];
+    expect(fields[0].props?.['textLang']).toBe('de');
+    expect(fields.find((f) => f.key === 'name')?.props?.['textLang']).toBeUndefined();
+    expect(fields.find((f) => f.key === 'note')?.props?.['textLang']).toBe('de');
+    const kind = fields.find((f) => f.key === 'kind');
+    expect(kind?.props?.['textLang']).toBeUndefined();
+    expect(kind?.props?.['options']).toEqual([
+      { value: 'a', label: 'Fest', lang: 'de' },
+      { value: 'b', label: 'Party' },
+    ]);
+  });
+
+  it('marks a section field heading in a fallback language', () => {
+    const [head] = toFormlyFields([{ key: 'h', type: 'section', label: { de: 'Kopf' } }], 'en');
+    expect(head.props?.['textLang']).toBe('de');
+    expect(toFormlyFields([{ key: 'h', type: 'section', label: { de: 'Kopf' } }], 'de')[0].props?.['textLang']).toBeUndefined();
+  });
+});

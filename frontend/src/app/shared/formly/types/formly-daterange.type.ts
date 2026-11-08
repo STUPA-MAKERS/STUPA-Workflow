@@ -34,7 +34,7 @@ interface DateRange {
       (focusout)="formControl.markAsTouched()"
     >
       <legend class="dr__legend">
-        {{ props.label }}
+        <span [attr.lang]="props['textLang'] ?? null">{{ props.label }}</span>
         @if (props.required) {
           <span class="dr__req" aria-hidden="true">*</span>
         }
@@ -64,7 +64,7 @@ interface DateRange {
         />
       </div>
       @if (props.description && !showError) {
-        <p class="dr__hint" [id]="controlId + '-hint'">{{ props.description }}</p>
+        <p class="dr__hint" [id]="controlId + '-hint'" [attr.lang]="props['textLang'] ?? null">{{ props.description }}</p>
       }
     </fieldset>
   `,
