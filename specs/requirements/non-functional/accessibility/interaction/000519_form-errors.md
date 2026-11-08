@@ -4,8 +4,17 @@ title: A form error is a text next to the field
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/vendor/ui-kit/src/lib/focus/first-invalid.spec.ts:focusFirstInvalid"
+  - "frontend/vendor/ui-kit/src/lib/currency-input/currency-input.component.spec.ts:CurrencyInputComponent"
+implementation:
+  - frontend/vendor/ui-kit/src/lib/focus/first-invalid.ts
+  - frontend/src/app/pages/applications/capture/application-capture.component.ts
+  - frontend/src/app/features/apply/status-timeline.component.ts
+  - frontend/vendor/ui-kit/src/lib/currency-input/currency-input.component.ts
+  - frontend/src/app/features/apply/apply-wizard.component.ts
+  - frontend/src/app/pages/applications/applications-detail.component.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

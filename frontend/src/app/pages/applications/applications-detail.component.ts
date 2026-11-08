@@ -54,9 +54,11 @@ import {
   DialogComponent,
   DropOverlayComponent,
   EmptyStateComponent,
+  FabComponent,
   FieldGroupComponent,
   FieldRowComponent,
   FileDropDirective,
+  revealFirstInvalid,
   IconComponent,
   ListDetailNav,
   type ListDetailTask,
@@ -66,6 +68,7 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  SectionComponent,
   SelectFieldComponent,
   type SelectOption,
   SheetBarComponent,
@@ -77,8 +80,6 @@ import {
   TabPagerComponent,
   TabsComponent,
   ToastService,
-  FabComponent,
-  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -1213,14 +1214,12 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Scroll the first field with an error into view, after the form drew it. */
+  /**
+   * Focus the first field with an error after the form drew it (spec 000519); without a
+   * field in error, scroll to the first error text.
+   */
   private revealError(): void {
-    setTimeout(() => {
-      const el = document.querySelector<HTMLElement>(
-        '.ad__edit [aria-invalid="true"], .ad__edit [role="alert"]',
-      );
-      el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-    });
+    setTimeout(() => revealFirstInvalid(document.querySelector('.ad__edit')));
   }
 
   doDelete(): void {

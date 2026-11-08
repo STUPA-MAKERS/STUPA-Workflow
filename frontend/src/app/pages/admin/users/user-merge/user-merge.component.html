@@ -60,7 +60,7 @@
         @if (loadingPreview()) {
           <app-skeleton variant="rows" [count]="4" [label]="'admin.users.merge.loadingPreview' | t" />
         } @else if (previewFailed() || !p) {
-          <app-note kind="error" icon="alert">
+          <app-note kind="error" icon="alert" role="alert">
             <span>{{ previewError() | t }}</span>
           </app-note>
         } @else {
@@ -102,7 +102,7 @@
 
           @if (conflicts().length) {
             <app-section class="um__sec" [heading]="'admin.users.merge.conflictsTitle' | t">
-              <app-note kind="error" icon="alert">
+              <app-note kind="error" icon="alert" role="alert">
                 <span>{{ 'admin.users.merge.conflictsLead' | t }}</span>
               </app-note>
               <ul class="rowgroup um__conflicts">

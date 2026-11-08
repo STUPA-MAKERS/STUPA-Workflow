@@ -28,20 +28,21 @@ import { applyServerErrors, clearServerErrors } from '@shared/forms/server-error
 import { debounced } from '@shared/debounced';
 import {
   AutocompleteComponent,
-  FabComponent,
   DatepickerComponent,
+  FabComponent,
+  revealFirstInvalid,
   IconComponent,
   InputComponent,
   liveSearch,
   NoteComponent,
   ScrollFadeDirective,
+  SectionComponent,
   SegmentedComponent,
   type SegmentedOption,
   SelectFieldComponent,
   type SelectOption,
   SkeletonComponent,
   ToastService,
-  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import {
   DRAFT_FILES_STORAGE_KEY,
@@ -395,6 +396,8 @@ export class ApplicationCaptureComponent {
     if (!this.canSubmit()) {
       this.form.markAllAsTouched();
       this.toast.error(this.i18n.translate('applications.capture.incomplete'));
+      const root = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+      setTimeout(() => revealFirstInvalid(root));
       return;
     }
     const ids = this.drafts.attachmentIds();

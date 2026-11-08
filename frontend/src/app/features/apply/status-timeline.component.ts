@@ -54,19 +54,20 @@ import {
   ConfirmDialogComponent,
   DropOverlayComponent,
   EmptyStateComponent,
+  FabComponent,
   FileDropDirective,
+  revealFirstInvalid,
   IconComponent,
   MEDIA,
   mediaQuery,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  SectionComponent,
   SideSheetComponent,
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
-  FabComponent,
-  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
@@ -575,6 +576,7 @@ export class StatusTimelineComponent {
     if (this.editForm.invalid) {
       this.editForm.markAllAsTouched();
       this.toast.error(this.i18n.translate('apply.error.invalid'));
+      setTimeout(() => revealFirstInvalid(document.querySelector('.sp__edit')));
       return;
     }
     this.saving.set(true);

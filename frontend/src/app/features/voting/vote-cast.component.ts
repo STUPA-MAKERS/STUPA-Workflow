@@ -16,10 +16,11 @@ import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/dele
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { MyBallot, ProblemDetail, Vote } from '@core/api/models';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
 import {
+  Announcer,
   ButtonComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
@@ -39,6 +40,7 @@ import type { BallotCaster, BallotFailure } from './ballot/ballot.component';
 import { VotePhoneHeaderComponent } from './phone-header/phone-header.component';
 import { VotePanelComponent } from './vote-panel/vote-panel.component';
 import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote-context';
+import { voteChangeText, voteSubject, type SeenVote } from './vote-announce.util';
 import { VotingPageService, visibleTicks } from './voting-page/voting-page.service';
 import { BEAMER_FROM_PARAM } from './beamer-link.util';
 import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
@@ -137,6 +139,9 @@ export class VoteCastComponent implements OnDestroy {
   private ownMeetingId: string | null = null;
   /** The vote the channel showed open at the last check, so a close of it reloads. */
   private lastOpened: string | null = null;
+  /** The status of the shown vote when it was last read, for the announcement of a change. */
+  private lastStatus: SeenVote | null = null;
+  private readonly announcer = inject(Announcer);
   /** The id of the shown vote. A late answer for another vote is dropped. */
   private currentId: string | null = null;
 
@@ -522,7 +527,27 @@ export class VoteCastComponent implements OnDestroy {
         else if (vote.status === 'open' && before === vote.id && opened !== vote.id) this.reload();
       });
     });
+
+    effect(() => {
+      const vote = this.loaded();
+      untracked(() => this.announceChange(vote));
+    });
   }
+
+  /**
+   * Read out that the shown vote opened or closed (spec 000518). The change comes over the
+   * live channel or the poll, without an action of the reader, so a screen reader would
+   * not notice it. The text names the vote and its TOP, and the result on a close.
+   */
+  private announceChange(vote: Vote | null): void {
+    const before = this.lastStatus;
+    this.lastStatus = vote ? { id: vote.id, status: vote.status } : null;
+    if (!vote) return;
+    const { meeting, position } = this.context();
+    const t: Translate = (key, params) => this.i18n.translate(key, params);
+    this.announcer.announce(voteChangeText(t, before, vote, voteSubject(t, vote.question, meeting?.title, position)));
+  }
+
 
   /**
    * Read the delegation status. It explains a handed-over voting right, or it unlocks

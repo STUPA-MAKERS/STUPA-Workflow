@@ -37,6 +37,7 @@
         <app-search-pill
           [placeholder]="'expenses.search' | t"
           [label]="'expenses.searchLabel' | t"
+          [results]="loading() || reloading() ? null : total()"
           [value]="q()"
           (valueChange)="onSearch($event)"
         />
