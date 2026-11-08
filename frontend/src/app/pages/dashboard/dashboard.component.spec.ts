@@ -274,8 +274,8 @@ describe('DashboardComponent', () => {
   describe('work list', () => {
     it('shows the tasks as a table with status and waiting time', async () => {
       const { http } = await setup(MEMBER);
-      expect(screen.getByRole('tab', { name: 'Offene Aufgaben 1' })).toHaveAttribute('aria-selected', 'true');
-      expect(screen.getByRole('tab', { name: 'Meine Anträge 7' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Offene Aufgaben' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('tab', { name: 'Meine Anträge' })).toBeInTheDocument();
       expect(screen.queryByRole('tab', { name: /Abstimmungen/ })).not.toBeInTheDocument();
       http.expectNone((r) => r.url.endsWith('/api/votes'));
       const table = screen.getByRole('table');
@@ -352,11 +352,11 @@ describe('DashboardComponent', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
-    it('counts nothing while every list failed', async () => {
+    it('shows empty lists and tabs without counts while every list failed', async () => {
       const { fixture } = await setup(MEMBER, { tasks: 'error', mine: 'error' });
       expect(cmp(fixture).taskRows()).toEqual([]);
       expect(cmp(fixture).mineRows()).toEqual([]);
-      expect(cmp(fixture).tabs().map((t: { count: number | null }) => t.count)).toEqual([null, null]);
+      expect(cmp(fixture).tabs().every((t: object) => !('count' in t))).toBe(true);
     });
 
     /** The user has own applications, so there is no card "Antrag stellen". */
@@ -423,8 +423,8 @@ describe('DashboardComponent', () => {
       const { fixture } = await setup(MEMBER, { phone: true, tasks: many });
       expect(screen.queryByRole('table')).not.toBeInTheDocument();
       expect(cmp(fixture).taskRows()).toHaveLength(5);
-      expect(screen.getByRole('tab', { name: 'Aufgaben 7' })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: 'Anträge 7' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Aufgaben' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Anträge' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Aufgabe 0' })).toHaveAttribute('href', '/tasks/t0');
     });
   });
@@ -515,7 +515,7 @@ describe('DashboardComponent', () => {
         },
         delegations: [delegation(null, { id: 'admin-row', meetingId: 'm-2' }), delegation('incoming')],
       });
-      expect(screen.getByRole('heading', { name: 'Anstehende Sitzungen · 4+' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Anstehende Sitzungen' })).toBeInTheDocument();
       const rows = cmp(fixture).upcoming();
       expect(rows).toHaveLength(3);
       expect(rows[0].note).toBe('Du vertrittst Konrad Pfeiffer');
@@ -543,7 +543,6 @@ describe('DashboardComponent', () => {
       expect(cmp(fixture).upcoming()[1].note).toBe('Du vertrittst ?');
       expect(cmp(fixture).upcoming()).toHaveLength(5);
       expect(cmp(fixture).upcoming()[0].note).toBe('Du wirst vertreten von ?');
-      expect(cmp(fixture).plannedCount()).toBe('6');
     });
 
     it('shows two meetings on a phone', async () => {

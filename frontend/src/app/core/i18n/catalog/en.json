@@ -516,7 +516,7 @@
   "dashboard.today.keeper": "You keep the minutes",
   "dashboard.today.voted": "You voted",
   "dashboard.today.voteMissing": "Your vote is missing",
-  "dashboard.today.upcoming": "Upcoming meetings · {n}",
+  "dashboard.today.upcoming": "Upcoming meetings",
   "dashboard.today.all": "All",
   "dashboard.today.none": "No meetings",
   "dashboard.today.noneBody": "No meeting of your committees is planned.",

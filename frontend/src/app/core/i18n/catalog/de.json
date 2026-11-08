@@ -516,7 +516,7 @@
   "dashboard.today.keeper": "Du führst Protokoll",
   "dashboard.today.voted": "Du hast abgestimmt",
   "dashboard.today.voteMissing": "Deine Stimme fehlt",
-  "dashboard.today.upcoming": "Anstehende Sitzungen · {n}",
+  "dashboard.today.upcoming": "Anstehende Sitzungen",
   "dashboard.today.all": "Alle",
   "dashboard.today.none": "Keine Sitzungen",
   "dashboard.today.noneBody": "Für deine Gremien ist keine Sitzung geplant.",
