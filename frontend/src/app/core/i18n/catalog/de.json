@@ -1841,6 +1841,7 @@
   "admin.flow.err.notifyRecipientValue": "Der Empfänger „{kind}“ braucht einen Wert.",
   "admin.flow.loadFailed": "Flow konnte nicht geladen werden (fehlende Berechtigung?).",
   "admin.flow.addState": "Status hinzufügen",
+  "admin.flow.addTransition": "Übergang hinzufügen",
   "admin.flow.initial": "Initial",
   "admin.flow.color": "Farbe",
   "admin.flow.colorClear": "Farbe entfernen",

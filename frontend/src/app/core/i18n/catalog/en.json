@@ -1841,6 +1841,7 @@
   "admin.flow.err.notifyRecipientValue": "The recipient \"{kind}\" needs a value.",
   "admin.flow.loadFailed": "Could not load flow (missing permission?).",
   "admin.flow.addState": "Add state",
+  "admin.flow.addTransition": "Add transition",
   "admin.flow.initial": "Initial",
   "admin.flow.color": "Color",
   "admin.flow.colorClear": "Clear color",

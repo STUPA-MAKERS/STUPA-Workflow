@@ -177,7 +177,10 @@ function patchTransition(
   };
 }
 
-export function addTransition(g: FlowGraph, t: TransitionDef): FlowGraph {
+export function addTransition(
+  g: FlowGraph,
+  t: TransitionDef,
+): FlowGraph & { transitions: TransitionDef[] } {
   return { ...g, transitions: [...(g.transitions ?? []), t] };
 }
 

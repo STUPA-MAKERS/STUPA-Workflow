@@ -276,6 +276,12 @@
           @if (stateTransitionLists(); as lists) {
             <app-transition-lists [lists]="lists" (selectTransition)="selectEdge($event)" />
           }
+          <app-button
+            variant="text"
+            size="sm"
+            [disabled]="graph().states.length < 2"
+            (click)="addTransitionFrom(s.key)"
+          ><app-icon name="plus" /> {{ 'admin.flow.addTransition' | t }}</app-button>
         } @else if (selectedTransition(); as sel) {
           <app-transition-inspector
             [transition]="sel.t"

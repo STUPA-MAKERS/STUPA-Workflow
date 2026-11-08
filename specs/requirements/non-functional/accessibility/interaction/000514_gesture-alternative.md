@@ -4,8 +4,15 @@ title: Each gesture has a single tap alternative
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/src/app/shared/ui/chat/chat.component.spec.ts:ChatComponent"
+  - "frontend/vendor/ui-kit/src/lib/press-select/press-select.directive.spec.ts:PressSelectDirective"
+implementation:
+  - frontend/src/app/shared/ui/chat/chat.component.html
+  - frontend/vendor/ui-kit/src/lib/press-select/press-select.directive.ts
+  - frontend/src/app/pages/expenses/expenses.component.html
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.html
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

@@ -48,6 +48,7 @@ import {
 } from '../admin.models';
 import {
   autoLayout,
+  blankTransition,
   emptyFlowGraph,
   normalizeFlowGraph,
   serializeFlowGraph,
@@ -617,6 +618,19 @@ export class FlowEditorComponent {
     const ctx = this.currentGroupId();
     this.graph.update((g) => ops.addState(g, key, ctx));
     this.selection.set({ kind: 'state', key });
+  }
+
+  /**
+   * A new transition from the state to the first other state, without a drag from the
+   * connector dot (app spec 000515). The inspector opens on it, so its selects set the
+   * real target, a branch and a guard.
+   */
+  protected addTransitionFrom(from: string): void {
+    const to = this.graph().states.find((st) => st.key !== from)?.key;
+    if (!to) return;
+    const graph = ops.addTransition(this.graph(), blankTransition(from, to));
+    this.graph.set(graph);
+    this.selection.set({ kind: 'transition', index: graph.transitions.length - 1 });
   }
 
   protected removeSelectedState(): void {
