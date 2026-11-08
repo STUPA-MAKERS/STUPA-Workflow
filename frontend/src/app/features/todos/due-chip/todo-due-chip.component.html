@@ -3,9 +3,11 @@
     type="button"
     class="chip dc__chip"
     [disabled]="disabled()"
-    [attr.aria-label]="(text() ? 'todos.due.change' : 'todos.due.set') | t: { date: text() ?? '' }"
     (click)="pick()"
   >
+    <!-- The action is hidden text before the visible date, not an aria-label: the name must
+         hold the visible text (WCAG 2.5.3). -->
+    <span class="sr-only">{{ (text() ? 'todos.due.change' : 'todos.due.set') | t: { date: '' } }}</span>
     <app-icon name="cal" [size]="15" />
     <span>{{ text() ?? ('todos.due.none' | t) }}</span>
     @if (!disabled()) {

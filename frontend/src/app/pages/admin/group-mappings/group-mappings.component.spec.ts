@@ -202,7 +202,7 @@ describe('GroupMappingsComponent', () => {
 
   it('the global dialog has a role select and no gremium field', async () => {
     await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Zuordnung zu globaler Rolle anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Zuordnung anlegen ?: Globale Rollen$/ }));
     const dialog = screen.getByRole('dialog', { name: 'Zuordnung zu globaler Rolle anlegen' });
     expect(within(dialog).getByLabelText(/OIDC-Gruppe/)).toBeInTheDocument();
     expect(within(dialog).getByText('Rolle')).toBeInTheDocument();
@@ -211,7 +211,7 @@ describe('GroupMappingsComponent', () => {
 
   it('the membership dialog has a gremium select and no role field', async () => {
     await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Zuordnung zu Mitgliedschaft anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Zuordnung anlegen ?: Gremien-Mitgliedschaft$/ }));
     const dialog = screen.getByRole('dialog', { name: 'Zuordnung zu Mitgliedschaft anlegen' });
     expect(within(dialog).getByText('Gremium')).toBeInTheDocument();
     expect(within(dialog).queryByText('Rolle')).toBeNull();
@@ -219,7 +219,7 @@ describe('GroupMappingsComponent', () => {
 
   it('the role dialog has a gremium filter, and a gremium role select', async () => {
     await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Zuordnung zu Gremien-Rolle anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Zuordnung anlegen ?: Gremien-Rollen$/ }));
     const dialog = screen.getByRole('dialog', { name: 'Zuordnung zu Gremien-Rolle anlegen' });
     expect(within(dialog).getByText('Gremium')).toBeInTheDocument();
     expect(within(dialog).getByText('Gremien-Rolle')).toBeInTheDocument();

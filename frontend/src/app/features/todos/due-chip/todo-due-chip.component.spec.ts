@@ -26,7 +26,7 @@ describe('TodoDueChipComponent', () => {
     const { native } = await setup(null);
     const click = jest.spyOn(native, 'click');
     Object.defineProperty(native, 'showPicker', { value: undefined, configurable: true });
-    fireEvent.click(screen.getByRole('button', { name: 'Datum setzen' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Datum setzen/ }));
     expect(click).toHaveBeenCalledTimes(1);
     Object.defineProperty(native, 'showPicker', {
       value: () => {
@@ -34,7 +34,7 @@ describe('TodoDueChipComponent', () => {
       },
       configurable: true,
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Datum setzen' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Datum setzen/ }));
     expect(click).toHaveBeenCalledTimes(2);
     expect(native.value).toBe('');
     expect(screen.getByText('ohne Datum')).toBeInTheDocument();

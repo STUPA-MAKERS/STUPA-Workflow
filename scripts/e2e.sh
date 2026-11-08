@@ -10,7 +10,9 @@
 # scenarios that are slow or flaky stay out of it: async voting,
 # live-vote WebSocket, protocol to PDF and OIDC. See e2e/README.md.
 #
-# Usage: scripts/e2e.sh
+# Usage: scripts/e2e.sh [playwright test args]
+#   Arguments go to `npx playwright test`, for example `e2e/06-axe.spec.ts` for the
+#   axe sweep alone (CI job `axe`).
 #   E2E_TIMEOUT: default 900s, for the image build and the ClamAV start.
 #   WEB_PORT: host port of `web`, default 8080. The mailpit API stays on
 #   127.0.0.1:8025 (overlay).
@@ -143,7 +145,7 @@ export E2E_MAILPIT_URL="http://127.0.0.1:8025"
 export E2E_ARTIFACTS_FILE="${ARTIFACTS}/e2e.json"
 
 set +e
-npx playwright test
+npx playwright test "$@"
 rc=$?
 set -e
 
