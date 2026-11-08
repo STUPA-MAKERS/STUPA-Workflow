@@ -70,7 +70,7 @@
           (click)="showPast.set(!showPast())"
         >
           <app-icon [name]="showPast() ? 'up' : 'down'" />
-          {{ 'admin.deleg.past' | t: { count: past().length } }}
+          {{ 'admin.deleg.past' | t }}
         </button>
         @if (showPast()) {
           <div id="dl-past">

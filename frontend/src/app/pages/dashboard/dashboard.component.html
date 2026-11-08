@@ -106,7 +106,7 @@
     }
 
     @if (upcoming().length) {
-      <app-section class="dash__block" [level]="hasToday() ? 3 : 2" [heading]="'dashboard.today.upcoming' | t: { n: plannedCount() }">
+      <app-section class="dash__block" [level]="hasToday() ? 3 : 2" [heading]="'dashboard.today.upcoming' | t">
         @if (canSeeMeetings()) {
           <a sectionAction class="dash__more" routerLink="/meetings">{{ 'dashboard.today.all' | t }}</a>
         }

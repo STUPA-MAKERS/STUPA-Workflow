@@ -113,7 +113,7 @@ interface TaskRow {
  * Below the applications the group "To-Dos" lists the open cards assigned to the user
  * over all boards (`GET /todos/mine`, by due date). A card opens as
  * `/tasks/todo/:cardId` with the card detail in the right pane. While To-Dos exist, the
- * groups carry headings with their counts and the chips "Anzeigen" and "Fällig" filter
+ * groups carry headings (no counts, spec 000560) and the chips "Anzeigen" and "Fällig" filter
  * them; without To-Dos the page looks as before.
  */
 @Component({

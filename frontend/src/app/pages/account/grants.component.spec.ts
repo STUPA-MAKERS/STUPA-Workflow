@@ -97,7 +97,7 @@ describe('AccountGrantsComponent', () => {
   /** No raw ISO time and no scope key shows. A missing time is a dash. */
   it('lists the grants with scope labels, Erstellt and Läuft ab, and counts them', async () => {
     await setup();
-    expect(screen.getByRole('heading', { name: 'Aktive Zugriffe · 2' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Aktive Zugriffe' })).toBeInTheDocument();
     const [first, second] = rows();
     expect(first).toHaveTextContent('Lesen, Sitzungen verwalten');
     expect(first).toHaveTextContent(`Erstellt ${fmt('2026-06-01T10:00:00Z')}`);
@@ -127,7 +127,7 @@ describe('AccountGrantsComponent', () => {
     const api = makeApi({ listGrants: jest.fn(() => of([])) });
     await setup({ api });
     expect(screen.getByText('Keine aktiven Zugriffe.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Aktive Zugriffe · 0' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Aktive Zugriffe' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Alle widerrufen' })).toBeNull();
   });
 
@@ -230,6 +230,12 @@ describe('AccountGrantsComponent', () => {
     expect(api.downloadMcpPackage).toHaveBeenCalled();
     expect(dl).toHaveBeenCalledWith(expect.any(Blob), 'antragsplattform-mcp.tar.gz');
     dl.mockRestore();
+  });
+
+  it('has no MCP config text before the setup loaded', async () => {
+    const { cmp } = await setup({ canMcp: true });
+    cmp.setup.set(null);
+    expect(cmp.setupJson()).toBe('');
   });
 
   it('copies the MCP config and says so', async () => {

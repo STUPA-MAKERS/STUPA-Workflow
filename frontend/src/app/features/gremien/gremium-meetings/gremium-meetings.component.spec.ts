@@ -28,17 +28,15 @@ async function setup(opts: { api?: ReturnType<typeof gremienApiMock>; phone?: bo
   localStorage.setItem('ap.locale', 'de');
   const restore = matchMediaQueries(...(opts.phone ? [MEDIA.phone] : []));
   const api = opts.api ?? gremienApiMock({ meetings: jest.fn(() => of(MEETINGS)) });
-  const count = jest.fn();
   const view = await render(GremiumMeetingsComponent, {
     inputs: { gremiumId: 'g-1' },
-    on: { count },
     providers: [
       provideRouter([]),
       { provide: GremienApiService, useValue: api },
       { provide: GREMIEN_NOW, useValue: GREMIEN_TEST_NOW },
     ],
   });
-  return { ...view, api, count, restore, cmp: view.fixture.componentInstance };
+  return { ...view, api, restore, cmp: view.fixture.componentInstance };
 }
 
 describe('GremiumMeetingsComponent', () => {
@@ -53,7 +51,6 @@ describe('GremiumMeetingsComponent', () => {
     const view = await setup();
     restore = view.restore;
     expect(view.api.meetings).toHaveBeenCalledWith('g-1');
-    expect(view.count).toHaveBeenCalledWith(MEETINGS.length);
     const heads = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
     expect(heads).toEqual(['Kommend', 'Oktober 2026', 'September 2026', 'November 2025', 'Ohne Datum']);
     const titles = view.cmp.groups()[0].rows.map((r) => r.meeting.id);

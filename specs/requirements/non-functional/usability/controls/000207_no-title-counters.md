@@ -2,12 +2,10 @@
 id: "000207"
 title: Titles show no counters
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+updated: 2026-11-08
+replaced_by: NF/usability/controls/000560
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

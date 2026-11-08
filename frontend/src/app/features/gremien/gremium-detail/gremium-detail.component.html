@@ -105,7 +105,7 @@
       @if (visited().has(id)) {
         @switch (id) {
           @case ('sitzungen') {
-            <app-gremium-meetings [gremiumId]="g.id" (count)="meetingCount.set($event)" />
+            <app-gremium-meetings [gremiumId]="g.id" />
           }
           @case ('mitglieder') {
             <app-gremium-members [gremiumId]="g.id" [gremiumName]="g.name" />

@@ -124,7 +124,7 @@ interface Load<T> {
  * The start page of a signed-in person (variant B "Arbeitsliste + Seitenleiste").
  *
  * Left: the search pill, the greeting, and ONE work list with the
- * tabs "Offene Aufgaben" and "Meine Anträge". The tabs show their counts
+ * tabs "Offene Aufgaben" and "Meine Anträge". The tabs show no counts (spec 000560),
  * and the URL keeps the choice (`?tab=`). Each tab is a table with real columns; a row
  * opens its detail page, and "Alle … öffnen" opens the full list. Wide, "Antrag stellen"
  * is a floating button at the foot of the list column; narrower, at the foot of the page.
@@ -255,19 +255,9 @@ export class DashboardComponent {
 
   readonly tabs = computed<TabItem[]>(() => {
     const short = this.phone();
-    const tasks = this.tasks();
-    const mine = this.mine();
     return [
-      {
-        id: 'tasks',
-        label: this.i18n.translate(short ? 'dashboard.tab.tasksShort' : 'dashboard.tasks.title'),
-        count: tasks ? tasks.length : null,
-      },
-      {
-        id: 'mine',
-        label: this.i18n.translate(short ? 'dashboard.tab.mineShort' : 'dashboard.applications.title'),
-        count: mine ? mine.total : null,
-      },
+      { id: 'tasks', label: this.i18n.translate(short ? 'dashboard.tab.tasksShort' : 'dashboard.tasks.title') },
+      { id: 'mine', label: this.i18n.translate(short ? 'dashboard.tab.mineShort' : 'dashboard.applications.title') },
     ];
   });
 
@@ -399,12 +389,6 @@ export class DashboardComponent {
 
   /** The planned meetings, in the order of the timeline. */
   private readonly planned = computed(() => this.meetings().filter((m) => m.status === 'planned'));
-
-  /** "5" or "8+" when the timeline holds more. */
-  readonly plannedCount = computed(() => {
-    const n = this.planned().length;
-    return this.timeline()?.nextCursor ? `${n}+` : String(n);
-  });
 
   readonly upcoming = computed<UpcomingRow[]>(() => {
     const cap = this.phone() ? PHONE_MEETINGS : this.extraWide() ? MEETINGS_XL : MEETINGS;

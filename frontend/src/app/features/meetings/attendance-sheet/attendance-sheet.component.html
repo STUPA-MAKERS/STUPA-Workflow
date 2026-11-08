@@ -136,7 +136,7 @@
 
         @if (meetingDelegations().length) {
           <section class="as__sec" [attr.aria-label]="'meetings.attendanceSheet.delegationsTitle' | t">
-            <h3 class="as__cap cap">{{ 'meetings.attendanceSheet.delegations' | t: { n: meetingDelegations().length } }}</h3>
+            <h3 class="as__cap cap">{{ 'meetings.attendanceSheet.delegationsTitle' | t }}</h3>
             <ul class="as__list rowgroup rowgroup--bg3">
               @for (d of meetingDelegations(); track d.id) {
                 <li class="as__item">
@@ -160,7 +160,7 @@
 
         @if (m.canWrite && m.status === 'live') {
           <section class="as__sec" [attr.aria-label]="'meetings.viewers.title' | t">
-            <h3 class="as__cap cap">{{ 'meetings.attendanceSheet.viewers' | t: { n: viewers().length } }}</h3>
+            <h3 class="as__cap cap">{{ 'meetings.viewers.title' | t }}</h3>
             <div aria-live="polite">
               @if (viewers().length) {
                 <ul class="as__list rowgroup rowgroup--bg3">

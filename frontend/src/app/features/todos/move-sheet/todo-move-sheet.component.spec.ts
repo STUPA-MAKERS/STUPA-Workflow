@@ -2,9 +2,9 @@ import { fireEvent, render, screen } from '@testing-library/angular';
 import { TodoMoveSheetComponent, type MoveColumn } from './todo-move-sheet.component';
 
 const COLUMNS: MoveColumn[] = [
-  { id: 'c-1', name: 'Offen', count: 5 },
-  { id: 'c-2', name: 'In Arbeit', count: 3 },
-  { id: 'c-4', name: 'Erledigt', count: null },
+  { id: 'c-1', name: 'Offen' },
+  { id: 'c-2', name: 'In Arbeit' },
+  { id: 'c-4', name: 'Erledigt' },
 ];
 
 async function setup(current: string | null = 'c-2', canTransfer = false) {
@@ -31,8 +31,7 @@ describe('TodoMoveSheetComponent', () => {
     expect(screen.getByRole('heading', { name: 'Verschieben' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'In anderes Board verschieben' })).toBeNull();
     expect(screen.getByRole('radio', { name: /In Arbeit/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: /Offen/ })).toHaveTextContent('5');
-    expect(screen.getByRole('radio', { name: 'Erledigt' }).querySelector('.ms__count')).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Offen' })).toHaveTextContent(/^\s*Offen\s*$/);
     fireEvent.click(screen.getByRole('radio', { name: 'Erledigt' }));
     fixture.componentInstance.setPosition('bottom');
     fixture.detectChanges();
