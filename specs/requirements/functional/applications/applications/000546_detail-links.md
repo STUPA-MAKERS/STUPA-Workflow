@@ -2,7 +2,7 @@
 id: "000546"
 title: The detail shows Vorgänger and Folgeanträge
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-08
 implementation: null

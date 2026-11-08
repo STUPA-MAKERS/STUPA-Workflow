@@ -2,7 +2,7 @@
 id: "000544"
 title: A Vorgänger chosen at creation prefills the form
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-08
 implementation: null

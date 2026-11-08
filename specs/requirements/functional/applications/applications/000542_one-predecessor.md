@@ -2,7 +2,7 @@
 id: "000542"
 title: An Antrag can have one Vorgänger
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-08
 implementation: null

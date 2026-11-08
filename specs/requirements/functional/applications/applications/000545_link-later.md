@@ -2,7 +2,7 @@
 id: "000545"
 title: A Vorgänger linked later adds only the link
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-08
 implementation: null

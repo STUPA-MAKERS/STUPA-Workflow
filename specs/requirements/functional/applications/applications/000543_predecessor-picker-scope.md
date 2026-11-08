@@ -2,7 +2,7 @@
 id: "000543"
 title: The Vorgänger picker lists only readable Anträge
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-08
 implementation: null
