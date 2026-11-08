@@ -4,8 +4,12 @@ title: An admin accent colour keeps the contrast
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/src/app/pages/admin/branding/branding-editor.component.spec.ts:BrandingEditorComponent"
+implementation:
+  - frontend/src/app/core/theme/accent.ts
+  - frontend/src/app/pages/admin/branding/branding-editor.component.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

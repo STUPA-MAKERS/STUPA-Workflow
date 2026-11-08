@@ -13,7 +13,7 @@ import { I18nService, baseLocale } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CATALOG, type TranslationKey } from '@core/i18n/translations';
 import { langFieldLabel, setI18n } from '@shared/forms/i18n-text';
-import { DEFAULT_ACCENT, normalizeHex } from '@core/theme/accent';
+import { DEFAULT_ACCENT, accentContrastIssues, accentPalette, normalizeHex } from '@core/theme/accent';
 import {
   ThemeService,
   FabComponent,
@@ -138,6 +138,14 @@ export class BrandingEditorComponent {
   protected readonly accent = computed(() => normalizeHex(this.draft()?.accentColor) ?? DEFAULT_ACCENT);
   /** The edited copy carries an own accent. */
   protected readonly customAccent = computed(() => this.accent() !== DEFAULT_ACCENT);
+  /**
+   * The text steps of the accent palette that miss 4.5:1 in either theme (spec 000501). An
+   * issue blocks the save. The derived palette moves every step to AA, so this guards a
+   * change of the derivation, not a pick.
+   */
+  protected readonly accentIssues = computed(() =>
+    this.customAccent() ? accentContrastIssues(accentPalette(this.accent())) : [],
+  );
 
   constructor() {
     this.loadConfig();
@@ -352,6 +360,7 @@ export class BrandingEditorComponent {
       this.toast.error(this.i18n.translate('admin.brand.badUrl'));
       return;
     }
+    if (this.accentIssues().length > 0) return;
     const rev = this.editRev();
     this.saving.set(true);
     this.api.saveSiteConfig(d).subscribe({

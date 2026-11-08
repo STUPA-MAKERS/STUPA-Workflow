@@ -147,6 +147,9 @@
                 </app-button>
               }
             </div>
+            @if (accentIssues().length > 0) {
+              <app-note kind="error" icon="alert" role="alert">{{ 'admin.brand.accent.lowContrast' | t }}</app-note>
+            }
           </app-section>
 
           <app-section class="br__sec" [level]="2" [heading]="'admin.brand.avatars.group' | t">
@@ -225,7 +228,7 @@
       icon="check"
       [label]="'action.save' | t"
       [loading]="saving()"
-      [disabled]="linkErrors().length > 0"
+      [disabled]="linkErrors().length > 0 || accentIssues().length > 0"
       (activate)="save()"
     />
   }

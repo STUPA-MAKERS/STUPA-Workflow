@@ -2025,6 +2025,7 @@
   "admin.brand.accent.pick": "Pick a colour",
   "admin.brand.accent.hex": "Colour value",
   "admin.brand.accent.reset": "Default",
+  "admin.brand.accent.lowContrast": "This colour does not reach a contrast of 4.5:1 everywhere. Pick another colour.",
   "admin.brand.tooLarge": "File too large (max. {mb} MB).",
   "admin.brand.badType": "File type not allowed.",
   "admin.brand.footer": "Footer",

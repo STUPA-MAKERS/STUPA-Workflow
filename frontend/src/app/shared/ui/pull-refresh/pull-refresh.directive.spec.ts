@@ -152,6 +152,14 @@ describe('PullRefreshDirective', () => {
     expect(vibrate).toHaveBeenCalledTimes(2);
   });
 
+  it('disarms when the finger goes back above the threshold, and then does not reload', async () => {
+    const { rows, host } = await setup();
+    drag(rows, { x: 100, y: 100 }, [{ x: 100, y: 120 }, { x: 100, y: 300 }, { x: 100, y: 130 }]);
+    jest.advanceTimersByTime(280);
+    expect(host.reloads).toBe(0);
+    expect(vibrate).toHaveBeenCalledTimes(1);
+  });
+
   it('leaves a scroll up and a sideways move alone', async () => {
     const { rows, host } = await setup();
     const up = drag(rows, { x: 100, y: 300 }, [{ x: 100, y: 296 }, { x: 100, y: 200 }]);
