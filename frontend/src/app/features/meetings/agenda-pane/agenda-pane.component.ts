@@ -3,11 +3,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
+  ElementRef,
   inject,
   input,
   model,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
@@ -115,6 +118,12 @@ export class AgendaPaneComponent {
   readonly savingAgenda = input(false);
   readonly renamingTopId = input<Uuid | null>(null);
   readonly renameDraft = model<string>('');
+  private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
+  /**
+   * The rename field takes the focus when it opens. The `autofocus` attribute works only on
+   * page load, and the template lint refuses it (§ NF/accessibility/conformance/000492).
+   */
+  private readonly focusRename = effect(() => this.renameInput()?.nativeElement.focus());
   /**
    * Inside the agenda sheet, whose header names the agenda and holds the add: the heading
    * is for screen readers only, and the pane shows no add of its own.

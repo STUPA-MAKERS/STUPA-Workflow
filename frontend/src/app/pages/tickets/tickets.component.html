@@ -7,6 +7,7 @@
         <app-search-pill
           [placeholder]="searchPlaceholder()"
           [label]="'tickets.list.searchLabel' | t"
+          [results]="loading() ? null : total()"
           [value]="search.text()"
           [clearable]="true"
           (valueChange)="search.set($event)"

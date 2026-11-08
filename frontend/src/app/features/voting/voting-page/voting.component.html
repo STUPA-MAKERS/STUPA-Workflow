@@ -15,6 +15,7 @@
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [placeholder]="'voting.list.search' | t"
+          [results]="loading() || reloading() ? null : total()"
           [value]="search.text()"
           [clearable]="true"
           (valueChange)="search.set($event)"

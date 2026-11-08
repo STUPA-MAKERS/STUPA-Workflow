@@ -24,6 +24,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
+  ApplicationListItem,
   ApplicationType,
   EffectiveForm,
   FormFieldDef,
@@ -42,23 +43,25 @@ import {
   EmptyStateComponent,
   FieldGroupComponent,
   FieldRowComponent,
+  revealFirstInvalid,
   IconComponent,
   InputComponent,
   ListDetailBarComponent,
   ListDetailNavDirective,
   MEDIA,
   mediaQuery,
+  SectionComponent,
   SkeletonComponent,
   type Step,
   StepperComponent,
   ToastService,
-  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AltchaComponent } from './altcha.component';
 import { DraftAttachmentsService } from './draft-attachments.service';
 import { DraftFilesComponent } from './draft-files/draft-files.component';
 import { FormlyDraftFilesType } from './draft-files/formly-draft-files.type';
 import { provideFormly } from '@shared/formly/formly.providers';
+import { PredecessorFieldComponent } from './predecessor-field/predecessor-field.component';
 
 /** The steps of the wizard. `contact` drops out for a signed-in user without PII fields. */
 export type StepKey = 'type' | 'details' | 'contact' | 'review';
@@ -150,6 +153,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     StepperComponent,
     AltchaComponent,
     DraftFilesComponent,
+    PredecessorFieldComponent,
     ListDetailBarComponent,
     ListDetailNavDirective,
     TranslatePipe,
@@ -202,6 +206,11 @@ export class ApplyWizardComponent {
   readonly saved = signal(false);
   /** Counts the failed submits: a new value draws a new ALTCHA widget. */
   readonly altchaRound = signal(0);
+  /**
+   * The Vorgänger of a Folgeantrag, picked on the type step by a signed-in user. The
+   * pick fills the form with the fitting answers of the Vorgänger; the submit links it.
+   */
+  readonly predecessor = signal<{ readonly id: Uuid; readonly title: string } | null>(null);
 
   /**
    * Shared Formly model of all steps.
@@ -368,7 +377,37 @@ export class ApplyWizardComponent {
   selectType(id: Uuid): void {
     if (this.typeId() === id) return;
     this.typeId.set(id);
+    this.predecessor.set(null);
     this.loadForm(id);
+  }
+
+  /**
+   * A Vorgänger is picked: its fitting answers replace the answers of the form (the server
+   * leaves out files, the fields that the form lost and the values that no longer fit).
+   * The fields are built again, because Formly reads the model only when it builds them.
+   */
+  choosePredecessor(item: ApplicationListItem): void {
+    const title = item.title || this.i18n.translate('applications.predecessor.untitled');
+    this.predecessor.set({ id: item.id, title });
+    this.api.applicationPrefill(item.id).subscribe({
+      next: (prefill) => {
+        const eff = this.effForm();
+        if (!eff || prefill.typeId !== this.typeId()) return;
+        this.model = { ...this.model, ...prefill.data };
+        this.buildFields(eff);
+        this.syncFileFields();
+        this.toast.show(this.i18n.translate('applications.predecessor.prefilled'));
+      },
+      error: () => {
+        this.predecessor.set(null);
+        this.toast.error(this.i18n.translate('applications.predecessor.error'));
+      },
+    });
+  }
+
+  /** The Vorgänger goes; the answers stay, so the user keeps what was already changed. */
+  clearPredecessor(): void {
+    this.predecessor.set(null);
   }
 
   private loadForm(id: Uuid): void {
@@ -539,6 +578,7 @@ export class ApplyWizardComponent {
       altcha: this.loggedIn() ? null : altcha,
       attachmentIds: ids,
       draftToken: ids.length ? token : null,
+      predecessorId: this.loggedIn() ? (this.predecessor()?.id ?? null) : null,
     };
 
     this.submitting.set(true);
@@ -621,6 +661,7 @@ export class ApplyWizardComponent {
     this.model = {};
     this.contactForm.reset();
     this.altchaSolution.set(null);
+    this.predecessor.set(null);
     const eff = this.effForm();
     if (eff) this.buildFields(eff);
     this.activeIndex.set(0);
@@ -751,14 +792,12 @@ export class ApplyWizardComponent {
     return new Intl.ListFormat(this.i18n.formatLocale(), { type: 'conjunction' }).format(parts);
   }
 
-  /** Scroll the first field with an error into view, after the form drew it. */
+  /**
+   * Focus the first field with an error after the form drew it (spec 000519); without a
+   * field in error, scroll to the first error text.
+   */
   private revealError(): void {
-    setTimeout(() => {
-      const el = document.querySelector<HTMLElement>(
-        '.wz__step:not([hidden]) [aria-invalid="true"], .wz__step:not([hidden]) [role="alert"]',
-      );
-      el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-    });
+    setTimeout(() => revealFirstInvalid(document.querySelector('.wz__step:not([hidden])')));
   }
 }
 

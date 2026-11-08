@@ -14,7 +14,7 @@
     <app-note kind="error" icon="alert" role="alert">{{ 'admin.translations.loadError' | t }}</app-note>
   } @else {
     <app-section class="tr__sec" [level]="2" [heading]="'admin.translations.languages' | t">
-      <ul class="rowgroup tr__langs">
+      <div class="rowgroup tr__langs">
         <app-list-item [title]="'shell.lang.de' | t" sub="de">
           <app-badge trail>{{ 'admin.translations.builtIn' | t }}</app-badge>
         </app-list-item>
@@ -38,7 +38,7 @@
             </span>
           </app-list-item>
         }
-      </ul>
+      </div>
     </app-section>
 
     <app-section class="tr__sec" [level]="2" [heading]="'admin.translations.texts' | t">

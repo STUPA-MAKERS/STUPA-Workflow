@@ -34,6 +34,10 @@ Deterministic. No Keycloak, typst or ClamAV on the gate path:
 - **04 admin-form** — form builder: add a field → the form version **persists**
   (the success toast fires only on a 2xx from the server) (scenario 6).
 - **05 budget-pots** — budget pots view plus pot creation.
+- **06 axe** — every route of `axe-routes.ts`, in the light and the dark theme, through
+  `@axe-core/playwright` with the WCAG 2.0/2.1/2.2 A and AA tags. A violation fails the
+  test (§ 000491). The jest contract `src/app/axe-routes.contract.spec.ts` fails when a
+  route of `app.routes.ts` is not in the table.
 
 **The suite therefore covers 4 of the 7 SDS scenarios green and for real** (1 apply plus
 magic link, 2 flow, 6 admin config, 7 RBAC) **plus** budget pots and read-only.

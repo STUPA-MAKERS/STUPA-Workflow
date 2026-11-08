@@ -27,6 +27,7 @@
         size="md"
         [clearable]="true"
         [placeholder]="'publicProtocols.search' | t"
+        [results]="loading() ? null : total()"
         [value]="search.text()"
         (valueChange)="search.set($event)"
         (commit)="search.flush()"

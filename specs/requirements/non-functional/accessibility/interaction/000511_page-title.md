@@ -4,8 +4,12 @@ title: Each page has its own title
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/src/app/layout/page-title.service.spec.ts:PageTitleService"
+implementation:
+  - frontend/src/app/layout/page-title.service.ts
+  - frontend/src/app/app.config.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

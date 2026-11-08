@@ -22,9 +22,10 @@ import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { Meeting, Uuid, Vote, VoteKind, VoteListItem, VoteStatus } from '@core/api/models';
 import {
+  Announcer,
   ButtonComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -50,6 +51,7 @@ import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
 import { VotingPageService, visibleTicks } from './voting-page.service';
 import { closedStatus } from '../election.util';
+import { voteSubject } from '../vote-announce.util';
 import { pollStatus } from '../poll.util';
 import { NewPollDialogComponent } from '../new-poll-dialog/new-poll-dialog.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
@@ -199,6 +201,7 @@ export class VotingComponent implements OnDestroy {
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
+  private readonly announcer = inject(Announcer);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(VotingPageService);
@@ -645,9 +648,23 @@ export class VotingComponent implements OnDestroy {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((vote) => {
+        this.announceFresh(vote);
         if (vote.canCast && !vote.myBallot?.cast) this.openFresh(fresh);
       });
   }
+
+  /**
+   * Read out that a vote opened (spec 000518), with its TOP from the list row. The detail
+   * reads out a change of the vote that it shows, so a vote in the detail is left to it.
+   */
+  private announceFresh(vote: Vote): void {
+    if (this.selectedId() === vote.id) return;
+    const row = this.items().find((i) => i.id === vote.id);
+    const t: Translate = (key, params) => this.i18n.translate(key, params);
+    const subject = voteSubject(t, vote.question, row?.meetingTitle, row?.agendaPosition);
+    this.announcer.announce(t('voting.live.opened', { subject }));
+  }
+
 
   /**
    * A vote just opened that the person can cast a ballot in. It must show at once, as on

@@ -11,7 +11,7 @@
     @if (loading()) {
       <app-skeleton variant="rows" [count]="4" [label]="'admin.users.revoke.loading' | t" />
     } @else if (failed() || !p) {
-      <app-note kind="error" icon="alert">
+      <app-note kind="error" icon="alert" role="alert">
         <span>{{ 'admin.users.revoke.loadFailed' | t }}</span>
       </app-note>
     } @else {

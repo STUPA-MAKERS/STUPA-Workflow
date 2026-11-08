@@ -9,7 +9,8 @@ import { AuthService } from '@core/auth/auth.service';
 import type { Vote } from '@core/api/models';
 import { LiveVoteService, type ConnectionState } from '@core/ws/live-vote.service';
 import type { VoteClosedMsg, VoteOpenedMsg, VoteTallyMsg } from '@core/ws/ws-messages';
-import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import { TestBed } from '@angular/core/testing';
+import { Announcer, MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../testing/meeting-fixtures';
 import { VoteCastComponent } from './vote-cast.component';
 import { VotingPageService, type ShownVote } from './voting-page/voting-page.service';
@@ -773,6 +774,30 @@ describe('VoteCastComponent', () => {
       });
       fixture.detectChanges();
       expect(screen.getByText('5 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
+    });
+
+    /** Spec 000518: an open or a close over the socket is read out with the TOP and the vote. */
+    it('announces the open of a draft and the close of an open vote', async () => {
+      const { sessions, getVote, fixture } = await setup({ vote: draftVote({ meetingId: 'm1' }) });
+      const say = jest.spyOn(TestBed.inject(Announcer), 'announce');
+      getVote.mockReturnValue(of({ ...vote(), canCast: true, canManage: false }));
+      sessions[0].openVote.set(opened('v1'));
+      fixture.detectChanges();
+      expect(say).toHaveBeenCalledWith(expect.stringMatching(/^Abstimmung geöffnet: Soll der Antrag gefördert werden\? – .*TOP 3/));
+      getVote.mockReturnValue(of({ ...vote({ status: 'closed', result: 'passed' }), canCast: true, canManage: false }));
+      sessions[0].result.set({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: {} });
+      fixture.detectChanges();
+      expect(say).toHaveBeenLastCalledWith(expect.stringMatching(/^Abstimmung beendet: Soll der Antrag gefördert werden\? – .*\. \S/));
+    });
+
+    it('says nothing on the first read or a read without a change', async () => {
+      const { sessions, getVote, fixture } = await setup();
+      const say = jest.spyOn(TestBed.inject(Announcer), 'announce');
+      getVote.mockClear();
+      sessions[0].result.set({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: {} });
+      fixture.detectChanges();
+      expect(getVote).toHaveBeenCalled();
+      expect(say).not.toHaveBeenCalled();
     });
 
     it('reads the vote again on its close', async () => {

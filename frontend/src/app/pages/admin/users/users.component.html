@@ -23,6 +23,7 @@
         [placeholder]="'admin.users.searchPlaceholder' | t"
         [label]="'admin.users.search' | t"
         [busy]="search.pending() && !loading()"
+        [results]="loading() ? null : principals().length"
         [value]="search.text()"
         (valueChange)="search.set($event)"
         (commit)="search.flush()"

@@ -5,6 +5,7 @@
     </div>
   } @else if (error() && !req()) {
     <div class="cs__card">
+      <h1 class="cs__title">{{ 'account.consent.title' | t }}</h1>
       <app-note kind="error" icon="alert" role="alert">{{ 'account.consent.error' | t }}</app-note>
     </div>
   } @else if (req(); as r) {

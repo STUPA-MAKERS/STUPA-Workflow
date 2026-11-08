@@ -401,6 +401,14 @@ describe('BrandingEditorComponent', () => {
     c.setText(c.draft().copyright, 'Neu');
     expect(c.draft().copyright.de).toBe('Neu');
 
+    // An extra language with an emptied text leaves the map.
+    c.lang.set('fr');
+    c.setText(c.draft().copyright, 'Nouveau');
+    expect(c.draft().copyright.fr).toBe('Nouveau');
+    c.setText(c.draft().copyright, '');
+    expect('fr' in c.draft().copyright).toBe(false);
+    c.lang.set('de');
+
     c.addLegalLink();
     expect(c.draft().legalLinks.length).toBeGreaterThan(0);
     c.removeLegalLink(c.draft().legalLinks.length - 1);

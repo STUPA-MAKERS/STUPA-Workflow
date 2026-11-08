@@ -238,7 +238,7 @@ describe('DashboardComponent', () => {
       screen.getByRole('button', { name: 'Antrag stellen' }).click();
       expect(nav).toHaveBeenCalledWith('/apply');
       const palette = fixture.debugElement.injector.get(CommandPalette);
-      screen.getByRole('button', { name: 'Suche' }).click();
+      screen.getByRole('button', { name: /Suche/ }).click();
       expect(palette.isOpen()).toBe(true);
       http.verify();
     });

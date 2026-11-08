@@ -4,8 +4,13 @@ title: Every shared component has a jest-axe test
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/src/app/shared/a11y.contract.spec.ts:sharedComponentAxeContract"
+implementation:
+  - frontend/src/app/shared/a11y.contract.spec.ts
+  - frontend/src/testing/a11y.ts
+  - frontend/vendor/ui-kit/testing/a11y.ts
 scope:
   - frontend/src/app/shared
   - frontend/vendor/ui-kit
