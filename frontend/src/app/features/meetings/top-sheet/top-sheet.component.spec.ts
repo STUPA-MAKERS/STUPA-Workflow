@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { ImageAltService } from '@shared/markdown/image-alt.service';
 import { MediaApiService } from '@shared/markdown/media-api.service';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 import { renderDeferred } from '../../../../testing/defer';
@@ -170,11 +171,18 @@ describe('TopSheetComponent', () => {
       .fn()
       .mockReturnValueOnce(of({ id: ID, url: `/api/media/images/${ID}`, mime: 'image/png', width: 1, height: 1, size: 1 }))
       .mockReturnValueOnce(throwError(() => ({ status: 413 })));
-    const view = await setup({}, [{ provide: MediaApiService, useValue: { uploadImage: upload } }]);
+    const ask = jest.fn().mockResolvedValueOnce(null).mockResolvedValue('Die Sitzung im Saal');
+    const view = await setup({}, [
+      { provide: MediaApiService, useValue: { uploadImage: upload } },
+      { provide: ImageAltService, useValue: { ask } },
+    ]);
     const uploader = editorOf(view).imageUpload();
     expect(uploader).not.toBeNull();
     const png = new File(['x'], 'Foto.der.Sitzung.png', { type: 'image/png' });
-    await expect(uploader!(png)).resolves.toEqual({ src: `/api/media/images/${ID}`, alt: 'Foto.der.Sitzung' });
+    // A cancelled alt text dialog uploads nothing.
+    await expect(uploader!(png)).rejects.toThrow('cancelled');
+    expect(upload).not.toHaveBeenCalled();
+    await expect(uploader!(png)).resolves.toEqual({ src: `/api/media/images/${ID}`, alt: 'Die Sitzung im Saal' });
     const toast = TestBed.inject(ToastService);
     const error = jest.spyOn(toast, 'error');
     await expect(uploader!(png)).rejects.toEqual({ status: 413 });

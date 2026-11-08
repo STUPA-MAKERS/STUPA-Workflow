@@ -5,12 +5,8 @@ import { catchError, concatMap, finalize, map } from 'rxjs/operators';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { ImageAltService } from './image-alt.service';
 import { MEDIA_IMAGE_TYPES, MediaApiService, markdownImage } from './media-api.service';
-
-/** The file name without its extension, as the alt text of the image. */
-function altOf(file: File): string {
-  return file.name.replace(/\.[^.]*$/, '');
-}
 
 /** The i18n key of an upload error, from the HTTP status of the problem response. */
 export function imageUploadErrorKey(status?: number): TranslationKey {
@@ -33,8 +29,9 @@ let placeholderSeq = 0;
 /**
  * Image upload for a Markdown `<textarea>`. A paste or a drop of image files (PNG, JPEG,
  * GIF, WebP) uploads each file to `POST /api/media/images` and inserts
- * `![name](/api/media/images/<id>)` at the caret. A placeholder holds the place while the
- * upload runs. On an error the placeholder goes away and a toast names the cause.
+ * `![alt](/api/media/images/<id>)` at the caret. Before the upload, a dialog asks for the
+ * alternative text of each file (app spec 000506); a cancelled file is not uploaded. A
+ * placeholder holds the place while the upload runs. On an error the placeholder goes away and a toast names the cause.
  * `pick()` opens a file dialog for an explicit "insert image" button.
  *
  * The directive writes the textarea value and then dispatches an `input` event, so
@@ -97,18 +94,29 @@ export class MarkdownImageUploadDirective {
     this.upload(files);
   }
 
-  /** Upload the image files and insert a reference for each. Other files are ignored. */
+  /**
+   * Ask for the alt text of each image file, then upload them and insert a reference for
+   * each. Other files are ignored.
+   */
   upload(files: readonly File[]): void {
     const images = files.filter((f) => isImageType(f.type));
     if (!images.length || this.locked()) return;
-    const slots = images.map((file) => ({ file, mark: this.insertPlaceholder() }));
+    void this.injector
+      .get(ImageAltService)
+      .askAll(images)
+      .then((picked) => this.send(picked));
+  }
+
+  private send(picked: readonly { file: File; alt: string }[]): void {
+    if (!picked.length || this.locked()) return;
+    const slots = picked.map(({ file, alt }) => ({ file, alt, mark: this.insertPlaceholder() }));
     this.uploading.update((n) => n + slots.length);
     const media = this.injector.get(MediaApiService);
     from(slots)
       .pipe(
         concatMap((slot) =>
           media.uploadImage(slot.file).pipe(
-            map((image) => markdownImage(altOf(slot.file), image.id)),
+            map((image) => markdownImage(slot.alt, image.id)),
             catchError((err: { status?: number } | null) => {
               this.toast.error(this.i18n.translate(imageUploadErrorKey(err?.status)));
               return of('');
