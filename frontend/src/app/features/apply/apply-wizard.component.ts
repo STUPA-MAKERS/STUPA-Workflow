@@ -43,17 +43,18 @@ import {
   EmptyStateComponent,
   FieldGroupComponent,
   FieldRowComponent,
+  revealFirstInvalid,
   IconComponent,
   InputComponent,
   ListDetailBarComponent,
   ListDetailNavDirective,
   MEDIA,
   mediaQuery,
+  SectionComponent,
   SkeletonComponent,
   type Step,
   StepperComponent,
   ToastService,
-  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AltchaComponent } from './altcha.component';
 import { DraftAttachmentsService } from './draft-attachments.service';
@@ -791,14 +792,12 @@ export class ApplyWizardComponent {
     return new Intl.ListFormat(this.i18n.formatLocale(), { type: 'conjunction' }).format(parts);
   }
 
-  /** Scroll the first field with an error into view, after the form drew it. */
+  /**
+   * Focus the first field with an error after the form drew it (spec 000519); without a
+   * field in error, scroll to the first error text.
+   */
   private revealError(): void {
-    setTimeout(() => {
-      const el = document.querySelector<HTMLElement>(
-        '.wz__step:not([hidden]) [aria-invalid="true"], .wz__step:not([hidden]) [role="alert"]',
-      );
-      el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-    });
+    setTimeout(() => revealFirstInvalid(document.querySelector('.wz__step:not([hidden])')));
   }
 }
 

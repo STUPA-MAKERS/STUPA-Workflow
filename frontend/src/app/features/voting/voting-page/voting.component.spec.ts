@@ -10,7 +10,7 @@ import { AuthService } from '@core/auth/auth.service';
 import type { Meeting, Page, Vote, VoteListItem, VoteListQuery } from '@core/api/models';
 import { LiveVoteService, type ConnectionState } from '@core/ws/live-vote.service';
 import type { VoteClosedMsg, VoteOpenedMsg, VoteTallyMsg } from '@core/ws/ws-messages';
-import { LIVE_SEARCH_DEBOUNCE_MS, MEDIA } from '@stupa-makers/ui-kit';
+import { Announcer, LIVE_SEARCH_DEBOUNCE_MS, MEDIA } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { VotingComponent, VOTE_LIVE_DEBOUNCE, VOTE_MAX_LIMIT } from './voting.component';
 import { VotingNoneComponent } from './voting-none.component';
@@ -716,6 +716,47 @@ describe('VotingComponent', () => {
           queryParamsHandling: 'preserve',
           replaceUrl: false,
         });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    /** Spec 000518: the list reads out a vote that opened, with its TOP from the row. */
+    it.each([
+      ['with the TOP of its row', [item('v7', { meetingTitle: '34. Sitzung', agendaPosition: 2 })], { question: 'Haushalt' }, /^Abstimmung geöffnet: Haushalt – 34\. Sitzung.*2/],
+      ['with the meeting of its row', [item('v7', { meetingTitle: '34. Sitzung' })], { question: 'Haushalt' }, /^Abstimmung geöffnet: Haushalt – 34\. Sitzung$/],
+      ['without a row or a question', [], {}, /^Abstimmung geöffnet: Abstimmung$/],
+    ])('announces a vote that opened %s', async (_name, items, fresh, text) => {
+      jest.useFakeTimers({ doNotFake: ['Date'] });
+      try {
+        const { sessions, harness } = await start('/voting', {
+          live: [{ id: 'm1', status: 'live' }],
+          pages: [page(items)],
+          fresh: { canCast: false, ...fresh },
+        });
+        const say = jest.spyOn(TestBed.inject(Announcer), 'announce');
+        sessions.get('m1')!.openVote.set(opened('v7'));
+        harness.detectChanges();
+        jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+        expect(say).toHaveBeenCalledWith(expect.stringMatching(text));
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('leaves the vote in the detail to the detail', async () => {
+      jest.useFakeTimers({ doNotFake: ['Date'] });
+      try {
+        const { sessions, harness } = await start('/voting/v7', {
+          live: [{ id: 'm1', status: 'live' }],
+          pages: [page([item('v7')])],
+          fresh: { canCast: false },
+        });
+        const say = jest.spyOn(TestBed.inject(Announcer), 'announce');
+        sessions.get('m1')!.openVote.set(opened('v7'));
+        harness.detectChanges();
+        jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+        expect(say).not.toHaveBeenCalled();
       } finally {
         jest.useRealTimers();
       }

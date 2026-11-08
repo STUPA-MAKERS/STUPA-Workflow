@@ -28,6 +28,7 @@
           [placeholder]="searchPlaceholder()"
           [label]="'gremien.list.searchLabel' | t"
           [clearable]="true"
+          [results]="store.loading() ? null : visibleCount()"
           [value]="query()"
           (valueChange)="query.set($event)"
         />
