@@ -158,7 +158,7 @@ describe('ApplicationsDetailComponent — Folgeanträge', () => {
     expect(screen.getByTestId('ad-predecessor')).toHaveTextContent('Ändern');
     const rows = screen.getAllByTestId('tl-row');
     expect(rows.map((r) => r.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
-      'Sommerfest 2025Vorgänger · Eingereicht',
+      'Sommerfest 2025Vorgänger',
       'Ohne TitelFolgeantrag',
     ]);
     expect(cmp.linkedRows()[1].link).toEqual(['/applications', 's-1']);

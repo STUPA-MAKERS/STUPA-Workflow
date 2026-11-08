@@ -486,7 +486,7 @@ export class ApplicationsDetailComponent {
     const row = (a: LinkedApplication, kind: string): LinkedLead => ({
       icon: 'file',
       title: a.title || t('applications.list.untitled'),
-      sub: [kind, a.state?.label].filter((x): x is string => !!x).join(' · '),
+      sub: kind,
       link: ['/applications', a.id],
     });
     return [
