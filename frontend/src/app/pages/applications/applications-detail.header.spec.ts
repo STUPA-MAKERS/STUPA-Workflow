@@ -167,7 +167,7 @@ async function setup(opts: Opts = {}) {
 
 /** The budget tree (managers) and the attachments load on their own. */
 function flushRest(http: HttpTestingController) {
-  for (const req of http.match((r) => r.url === '/api/budgets' || /\/(attachments|timeline)$/.test(r.url))) {
+  for (const req of http.match((r) => r.url === '/api/budgets' || /\/(attachments|timeline|links)$/.test(r.url))) {
     req.flush([]);
   }
 }

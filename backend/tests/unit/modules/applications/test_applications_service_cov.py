@@ -445,6 +445,7 @@ def _payload(**over: Any) -> SimpleNamespace:
         "lang": "de",
         "attachment_ids": [],
         "draft_token": None,
+        "predecessor_id": None,
     }
     base.update(over)
     return SimpleNamespace(**base)
