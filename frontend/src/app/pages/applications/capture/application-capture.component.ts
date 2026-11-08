@@ -14,6 +14,7 @@ import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import type {
   ApplicantCandidate,
+  ApplicationListItem,
   ApplicationType,
   EffectiveForm,
   OnBehalfApplication,
@@ -48,6 +49,7 @@ import {
   DraftAttachmentsService,
 } from '../../../features/apply/draft-attachments.service';
 import { DraftFilesComponent } from '../../../features/apply/draft-files/draft-files.component';
+import { PredecessorFieldComponent } from '../../../features/apply/predecessor-field/predecessor-field.component';
 import { FormlyDraftFilesType } from '../../../features/apply/draft-files/formly-draft-files.type';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
@@ -136,6 +138,7 @@ function withDraftFiles(
     ScrollFadeDirective,
     SkeletonComponent,
     DraftFilesComponent,
+    PredecessorFieldComponent,
   ],
   providers: [
     provideFormly(),
@@ -191,6 +194,8 @@ export class ApplicationCaptureComponent {
   private emailSeq = 0;
 
   readonly typeId = signal('');
+  /** The Vorgänger of a Folgeantrag: its fitting answers fill the form, the submit links it. */
+  readonly predecessor = signal<{ readonly id: Uuid; readonly title: string } | null>(null);
   readonly effForm = signal<EffectiveForm | null>(null);
   readonly loadingForm = signal(false);
   readonly today = localToday();
@@ -342,6 +347,7 @@ export class ApplicationCaptureComponent {
   selectType(id: string): void {
     if (!id || id === this.typeId()) return;
     this.typeId.set(id);
+    this.predecessor.set(null);
     this.loadingForm.set(true);
     this.api.effectiveForm(id).subscribe({
       next: (eff) => {
@@ -355,6 +361,28 @@ export class ApplicationCaptureComponent {
         this.fields.set([]);
         this.loadingForm.set(false);
         this.toast.error(this.i18n.translate('apply.error.formLoad'));
+      },
+    });
+  }
+
+  /**
+   * A Vorgänger is picked: its fitting answers replace the answers of the form, as in the
+   * apply wizard. The fields are built again, because Formly reads the model only then.
+   */
+  choosePredecessor(item: ApplicationListItem): void {
+    const title = item.title || this.i18n.translate('applications.predecessor.untitled');
+    this.predecessor.set({ id: item.id, title });
+    this.api.applicationPrefill(item.id).subscribe({
+      next: (prefill) => {
+        const eff = this.effForm();
+        if (!eff || prefill.typeId !== this.typeId()) return;
+        this.model = { ...this.model, ...prefill.data };
+        this.buildFields(eff);
+        this.toast.show(this.i18n.translate('applications.predecessor.prefilled'));
+      },
+      error: () => {
+        this.predecessor.set(null);
+        this.toast.error(this.i18n.translate('applications.predecessor.error'));
       },
     });
   }
@@ -410,6 +438,7 @@ export class ApplicationCaptureComponent {
       lang: this.i18n.uiLocale(),
       attachmentIds: ids,
       draftToken: ids.length ? this.drafts.token() : null,
+      predecessorId: this.predecessor()?.id ?? null,
     };
     this.saving.set(true);
     clearServerErrors(this.fields());
