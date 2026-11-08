@@ -852,7 +852,11 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.phoneMenuSections().map((s) => s.items.map((i) => i.id))).toEqual([
         ['createdAt:desc', 'createdAt:asc', 'amount:desc', 'amount:asc'],
         ['export'],
+        ['refresh'],
       ]);
+      // "Aktualisieren" reloads the list like a pull (app spec 000514).
+      cmp.onHeaderMenu({ id: 'refresh', label: 'Aktualisieren' });
+      http.expectOne(LIST).flush(page(ROWS));
       cmp.onHeaderMenu({ id: 'export', label: 'Exportieren' });
       http.expectOne((r) => r.url === '/api/applications/export.xlsx').flush(null, { status: 500, statusText: 'x' });
       cmp.onHeaderMenu({ id: 'createdAt:asc', label: '' });
@@ -860,7 +864,7 @@ describe('ApplicationsListComponent', () => {
       expect(router.url).toBe('/applications?sort=createdAt&order=asc');
       http.expectOne(LIST).flush(page(ROWS));
       cmp.mine.set('true');
-      expect(cmp.phoneMenuSections()).toHaveLength(1);
+      expect(cmp.phoneMenuSections()).toHaveLength(2);
     });
   });
 

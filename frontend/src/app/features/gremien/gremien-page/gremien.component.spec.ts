@@ -186,12 +186,16 @@ describe('GremienComponent', () => {
     const s = await start('/gremien', { media: [MEDIA.phone] });
     restore = s.restore;
     expect(screen.queryByRole('button', { name: 'Sitzungen abonnieren' })).toBeNull();
-    expect(s.cmp.phoneMenu()[0].items.map((i) => i.id)).toEqual(['calendar']);
+    expect(s.cmp.phoneMenu().map((sec) => sec.items.map((i) => i.id))).toEqual([['calendar'], ['refresh']]);
     const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;
     s.cmp.onPhoneMenu({ id: 'other', label: 'x' }, abo);
     expect(abo.open).not.toHaveBeenCalled();
     s.cmp.onPhoneMenu({ id: 'calendar', label: 'x' }, abo);
     expect(abo.open).toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const refresh = jest.spyOn((s.cmp as any).store, 'refresh');
+    s.cmp.onPhoneMenu({ id: 'refresh', label: 'Aktualisieren' }, abo);
+    expect(refresh).toHaveBeenCalled();
   });
 
   it('shows the calendar button on a wider screen', async () => {

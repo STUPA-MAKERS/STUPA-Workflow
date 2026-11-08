@@ -45,6 +45,9 @@ import {
   StickyBarComponent,
   FabComponent,
   PageHeaderComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
 } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
@@ -60,6 +63,7 @@ import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { groupByMonth } from '@shared/group-by-month';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { withEntry } from '@shared/util/immutable';
+import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 
 /**
  * The status chip: every vote, the open votes, the ended votes, the drafts. A cancelled
@@ -172,6 +176,7 @@ function whenSource(
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowMenuComponent,
     FabComponent,
     NewPollDialogComponent,
     PullRefreshDirective,
@@ -201,6 +206,14 @@ export class VotingComponent implements OnDestroy {
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
+  /** The ⋮ menu of the phone header: "Aktualisieren", the one-tap way to the pull (app spec 000514). */
+  protected readonly phoneMenu = computed<RowMenuSection[]>(() => [
+    refreshMenuSection((key) => this.i18n.translate(key)),
+  ]);
+
+  protected onPhoneMenu(item: RowMenuItem): void {
+    if (isRefreshItem(item)) reloadLikePull(() => this.reload());
+  }
   private readonly announcer = inject(Announcer);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);

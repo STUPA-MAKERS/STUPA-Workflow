@@ -134,6 +134,17 @@ describe('TasksComponent', () => {
   afterEach(() => jest.restoreAllMocks());
 
   /** The status is coloured text, not a badge: a yellow flow colour reads as "warn". */
+  /** The one-tap way to the pull to refresh (app spec 000514). */
+  it('reloads the list from "Aktualisieren" in the phone menu', async () => {
+    const { cmp } = await start('/tasks', [[]]);
+    expect(cmp.phoneMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['refresh']);
+    const refresh = jest.spyOn(cmp, 'refreshAll');
+    cmp.onPhoneMenu({ id: 'other', label: '' });
+    expect(refresh).not.toHaveBeenCalled();
+    cmp.onPhoneMenu({ id: 'refresh', label: 'Aktualisieren' });
+    expect(refresh).toHaveBeenCalled();
+  });
+
   it('fills a row: title, status as text, type, amount and waiting time', async () => {
     const since = new Date(Date.now() - 4 * DAY - 3_600_000).toISOString();
     await start('/tasks', [[task('a1', { stateSince: since })]]);

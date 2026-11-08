@@ -3239,3 +3239,25 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     });
   });
 });
+
+describe('FlowEditorDragAlternative', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  /** A transition needs no drag: the state inspector adds one, and the inspector opens on it. */
+  it('adds a transition from the state inspector without a drag (000515)', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addState();
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: /Übergang hinzufügen/ })).toBeDisabled();
+    c.addTransitionFrom('state');
+    expect(c.graph().transitions ?? []).toHaveLength(0);
+    c.addState();
+    c.selection.set({ kind: 'state', key: 'state' });
+    fixture.detectChanges();
+    screen.getByRole('button', { name: /Übergang hinzufügen/ }).click();
+    expect(c.graph().transitions).toEqual([expect.objectContaining({ from: 'state', to: 'state2' })]);
+    expect(c.selection()).toEqual({ kind: 'transition', index: 0 });
+  });
+});

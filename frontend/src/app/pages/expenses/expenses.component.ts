@@ -92,6 +92,7 @@ import { formatMoney } from '@shared/format-money';
 import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
+import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
@@ -382,7 +383,7 @@ export class ExpensesComponent implements OnDestroy {
     ];
   });
 
-  /** The sections only a phone adds to the header menu: the sort and the export. */
+  /** The sections only a phone adds to the header menu: the sort, the export and "Aktualisieren". */
   private phoneSections(bookings: boolean): RowMenuSection[] {
     const exportSection: RowMenuSection = {
       items: [{ id: 'export', label: this.i18n.translate('expenses.export'), icon: 'download' }],
@@ -390,10 +391,12 @@ export class ExpensesComponent implements OnDestroy {
     return [
       ...(bookings ? this.sortSections() : []),
       ...(this.canExport() ? [exportSection] : []),
+      refreshMenuSection((key) => this.i18n.translate(key)),
     ];
   }
 
   onHeaderMenu(item: RowMenuItem): void {
+    if (isRefreshItem(item)) return reloadLikePull(() => this.refreshList());
     if (item.id === 'transfer') this.openTransfer();
     else if (item.id === 'select') this.startSelecting();
     else if (item.id === 'export') this.onExport();

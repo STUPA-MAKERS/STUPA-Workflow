@@ -117,6 +117,7 @@
                     [class.chat__bubble--failed]="m.state === 'failed'"
                     appPressSelect
                     [appPressSelectEnabled]="canAct(m) && touchMenu()"
+                    [appPressSelectActive]="true"
                     (appPressSelectToggle)="openMenu(m)"
                   >
                     @if (item.markLabel && item.mark === 'internal') {

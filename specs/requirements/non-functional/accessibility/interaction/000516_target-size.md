@@ -4,8 +4,12 @@ title: A target is at least 24 by 24 px
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/src/app/axe-routes.contract.spec.ts:axeRouteSweep"
+implementation:
+  - frontend/e2e/06-axe.spec.ts
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit
