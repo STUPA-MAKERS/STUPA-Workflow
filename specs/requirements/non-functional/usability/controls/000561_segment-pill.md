@@ -2,7 +2,7 @@
 id: "000561"
 title: A segmented control is a pill track
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-08
 tests:

@@ -2,7 +2,7 @@
 id: "000560"
 title: Headings and selectors show no counts
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-08
 tests:
