@@ -154,7 +154,7 @@ def get_magic_link_sender() -> MagicLinkSender:
         Depends(rate_limit_applications),
         Depends(verify_altcha_unless_authenticated),
     ],
-    responses=_errors(400, 404, 413, 422, 429),
+    responses=_errors(400, 403, 404, 413, 422, 429),
 )
 async def create_application(
     payload: ApplicationCreate,
