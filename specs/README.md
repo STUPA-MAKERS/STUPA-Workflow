@@ -200,7 +200,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000547](requirements/functional/collaboration/todos/000547_create-card-from-element.md) | A card is created from the detail of an element | draft |
 | [F/collaboration/todos/000548](requirements/functional/collaboration/todos/000548_link-card-from-element.md) | An element is linked to a card from its detail | draft |
 | [F/collaboration/todos/000549](requirements/functional/collaboration/todos/000549_due-cards-in-calendar.md) | A due card of a person is in their calendar | draft |
-| [F/collaboration/todos/000551](requirements/functional/collaboration/todos/000551_meeting-gremium-linked.md) | A meeting and a Gremium show their linked cards | draft |
+| [F/collaboration/todos/000551](requirements/functional/collaboration/todos/000551_meeting-gremium-linked.md) | A meeting shows its linked cards and a Gremium its board | draft |
 | [F/collaboration/todos/000552](requirements/functional/collaboration/todos/000552_cost-centre-link.md) | A card can link a cost centre | draft |
 | [F/collaboration/todos/000553](requirements/functional/collaboration/todos/000553_card-to-agenda.md) | A card is put on the agenda from the card | draft |
 | [F/collaboration/todos/000554](requirements/functional/collaboration/todos/000554_duplicate-card.md) | A card can be duplicated | draft |
