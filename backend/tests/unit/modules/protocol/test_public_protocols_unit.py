@@ -76,7 +76,7 @@ def _rows(
         date=_date(2026, 9, 29) if day is None else day,
         created_at=datetime(2026, 9, 1, tzinfo=UTC),
     )
-    gremium = SimpleNamespace(id=GID, name="Fachschaft Informatik", slug=slug)
+    gremium = SimpleNamespace(id=GID, name="Fachschaft Informatik", slug=slug, default_lang="en")
     return protocol, meeting, gremium
 
 
@@ -225,6 +225,7 @@ async def test_get_protocol_hides_non_public_content() -> None:
     assert detail.tops[1].markdown is None
     assert detail.tops[1].decisions == []
     assert detail.attendance.present == 0
+    assert detail.lang == "en"
 
 
 async def test_get_protocol_missing_is_404() -> None:

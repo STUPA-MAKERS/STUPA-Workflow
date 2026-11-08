@@ -128,6 +128,8 @@ export class CostCentreSelectComponent {
   /** The id of the picked cost centre, or ''. */
   readonly value = input('');
   readonly label = input.required<string>();
+  /** The language of the label when it is not the UI language (app spec 000523). */
+  readonly textLang = input<string | null>(null);
   readonly placeholder = input('');
   readonly required = input(false, { transform: booleanAttribute });
   /** The field shows the error state (a form field with an error below it). */

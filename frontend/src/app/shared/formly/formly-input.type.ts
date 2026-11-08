@@ -30,6 +30,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
       <app-datepicker
         [formControl]="formControl"
         [label]="props.label ?? ''"
+        [textLang]="props['textLang'] ?? null"
         [required]="!!props.required"
         [hint]="props['hint'] ?? props.description ?? ''"
         [min]="asString(props['min'])"
@@ -42,6 +43,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
       <app-currency-input
         [formControl]="formControl"
         [label]="props.label ?? ''"
+        [textLang]="props['textLang'] ?? null"
         [required]="!!props.required"
         [hint]="props['hint'] ?? props.description ?? ''"
         [placeholder]="props.placeholder ?? ''"
@@ -53,6 +55,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
       <app-input
         [formControl]="formControl"
         [label]="props.label ?? ''"
+        [textLang]="props['textLang'] ?? null"
         [type]="props.type ?? 'text'"
         [placeholder]="props.placeholder ?? ''"
         [required]="!!props.required"

@@ -207,6 +207,12 @@ describe('ApplicationsDetailComponent — header', () => {
     expect(line.textContent).not.toContain('·');
   });
 
+  /** The application keeps the language it was submitted in (app spec 000523). */
+  it('marks the title with the language of the application when it is not the UI language', async () => {
+    await setup({ app: { lang: 'en' } });
+    expect(document.getElementById('ad-title')?.getAttribute('lang')).toBe('en');
+  });
+
   it('starts the status line with an item when the state is missing', async () => {
     await setup({ app: { state: null } });
     const line = document.querySelector('.ad__line') as HTMLElement;

@@ -39,7 +39,7 @@ import type {
   Transition,
   Uuid,
 } from '@core/api/models';
-import { resolveI18n } from '@shared/forms/i18n-text';
+import { resolveI18n, langAttr } from '@shared/forms/i18n-text';
 import { actorLabel } from '@shared/actor-label.util';
 import { toFormlySections } from '@shared/forms/formly-mapper';
 import { formatAnswer, formatFieldValue } from '@shared/forms/answer-format';
@@ -763,6 +763,12 @@ export class ApplicationsDetailComponent {
   readonly title = computed(() =>
     applicationTitle(this.app()?.data, this.i18n.translate('applications.list.untitled')),
   );
+
+  /**
+   * The language of the content of the application (the UI language at submit), as the
+   * `lang` of its title and answers when it is not the UI language (app spec 000523).
+   */
+  protected readonly contentLang = computed(() => langAttr(this.app()?.lang, this.i18n.uiLocale()));
 
   /** The application types, for "<Typ> · Version n". */
   private readonly types = signal<ApplicationType[]>([]);

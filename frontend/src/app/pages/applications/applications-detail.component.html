@@ -102,7 +102,7 @@
       }
       <header class="sheet-head ad__head">
         <app-sheet-bar [bleed]="split()">
-          <h2 appSheetBarTitle id="ad-title" class="sheet-title ad__title">{{ title() }}</h2>
+          <h2 appSheetBarTitle id="ad-title" class="sheet-title ad__title" [attr.lang]="contentLang()">{{ title() }}</h2>
           <app-button
             class="ad__commentsBtn"
             variant="text"
@@ -363,6 +363,7 @@
     <app-answer-view
       [sections]="sections()"
       [data]="application.data"
+      [contentLang]="application.lang"
       [context]="formContext()"
       [emptyText]="'applications.detail.data.empty' | t"
     />

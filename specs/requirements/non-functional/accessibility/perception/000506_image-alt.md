@@ -4,8 +4,16 @@ title: A Markdown image has an alternative text
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/src/app/shared/markdown/image-alt.service.spec.ts:ImageAltService"
+  - "frontend/src/app/shared/markdown/markdown-image-upload.directive.spec.ts:MarkdownImageUploadDirective"
+implementation:
+  - frontend/src/app/shared/markdown/image-alt.service.ts
+  - frontend/src/app/shared/markdown/image-alt-dialog.component.ts
+  - frontend/src/app/shared/markdown/markdown-image-upload.directive.ts
+  - frontend/src/app/features/meetings/top-sheet/top-sheet.component.ts
+  - typst/template/protocol.typ
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

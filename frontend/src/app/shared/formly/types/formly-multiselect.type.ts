@@ -14,6 +14,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 interface MultiOption {
   readonly value: string;
   readonly label: string;
+  readonly lang?: string;
 }
 
 /**
@@ -38,7 +39,7 @@ interface MultiOption {
     <div class="field">
       <div class="field__box" [class.field__box--invalid]="showError">
         <span class="field__label" [id]="controlId + '-label'">
-          {{ props.label }}
+          <span [attr.lang]="props['textLang'] ?? null">{{ props.label }}</span>
           @if (props.required) {
             <span class="field__req" aria-hidden="true">*</span>
           }
@@ -61,7 +62,7 @@ interface MultiOption {
         <app-icon class="field__chevron" name="down" [size]="18" />
       </div>
       @if (props.description && !showError) {
-        <p class="field__hint" [id]="controlId + '-hint'">{{ props.description }}</p>
+        <p class="field__hint" [id]="controlId + '-hint'" [attr.lang]="props['textLang'] ?? null">{{ props.description }}</p>
       }
       @if (showError) {
         <p class="field__error" [id]="controlId + '-error'" role="alert">
@@ -84,7 +85,7 @@ interface MultiOption {
               [ngModel]="isChecked(opt.value)"
               [ngModelOptions]="{ standalone: true }"
               (ngModelChange)="toggle(opt.value, $event)"
-              >{{ opt.label }}</app-checkbox
+              ><span [attr.lang]="opt.lang ?? null">{{ opt.label }}</span></app-checkbox
             >
           </div>
         }

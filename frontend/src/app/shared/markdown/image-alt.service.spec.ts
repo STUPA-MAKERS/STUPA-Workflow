@@ -1,6 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { fireEvent, screen, within } from '@testing-library/angular';
+import { runAxe } from '../../../testing/a11y';
 import { ImageAltService } from './image-alt.service';
+
+/** The dialog itself is ImageAltDialogComponent; the service is how a page opens it. */
 
 function png(name: string): File {
   return new File(['x'], name, { type: 'image/png' });
@@ -50,5 +53,12 @@ describe('ImageAltService', () => {
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Einfügen' }));
     const picked = await all;
     expect(picked.map((p) => [p.file.name, p.alt])).toEqual([['b.png', 'B']]);
+  });
+
+  it('has no axe violations (ImageAltDialogComponent)', async () => {
+    const svc = TestBed.inject(ImageAltService);
+    void svc.ask(png('Plan.png'));
+    await new Promise((r) => setTimeout(r));
+    expect(await runAxe(dialog())).toHaveNoViolations();
   });
 });
