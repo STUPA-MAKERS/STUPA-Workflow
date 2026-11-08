@@ -103,6 +103,7 @@ import { provideFormly } from '@shared/formly/formly.providers';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { formatMoney } from '@shared/format-money';
 import { withoutKey } from '@shared/util/immutable';
+import { pageItemTitle } from '../../layout/page-title.service';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -811,6 +812,7 @@ export class ApplicationsDetailComponent {
    * detail-to-detail navigation and the constructor does not run again.
    */
   constructor() {
+    pageItemTitle(() => (this.app() ? this.title() : null));
     this.dockEditInBar();
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.loadApplication(pm.get('id') ?? '');

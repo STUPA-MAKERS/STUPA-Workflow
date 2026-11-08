@@ -8,7 +8,12 @@ import {
   provideZoneChangeDetection,
 } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
+import {
+  TitleStrategy,
+  provideRouter,
+  withComponentInputBinding,
+  withInMemoryScrolling,
+} from '@angular/router';
 import { authInterceptor } from '@core/auth/auth.interceptor';
 import { AuthService } from '@core/auth/auth.service';
 import { lazyMockApiInterceptor } from '@core/api/mock-api.lazy';
@@ -35,6 +40,7 @@ import { provideAppUiKit } from '@core/i18n/ui-kit-intl';
 import { BrandingService } from '@core/branding/branding.service';
 import { guardTouchContextMenu } from '@core/touch/touch-context-menu';
 import { AvatarService } from '@shared/ui/avatar/avatar.service';
+import { PageTitleService } from './layout/page-title.service';
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
 
@@ -78,6 +84,7 @@ export const appConfig: ApplicationConfig = {
       ),
     ),
     provideDetailPrefetch(),
+    { provide: TitleStrategy, useExisting: PageTitleService },
     {
       provide: LIVE_VOTE_SOURCE,
       useFactory: () => (inject(USE_MOCK_API) ? inject(MockLiveVoteSource) : inject(WsService)),

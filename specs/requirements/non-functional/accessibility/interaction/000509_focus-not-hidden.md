@@ -4,8 +4,12 @@ title: Sticky bars do not hide the focus
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/vendor/ui-kit/src/lib/focus/focus-reveal.spec.ts:watchFocusReveal"
+implementation:
+  - frontend/vendor/ui-kit/src/lib/focus/focus-reveal.ts
+  - frontend/vendor/ui-kit/shell/src/shell/shell.component.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit
