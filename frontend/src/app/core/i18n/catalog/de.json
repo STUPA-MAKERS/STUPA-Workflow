@@ -2019,6 +2019,7 @@
   "admin.brand.accent.pick": "Farbe wählen",
   "admin.brand.accent.hex": "Farbwert",
   "admin.brand.accent.reset": "Standard",
+  "admin.brand.accent.lowContrast": "Diese Farbe erreicht nicht überall einen Kontrast von 4,5:1. Wähle eine andere Farbe.",
   "admin.brand.tooLarge": "Datei zu groß (max. {mb} MB).",
   "admin.brand.badType": "Dateityp nicht erlaubt.",
   "admin.brand.footer": "Fußzeile",

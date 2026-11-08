@@ -101,7 +101,7 @@
 
 .ar__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
   gap: var(--space-2) var(--space-4);
 }
 // A key breaks only at the <wbr> after a "." or a "_" in the template.
