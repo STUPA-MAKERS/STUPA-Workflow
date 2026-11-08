@@ -24,7 +24,7 @@ from app.shared.altcha import AltchaSolutionStr
 from app.shared.i18n import DEFAULT_LANG, I18nMap, Lang
 from app.shared.mentions import MAX_MENTIONS
 from app.shared.people import PersonRef
-from app.shared.schemas import FrozenCamelModel
+from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 
 class ApplicationCreate(FrozenCamelModel, frozen=True):
@@ -51,6 +51,8 @@ class ApplicationCreate(FrozenCamelModel, frozen=True):
             the token in its own transaction. A list without a token answers 422. Both
             stay optional, because the upload after the create
             (``POST /applications/{id}/attachments``) still works.
+        predecessor_id: The Vorgänger of the new application. It needs a logged-in
+            caller who reads it, and the same application type.
     """
 
     type_id: UUID = Field(alias="typeId")
@@ -65,6 +67,7 @@ class ApplicationCreate(FrozenCamelModel, frozen=True):
     draft_token: str | None = Field(
         default=None, alias="draftToken", min_length=1, max_length=128
     )
+    predecessor_id: UUID | None = Field(default=None, alias="predecessorId")
 
 
 class OnBehalfCreate(FrozenCamelModel, frozen=True):
@@ -78,7 +81,8 @@ class OnBehalfCreate(FrozenCamelModel, frozen=True):
     channel ("Eingang"), for example "per PDF".
 
     ``attachmentIds`` and ``draftToken`` bind draft uploads, as on
-    ``POST /applications``.
+    ``POST /applications``. ``predecessorId`` names the Vorgänger, which the capturing
+    person must read.
     """
 
     type_id: UUID = Field(alias="typeId")
@@ -97,6 +101,7 @@ class OnBehalfCreate(FrozenCamelModel, frozen=True):
     draft_token: str | None = Field(
         default=None, alias="draftToken", min_length=1, max_length=128
     )
+    predecessor_id: UUID | None = Field(default=None, alias="predecessorId")
 
     @model_validator(mode="after")
     def _one_applicant(self) -> OnBehalfCreate:
@@ -453,3 +458,68 @@ class CommentOut(FrozenCamelModel, frozen=True):
 
 
 ApplicationOut.model_rebuild()
+
+
+class LinkedApplicationOut(FrozenCamelModel, frozen=True):
+    """One linked application (Vorgänger or Folgeantrag), as the reader may see it.
+
+    Attributes:
+        title: The system title ``data['title']``.
+        state: The current state, with the color of the active flow.
+    """
+
+    id: UUID
+    title: str | None = None
+    state: StateOut | None = None
+    created_at: datetime = Field(alias="createdAt")
+    archived: bool = False
+
+
+class LinkEventOut(FrozenCamelModel, frozen=True):
+    """One change of the Vorgänger link, for the history.
+
+    Attributes:
+        action: ``set`` or ``removed``.
+        predecessor: The Vorgänger that the change set or removed. Null when the reader
+            cannot open it or when it was deleted.
+    """
+
+    action: Literal["set", "removed"]
+    at: datetime
+    actor_info: ActorOut | None = Field(default=None, alias="actorInfo")
+    predecessor: LinkedApplicationOut | None = None
+
+
+class ApplicationLinksOut(FrozenCamelModel, frozen=True):
+    """The Vorgänger, the Folgeanträge and the link history of one application.
+
+    Only the linked applications that the reader can open appear.
+
+    Attributes:
+        successors: The Folgeanträge, oldest first.
+        events: The link changes, oldest first.
+    """
+
+    predecessor: LinkedApplicationOut | None = None
+    successors: tuple[LinkedApplicationOut, ...] = ()
+    events: tuple[LinkEventOut, ...] = ()
+
+
+class PredecessorSet(FrozenStrictCamelModel, frozen=True):
+    """Set or change the Vorgänger of an application."""
+
+    predecessor_id: UUID = Field(alias="predecessorId")
+
+
+class ApplicationPrefillOut(FrozenCamelModel, frozen=True):
+    """The answers of a Vorgänger that fit the current form of its application type.
+
+    Attributes:
+        type_id: The application type of the Vorgänger, and so of the Folgeantrag.
+        data: The answers whose field key exists in the current form version and whose
+            value is valid there. File fields and unreadable ``isPII`` fields are not in
+            it.
+    """
+
+    type_id: UUID = Field(alias="typeId")
+    data: dict[str, Any]

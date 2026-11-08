@@ -141,6 +141,63 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     )
 
 
+class ApplicationLink(Base):
+    """The Vorgänger of an application (Folgeantrag link).
+
+    The primary key is the application, so an application has at most one Vorgänger,
+    while a Vorgänger can have several Folgeanträge. Both foreign keys cascade: a delete
+    of either application removes the link, and the other application stays. The
+    service keeps the two applications of one type and refuses a cycle, because a
+    database constraint cannot see a chain.
+    """
+
+    __tablename__ = "application_link"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE"), primary_key=True
+    )
+    predecessor_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    linked_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    linked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("application_id <> predecessor_id", name="not_self"),
+        Index("ix_application_link_predecessor_id", "predecessor_id"),
+    )
+
+
+class ApplicationLinkEvent(UUIDPkMixin, Base):
+    """One change of the Vorgänger link, for the history of the application.
+
+    ``action`` is ``set`` or ``removed``. ``predecessor_id`` names the Vorgänger that
+    the change set or removed. It becomes NULL when that application is deleted, so the
+    entry stays in the history without a target.
+    """
+
+    __tablename__ = "application_link_event"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    predecessor_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application.id", ondelete="SET NULL"), nullable=True
+    )
+    action: Mapped[str] = mapped_column(Text)
+    actor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("action IN ('set','removed')", name="action"),
+        Index("ix_application_link_event_application_id_at", "application_id", "at"),
+    )
+
+
 class Applicant(UUIDPkMixin, Base):
     """PII of the applicant, split out 1:1 from the application.
 
