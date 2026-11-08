@@ -15,6 +15,7 @@ import type {
   OnBehalfApplication,
   ApplicationCreatedWire,
   ApplicationListItemWire,
+  ApplicationLinksWire,
   ApplicationOutWire,
   ApplicationTypeListItemWire,
   AttachmentOutWire,
@@ -648,6 +649,19 @@ const MOCK_APP_ATTACHMENTS: readonly AttachmentOutWire[] = [
     scanned: true,
   },
 ];
+
+/** The Vorgänger and the link history of every demo application (`GET .../links`). */
+const MOCK_LINKS: ApplicationLinksWire = {
+  predecessor: {
+    id: '33333333-3333-3333-3333-333333333330',
+    title: 'Sommerfest 2025',
+    state: { id: '66666666-6666-6666-6666-666666666666', key: 'approved', label: { de: 'Bewilligt', en: 'Approved' }, color: '#3f8f5a', editAllowed: false },
+    createdAt: '2025-05-12T10:00:00Z',
+    archived: true,
+  },
+  successors: [],
+  events: [],
+};
 
 function mockApplication(data: Record<string, unknown> = MOCK_APP_DATA): ApplicationOutWire {
   return {
@@ -1849,6 +1863,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     if (p.endsWith(`/applications/${MOCK_APP_ID}/attachments`)) return ok([...MOCK_APP_ATTACHMENTS]);
     if (p.endsWith('/timeline')) return ok(MOCK_TIMELINE);
+    if (p.endsWith('/links')) return ok(MOCK_LINKS);
+    if (p.endsWith('/prefill')) return ok({ typeId: MOCK_TYPES.items[0].id, data: { ...MOCK_APP_DATA } });
     if (p.endsWith('/versions')) return ok([...MOCK_VERSIONS]);
     if (p.endsWith('/comments')) return ok([...MOCK_COMMENTS]);
     if (p.endsWith('/mentionable')) return ok([...MOCK_MENTIONABLE]);

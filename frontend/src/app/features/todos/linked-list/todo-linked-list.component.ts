@@ -37,6 +37,9 @@ export interface LinkedLead {
  * The TOP sheet puts the application of an application item there, "Antrag · Entwurf ·
  * 1.250,00 €", above the cards of the TOP.
  *
+ * `rows` adds linked objects that are no cards: the Antrag page puts its Vorgänger and its
+ * Folgeanträge there.
+ *
  * A page that needs the cards itself (the ticket page counts the open ones) passes them
  * as `items`; the list then reads nothing.
  */
@@ -69,6 +72,11 @@ export class TodoLinkedListComponent {
   readonly avatarSize = input<AvatarSize>('sm');
   /** The row above the cards. */
   readonly lead = input<LinkedLead | null>(null);
+  /**
+   * More objects of the same kind linked to the object, such as the Vorgänger and the
+   * Folgeanträge of an Antrag. They stand above the cards and open in the same tab.
+   */
+  readonly rows = input<readonly LinkedLead[]>([]);
 
   private readonly loaded = signal<readonly TodoLinkedCard[]>([]);
   readonly cards = computed(() => this.items() ?? this.loaded());
