@@ -220,7 +220,7 @@ describe('BookingFormComponent', () => {
       expect(dialogs.newKind()).toBe('expense');
       expect(screen.getByRole('combobox', { name: 'Antrag' })).toBeInTheDocument();
 
-      const pick = screen.getByRole('button', { name: /^Kostenstelle Kostenstelle wählen/ });
+      const pick = screen.getByRole('button', { name: /^Kostenstelle Pflichtfeld Kostenstelle wählen/ });
       await user.click(pick);
       await tick();
       view.fixture.detectChanges();

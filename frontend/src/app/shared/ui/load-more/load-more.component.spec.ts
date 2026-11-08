@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { LoadMoreComponent } from './load-more.component';
+import { runAxe } from '../../../../testing/a11y';
 
 describe('LoadMoreComponent', () => {
   it('loads the next page from its button', async () => {
@@ -12,5 +13,14 @@ describe('LoadMoreComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Mehr laden' }));
     expect(more).toHaveBeenCalledTimes(1);
     expect(container.querySelector('.lm__sentinel')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  /** § NF/accessibility/conformance/000493 */
+  it.each([false, true])('has no axe violations (loading %s)', async (loading) => {
+    const { container } = await render(`<app-load-more label="Mehr laden" [loading]="loading" />`, {
+      imports: [LoadMoreComponent],
+      componentProperties: { loading },
+    });
+    expect(await runAxe(container)).toHaveNoViolations();
   });
 });
