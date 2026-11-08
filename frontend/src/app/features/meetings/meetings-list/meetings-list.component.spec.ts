@@ -388,6 +388,11 @@ describe('MeetingsListComponent', () => {
       const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;
       view.fixture.componentInstance.onPhoneMenu({ id: 'x', label: 'x' }, abo);
       expect(view.router.url).toBe('/');
+      // "Aktualisieren" reloads the list like a pull (app spec 000514).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const refresh = jest.spyOn((view.fixture.componentInstance as any).timeline, 'refreshList');
+      view.fixture.componentInstance.onPhoneMenu({ id: 'refresh', label: 'Aktualisieren' }, abo);
+      expect(refresh).toHaveBeenCalled();
     });
   });
 });

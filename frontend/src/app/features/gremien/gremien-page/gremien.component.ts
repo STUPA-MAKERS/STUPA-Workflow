@@ -45,6 +45,7 @@ import { weekdayDate } from '@shared/date-format';
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
+import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 
 /** The permission that shows every gremium, also without a membership. */
 export const GREMIUM_VIEW_ALL = 'gremium.view_all';
@@ -182,6 +183,7 @@ export class GremienComponent {
     {
       items: [{ id: 'calendar', label: this.i18n.translate('gremien.list.subscribe'), icon: 'cal' }],
     },
+    refreshMenuSection((key) => this.i18n.translate(key)),
   ]);
 
   constructor() {
@@ -217,6 +219,7 @@ export class GremienComponent {
 
   /** The ⋮ menu of the phone header: "Kalender abonnieren" opens the bottom sheet. */
   onPhoneMenu(item: RowMenuItem, abo: CalendarSubscribeComponent): void {
+    if (isRefreshItem(item)) return reloadLikePull(() => this.store.refresh());
     if (item.id === 'calendar') abo.open();
   }
 

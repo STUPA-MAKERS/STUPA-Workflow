@@ -44,6 +44,8 @@
   "action.copy": "Copy",
   "action.save": "Save",
   "action.cancel": "Cancel",
+  "action.refresh": "Refresh",
+  "action.more": "More actions",
   "common.loading": "Loading …",
   "ui.rowMenu.trigger": "More actions",
   "ui.selection.toolbar": "Selection",

@@ -83,6 +83,7 @@ import { formatMoney } from '@shared/format-money';
 import { applicationReads } from './application-reads';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { withEntry, withoutKey } from '@shared/util/immutable';
+import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 
 /**
  * One filter of the list.
@@ -450,14 +451,18 @@ export class ApplicationsListComponent {
     return [{ label: this.i18n.translate('applications.list.sort.title'), items: sorts }];
   });
 
-  /** Phone: the sort orders and the export in one "more" menu of the header. */
+  /** Phone: the sort orders, the export and "Aktualisieren" in one "more" menu of the header. */
   readonly phoneMenuSections = computed<RowMenuSection[]>(() => {
     const exportItem: RowMenuItem = {
       id: 'export',
       label: this.i18n.translate('applications.list.export'),
       icon: 'download',
     };
-    return [...this.sortSections(), ...(this.exportShown() ? [{ items: [exportItem] }] : [])];
+    return [
+      ...this.sortSections(),
+      ...(this.exportShown() ? [{ items: [exportItem] }] : []),
+      refreshMenuSection((key) => this.i18n.translate(key)),
+    ];
   });
 
   /** The row the force-status dialog acts on. */
@@ -629,6 +634,7 @@ export class ApplicationsListComponent {
 
   /** A sort order or the export was chosen in a header menu. */
   onHeaderMenu(item: RowMenuItem): void {
+    if (isRefreshItem(item)) return reloadLikePull(() => this.reload());
     if (item.id === 'export') {
       this.onExport();
       return;

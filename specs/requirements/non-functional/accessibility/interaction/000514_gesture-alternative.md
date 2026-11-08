@@ -8,8 +8,10 @@ updated: 2026-11-08
 tests:
   - "frontend/src/app/shared/ui/chat/chat.component.spec.ts:ChatComponent"
   - "frontend/vendor/ui-kit/src/lib/press-select/press-select.directive.spec.ts:PressSelectDirective"
+  - "frontend/src/app/shared/ui/pull-refresh/refresh-menu.spec.ts:refreshMenuSection"
 implementation:
   - frontend/src/app/shared/ui/chat/chat.component.html
+  - frontend/src/app/shared/ui/pull-refresh/refresh-menu.ts
   - frontend/vendor/ui-kit/src/lib/press-select/press-select.directive.ts
   - frontend/src/app/pages/expenses/expenses.component.html
   - frontend/src/app/features/todos/card-detail/todo-card-detail.component.html

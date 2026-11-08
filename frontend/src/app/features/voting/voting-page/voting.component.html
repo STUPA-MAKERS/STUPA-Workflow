@@ -9,8 +9,13 @@
         [pane]="true"
         titleId="vl-title"
         [title]="'nav.voting' | t"
-        [meta]="!loading() && !error() && openCount() > 0 ? ('voting.list.openCount' | t: { n: openCount() }) : null"
-      />
+        [meta]="!loading() && !error() && openCount() > 0 ? ('voting.list.openCount' | t: { n: openCount() }) : null">
+        <ng-container ngProjectAs="[actions]">
+          @if (phone()) {
+            <app-row-menu [label]="'action.more' | t" [sections]="phoneMenu()" (selected)="onPhoneMenu($event)" />
+          }
+        </ng-container>
+      </app-page-header>
 
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill

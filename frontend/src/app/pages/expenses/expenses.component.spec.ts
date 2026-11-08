@@ -2947,6 +2947,9 @@ describe('ExpensesComponent (list/detail)', () => {
   /** An unknown item does nothing. */
   it('runs the items of the header menu', () => {
     const { cmp, http } = build();
+    const refresh = jest.spyOn(cmp, 'refreshList');
+    cmp.onHeaderMenu({ id: 'refresh', label: 'Aktualisieren' });
+    expect(refresh).toHaveBeenCalled();
     cmp.onHeaderMenu({ id: 'transfer', label: '' });
     expect(cmp.transferOpen()).toBe(true);
     expect(cmp.formMode()).toBe('transfer-create');

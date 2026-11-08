@@ -79,6 +79,7 @@ import { formatMoney } from '@shared/format-money';
 import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
+import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 
 /** What the import found, for the note at the top of the review form. */
 export type ImportNotice = 'parsed' | 'manual' | null;
@@ -177,6 +178,7 @@ export class InvoicesComponent implements InvoiceFormHost {
   /** The page actions that do not fit the title row of a phone. */
   readonly phoneMenu = computed<RowMenuSection[]>(() => [
     { items: [{ id: 'import', label: this.i18n.translate('invoices.import'), icon: 'upload' }] },
+    refreshMenuSection((key) => this.i18n.translate(key)),
   ]);
 
   /** The cost-centre tree, for the swatches of the bookings in the detail. It loads once
@@ -638,6 +640,7 @@ export class InvoicesComponent implements InvoiceFormHost {
   }
 
   onHeaderMenu(item: RowMenuItem): void {
+    if (isRefreshItem(item)) return reloadLikePull(() => this.reload());
     if (item.id === 'import') this.fileInput()?.nativeElement.click();
   }
 

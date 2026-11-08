@@ -155,6 +155,19 @@ describe('VotingComponent', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
+  /** The one-tap way to the pull to refresh (app spec 000514). */
+  it('reloads the list from "Aktualisieren" in the phone menu', async () => {
+    const { cmp } = await start('/voting');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    expect(c.phoneMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['refresh']);
+    const reload = jest.spyOn(c, 'reload');
+    c.onPhoneMenu({ id: 'other', label: '' });
+    expect(reload).not.toHaveBeenCalled();
+    c.onPhoneMenu({ id: 'refresh', label: 'Aktualisieren' });
+    expect(reload).toHaveBeenCalled();
+  });
+
   describe('rows', () => {
     it('shows the question, the status, the meeting with the agenda item and the own ballot', async () => {
       await start('/voting', {

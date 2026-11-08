@@ -49,6 +49,7 @@ import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.componen
 import { MeetingsViewActionsComponent } from '../meetings-view-actions/meetings-view-actions.component';
 import { weekdayName } from '@shared/date-format';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
+import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 
 /**
  * The list view of the meeting overview (`/meetings`): one column on every screen, with no
@@ -133,6 +134,7 @@ export class MeetingsListComponent {
         { id: 'calendar', label: this.i18n.translate('meetings.overview.subscribe'), icon: 'cal' },
       ],
     },
+    refreshMenuSection((key) => this.i18n.translate(key)),
   ]);
 
   constructor() {
@@ -149,6 +151,7 @@ export class MeetingsListComponent {
 
   /** The ⋮ menu of the phone header: "Kalender-Abo" opens the bottom sheet. */
   onPhoneMenu(item: RowMenuItem, abo: CalendarSubscribeComponent): void {
+    if (isRefreshItem(item)) return reloadLikePull(() => this.timeline.refreshList());
     if (item.id === 'calendar') abo.open();
   }
 

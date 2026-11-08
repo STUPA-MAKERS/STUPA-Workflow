@@ -135,6 +135,19 @@ const groupTitles = () =>
 describe('TicketsComponent', () => {
   afterEach(() => localStorage.clear());
 
+  /** The one-tap way to the pull to refresh (app spec 000514). */
+  it('reloads the list from "Aktualisieren" in the phone menu', async () => {
+    const { cmp } = await start();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    expect(c.phoneMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['refresh']);
+    const refresh = jest.spyOn(c, 'refreshList');
+    c.onPhoneMenu({ id: 'other', label: '' });
+    expect(refresh).not.toHaveBeenCalled();
+    c.onPhoneMenu({ id: 'refresh', label: 'Aktualisieren' });
+    expect(refresh).toHaveBeenCalled();
+  });
+
   it('groups the open tickets and folds the closed ones with their number', async () => {
     const { api, rail } = await start();
     expect(api.list).toHaveBeenCalledWith({

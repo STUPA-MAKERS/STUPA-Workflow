@@ -34,6 +34,11 @@ import {
   StatusTextComponent,
   StickyBarComponent,
   PageHeaderComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  MEDIA,
+  mediaQuery,
 } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import {
@@ -47,6 +52,7 @@ import { formatMoney } from '@shared/format-money';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { applicationReads } from '../applications/application-reads';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
+import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 
 /** "Anzeigen": both groups, or one of them. */
 export type TasksShow = 'all' | 'applications' | 'todos';
@@ -115,6 +121,7 @@ interface TaskRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowMenuComponent,
     PullRefreshDirective,
     NoteComponent,
     PageHeaderComponent,
@@ -140,6 +147,15 @@ interface TaskRow {
 export class TasksComponent {
   private readonly api = inject(ApiClient);
   private readonly i18n = inject(I18nService);
+  protected readonly phone = mediaQuery(MEDIA.phone);
+  /** The ⋮ menu of the phone header: "Aktualisieren", the one-tap way to the pull (app spec 000514). */
+  protected readonly phoneMenu = computed<RowMenuSection[]>(() => [
+    refreshMenuSection((key) => this.i18n.translate(key)),
+  ]);
+
+  protected onPhoneMenu(item: RowMenuItem): void {
+    if (isRefreshItem(item)) reloadLikePull(() => this.refreshAll());
+  }
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(ApplicationsPageService);

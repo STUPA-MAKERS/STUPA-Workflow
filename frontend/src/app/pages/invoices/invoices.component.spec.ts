@@ -1585,6 +1585,9 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(click).toHaveBeenCalled();
     c.onHeaderMenu({ id: 'other', label: '' });
     expect(click).toHaveBeenCalledTimes(1);
+    const reload = jest.spyOn(c, 'reload').mockImplementation(() => undefined);
+    c.onHeaderMenu({ id: 'refresh', label: 'Aktualisieren' });
+    expect(reload).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Rechnung anlegen' }));
     expect(screen.getByRole('dialog', { name: 'Rechnung hinzufügen' }).classList.contains('ss--bottom')).toBe(true);
     expect(c.detailView()).toBe('none');

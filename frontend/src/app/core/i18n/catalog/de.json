@@ -172,6 +172,8 @@
   "account.scope.admin_write.label": "Administration",
   "account.scope.admin_write.desc": "Gremien, Rollen, Rechte und Webhooks verwalten.",
   "action.cancel": "Abbrechen",
+  "action.refresh": "Aktualisieren",
+  "action.more": "Weitere Aktionen",
   "action.edit": "Bearbeiten",
   "action.delete": "Löschen",
   "action.remove": "Entfernen",
