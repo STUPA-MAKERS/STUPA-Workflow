@@ -351,7 +351,7 @@ describe('MeetingFollowViewComponent', () => {
       context();
       await userEvent.click(screen.getByRole('button', { name: 'Deine Anwesenheit: Anwesend' }));
       const sheet = screen.getByRole('dialog', { name: 'Deine Anwesenheit' });
-      const roster = within(sheet).getByRole('region', { name: 'Anwesenheit · 2 von 3 anwesend' });
+      const roster = within(sheet).getByRole('region', { name: 'Anwesenheit' });
       const rows = within(roster).getAllByRole('listitem');
       expect(rows[1]).toHaveTextContent('Mara Keller');
       expect(rows[1]).toHaveTextContent('Protokollführung');

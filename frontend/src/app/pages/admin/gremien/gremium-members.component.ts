@@ -191,10 +191,4 @@ export class GremiumMembersComponent {
     const i = (FORCED_GREMIUM_ROLE_KEYS as readonly string[]).indexOf(role.key);
     return i < 0 ? 10 : i;
   }
-
-  protected countLabel(n: number): string {
-    return this.i18n.translate(n === 1 ? 'admin.home.memberCountOne' : 'admin.home.memberCount', {
-      count: n,
-    });
-  }
 }

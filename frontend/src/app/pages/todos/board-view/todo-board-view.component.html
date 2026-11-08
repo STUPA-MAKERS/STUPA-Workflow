@@ -52,7 +52,6 @@
         <header class="bv__head">
           <h2 class="bv__name" [id]="'bv-col-' + col.id">
             {{ col.name }}
-            <span class="bv__count num">{{ count(col) }}</span>
           </h2>
           @if (col.isDone) {
             <span class="bv__doneTag">

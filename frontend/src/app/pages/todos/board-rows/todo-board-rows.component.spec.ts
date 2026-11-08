@@ -185,11 +185,11 @@ describe('TodoBoardRowsComponent', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it('shows one region per board with its heading, count, columns and my cards', async () => {
+  it('shows one region per board with its heading (no count), columns and my cards', async () => {
     const { on, api } = await setup();
     expect(api.pollMineBoards).toHaveBeenCalledWith(null);
     const region = screen.getByRole('region', { name: /Studierendenparlament/ });
-    expect(within(region).getByRole('heading', { level: 2 })).toHaveTextContent('3');
+    expect(within(region).getByRole('heading', { level: 2 })).not.toHaveTextContent(/\d/);
     expect(within(region).getByRole('list', { name: 'Studierendenparlament · Offen' }).children).toHaveLength(2);
     expect(within(region).getByRole('list', { name: 'Studierendenparlament · In Arbeit' }).children).toHaveLength(0);
     expect(within(region).getByRole('link', { name: 'Board „Studierendenparlament“ öffnen' })).toHaveAttribute('href', '/todos/b-1');
@@ -295,26 +295,6 @@ describe('TodoBoardRowsComponent', () => {
     }
   });
 
-  /** Over a column of another row, that row counts the card. */
-  it('moves the column counts with a pointer drag, also over another row', async () => {
-    const { cmp } = await setup();
-    const [r, other] = cmp.rows();
-    const [open, doing] = r.columns;
-    cmp.kb.set({ boardId: 'b-1', cardId: 'k-1', col: 0, index: 0, fromCol: 0, fromIndex: 0 });
-    cmp.onEnter({ container: { data: doing.id } } as never);
-    expect(cmp.ptr()).toBeNull();
-    cmp.onDragStart(open);
-    expect(cmp.kb()).toBeNull();
-    expect(cmp.count(r, open)).toBe(2);
-    cmp.onEnter({ container: { data: doing.id } } as never);
-    expect([cmp.count(r, open), cmp.count(r, doing), cmp.count(r, r.columns[2])]).toEqual([1, 1, 0]);
-    expect(cmp.count(other, other.columns[0])).toBe(1);
-    cmp.onEnter({ container: { data: other.columns[0].id } } as never);
-    expect([cmp.count(r, open), cmp.count(other, other.columns[0])]).toEqual([1, 2]);
-    cmp.ptr.set(null);
-    expect(cmp.count(r, open)).toBe(2);
-  });
-
   it('hides "n weitere" of the done column while a card of the row is held', async () => {
     const done = Array.from({ length: DONE_PREVIEW + 1 }, (_, i) =>
       tile({ id: `d-${i}`, columnId: 'c-4', title: `Fertig ${i}`, assignees: [ME] }),
@@ -405,11 +385,6 @@ describe('TodoBoardRowsComponent', () => {
     expect(cmp.kb()?.col).toBe(0);
     await key('Raum buchen', 'ArrowRight');
     expect(cmp.kb()?.col).toBe(1);
-    const r = cmp.rows()[0];
-    expect(cmp.count(r, r.columns[0])).toBe(1);
-    expect(cmp.count(r, r.columns[1])).toBe(1);
-    expect(cmp.count(r, r.columns[2])).toBe(0);
-    expect(cmp.count(cmp.rows()[1], cmp.rows()[1].columns[0])).toBe(1);
     await key('Raum buchen', 'a');
     fireEvent.keyDown(item('Haushalt Kapitel 3'), { key: 'ArrowDown' });
     await key('Raum buchen', 'Enter');
@@ -449,7 +424,6 @@ describe('TodoBoardRowsComponent', () => {
     expect(cmp.list(r, r.columns[0]).map((c) => c.id)).toEqual(['k-1', 'k-2']);
     expect(cmp.list(r, { id: 'c-x', name: 'X', position: 9, isDone: false, cardCount: 0 })).toEqual([]);
     expect(cmp.more(r, { id: 'c-x', name: 'X', position: 9, isDone: true, cardCount: 0 })).toBe(0);
-    expect(cmp.count(r, { id: 'c-x', name: 'X', position: 9, isDone: true, cardCount: 0 })).toBe(0);
   });
 
   it('ends a keyboard drag on a row that left the rows without a word', async () => {
@@ -841,7 +815,7 @@ describe('TodoBoardRowsComponent', () => {
     it('puts the personal board first, with the empty state when it has no card', async () => {
       const { fixture, settle, on, container } = await setup({ phone: true, inputs: { lead: lead() } });
       const heads = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
-      expect(heads[0]).toMatch(/^Meine To-Dos\s*3/);
+      expect(heads[0]).toBe('Meine To-Dos');
       expect(heads).toHaveLength(3);
       expect(on.matches).toHaveBeenLastCalledWith(4);
       const empty = lead();

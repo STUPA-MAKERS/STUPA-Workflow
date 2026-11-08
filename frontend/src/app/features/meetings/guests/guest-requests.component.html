@@ -1,7 +1,7 @@
 @if (rows().length) {
-  <section class="gr" [attr.aria-label]="'guests.request.title' | t: { n: rows().length }">
+  <section class="gr" [attr.aria-label]="'guests.request.title' | t">
     <div class="gr__head">
-      <h3 class="gr__cap cap">{{ 'guests.request.title' | t: { n: rows().length } }}</h3>
+      <h3 class="gr__cap cap">{{ 'guests.request.title' | t }}</h3>
       <app-button size="sm" variant="tonal" [loading]="guests.busy() === 'all'" [disabled]="!!guests.busy()" (click)="guests.admitAll()">
         <app-icon name="check" />
         {{ 'guests.request.admitAll' | t }}

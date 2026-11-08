@@ -340,7 +340,6 @@ export class VotingComponent implements OnDestroy {
 
   readonly hasMore = computed(() => this.items().length < this.total());
   /** The open votes among the loaded rows. They come first, so the count is exact. */
-  readonly openCount = computed(() => this.items().filter((i) => i.status === 'open').length);
 
   readonly rows = computed<readonly VoteRow[]>(() => this.items().map((item) => this.toRow(item)));
 

@@ -73,7 +73,7 @@ export interface BoardMove {
  * The done column shows its newest cards and "n weitere · Archiv". Each column ends
  * with "+ To-Do", which opens a quick field for a title.
  *
- * Phone: one page per column behind tabs with the counts, in the tab pager of the kit
+ * Phone: one page per column behind tabs, in the tab pager of the kit
  * (`app-tab-pager`): a swipe moves one column, a tab scrolls to its page, and the ink
  * under the tabs moves with the scroll. The pager and the tab bar run to the edges of the
  * screen, so a card or a tab leaves at the edge and not at the gutter. Each page scrolls
@@ -186,7 +186,7 @@ export class TodoBoardViewComponent {
   });
 
   readonly tabs = computed<TabItem[]>(() =>
-    this.columns().map((c) => ({ id: c.id, label: c.name, count: this.cards().get(c.id)?.length ?? 0 })),
+    this.columns().map((c) => ({ id: c.id, label: c.name })),
   );
 
   readonly phoneCol = computed<TodoColumn | null>(() => {
@@ -194,32 +194,12 @@ export class TodoBoardViewComponent {
     return cols[Math.min(this.phoneColumn(), cols.length - 1)] ?? null;
   });
 
-  /** The number in the column head; it follows a card that is being dragged. */
-  count(col: TodoColumn): number {
-    const n = this.total(col);
-    const move = this.moving();
-    if (!move || move.from === move.over) return n;
-    if (col.id === move.from) return n - 1;
-    if (col.id === move.over) return n + 1;
-    return n;
-  }
-
   more(col: TodoColumn): number {
     return this.total(col) - (this.shown().get(col.id)?.length ?? 0);
   }
 
   private total(col: TodoColumn): number {
     return this.cards().get(col.id)?.length ?? 0;
-  }
-
-  /** The column a dragged card left and the one it is over, by pointer or keyboard. */
-  private moving(): { from: Uuid; over: Uuid } | null {
-    const ptr = this.ptr();
-    if (ptr) return ptr;
-    const kb = this.kb();
-    if (!kb) return null;
-    const cols = this.columns();
-    return { from: cols[kb.fromCol].id, over: cols[kb.col].id };
   }
 
   /** A pointer drag computes its move from the shown lists, so a held card goes back first. */

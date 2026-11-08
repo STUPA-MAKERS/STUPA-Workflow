@@ -122,8 +122,7 @@ describe('GremiumDetailComponent', () => {
     expect(d.tab()).toBe('sitzungen');
     expect(s.api.meetings).toHaveBeenCalledWith('g-1');
     expect(s.api.members).not.toHaveBeenCalled();
-    expect(d.meetingCount()).toBe(1);
-    expect(d.tabs().map((t) => t.count)).toEqual([1, 31, undefined, undefined]);
+    expect(d.tabs().map((t) => t.label)).toEqual(['Sitzungen', 'Mitglieder', 'Anwesenheit', 'Beschlüsse']);
     expect(s.frame.crumbLabel()).toEqual({ url: '/gremien/g-1', label: 'Studierendenparlament' });
     const sheet = within(s.harness.fixture.nativeElement.querySelector('app-gremium-detail') as HTMLElement);
     expect(sheet.getByRole('button', { name: 'Sitzungen abonnieren' })).toBeTruthy();

@@ -68,7 +68,7 @@ export class AccountGrantsComponent {
 
   readonly grants = signal<OAuthGrant[]>([]);
   readonly loading = signal(true);
-  /** The list loaded once. Until then the heading shows no count. */
+  /** The list loaded once. */
   readonly loaded = signal(false);
   /** The list could not load. */
   readonly loadError = signal(false);

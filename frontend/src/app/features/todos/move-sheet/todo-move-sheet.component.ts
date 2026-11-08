@@ -11,11 +11,10 @@ import {
   SideSheetComponent,
 } from '@stupa-makers/ui-kit';
 
-/** A column of the sheet; `count` is the number of cards when the board is known. */
+/** A column of the sheet, by its name alone: a selector shows no count (spec 000560). */
 export interface MoveColumn {
   readonly id: Uuid;
   readonly name: string;
-  readonly count?: number | null;
 }
 
 /** A long press on a tile asks for its sheet: the card, its board and the columns in order. */
@@ -35,7 +34,7 @@ export interface MoveChoice {
 /**
  * "Verschieben": the phone moves a card with this bottom sheet instead of a
  * drag. The card detail and a long press on a tile open the same sheet. The columns as a
- * radio list with their counts, the place in the column as a segmented control
+ * radio list, the place in the column as a segmented control
  * (Oben | Unten), then "Verschieben". With `canTransfer`, a row below the columns, "In
  * anderes Board verschieben", closes the sheet and emits `transfer` (the host opens the
  * transfer dialog). A close without a choice (Escape, the scrim, the close button) emits

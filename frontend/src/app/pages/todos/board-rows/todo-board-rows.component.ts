@@ -200,8 +200,8 @@ function writeCollapsed(ids: ReadonlySet<Uuid>): void {
  * The board rows. `source="mine"`: the rows under "Meine To-Dos", one row per other board
  * that holds cards assigned to me (`GET /todos/mine/boards`), with only my cards.
  * `source="all"`: the meta-board "Alle", one row per readable board with all its cards
- * (`GET /todos/all/boards`). Each row is headed by the board name and the count, with the
- * columns of that board.
+ * (`GET /todos/all/boards`). Each row is headed by the board name (no count, spec 000560), with
+ * the columns of that board.
  *
  * A row is a region with a heading; the heading button collapses it (remembered per
  * browser). A pointer drag reaches every column of every writable row and the drop lists
@@ -636,28 +636,6 @@ export class TodoBoardRowsComponent implements OnInit {
   more(row: BoardRow, col: TodoColumn): number {
     if (!col.isDone || this.kb()?.boardId === row.board.id) return 0;
     return this.cardsIn(row, col.id).length - this.list(row, col).length;
-  }
-
-  /** The number in the column head; it follows a card that is being dragged. */
-  count(row: BoardRow, col: TodoColumn): number {
-    const n = this.cardsIn(row, col.id).length;
-    const move = this.moving(row);
-    if (!move || move.from === move.over) return n;
-    if (col.id === move.from) return n - 1;
-    if (col.id === move.over) return n + 1;
-    return n;
-  }
-
-  /**
-   * The column a dragged card left and the one it is over, by pointer or keyboard. The
-   * column ids are unique over all boards, so a pointer drag counts in every row.
-   */
-  private moving(row: BoardRow): { from: Uuid; over: Uuid } | null {
-    const ptr = this.ptr();
-    if (ptr) return ptr;
-    const kb = this.kb();
-    if (!kb || kb.boardId !== row.board.id) return null;
-    return { from: row.columns[kb.fromCol].id, over: row.columns[kb.col].id };
   }
 
   onDragStart(col: TodoColumn): void {

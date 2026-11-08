@@ -214,7 +214,7 @@ describe('TodoCardDetailComponent', () => {
     expect(screen.queryByRole('checkbox', { name: 'Termin klären' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /1 erledigte Punkte zeigen/ }));
     expect(screen.getByRole('checkbox', { name: 'Termin klären' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(screen.queryByText('1/2')).toBeNull();
     expect(container.querySelector('.cd__checkBar .bar__seg--filled')).toHaveStyle({ flexBasis: '50%' });
     expect(screen.queryByRole('link', { name: /Im Board öffnen/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Schließen' }));
@@ -395,7 +395,7 @@ describe('TodoCardDetailComponent', () => {
   });
 
   /** A tile of a row of another board is not held by the board of the page. */
-  it('counts no foreign columns while it loads a card of another board', async () => {
+  it('draws no composer while it loads a card of another board', async () => {
     const { cmp, api, detect, fixture } = await setup({ board: board({ id: 'b-0', name: 'Meine To-Dos' }) });
     const late = new Subject<TodoCardDetail>();
     api.card.mockReturnValueOnce(late);
@@ -405,7 +405,7 @@ describe('TodoCardDetailComponent', () => {
     expect(document.querySelector('.cd__chat .sk__composer')).toBeNull();
     late.next(detail({ id: 'k-9', boardId: 'b-7', boardName: 'AStA' }));
     detect();
-    expect(cmp.moveColumns().every((col) => col.count === null)).toBe(true);
+    expect(cmp.moveColumns().every((col) => !('count' in col))).toBe(true);
   });
 
   /**
@@ -492,9 +492,9 @@ describe('TodoCardDetailComponent', () => {
     });
     const { cmp, api, fixture } = await setup({ board: own });
     expect(cmp.moveColumns()).toEqual([
-      { id: 'c-1', name: 'Offen', count: 1 },
-      { id: 'c-2', name: 'In Arbeit', count: 2 },
-      { id: 'c-4', name: 'Erledigt', count: 0 },
+      { id: 'c-1', name: 'Offen' },
+      { id: 'c-2', name: 'In Arbeit' },
+      { id: 'c-4', name: 'Erledigt' },
     ]);
     cmp.moveTo({ columnId: 'c-2', position: 'top' });
     expect(api.moveCard).toHaveBeenLastCalledWith('k-1', { columnId: 'c-2', beforeId: 'k-5' });

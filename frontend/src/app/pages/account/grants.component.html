@@ -58,7 +58,7 @@
   <app-section
     class="gr__active"
     [level]="2"
-    [heading]="loaded() ? ('account.grants.activeCount' | t: { count: grants().length }) : ('account.grants.active' | t)"
+    [heading]="'account.grants.active' | t"
   >
     @if (grants().length > 0) {
       <app-button sectionAction variant="danger" size="sm" (click)="askRevokeAll()">

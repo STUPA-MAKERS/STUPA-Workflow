@@ -62,7 +62,6 @@ import {
   type Invoice,
   type InvoiceParseResult,
   type InvoiceQuery,
-  type InvoiceSegmentCounts,
   type InvoiceStatus,
 } from '../budget/budget-tree.api';
 import { costCentreIndex } from '../budget/expense-display.util';
@@ -106,7 +105,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
  * a booking can reference one invoice, so one invoice can serve many bookings.
  *
  * The list: title with the import; the search and the chips (invoice date, due date,
- * amount); the segments Alle / Eingang / Verbucht / Bezahlt with their counts; the drop
+ * amount); the segments Alle / Eingang / Verbucht / Bezahlt (no counts, spec 000560); the drop
  * zone; the rows by month. The detail: the open invoice (`?id=`, also the target of the
  * global search), or the form of a new, an imported or an edited invoice.
  *
@@ -191,7 +190,6 @@ export class InvoicesComponent implements InvoiceFormHost {
   readonly items = signal<readonly Invoice[]>([]);
   readonly total = signal(0);
   /** The size of each segment under the other filters; null from an older backend. */
-  readonly counts = signal<InvoiceSegmentCounts | null>(null);
   private nextOffset = 0;
   readonly loading = signal(true);
   /**
@@ -253,15 +251,10 @@ export class InvoicesComponent implements InvoiceFormHost {
     () => this.filterSignals.filter((f) => f.signal().trim() !== '').length,
   );
 
-  /** The segments with their counts. */
-  readonly segmentOptions = computed<SegmentedOption[]>(() => {
-    const c = this.counts();
-    return SEGMENTS.map((value) => ({
-      value,
-      label: this.i18n.translate(`invoices.segment.${value}`),
-      count: c ? c[value] : null,
-    }));
-  });
+  /** The segments, by their labels alone (spec 000560). */
+  readonly segmentOptions = computed<SegmentedOption[]>(() =>
+    SEGMENTS.map((value) => ({ value, label: this.i18n.translate(`invoices.segment.${value}`) })),
+  );
 
   /** The invoice open in the detail (`?id=`). */
   readonly selectedId = signal('');
@@ -543,7 +536,6 @@ export class InvoicesComponent implements InvoiceFormHost {
         next: (page) => {
           if (epoch !== this.fetchEpoch) return;
           this.total.set(page.total);
-          this.counts.set(page.counts ?? null);
           this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
           this.nextOffset = page.offset + page.items.length;
           this.loading.set(false);
