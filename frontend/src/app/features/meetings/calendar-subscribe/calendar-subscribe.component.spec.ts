@@ -160,6 +160,20 @@ describe('CalendarSubscribeComponent', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('takes the focus on open and keeps Tab inside (spec 000513)', async () => {
+    const { openIt } = await setup();
+    await openIt();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveFocus();
+    const controls = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input'));
+    controls[controls.length - 1].focus();
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    controls[controls.length - 1].dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(true);
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
   /** Closing a closed popover changes nothing. */
   it('closes on Escape and on a press outside, and returns the focus to the anchor', async () => {
     const { openIt, anchor, fixture, cmp } = await setup();
@@ -358,6 +372,8 @@ describe('CalendarSubscribeComponent', () => {
       expect(pop).toHaveClass('cs--placed');
       expect(pop.style.top).toBe(`${100 + 40 + 6}px`);
       expect(pop.style.left).toBe(`${940 - 400}px`);
+      // The focus waits one frame: Chrome drops it in the task that shows the popover.
+      await new Promise((resolve) => requestAnimationFrame(resolve));
       expect(pop).toHaveFocus();
       fixture.destroy();
     } finally {

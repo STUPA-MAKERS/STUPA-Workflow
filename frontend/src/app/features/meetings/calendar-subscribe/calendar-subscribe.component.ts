@@ -16,6 +16,7 @@ import {
   ButtonComponent,
   CopyButtonComponent,
   EmptyStateComponent,
+  FocusDialogDirective,
   IconComponent,
   MEDIA,
   mediaQuery,
@@ -66,6 +67,7 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FocusDialogDirective,
     EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,
@@ -160,7 +162,11 @@ export class CalendarSubscribeComponent {
     if (phone) return;
     this.place();
     el.classList.add('cs--placed');
-    el.focus();
+    // Chrome drops a focus() in the same task that shows the popover and removes the
+    // hidden state, so the focus waits for the next frame (spec 000513).
+    requestAnimationFrame(() => {
+      if (this.shownEl === el) el.focus();
+    });
     this.observe(el);
   }
 
