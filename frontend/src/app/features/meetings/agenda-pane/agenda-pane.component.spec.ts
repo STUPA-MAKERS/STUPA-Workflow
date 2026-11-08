@@ -325,6 +325,7 @@ describe('AgendaPaneComponent', () => {
     const { on, fixture } = await setup({ renamingTopId: 't-1', renameDraft: 'Begrüßung neu' });
     const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
     expect(input).toHaveValue('Begrüßung neu');
+    expect(input).toHaveFocus();
     await userEvent.type(input, '!');
     fireEvent.keyUp(input, { key: 'Enter' });
     expect(on.renameTop).toHaveBeenCalledWith(AGENDA[0]);
