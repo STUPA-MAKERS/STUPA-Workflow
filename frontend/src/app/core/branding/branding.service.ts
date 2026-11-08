@@ -1,5 +1,4 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
-import { Title } from '@angular/platform-browser';
 import { ApiClient } from '@core/api/api-client.service';
 import type {
   AttachmentLimits,
@@ -44,7 +43,8 @@ const ACCENT_KEY = 'ap.accent';
  * This service is the single source of truth for the configurable branding. It loads
  * the public config once at app start and exposes the app name, the footer copyright
  * and the footer legal links as signals. The header (aria-label), the home page (H1)
- * and the footer read them, and it also sets `document.title`.
+ * and the footer read them, and the document title (`PageTitleService`) ends with the
+ * app name.
  *
  * It also applies the accent colour of the config to the theme tokens (`core/theme/accent`)
  * and gives the logos of the config, with the built-in logos for an empty slot.
@@ -63,7 +63,6 @@ export class BrandingService {
    */
   private readonly injector = inject(Injector);
   private readonly i18n = inject(I18nService);
-  private readonly title = inject(Title);
   private readonly theme = inject(ThemeService);
 
   /** Configured full name (empty ⇒ fallback). */
@@ -192,7 +191,6 @@ export class BrandingService {
    * the built-in href back.
    */
   constructor() {
-    effect(() => this.title.setTitle(this.appName()));
     effect(() => {
       const preview = this._accentPreview();
       applyAccent(preview === undefined ? this._accent() : preview);

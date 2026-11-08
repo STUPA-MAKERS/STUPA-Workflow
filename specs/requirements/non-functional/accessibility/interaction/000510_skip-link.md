@@ -4,8 +4,12 @@ title: A skip link goes to the main content
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/vendor/ui-kit/shell/src/shell/shell.component.spec.ts:ShellComponent"
+implementation:
+  - frontend/vendor/ui-kit/shell/src/shell/shell.component.ts
+  - frontend/vendor/ui-kit/shell/src/shell/shell.component.html
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

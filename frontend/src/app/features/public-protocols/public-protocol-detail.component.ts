@@ -19,6 +19,7 @@ import { PublicProtocolsService } from './public-protocols.service';
 import { optionKey, orderedCounts, topParts, useNoindex, type TopPart } from './public-protocols.util';
 import { dayMonthYear, weekdayDate } from '@shared/date-format';
 import { voteRulesParts } from '../meetings/meetings-display.util';
+import { pageItemTitle } from '../../layout/page-title.service';
 
 /**
  * One public protocol (`/protokolle/:id`, no login): the public version of a final
@@ -95,6 +96,7 @@ export class PublicProtocolDetailComponent {
   }
 
   constructor() {
+    pageItemTitle(() => this.protocol()?.title);
     useNoindex();
     const id = String(this.route.snapshot.paramMap.get('id'));
     this.api.detail(id).subscribe({

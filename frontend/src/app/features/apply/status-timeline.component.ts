@@ -72,6 +72,7 @@ import { AttachmentsPanelComponent } from '../../pages/applications/attachments-
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
 import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
+import { pageItemTitle } from '../../layout/page-title.service';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
@@ -339,6 +340,7 @@ export class StatusTimelineComponent {
    * leak through Referer or logs. The query form (?t=&app=) stays as a fallback.
    */
   constructor() {
+    pageItemTitle(() => (this.application() ? this.title() : null));
     effect(() => {
       const panel = this.filesPanel();
       const files = this.droppedFiles();
