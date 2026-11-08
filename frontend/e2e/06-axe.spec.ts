@@ -27,10 +27,14 @@ async function json<T>(res: Awaited<ReturnType<APIRequestContext['get']>>): Prom
   return (await res.json()) as T;
 }
 
-async function createIds(api: APIRequestContext): Promise<Ids> {
+/**
+ * The application goes through a context without the admin cookie: the public route needs
+ * no CSRF token then, while a cookie-authenticated POST does (middleware.py).
+ */
+async function createIds(api: APIRequestContext, pub: APIRequestContext): Promise<Ids> {
   const art = readArtifacts();
   const headers = await xsrf(api);
-  const application = await createApplication(api, {
+  const application = await createApplication(pub, {
     typeId: art.typeId,
     email: uniqueEmail('axe'),
     title: 'Barrierefreiheit prüfen',
@@ -69,8 +73,9 @@ let ids: Ids;
 
 test.beforeAll(async ({ playwright, baseURL }) => {
   const api = await playwright.request.newContext({ baseURL, storageState: ADMIN_STATE });
-  ids = await createIds(api);
-  await api.dispose();
+  const pub = await playwright.request.newContext({ baseURL });
+  ids = await createIds(api, pub);
+  await Promise.all([api.dispose(), pub.dispose()]);
 });
 
 for (const theme of THEMES) {
