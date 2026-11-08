@@ -10,6 +10,8 @@ tests:
 implementation:
   - frontend/e2e/06-axe.spec.ts
   - frontend/e2e/axe-routes.ts
+  - .github/workflows/ci.yml
+  - scripts/e2e.sh
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit
