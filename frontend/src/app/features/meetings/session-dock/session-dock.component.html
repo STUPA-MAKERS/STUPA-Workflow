@@ -10,7 +10,7 @@
   </app-side-sheet>
 } @else if (keeperOpen) {
   <button type="button" class="sd__backdrop" aria-hidden="true" tabindex="-1" (click)="closePanel()"></button>
-  <div class="sd__pop" role="dialog" [attr.aria-label]="panelHeading() | t" [style.--sd-pop-end.px]="popEnd()">
+  <div class="sd__pop" role="dialog" appFocusDialog [attr.aria-label]="panelHeading() | t" [style.--sd-pop-end.px]="popEnd()">
     <app-keeper-menu [meeting]="m" [attendance]="attendance()" (pick)="pickKeeper($event)" (discard)="discardHandover()" />
   </div>
 }
