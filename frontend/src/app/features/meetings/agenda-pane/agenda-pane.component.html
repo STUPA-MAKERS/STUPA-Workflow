@@ -44,7 +44,7 @@
               (blur)="renameTop.emit(item)"
               [placeholder]="'meetings.agenda.renamePlaceholder' | t"
               [attr.aria-label]="'meetings.agenda.rename' | t"
-              autofocus
+              #renameInput
             />
           </div>
         } @else {
