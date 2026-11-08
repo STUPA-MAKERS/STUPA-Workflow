@@ -9,6 +9,7 @@ import { type ParamValue, httpParams } from './http-params';
 import {
   mapApplication,
   mapApplicationCreated,
+  mapApplicationLinks,
   mapApplicationListItem,
   mapApplicationType,
   mapAttachment,
@@ -37,10 +38,13 @@ import type {
   ApplicationComment,
   ApplicationCreated,
   ApplicationCreatedWire,
+  ApplicationLinks,
+  ApplicationLinksWire,
   ApplicationListItem,
   ApplicationListItemWire,
   ApplicationListQuery,
   ApplicationOutWire,
+  ApplicationPrefill,
   ApplicationState,
   ApplicationType,
   ApplicationTypeListItemWire,
@@ -331,6 +335,45 @@ export class ApiClient {
       ? this.http.post<ApplicationOutWire>(url, {})
       : this.http.delete<ApplicationOutWire>(url);
     return call.pipe(map((wire) => mapApplication(wire, lang)));
+  }
+
+  /**
+   * GET /applications/{id}/links — the Vorgänger, the Folgeanträge and the link history.
+   * The server leaves out a linked application that the reader cannot open.
+   */
+  applicationLinks(id: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<ApplicationLinks> {
+    const lang = this.i18n.uiLocale();
+    return this.http
+      .get<ApplicationLinksWire>(`${this.base}/applications/${id}/links`, {
+        context: readContext({ quiet: true, ...opts }),
+      })
+      .pipe(map((wire) => mapApplicationLinks(wire, lang)));
+  }
+
+  /**
+   * PUT /applications/{id}/predecessor — set or change the Vorgänger. Needs the edit right
+   * on both applications; only the link changes, never the answers.
+   */
+  setPredecessor(id: Uuid, predecessorId: Uuid): Observable<ApplicationLinks> {
+    const lang = this.i18n.uiLocale();
+    return this.http
+      .put<ApplicationLinksWire>(`${this.base}/applications/${id}/predecessor`, { predecessorId })
+      .pipe(map((wire) => mapApplicationLinks(wire, lang)));
+  }
+
+  /** DELETE /applications/{id}/predecessor — remove the Vorgänger. */
+  removePredecessor(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/applications/${id}/predecessor`);
+  }
+
+  /**
+   * GET /applications/{id}/prefill — the answers of a Vorgänger that fit the current form
+   * of its type, for a new Antrag. Needs a login.
+   */
+  applicationPrefill(id: Uuid): Observable<ApplicationPrefill> {
+    return this.http.get<ApplicationPrefill>(`${this.base}/applications/${id}/prefill`, {
+      context: skipLoading(),
+    });
   }
 
   /** POST /applications/{id}/erasure-request — file a GDPR Art. 17 erasure request. */

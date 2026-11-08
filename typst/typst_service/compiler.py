@@ -86,6 +86,8 @@ class TypstCompiler:
             str(root / ".no-package-cache"),
             "--diagnostic-format",
             "short",
+            "--pdf-standard",
+            "ua-1",
             *fonts,
             str(root / "main.typ"),
             str(output),

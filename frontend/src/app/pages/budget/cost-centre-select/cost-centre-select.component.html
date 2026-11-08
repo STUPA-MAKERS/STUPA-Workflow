@@ -26,6 +26,7 @@
       >{{ label() }}
       @if (required()) {
         <span class="ccs__req" aria-hidden="true"> *</span>
+        <span class="sr-only">{{ 'admin.common.required' | t }}</span>
       }
     </span>
     <button
@@ -38,7 +39,6 @@
       [attr.aria-expanded]="open()"
       [attr.aria-controls]="open() ? listId() : null"
       [attr.aria-labelledby]="labelId() + ' ' + id() + '-value'"
-      [attr.aria-required]="required() ? 'true' : null"
       [attr.aria-invalid]="invalid() ? 'true' : null"
       (click)="toggle()"
       (keydown)="onTriggerKey($event)"
@@ -137,7 +137,10 @@
     [class.ccs__opt--active]="c.index === active()"
     [style.--ccs-depth]="c.depth"
     [attr.aria-selected]="c.id === value()"
+    tabindex="-1"
+    (mousedown)="$event.preventDefault()"
     (click)="choose(c)"
+    (keydown.enter)="choose(c)"
     (pointermove)="hover(c)"
   >
     @if (c.id) {

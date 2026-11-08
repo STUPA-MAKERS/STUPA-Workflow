@@ -33,6 +33,7 @@ from app.modules.admin.router import public_router as site_config_public_router
 from app.modules.admin.router import router as admin_router
 from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
+from app.modules.applications.links_router import router as application_links_router
 from app.modules.applications.router import router as applications_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.mcp_router import router as mcp_router
@@ -98,6 +99,7 @@ api_router.include_router(oauth_well_known_router)
 api_router.include_router(forms_router)
 api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
+api_router.include_router(application_links_router)
 api_router.include_router(flow_router)
 api_router.include_router(voting_router)
 api_router.include_router(livevote_router)

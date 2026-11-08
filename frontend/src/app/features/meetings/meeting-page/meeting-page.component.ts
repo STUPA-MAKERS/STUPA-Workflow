@@ -56,6 +56,7 @@ import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
 import { topApplicationLead } from '../top-application-lead.util';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
+import { pageItemTitle } from '../../../layout/page-title.service';
 
 /** The ids of the session menu. */
 type SessionAction = 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
@@ -211,6 +212,7 @@ export class MeetingPageComponent {
   protected readonly revision = signal(0);
 
   constructor() {
+    pageItemTitle(() => this.meeting().title);
     observeElementSize(
       () => this.dock().nativeElement,
       (size) => this.dockHeight.set(size.height),

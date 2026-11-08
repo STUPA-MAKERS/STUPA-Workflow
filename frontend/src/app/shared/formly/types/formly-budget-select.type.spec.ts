@@ -52,7 +52,7 @@ describe('FormlyBudgetSelectType', () => {
     const { host } = await renderField({ label: 'Kostenstelle', required: true });
     const field = screen.getByRole('button', { name: /Kostenstelle/ });
     expect(field).toHaveTextContent(de['formly.select.placeholder']);
-    expect(field).toHaveAttribute('aria-required', 'true');
+    expect(field).toHaveAccessibleName(/Pflichtfeld/);
     await userEvent.click(field);
     await settle();
     const options = screen.getAllByRole('option');

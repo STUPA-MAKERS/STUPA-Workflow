@@ -151,6 +151,8 @@ const BACKEND_AUDIT_ACTIONS = [
   'application_archive',
   'application_unarchive',
   'application_decision',
+  'application_link_set',
+  'application_link_remove',
   'webhook_config',
   'attachment_upload',
   'attachment_quarantine',

@@ -1,6 +1,7 @@
 import { Router, provideRouter } from '@angular/router';
 import { fireEvent, render, screen } from '@testing-library/angular';
 import { MarkdownViewComponent } from './markdown-view.component';
+import { runAxe } from '../../../testing/a11y';
 
 describe('MarkdownViewComponent', () => {
   /** The renderer escapes raw HTML and never runs it. */
@@ -68,5 +69,16 @@ describe('MarkdownViewComponent', () => {
     const link = screen.getByRole('link', { name: 'In' });
     link.addEventListener('click', (e) => e.preventDefault());
     expect(fireEvent.click(link)).toBe(false);
+  });
+
+  /** § NF/accessibility/conformance/000493 */
+  it('has no axe violations for text, lists, links, tables and an image', async () => {
+    const { container } = await render(MarkdownViewComponent, {
+      inputs: {
+        src: '# Titel\n\n**fett** [Link](https://example.org)\n\n- a\n- b\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n![Foto](/api/media/images/0b7c6f0e-3a51-4c3e-9b8e-6f1d2a3b4c5d)',
+      },
+      providers: [provideRouter([])],
+    });
+    expect(await runAxe(container)).toHaveNoViolations();
   });
 });
