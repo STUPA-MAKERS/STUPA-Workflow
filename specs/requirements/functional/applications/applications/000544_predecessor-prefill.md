@@ -16,8 +16,8 @@ scope:
 
 In the apply wizard and in "Antrag erfassen", the user must be able to choose a Vorgänger
 before the first form step. The choice must fill the new form with the answers of the
-Vorgänger. Only an answer whose field key exists in the new form version and whose value is
-valid there must be copied. File fields must stay empty. A PII field must stay empty when the
+Vorgänger. Only an answer whose field key exists in the current form version of the Antragstyp and
+whose value is valid there must be copied. File fields must stay empty. A PII field must stay empty when the
 caller cannot read the PII of the Vorgänger. The user must be able to change every prefilled
 answer before "Antrag anlegen". The new Antrag must save the Vorgänger as its link.
 

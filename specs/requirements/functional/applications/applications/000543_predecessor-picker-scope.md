@@ -14,7 +14,8 @@ scope:
 
 # The Vorgänger picker lists only readable Anträge
 
-The Vorgänger picker must list only the Anträge that the caller can open in the Anträge list.
+The Vorgänger picker must list only the Anträge of the same Antragstyp that the caller can open
+in the Anträge list.
 For a logged-in user, that is the read scope of the list: `application.read`,
 `application.read_all`, the Gremium read scope, and every Antrag that the user created while
 logged in. The server must check the read right of the chosen Vorgänger again when it saves
