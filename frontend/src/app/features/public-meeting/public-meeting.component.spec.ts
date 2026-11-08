@@ -3,7 +3,7 @@ import { ActivatedRoute, Router, convertToParamMap, type ParamMap } from '@angul
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { signal } from '@angular/core';
-import { BehaviorSubject, type Observable, of, throwError } from 'rxjs';
+import { BehaviorSubject, EMPTY, type Observable, of, throwError } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { GuestMe } from '@core/api/models';
@@ -43,7 +43,7 @@ async function setup(
     meetingOfJoinCode: jest.fn(() => target),
   };
   const auth = fakeAuth(loggedIn);
-  const router = { navigate: jest.fn() };
+  const router = { navigate: jest.fn(), ...LINK_ROUTER };
   const view = await render(PublicMeetingComponent, {
     providers: [
       { provide: ApiClient, useValue: api },
@@ -57,6 +57,13 @@ async function setup(
   });
   return { ...view, api, auth, router, params };
 }
+
+/** What a `routerLink` (the statement link of the footer) reads from the router. */
+const LINK_ROUTER = {
+  events: EMPTY,
+  createUrlTree: (commands: readonly string[]) => commands.join('/'),
+  serializeUrl: (tree: string) => tree,
+};
 
 describe('PublicMeetingComponent', () => {
   afterEach(() => jest.useRealTimers());
@@ -236,7 +243,7 @@ describe('PublicMeetingComponent', () => {
       providers: [
         { provide: ApiClient, useValue: api },
         { provide: AuthService, useValue: fakeAuth() },
-        { provide: Router, useValue: { navigate: jest.fn() } },
+        { provide: Router, useValue: { navigate: jest.fn(), ...LINK_ROUTER } },
         { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({})) } },
         { provide: AltchaService, useValue: { solve: () => Promise.resolve(null) } },
         { provide: USE_MOCK_API, useValue: true },

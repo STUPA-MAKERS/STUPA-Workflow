@@ -4,8 +4,15 @@ title: A public page holds the accessibility statement
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/src/app/features/accessibility/accessibility-statement.component.spec.ts:AccessibilityStatementComponent"
+  - "backend/tests/unit/modules/admin/test_admin_branding.py:test_the_accessibility_statement_defaults_to_the_built_in_draft"
+implementation:
+  - frontend/src/app/features/accessibility/accessibility-statement.component.ts
+  - frontend/src/app/pages/admin/branding/branding-editor.component.ts
+  - backend/app/modules/admin/statement.py
+  - backend/app/modules/admin/branding.py
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

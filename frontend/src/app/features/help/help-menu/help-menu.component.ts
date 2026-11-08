@@ -13,6 +13,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -41,7 +42,8 @@ let nextId = 0;
 
 /**
  * The help menu: "Handbuch im Wiki" (the configured `help.wikiUrl`, a real link in a new
- * tab) and "Problem melden", which opens the report dialog.
+ * tab), "Barrierefreiheit" (the accessibility statement, on every page with and without a
+ * login, spec 000496) and "Problem melden", which opens the report dialog.
  *
  * A signed-in person always gets "Problem melden". A visitor gets it only while the
  * admin allows tickets without an account (`tickets.publicEnabled`).
@@ -54,7 +56,7 @@ let nextId = 0;
   selector: 'app-help-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, TranslatePipe, IconComponent, SideSheetComponent],
+  imports: [NgTemplateOutlet, RouterLink, TranslatePipe, IconComponent, SideSheetComponent],
   templateUrl: './help-menu.component.html',
   styleUrl: './help-menu.component.scss',
 })
@@ -141,6 +143,13 @@ export class HelpMenuComponent {
 
   /** The handbook link was followed (it opens in a new tab). */
   onWiki(): void {
+    this.close();
+    this.sheetOpen.set(false);
+    this.navigated.emit();
+  }
+
+  /** The statement link was followed: the menu closes. */
+  onStatement(): void {
     this.close();
     this.sheetOpen.set(false);
     this.navigated.emit();

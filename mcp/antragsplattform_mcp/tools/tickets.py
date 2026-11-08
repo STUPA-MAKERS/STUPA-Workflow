@@ -23,7 +23,7 @@ group = ToolGroup()
 @group.tool
 async def tickets_list(
     status: list[Literal["new", "in_progress", "done", "rejected"]] | None = None,
-    kind: list[Literal["bug", "question", "idea"]] | None = None,
+    kind: list[Literal["bug", "question", "idea", "barrier"]] | None = None,
     assignee: str | None = None,
     q: str | None = None,
     limit: int = 50,

@@ -253,6 +253,15 @@ def test_an_anonymous_report_while_public_reports_are_off_is_403(env: _Env) -> N
     assert resp.json()["code"] == "tickets_public_disabled"
 
 
+def test_an_anonymous_barrier_report_passes_while_public_reports_are_off(env: _Env) -> None:
+    """The feedback route of the accessibility statement needs no login (spec 000497)."""
+    env.public = False
+    report = {**_REPORT, "kind": "barrier", "email": "a@example.org"}
+    resp = TestClient(env.app).post("/api/tickets", json=report)
+    assert resp.status_code == 201
+    assert env.service.calls[0][1]["reporter_id"] is None
+
+
 def test_a_session_report_passes_while_public_reports_are_off(env: _Env) -> None:
     env.public = False
     env.login(Principal(sub="u"))

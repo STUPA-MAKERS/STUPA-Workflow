@@ -493,6 +493,23 @@ describe('BrandingEditorComponent', () => {
       expect(saved.freetexts.submittedExternal).toEqual({});
     });
 
+    /** Spec 000495: the statement of `/barrierefreiheit` is an admin text. */
+    it('edits the accessibility statement per language', async () => {
+      const { fixture, api } = await setupWithStub({}, 'texts');
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const field = screen.getByRole('textbox', { name: 'Text der Erklärung (Markdown) (DE)' });
+      await userEvent.clear(field);
+      await userEvent.type(field, 'Stand: teilweise');
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      const saved = api.saveSiteConfig.mock.calls[0][0] as Branding;
+      expect(saved.freetexts.accessibilityStatement?.['de']).toBe('Stand: teilweise');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      delete c.draft().freetexts.accessibilityStatement;
+      expect(c.statementMap(c.draft())).toEqual({});
+    });
+
     it('keeps a map that the config already has', async () => {
       const { fixture } = await setup();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

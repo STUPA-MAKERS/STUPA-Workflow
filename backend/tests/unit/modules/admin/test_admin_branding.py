@@ -37,6 +37,19 @@ def test_empty_branding_defaults() -> None:
     assert b.freetexts.submitted_external == {}
 
 
+def test_the_accessibility_statement_defaults_to_the_built_in_draft() -> None:
+    """A config without the statement reads as the draft; an edited one stays (000495)."""
+    statement = Branding().freetexts.accessibility_statement
+    assert set(statement) == {"de", "en"}
+    assert "teilweise vereinbar" in statement["de"]
+    assert "Schlichtungsstelle" in statement["de"]
+    assert "conciliation body" in statement["en"]
+    edited = Branding.model_validate({"freetexts": {"accessibilityStatement": {"de": "Text"}}})
+    assert edited.freetexts.accessibility_statement == {"de": "Text"}
+    with pytest.raises(ValidationError):
+        Branding.model_validate({"freetexts": {"accessibilityStatement": {"de": "x" * 10_001}}})
+
+
 def test_full_branding_roundtrip_by_alias() -> None:
     raw = {
         "logos": {"wordmark": _png(), "imagemark": _png(), "favicon": _png()},

@@ -5,7 +5,7 @@
   "frontend/src/app/pages/admin/admin.mock.ts": 2,
   "frontend/src/app/pages/admin/admin.models.ts": 24,
   "frontend/src/app/pages/admin/backups/backups.component.ts": 1,
-  "frontend/src/app/pages/admin/branding/branding-editor.component.ts": 15,
+  "frontend/src/app/pages/admin/branding/branding-editor.component.ts": 14,
   "frontend/src/app/pages/admin/cd-variants/cd-variants.component.ts": 2,
   "frontend/src/app/pages/admin/cd-variants/cd-variants.util.ts": 3,
   "frontend/src/app/pages/admin/deadlines/deadlines.component.ts": 1,

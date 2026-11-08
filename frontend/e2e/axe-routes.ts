@@ -37,6 +37,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('protokolle', { public: true }),
   { path: 'protokolle/:id', url: () => `/protokolle/${MISSING}`, public: true },
   { path: 'j/:code', url: () => '/j/ZZZZZZ', public: true },
+  fixed('barrierefreiheit', { public: true }),
   fixed('dashboard'),
   fixed('applications'),
   { path: 'applications/:id', url: (ids) => `/applications/${ids.application}` },

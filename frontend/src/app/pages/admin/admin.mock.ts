@@ -490,6 +490,10 @@ export const MOCK_BRANDING: Branding = {
     applyInfo: {},
     submittedInternal: {},
     submittedExternal: {},
+    accessibilityStatement: {
+      de: '## Stand der Vereinbarkeit\n\nDiese Plattform ist **teilweise vereinbar**.',
+      en: '## Compliance status\n\nThis platform is **partially compliant**.',
+    },
   },
 };
 

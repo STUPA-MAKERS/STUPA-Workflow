@@ -85,6 +85,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'barrierefreiheit',
+        data: { title: 'a11yStatement.title', footer: true },
+        loadComponent: () =>
+          import('./features/accessibility/accessibility-statement.component').then(
+            (m) => m.AccessibilityStatementComponent,
+          ),
+      },
+      {
         path: 'j/:code',
         data: { title: 'guests.page.routeTitle', chrome: false },
         loadComponent: () =>
