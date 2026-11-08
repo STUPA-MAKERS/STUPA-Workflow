@@ -4,8 +4,11 @@ title: User text spacing does not cut text
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+implementation:
+  - frontend/vendor/ui-kit/src/styles/_field.scss
+  - frontend/vendor/ui-kit/src/styles/_nav-items.scss
+  - frontend/vendor/ui-kit/src/lib/segmented/segmented.component.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

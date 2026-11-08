@@ -15,7 +15,7 @@
 }
 .field__label {
   @include f.label;
-  right: 2.75rem;
+  padding-right: 2.75rem;
 }
 .field__box:focus-within .field__label {
   @include f.label-focus;
