@@ -3932,5 +3932,15 @@
   "applications.predecessor.open": "Open application",
   "applications.predecessor.errorCycle": "This application already comes before the chosen one.",
   "applications.predecessor.errorType": "The previous application must have the same type.",
-  "applications.predecessor.errorForbidden": "You need edit rights on both applications."
+  "applications.predecessor.errorForbidden": "You need edit rights on both applications.",
+  "a11yStatement.title": "Accessibility statement",
+  "a11yStatement.loading": "Loading the statement",
+  "a11yStatement.empty": "The statement is not filled in yet.",
+  "a11yStatement.report.title": "Report a barrier",
+  "a11yStatement.report.body": "Did you find a barrier? Tell us, also without signing in.",
+  "a11yStatement.report.action": "Report a barrier",
+  "a11yStatement.link": "Accessibility",
+  "tickets.kind.barrier": "Barrier",
+  "admin.brand.statement.group": "Accessibility statement",
+  "admin.brand.statement.label": "Text of the statement (Markdown)"
 }

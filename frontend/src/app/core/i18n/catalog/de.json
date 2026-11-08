@@ -3932,5 +3932,15 @@
   "applications.predecessor.open": "Antrag öffnen",
   "applications.predecessor.errorCycle": "Dieser Antrag ist schon ein Vorgänger des gewählten Antrags.",
   "applications.predecessor.errorType": "Der Vorgänger muss dieselbe Antragsart haben.",
-  "applications.predecessor.errorForbidden": "Du brauchst Bearbeitungsrechte auf beiden Anträgen."
+  "applications.predecessor.errorForbidden": "Du brauchst Bearbeitungsrechte auf beiden Anträgen.",
+  "a11yStatement.title": "Erklärung zur Barrierefreiheit",
+  "a11yStatement.loading": "Erklärung wird geladen",
+  "a11yStatement.empty": "Die Erklärung ist noch nicht ausgefüllt.",
+  "a11yStatement.report.title": "Barriere melden",
+  "a11yStatement.report.body": "Ist dir eine Barriere aufgefallen? Melde sie uns, auch ohne Anmeldung.",
+  "a11yStatement.report.action": "Barriere melden",
+  "a11yStatement.link": "Barrierefreiheit",
+  "tickets.kind.barrier": "Barriere",
+  "admin.brand.statement.group": "Erklärung zur Barrierefreiheit",
+  "admin.brand.statement.label": "Text der Erklärung (Markdown)"
 }

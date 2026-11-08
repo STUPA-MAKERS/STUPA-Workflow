@@ -208,24 +208,35 @@ export class BrandingEditorComponent {
     return CATALOG[baseLocale(this.lang())][key] ?? CATALOG.de[key] ?? '';
   }
 
-  /** The text map of a free text. `applyInfo` is missing in an older config. */
+  /**
+   * The text map of a free text. A config from before a newer text (`applyInfo`, the texts
+   * after the creation, the accessibility statement) has none, so it gets an empty map.
+   */
+  private textMap(d: Branding, key: keyof Branding['freetexts']): I18nMap {
+    const texts: Partial<Record<keyof Branding['freetexts'], I18nMap>> = d.freetexts;
+    return (texts[key] ??= {});
+  }
+
+  /** The text map of a free text of the first group. */
   protected freetext(d: Branding, key: FreetextKey): I18nMap {
-    if (key === 'applyInfo') {
-      d.freetexts.applyInfo ??= {};
-      return d.freetexts.applyInfo;
-    }
-    return d.freetexts[key];
+    return this.textMap(d, key);
   }
 
   protected submittedLabel(kind: SubmittedKind): string {
     return this.i18n.translate(`admin.brand.submitted.${kind}` as TranslationKey);
   }
 
-  /** The text map of a kind. A config from before the feature has none. */
+  /** The text map of a kind. */
   protected submittedMap(d: Branding, kind: SubmittedKind): I18nMap {
-    const key = SUBMITTED_FREETEXT[kind];
-    d.freetexts[key] ??= {};
-    return d.freetexts[key];
+    return this.textMap(d, SUBMITTED_FREETEXT[kind]);
+  }
+
+  /**
+   * The text map of the accessibility statement (`/barrierefreiheit`, spec 000495). The
+   * server fills a config without it with its built-in draft.
+   */
+  protected statementMap(d: Branding): I18nMap {
+    return this.textMap(d, 'accessibilityStatement');
   }
 
   /** The built-in text in the picked language: the placeholder of the empty field. */

@@ -73,7 +73,8 @@ export interface PublicSiteConfig {
           | 'emailFooter'
           | 'applyInfo'
           | 'submittedInternal'
-          | 'submittedExternal',
+          | 'submittedExternal'
+          | 'accessibilityStatement',
           I18nMap
         >
       >

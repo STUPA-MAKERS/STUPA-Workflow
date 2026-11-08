@@ -18,12 +18,14 @@ export const KIND_ICON: Record<TicketKind, IconName> = {
   bug: 'bug',
   question: 'help',
   idea: 'bulb',
+  barrier: 'eye',
 };
 
 export const KIND_LABEL: Record<TicketKind, TranslationKey> = {
   bug: 'tickets.kind.bug',
   question: 'tickets.kind.question',
   idea: 'tickets.kind.idea',
+  barrier: 'tickets.kind.barrier',
 };
 
 export const STATUS_LABEL: Record<TicketStatus, TranslationKey> = {

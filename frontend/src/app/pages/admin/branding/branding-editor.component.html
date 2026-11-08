@@ -48,6 +48,19 @@
               </label>
             }
           </app-section>
+
+          <app-section class="br__sec" [level]="2" [heading]="'admin.brand.statement.group' | t">
+            <label class="br__area" data-testid="statement">
+              <span class="br__areaLabel">{{ withLang('admin.brand.statement.label' | t) }}</span>
+              <textarea
+                class="br__areaInput"
+                rows="12"
+                [ngModel]="statementMap(d)[lang()]"
+                (ngModelChange)="setText(statementMap(d), $event)"
+                name="statement"
+              ></textarea>
+            </label>
+          </app-section>
         </div>
 
         <div class="br__col">

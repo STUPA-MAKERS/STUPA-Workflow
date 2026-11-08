@@ -4,8 +4,13 @@ title: Every page links to the accessibility statement
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/src/app/layout/site-footer/site-footer.component.spec.ts:SiteFooterComponent"
+  - "frontend/src/app/features/help/help-menu/help-menu.component.spec.ts:HelpMenuComponent"
+implementation:
+  - frontend/src/app/layout/site-footer/site-footer.component.html
+  - frontend/src/app/features/help/help-menu/help-menu.component.html
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

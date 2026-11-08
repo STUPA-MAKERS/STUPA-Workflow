@@ -1210,6 +1210,8 @@ export interface SiteFreetexts {
    */
   submittedInternal?: I18nMap;
   submittedExternal?: I18nMap;
+  /** The accessibility statement of `/barrierefreiheit` — Markdown, each i18n. */
+  readonly accessibilityStatement?: I18nMap;
 }
 
 export interface Branding {

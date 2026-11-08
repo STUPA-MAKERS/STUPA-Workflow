@@ -13,4 +13,12 @@ describe('HelpService', () => {
     expect(help.reportOpen()).toBe(false);
     expect(help.reportUsed()).toBe(true);
   });
+
+  it('remembers the kind the opener picks, and none for a plain opening', () => {
+    const help = new HelpService();
+    help.openReport('barrier');
+    expect(help.presetKind()).toBe('barrier');
+    help.openReport();
+    expect(help.presetKind()).toBeNull();
+  });
 });

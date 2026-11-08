@@ -1,4 +1,5 @@
 import { signal } from '@angular/core';
+import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { BrandingService } from '@core/branding/branding.service';
 import { SiteFooterComponent } from './site-footer.component';
@@ -15,7 +16,7 @@ function branding(
 async function setup(value = branding()) {
   localStorage.setItem('ap.locale', 'de');
   return render(SiteFooterComponent, {
-    providers: [{ provide: BrandingService, useValue: value }],
+    providers: [provideRouter([]), { provide: BrandingService, useValue: value }],
   });
 }
 
@@ -26,7 +27,7 @@ describe('SiteFooterComponent', () => {
     const { container } = await setup();
     expect(screen.getByText('Eine Plattform des Studierendenparlaments')).toBeInTheDocument();
     expect(container.querySelector('.ft__cols')).toBeNull();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link').map((a) => a.textContent?.trim())).toEqual(['Barrierefreiheit']);
   });
 
   it('shows the copyright and the legal links of the active locale', async () => {
@@ -88,7 +89,7 @@ describe('SiteFooterComponent', () => {
           { label: { de: '' }, url: 'https://example.org/empty' },
           { label: { de: 'Datenschutz' }, url: 'https://example.org/d' },
           { label: { de: 'Kontakt' }, url: ' ' },
-          { label: { de: 'Barrierefreiheit' }, url: 'https://example.org/a' },
+          { label: { de: 'Hilfe' }, url: 'https://example.org/a' },
         ],
       }),
     );
@@ -96,14 +97,15 @@ describe('SiteFooterComponent', () => {
     expect(items.map((li) => li.textContent?.trim())).toEqual([
       'Impressum',
       'Datenschutz',
+      'Hilfe',
       'Barrierefreiheit',
     ]);
     expect(screen.getByRole('list')).toBeInTheDocument();
   });
 
-  it('renders no legal list without legal links', async () => {
-    const { container } = await setup(branding({ copyright: { de: '© AStA' } }));
-    expect(container.querySelector('.ft__legal')).toBeNull();
-    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  /** Spec 000496: the statement link shows on every page, also without legal links. */
+  it('always links to the accessibility statement', async () => {
+    await setup(branding({ copyright: { de: '© AStA' } }));
+    expect(screen.getByRole('link', { name: 'Barrierefreiheit' })).toHaveAttribute('href', '/barrierefreiheit');
   });
 });

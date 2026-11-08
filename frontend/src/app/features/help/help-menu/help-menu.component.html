@@ -13,6 +13,10 @@
     </span>
     <app-icon class="hm__ext" name="ext" [size]="16" />
   </a>
+  <a class="hm__item" routerLink="/barrierefreiheit" (click)="onStatement()">
+    <app-icon name="eye" [size]="19" />
+    <span class="hm__text">{{ 'a11yStatement.link' | t }}</span>
+  </a>
   @if (canReport()) {
     <div class="hm__sep" role="separator"></div>
     <button type="button" class="hm__item" (click)="report()">

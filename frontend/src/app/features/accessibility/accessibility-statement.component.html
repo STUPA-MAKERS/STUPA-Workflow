@@ -1,0 +1,20 @@
+<article class="as" aria-labelledby="as-title">
+  <h1 class="as__title" id="as-title">{{ 'a11yStatement.title' | t }}</h1>
+
+  @if (!loaded()) {
+    <app-skeleton variant="rows" [count]="6" [label]="'a11yStatement.loading' | t" />
+  } @else if (markdown()) {
+    <app-markdown-view class="as__text" [src]="markdown()" [headingOffset]="0" [imageSrc]="null" />
+  } @else {
+    <p class="as__empty">{{ 'a11yStatement.empty' | t }}</p>
+  }
+
+  <section class="as__report" aria-labelledby="as-report">
+    <h2 class="as__reportTitle" id="as-report">{{ 'a11yStatement.report.title' | t }}</h2>
+    <p class="as__reportBody">{{ 'a11yStatement.report.body' | t }}</p>
+    <app-button variant="fill" (click)="report()">
+      <app-icon name="eye" [size]="18" />
+      {{ 'a11yStatement.report.action' | t }}
+    </app-button>
+  </section>
+</article>

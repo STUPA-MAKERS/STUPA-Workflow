@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import type { TicketKind } from '@core/api/tickets.service';
 
 /**
  * Opens and closes the dialog "Problem melden".
@@ -16,7 +17,16 @@ export class HelpService {
   private readonly _reportUsed = signal(false);
   readonly reportUsed = this._reportUsed.asReadonly();
 
-  openReport(): void {
+  /** The kind the dialog starts with; `null` keeps the kind of the last draft. */
+  private readonly _presetKind = signal<TicketKind | null>(null);
+  readonly presetKind = this._presetKind.asReadonly();
+
+  /**
+   * Open the dialog. `kind` picks the kind, e.g. `barrier` from the accessibility
+   * statement (spec 000497).
+   */
+  openReport(kind: TicketKind | null = null): void {
+    this._presetKind.set(kind);
     this._reportUsed.set(true);
     this._reportOpen.set(true);
   }

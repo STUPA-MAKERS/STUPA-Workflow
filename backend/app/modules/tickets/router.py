@@ -183,16 +183,19 @@ def _queue_mention_mails(
 
 
 async def require_public_or_session(
-    db: DbSession,
-    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    db: DbSession, principal: Principal | None, kind: TicketKind
 ) -> None:
     """Refuse a report without a session while ``tickets.publicEnabled`` is off.
 
+    A barrier report (``kind == "barrier"``) always passes: it is the feedback route
+    of the accessibility statement, which the law requires without a login
+    (spec 000497).
+
     Raises:
-        ForbiddenError: No session and public reports are off (HTTP 403,
-            ``tickets_public_disabled``).
+        ForbiddenError: No session, not a barrier report and public reports are off
+            (HTTP 403, ``tickets_public_disabled``).
     """
-    if principal is not None:
+    if principal is not None or kind == "barrier":
         return
     if not (await active_branding(db)).tickets.public_enabled:
         raise ForbiddenError(
@@ -207,7 +210,6 @@ async def require_public_or_session(
     dependencies=[
         Depends(enforce_ticket_payload_limit),
         Depends(rate_limit_tickets),
-        Depends(require_public_or_session),
         Depends(verify_altcha_unless_authenticated),
     ],
     responses=_errors(400, 403, 413, 422, 429),
@@ -222,11 +224,11 @@ async def create_ticket(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     send_mails: Annotated[TicketMailSender, Depends(get_ticket_mail_sender)],
 ) -> TicketCreated:
-    """Report a problem, a question or an idea.
+    """Report a problem, a question, an idea or an accessibility barrier.
 
     ALTCHA applies to a report without a session only. Errors: 400 invalid ALTCHA, 403
-    public reports off, 413 body too large, 422 validation (missing email, bad drafts),
-    429 rate limit.
+    public reports off (never for a barrier report), 413 body too large, 422 validation
+    (missing email, bad drafts), 429 rate limit.
 
     With a session the account is the reporter and ``email`` is ignored. Without
     one, ``email`` is required (422). ``attachmentIds`` and ``draftToken`` bind the
@@ -236,6 +238,7 @@ async def create_ticket(
     A report of a blocked sender gets the same answer with a fresh number, but
     nothing is stored and no mail goes out.
     """
+    await require_public_or_session(db, principal, payload.kind)
     reporter_id = await principal_id_of(db, principal.sub) if principal is not None else None
     email = str(payload.email) if payload.email is not None else None
     if reporter_id is None and email is None:

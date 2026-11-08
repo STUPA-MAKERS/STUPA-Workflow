@@ -43,7 +43,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base, TimestampMixin, UUIDPkMixin
 
 #: The kinds of a ticket.
-TICKET_KINDS: tuple[str, ...] = ("bug", "question", "idea")
+TICKET_KINDS: tuple[str, ...] = ("bug", "question", "idea", "barrier")
 #: The statuses of a ticket.
 TICKET_STATUSES: tuple[str, ...] = ("new", "in_progress", "done", "rejected")
 #: The statuses that close a ticket and start the retention clock.

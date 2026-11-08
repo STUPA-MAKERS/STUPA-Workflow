@@ -728,7 +728,7 @@ TodoLinkKind = Literal[
     "ticket",
     "todo",
 ]
-TicketKind = Literal["bug", "question", "idea"]
+TicketKind = Literal["bug", "question", "idea", "barrier"]
 TicketStatus = Literal["new", "in_progress", "done", "rejected"]
 
 
