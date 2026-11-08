@@ -10,6 +10,7 @@ exactly this class. The implementation lives in the ops classes:
 * `listing.ListingOps`: filtered listing, Gremium scope, tasks, name maps
 * `comments.CommentOps`: internal and public comments
 * `anonymize.AnonymizeOps`: GDPR anonymization
+* `links.LinkOps`: the Vorgänger link of a Folgeantrag and the prefill
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from app.modules.applications.service.anonymize import AnonymizeOps
 from app.modules.applications.service.comments import CommentOps
 from app.modules.applications.service.create import CreateOps
 from app.modules.applications.service.edits import EditOps
+from app.modules.applications.service.links import LinkOps
 from app.modules.applications.service.listing import ListingOps
 from app.modules.applications.service.on_behalf import OnBehalfOps
 from app.modules.applications.service.reads import ReadOps
@@ -31,5 +33,6 @@ class ApplicationsService(
     ListingOps,
     CommentOps,
     AnonymizeOps,
+    LinkOps,
 ):
     """DB-backed application operations, bound to one `AsyncSession`."""

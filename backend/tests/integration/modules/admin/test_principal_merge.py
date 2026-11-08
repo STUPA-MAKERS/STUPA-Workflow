@@ -42,6 +42,8 @@ from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.applications.models import (
     Application,
     ApplicationDecision,
+    ApplicationLink,
+    ApplicationLinkEvent,
     Comment,
     GuestApplicationSettings,
     StatusEvent,
@@ -284,6 +286,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
     tag = _tag()
 
     app_id = await create_app(maker, seed, actor=old.sub, title="Antrag Alt")
+    follow_id = await create_app(maker, seed, actor="folge-sub", title="Antrag Folge")
     await fire(
         maker,
         app_id,
@@ -306,6 +309,14 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             LoginSettings(id=1, web_session_days=90, pwa_session_days=180, updated_by=old.sub)
         )
         session.add(ApplicationDecision(application_id=app_id, decided_by=old.sub))
+        session.add(
+            ApplicationLink(application_id=follow_id, predecessor_id=app_id, linked_by=old.sub)
+        )
+        session.add(
+            ApplicationLinkEvent(
+                application_id=follow_id, predecessor_id=app_id, action="set", actor=old.sub
+            )
+        )
         now = datetime.now(UTC)
         session.add(
             UiLanguage(

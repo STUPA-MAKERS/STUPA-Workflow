@@ -1,0 +1,16 @@
+:host {
+  display: block;
+}
+
+.pf__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pf__title {
+  overflow-wrap: anywhere;
+}
+.pf__meta {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
