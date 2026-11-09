@@ -138,7 +138,11 @@ and every live card, done ones too; `cardCount` = the live cards of the column; 
 token gate (403), the same weak ETag and 304, and a constant number of queries: one for
 the boards, one for the cards, one each for columns and labels, and the tile facts),
 `GET /link-targets` (`kind` = `all` or a `TodoLinkKind`), `GET /linked?kind&targetId`
-(`TodoLinkedKind`: every kind but `todo`), `GET /cards?ids=` (the read-ahead of the board
+(`TodoLinkedKind`: every kind but `todo`; a card shows the cards that link it in its own
+`links` instead, as `todo` links with the id of the other card's row, each other card once,
+readable cards only; `DELETE /cards/{id}/links/{linkId}` takes such a link from either card
+and removes every link between the two, and `POST` answers 409 `link_exists` for a link in
+either direction; spec 000573, `service.card_links`), `GET /cards?ids=` (the read-ahead of the board
 page: up to 50 whole cards (`CARD_BATCH`) in the order of `ids`; an unreadable or unknown
 card is left out, not 404; `TodoService.cards`), `POST /cards`, `GET|PATCH
 /cards/{id}` (PATCH needs `version`, 409 `card_version_conflict`), `POST
