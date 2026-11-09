@@ -51,8 +51,9 @@
         appScrollFade="y"
       >
         @if (error()) {
-          <app-note class="tasks__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tasks.error' | t }}</app-note>
-        } @else if (loading()) {
+          <app-load-error [message]="'tasks.error' | t" (retry)="retry()" />
+        }
+        @if (loading()) {
           <app-skeleton variant="rows" [count]="6" [label]="'tasks.loading' | t" />
         } @else if (query() && !rows().length && !todoRows().length) {
           <app-empty-state rows="3" [heading]="'tasks.noMatch' | t" />

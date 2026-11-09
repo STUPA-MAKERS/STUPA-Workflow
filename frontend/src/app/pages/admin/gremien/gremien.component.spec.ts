@@ -7,6 +7,7 @@ import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import type { Gremium } from '../admin.models';
 import { AdminGremienComponent } from './gremien.component';
+import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 
 const GREMIEN: Gremium[] = [
   {
@@ -93,7 +94,7 @@ async function setup(opts: { api?: ReturnType<typeof makeApi>; perms?: string[] 
     providers: [
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       { provide: AuthService, useValue: { can: (p: string) => perms.includes(p) } },
     ],
   });
@@ -383,7 +384,7 @@ describe('AdminGremienComponent', () => {
     await setup({
       api: makeApi({ listGremien: jest.fn(() => throwError(() => ({ status: 500 }))) }),
     });
-    expect(screen.getByRole('alert')).toHaveTextContent('Gremien konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Gremien konnten nicht geladen werden.');
   });
 
   it('names a failed load and an empty list (2)', async () => {

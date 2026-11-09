@@ -24,7 +24,6 @@ import {
   type FilterSelectOption,
   IconComponent,
   InfiniteScrollDirective,
-  NoteComponent,
   RangeChipComponent,
   type RangeValue,
   SkeletonComponent,
@@ -39,6 +38,7 @@ import type {
   ConfigRevisionDiff,
 } from '../admin.models';
 import { expandSet } from '@shared/expand-set';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 const PAGE_SIZE = 50;
 
@@ -240,7 +240,7 @@ type VerifyState =
     LoadMoreComponent,
     _Sb,
     InfiniteScrollDirective,
-    NoteComponent,
+    LoadErrorComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,

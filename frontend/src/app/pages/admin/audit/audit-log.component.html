@@ -59,7 +59,7 @@
   </app-sticky-bar>
 
   @if (loadError()) {
-    <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'admin.audit.error' | t }}</app-note>
+    <app-load-error [message]="'admin.audit.error' | t" (retry)="retry()" />
   }
 
   @if (entries().length) {

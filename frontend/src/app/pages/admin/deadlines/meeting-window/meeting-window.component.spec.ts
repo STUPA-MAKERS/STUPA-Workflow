@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import type { MeetingSettings } from '../../admin.models';
 import { MeetingWindowSettingsComponent } from './meeting-window.component';
+import { loadErrorToast, toastWith } from '../../../../../testing/load-error';
 
 type Body = Pick<MeetingSettings, 'openLeadMinutes' | 'confirmLeadMinutes'>;
 
@@ -25,7 +26,7 @@ async function setup(opts: { api?: Record<string, jest.Mock>; perms?: string[] }
     providers: [
       { provide: AdminApiService, useValue: api },
       { provide: AuthService, useValue: { can: (p: string) => perms.has(p) } },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   await view.fixture.whenStable();
@@ -114,6 +115,6 @@ describe('MeetingWindowSettingsComponent', () => {
     await setup({
       api: { getMeetingSettings: jest.fn(() => throwError(() => ({ status: 500 }))), putMeetingSettings: jest.fn() },
     });
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Einstellungen konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Einstellungen konnten nicht geladen werden.');
   });
 });

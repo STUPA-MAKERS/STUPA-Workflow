@@ -9,6 +9,7 @@ import { AdminApiService } from '../admin-api.service';
 import type { GremiumMembership, GremiumRole } from '../admin.models';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { GremiumMembersComponent, MEMBER_PREVIEW } from './gremium-members.component';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 
 const ROLES: GremiumRole[] = [
   { id: 'r-v', gremiumId: 'g-1', key: 'vorstand', name: { de: 'Vorstand' }, forced: true },
@@ -69,7 +70,7 @@ async function setup(
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
       { provide: DelegationsApiService, useValue: delegations },
-      { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
+      { provide: ToastService, useFactory: () => toastWith({ success: jest.fn(), error: jest.fn() }) },
       {
         provide: AuthService,
         useValue: {
@@ -169,16 +170,15 @@ describe('GremiumMembersComponent', () => {
     expect(screen.getByRole('heading', { name: 'Stellvertretungen' })).toBeInTheDocument();
   });
 
-  it('names a failed load and never shows an empty list for it', async () => {
+  /** § 000576: the toast names the error, the list shows its empty placeholder. */
+  it('names a failed load in a toast and shows the empty placeholder', async () => {
     const { api, fixture } = await setup({
       api: makeApi({ listGremiumMemberships: jest.fn(() => throwError(() => ({ status: 403 }))) }),
     });
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Die Mitglieder konnten nicht geladen werden.',
-    );
-    expect(screen.queryByText('Noch keine Mitglieder in diesem Gremium.')).toBeNull();
+    expect(loadErrorToast()).toContain('Die Mitglieder konnten nicht geladen werden.');
+    expect(screen.getByText('Noch keine Mitglieder in diesem Gremium.')).toBeInTheDocument();
     expect(screen.queryByText(/\d Mitglieder$/)).toBeNull();
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     fixture.detectChanges();
     expect(api.listGremiumMemberships).toHaveBeenCalledTimes(2);
   });

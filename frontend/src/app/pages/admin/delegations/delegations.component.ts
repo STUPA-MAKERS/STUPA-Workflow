@@ -12,7 +12,6 @@ import {
   FilterSelectComponent,
   type FilterSelectOption,
   IconComponent,
-  NoteComponent,
   RowMenuComponent,
   type RowMenuSection,
   SkeletonComponent,
@@ -25,6 +24,7 @@ import { AdminApiService } from '../admin-api.service';
 import type { Gremium } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
 import { localToday } from '@shared/date-format';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /**
  * The admin overview of the delegations (`/admin/delegations`).
@@ -46,7 +46,7 @@ import { localToday } from '@shared/date-format';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SectionComponent,
-    NoteComponent,
+    LoadErrorComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     NgTemplateOutlet,

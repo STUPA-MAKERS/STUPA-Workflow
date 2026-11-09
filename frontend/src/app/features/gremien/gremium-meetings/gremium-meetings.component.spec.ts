@@ -12,6 +12,7 @@ import {
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { GREMIEN_NOW } from '../gremien.store';
 import { GremiumMeetingsComponent } from './gremium-meetings.component';
+import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 const MEETINGS = [
   gremiumMeeting({ id: 'm-p1', title: '34. Sitzung', date: '2026-10-20', status: 'planned', protocolStatus: null }),
@@ -133,11 +134,11 @@ describe('GremiumMeetingsComponent', () => {
     const meetings = jest.fn((): ReturnType<GremienApiService['meetings']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ meetings }) });
     restore = view.restore;
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Sitzungen konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Sitzungen konnten nicht geladen werden.');
     meetings.mockReturnValue(of(MEETINGS));
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     view.fixture.detectChanges();
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(loadErrorToast()).toBeNull();
     expect(meetings).toHaveBeenCalledTimes(2);
   });
 

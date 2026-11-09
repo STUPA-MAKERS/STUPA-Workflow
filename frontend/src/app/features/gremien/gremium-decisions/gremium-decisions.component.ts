@@ -32,7 +32,6 @@ import {
   liveSearch,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   SearchPillComponent,
   SkeletonComponent,
   StatusTextComponent,
@@ -46,6 +45,7 @@ import { dayMonth, monthYear } from '@shared/date-format';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { majorityLabel } from '../../meetings/meetings-display.util';
 import { formatMoney } from '@shared/format-money';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 export type DecisionsResult = '' | GremiumDecisionResultFilter;
 export type DecisionsKind = '' | GremiumDecisionKind;
@@ -106,7 +106,7 @@ function decisionKey(d: GremiumDecision): string {
   imports: [
     SectionComponent,
     RowChevronComponent,
-    NoteComponent,
+    LoadErrorComponent,
     StickyBarComponent,
     TranslatePipe,
     ButtonComponent,

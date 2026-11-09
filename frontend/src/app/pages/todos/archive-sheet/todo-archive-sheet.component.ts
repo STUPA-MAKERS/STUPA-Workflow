@@ -10,12 +10,12 @@ import {
   liveSearch,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   SearchPillComponent,
   SideSheetComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { isoDay, shortDay } from '@shared/date-format';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** One page of the archive. */
 export const ARCHIVE_PAGE = 50;
@@ -28,7 +28,7 @@ export const ARCHIVE_PAGE = 50;
   selector: 'app-todo-archive-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NoteComponent, TranslatePipe, ButtonComponent, EmptyStateComponent, IconComponent, SearchPillComponent, SideSheetComponent],
+  imports: [LoadErrorComponent, TranslatePipe, ButtonComponent, EmptyStateComponent, IconComponent, SearchPillComponent, SideSheetComponent],
   templateUrl: './todo-archive-sheet.component.html',
   styleUrl: './todo-archive-sheet.component.scss',
 })

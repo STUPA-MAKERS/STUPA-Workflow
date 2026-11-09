@@ -37,6 +37,7 @@ import { Subscription } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import { type AdminPrincipal, isActiveMembership } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {
@@ -63,6 +64,7 @@ const SEARCH_LIMIT = 8;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadErrorComponent,
     SectionComponent,
     NoteComponent,
     EmptyStateComponent,

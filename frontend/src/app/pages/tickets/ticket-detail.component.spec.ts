@@ -23,6 +23,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
 import { TicketDetailComponent, reportScanState } from './ticket-detail.component';
 import { TicketsPageService } from './tickets-page.service';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../testing/load-error';
 
 const MARA: PersonRef = { principalId: 'p1', displayName: 'Mara Keller' };
 const JONAS: PersonRef = { principalId: 'p2', displayName: 'Jonas Albrecht' };
@@ -247,7 +248,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
       { provide: TicketsApiService, useValue: api },
       { provide: ApiClient, useValue: files },
       { provide: TodosApiService, useValue: todosApi },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       ...(page ? [{ provide: TicketsPageService, useValue: page }] : []),
       {
         provide: AuthService,
@@ -710,7 +711,7 @@ describe('TicketDetailComponent', () => {
   /** Without a ticket the header parts fall back. */
   it('names a failed read', async () => {
     const { cmp } = await start('/tickets/t40', { get: () => throwError(() => new Error('down')) });
-    expect(screen.getByRole('alert')).toHaveTextContent('Das Ticket konnte nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Das Ticket konnte nicht geladen werden.');
     expect(cmp.reporter()).toBe('');
     expect(cmp.statusKind()).toBe('accent');
     expect(cmp.statusLabel()).toBe('Neu');
@@ -728,7 +729,7 @@ describe('TicketDetailComponent', () => {
   it('reads the ticket again on "Erneut versuchen"', async () => {
     const { cmp, harness, setGet } = await start('/tickets/t40', { get: () => throwError(() => new Error('down')) });
     setGet(() => of(detail()));
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     harness.detectChanges();
     expect(cmp.error()).toBe(false);
     expect(cmp.ticket()).not.toBeNull();

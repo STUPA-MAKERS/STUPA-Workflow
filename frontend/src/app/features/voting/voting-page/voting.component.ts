@@ -37,7 +37,6 @@ import {
   liveSearch,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   ScrollFadeDirective,
   SearchPillComponent,
   SkeletonComponent,
@@ -64,6 +63,7 @@ import { groupByMonth } from '@shared/group-by-month';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { withEntry } from '@shared/util/immutable';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /**
  * The status chip: every vote, the open votes, the ended votes, the drafts. A cancelled
@@ -181,7 +181,7 @@ function whenSource(
     NewPollDialogComponent,
     PullRefreshDirective,
     RowChevronComponent,
-    NoteComponent,
+    LoadErrorComponent,
     PageHeaderComponent,
     RouterOutlet,
     TranslatePipe,

@@ -1,7 +1,7 @@
 @if (form.state() !== 'forbidden') {
   <app-section class="gs" [level]="2" [heading]="'admin.guest.title' | t">
 
-    <app-load-state [state]="form.state()" [lines]="2" [errorText]="'admin.guest.loadError' | t">
+    <app-load-state [state]="form.state()" [lines]="2" [errorText]="'admin.guest.loadError' | t" (retry)="form.reload()">
       <ng-template #content>
         <form class="gs__grid" (submit)="$event.preventDefault(); save()">
           <div class="gs__field">

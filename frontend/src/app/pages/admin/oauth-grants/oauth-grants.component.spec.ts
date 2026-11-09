@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import type { AdminPrincipal, OAuthGrantAdmin, OAuthGrantQuery } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { AdminOAuthGrantsComponent } from './oauth-grants.component';
+import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 
 /**
  * The last principal has neither a name nor an email, so the option falls back to the placeholder.
@@ -67,7 +68,7 @@ async function setup(api = makeApi(), auth = makeAuth()) {
     providers: [
       { provide: AdminApiService, useValue: api },
       { provide: AuthService, useValue: auth },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,7 +128,7 @@ describe('AdminOAuthGrantsComponent', () => {
     const { inst } = await setup(api);
     expect(inst.loadError()).toBe(true);
     expect(inst.loading()).toBe(false);
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Zugänge konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Zugänge konnten nicht geladen werden.');
   });
 
   it('survives a failing principal list — the grants still show', async () => {

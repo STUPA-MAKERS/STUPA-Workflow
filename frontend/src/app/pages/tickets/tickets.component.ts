@@ -40,7 +40,6 @@ import {
   ListGroupComponent,
   ListItemComponent,
   liveSearch,
-  NoteComponent,
   ScrollFadeDirective,
   SearchPillComponent,
   SkeletonComponent,
@@ -59,6 +58,7 @@ import { KIND_ICON, KIND_LABEL, STATUS_LABEL, reporterRowName, ticketAge } from 
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** The state chip. `open` (the default) shows new and in progress, the closed ones folded. */
 export type TicketStatusFilter = 'open' | TicketStatus | 'all';
@@ -119,7 +119,7 @@ function statusOrder(status: TicketStatusFilter): readonly TicketStatus[] {
     RowMenuComponent,
     PullRefreshDirective,
     RowChevronComponent,
-    NoteComponent,
+    LoadErrorComponent,
     RouterOutlet,
     TranslatePipe,
     AvatarComponent,

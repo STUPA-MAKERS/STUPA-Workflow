@@ -18,6 +18,7 @@ import { authInterceptor } from '@core/auth/auth.interceptor';
 import { AuthService } from '@core/auth/auth.service';
 import { lazyMockApiInterceptor } from '@core/api/mock-api.lazy';
 import { cacheInterceptor } from '@core/cache/cache.interceptor';
+import { reachabilityInterceptor } from '@core/api/reachability.interceptor';
 import { provideDetailPrefetch } from '@core/cache/detail-prefetch';
 import {
   loadingInterceptor,
@@ -51,7 +52,8 @@ import { provideServiceWorker } from '@angular/service-worker';
  * browser animated gets no second view transition. English lives in a lazy chunk, so the app waits
  * for it and the first paint is not German.
  *
- * Interceptor order: loading (outermost, measures the full duration) → cache → auth
+ * Interceptor order: loading (outermost, measures the full duration) → cache → reachability
+ * (a 502/503/504 or no answer starts the "Server nicht erreichbar" check) → auth
  * (credentials and bearer) → mock response. The cache sits inside the loading interceptor,
  * because a served-from-cache answer still counts as a completed request for the loading
  * bar, and the auth layer must run for the revalidation that follows.
@@ -79,8 +81,8 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(
       withInterceptors(
         isDevMode()
-          ? [loadingInterceptor, cacheInterceptor, authInterceptor, lazyMockApiInterceptor]
-          : [loadingInterceptor, cacheInterceptor, authInterceptor],
+          ? [loadingInterceptor, cacheInterceptor, reachabilityInterceptor, authInterceptor, lazyMockApiInterceptor]
+          : [loadingInterceptor, cacheInterceptor, reachabilityInterceptor, authInterceptor],
       ),
     ),
     provideDetailPrefetch(),

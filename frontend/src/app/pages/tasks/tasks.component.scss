@@ -67,10 +67,6 @@
   color: var(--color-text-muted);
 }
 
-.tasks__loadError {
-  margin: var(--space-4) 0;
-}
-
 .tasks__detail {
   @include lp.detail;
 }

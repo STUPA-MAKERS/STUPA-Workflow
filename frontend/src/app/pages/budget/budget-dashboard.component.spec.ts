@@ -20,6 +20,7 @@ import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
 import { TodosApiService } from '@core/api/todos.service';
 import { PALETTE, shadeColor } from './budget-color.util';
 import { itemApp, itemBooking } from './budget-items/budget-items.fixtures';
+import { loadErrorToast } from '../../../testing/load-error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Inst = any;
@@ -758,7 +759,7 @@ describe('BudgetDashboardComponent', () => {
         .expectOne((r) => r.url.endsWith('/budgets/b-800/applications'))
         .flush('x', { status: 500, statusText: 'err' });
       fixture.detectChanges();
-      expect(screen.getByText('Die Anträge und Buchungen konnten nicht geladen werden.')).toBeTruthy();
+      expect(loadErrorToast()).toBe('Die Anträge und Buchungen konnten nicht geladen werden.');
     });
 
     it('drops a stale answer when the selection moves on', async () => {
@@ -1077,7 +1078,7 @@ describe('BudgetDashboardComponent', () => {
     fixture.detectChanges();
     expect(c.error()).toBe(true);
     expect(c.loading()).toBe(false);
-    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(loadErrorToast()).not.toBeNull();
   });
 
   it('never claims the budget is empty while it is still loading', async () => {

@@ -43,7 +43,6 @@ import {
   ListItemComponent,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -84,6 +83,7 @@ import { applicationReads } from './application-reads';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { withEntry, withoutKey } from '@shared/util/immutable';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /**
  * One filter of the list.
@@ -162,7 +162,7 @@ type FilterSheet = 'more' | null;
     PullRefreshDirective,
     InfiniteScrollDirective,
     AmountComponent,
-    NoteComponent,
+    LoadErrorComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
     FormsModule,

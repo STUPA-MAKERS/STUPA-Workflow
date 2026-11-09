@@ -26,7 +26,6 @@ import {
   ListGroupComponent,
   ListItemComponent,
   liveSearch,
-  NoteComponent,
   ScrollFadeDirective,
   SearchPillComponent,
   SkeletonComponent,
@@ -53,6 +52,7 @@ import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { applicationReads } from '../applications/application-reads';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** "Anzeigen": both groups, or one of them. */
 export type TasksShow = 'all' | 'applications' | 'todos';
@@ -123,7 +123,7 @@ interface TaskRow {
   imports: [
     RowMenuComponent,
     PullRefreshDirective,
-    NoteComponent,
+    LoadErrorComponent,
     PageHeaderComponent,
     RouterOutlet,
     TranslatePipe,

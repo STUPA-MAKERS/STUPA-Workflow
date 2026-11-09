@@ -20,6 +20,7 @@ import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsComponent } from './meetings.component';
 import { pickOption } from '../../../testing/select';
+import { retryLoadError } from '../../../testing/load-error';
 
 const MEETING: MeetingOutWire = {
   id: 'm-1',
@@ -621,7 +622,7 @@ describe('MeetingsComponent', () => {
       { status: 500, statusText: 'Server Error' },
     );
     expect(await screen.findByText(/konnte nicht geladen/i)).toBeInTheDocument();
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     http.expectOne('/api/meetings/m-1').flush({ title: 'fail' }, { status: 500, statusText: 'Server Error' });
   });
 

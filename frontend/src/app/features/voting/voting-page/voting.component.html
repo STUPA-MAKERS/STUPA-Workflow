@@ -79,8 +79,9 @@
         [attr.aria-busy]="reloading() || null"
       >
         @if (error()) {
-          <app-note class="vl__loadError" kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'voting.list.error' | t }}</app-note>
-        } @else if (loading()) {
+          <app-load-error [message]="'voting.list.error' | t" (retry)="reload()" />
+        }
+        @if (loading()) {
           <div class="vl__skel skel-in">
             <app-list-group skeleton="7rem" />
             <app-skeleton

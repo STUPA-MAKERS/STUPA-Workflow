@@ -1,3 +1,6 @@
+@if (loadError()) {
+  <app-load-error [message]="'admin.deleg.error' | t" (retry)="reload()" />
+}
 <section class="dl admin-page">
   <app-page-header
     [flush]="true"
@@ -14,8 +17,6 @@
 
     @if (loading()) {
       <app-skeleton variant="rows" [count]="3" [label]="'admin.deleg.loading' | t" />
-    } @else if (loadError()) {
-      <app-note kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'admin.deleg.error' | t }}</app-note>
     } @else {
       <ng-template #rows let-list>
         @if (list.length) {
