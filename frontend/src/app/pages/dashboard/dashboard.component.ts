@@ -42,7 +42,6 @@ import {
   ListItemComponent,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   ScrollFadeDirective,
   SearchPillComponent,
   SegBarComponent,
@@ -64,6 +63,7 @@ import { flowColorKind } from '@shared/status-kind.util';
 import { FabLinkDirective, CommandPalette } from '@stupa-makers/ui-kit/shell';
 import { AppAccountMenuComponent } from '../../layout/account-menu/account-menu.component';
 import { NavService } from '../../layout/nav.service';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** The rows a tab loads. The list scrolls inside its pane; "Alle … öffnen" shows the rest. */
 const ROWS = 25;
@@ -158,7 +158,7 @@ interface Load<T> {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SectionComponent,
-    NoteComponent,
+    LoadErrorComponent,
     NgTemplateOutlet,
     RouterLink,
     IconComponent,

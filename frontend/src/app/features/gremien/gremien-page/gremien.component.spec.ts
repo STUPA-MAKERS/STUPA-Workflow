@@ -14,6 +14,7 @@ import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import type { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
 import { GremienNoneComponent } from '../gremien-none/gremien-none.component';
 import { GREMIUM_VIEW_ALL, GremienComponent } from './gremien.component';
+import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 @Component({ standalone: true, template: '<p>Detail</p>' })
 class DetailStub {}
@@ -164,11 +165,11 @@ describe('GremienComponent', () => {
     const overview = jest.fn((): ReturnType<GremienApiService['overview']> => throwError(() => new Error('x')));
     const s = await start('/gremien', { overview });
     restore = s.restore;
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Gremien konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Gremien konnten nicht geladen werden.');
     overview.mockReturnValue(of(ITEMS));
-    screen.getByRole('button', { name: /Erneut versuchen/ }).click();
+    retryLoadError();
     s.harness.detectChanges();
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(loadErrorToast()).toBeNull();
     expect(s.cmp.mine()).toHaveLength(2);
   });
 

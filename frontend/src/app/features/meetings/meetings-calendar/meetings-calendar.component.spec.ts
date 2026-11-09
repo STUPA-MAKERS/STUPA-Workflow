@@ -17,6 +17,7 @@ import { MeetingSessionService } from '../meeting-session.service';
 import { OVERVIEW_NOW } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { MeetingsCalendarComponent } from './meetings-calendar.component';
+import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 /** "Now" of the board: Tuesday, 29.09.2026, 18:50. */
 const NOW = new Date(2026, 8, 29, 18, 50);
@@ -362,9 +363,9 @@ describe('MeetingsCalendarComponent', () => {
     first.flush([FA]);
     second.flush(null, { status: 500, statusText: 'e' });
     view.fixture.detectChanges();
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Sitzungen des Monats konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Sitzungen des Monats konnten nicht geladen werden.');
     expect(screen.getByRole('button', { name: 'Gremium: Alle Gremien' })).toBeInTheDocument();
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     const again = monthReq(view.http);
     expect(again.request.params.get('gremiumId')).toBe('g-gone');
     again.flush(null, { status: 500, statusText: 'e' });

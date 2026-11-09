@@ -7,6 +7,7 @@ import { runAxe } from '../../../../testing/a11y';
 import { gremienApiMock, memberAttendance } from '../../../../testing/gremien-fixtures';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { AttendanceDetailComponent, type AttendanceDetailRequest } from './attendance-detail.component';
+import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 @Component({
   standalone: true,
@@ -164,11 +165,11 @@ describe('AttendanceDetailComponent', () => {
     const view = await setup({ api: gremienApiMock({ memberAttendance: memberAttendanceFn }) });
     restore = view.restore;
     await view.openWith(ONE);
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Sitzungen konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Sitzungen konnten nicht geladen werden.');
     memberAttendanceFn.mockReturnValue(of(memberAttendance()));
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     view.fixture.detectChanges();
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(loadErrorToast()).toBeNull();
     view.cmp.close(false);
     view.cmp.retry();
     expect(memberAttendanceFn).toHaveBeenCalledTimes(2);

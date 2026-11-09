@@ -1,3 +1,6 @@
+@if (failed()) {
+  <app-load-error [message]="'admin.substitutes.loadFailed' | t" (retry)="retry()" />
+}
 <app-section class="sp" headingId="sp-title" [level]="2" [heading]="'admin.substitutes.title' | t">
   <span sectionAction class="sp__actions">
     <ng-content select="[poolActions]" />
@@ -8,8 +11,6 @@
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
-  } @else if (failed()) {
-    <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'admin.substitutes.loadFailed' | t }}</app-note>
   } @else if (entries().length) {
     <ul class="rowgroup sp__list" aria-labelledby="sp-title">
       @for (s of entries(); track s.id) {

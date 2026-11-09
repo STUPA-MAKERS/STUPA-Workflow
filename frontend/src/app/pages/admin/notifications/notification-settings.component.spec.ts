@@ -4,6 +4,7 @@ import type { NotificationSettings } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { NotificationSettingsComponent } from './notification-settings.component';
+import { toastWith } from '../../../../testing/load-error';
 
 const SETTINGS: NotificationSettings = {
   taskReminderEnabled: true,
@@ -134,7 +135,7 @@ describe('NotificationSettingsComponent', () => {
     const view = await render(NotificationSettingsComponent, {
       providers: [
         { provide: AdminApiService, useValue: api },
-        { provide: ToastService, useValue: toast },
+        { provide: ToastService, useFactory: () => toastWith(toast) },
       ],
     });
     await view.fixture.whenStable();

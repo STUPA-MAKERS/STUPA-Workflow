@@ -1,3 +1,6 @@
+@if (store.error()) {
+  <app-load-error [message]="'gremien.list.error' | t" (retry)="store.load()" />
+}
 <div class="grl" [class.grl--split]="split()">
   <app-list-detail [detailOpen]="selectedId() !== null" (back)="closeDetail()">
     <section list class="ld-pane grl__pane" aria-labelledby="grl-title">
@@ -67,8 +70,6 @@
               [label]="'gremien.list.loading' | t"
             />
           </div>
-        } @else if (store.error()) {
-          <app-note class="grl__loadError" kind="error" icon="alert" role="alert" retryable (retry)="store.load()">{{ 'gremien.list.error' | t }}</app-note>
         } @else if (!mine().length && !others().length) {
           @if (query().trim()) {
             <app-empty-state [heading]="'gremien.list.noMatch' | t" />

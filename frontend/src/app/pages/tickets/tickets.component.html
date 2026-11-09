@@ -65,8 +65,9 @@
         appScrollFade="y"
       >
         @if (error()) {
-          <app-note class="tk__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tickets.list.error' | t }}</app-note>
-        } @else if (loading()) {
+          <app-load-error [message]="'tickets.list.error' | t" (retry)="retry()" />
+        }
+        @if (loading()) {
           <div class="tk__skel skel-in">
             @for (n of [2, 4]; track $index) {
               <app-list-group aria-hidden="true" [skeleton]="$first ? '2.5rem' : '7rem'">

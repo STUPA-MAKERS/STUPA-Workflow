@@ -6,6 +6,7 @@ import { render, screen } from '@testing-library/angular';
 import type { BudgetApplication, Expense } from '../budget-tree.api';
 import { BudgetItemsDialogComponent } from './budget-items-dialog.component';
 import { itemApp, itemBooking } from './budget-items.fixtures';
+import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the spec reads protected state
 type Inst = any;
@@ -123,8 +124,8 @@ describe('BudgetItemsDialogComponent', () => {
     const view = await setup();
     nextPage(view.http).flush('x', { status: 500, statusText: 'err' });
     view.fixture.detectChanges();
-    expect(screen.getByText('Die Anträge und Buchungen konnten nicht geladen werden.')).toBeTruthy();
-    screen.getByRole('button', { name: /erneut|Wiederholen/i }).click();
+    expect(loadErrorToast()).toBe('Die Anträge und Buchungen konnten nicht geladen werden.');
+    retryLoadError();
     nextPage(view.http).flush(page([], 0));
     view.fixture.detectChanges();
     expect(screen.getByText('Keine Anträge oder Buchungen auf dieser Kostenstelle.')).toBeTruthy();
@@ -137,7 +138,7 @@ describe('BudgetItemsDialogComponent', () => {
     nextPage(view.http).flush('x', { status: 500, statusText: 'err' });
     view.fixture.detectChanges();
     expect(view.container.querySelectorAll('app-list-item')).toHaveLength(1);
-    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(loadErrorToast()).not.toBeNull();
     expect(view.c.hasMore()).toBe(false);
     view.c.retry();
     expect(nextPage(view.http).request.params.get('offset')).toBe('1');

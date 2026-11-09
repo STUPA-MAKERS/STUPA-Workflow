@@ -16,7 +16,6 @@ import {
   IconComponent,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -53,6 +52,7 @@ import { BudgetItemListComponent } from './budget-items/budget-item-list.compone
 import { BudgetItemsDialogComponent } from './budget-items/budget-items-dialog.component';
 import { type BudgetItem, mergeBudgetItems } from './budget-items/budget-items';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** The amounts of one cost centre in one fiscal year, as numbers. */
 export interface Figures {
@@ -146,7 +146,7 @@ export const APPS_SHOWN = 5;
   imports: [
     TodoLinkedListComponent,
     SectionComponent,
-    NoteComponent,
+    LoadErrorComponent,
     PageHeaderComponent,
     SheetBarComponent,
     SheetBarTitleDirective,

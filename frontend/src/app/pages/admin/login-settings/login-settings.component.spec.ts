@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { LoginSettings } from '../admin.models';
 import { LoginSettingsComponent } from './login-settings.component';
+import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 
 type Body = Pick<LoginSettings, 'webSessionDays' | 'pwaSessionDays'>;
 
@@ -29,7 +30,7 @@ async function setup(opts: { api?: ReturnType<typeof makeApi> | Record<string, j
     providers: [
       { provide: AdminApiService, useValue: api },
       { provide: AuthService, useValue: { can: (p: string) => perms.has(p) } },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   await view.fixture.whenStable();
@@ -139,12 +140,12 @@ describe('LoginSettingsComponent', () => {
 
   it('names any other read failure', async () => {
     await setup({ api: { getLoginSettings: jest.fn(() => throwError(() => ({ status: 500 }))), putLoginSettings: jest.fn() } });
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Einstellungen konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Einstellungen konnten nicht geladen werden.');
     expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
   });
 
   it('reads an error without a status as a failure, not as a refusal', async () => {
     await setup({ api: { getLoginSettings: jest.fn(() => throwError(() => null)), putLoginSettings: jest.fn() } });
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Einstellungen konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Einstellungen konnten nicht geladen werden.');
   });
 });

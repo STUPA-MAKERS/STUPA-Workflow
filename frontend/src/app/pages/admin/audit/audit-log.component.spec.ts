@@ -8,6 +8,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import type { AuditActor, AuditEntry, AuditPage, AuditVerification } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { AUDIT_ACTIONS, AuditLogComponent, localDayBound } from './audit-log.component';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 
 /**
  * Typed view on the protected surface of the component. The tests call the filter setters
@@ -106,7 +107,7 @@ async function setup(opts: SetupOpts = {}) {
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
       { provide: AuthService, useValue: { can: (p: string) => perms.has(p) } },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   const cmp = view.fixture.componentInstance as unknown as Cmp;
@@ -468,7 +469,7 @@ describe('AuditLogComponent', () => {
     expect(cmp.loadError()).toBe(true);
     expect(cmp.loading()).toBe(false);
     fixture.detectChanges();
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(loadErrorToast()).not.toBeNull();
   });
 
   it('"Erneut versuchen" loads the first page again, or the next page after a failed one', async () => {
@@ -480,7 +481,7 @@ describe('AuditLogComponent', () => {
       .mockReturnValueOnce(of<AuditPage>({ items: [entry(2)], nextCursor: null, hasMore: false }));
     const { cmp, fixture } = await setup({ listAuditLog });
     fixture.detectChanges();
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     expect(listAuditLog).toHaveBeenLastCalledWith(expect.objectContaining({ before: undefined }));
     expect(cmp.entries().map((e) => e.id)).toEqual([1]);
     cmp.loadMore();

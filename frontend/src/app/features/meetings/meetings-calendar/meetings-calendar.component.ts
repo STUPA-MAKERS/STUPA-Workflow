@@ -29,7 +29,6 @@ import {
   IconComponent,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -70,6 +69,7 @@ import {
   shortTime,
   weekdayDate,
 } from '@shared/date-format';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** A cell shows this many meetings; the rest is "+n" and shows in the side panel. */
 export const CELL_ENTRIES = 2;
@@ -108,7 +108,7 @@ interface DayCard {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MeetingsViewActionsComponent,
-    NoteComponent,
+    LoadErrorComponent,
     EmptyStateComponent,
     FabComponent,
     SheetBarComponent,

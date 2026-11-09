@@ -25,7 +25,6 @@ import {
   ListItemComponent,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -46,6 +45,7 @@ import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** The permission that shows every gremium, also without a membership. */
 export const GREMIUM_VIEW_ALL = 'gremium.view_all';
@@ -88,7 +88,7 @@ export interface GremiumRow {
   imports: [
     PullRefreshDirective,
     RowChevronComponent,
-    NoteComponent,
+    LoadErrorComponent,
     NgTemplateOutlet,
     RouterOutlet,
     TranslatePipe,

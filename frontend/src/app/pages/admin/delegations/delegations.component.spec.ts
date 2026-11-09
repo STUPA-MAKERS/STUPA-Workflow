@@ -7,6 +7,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import { DelegationsComponent } from './delegations.component';
+import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 
 function delegation(over: Partial<Delegation>): Delegation {
   return {
@@ -92,7 +93,7 @@ async function setup(api = makeApi(), admin = makeAdmin()) {
       provideRouter([]),
       { provide: DelegationsApiService, useValue: api },
       { provide: AdminApiService, useValue: admin },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       { provide: AuthService, useValue: { can: () => true } },
     ],
   });
@@ -174,9 +175,7 @@ describe('DelegationsComponent', () => {
 
   it('names a failed load and shows no list', async () => {
     await setup(makeApi({ list: jest.fn(() => throwError(() => ({ status: 500 }))) }));
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Die Vertretungen konnten nicht geladen werden.',
-    );
+    expect(loadErrorToast()).toContain('Die Vertretungen konnten nicht geladen werden.');
   });
 
   it('says so when no delegation is active', async () => {

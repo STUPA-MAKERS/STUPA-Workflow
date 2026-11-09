@@ -1,3 +1,6 @@
+@if (error()) {
+  <app-load-error [message]="'gremien.meetings.error' | t" (retry)="load()" />
+}
 <div class="gmt__tools" role="group" [attr.aria-label]="'gremien.filters' | t">
   <app-filter-select
     [label]="'gremien.meetings.range' | t"
@@ -26,8 +29,6 @@
 
 @if (loading()) {
   <app-skeleton variant="rows" [count]="4" [label]="'gremien.meetings.loading' | t" />
-} @else if (error()) {
-  <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'gremien.meetings.error' | t }}</app-note>
 } @else if (!groups().length) {
   @if (filterActive()) {
     <app-empty-state shape="date" rows="3" [heading]="'gremien.meetings.noMatch' | t" />

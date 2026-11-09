@@ -7,6 +7,7 @@ import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import type { GremiumRole } from '../admin.models';
 import { GremiumRoleMatrixComponent } from './gremium-role-matrix.component';
+import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 
 const ALL = ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize'];
 const ROLES: GremiumRole[] = [
@@ -76,7 +77,7 @@ async function setup(
     providers: [
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       { provide: AuthService, useValue: { can: (p: string) => perms.includes(p) } },
     ],
     componentInputs: { gremiumId: 'g-1', gremiumName: 'Studierendenparlament', ...opts.inputs },
@@ -243,7 +244,7 @@ describe('GremiumRoleMatrixComponent', () => {
     await setup({
       api: makeApi({ listGremiumRoles: jest.fn(() => throwError(() => ({ status: 403 }))) }),
     });
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Rollen konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Rollen konnten nicht geladen werden.');
   });
 
   it('shows the heading by default and leaves it out on the roles page', async () => {

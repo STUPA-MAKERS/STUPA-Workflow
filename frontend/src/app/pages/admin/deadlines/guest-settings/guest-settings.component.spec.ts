@@ -7,6 +7,7 @@ import { AdminApiService } from '../../admin-api.service';
 import type { GuestSettings } from '../../admin.models';
 import { GuestSettingsComponent } from './guest-settings.component';
 import { pickOption } from '../../../../../testing/select';
+import { loadErrorToast, toastWith } from '../../../../../testing/load-error';
 
 function makeApi(initial: GuestSettings = { confirmTtlHours: 12, linkTtlDays: null }) {
   return {
@@ -24,7 +25,7 @@ async function setup(opts: { api?: ReturnType<typeof makeApi> | Record<string, j
     providers: [
       { provide: AdminApiService, useValue: api },
       { provide: AuthService, useValue: { can: (p: string) => perms.has(p) } },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   await view.fixture.whenStable();
@@ -146,7 +147,7 @@ describe('GuestSettingsComponent', () => {
 
   it('names any other read failure', async () => {
     await setup({ api: { getGuestSettings: jest.fn(() => throwError(() => ({ status: 500 }))), putGuestSettings: jest.fn() } });
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Einstellungen konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Einstellungen konnten nicht geladen werden.');
     expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
   });
 });

@@ -6,6 +6,7 @@ import { runAxe } from '../../../../testing/a11y';
 import { gremienApiMock, member } from '../../../../testing/gremien-fixtures';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { GremiumMembersComponent } from './gremium-members.component';
+import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 jest.mock('@stupa-makers/ui-kit', () => ({
   __esModule: true,
@@ -133,11 +134,11 @@ describe('GremiumMembersComponent', () => {
     const members = jest.fn((): ReturnType<GremienApiService['members']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ members }) });
     restore = view.restore;
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Mitglieder konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Mitglieder konnten nicht geladen werden.');
     members.mockReturnValue(of(MEMBERS));
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     view.fixture.detectChanges();
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(loadErrorToast()).toBeNull();
   });
 
   it('hides the address and the export on a phone', async () => {

@@ -7,6 +7,7 @@
     [state]="form.state()"
     [forbiddenText]="'admin.loginSettings.forbidden' | t"
     [errorText]="'admin.loginSettings.loadError' | t"
+    (retry)="form.reload()"
   >
     <ng-template #content>
       <form class="ls__grid" (submit)="$event.preventDefault(); save()">

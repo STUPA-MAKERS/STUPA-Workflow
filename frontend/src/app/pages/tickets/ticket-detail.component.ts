@@ -100,6 +100,7 @@ import {
 import { clock, dayMonth } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
 import { pageItemTitle } from '../../layout/page-title.service';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 type DetailTab = 'log' | 'details';
 
@@ -197,6 +198,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadErrorComponent,
     SectionComponent,
     FormsModule,
     NgTemplateOutlet,

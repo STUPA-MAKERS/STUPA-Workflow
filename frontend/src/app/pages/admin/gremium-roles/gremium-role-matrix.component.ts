@@ -20,7 +20,6 @@ import {
   ConfirmDialogComponent,
   EmptyStateComponent,
   IconComponent,
-  NoteComponent,
   RowMenuComponent,
   type RowMenuSection,
   SkeletonComponent,
@@ -39,6 +38,7 @@ import {
   sortGremiumRoles,
 } from '../admin.models';
 import { GremiumRoleDialogComponent } from './gremium-role-dialog.component';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 let nextId = 0;
 
@@ -62,7 +62,7 @@ let nextId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SectionComponent,
-    NoteComponent,
+    LoadErrorComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FabComponent,

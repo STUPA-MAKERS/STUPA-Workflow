@@ -54,6 +54,8 @@ export interface SettingsForm<S, D> {
   reset(): void;
   /** Send the draft. A toast names the result. */
   save(): void;
+  /** Read the stored values again, after a failed read (§ 000576). */
+  reload(): void;
 }
 
 /**
@@ -107,10 +109,8 @@ export function settingsForm<S, D extends object, B>(opts: SettingsFormOptions<S
     loadState.set('ok');
   };
 
-  if (opts.allowed && !opts.allowed()) {
-    loading.set(false);
-    loadState.set('forbidden');
-  } else {
+  const read = (): void => {
+    loading.set(true);
     opts.load().subscribe({
       next: apply,
       error: (err: { status?: number } | null) => {
@@ -118,6 +118,13 @@ export function settingsForm<S, D extends object, B>(opts: SettingsFormOptions<S
         loadState.set(err?.status === 403 ? 'forbidden' : 'error');
       },
     });
+  };
+
+  if (opts.allowed && !opts.allowed()) {
+    loading.set(false);
+    loadState.set('forbidden');
+  } else {
+    read();
   }
 
   return {
@@ -129,6 +136,9 @@ export function settingsForm<S, D extends object, B>(opts: SettingsFormOptions<S
     dirty,
     valid,
     canSave,
+    reload: () => {
+      if (loadState() !== 'forbidden') read();
+    },
     patch: (change) => draft.update((d) => ({ ...d, ...change })),
     reset: () => {
       const s = saved();

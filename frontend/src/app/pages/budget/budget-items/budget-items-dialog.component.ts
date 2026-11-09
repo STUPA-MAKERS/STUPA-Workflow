@@ -12,13 +12,13 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-  NoteComponent,
   SearchPillComponent,
   SkeletonComponent,
 } from '@stupa-makers/ui-kit';
 import { type BudgetApplication, BudgetTreeApi, type Expense, type ExpensePage } from '../budget-tree.api';
 import { BudgetItemListComponent } from './budget-item-list.component';
 import { type BudgetItemType, mergeBudgetItems } from './budget-items';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** Bookings per page. A search loads the largest page, because the server ranks its hits by
  *  relevance and not by date, so only one page keeps the merged list in date order. */
@@ -51,7 +51,7 @@ interface PageRequest {
     EmptyStateComponent,
     FilterSelectComponent,
     LoadMoreComponent,
-    NoteComponent,
+    LoadErrorComponent,
     SearchPillComponent,
     SkeletonComponent,
     TranslatePipe,

@@ -27,7 +27,6 @@ import {
   ListItemComponent,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   SkeletonComponent,
   StatusTextComponent,
   SectionComponent,
@@ -37,6 +36,7 @@ import { GREMIEN_NOW } from '../gremien.store';
 import { groupInOrder, monthKey, shiftMonth } from '../gremien.util';
 import { isoDay, monthYear, shortTime, weekdayDate } from '@shared/date-format';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 export type MeetingsRange = '' | 'upcoming' | 'past6' | 'past12';
 export type MeetingsProtocol = '' | 'final' | 'draft' | 'none';
@@ -77,7 +77,7 @@ const NO_PROTOCOL: StatusView = { kind: 'muted', key: 'gremien.meetings.protocol
   imports: [
     SectionComponent,
     RowChevronComponent,
-    NoteComponent,
+    LoadErrorComponent,
     RouterLink,
     TranslatePipe,
     IconComponent,

@@ -28,7 +28,6 @@ import {
   IconComponent,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   SkeletonComponent,
 } from '@stupa-makers/ui-kit';
 import { AttendanceDetailComponent } from '../attendance-detail/attendance-detail.component';
@@ -57,6 +56,7 @@ import {
 import { monthShort, monthYear } from '@shared/date-format';
 import { assertNever } from '@shared/util/immutable';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 const PRESETS: readonly RangePreset[] = ['last6', 'last12', 'last24', 'semester', 'prevSemester'];
 const SORTS: readonly AttendanceSort[] = ['quotaAsc', 'quotaDesc', 'name'];
@@ -117,7 +117,7 @@ export interface RowModel {
   host: { '[class.gat-host--fill]': 'fill()' },
   imports: [
     RowChevronComponent,
-    NoteComponent,
+    LoadErrorComponent,
     EmptyStateComponent,
     TranslatePipe,
     ButtonComponent,

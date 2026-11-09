@@ -11,6 +11,7 @@ import type { Attendance } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { DELEGATION_CONTEXT } from '../../../../testing/meeting-fixtures';
 import { LeadSubstituteDialogComponent } from './lead-substitute-dialog.component';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 
 const BASE = '/api';
 const POOL_URL = `${BASE}/delegations/meetings/m-1/recipients?delegatorId=pr-5`;
@@ -42,7 +43,7 @@ async function setup(member: Attendance | null = FRITZ) {
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: API_BASE_URL, useValue: BASE },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
@@ -132,14 +133,14 @@ describe('LeadSubstituteDialogComponent', () => {
     http.expectOne(CONTEXT_URL).flush(null, { status: 500, statusText: 'Error' });
     fixture.detectChanges();
     expect(within(dialog()).getByText('für —')).toBeInTheDocument();
-    expect(within(dialog()).getByText('Der Pool konnte nicht geladen werden.')).toBeInTheDocument();
+    expect(loadErrorToast()).toBe('Der Pool konnte nicht geladen werden.');
     expect(within(dialog()).queryByRole('switch')).toBeNull();
-    within(dialog()).getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     fixture.detectChanges();
     http.expectOne(`${BASE}/delegations/meetings/m-1/recipients?delegatorId=pr-9`).flush([]);
     http.match(CONTEXT_URL);
     fixture.detectChanges();
-    expect(within(dialog()).queryByText('Der Pool konnte nicht geladen werden.')).toBeNull();
+    expect(loadErrorToast()).toBeNull();
   });
 
   it('ignores a pool answer for a member who is no longer picked', async () => {
@@ -171,7 +172,7 @@ describe('LeadSubstituteDialogComponent', () => {
     stalePool.flush(null, { status: 500, statusText: 'Error' });
     staleContext.flush(null, { status: 500, statusText: 'Error' });
     fixture.detectChanges();
-    expect(within(dialog()).queryByText('Der Pool konnte nicht geladen werden.')).toBeNull();
+    expect(loadErrorToast()).toBeNull();
     expect(within(dialog()).getByText('Wird geladen …')).toBeInTheDocument();
     pool.flush(POOL);
     context.flush(CTX);
