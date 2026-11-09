@@ -26,6 +26,13 @@
 .pub--under {
   box-shadow: var(--shadow-md);
 }
+// On a phone a hairline marks the edge of the glass instead of the shadow, as on every
+// phone bar (`--edge-line`).
+@include bp.phone {
+  .pub--under {
+    box-shadow: var(--edge-line);
+  }
+}
 .pub:not(.pub--under) {
   @include frosted-rest(var(--color-bg));
 }
