@@ -128,8 +128,9 @@
   scroll-padding-block: var(--space-5);
   @include fade.fade-y(var(--space-5));
 }
-.cd__secAction {
-  margin-inline-end: calc(-1 * var(--space-2));
+/* A text action ends flush with the content of its section, like the rows below it. */
+.cd__addItem {
+  align-self: flex-start;
 }
 .cd__secAction--icon {
   margin-inline-end: -10px;

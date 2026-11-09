@@ -17,14 +17,15 @@ scope:
 # The approved amount follows the approved state
 
 An Antrag in an approved state (000571) must count with its approved amount: the amount of its
-valid decision, else the requested amount. These places must use this rule:
+valid decision, else the requested amount. An Antrag in a denied state must count with 0 €. An
+Antrag in a state with neither flag counts as requested. These places must use this rule:
 
 - the budget overview (committed amount of a cost centre),
 - the total `Bewilligt` (`Approved`) of an Event (000479),
 - a transition into an approved state, which allows a decision with deviations (000132).
 
-The list `acceptedStateKeys` of a top cost centre must go. A migration must set the flag on
-every state whose key one of these lists holds.
+The lists `acceptedStateKeys` and `deniedStateKeys` of a top cost centre must go. A migration
+must set the matching flag on every state whose key one of these lists holds.
 
 Reason: One rule gives the same approved amount in the budget and at the Event. Today the Event
 counts only an Antrag with a stored decision, so it shows 0 € for a normal approval.

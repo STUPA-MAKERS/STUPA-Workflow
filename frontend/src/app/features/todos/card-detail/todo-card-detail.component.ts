@@ -993,7 +993,7 @@ export class TodoCardDetailComponent {
   cancelItem(): void {
     this.addingItem.set(false);
     this.itemDraft.set('');
-    this.focusSoon('[data-focus="item-add"]');
+    this.focusSoon('[data-focus="item-add"] button');
   }
 
   startItem(item: TodoCheckItem): void {
@@ -1027,7 +1027,7 @@ export class TodoCardDetailComponent {
     this.write(this.api.deleteCheckItem(c.id, item.id), () =>
       this.focusSoon(
         ...(near ? [`[data-item="${near.id}"]`] : []),
-        '[data-focus="item-add"]',
+        '[data-focus="item-add"] button',
         '[data-focus="item-new"]',
       ),
     );

@@ -642,10 +642,10 @@
             <app-button variant="fill" [disabled]="!itemDraft().trim()" (click)="addItem()">{{ 'todos.card.addItem' | t }}</app-button>
           </form>
         } @else {
-          <button type="button" class="cd__toggle" data-focus="item-add" (click)="startAddItem()">
-            <app-icon name="plus" [size]="15" />
+          <app-button class="cd__addItem" variant="text" size="sm" data-focus="item-add" (click)="startAddItem()">
+            <app-icon name="plus" />
             {{ 'todos.card.addItem' | t }}
-          </button>
+          </app-button>
         }
       }
     </app-section>
