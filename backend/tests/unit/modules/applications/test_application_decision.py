@@ -21,7 +21,6 @@ from app.modules.applications.decision import (
     MAX_CONDITIONS,
     DecisionIn,
     DecisionSwap,
-    accepted_state_keys,
     amount_deviates,
     check_approved_amount,
     check_decision_target,
@@ -35,6 +34,7 @@ from app.modules.applications.decision import (
 )
 from app.modules.applications.models import Application, ApplicationDecision
 from app.modules.audit.actions import AuditAction
+from app.modules.flow.models import State
 from app.shared.errors import ValidationProblem
 
 NOW = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
@@ -213,31 +213,14 @@ def test_amount_deviates_and_committed_amount() -> None:
 
 
 
-async def test_accepted_state_keys_without_budget() -> None:
-    assert await accepted_state_keys(_s(_Session()), None) == frozenset()
+def test_check_decision_target_admits_an_approved_state() -> None:
+    check_decision_target(cast("State", SimpleNamespace(is_approved=True)))
 
 
-async def test_accepted_state_keys_filters_non_strings() -> None:
-    session = _Session(scalar=[["approved", 3, "paid"]])
-    keys = await accepted_state_keys(_s(session), uuid.uuid4())
-    assert keys == frozenset({"approved", "paid"})
-
-
-async def test_accepted_state_keys_with_no_top_budget() -> None:
-    session = _Session(scalar=[None])
-    assert await accepted_state_keys(_s(session), uuid.uuid4()) == frozenset()
-
-
-async def test_check_decision_target_admits_an_accepted_state() -> None:
-    session = _Session(scalar=[["approved"]])
-    await check_decision_target(_s(session), _app(), "approved")
-
-
-@pytest.mark.parametrize("target", [None, "rejected"])
-async def test_check_decision_target_refuses(target: str | None) -> None:
-    session = _Session(scalar=[["approved"]])
+@pytest.mark.parametrize("target", [None, SimpleNamespace(is_approved=False)])
+def test_check_decision_target_refuses(target: SimpleNamespace | None) -> None:
     with pytest.raises(ValidationProblem) as exc:
-        await check_decision_target(_s(session), _app(), target)
+        check_decision_target(cast("State | None", target))
     assert exc.value.code == CODE_NOT_ALLOWED
 
 

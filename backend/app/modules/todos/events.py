@@ -3,10 +3,10 @@
 A card with a ``todo_card_event`` row is an Event. Its links bring the money and the
 decisions:
 
-* Totals: the requested and approved amounts of the linked Anträge, and the expenses
-  and the income of the linked Buchungen. A sub-booking whose parent is linked too
-  counts once, through the parent. The totals count every linked element, because
-  each reader of the Event reads them (spec 000479).
+* Totals: the requested amount of the linked Anträge, the approved amount of those in an
+  approved state (spec 000572), and the expenses and the income of the linked Buchungen.
+  A sub-booking whose parent is linked too counts once, through the parent. The totals
+  count every linked element, because each reader of the Event reads them (spec 000479).
 * Decisions: the valid decision of each linked Antrag and each closed vote of a linked
   TOP or vote, the newest first. A vote that made the decision of a linked Antrag shows
   once, as that decision (spec 000482).
@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Application, ApplicationDecision
 from app.modules.applications.service.service_base import _title_of
 from app.modules.budget.tree_models import BudgetExpense
+from app.modules.flow.models import State
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.todos.grouping import grouped
 from app.modules.todos.models import (
@@ -129,7 +130,7 @@ async def totals(session: AsyncSession, card_ids: Sequence[uuid.UUID]) -> dict[u
     expenses_of = _id_sets(
         (link.card_id, link.expense_id) for link in links if link.expense_id is not None
     )
-    money, decided = await _application_money(
+    money, approved = await _application_money(
         session, frozenset(aid for ids in apps_of.values() for aid in ids)
     )
     bookings = await _bookings(
@@ -140,7 +141,7 @@ async def totals(session: AsyncSession, card_ids: Sequence[uuid.UUID]) -> dict[u
             apps_of.get(card_id, frozenset()),
             _counted(expenses_of.get(card_id, frozenset()), bookings),
             money,
-            decided,
+            approved,
         )
         for card_id in card_ids
     }
@@ -160,11 +161,19 @@ def _id_sets(
 async def _application_money(
     session: AsyncSession, app_ids: frozenset[uuid.UUID]
 ) -> tuple[_Money, frozenset[uuid.UUID]]:
-    """The requested and approved amount of each Antrag, and the decided Anträge."""
+    """The requested and decided amount of each Antrag, and the Anträge in an approved state.
+
+    The approved state is the flag ``is_approved`` of the current state (spec 000572).
+    """
     if not app_ids:
         return {}, frozenset()
     rows = await session.execute(
-        select(Application.id, Application.amount, ApplicationDecision.approved_amount)
+        select(
+            Application.id,
+            Application.amount,
+            ApplicationDecision.approved_amount,
+            State.is_approved,
+        )
         .outerjoin(
             ApplicationDecision,
             and_(
@@ -172,18 +181,12 @@ async def _application_money(
                 ApplicationDecision.superseded_at.is_(None),
             ),
         )
+        .outerjoin(State, State.id == Application.current_state_id)
         .where(Application.id.in_(app_ids))
     )
-    money = {
-        app_id: (amount or _ZERO, approved) for app_id, amount, approved in rows.tuples().all()
-    }
-    decided_rows = await session.scalars(
-        select(ApplicationDecision.application_id).where(
-            ApplicationDecision.application_id.in_(app_ids),
-            ApplicationDecision.superseded_at.is_(None),
-        )
-    )
-    return money, frozenset(decided_rows.all())
+    found = rows.tuples().all()
+    money = {app_id: (amount or _ZERO, approved) for app_id, amount, approved, _flag in found}
+    return money, frozenset(app_id for app_id, _amount, _approved, flag in found if flag)
 
 
 async def _bookings(
@@ -220,9 +223,13 @@ def _card_totals(
     app_ids: frozenset[uuid.UUID],
     booked: Iterable[tuple[str, Decimal]],
     money: _Money,
-    decided: frozenset[uuid.UUID],
+    in_approved_state: frozenset[uuid.UUID],
 ) -> Totals:
-    """The totals of one card from the money of its Anträge and its counted Buchungen."""
+    """The totals of one card from the money of its Anträge and its counted Buchungen.
+
+    ``approved`` counts each Antrag in an approved state: the amount of its valid decision,
+    else the requested amount (spec 000572).
+    """
     amounts = {app_id: money.get(app_id, (_ZERO, None)) for app_id in app_ids}
     entries = tuple(booked)
     return Totals(
@@ -231,7 +238,7 @@ def _card_totals(
             (
                 approved if approved is not None else amount
                 for app_id, (amount, approved) in amounts.items()
-                if app_id in decided
+                if app_id in in_approved_state
             ),
             _ZERO,
         ),

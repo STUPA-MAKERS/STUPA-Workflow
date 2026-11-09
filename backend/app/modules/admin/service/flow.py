@@ -73,6 +73,8 @@ class FlowOps(ConfigServiceBase):
                         "editAllowed": s.edit_allowed,
                         "isInitial": s.is_initial,
                         "isTerminal": s.is_terminal,
+                        "isApproved": s.is_approved,
+                        "isDenied": s.is_denied,
                         "kind": s.kind,
                         "config": s.config or {},
                     }
@@ -235,6 +237,8 @@ class FlowOps(ConfigServiceBase):
             edit_allowed=state.edit_allowed,
             is_initial=state.is_initial,
             is_terminal=state.is_terminal,
+            is_approved=state.is_approved,
+            is_denied=state.is_denied,
             kind=state.kind,
             config=state.config,
         )

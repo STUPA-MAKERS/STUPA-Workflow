@@ -267,6 +267,8 @@ class StateDef(FrozenStrictCamelModel, frozen=True):
 
     Attributes:
         is_terminal: Retention and anonymization apply to an application in this state.
+        is_approved: An application in this state is approved (spec 000571).
+        is_denied: An application in this state is denied (spec 000571).
     """
     key: str = Field(pattern=KEY_PATTERN)
     label: I18nMap
@@ -274,8 +276,22 @@ class StateDef(FrozenStrictCamelModel, frozen=True):
     edit_allowed: bool = Field(default=True, alias="editAllowed")
     is_initial: bool = Field(default=False, alias="isInitial")
     is_terminal: bool = Field(default=False, alias="isTerminal")
+    is_approved: bool = Field(default=False, alias="isApproved")
+    is_denied: bool = Field(default=False, alias="isDenied")
     kind: StateKind = "normal"
     config: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _one_outcome(self) -> StateDef:
+        """A state is approved or denied, not both; a vote state is neither (000571).
+
+        A vote state leads to its result through its pass and fail exits.
+        """
+        if self.is_approved and self.is_denied:
+            raise ValueError(f"state {self.key!r} cannot be approved and denied")
+        if self.kind == "vote" and (self.is_approved or self.is_denied):
+            raise ValueError(f"vote state {self.key!r} cannot be approved or denied")
+        return self
 
 
 class TransitionDef(FrozenStrictCamelModel, frozen=True):

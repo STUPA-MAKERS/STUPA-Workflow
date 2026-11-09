@@ -566,26 +566,24 @@ async def test_move_fiscal_year_wrong_top() -> None:
 
 
 async def test_get_tree_assembles() -> None:
-    """The tree classifies applications by the state keys of the top budget.
+    """The tree classifies applications by the flags of their state (spec 000572).
 
-    An application in an accepted state counts as bound (250), a submitted one as
+    An application in an approved state counts as bound (250), a submitted one as
     requested (120), and a rejected one drops out (999). Committed is bound plus
     expended. The fake session serves the nodes, the allocations, the application rows
-    (id, path, fiscal year, amount, committed, state) and no expense rows.
+    (id, path, fiscal year, amount, committed, approved, denied) and no expense rows.
     """
     g = uuid.uuid4()
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", gremium_id=g, key="VS")
-    top.accepted_state_keys = ["approved"]
-    top.denied_state_keys = ["rejected"]
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
     sess = fake_session(
         result(top),
         result(alloc),
         result(
-            (uuid.uuid4(), "VS", fy_id, Decimal("250"), Decimal("250"), "approved"),
-            (uuid.uuid4(), "VS", fy_id, Decimal("120"), Decimal("120"), "submitted"),
-            (uuid.uuid4(), "VS", fy_id, Decimal("999"), Decimal("999"), "rejected"),
+            (uuid.uuid4(), "VS", fy_id, Decimal("250"), Decimal("250"), True, False),
+            (uuid.uuid4(), "VS", fy_id, Decimal("120"), Decimal("120"), False, False),
+            (uuid.uuid4(), "VS", fy_id, Decimal("999"), Decimal("999"), False, True),
         ),
         result(),
     )
@@ -602,17 +600,16 @@ async def test_get_tree_assembles() -> None:
 
 
 async def test_get_tree_binds_the_approved_amount() -> None:
-    """An accepted application binds its approved amount, not the requested one."""
+    """An approved application binds its approved amount, not the requested one."""
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", gremium_id=uuid.uuid4(), key="VS")
-    top.accepted_state_keys = ["approved"]
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
     sess = fake_session(
         result(top),
         result(alloc),
         result(
-            (uuid.uuid4(), "VS", fy_id, Decimal("250"), Decimal("200"), "approved"),
-            (uuid.uuid4(), "VS", fy_id, Decimal("120"), Decimal("120"), "submitted"),
+            (uuid.uuid4(), "VS", fy_id, Decimal("250"), Decimal("200"), True, False),
+            (uuid.uuid4(), "VS", fy_id, Decimal("120"), Decimal("120"), False, False),
         ),
         result(),
     )
@@ -677,12 +674,11 @@ async def test_get_tree_linked_expense_replaces_bound() -> None:
     fy_id = uuid.uuid4()
     app_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
-    top.accepted_state_keys = ["approved"]
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
     sess = fake_session(
         result(top),
         result(alloc),
-        result((app_id, "VS", fy_id, Decimal("250"), Decimal("250"), "approved")),
+        result((app_id, "VS", fy_id, Decimal("250"), Decimal("250"), True, False)),
         result(("VS", fy_id, Decimal("100"), "expense", app_id)),
     )
     svc = BudgetTreeService(sess)

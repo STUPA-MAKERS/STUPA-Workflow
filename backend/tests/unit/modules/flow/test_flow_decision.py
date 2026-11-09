@@ -41,8 +41,8 @@ class _Calls:
 def calls(monkeypatch: pytest.MonkeyPatch) -> _Calls:
     out = _Calls()
 
-    async def _check(_session: Any, _app: Any, target_key: str | None) -> None:
-        out.checks.append(target_key)
+    def _check(target: Any) -> None:
+        out.checks.append(None if target is None else target.key)
         if out.refuse:
             raise not_allowed_problem("no")
 
@@ -80,7 +80,9 @@ async def test_fire_with_decision_sets_the_amount_and_records_it(calls: _Calls) 
     flow_id, draft, approved = uuid4(), uuid4(), uuid4()
     app = _decision_app(draft, flow_id)
     transition = _transition(flow_id=flow_id, from_id=draft, to_id=approved)
-    target = SimpleNamespace(id=approved, key="approved", kind="normal", config={})
+    target = SimpleNamespace(
+        id=approved, key="approved", kind="normal", config={}, is_approved=True
+    )
     db = fake_session(result(app), result(transition), result(target), result(rowcount=1))
     decision = DecisionIn(approvedAmount=Decimal("800.00"), conditions=["A"])
 
@@ -137,13 +139,7 @@ async def test_fire_without_decision_records_nothing(calls: _Calls) -> None:
     assert calls.records == []
 
 
-async def test_available_flags_transitions_into_accepted_states(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def _accepted(_session: Any, _budget_id: Any) -> frozenset[str]:
-        return frozenset({"approved"})
-
-    monkeypatch.setattr(flow_service, "accepted_state_keys", _accepted)
+async def test_available_flags_transitions_into_approved_states() -> None:
     flow_id, draft, ok_id, no_id = uuid4(), uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     to_ok = _transition(flow_id=flow_id, from_id=draft, to_id=ok_id)
@@ -151,8 +147,8 @@ async def test_available_flags_transitions_into_accepted_states(
     to_gone = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
     db = fake_session(result(app), result(to_ok, to_no, to_gone))
     db.get_results = [
-        SimpleNamespace(id=ok_id, key="approved", kind="normal", config={}),
-        SimpleNamespace(id=no_id, key="review", kind="normal", config={}),
+        SimpleNamespace(id=ok_id, key="approved", kind="normal", config={}, is_approved=True),
+        SimpleNamespace(id=no_id, key="review", kind="normal", config={}, is_approved=False),
         None,
     ]
     out = {t.id: t for t in await FlowService(db).available_transitions(app.id, _principal())}
@@ -162,7 +158,7 @@ async def test_available_flags_transitions_into_accepted_states(
     assert out[to_ok.id].model_dump(by_alias=True)["allowsDecision"] is True
 
 
-async def test_available_without_accepted_states_flags_nothing() -> None:
+async def test_available_without_approved_states_flags_nothing() -> None:
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     t = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
