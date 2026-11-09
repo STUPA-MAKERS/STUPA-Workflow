@@ -95,7 +95,7 @@ async def test_due_cards_of_the_assignee_are_in_the_feed(
     """Spec 000549."""
     gid, board = await add_gremium(maker, "Kultur")
     person, pid = await add_person(maker, "Ada")
-    other, oid = await add_person(maker, "Bea")
+    _other, oid = await add_person(maker, "Bea")
     await add_member(maker, gid, pid, "todo.write")
     await add_member(maker, gid, oid, "todo.write")
     api.login(person)

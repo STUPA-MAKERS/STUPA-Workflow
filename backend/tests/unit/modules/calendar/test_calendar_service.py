@@ -5,11 +5,15 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime, time
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from app.modules.calendar import service
 from tests._support.auth_fakes import fake_session, result
+
+if TYPE_CHECKING:
+    from app.modules.auth.models import Principal
 
 
 def test_generate_token_is_url_safe() -> None:
@@ -113,8 +117,7 @@ async def test_due_cards_map_the_cards_of_the_person(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(rbac, "resolve_principal", _principal)
     monkeypatch.setattr(TodoService, "calendar_due_cards", _rows)
-    (due,) = await service.due_cards(
-        fake_session(), SimpleNamespace(sub="u1"), "https://s.example/"
-    )  # type: ignore[arg-type]
+    user = cast("Principal", SimpleNamespace(sub="u1"))
+    (due,) = await service.due_cards(fake_session(), user, "https://s.example/")
     assert (due.title, due.due, due.board_name) == ("Raum buchen", date(2026, 11, 18), "Kultur")
     assert due.url == f"https://s.example/todos?card={card.id}"
