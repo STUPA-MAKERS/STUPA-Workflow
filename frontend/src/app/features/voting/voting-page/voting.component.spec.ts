@@ -15,6 +15,7 @@ import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { VotingComponent, VOTE_LIVE_DEBOUNCE, VOTE_MAX_LIMIT } from './voting.component';
 import { VotingNoneComponent } from './voting-none.component';
 import { VOTE_POLL_MS, VotingPageService } from './voting-page.service';
+import { loadErrorToast } from '../../../../testing/load-error';
 
 /** The detail of the outlet. The detail has its own spec; here only the route matters. */
 @Component({ standalone: true, template: '<p>detail</p>' })
@@ -355,7 +356,7 @@ describe('VotingComponent', () => {
   describe('states', () => {
     it('shows an error, not an empty list, when the request fails', async () => {
       await start('/voting', { listError: true });
-      expect(screen.getByRole('alert')).toHaveTextContent('Die Abstimmungen konnten nicht geladen werden.');
+      expect(loadErrorToast()).toContain('Die Abstimmungen konnten nicht geladen werden.');
       expect(screen.queryByText(/offen$/)).not.toBeInTheDocument();
     });
 

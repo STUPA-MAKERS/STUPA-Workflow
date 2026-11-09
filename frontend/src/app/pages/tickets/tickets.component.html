@@ -65,7 +65,7 @@
         appScrollFade="y"
       >
         @if (error()) {
-          <app-note class="tk__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tickets.list.error' | t }}</app-note>
+          <app-load-error [message]="'tickets.list.error' | t" (retry)="retry()" />
         } @else if (loading()) {
           <div class="tk__skel skel-in">
             @for (n of [2, 4]; track $index) {

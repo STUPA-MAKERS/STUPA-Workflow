@@ -28,6 +28,7 @@ import type { CdVariantOption, Gremium } from '../admin.models';
 import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
 import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
 import { expandSet } from '@shared/expand-set';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /**
  * The message of a refused gremium delete. The delete applies the rules of the meeting
@@ -70,6 +71,7 @@ interface Setting {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadErrorComponent,
     SectionComponent,
     ExpandRowComponent,
     FabComponent,

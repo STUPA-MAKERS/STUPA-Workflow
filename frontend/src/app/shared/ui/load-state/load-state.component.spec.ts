@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/angular';
 import { runAxe } from '../../../../testing/a11y';
 import { LoadStateComponent } from './load-state.component';
+import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 const TEMPLATE = `
   <app-load-state [state]="state" [lines]="2" [forbiddenText]="forbidden" errorText="Laden fehlgeschlagen.">
@@ -38,10 +39,17 @@ describe('LoadStateComponent', () => {
     expect(screen.queryByText('Inhalt')).toBeNull();
   });
 
-  it('names a failed read in an error note', async () => {
-    const { container } = await setup('error');
-    expect(screen.getByRole('alert')).toHaveTextContent('Laden fehlgeschlagen.');
-    expect(container.querySelector('app-note')).toHaveClass('note--error');
+  /** § 000576: a failed read shows a toast with a retry, and no note in the page. */
+  it('names a failed read in an error toast with a retry, not in a note', async () => {
+    const retry = jest.fn();
+    const { container } = await render(
+      `<app-load-state state="error" errorText="Laden fehlgeschlagen." (retry)="retry()" />`,
+      { imports: [LoadStateComponent], componentProperties: { retry } },
+    );
+    expect(loadErrorToast()).toBe('Laden fehlgeschlagen.');
+    expect(container.querySelector('app-note')).toBeNull();
+    retryLoadError();
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 
   it('shows the loading template of the page in place of the lines', async () => {

@@ -26,13 +26,13 @@
     @if (loadingFirst()) {
       <app-skeleton variant="rows" [count]="6" [label]="'budget.dash.itemsLoading' | t" />
     } @else if (error() && !items().length) {
-      <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'budget.dash.itemsError' | t }}</app-note>
+      <app-load-error [message]="'budget.dash.itemsError' | t" (retry)="retry()" />
     } @else if (!items().length) {
       <app-empty-state rows="3" [heading]="'budget.dash.itemsNone' | t" />
     } @else {
       <app-budget-item-list [items]="items()" [names]="names()" />
       @if (error()) {
-        <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'budget.dash.itemsError' | t }}</app-note>
+        <app-load-error [message]="'budget.dash.itemsError' | t" (retry)="retry()" />
       } @else if (hasMore()) {
         <app-load-more [label]="'budget.dash.loadMore' | t" [loading]="loading()" (more)="loadMore()" />
       }

@@ -7,6 +7,7 @@ import { GREMIEN_TEST_NOW, attendance, gremienApiMock } from '../../../../testin
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { GREMIEN_NOW } from '../gremien.store';
 import { GremiumAttendanceComponent } from './gremium-attendance.component';
+import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 jest.mock('@stupa-makers/ui-kit', () => ({
   __esModule: true,
@@ -196,11 +197,11 @@ describe('GremiumAttendanceComponent', () => {
     const attendanceFn = jest.fn((): ReturnType<GremienApiService['attendance']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ attendance: attendanceFn }) });
     restore = view.restore;
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Anwesenheit konnte nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Anwesenheit konnte nicht geladen werden.');
     attendanceFn.mockReturnValue(of(attendance()));
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     view.fixture.detectChanges();
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(loadErrorToast()).toBeNull();
     expect(screen.getByRole('table')).toBeTruthy();
   });
 

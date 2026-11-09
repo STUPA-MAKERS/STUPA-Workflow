@@ -24,6 +24,7 @@ import type { BudgetTreeNode } from '../budget/budget-tree.api';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { ApplicationsListComponent, actionErrorKey } from './applications-list.component';
 import { ApplicationsPageService } from './applications-page.service';
+import { loadErrorToast } from '../../../testing/load-error';
 
 /** The detail of the outlet. The detail has its own spec; here only the route matters. */
 @Component({ standalone: true, template: '<p>detail</p>' })
@@ -350,7 +351,7 @@ describe('ApplicationsListComponent', () => {
       expect(screen.getByText('Anträge werden geladen …')).toBeInTheDocument();
       first!.flush({}, { status: 500, statusText: 'x' });
       harness.detectChanges();
-      expect(screen.getByRole('alert')).toHaveTextContent('Anträge konnten nicht geladen werden.');
+      expect(loadErrorToast()).toContain('Anträge konnten nicht geladen werden.');
     });
 
     it('puts the number of applications into the search field', async () => {

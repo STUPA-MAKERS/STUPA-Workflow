@@ -2,11 +2,13 @@
 id: "000577"
 title: A load error toast stays until it is closed
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
+tests:
+  - "frontend/src/app/shared/ui/load-error/load-error.component.spec.ts:LoadErrorComponent"
 implementation:
-  - frontend/vendor/ui-kit/src/lib/toast/toast.service.ts
+  - frontend/src/app/shared/ui/load-error/load-error.component.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

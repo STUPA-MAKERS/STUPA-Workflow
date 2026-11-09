@@ -38,7 +38,7 @@
 @if (loading()) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.attendance.loading' | t" />
 } @else if (error()) {
-  <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'gremien.attendance.error' | t }}</app-note>
+  <app-load-error [message]="'gremien.attendance.error' | t" (retry)="load()" />
 } @else if (noMeetings()) {
   <p class="sr-only">{{ 'gremien.attendance.noMeetings' | t }}</p>
   <div class="gat__ghost" aria-hidden="true">

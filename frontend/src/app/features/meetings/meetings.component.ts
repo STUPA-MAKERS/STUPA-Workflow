@@ -26,7 +26,6 @@ import {
   ButtonComponent,
   CardComponent,
   IconComponent,
-  NoteComponent,
   PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -60,6 +59,7 @@ import {
 } from './meetings-display.util';
 import { beamerUrl } from '../voting/beamer-link.util';
 import { MeetingPageSkeletonComponent } from './meeting-page-skeleton/meeting-page-skeleton.component';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /**
  * Meetings page: the overview (`/meetings`, `MeetingsOverviewComponent`: list or
@@ -85,7 +85,7 @@ import { MeetingPageSkeletonComponent } from './meeting-page-skeleton/meeting-pa
   ],
   imports: [
     MeetingPageSkeletonComponent,
-    NoteComponent,
+    LoadErrorComponent,
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,

@@ -36,6 +36,7 @@ import {
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
 import { personLabel } from '@shared/person-label.util';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** One row of the member list. */
 interface Member {
@@ -65,6 +66,7 @@ export const MEMBER_PREVIEW = 7;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadErrorComponent,
     SectionComponent,
     ButtonComponent,
     EmptyStateComponent,

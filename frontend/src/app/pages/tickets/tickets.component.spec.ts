@@ -18,6 +18,7 @@ import { matchMediaQueries } from '../../../testing/meeting-fixtures';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TicketsPageService } from './tickets-page.service';
 import { TICKET_PAGE, TicketsComponent } from './tickets.component';
+import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 
 @Component({ standalone: true, template: '<p>detail</p>' })
 class DetailStub {}
@@ -330,11 +331,11 @@ describe('TicketsComponent', () => {
 
   it('names a failed read, and counts no closed tickets after their failure', async () => {
     const { cmp, harness, setAnswer } = await start('/tickets', { answer: () => throwError(() => new Error('down')) });
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Tickets konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Tickets konnten nicht geladen werden.');
     expect(cmp.closedTotal()).toBe(0);
     expect(cmp.hasRows()).toBe(false);
     setAnswer(defaultAnswer);
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     harness.detectChanges();
     expect(cmp.error()).toBe(false);
     expect(cmp.hasRows()).toBe(true);

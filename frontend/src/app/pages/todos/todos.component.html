@@ -197,7 +197,7 @@
       <app-empty-state plain icon="circleok" fill [heading]="'todos.notFound' | t" />
     } @else if (error()) {
       <div class="td__state">
-        <app-note kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'todos.error.load' | t }}</app-note>
+        <app-load-error [message]="'todos.error.load' | t" (retry)="reload()" />
       </div>
     } @else if (board(); as b) {
       @if (noMatch()) {

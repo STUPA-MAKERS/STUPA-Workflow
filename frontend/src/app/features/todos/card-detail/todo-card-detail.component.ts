@@ -96,6 +96,7 @@ import {
 import { dayMonthYear, isoDay, weekdayDate } from '@shared/date-format';
 import { formatMoney, moneyNumber } from '@shared/format-money';
 import { personName } from '@shared/person-label.util';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** The value of the "Neue Reihe …" option of "Reihe". */
 const NEW_SERIES = '__new';
@@ -153,6 +154,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadErrorComponent,
     ConfirmDialogComponent,
     SectionComponent,
     ChipComponent,

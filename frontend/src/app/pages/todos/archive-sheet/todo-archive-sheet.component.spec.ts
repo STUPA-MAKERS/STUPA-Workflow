@@ -5,6 +5,7 @@ import { TodosApiService, type TodoCardTile } from '@core/api/todos.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { asPhone, detail, tile } from '../../../../testing/todo-fixtures';
 import { ARCHIVE_PAGE, TodoArchiveSheetComponent } from './todo-archive-sheet.component';
+import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 
 const page = (items: TodoCardTile[], total = items.length): Page<TodoCardTile> => ({
   items,
@@ -29,7 +30,7 @@ async function setup(first: Page<TodoCardTile> = page([A, B], 3)) {
     on,
     providers: [
       { provide: TodosApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   const cmp = view.fixture.componentInstance;
@@ -76,7 +77,7 @@ describe('TodoArchiveSheetComponent', () => {
     cmp.search.set('zz');
     cmp.search.flush();
     detect();
-    expect(screen.getByRole('alert')).toHaveTextContent('Das Archiv konnte nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Das Archiv konnte nicht geladen werden.');
     expect(cmp.loading()).toBe(false);
     api.archive.mockReturnValueOnce(throwError(() => new Error('x')));
     cmp.more();

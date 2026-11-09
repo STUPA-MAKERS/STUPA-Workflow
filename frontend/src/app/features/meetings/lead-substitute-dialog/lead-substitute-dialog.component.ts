@@ -24,7 +24,6 @@ import {
   DialogComponent,
   EmptyStateComponent,
   IconComponent,
-  NoteComponent,
   SearchPillComponent,
   SkeletonComponent,
   SwitchComponent,
@@ -32,6 +31,7 @@ import {
   TruncatedDirective,
 } from '@stupa-makers/ui-kit';
 import { personLabel } from '@shared/person-label.util';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** Above this many substitutes the dialog shows a search field. */
 const SEARCH_ABOVE = 5;
@@ -55,7 +55,7 @@ const SEARCH_ABOVE = 5;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NoteComponent,
+    LoadErrorComponent,
     EmptyStateComponent,
     SkeletonComponent,
     TruncatedDirective,

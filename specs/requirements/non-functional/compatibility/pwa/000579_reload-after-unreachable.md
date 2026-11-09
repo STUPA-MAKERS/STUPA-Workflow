@@ -2,11 +2,14 @@
 id: "000579"
 title: An unreachable server shows no error toast, and the page loads again
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
+tests:
+  - "frontend/src/app/shared/ui/load-error/load-error.component.spec.ts:LoadErrorComponent"
 implementation:
-  - frontend/src/app/core/
+  - frontend/src/app/shared/ui/load-error/load-error.component.ts
+  - frontend/src/app/core/api/server-reachability.service.ts
 scope:
   - frontend/src/app/
 ---

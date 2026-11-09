@@ -112,6 +112,7 @@ import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { formatMoney } from '@shared/format-money';
 import { withoutKey } from '@shared/util/immutable';
 import { pageItemTitle } from '../../layout/page-title.service';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -171,6 +172,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadErrorComponent,
     SectionComponent,
     AmountComponent,
     DropOverlayComponent,

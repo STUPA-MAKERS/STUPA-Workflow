@@ -27,7 +27,6 @@ import {
   FocusDialogDirective,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   placeBelow,
   showInTopLayer,
   SideSheetComponent,
@@ -36,6 +35,7 @@ import {
   watchAnchoredPopover,
 } from '@stupa-makers/ui-kit';
 import { dayMonth, monthYear } from '@shared/date-format';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** The gap between the cell and the popover, and the least gap to the viewport edge. */
 const GAP = 6;
@@ -85,7 +85,7 @@ export const ATTENDANCE_STATE: Record<GremiumAttendanceState, StatusView> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FocusDialogDirective,
-    NoteComponent,
+    LoadErrorComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,

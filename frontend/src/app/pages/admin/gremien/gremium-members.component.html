@@ -23,7 +23,7 @@
     @if (loading()) {
       <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
     } @else if (failed()) {
-      <app-note kind="error" icon="alert" role="alert" retryable (retry)="loadMembers()">{{ 'admin.gremien.membersLoadFailed' | t }}</app-note>
+      <app-load-error [message]="'admin.gremien.membersLoadFailed' | t" (retry)="loadMembers()" />
     } @else if (!visible().length) {
       <app-empty-state shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
     } @else {

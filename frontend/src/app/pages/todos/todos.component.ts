@@ -46,7 +46,6 @@ import {
   liveSearch,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -101,6 +100,7 @@ import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-vie
 import { TodoListViewComponent } from './list-view/todo-list-view.component';
 import { isoDay } from '@shared/date-format';
 import { pageItemTitle } from '../../layout/page-title.service';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /** The board reads itself again this often while the tab is visible. */
 export const BOARD_POLL_MS = 30_000;
@@ -169,7 +169,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NoteComponent,
+    LoadErrorComponent,
     CdkScrollable,
     TranslatePipe,
     ButtonComponent,

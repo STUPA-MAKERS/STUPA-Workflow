@@ -12,7 +12,7 @@
     }
   }
   @case ('error') {
-    <app-note kind="error" icon="alert" role="alert">{{ errorText() }}</app-note>
+    <app-load-error [message]="errorText()" (retry)="retry.emit()" />
   }
   @default {
     @if (content(); as tpl) {

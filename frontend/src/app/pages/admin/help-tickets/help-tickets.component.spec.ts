@@ -11,6 +11,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { HelpTicketsSettings } from '../admin.models';
 import { HelpTicketsComponent, isHttpUrl } from './help-tickets.component';
+import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 
 const STORED: HelpTicketsSettings = {
   wikiUrl: 'https://wiki.example.org/books/stupa',
@@ -83,7 +84,7 @@ async function setup(
       { provide: TicketsApiService, useValue: tickets },
       { provide: AdminApiService, useValue: api },
       { provide: AuthService, useValue: { can: (p: string) => perms.has(p) } },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   await view.fixture.whenStable();
@@ -242,7 +243,7 @@ describe('HelpTicketsComponent', () => {
 
   it('names a failed read', async () => {
     await setup({ api: { getHelpTickets: jest.fn(() => throwError(() => null)), putHelpTickets: jest.fn() } });
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Einstellungen konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Einstellungen konnten nicht geladen werden.');
   });
 
   /** The form shows in its loaded shape: the field and the switch rows with their labels. */

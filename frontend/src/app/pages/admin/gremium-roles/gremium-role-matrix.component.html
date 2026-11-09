@@ -17,7 +17,7 @@
   @if (loading()) {
     <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
   } @else if (failed()) {
-    <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'admin.gremiumRoles.loadFailed' | t }}</app-note>
+    <app-load-error [message]="'admin.gremiumRoles.loadFailed' | t" (retry)="load()" />
   } @else if (!sorted().length) {
     <app-empty-state shape="table" rows="3" [heading]="'admin.gremiumRoles.empty' | t" />
   } @else {

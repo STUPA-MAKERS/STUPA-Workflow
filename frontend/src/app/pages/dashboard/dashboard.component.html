@@ -213,7 +213,7 @@
 
 <ng-template #workTpl let-t>
   @if (errorOf(t)) {
-    <app-note class="dash__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retryTab(t)">{{ 'dashboard.error' | t }}</app-note>
+    <app-load-error [message]="'dashboard.error' | t" (retry)="retryTab(t)" />
   } @else if (emptyOf(t)) {
     <div class="dash__emptyGrid" [class.dash__emptyGrid--two]="newUser() && applyTypes().length">
       @switch (t) {

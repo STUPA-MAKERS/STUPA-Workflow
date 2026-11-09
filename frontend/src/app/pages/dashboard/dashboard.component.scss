@@ -210,10 +210,6 @@
   white-space: nowrap;
 }
 
-.dash__loadError {
-  margin: var(--space-4) 0;
-}
-
 .dash__emptyGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

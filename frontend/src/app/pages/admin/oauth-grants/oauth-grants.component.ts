@@ -21,6 +21,7 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /**
  * The most scope tags per row. A token usually carries every scope, and all of them would
@@ -53,6 +54,7 @@ const PAGE_SIZE = 25;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadErrorComponent,
     ConfirmDialogComponent,
     TranslatePipe,
     LocalizedDatePipe,

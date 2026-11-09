@@ -13,6 +13,7 @@ import { TestBed } from '@angular/core/testing';
 import { DraftAttachmentsService } from '../../apply/draft-attachments.service';
 import { TodoCacheService } from '../todo-cache.service';
 import { TodoCardDetailComponent } from './todo-card-detail.component';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 
 const COMMENT: TodoComment = {
   id: 'cm-1',
@@ -133,7 +134,7 @@ async function setup(opts: Opts = {}) {
       provideRouter([]),
       { provide: TodosApiService, useValue: api },
       { provide: ApiClient, useValue: files },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       provideFakeTodoLive(),
       ...(opts.cache ? [{ provide: TodoCacheService, useValue: opts.cache }] : []),
     ],
@@ -361,8 +362,8 @@ describe('TodoCardDetailComponent', () => {
     api.card.mockReturnValueOnce(http(500));
     cmp.reload();
     detect();
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Karte konnte nicht geladen werden.');
-    fireEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
+    expect(loadErrorToast()).toContain('Die Karte konnte nicht geladen werden.');
+    retryLoadError();
     detect();
     expect(cmp.card()?.id).toBe('k-1');
 

@@ -8,6 +8,7 @@ import { GREMIEN_TEST_NOW, decision, gremienApiMock } from '../../../../testing/
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { GREMIEN_NOW } from '../gremien.store';
 import { GremiumDecisionsComponent } from './gremium-decisions.component';
+import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 const ITEMS: GremiumDecision[] = [
   decision(),
@@ -184,7 +185,7 @@ describe('GremiumDecisionsComponent', () => {
     expect(view.cmp.items().map((d) => d.id)).toEqual(['v-1', 'v-9']);
     screen.getByRole('button', { name: 'Weitere laden' }).click();
     view.fixture.detectChanges();
-    expect(screen.getByRole('alert')).toHaveTextContent('Weitere Beschlüsse konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Weitere Beschlüsse konnten nicht geladen werden.');
     expect(view.cmp.items()).toHaveLength(2);
   });
 
@@ -203,11 +204,11 @@ describe('GremiumDecisionsComponent', () => {
     const decisions = jest.fn((): ReturnType<GremienApiService['decisions']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ decisions }) });
     restore = view.restore;
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Beschlüsse konnten nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Die Beschlüsse konnten nicht geladen werden.');
     decisions.mockReturnValue(of({ items: ITEMS, nextCursor: null }));
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    retryLoadError();
     view.fixture.detectChanges();
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(loadErrorToast()).toBeNull();
     expect(view.cmp.groups()).toHaveLength(4);
   });
 

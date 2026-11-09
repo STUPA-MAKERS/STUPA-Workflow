@@ -83,10 +83,6 @@
   font-weight: var(--fw-semibold);
   white-space: nowrap;
 }
-.grl__loadError {
-  margin: var(--space-4) 0;
-}
-
 .grl__detail {
   @include lp.detail;
 }

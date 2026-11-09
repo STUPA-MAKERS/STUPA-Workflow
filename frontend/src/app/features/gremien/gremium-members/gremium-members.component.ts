@@ -22,7 +22,6 @@ import {
   IconComponent,
   MEDIA,
   mediaQuery,
-  NoteComponent,
   SearchPillComponent,
   SkeletonComponent,
   StickyBarComponent,
@@ -30,6 +29,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { fileSlug, groupInOrder, localized, roleRank, toCsv } from '../gremien.util';
 import { personLabel } from '@shared/person-label.util';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 export interface MemberGroup {
   readonly key: string;
@@ -57,7 +57,7 @@ export interface MemberRow {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SectionComponent,
-    NoteComponent,
+    LoadErrorComponent,
     StickyBarComponent,
     TranslatePipe,
     ButtonComponent,

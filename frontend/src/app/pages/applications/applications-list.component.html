@@ -136,9 +136,7 @@
         [attr.aria-busy]="reloading() || null"
       >
         @if (error()) {
-          <app-note class="apps__loadError" kind="error" icon="alert" role="alert" retryable (retry)="reload()">
-            {{ 'applications.list.error' | t }}
-          </app-note>
+          <app-load-error [message]="'applications.list.error' | t" (retry)="reload()" />
         } @else if (loading()) {
           <div class="apps__skel skel-in">
             <app-list-group skeleton="7rem" />

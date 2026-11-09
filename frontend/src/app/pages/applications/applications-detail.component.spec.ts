@@ -27,6 +27,7 @@ import type {
   VersionOutWire,
 } from '@core/api/models';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 
 const SUBMITTED: StateOutWire = {
   id: 's1',
@@ -720,8 +721,8 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     expect(cmp.error()).toBe(true);
     expect(cmp.notFound()).toBe(false);
-    expect(screen.getByText('Antrag konnte nicht geladen werden.')).toBeInTheDocument();
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    expect(loadErrorToast()).toBe('Antrag konnte nicht geladen werden.');
+    retryLoadError();
     detectChanges();
     expect(cmp.error()).toBe(false);
     expect(cmp.loading()).toBe(true);

@@ -78,6 +78,13 @@ export class NotificationSettingsComponent {
   readonly valid = computed(() => !this.afterDaysError() && !this.repeatDaysError());
 
   constructor() {
+    this.load();
+  }
+
+  /** Reads the settings, again after a failed read (§ 000576). */
+  load(): void {
+    this.loading.set(true);
+    this.error.set(null);
     this.api.getNotificationSettings().subscribe({
       next: (s) => {
         this.settings.set(s);

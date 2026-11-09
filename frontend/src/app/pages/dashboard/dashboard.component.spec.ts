@@ -21,6 +21,7 @@ import type {
   Principal,
   StateOutWire,
 } from '@core/api/models';
+import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 
 /** "Now": Tuesday, 29 September 2026, 18:50 local time. */
 const NOW = new Date(2026, 8, 29, 18, 50);
@@ -343,7 +344,7 @@ describe('DashboardComponent', () => {
       expect(screen.getByRole('tab', { name: 'Offene Aufgaben' })).toBeInTheDocument();
       requests.tasks.flush(null, { status: 500, statusText: 'x' });
       fixture.detectChanges();
-      expect(screen.getByRole('alert')).toHaveTextContent('Konnte nicht geladen werden.');
+      expect(loadErrorToast()).toContain('Konnte nicht geladen werden.');
       expect(cmp(fixture).tabEmpty()).toBe(false);
       expect(screen.queryByRole('link', { name: 'Alle Aufgaben öffnen' })).not.toBeInTheDocument();
     });
@@ -351,13 +352,13 @@ describe('DashboardComponent', () => {
     it('sends the request of the open tab again on "Erneut versuchen"', async () => {
       const { fixture, http } = await setup(MEMBER, { url: '/?tab=mine', mine: 'error' });
       fixture.detectChanges();
-      screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+      retryLoadError();
       fixture.detectChanges();
       expect(cmp(fixture).tabLoading()).toBe(true);
       http.expectOne((r) => r.url.endsWith('/api/applications')).flush(MINE);
       fixture.detectChanges();
       expect(cmp(fixture).tabError()).toBe(false);
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(loadErrorToast()).toBeNull();
     });
 
     it('shows empty lists and tabs without counts while every list failed', async () => {

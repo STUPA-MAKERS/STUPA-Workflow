@@ -48,7 +48,7 @@
   </div>
 } @else if (error()) {
   <div class="td">
-    <app-note class="td__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tickets.detail.error.load' | t }}</app-note>
+    <app-load-error [message]="'tickets.detail.error.load' | t" (retry)="retry()" />
   </div>
 } @else if (ticket(); as ticket) {
   <article

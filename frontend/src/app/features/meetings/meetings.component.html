@@ -9,7 +9,7 @@
 } @else if (loading()) {
   <app-meeting-page-skeleton />
 } @else if (error()) {
-  <app-note class="mtg__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retryMeeting()">{{ 'meetings.error' | t }}</app-note>
+  <app-load-error [message]="'meetings.error' | t" (retry)="retryMeeting()" />
 } @else if (meeting(); as m) {
   @if (isFollower()) {
     <app-meeting-follow-view

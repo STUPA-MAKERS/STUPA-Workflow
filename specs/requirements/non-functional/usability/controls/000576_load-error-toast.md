@@ -2,12 +2,15 @@
 id: "000576"
 title: A load error shows as a toast with a retry action
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
+tests:
+  - "frontend/src/app/shared/ui/load-error/load-error.component.spec.ts:LoadErrorComponent"
+  - "frontend/src/app/shared/ui/load-state/load-state.component.spec.ts:LoadStateComponent"
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit/src/lib/toast/toast.service.ts
+  - frontend/src/app/shared/ui/load-error/load-error.component.ts
+  - frontend/src/app/shared/ui/load-state/load-state.component.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

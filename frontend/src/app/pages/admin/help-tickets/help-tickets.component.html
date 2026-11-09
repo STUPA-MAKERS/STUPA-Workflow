@@ -12,6 +12,7 @@
     [state]="form.state()"
     [forbiddenText]="canBlock() ? null : ('admin.helpTickets.forbidden' | t)"
     [errorText]="'admin.helpTickets.loadError' | t"
+    (retry)="form.reload()"
   >
     <ng-template #loading>
       <div class="ht__form" aria-hidden="true">

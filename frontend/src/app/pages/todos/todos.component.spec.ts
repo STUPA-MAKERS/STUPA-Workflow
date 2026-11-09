@@ -26,6 +26,7 @@ import { type FakeTodoLive, provideFakeTodoLive } from '../../../testing/todo-li
 import { TodoLiveService } from '@core/ws/todo-live.service';
 import { TodoCacheService } from '../../features/todos/todo-cache.service';
 import { ALL_BOARDS, BOARD_POLL_MS, TodosComponent } from './todos.component';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../testing/load-error';
 
 /** Keeps what the page reads but reads nothing ahead, so a test counts the reads of the page. */
 @Injectable()
@@ -97,7 +98,7 @@ async function start(url: string, opts: Opts = {}) {
       ]),
       { provide: TodosApiService, useValue: api },
       provideFakeTodoLive(),
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   if (!opts.readAhead) {
@@ -247,7 +248,7 @@ describe('TodosComponent', () => {
   it('shows an error when the boards fail without a board in the route', async () => {
     const failing = await start('/todos', { boardsFail: true });
     expect(failing.cmp.error()).toBe(true);
-    expect(screen.getByRole('alert')).toHaveTextContent('Das Board konnte nicht geladen werden.');
+    expect(loadErrorToast()).toContain('Das Board konnte nicht geladen werden.');
   });
 
   it('keeps a board in the route when the board list fails', async () => {
@@ -437,7 +438,7 @@ describe('TodosComponent', () => {
     cmp.reload();
     harness.detectChanges();
     expect(cmp.error()).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
+    retryLoadError();
     harness.detectChanges();
     expect(cmp.board()).not.toBeNull();
   });

@@ -85,6 +85,7 @@
   "pwa.updateReady": "Eine neue Version der App ist verfügbar.",
   "pwa.reload": "Neu laden",
   "pwa.offline": "Keine Verbindung",
+  "pwa.serverUnreachable": "Server nicht erreichbar",
   "account.notifications.title": "Benachrichtigungen",
   "account.notifications.error": "Einstellungen konnten nicht geladen werden.",
   "account.notifications.saveError": "Speichern fehlgeschlagen. Versuche es noch einmal.",

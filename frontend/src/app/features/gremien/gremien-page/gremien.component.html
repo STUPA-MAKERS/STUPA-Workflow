@@ -68,7 +68,7 @@
             />
           </div>
         } @else if (store.error()) {
-          <app-note class="grl__loadError" kind="error" icon="alert" role="alert" retryable (retry)="store.load()">{{ 'gremien.list.error' | t }}</app-note>
+          <app-load-error [message]="'gremien.list.error' | t" (retry)="store.load()" />
         } @else if (!mine().length && !others().length) {
           @if (query().trim()) {
             <app-empty-state [heading]="'gremien.list.noMatch' | t" />

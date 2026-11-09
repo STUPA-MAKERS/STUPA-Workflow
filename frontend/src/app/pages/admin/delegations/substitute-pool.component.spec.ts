@@ -7,6 +7,7 @@ import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
 import { optionLabels, pickOption } from '../../../../testing/select';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 
 const ENTRIES: DelegationSubstitute[] = [
   {
@@ -143,7 +144,7 @@ async function setup(
     providers: [
       { provide: DelegationsApiService, useValue: delegations },
       { provide: AdminApiService, useValue: admin },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
     componentInputs: {
       gremiumId: 'g-1',
@@ -297,10 +298,8 @@ describe('SubstitutePoolComponent', () => {
   it('names a failed load and an empty pool', async () => {
     const substitutes = jest.fn(() => throwError(() => ({ status: 403 })));
     const { fixture } = await setup({ delegations: makeDelegations({ substitutes }) });
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Die Stellvertretungen konnten nicht geladen werden.',
-    );
-    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    expect(loadErrorToast()).toContain('Die Stellvertretungen konnten nicht geladen werden.');
+    retryLoadError();
     fixture.detectChanges();
     expect(substitutes).toHaveBeenCalledTimes(2);
   });
