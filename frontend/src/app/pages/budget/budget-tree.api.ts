@@ -357,9 +357,6 @@ export interface BudgetTreeNode {
   readonly active: boolean;
   /** Display color for the pie and the tree. `null` means automatic. */
   readonly color: string | null;
-  /** Top-level only: flow-state keys that count as accepted/denied. */
-  readonly acceptedStateKeys: readonly string[];
-  readonly deniedStateKeys: readonly string[];
   /** Hide in the budget tab. This is display only and the rollups do not change. */
   readonly hiddenInBudget: boolean;
   /** Visibility gremium: its members see this subtree in the budget tab as a root.
@@ -389,8 +386,6 @@ export interface BudgetNode {
   readonly currency: string;
   readonly active: boolean;
   readonly color?: string | null;
-  readonly acceptedStateKeys?: readonly string[];
-  readonly deniedStateKeys?: readonly string[];
   readonly hiddenInBudget?: boolean;
   readonly decisionGremiumId?: Uuid | null;
   readonly effectiveDecisionGremiumId?: Uuid | null;
@@ -435,8 +430,6 @@ export interface BudgetNodeUpdate {
   readonly name?: string;
   readonly active?: boolean;
   readonly color?: string | null;
-  readonly acceptedStateKeys?: readonly string[];
-  readonly deniedStateKeys?: readonly string[];
   readonly hiddenInBudget?: boolean;
   /** Visibility gremium. `null` clears the assignment. */
   readonly viewGremiumId?: Uuid | null;

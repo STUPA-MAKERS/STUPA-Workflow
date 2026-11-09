@@ -310,21 +310,6 @@
   outline: none;
 }
 
-.bt__states {
-  width: 100%;
-  border-collapse: collapse;
-}
-.bt__states th,
-.bt__states td {
-  padding: var(--space-2) var(--space-3);
-  text-align: start;
-}
-.bt__states tbody th {
-  font-weight: var(--fw-regular);
-}
-.bt__states tbody tr + tr > * {
-  border-top: 1px solid var(--color-border);
-}
 .bt__foot {
   --dialog-footer-gap: var(--space-2);
 }

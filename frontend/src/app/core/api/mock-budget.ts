@@ -125,8 +125,6 @@ function build(spec: Spec, parent: BudgetTreeNode | null): BudgetTreeNode {
     currency: 'EUR',
     active: true,
     color: spec.color ?? null,
-    acceptedStateKeys: [],
-    deniedStateKeys: [],
     hiddenInBudget: false,
     viewGremiumId: null,
     decisionGremiumId: spec.decision ?? null,

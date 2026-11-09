@@ -267,6 +267,7 @@
             (makeInitial)="setInitial(s.key)"
             (editAllowedChange)="setStateEditAllowed(s.key, $event)"
             (terminalChange)="setStateTerminal(s.key, $event)"
+            (outcomeChange)="setStateOutcome(s.key, $event.outcome, $event.on)"
             (kindChange)="setStateKind(s.key, $event)"
             (gremiumChange)="setStateGremium(s.key, $event)"
             (gremiumSourceChange)="setStateGremiumSource(s.key, $event)"

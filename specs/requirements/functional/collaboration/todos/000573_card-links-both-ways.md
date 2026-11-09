@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
-implementation: null
+implementation:
+  - backend/app/modules/todos/service.py
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos
