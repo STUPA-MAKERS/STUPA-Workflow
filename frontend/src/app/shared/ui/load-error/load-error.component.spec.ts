@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { render } from '@testing-library/angular';
 import { ServerReachabilityService } from '@core/api/server-reachability.service';
+import { runAxe } from '../../../../testing/a11y';
 import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 import { LoadErrorComponent } from './load-error.component';
 
@@ -37,6 +38,11 @@ describe('LoadErrorComponent', () => {
     retryLoadError();
     expect(retry).toHaveBeenCalledTimes(1);
     expect(loadErrorToast()).toBeNull();
+  });
+
+  it('adds nothing to the page that axe can flag', async () => {
+    const { container } = await setup();
+    expect(await runAxe(container)).toHaveNoViolations();
   });
 
   /** § 000577: the toast does not close by its time, and closes when the error goes. */
