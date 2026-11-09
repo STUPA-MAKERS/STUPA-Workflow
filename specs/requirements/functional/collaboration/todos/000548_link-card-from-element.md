@@ -2,7 +2,7 @@
 id: "000548"
 title: An element is linked to a card from its detail
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation:
