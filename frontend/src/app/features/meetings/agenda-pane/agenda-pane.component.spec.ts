@@ -88,20 +88,15 @@ async function openMenu(index: number): Promise<HTMLElement> {
 
 describe('AgendaPaneComponent', () => {
   /** The number badge names the TOP; a free-text item has no sub line at all. */
-  it('counts the items and shows the kind of an application, an open vote and the NÖ tag', async () => {
+  it('shows the heading without a count, the kind the kind of an application, an open vote and the NÖ tag', async () => {
     await setup({ meeting: meeting({ votes: [vote({ agendaItemId: 't-3' })] }) });
-    expect(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tagesordnung' })).toBeInTheDocument();
     const rows = screen.getAllByRole('listitem');
     expect(rows[0].querySelector('.li__subText')).toBeNull();
     expect(screen.queryByText(/Freitext|TOP 1/)).toBeNull();
     expect(screen.getByText('Antrag · Abstimmung offen')).toBeInTheDocument();
     const noe = screen.getByText('NÖ');
     expect(noe.closest('li')).toHaveTextContent('Antrag Kulturfestival');
-  });
-
-  it('says one item in the singular and shows the empty hint', async () => {
-    await setup({ agenda: [AGENDA[0]] });
-    expect(screen.getByRole('heading', { name: 'Tagesordnung · 1 TOP' })).toBeInTheDocument();
   });
 
   it('shows the empty agenda hint', async () => {

@@ -416,15 +416,15 @@ describe('ApplicationsDetailComponent — header', () => {
 
   describe('tabs (one pane at a time)', () => {
     /** The comments are a header action that opens a sheet, not a tab. */
-    it('shows the sections in tabs with their counts', async () => {
+    it('shows the sections in tabs without counts (spec 000560)', async () => {
       const { detectChanges } = await setup({ split: false });
       const tabs = screen.getAllByRole('tab').map((t) => t.getAttribute('aria-label') ?? t.textContent?.trim());
-      expect(tabs).toEqual(['Antrag', 'Verlauf 2', 'Anhänge 0']);
+      expect(tabs).toEqual(['Antrag', 'Verlauf', 'Anhänge']);
       expect(screen.getByRole('button', { name: 'Kommentare, 0' })).toBeInTheDocument();
       expect(screen.getByRole('tabpanel', { name: 'Antrag' })).toBeVisible();
-      await userEvent.click(screen.getByRole('tab', { name: 'Verlauf 2' }));
+      await userEvent.click(screen.getByRole('tab', { name: 'Verlauf' }));
       detectChanges();
-      expect(screen.getByRole('tabpanel', { name: 'Verlauf 2' })).toBeInTheDocument();
+      expect(screen.getByRole('tabpanel', { name: 'Verlauf' })).toBeInTheDocument();
       expect(screen.queryByRole('tabpanel', { name: 'Antrag' })).not.toBeInTheDocument();
     });
 
@@ -435,7 +435,7 @@ describe('ApplicationsDetailComponent — header', () => {
      */
     it('replaces the tabs with the edit form, also from another tab', async () => {
       const { cmp, detectChanges } = await setup({ split: false });
-      await userEvent.click(screen.getByRole('tab', { name: 'Anhänge 0' }));
+      await userEvent.click(screen.getByRole('tab', { name: 'Anhänge' }));
       detectChanges();
       expect(cmp.tab()).toBe('files');
       const g = globalThis as unknown as { structuredClone?: unknown };

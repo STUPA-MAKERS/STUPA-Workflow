@@ -8,8 +8,7 @@
       <app-page-header
         [pane]="true"
         titleId="vl-title"
-        [title]="'nav.voting' | t"
-        [meta]="!loading() && !error() && openCount() > 0 ? ('voting.list.openCount' | t: { n: openCount() }) : null">
+        [title]="'nav.voting' | t">
         <ng-container ngProjectAs="[actions]">
           @if (phone()) {
             <app-row-menu [label]="'action.more' | t" [sections]="phoneMenu()" (selected)="onPhoneMenu($event)" />

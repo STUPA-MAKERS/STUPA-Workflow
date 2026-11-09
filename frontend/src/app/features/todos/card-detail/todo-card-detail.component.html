@@ -571,7 +571,6 @@
     <app-section class="cd__sec" [heading]="'todos.card.checklist' | t">
       @if (items().length) {
         <span sectionAction class="cd__progress">
-          <span class="num">{{ doneItems().length }}/{{ items().length }}</span>
           <app-seg-bar
             class="cd__checkBar"
             size="thin"

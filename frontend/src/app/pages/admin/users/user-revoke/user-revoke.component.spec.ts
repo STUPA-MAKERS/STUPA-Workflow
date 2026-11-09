@@ -164,8 +164,8 @@ describe('UserRevokeComponent', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getAllByText('Tobias Kern').length).toBeGreaterThan(0);
     expect(screen.getByText(/^Letzte Anmeldung .+ \(vor \d+ Monaten\)$/)).toBeInTheDocument();
-    expect(screen.getByText('Gremien (2)')).toBeInTheDocument();
-    expect(screen.getByText('Globale Rollen (2)')).toBeInTheDocument();
+    expect(screen.getByText('Gremien')).toBeInTheDocument();
+    expect(screen.getByText('Globale Rollen')).toBeInTheDocument();
     expect(screen.getByText('Mitgliedschaft als Mitglied')).toBeInTheDocument();
     expect(screen.getByText('über die SSO-Gruppe stupa-mitglieder')).toBeInTheDocument();
     expect(screen.getByText('SSO-Gruppen gremien-alle, stupa-sitzung')).toBeInTheDocument();
@@ -320,7 +320,7 @@ describe('UserRevokeComponent', () => {
     expect(screen.getByText('Die Rechte der Person konnten nicht geladen werden.')).toBeInTheDocument();
     api.previewPrincipalRevoke.mockReturnValue(of(preview()));
     await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
-    expect(screen.getByText('Gremien (2)')).toBeInTheDocument();
+    expect(screen.getByText('Gremien')).toBeInTheDocument();
   });
 
   it('age() counts days and months', async () => {

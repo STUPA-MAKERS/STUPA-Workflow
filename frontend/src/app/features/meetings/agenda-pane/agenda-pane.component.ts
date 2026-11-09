@@ -55,7 +55,7 @@ export interface AgendaMove {
 }
 
 /**
- * The agenda of the session page ("Tagesordnung · n TOPs").
+ * The agenda of the session page ("Tagesordnung").
  *
  * A row shows the number, the title, the kind ("Antrag" or "Freitext"), an open vote
  * and the tag NÖ. The number is filled for the item that the room handles now, and a
@@ -168,13 +168,6 @@ export class AgendaPaneComponent {
   protected readonly canChangeAgenda = computed(() =>
     canChangeAgenda(this.meeting(), this.locked()),
   );
-
-  protected readonly headingText = computed(() => {
-    const n = this.agenda().length;
-    return this.i18n.translate(n === 1 ? 'meetings.agenda.headingOne' : 'meetings.agenda.heading', {
-      n,
-    });
-  });
 
   /**
    * The id of the item that the room handles now. Only a live or closed meeting has

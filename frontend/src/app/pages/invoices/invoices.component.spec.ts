@@ -337,7 +337,7 @@ describe('InvoicesComponent', () => {
     req.flush(page([]));
   });
 
-  it('asks each segment with its status and booked filter, and keeps the counts', async () => {
+  it('asks each segment with its status and booked filter, and shows no counts (spec 000560)', async () => {
     const { c, http } = await setup();
     const cases: [string, Record<string, string | null>][] = [
       ['inbox', { status: 'open', booked: 'false' }],
@@ -352,19 +352,13 @@ describe('InvoicesComponent', () => {
       expect(req.request.params.get('booked')).toBe(want['booked']);
       req.flush({ ...page([]), counts: { all: 9, inbox: 2, booked: 3, paid: 4 } });
     }
-    expect(c.counts()).toEqual({ all: 9, inbox: 2, booked: 3, paid: 4 });
-    expect(c.segmentOptions().map((o: { label: string; count: number }) => `${o.label} ${o.count}`)).toEqual([
-      'Alle 9',
-      'Eingang 2',
-      'Verbucht 3',
-      'Bezahlt 4',
+    expect(c.segmentOptions().map((o: { label: string }) => o.label)).toEqual([
+      'Alle',
+      'Eingang',
+      'Verbucht',
+      'Bezahlt',
     ]);
-  });
-
-  it('shows no counts from a backend without them', async () => {
-    const { c } = await setup();
-    expect(c.counts()).toBeNull();
-    expect(c.segmentOptions()[0].count).toBeNull();
+    expect(c.segmentOptions().every((o: object) => !('count' in o))).toBe(true);
   });
 
   it('applies the amount and the two date chips at once', async () => {
@@ -1108,7 +1102,6 @@ describe('InvoicesComponent', () => {
     expect(c.confirmDelete()).toBe(target);
   });
 
-  /** The counts of the segments change, so the list loads again. */
   it('doDelete removes the row, decrements the total and toasts', async () => {
     const { c, http, toast } = await setup({
       initial: [inv({ id: 'd1' }), inv({ id: 'd2' })],

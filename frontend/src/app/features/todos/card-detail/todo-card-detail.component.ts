@@ -469,13 +469,10 @@ export class TodoCardDetailComponent {
     ];
   });
 
-  /** The columns of the move sheet, with the counts of the board when the page has it. */
-  readonly moveColumns = computed<MoveColumn[]>(() => {
-    const c = this.card();
-    if (!c) return [];
-    const counts = new Map((this.pageBoard()?.columns ?? []).map((col) => [col.id, col.cardCount]));
-    return c.columns.map((col) => ({ id: col.id, name: col.name, count: counts.get(col.id) ?? null }));
-  });
+  /** The columns of the move sheet. */
+  readonly moveColumns = computed<MoveColumn[]>(() =>
+    (this.card()?.columns ?? []).map((col) => ({ id: col.id, name: col.name })),
+  );
 
   readonly boardLink = computed(() => {
     const c = this.card();

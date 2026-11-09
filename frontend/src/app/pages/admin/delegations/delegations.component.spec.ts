@@ -130,7 +130,7 @@ describe('DelegationsComponent', () => {
   it('keeps the delegations of past meetings behind a toggle', async () => {
     await setup();
     expect(screen.queryByText('Alte Sitzung')).toBeNull();
-    const toggle = screen.getByRole('button', { name: /Frühere Vertretungen \(1\)/ });
+    const toggle = screen.getByRole('button', { name: /Frühere Vertretungen/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await userEvent.click(toggle);
     expect(screen.getByText('Alte Sitzung')).toBeInTheDocument();

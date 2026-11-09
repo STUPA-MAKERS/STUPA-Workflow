@@ -82,12 +82,6 @@ export class TodoBoardPickerComponent {
   });
   readonly chipIcon = computed<IconName>(() => (this.onAll() ? ALL_ICON : BOARD_ICON[this.currentBoard()?.kind ?? 'gremium']));
   readonly allIcon = ALL_ICON;
-  /** The sub line of "Alle": the open cards of every board. */
-  readonly allSub = computed(() => {
-    const n = this.boards().reduce((sum, b) => sum + b.openCount, 0);
-    return this.i18n.translate('todos.board.open', { n });
-  });
-
   readonly sections = computed<PickerSection[]>(() => {
     const of = (kind: TodoBoardKind) => this.boards().filter((b) => b.kind === kind);
     const all: PickerSection[] = [
@@ -112,11 +106,11 @@ export class TodoBoardPickerComponent {
     return BOARD_ICON[kind];
   }
 
-  sub(board: TodoBoardSummary): string {
-    const open = this.i18n.translate('todos.board.open', { n: board.openCount });
-    if (board.kind === 'personal') return `${open} · ${this.i18n.translate('todos.board.onlyYou')}`;
-    if (board.kind === 'team') return `${open} · ${this.i18n.translate('todos.board.teamSub')}`;
-    return open;
+  /** The sub line of a board: who sees it. A picker shows no count (spec 000560). */
+  sub(board: TodoBoardSummary): string | null {
+    if (board.kind === 'personal') return this.i18n.translate('todos.board.onlyYou');
+    if (board.kind === 'team') return this.i18n.translate('todos.board.teamSub');
+    return null;
   }
 
   toggle(): void {
