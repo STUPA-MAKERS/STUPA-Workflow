@@ -735,6 +735,7 @@ export class ApplicationsListComponent {
         this.toast.showAction({
           message: this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
           action: this.i18n.translate('action.undo'),
+          actionIcon: 'undo',
           variant: 'success',
           closed: (how) => {
             if (how !== 'action') {
