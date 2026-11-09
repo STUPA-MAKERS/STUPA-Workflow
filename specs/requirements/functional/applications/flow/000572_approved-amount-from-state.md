@@ -26,7 +26,8 @@ Antrag in a state with neither flag counts as requested. These places must use t
 
 The lists `acceptedStateKeys` and `deniedStateKeys` of a top cost centre must go. A migration
 must set the matching flag on every state whose key one of these lists holds. A key that one
-list marks as accepted and another as denied must stop the migration with the key named.
+list marks as accepted and another as denied must get neither flag, and the migration must go
+on with the next state.
 
 Reason: One rule gives the same approved amount in the budget and at the Event. Today the Event
 counts only an Antrag with a stored decision, so it shows 0 € for a normal approval.
