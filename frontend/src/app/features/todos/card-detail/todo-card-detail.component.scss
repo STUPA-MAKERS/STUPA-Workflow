@@ -128,6 +128,23 @@
   scroll-padding-block: var(--space-5);
   @include fade.fade-y(var(--space-5));
 }
+// Beside the board the column runs through the bottom padding of the sheet to its lower edge,
+// which is the screen edge, and cuts there without a fade (000575). Only the top end fades.
+@include bp.not-phone {
+  :host-context(.td__drawer) .cd__col--details {
+    margin-bottom: calc(-1 * var(--space-6));
+    padding-bottom: var(--space-6);
+
+    &.is-fade-end {
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+    &.is-fade-start.is-fade-end {
+      -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+      mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+    }
+  }
+}
 /* A text action ends flush with the content of its section, like the rows below it. */
 .cd__addItem {
   align-self: flex-start;
