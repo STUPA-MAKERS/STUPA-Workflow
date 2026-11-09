@@ -389,12 +389,11 @@ async def test_event_facts_sum_decide_and_list_the_editions() -> None:
     session.scalar_q.append(3)
     session.scalars_q[:] = [
         [link(c.id, application_id=APP)],
-        [APP],
         [link(c.id, application_id=APP)],
     ]
     session.execute_q[:] = [
         [(other, b, other_row)],
-        [(APP, Decimal("100.00"), Decimal("80.00"))],
+        [(APP, Decimal("100.00"), Decimal("80.00"), True)],
         [(*decided, "StuPa")],
     ]
     facts = SimpleNamespace(events={c.id: _event_of(c.id, series_id=SERIES)})

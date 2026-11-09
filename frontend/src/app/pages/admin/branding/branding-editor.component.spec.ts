@@ -11,7 +11,13 @@ import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { AdminApiService } from '../admin-api.service';
 import type { Branding, SiteConfig } from '../admin.models';
+import { accentContrastIssues } from '@core/theme/accent';
 import { BrandingEditorComponent, type BrandingSection } from './branding-editor.component';
+
+jest.mock('@core/theme/accent', () => {
+  const actual = jest.requireActual<typeof import('@core/theme/accent')>('@core/theme/accent');
+  return { ...actual, accentContrastIssues: jest.fn(actual.accentContrastIssues) };
+});
 
 /** The route of one of the two pages. */
 function route(section: BrandingSection) {
@@ -189,6 +195,24 @@ describe('BrandingEditorComponent', () => {
       fixture.detectChanges();
       expect(document.documentElement.style.getPropertyValue('--c-accent')).toBe('');
       brand.applyBranding(null);
+    });
+
+    /** Spec 000501: an accent whose palette misses 4.5:1 cannot be saved. */
+    it('refuses an accent with a contrast issue', async () => {
+      const issues = jest.mocked(accentContrastIssues);
+      issues.mockImplementation(() => [{ token: '--c-on-accent', on: '#0075bf', ratio: 3 }]);
+      try {
+        const { api, fixture } = await setupWithStub({});
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const c = fixture.componentInstance as any;
+        c.setAccent('#0075bf');
+        fixture.detectChanges();
+        expect(screen.getByRole('alert')).toHaveTextContent('Kontrast von 4,5:1');
+        c.save();
+        expect(api.saveSiteConfig).not.toHaveBeenCalled();
+      } finally {
+        issues.mockImplementation(jest.requireActual('@core/theme/accent').accentContrastIssues);
+      }
     });
 
     it('takes the native colour picker and ignores a partial value', async () => {
@@ -377,6 +401,14 @@ describe('BrandingEditorComponent', () => {
     c.setText(c.draft().copyright, 'Neu');
     expect(c.draft().copyright.de).toBe('Neu');
 
+    // An extra language with an emptied text leaves the map.
+    c.lang.set('fr');
+    c.setText(c.draft().copyright, 'Nouveau');
+    expect(c.draft().copyright.fr).toBe('Nouveau');
+    c.setText(c.draft().copyright, '');
+    expect('fr' in c.draft().copyright).toBe(false);
+    c.lang.set('de');
+
     c.addLegalLink();
     expect(c.draft().legalLinks.length).toBeGreaterThan(0);
     c.removeLegalLink(c.draft().legalLinks.length - 1);
@@ -459,6 +491,23 @@ describe('BrandingEditorComponent', () => {
       const saved = api.saveSiteConfig.mock.calls[0][0] as Branding;
       expect(saved.freetexts.submittedInternal).toEqual({ de: 'Danke **sehr** <b>x</b>' });
       expect(saved.freetexts.submittedExternal).toEqual({});
+    });
+
+    /** Spec 000495: the statement of `/barrierefreiheit` is an admin text. */
+    it('edits the accessibility statement per language', async () => {
+      const { fixture, api } = await setupWithStub({}, 'texts');
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const field = screen.getByRole('textbox', { name: 'Text der Erklärung (Markdown) (DE)' });
+      await userEvent.clear(field);
+      await userEvent.type(field, 'Stand: teilweise');
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      const saved = api.saveSiteConfig.mock.calls[0][0] as Branding;
+      expect(saved.freetexts.accessibilityStatement?.['de']).toBe('Stand: teilweise');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      delete c.draft().freetexts.accessibilityStatement;
+      expect(c.statementMap(c.draft())).toEqual({});
     });
 
     it('keeps a map that the config already has', async () => {

@@ -32,8 +32,6 @@ function node(
     currency: 'EUR',
     active: true,
     color: null,
-    acceptedStateKeys: [],
-    deniedStateKeys: [],
     hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
@@ -117,6 +115,20 @@ describe('BudgetSunburstComponent', () => {
     expect(segs[1].percent).toBe(40);
     expect(segs[0].depth).toBe(1);
     expect(segs[0].d).toContain('M ');
+  });
+
+  /** A screen reader gets the values as a list (app spec 000507). */
+  it('lists the values of the chart for a screen reader', async () => {
+    localStorage.setItem('ap.locale', 'de');
+    const a = node('a', { fiscalYearId: FY, allocated: '60' });
+    const b = node('b', { fiscalYearId: FY, allocated: '40' });
+    const root = node('root', { fiscalYearId: FY, allocated: '100' }, [a, b]);
+    const { getByRole } = await setup({ root });
+    const list = getByRole('list', { name: 'Werte von Node root' });
+    const items = Array.from(list.querySelectorAll('li')).map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatch(/^A Node a: 60 € · 60 %$/);
+    expect(items[1]).toMatch(/Node b: 40 € · 40 %$/);
   });
 
   it('skips children whose subtree value is <= 0', async () => {

@@ -4,6 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, map, of, startWith, Subject, switchMap, type Observable } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
+import { TodosApiService, type TodoMineItem } from '@core/api/todos.service';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -12,12 +13,15 @@ import {
   calendarDaysSince,
   clock,
   daysUntil,
+  isoDay,
   shortDay,
   shortTime,
   weekdayName,
 } from '@shared/date-format';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
+import { TodoDueComponent } from '../../features/todos/card-facts/todo-due.component';
+import { dueInfo } from '../../features/todos/todos.util';
 import type {
   ApplicationListItem,
   ApplicationType,
@@ -124,7 +128,7 @@ interface Load<T> {
  * The start page of a signed-in person (variant B "Arbeitsliste + Seitenleiste").
  *
  * Left: the search pill, the greeting, and ONE work list with the
- * tabs "Offene Aufgaben" and "Meine Anträge". The tabs show their counts
+ * tabs "Offene Aufgaben" and "Meine Anträge". The tabs show no counts (spec 000560),
  * and the URL keeps the choice (`?tab=`). Each tab is a table with real columns; a row
  * opens its detail page, and "Alle … öffnen" opens the full list. Wide, "Antrag stellen"
  * is a floating button at the foot of the list column; narrower, at the foot of the page.
@@ -158,6 +162,7 @@ interface Load<T> {
     NgTemplateOutlet,
     RouterLink,
     IconComponent,
+    TodoDueComponent,
     TranslatePipe,
     TabPageDirective,
     TabPagerComponent,
@@ -255,19 +260,9 @@ export class DashboardComponent {
 
   readonly tabs = computed<TabItem[]>(() => {
     const short = this.phone();
-    const tasks = this.tasks();
-    const mine = this.mine();
     return [
-      {
-        id: 'tasks',
-        label: this.i18n.translate(short ? 'dashboard.tab.tasksShort' : 'dashboard.tasks.title'),
-        count: tasks ? tasks.length : null,
-      },
-      {
-        id: 'mine',
-        label: this.i18n.translate(short ? 'dashboard.tab.mineShort' : 'dashboard.applications.title'),
-        count: mine ? mine.total : null,
-      },
+      { id: 'tasks', label: this.i18n.translate(short ? 'dashboard.tab.tasksShort' : 'dashboard.tasks.title') },
+      { id: 'mine', label: this.i18n.translate(short ? 'dashboard.tab.mineShort' : 'dashboard.applications.title') },
     ];
   });
 
@@ -400,17 +395,29 @@ export class DashboardComponent {
   /** The planned meetings, in the order of the timeline. */
   private readonly planned = computed(() => this.meetings().filter((m) => m.status === 'planned'));
 
-  /** "5" or "8+" when the timeline holds more. */
-  readonly plannedCount = computed(() => {
-    const n = this.planned().length;
-    return this.timeline()?.nextCursor ? `${n}+` : String(n);
-  });
-
   readonly upcoming = computed<UpcomingRow[]>(() => {
     const cap = this.phone() ? PHONE_MEETINGS : this.extraWide() ? MEETINGS_XL : MEETINGS;
     return this.planned()
       .slice(0, cap)
       .map((m) => ({ meeting: m, note: this.delegationNote(m.id), when: this.plannedLabel(m) }));
+  });
+
+  private readonly todos = inject(TodosApiService);
+  private readonly myCards = toSignal(
+    this.todos.mine().pipe(
+      map((m) => m.items),
+      catchError(() => of([] as TodoMineItem[])),
+    ),
+    { initialValue: [] as readonly TodoMineItem[] },
+  );
+  /** "Fällige To-Dos" (spec 000550): my cards due within 7 days or overdue, the oldest first. */
+  readonly dueTodos = computed(() => {
+    const today = isoDay(new Date(Date.now()));
+    const t: Translate = (key, params) => this.i18n.translate(key, params);
+    return dueCards(this.myCards(), today, this.phone() ? DUE_PHONE : DUE_MAX).map(({ card, day }) => ({
+      card,
+      due: dueInfo(day, today, this.i18n.formatLocale(), t),
+    }));
   });
 
   /** A meeting runs or is planned for today: only then the sheet has the title "Heute". */
@@ -517,4 +524,24 @@ export class DashboardComponent {
   closeAccount(): void {
     this.accountOpen.set(false);
   }
+}
+
+/** The most due cards on the start page, and on a phone. */
+export const DUE_MAX = 5;
+export const DUE_PHONE = 3;
+/** Days ahead that count as due. */
+export const DUE_DAYS = 7;
+
+/** The cards due within {@link DUE_DAYS} days or overdue, the oldest due date first. */
+export function dueCards<T extends { readonly dueDate: string | null }>(
+  cards: readonly T[],
+  today: string,
+  max: number,
+): readonly { readonly card: T; readonly day: string }[] {
+  const end = isoDay(new Date(Date.parse(`${today}T12:00:00`) + DUE_DAYS * 86_400_000));
+  return cards
+    .filter((c): c is T & { readonly dueDate: string } => !!c.dueDate && c.dueDate <= end)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, max)
+    .map((card) => ({ card, day: card.dueDate }));
 }

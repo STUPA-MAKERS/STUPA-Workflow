@@ -1,12 +1,19 @@
 <div class="tk" [class.tk--split]="split()">
   <app-list-detail [detailOpen]="selectedId() !== null" (back)="closeDetail()">
     <section list class="ld-pane tk__pane" aria-labelledby="tk-title">
-      <app-page-header [pane]="true" titleId="tk-title" [title]="'nav.tickets' | t" />
+      <app-page-header [pane]="true" titleId="tk-title" [title]="'nav.tickets' | t">
+        <ng-container ngProjectAs="[actions]">
+          @if (phone()) {
+            <app-row-menu [label]="'action.more' | t" [sections]="phoneMenu()" (selected)="onPhoneMenu($event)" />
+          }
+        </ng-container>
+      </app-page-header>
 
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [placeholder]="searchPlaceholder()"
           [label]="'tickets.list.searchLabel' | t"
+          [results]="loading() ? null : total()"
           [value]="search.text()"
           [clearable]="true"
           (valueChange)="search.set($event)"

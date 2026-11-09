@@ -73,7 +73,8 @@ export interface PublicSiteConfig {
           | 'emailFooter'
           | 'applyInfo'
           | 'submittedInternal'
-          | 'submittedExternal',
+          | 'submittedExternal'
+          | 'accessibilityStatement',
           I18nMap
         >
       >
@@ -320,6 +321,38 @@ export interface OnBehalfApplication {
   readonly lang: Lang;
   readonly attachmentIds?: readonly Uuid[];
   readonly draftToken?: string | null;
+  /** The Vorgänger of a Folgeantrag; the capturing person must read it. */
+  readonly predecessorId?: Uuid | null;
+}
+
+/** `LinkedApplicationOut`. A Vorgänger or a Folgeantrag as the reader may see it. */
+export interface LinkedApplicationWire {
+  readonly id: Uuid;
+  readonly title?: string | null;
+  readonly state?: StateOutWire | null;
+  readonly createdAt: IsoDateTime;
+  readonly archived?: boolean;
+}
+
+/** `LinkEventOut`. One change of the Vorgänger link. */
+export interface LinkEventWire {
+  readonly action: 'set' | 'removed';
+  readonly at: IsoDateTime;
+  readonly actorInfo?: ActorInfo | null;
+  readonly predecessor?: LinkedApplicationWire | null;
+}
+
+/** `ApplicationLinksOut`. The Vorgänger, the Folgeanträge and the link history. */
+export interface ApplicationLinksWire {
+  readonly predecessor?: LinkedApplicationWire | null;
+  readonly successors?: readonly LinkedApplicationWire[];
+  readonly events?: readonly LinkEventWire[];
+}
+
+/** `ApplicationPrefillOut`. The answers of a Vorgänger that fit the current form. */
+export interface ApplicationPrefill {
+  readonly typeId: Uuid;
+  readonly data: Readonly<Record<string, unknown>>;
 }
 
 /** `ApplicationListItem`. A list entry without `data` and without `applicant`. */
@@ -603,6 +636,8 @@ export interface ApplicationCreateBody {
   readonly attachmentIds?: readonly Uuid[];
   /** The token of the draft uploads. */
   readonly draftToken?: string | null;
+  /** The Vorgänger of a Folgeantrag; needs a login and the read right. */
+  readonly predecessorId?: Uuid | null;
 }
 
 /** Body for `POST /applications/{id}/comments` (`CommentCreate`). */
@@ -728,6 +763,30 @@ export interface ApplicationListItem {
   readonly archivedAt: IsoDateTime | null;
   /** Time of the last status change, for "waiting since". */
   readonly stateSince?: IsoDateTime | null;
+}
+
+/** A Vorgänger or a Folgeantrag, frontend view. */
+export interface LinkedApplication {
+  readonly id: Uuid;
+  readonly title: string | null;
+  readonly state: ApplicationState | null;
+  readonly createdAt: IsoDateTime;
+  readonly archived: boolean;
+}
+
+/** One change of the Vorgänger link, frontend view. A hidden Vorgänger is null. */
+export interface ApplicationLinkEvent {
+  readonly action: 'set' | 'removed';
+  readonly at: IsoDateTime;
+  readonly actorInfo: ActorInfo | null;
+  readonly predecessor: LinkedApplication | null;
+}
+
+/** The links of one application, frontend view. */
+export interface ApplicationLinks {
+  readonly predecessor: LinkedApplication | null;
+  readonly successors: readonly LinkedApplication[];
+  readonly events: readonly ApplicationLinkEvent[];
 }
 
 /** Result of `POST /applications`, frontend view. */
@@ -904,6 +963,8 @@ export interface NewApplication {
   readonly attachmentIds?: readonly Uuid[];
   /** The token of the draft uploads; required with `attachmentIds`. */
   readonly draftToken?: string | null;
+  /** The Vorgänger of a Folgeantrag; needs a login and the read right. */
+  readonly predecessorId?: Uuid | null;
 }
 
 /**

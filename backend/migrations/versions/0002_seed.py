@@ -103,8 +103,6 @@ _budget = sa.table(
     sa.column("path_key", sa.Text),
     sa.column("name", sa.Text),
     sa.column("color", sa.Text),
-    sa.column("accepted_state_keys", JSONB),
-    sa.column("denied_state_keys", JSONB),
 )
 
 ROLE_IDS = {
@@ -345,8 +343,6 @@ def _flatten(nodes: list, parent_path: str, parent_id: str | None, out: list) ->
                 "path_key": path_key,
                 "name": name,
                 "color": None,
-                "accepted_state_keys": [],
-                "denied_state_keys": [],
             }
         )
         _flatten(children, path_key, node_id, out)
@@ -442,8 +438,6 @@ def upgrade() -> None:
             "path_key": "VSM",
             "name": "VS-Mittel",
             "color": None,
-            "accepted_state_keys": [],
-            "denied_state_keys": [],
         },
         {
             "id": _node_id("QSM"),
@@ -453,8 +447,6 @@ def upgrade() -> None:
             "path_key": "QSM",
             "name": "QS-Mittel",
             "color": None,
-            "accepted_state_keys": [],
-            "denied_state_keys": [],
         },
     ]
     _flatten(_VSM_TREE, "VSM", _node_id("VSM"), rows)

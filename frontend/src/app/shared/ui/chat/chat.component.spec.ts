@@ -1087,6 +1087,14 @@ describe('ChatComponent', () => {
       expect(screen.queryByRole('dialog', { name: 'Deine Nachricht · 08:21' })).toBeNull();
     });
 
+    /** A tap is the alternative to the long press (app spec 000514). */
+    it('opens the sheet on a plain tap too', async () => {
+      const { view } = await setup({ phone: true, messages: [msg('m', today(8, 21), { own: true, body: 'Prüfe ich' })] });
+      fireEvent.click(view.container.querySelector('.chat__bubble') as HTMLElement);
+      view.fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'Deine Nachricht · 08:21' })).toBeInTheDocument();
+    });
+
     it('copies nothing without a clipboard and survives a refused copy', async () => {
       const { cmp } = await longPress();
       Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });

@@ -73,6 +73,12 @@
   line-height: 1.75rem;
   @include frosted-pop(var(--color-pop));
 }
+.mp__viewer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
 .mp__beamer {
   flex: none;
 }
@@ -256,4 +262,12 @@
 .mp__tool:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
+}
+
+/* "Verknüpfen" and "To-Do anlegen" of the sheet To-Dos sit in its head, before the close button. */
+.mp__sheet-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
 }

@@ -18,11 +18,11 @@ import { skipLoading } from '@stupa-makers/ui-kit';
 import { detailContext } from '@core/cache/cache.interceptor';
 import { httpParams } from './http-params';
 
-export type TicketKind = 'bug' | 'question' | 'idea';
+export type TicketKind = 'bug' | 'question' | 'idea' | 'barrier';
 export type TicketStatus = 'new' | 'in_progress' | 'done' | 'rejected';
 
 /** The kinds in the order of the dialog and the filter. */
-export const TICKET_KINDS: readonly TicketKind[] = ['bug', 'question', 'idea'];
+export const TICKET_KINDS: readonly TicketKind[] = ['bug', 'question', 'idea', 'barrier'];
 
 /** What the dialog sends along: every field optional, capped by the server. */
 export interface TicketContext {

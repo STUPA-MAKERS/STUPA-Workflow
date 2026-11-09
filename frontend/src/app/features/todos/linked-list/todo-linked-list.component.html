@@ -1,48 +1,135 @@
-@if (cards().length || lead()) {
-  <app-section class="tl" [headingId]="headingId()" [heading]="'todos.linked.title' | t" [hideHeading]="!showTitle()">
-    <ul class="rowgroup tl__list">
-      @if (lead(); as l) {
-        <li class="tl__row">
-          <app-icon class="tl__icon" [name]="l.icon" [size]="18" />
-          <span class="tl__text">
-            <a class="tl__link" [routerLink]="l.link" target="_blank" rel="noopener">{{ l.title }}</a>
-            <span class="tl__sub">{{ l.sub }}</span>
-          </span>
-          <app-icon class="tl__icon" name="ext" [size]="18" />
-        </li>
-      }
-      @for (card of cards(); track card.id) {
-        @if (card.event; as event) {
-          <li class="tl__row tl__row--event" data-testid="tl-event">
-            <app-icon class="tl__icon" name="cal" [size]="18" />
+@if (hasRows() || showActions()) {
+  <app-section
+    class="tl"
+    [size]="size()"
+    [headingId]="headingId()"
+    [heading]="'todos.linked.title' | t"
+    [hideHeading]="!showTitle()"
+  >
+    @if (showActions()) {
+      <span sectionAction class="tl__actions">
+        <app-button
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="'todos.linked.link' | t"
+          data-testid="tl-link"
+          (click)="linkOpen.set(true)"
+        >
+          <app-icon name="link" />
+        </app-button>
+        <app-button
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="'todos.linked.add' | t"
+          data-testid="tl-new"
+          (click)="newOpen.set(true)"
+        >
+          <app-icon name="plus" />
+        </app-button>
+      </span>
+    }
+    @if (hasRows()) {
+      <ul class="rowgroup tl__list">
+        @if (lead(); as l) {
+          <li class="tl__row">
+            <app-icon class="tl__icon" [name]="l.icon" [size]="18" />
             <span class="tl__text">
-              <a class="tl__link" routerLink="/todos" [queryParams]="{ card: card.id }" [state]="{ cardReturn: true }">{{ card.title }}</a>
-              <span class="tl__sub">{{ eventSub(card) }}</span>
-              <span class="tl__sub">
-                @if (event.place) {
-                  {{ event.place }} ·
-                }
-                {{ 'todos.eventCard.balance' | t }}
-                <span class="num" [class.tl__neg]="negative(card.balance)">{{ money(card.balance) }}</span>
-              </span>
+              <a class="tl__link" [routerLink]="l.link" target="_blank" rel="noopener">{{
+                l.title
+              }}</a>
+              <span class="tl__sub">{{ l.sub }}</span>
             </span>
-            @if (card.assignees.length) {
-              <app-avatar-stack [size]="avatarSize()" [names]="names(card)" [principalIds]="ids(card)" [max]="3" />
-            }
+            <app-icon class="tl__icon" name="ext" [size]="18" />
           </li>
-        } @else {
-        <li class="tl__row" [class.tl__row--done]="card.isDone">
-          <app-icon class="tl__icon" [name]="card.isDone ? 'circleok' : 'circle'" [size]="18" />
-          <span class="tl__text">
-            <a class="tl__link" routerLink="/todos" [queryParams]="{ card: card.id }" [state]="{ cardReturn: true }">{{ card.title }}</a>
-            <span class="tl__sub">{{ sub(card) }}</span>
-          </span>
-          @if (card.assignees.length) {
-            <app-avatar-stack [size]="avatarSize()" [names]="names(card)" [principalIds]="ids(card)" [max]="3" />
-          }
-        </li>
         }
-      }
-    </ul>
+        @for (row of rows(); track $index) {
+          <li class="tl__row" data-testid="tl-row">
+            <app-icon class="tl__icon" [name]="row.icon" [size]="18" />
+            <span class="tl__text">
+              <a class="tl__link" [routerLink]="row.link">{{ row.title }}</a>
+              <span class="tl__sub">{{ row.sub }}</span>
+            </span>
+          </li>
+        }
+        @for (card of cards(); track card.id) {
+          @if (card.event; as event) {
+            <li class="tl__row tl__row--event" data-testid="tl-event">
+              <app-icon class="tl__icon" name="cal" [size]="18" />
+              <span class="tl__text">
+                <a
+                  class="tl__link"
+                  routerLink="/todos"
+                  [queryParams]="{ card: card.id }"
+                  [state]="{ cardReturn: true }"
+                  >{{ card.title }}</a
+                >
+                <span class="tl__sub">{{ eventSub(card) }}</span>
+                <span class="tl__sub">
+                  @if (event.place) {
+                    {{ event.place }} ·
+                  }
+                  {{ 'todos.eventCard.balance' | t }}
+                  <span class="num" [class.tl__neg]="negative(card.balance)">{{
+                    money(card.balance)
+                  }}</span>
+                </span>
+              </span>
+              @if (card.assignees.length) {
+                <app-avatar-stack
+                  [size]="avatarSize()"
+                  [names]="names(card)"
+                  [principalIds]="ids(card)"
+                  [max]="3"
+                />
+              }
+            </li>
+          } @else {
+            <li class="tl__row" [class.tl__row--done]="card.isDone">
+              <app-icon class="tl__icon" [name]="card.isDone ? 'circleok' : 'circle'" [size]="18" />
+              <span class="tl__text">
+                <a
+                  class="tl__link"
+                  routerLink="/todos"
+                  [queryParams]="{ card: card.id }"
+                  [state]="{ cardReturn: true }"
+                  >{{ card.title }}</a
+                >
+                <span class="tl__sub">{{ sub(card) }}</span>
+              </span>
+              @if (card.assignees.length) {
+                <app-avatar-stack
+                  [size]="avatarSize()"
+                  [names]="names(card)"
+                  [principalIds]="ids(card)"
+                  [max]="3"
+                />
+              }
+            </li>
+          }
+        }
+      </ul>
+    } @else if (emptyHeading()) {
+      <app-empty-state shape="row" rows="3" [heading]="emptyHeading()" />
+    }
   </app-section>
+} @else if (emptyHeading()) {
+  <app-empty-state shape="row" rows="3" [heading]="emptyHeading()" />
+}
+@if (newOpen()) {
+  <app-todo-new-dialog
+    [(open)]="newOpen"
+    [gremiumId]="gremiumId()"
+    [initialLinks]="newLinks()"
+    (created)="created()"
+  />
+}
+@if (linkOpen()) {
+  <app-todo-link-card-dialog
+    [(open)]="linkOpen"
+    [kind]="kind()"
+    [targetId]="targetId()"
+    [exclude]="linkedIds()"
+  />
 }

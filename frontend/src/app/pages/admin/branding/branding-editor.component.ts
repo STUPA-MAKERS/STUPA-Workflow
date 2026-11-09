@@ -13,7 +13,7 @@ import { I18nService, baseLocale } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CATALOG, type TranslationKey } from '@core/i18n/translations';
 import { langFieldLabel, setI18n } from '@shared/forms/i18n-text';
-import { DEFAULT_ACCENT, normalizeHex } from '@core/theme/accent';
+import { DEFAULT_ACCENT, accentContrastIssues, accentPalette, normalizeHex } from '@core/theme/accent';
 import {
   ThemeService,
   FabComponent,
@@ -138,6 +138,14 @@ export class BrandingEditorComponent {
   protected readonly accent = computed(() => normalizeHex(this.draft()?.accentColor) ?? DEFAULT_ACCENT);
   /** The edited copy carries an own accent. */
   protected readonly customAccent = computed(() => this.accent() !== DEFAULT_ACCENT);
+  /**
+   * The text steps of the accent palette that miss 4.5:1 in either theme (spec 000501). An
+   * issue blocks the save. The derived palette moves every step to AA, so this guards a
+   * change of the derivation, not a pick.
+   */
+  protected readonly accentIssues = computed(() =>
+    this.customAccent() ? accentContrastIssues(accentPalette(this.accent())) : [],
+  );
 
   constructor() {
     this.loadConfig();
@@ -200,24 +208,35 @@ export class BrandingEditorComponent {
     return CATALOG[baseLocale(this.lang())][key] ?? CATALOG.de[key] ?? '';
   }
 
-  /** The text map of a free text. `applyInfo` is missing in an older config. */
+  /**
+   * The text map of a free text. A config from before a newer text (`applyInfo`, the texts
+   * after the creation, the accessibility statement) has none, so it gets an empty map.
+   */
+  private textMap(d: Branding, key: keyof Branding['freetexts']): I18nMap {
+    const texts: Partial<Record<keyof Branding['freetexts'], I18nMap>> = d.freetexts;
+    return (texts[key] ??= {});
+  }
+
+  /** The text map of a free text of the first group. */
   protected freetext(d: Branding, key: FreetextKey): I18nMap {
-    if (key === 'applyInfo') {
-      d.freetexts.applyInfo ??= {};
-      return d.freetexts.applyInfo;
-    }
-    return d.freetexts[key];
+    return this.textMap(d, key);
   }
 
   protected submittedLabel(kind: SubmittedKind): string {
     return this.i18n.translate(`admin.brand.submitted.${kind}` as TranslationKey);
   }
 
-  /** The text map of a kind. A config from before the feature has none. */
+  /** The text map of a kind. */
   protected submittedMap(d: Branding, kind: SubmittedKind): I18nMap {
-    const key = SUBMITTED_FREETEXT[kind];
-    d.freetexts[key] ??= {};
-    return d.freetexts[key];
+    return this.textMap(d, SUBMITTED_FREETEXT[kind]);
+  }
+
+  /**
+   * The text map of the accessibility statement (`/barrierefreiheit`, spec 000495). The
+   * server fills a config without it with its built-in draft.
+   */
+  protected statementMap(d: Branding): I18nMap {
+    return this.textMap(d, 'accessibilityStatement');
   }
 
   /** The built-in text in the picked language: the placeholder of the empty field. */
@@ -352,6 +371,7 @@ export class BrandingEditorComponent {
       this.toast.error(this.i18n.translate('admin.brand.badUrl'));
       return;
     }
+    if (this.accentIssues().length > 0) return;
     const rev = this.editRev();
     this.saving.set(true);
     this.api.saveSiteConfig(d).subscribe({

@@ -37,8 +37,6 @@ def _node_out(
         currency=b.currency,
         active=b.active,
         color=b.color,
-        acceptedStateKeys=tuple(b.accepted_state_keys or ()),
-        deniedStateKeys=tuple(b.denied_state_keys or ()),
         hiddenInBudget=bool(b.hidden_in_budget),
         viewGremiumId=b.view_gremium_id,
         decisionGremiumId=b.decision_gremium_id,

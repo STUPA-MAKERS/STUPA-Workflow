@@ -303,15 +303,27 @@ describe('ReportDialogComponent', () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the kind to the three kinds', async () => {
+  it('keeps the kind to the four kinds', async () => {
     const { open, c } = await setup({ locale: 'en' });
     await open();
+    c.setKind('barrier');
+    expect(c.kind()).toBe('barrier');
     c.setKind('question');
     expect(c.kind()).toBe('question');
     c.setKind('other');
     c.setKind(null);
     expect(c.kind()).toBe('question');
     expect(screen.getByText('1440 × 900 · English')).toBeInTheDocument();
+  });
+
+  /** The statement page opens the dialog on "Barriere" (spec 000497). */
+  it('starts on the kind the opener picks', async () => {
+    const { help, fixture, c } = await setup();
+    help.openReport('barrier');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(c.kind()).toBe('barrier');
+    expect(screen.getByRole('radio', { name: 'Barriere' })).toBeChecked();
   });
 
   /**

@@ -162,9 +162,11 @@
                     class="fe__connector"
                     [class.fe__connector--branch]="d.branch"
                     [class.fe__connector--guard]="d.label && !d.branch"
-                    [attr.aria-label]="d.label || ('admin.flow.connectHint' | t)"
+                    aria-hidden="true"
                     (pointerdown)="onConnectPointerDown($event, n.key, d.branch, d.guard)"
-                  />
+                  >
+                    <title>{{ d.label || ('admin.flow.connectHint' | t) }}</title>
+                  </circle>
                   @if (d.label) {
                     <text [attr.x]="n.w + 11" [attr.y]="d.cy - 4" class="fe__dot-label">{{ d.label }}</text>
                   }
@@ -265,6 +267,7 @@
             (makeInitial)="setInitial(s.key)"
             (editAllowedChange)="setStateEditAllowed(s.key, $event)"
             (terminalChange)="setStateTerminal(s.key, $event)"
+            (outcomeChange)="setStateOutcome(s.key, $event.outcome, $event.on)"
             (kindChange)="setStateKind(s.key, $event)"
             (gremiumChange)="setStateGremium(s.key, $event)"
             (gremiumSourceChange)="setStateGremiumSource(s.key, $event)"
@@ -274,6 +277,12 @@
           @if (stateTransitionLists(); as lists) {
             <app-transition-lists [lists]="lists" (selectTransition)="selectEdge($event)" />
           }
+          <app-button
+            variant="text"
+            size="sm"
+            [disabled]="graph().states.length < 2"
+            (click)="addTransitionFrom(s.key)"
+          ><app-icon name="plus" /> {{ 'admin.flow.addTransition' | t }}</app-button>
         } @else if (selectedTransition(); as sel) {
           <app-transition-inspector
             [transition]="sel.t"

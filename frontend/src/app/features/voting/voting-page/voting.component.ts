@@ -22,9 +22,10 @@ import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { Meeting, Uuid, Vote, VoteKind, VoteListItem, VoteStatus } from '@core/api/models';
 import {
+  Announcer,
   ButtonComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -44,12 +45,16 @@ import {
   StickyBarComponent,
   FabComponent,
   PageHeaderComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
 } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
 import { VotingPageService, visibleTicks } from './voting-page.service';
 import { closedStatus } from '../election.util';
+import { voteSubject } from '../vote-announce.util';
 import { pollStatus } from '../poll.util';
 import { NewPollDialogComponent } from '../new-poll-dialog/new-poll-dialog.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
@@ -58,6 +63,7 @@ import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { groupByMonth } from '@shared/group-by-month';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { withEntry } from '@shared/util/immutable';
+import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 
 /**
  * The status chip: every vote, the open votes, the ended votes, the drafts. A cancelled
@@ -170,6 +176,7 @@ function whenSource(
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowMenuComponent,
     FabComponent,
     NewPollDialogComponent,
     PullRefreshDirective,
@@ -199,6 +206,15 @@ export class VotingComponent implements OnDestroy {
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
+  /** The ⋮ menu of the phone header: "Aktualisieren", the one-tap way to the pull (app spec 000514). */
+  protected readonly phoneMenu = computed<RowMenuSection[]>(() => [
+    refreshMenuSection((key) => this.i18n.translate(key)),
+  ]);
+
+  protected onPhoneMenu(item: RowMenuItem): void {
+    if (isRefreshItem(item)) reloadLikePull(() => this.reload());
+  }
+  private readonly announcer = inject(Announcer);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(VotingPageService);
@@ -324,7 +340,6 @@ export class VotingComponent implements OnDestroy {
 
   readonly hasMore = computed(() => this.items().length < this.total());
   /** The open votes among the loaded rows. They come first, so the count is exact. */
-  readonly openCount = computed(() => this.items().filter((i) => i.status === 'open').length);
 
   readonly rows = computed<readonly VoteRow[]>(() => this.items().map((item) => this.toRow(item)));
 
@@ -645,9 +660,23 @@ export class VotingComponent implements OnDestroy {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((vote) => {
+        this.announceFresh(vote);
         if (vote.canCast && !vote.myBallot?.cast) this.openFresh(fresh);
       });
   }
+
+  /**
+   * Read out that a vote opened (spec 000518), with its TOP from the list row. The detail
+   * reads out a change of the vote that it shows, so a vote in the detail is left to it.
+   */
+  private announceFresh(vote: Vote): void {
+    if (this.selectedId() === vote.id) return;
+    const row = this.items().find((i) => i.id === vote.id);
+    const t: Translate = (key, params) => this.i18n.translate(key, params);
+    const subject = voteSubject(t, vote.question, row?.meetingTitle, row?.agendaPosition);
+    this.announcer.announce(t('voting.live.opened', { subject }));
+  }
+
 
   /**
    * A vote just opened that the person can cast a ballot in. It must show at once, as on

@@ -37,6 +37,7 @@ from app.modules.applications.access import (
     principal_reads_pii,
     require_app_edit,
     require_app_read,
+    resolve_app_read,
 )
 from app.modules.applications.schemas import (
     ApplicantCandidateOut,
@@ -153,7 +154,7 @@ def get_magic_link_sender() -> MagicLinkSender:
         Depends(rate_limit_applications),
         Depends(verify_altcha_unless_authenticated),
     ],
-    responses=_errors(400, 404, 413, 422, 429),
+    responses=_errors(400, 403, 404, 413, 422, 429),
 )
 async def create_application(
     payload: ApplicationCreate,
@@ -190,6 +191,9 @@ async def create_application(
     only. An explicit identity value wins over the logged-in account. The route answers 400
     for malformed JSON or an invalid ALTCHA, 413 for a body that is too large, 422 for a
     failed form or schema validation and 429 at the rate limit.
+
+    ``predecessorId`` links a Vorgänger. Only a logged-in caller who reads it may name it
+    (403 otherwise), and it must have the same type (422).
     """
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
         raise PayloadTooLargeError(
@@ -210,6 +214,10 @@ async def create_application(
         if principal and not payload.applicant_name
         else payload.applicant_name
     )
+    if payload.predecessor_id is not None:
+        if principal is None:
+            raise ForbiddenError("A Vorgänger needs a login.")
+        await resolve_app_read(service.session, payload.predecessor_id, principal, None)
     filled = payload.model_copy(update={"applicant_email": email, "applicant_name": name})
     actor = principal.sub if principal else "applicant"
     email_confirmed = (
@@ -293,12 +301,14 @@ async def create_application_on_behalf(
     The body cap applies. The rate limit and ALTCHA do not, because the route needs a
     session with ``application.create_on_behalf``. When a guest e-mail turned the
     application into an account application, the owner decides the link of the mail, not the
-    request.
+    request. ``predecessorId`` links a Vorgänger that the capturing person reads.
     """
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
         raise PayloadTooLargeError(
             f"Application data exceeds {settings.max_application_payload_bytes} bytes."
         )
+    if payload.predecessor_id is not None:
+        await resolve_app_read(service.session, payload.predecessor_id, principal, None)
     today = datetime.now(ZoneInfo(settings.local_timezone)).date()
     app, email = await service.create_on_behalf(
         payload,

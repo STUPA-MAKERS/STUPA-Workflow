@@ -22,7 +22,7 @@ import type {
 import { TodosApiService } from '@core/api/todos.service';
 
 /** The Events of the `Veranstaltung` picker: none, and no linked Event. */
-const EVENTS_API = { writableEvents: () => of([]), linked: () => of([]) };
+const EVENTS_API = { writableEvents: () => of([]), linked: () => of([]), boards: () => of([]) };
 
 /**
  * An `ActivatedRoute` carrying query params.
@@ -146,8 +146,6 @@ const ROOT_TREE: BudgetTreeNode[] = [
     currency: 'EUR',
     active: true,
     color: null,
-    acceptedStateKeys: [],
-    deniedStateKeys: [],
     hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
@@ -164,8 +162,6 @@ const ROOT_TREE: BudgetTreeNode[] = [
         currency: 'EUR',
         active: true,
         color: null,
-        acceptedStateKeys: [],
-        deniedStateKeys: [],
         hiddenInBudget: false,
         viewGremiumId: null,
         fiscalStartMonth: 1,
@@ -2947,6 +2943,9 @@ describe('ExpensesComponent (list/detail)', () => {
   /** An unknown item does nothing. */
   it('runs the items of the header menu', () => {
     const { cmp, http } = build();
+    const refresh = jest.spyOn(cmp, 'refreshList');
+    cmp.onHeaderMenu({ id: 'refresh', label: 'Aktualisieren' });
+    expect(refresh).toHaveBeenCalled();
     cmp.onHeaderMenu({ id: 'transfer', label: '' });
     expect(cmp.transferOpen()).toBe(true);
     expect(cmp.formMode()).toBe('transfer-create');

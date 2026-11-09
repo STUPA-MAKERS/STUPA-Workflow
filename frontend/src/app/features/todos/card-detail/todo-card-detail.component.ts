@@ -16,10 +16,10 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import type { Observable } from 'rxjs';
+import { catchError, map, of, switchMap, type Observable, type Subscription } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
-import type { Uuid } from '@core/api/models';
+import type { Meeting, Uuid } from '@core/api/models';
 import {
   TodosApiService,
   type TodoBoard,
@@ -74,14 +74,17 @@ import {
   SectionComponent,
   ConfirmDialogComponent,
 } from '@stupa-makers/ui-kit';
+import { TodoAgendaDialogComponent } from '../agenda-dialog/todo-agenda-dialog.component';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { TodoLinkViewComponent } from '../link-view/todo-link-view.component';
 import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
+import { type NewTodoLink, type TodoCardCopy, TodoNewDialogComponent } from '../new-dialog/todo-new-dialog.component';
 import { TodoCacheService } from '../todo-cache.service';
 import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfer-dialog/todo-transfer-dialog.component';
 import {
   LINK_ICON,
+  LINK_KIND_LABEL,
   eventDays,
   eventText,
   linkSub,
@@ -177,6 +180,8 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     TodoDueChipComponent,
     TodoLinkPickerComponent,
     TodoMoveSheetComponent,
+    TodoNewDialogComponent,
+    TodoAgendaDialogComponent,
     TodoTransferDialogComponent,
   ],
   providers: [ChatDrafts],
@@ -314,6 +319,107 @@ export class TodoCardDetailComponent {
       if (this.editing() || !this.stale()) return;
       untracked(() => this.liveRead());
     });
+    effect((onCleanup) => {
+      const boardId = this.agendaBoard();
+      this.agendaMeetings.set([]);
+      if (!boardId) return;
+      const sub = untracked(() => this.readAgendaMeetings(boardId));
+      onCleanup(() => sub.unsubscribe());
+    });
+  }
+
+  /**
+   * The board whose Gremium can take the card as a TOP (spec 000553): a Gremium board, a
+   * card the person writes, not archived and not on an agenda yet.
+   */
+  private readonly agendaBoard = computed(() => {
+    const c = this.card();
+    if (!c || c.boardKind !== 'gremium' || !c.canWrite || c.archivedAt) return null;
+    return c.links.some((l) => l.kind === 'agenda_item') ? null : c.boardId;
+  });
+  /** The planned meetings of the Gremium whose agenda the person edits, the next first. */
+  readonly agendaMeetings = signal<readonly Meeting[]>([]);
+  readonly agendaOpen = signal(false);
+  /** "Duplizieren": the dialog with the copy of the card (spec 000554). */
+  readonly copy = signal<TodoCardCopy | null>(null);
+  readonly copyOpen = signal(false);
+  readonly copyLinks = signal<readonly NewTodoLink[]>([]);
+  /** "Als Karte anlegen" of a checklist item (spec 000555). */
+  readonly itemCard = signal<TodoCheckItem | null>(null);
+  readonly itemOpen = signal(false);
+  readonly itemLinks = computed<NewTodoLink[]>(() => {
+    const c = this.card();
+    return c ? [{ kind: 'todo', targetId: c.id, label: `${this.t('todos.linkKind.todo')} · ${c.title}` }] : [];
+  });
+
+  /** The people of the card, for the card made of one of its items. */
+  readonly itemAssignees = computed<readonly Uuid[]>(() =>
+    (this.card()?.assignees ?? []).flatMap((a) => (a.principalId ? [a.principalId] : [])),
+  );
+
+  private readAgendaMeetings(boardId: Uuid): Subscription {
+    const today = isoDay(new Date(Date.now()));
+    return this.api
+      .boards()
+      .pipe(
+        map((boards) => boards.find((b) => b.id === boardId)?.gremiumId ?? null),
+        switchMap((gid) => (gid ? this.files.listMeetings(gid) : of([] as Meeting[]))),
+        map((list) =>
+          list
+            .filter((m) => m.status === 'planned' && m.canWrite && (!m.date || m.date >= today))
+            .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999')),
+        ),
+        catchError(() => of([] as Meeting[])),
+      )
+      .subscribe((list) => this.agendaMeetings.set(list));
+  }
+
+  /** The card is a TOP now: read it again, so it shows the link and the menu drops the item. */
+  onAgenda(): void {
+    this.liveRead();
+  }
+
+  duplicate(): void {
+    const c = this.card();
+    if (!c || c.event) return;
+    this.copy.set({
+      boardId: c.boardId,
+      descriptionMd: c.descriptionMd ?? '',
+      dueDate: c.dueDate ?? '',
+      assigneeIds: c.assignees.map((a) => a.principalId).filter((id): id is Uuid => !!id),
+      labelIds: c.labels.map((l) => l.id),
+      checklist: c.checklistItems.map((i) => i.text),
+    });
+    this.copyLinks.set(
+      c.links
+        .filter((l) => l.accessible)
+        .map((l) => ({
+          kind: l.kind,
+          targetId: l.targetId,
+          label: [this.t(LINK_KIND_LABEL[l.kind]), l.title].filter(Boolean).join(' · '),
+        })),
+    );
+    this.copyOpen.set(true);
+  }
+
+  /** The copy opens on its board. */
+  onCopied(card: TodoCardDetail): void {
+    void this.router.navigate(['/todos', card.boardId], { queryParams: { card: card.id } });
+  }
+
+  makeCard(item: TodoCheckItem): void {
+    this.itemCard.set(item);
+    this.itemOpen.set(true);
+  }
+
+  /**
+   * The item is a card now and leaves the checklist. The new card links this card, and
+   * "Verknüpft" of each card shows that one link (spec 000573).
+   */
+  onItemCard(): void {
+    const item = this.itemCard();
+    this.itemCard.set(null);
+    if (item) this.deleteItem(item);
   }
 
   /**
@@ -462,6 +568,8 @@ export class TodoCardDetailComponent {
         items: [
           { id: 'rename', label: this.t('todos.card.rename'), icon: 'edit' },
           { id: 'transfer', label: this.t('todos.card.transfer'), icon: 'arrow' },
+          ...(this.agendaMeetings().length ? [{ id: 'agenda', label: this.t('todos.card.agenda'), icon: 'list' as const }] : []),
+          ...(c.event ? [] : [{ id: 'duplicate', label: this.t('todos.card.duplicate'), icon: 'copy' as const }]),
           ...this.eventItems(c),
         ],
       },
@@ -469,13 +577,10 @@ export class TodoCardDetailComponent {
     ];
   });
 
-  /** The columns of the move sheet, with the counts of the board when the page has it. */
-  readonly moveColumns = computed<MoveColumn[]>(() => {
-    const c = this.card();
-    if (!c) return [];
-    const counts = new Map((this.pageBoard()?.columns ?? []).map((col) => [col.id, col.cardCount]));
-    return c.columns.map((col) => ({ id: col.id, name: col.name, count: counts.get(col.id) ?? null }));
-  });
+  /** The columns of the move sheet. */
+  readonly moveColumns = computed<MoveColumn[]>(() =>
+    (this.card()?.columns ?? []).map((col) => ({ id: col.id, name: col.name })),
+  );
 
   readonly boardLink = computed(() => {
     const c = this.card();
@@ -886,7 +991,7 @@ export class TodoCardDetailComponent {
   cancelItem(): void {
     this.addingItem.set(false);
     this.itemDraft.set('');
-    this.focusSoon('[data-focus="item-add"]');
+    this.focusSoon('[data-focus="item-add"] button');
   }
 
   startItem(item: TodoCheckItem): void {
@@ -920,7 +1025,7 @@ export class TodoCardDetailComponent {
     this.write(this.api.deleteCheckItem(c.id, item.id), () =>
       this.focusSoon(
         ...(near ? [`[data-item="${near.id}"]`] : []),
-        '[data-focus="item-add"]',
+        '[data-focus="item-add"] button',
         '[data-focus="item-new"]',
       ),
     );
@@ -1128,6 +1233,10 @@ export class TodoCardDetailComponent {
         return this.makeEventAsk.set(true);
       case 'followUp':
         return this.followUp();
+      case 'agenda':
+        return this.agendaOpen.set(true);
+      case 'duplicate':
+        return this.duplicate();
       default:
         return;
     }

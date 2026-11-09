@@ -147,6 +147,34 @@
     }
   </article>
 
+  @if (agendaOpen()) {
+    <app-todo-agenda-dialog [(open)]="agendaOpen" [cardId]="card.id" [meetings]="agendaMeetings()" (added)="onAgenda()" />
+  }
+  @if (copyOpen()) {
+    <app-todo-new-dialog
+      [(open)]="copyOpen"
+      heading="todos.new.duplicateTitle"
+      [boardId]="card.boardId"
+      [columnId]="card.columnId"
+      [initialTitle]="card.title"
+      [initialLinks]="copyLinks()"
+      [copy]="copy()"
+      (created)="onCopied($event)"
+    />
+  }
+  @if (itemOpen()) {
+    <app-todo-new-dialog
+      [(open)]="itemOpen"
+      heading="todos.new.itemTitle"
+      [boardId]="card.boardId"
+      [initialTitle]="itemCard()?.text ?? ''"
+      [initialLinks]="itemLinks()"
+      [initialAssigneeIds]="itemAssignees()"
+      [withDescription]="false"
+      (created)="onItemCard()"
+    />
+  }
+
   <app-todo-move-sheet
     [(open)]="moveOpen"
     [columns]="moveColumns()"
@@ -419,7 +447,7 @@
     <app-section class="cd__sec" [heading]="'todos.card.links' | t">
       @if (canWrite()) {
         <app-button sectionAction class="cd__secAction" variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
-          <app-icon name="plus" />
+          <app-icon name="link" />
           {{ 'todos.card.link' | t }}
         </app-button>
       }
@@ -571,7 +599,6 @@
     <app-section class="cd__sec" [heading]="'todos.card.checklist' | t">
       @if (items().length) {
         <span sectionAction class="cd__progress">
-          <span class="num">{{ doneItems().length }}/{{ items().length }}</span>
           <app-seg-bar
             class="cd__checkBar"
             size="thin"
@@ -615,10 +642,10 @@
             <app-button variant="fill" [disabled]="!itemDraft().trim()" (click)="addItem()">{{ 'todos.card.addItem' | t }}</app-button>
           </form>
         } @else {
-          <button type="button" class="cd__toggle" data-focus="item-add" (click)="startAddItem()">
-            <app-icon name="plus" [size]="15" />
+          <app-button class="cd__addItem" variant="text" size="sm" data-focus="item-add" (click)="startAddItem()">
+            <app-icon name="plus" />
             {{ 'todos.card.addItem' | t }}
-          </button>
+          </app-button>
         }
       }
     </app-section>
@@ -656,6 +683,16 @@
       </button>
       @if (canWrite()) {
         <span class="cd__itemActions">
+          <app-button
+            variant="text"
+            size="sm"
+            [iconOnly]="true"
+            [attr.data-to-card]="item.id"
+            [ariaLabel]="'todos.card.itemToCard' | t: { text: item.text }"
+            (click)="makeCard(item)"
+          >
+            <app-icon name="kanban" />
+          </app-button>
           <app-button
             variant="text"
             size="sm"

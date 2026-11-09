@@ -179,9 +179,6 @@ export class BudgetTreeComponent {
   /** Top budgets (roots). */
   readonly tops = computed(() => this.tree().filter((n) => n.parentId === null));
 
-  /** Flow-state keys (global flow) for the accepted/denied config. */
-  readonly stateOptions = signal<SelectOption[]>([]);
-
   /** Create a top budget. A budget has no Gremium. ``fiscalStartMonth`` and
    *  ``fiscalStartDay`` hold the fiscal-year cutoff. The default is 01.01. */
   readonly newTop = signal<{
@@ -193,7 +190,6 @@ export class BudgetTreeComponent {
   readonly topOpen = signal(false);
   readonly fyOpen = signal(false);
   readonly stichtagOpen = signal(false);
-  readonly stateConfigOpen = signal(false);
   /** Add a sub cost centre: the parent and the draft of the inline row. */
   readonly addingChildOf = signal<Uuid | null>(null);
   readonly childDraft = signal<{ key: string; name: string }>({ key: '', name: '' });
@@ -363,25 +359,6 @@ export class BudgetTreeComponent {
       next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
       error: () => this.gremiumOptions.set([]),
     });
-    this.adminApi.getGlobalFlow().subscribe({
-      next: (graph) =>
-        this.stateOptions.set(
-          (graph?.states ?? []).map((s) => ({
-            value: s.key,
-            label: `${s.label['de'] ?? s.key} (${s.key})`,
-          })),
-        ),
-      error: () => this.stateOptions.set([]),
-    });
-  }
-
-  readonly acceptedKeys = computed(() => new Set(this.selectedTop()?.acceptedStateKeys ?? []));
-  readonly deniedKeys = computed(() => new Set(this.selectedTop()?.deniedStateKeys ?? []));
-  isAccepted(key: string): boolean {
-    return this.acceptedKeys().has(key);
-  }
-  isDenied(key: string): boolean {
-    return this.deniedKeys().has(key);
   }
 
   /** An amount in the currency of the node; cents only where they are not zero. */
@@ -519,7 +496,6 @@ export class BudgetTreeComponent {
       ? [{ id: 'fy', label: t('budget.tree.fyTitle'), icon: 'cal', disabledReason: noTop }]
       : [];
     const items: RowMenuItem[] = [
-      { id: 'states', label: t('budget.tree.stateConfig'), disabledReason: noTop },
       { id: 'cutoff', label: t('budget.tree.stichtagTitle'), disabledReason: noTop },
       ...fyItem,
     ];
@@ -531,8 +507,7 @@ export class BudgetTreeComponent {
   });
 
   onHeaderMenu(item: RowMenuItem): void {
-    if (item.id === 'states') this.openStateConfig();
-    else if (item.id === 'cutoff') this.openStichtag();
+    if (item.id === 'cutoff') this.openStichtag();
     else if (item.id === 'fyClose' || item.id === 'fyReopen') {
       const fy = this.selectedFy();
       if (fy) this.askFyClose(fy, false);
@@ -597,19 +572,6 @@ export class BudgetTreeComponent {
     if (id) this.selectedFyId.set(id);
   }
 
-  /** Toggle a state key in the top budget's accepted/denied set. */
-  toggleState(kind: 'accepted' | 'denied', key: string): void {
-    const top = this.selectedTop();
-    if (!top) return;
-    const { accepted, denied } = toggledStateKey(kind, key, this.acceptedKeys(), this.deniedKeys());
-    this.api
-      .updateNode(top.id, { acceptedStateKeys: [...accepted], deniedStateKeys: [...denied] })
-      .subscribe({
-        next: () => this.reload(),
-        error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
-      });
-  }
-
   /** Set a field of the new top budget. */
   patchTop<K extends 'key' | 'name'>(key: K, value: string): void {
     this.newTop.update((t) => ({ ...t, [key]: value }));
@@ -670,12 +632,6 @@ export class BudgetTreeComponent {
   }
   closeStichtag(): void {
     this.stichtagOpen.set(false);
-  }
-  openStateConfig(): void {
-    this.stateConfigOpen.set(true);
-  }
-  closeStateConfig(): void {
-    this.stateConfigOpen.set(false);
   }
 
   /**
@@ -1046,24 +1002,6 @@ function fyCloseItem(
   return fy.closedAt
     ? { id: 'fyReopen', label: label('budget.tree.fyReopenSelected'), icon: 'undo' }
     : { id: 'fyClose', label: label('budget.tree.fyCloseSelected'), icon: 'lock' };
-}
-
-/**
- * The accepted and denied state keys after a toggle of `key` in the set of `kind`. A key
- * that joins one set leaves the other, because a state cannot count as both.
- */
-function toggledStateKey(
-  kind: 'accepted' | 'denied',
-  key: string,
-  accepted: ReadonlySet<string>,
-  denied: ReadonlySet<string>,
-): { readonly accepted: ReadonlySet<string>; readonly denied: ReadonlySet<string> } {
-  const target = toggled(kind === 'accepted' ? accepted : denied, key);
-  const other = kind === 'accepted' ? denied : accepted;
-  const rest = target.has(key) ? new Set([...other].filter((k) => k !== key)) : other;
-  return kind === 'accepted'
-    ? { accepted: target, denied: rest }
-    : { accepted: rest, denied: target };
 }
 
 /** The default year of a budget: the newest active year, else the newest year. */

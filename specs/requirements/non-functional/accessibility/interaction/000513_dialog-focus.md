@@ -4,8 +4,19 @@ title: A dialog keeps the focus inside
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/vendor/ui-kit/src/lib/focus/focus-dialog.directive.spec.ts:FocusDialogDirective"
+  - "frontend/vendor/ui-kit/src/lib/focus/focus-trap.spec.ts:trapTab"
+  - "frontend/vendor/ui-kit/src/lib/dialog/dialog.component.spec.ts:DialogComponent"
+  - "frontend/vendor/ui-kit/src/lib/side-sheet/side-sheet.component.spec.ts:SideSheetComponent"
+  - "frontend/vendor/ui-kit/src/lib/fab/fab.component.spec.ts:FabComponent"
+implementation:
+  - frontend/vendor/ui-kit/src/lib/focus/focus-dialog.directive.ts
+  - frontend/vendor/ui-kit/src/lib/focus/focus-trap.ts
+  - frontend/vendor/ui-kit/src/lib/dialog/dialog.component.ts
+  - frontend/vendor/ui-kit/src/lib/side-sheet/side-sheet.component.ts
+  - frontend/vendor/ui-kit/src/lib/fab/fab.component.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

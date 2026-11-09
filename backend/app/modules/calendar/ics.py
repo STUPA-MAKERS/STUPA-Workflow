@@ -8,7 +8,8 @@ timed event to UTC and writes it with `Z`. This avoids the error-prone
 `VTIMEZONE` block. `zoneinfo` resolves DST per date. A meeting without a time
 becomes an all-day event (`VALUE=DATE`). An Event (a to-do card with event data) is
 always all-day: `DTEND` is the day after its end, because RFC5545 makes the end of
-a `VALUE=DATE` event exclusive. An Event without an end lasts one day.
+a `VALUE=DATE` event exclusive. An Event without an end lasts one day. A due card
+(spec 000549) is an all-day event on its due date with the url of the card.
 """
 
 from __future__ import annotations
@@ -70,6 +71,21 @@ class CardEvent:
     stamp: datetime
     place: str | None = None
     board_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DueCard:
+    """A card with a due date as an all-day calendar event (spec 000549).
+
+    `uid` is the card id. `url` opens the card in the app.
+    """
+
+    uid: str
+    title: str
+    due: _date
+    stamp: datetime
+    board_name: str
+    url: str
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -171,11 +187,28 @@ def _build_card_event(event: CardEvent, *, domain: str) -> Event:
     return _filled(Event(), properties)
 
 
+def _build_due_card(card: DueCard, *, domain: str) -> Event:
+    """Build one all-day VEVENT for a due card."""
+    from icalendar import Event
+
+    properties = (
+        ("uid", f"due-{card.uid}@{domain}"),
+        ("dtstamp", _as_utc(card.stamp)),
+        ("summary", card.title),
+        ("description", f"Board: {card.board_name}"),
+        ("url", card.url),
+        ("dtstart", card.due),
+        ("dtend", card.due + timedelta(days=1)),
+    )
+    return _filled(Event(), properties)
+
+
 def build_calendar(
     events: Sequence[MeetingEvent],
     *,
     domain: str,
     card_events: Sequence[CardEvent] | None = None,
+    due_cards: Sequence[DueCard] | None = None,
     calendar_name: str = "STUPA — Sitzungen",
     default_duration: timedelta = DEFAULT_DURATION,
 ) -> bytes:
@@ -197,5 +230,6 @@ def build_calendar(
     parts = (
         *(_build_event(e, domain=domain, default_duration=default_duration) for e in events),
         *(_build_card_event(c, domain=domain) for c in card_events or ()),
+        *(_build_due_card(d, domain=domain) for d in due_cards or ()),
     )
     return _filled(Calendar(), properties, parts).to_ical()

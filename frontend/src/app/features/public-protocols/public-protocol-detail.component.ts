@@ -19,6 +19,8 @@ import { PublicProtocolsService } from './public-protocols.service';
 import { optionKey, orderedCounts, topParts, useNoindex, type TopPart } from './public-protocols.util';
 import { dayMonthYear, weekdayDate } from '@shared/date-format';
 import { voteRulesParts } from '../meetings/meetings-display.util';
+import { pageItemTitle } from '../../layout/page-title.service';
+import { langAttr } from '@shared/forms/i18n-text';
 
 /**
  * One public protocol (`/protokolle/:id`, no login): the public version of a final
@@ -51,6 +53,11 @@ export class PublicProtocolDetailComponent {
   private readonly route = inject(ActivatedRoute);
 
   protected readonly protocol = signal<PublicProtocolDetail | null>(null);
+  /**
+   * `lang` of the protocol text (the default language of the gremium) when it is not the
+   * UI language (app spec 000523).
+   */
+  protected readonly textLang = computed(() => langAttr(this.protocol()?.lang, this.i18n.uiLocale()));
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
   protected readonly error = signal(false);
@@ -95,6 +102,7 @@ export class PublicProtocolDetailComponent {
   }
 
   constructor() {
+    pageItemTitle(() => this.protocol()?.title);
     useNoindex();
     const id = String(this.route.snapshot.paramMap.get('id'));
     this.api.detail(id).subscribe({

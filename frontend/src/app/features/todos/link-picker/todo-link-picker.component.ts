@@ -55,6 +55,7 @@ const KIND_CHIPS: readonly { readonly value: PickerKind; readonly label: Transla
   { value: 'gremium', label: 'todos.picker.gremien' },
   { value: 'invoice', label: 'todos.picker.invoices' },
   { value: 'expense', label: 'todos.picker.expenses' },
+  { value: 'budget', label: 'todos.picker.budgets' },
   { value: 'ticket', label: 'todos.picker.tickets' },
   { value: 'todo', label: 'todos.picker.todos' },
 ];
@@ -67,7 +68,7 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
 /**
  * "Verknüpfen": search what a card can link. The server lists per kind only
  * what the person may read. The chips narrow the kind; the hits come in groups (Anträge,
- * Sitzungen und TOPs, Abstimmungen, Gremien, Rechnungen, Buchungen, Tickets, To-Dos), a
+ * Sitzungen und TOPs, Abstimmungen, Gremien, Rechnungen, Buchungen, Kostenstellen, Tickets, To-Dos), a
  * linked target carries a check mark. A pick of a linked target takes the link off again.
  *
  * Desktop: a panel that floats over the whole page, like the search palette, with a
@@ -140,6 +141,7 @@ export class TodoLinkPickerComponent {
       { key: 'gremium', label: 'todos.picker.gremien', hits: by(['gremium']) },
       { key: 'invoice', label: 'todos.picker.invoices', hits: by(['invoice']) },
       { key: 'expense', label: 'todos.picker.expenses', hits: by(['expense']) },
+      { key: 'budget', label: 'todos.picker.budgets', hits: by(['budget']) },
       { key: 'ticket', label: 'todos.picker.tickets', hits: by(['ticket']) },
       { key: 'todo', label: 'todos.picker.todos', hits: by(['todo']) },
     ];

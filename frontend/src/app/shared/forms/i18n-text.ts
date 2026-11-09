@@ -14,6 +14,23 @@ export function resolveI18n(map: I18nMap | null | undefined, lang: Lang): string
 }
 
 /**
+ * The language of the text that `resolveI18n` shows, or `null` when it shows nothing. A
+ * view puts it on the text as `lang` when it is not the UI language (app spec 000523).
+ */
+export function resolvedI18nLang(map: I18nMap | null | undefined, lang: Lang): string | null {
+  if (!map) return null;
+  return fallbackChain(lang).find((c) => c in map) ?? Object.keys(map)[0] ?? null;
+}
+
+/**
+ * The `lang` attribute of a text in `textLang` inside a UI in `uiLang`: the language when
+ * it differs, else `null`, so the page language applies.
+ */
+export function langAttr(textLang: string | null | undefined, uiLang: string): string | null {
+  return textLang && textLang !== uiLang ? textLang : null;
+}
+
+/**
  * The display name of a configured object with an `*_i18n` label (a role, a gremium
  * role): the first non-empty label of the fallback chain of the language, then `fallback`
  * (the key). Unlike `resolveI18n` it never shows a language outside the chain, so a role

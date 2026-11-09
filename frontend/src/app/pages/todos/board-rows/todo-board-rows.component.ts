@@ -1,6 +1,6 @@
 import { CdkScrollable } from '@angular/cdk/scrolling';
 import { HttpErrorResponse } from '@angular/common/http';
-import { CdkDrag, CdkDropList, type CdkDragDrop, type CdkDragEnter } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDropList, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -200,8 +200,8 @@ function writeCollapsed(ids: ReadonlySet<Uuid>): void {
  * The board rows. `source="mine"`: the rows under "Meine To-Dos", one row per other board
  * that holds cards assigned to me (`GET /todos/mine/boards`), with only my cards.
  * `source="all"`: the meta-board "Alle", one row per readable board with all its cards
- * (`GET /todos/all/boards`). Each row is headed by the board name and the count, with the
- * columns of that board.
+ * (`GET /todos/all/boards`). Each row is headed by the board name (no count, spec 000560), with
+ * the columns of that board.
  *
  * A row is a region with a heading; the heading button collapses it (remembered per
  * browser). A pointer drag reaches every column of every writable row and the drop lists
@@ -317,7 +317,8 @@ export class TodoBoardRowsComponent implements OnInit {
   /** A touch lifts a card after this long press, so a swipe over the cards scrolls; a mouse lifts it at once. */
   protected readonly dragDelay = { touch: 400, mouse: 0 };
   /** The pointer drag: the column the card left and the column it is over (any row). */
-  readonly ptr = signal<{ from: Uuid; over: Uuid } | null>(null);
+  /** The column a pointer drag started in; null without a pointer drag. */
+  readonly ptr = signal<Uuid | null>(null);
   /** A card of the rows is held, by pointer or keyboard. */
   readonly dragging = computed(() => this.ptr() !== null || this.kb() !== null);
   readonly announce = signal('');
@@ -638,37 +639,10 @@ export class TodoBoardRowsComponent implements OnInit {
     return this.cardsIn(row, col.id).length - this.list(row, col).length;
   }
 
-  /** The number in the column head; it follows a card that is being dragged. */
-  count(row: BoardRow, col: TodoColumn): number {
-    const n = this.cardsIn(row, col.id).length;
-    const move = this.moving(row);
-    if (!move || move.from === move.over) return n;
-    if (col.id === move.from) return n - 1;
-    if (col.id === move.over) return n + 1;
-    return n;
-  }
-
-  /**
-   * The column a dragged card left and the one it is over, by pointer or keyboard. The
-   * column ids are unique over all boards, so a pointer drag counts in every row.
-   */
-  private moving(row: BoardRow): { from: Uuid; over: Uuid } | null {
-    const ptr = this.ptr();
-    if (ptr) return ptr;
-    const kb = this.kb();
-    if (!kb || kb.boardId !== row.board.id) return null;
-    return { from: row.columns[kb.fromCol].id, over: row.columns[kb.col].id };
-  }
-
   onDragStart(col: TodoColumn): void {
     haptic('lift');
     this.kb.set(null);
-    this.ptr.set({ from: col.id, over: col.id });
-  }
-
-  onEnter(event: CdkDragEnter<Uuid>): void {
-    const over = event.container.data;
-    this.ptr.update((p) => (p ? { ...p, over } : p));
+    this.ptr.set(col.id);
   }
 
   /** The cards of a column that pass the filters. */

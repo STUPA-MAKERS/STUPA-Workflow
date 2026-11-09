@@ -42,8 +42,6 @@ const BUDGET_TREE = [
     currency: 'EUR',
     active: true,
     color: null,
-    acceptedStateKeys: [],
-    deniedStateKeys: [],
     hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
@@ -60,8 +58,6 @@ const BUDGET_TREE = [
         currency: 'EUR',
         active: true,
         color: null,
-        acceptedStateKeys: [],
-        deniedStateKeys: [],
         hiddenInBudget: false,
         viewGremiumId: null,
         fiscalStartMonth: 1,
@@ -682,6 +678,29 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.setStateTerminal(key, true);
     expect(c.graph().states[0].isTerminal).toBe(true);
     expect(c.branchesFor(key)).toEqual([]);
+  });
+
+  /** § 000571: the switches "Bewilligt" and "Abgelehnt" sit on a normal state only. */
+  it('sets the outcome of a state with its switches', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addState();
+    const key = c.graph().states[0].key;
+    c.selection.set({ kind: 'state', key });
+    fixture.detectChanges();
+    const flip = (name: string): void => {
+      screen.getByRole('switch', { name }).click();
+      fixture.detectChanges();
+    };
+    flip('Bewilligt');
+    expect(c.graph().states[0].isApproved).toBe(true);
+    flip('Abgelehnt');
+    expect([c.graph().states[0].isApproved, c.graph().states[0].isDenied]).toEqual([false, true]);
+    c.setStateKind(key, 'vote');
+    fixture.detectChanges();
+    expect(screen.queryByRole('switch', { name: 'Bewilligt' })).toBeNull();
+    expect(c.graph().states[0].isDenied).toBe(false);
   });
 
   /**
@@ -3050,8 +3069,8 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       const c = fixture.componentInstance as any;
       c.selection.set({ kind: 'state', key: 'v' });
       fixture.detectChanges();
-      expect(screen.getByRole('heading', { name: 'Eingehend (1)' })).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Ausgehend (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Eingehend' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Ausgehend' })).toBeInTheDocument();
       screen.getByRole('button', { name: /^Automatisch:/ }).click();
       expect(c.selection()).toEqual({ kind: 'transition', index: 0 });
     });
@@ -3237,5 +3256,27 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       c.selection.set({ kind: 'transition', index: 99 });
       expect(dim()).toEqual({ nodes: [], edges: [] });
     });
+  });
+});
+
+describe('FlowEditorDragAlternative', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  /** A transition needs no drag: the state inspector adds one, and the inspector opens on it. */
+  it('adds a transition from the state inspector without a drag (000515)', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addState();
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: /Übergang hinzufügen/ })).toBeDisabled();
+    c.addTransitionFrom('state');
+    expect(c.graph().transitions ?? []).toHaveLength(0);
+    c.addState();
+    c.selection.set({ kind: 'state', key: 'state' });
+    fixture.detectChanges();
+    screen.getByRole('button', { name: /Übergang hinzufügen/ }).click();
+    expect(c.graph().transitions).toEqual([expect.objectContaining({ from: 'state', to: 'state2' })]);
+    expect(c.selection()).toEqual({ kind: 'transition', index: 0 });
   });
 });

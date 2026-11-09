@@ -80,6 +80,7 @@
           [voteInfo]="voteInfo()"
           [value]="t.body ?? ''"
           [disabled]="true"
+          [ariaLabel]="'participant.top.protocol' | t"
           [placeholder]="'participant.top.empty' | t"
         />
       } @placeholder {
@@ -147,7 +148,6 @@
           class="ts__mode"
           size="control"
           width="equal"
-          [check]="false"
           [ariaLabel]="'meetings.editor.mode' | t"
           [options]="modeOptions()"
           [value]="mode()"
@@ -168,6 +168,7 @@
             [attr.aria-label]="'meetings.editor.modeRaw' | t"
             [value]="t.body ?? ''"
             [readOnly]="!editable()"
+            [ariaLabel]="'participant.top.protocol' | t"
             [placeholder]="'meetings.protocol.placeholder' | t"
             spellcheck="true"
             (input)="onRawInput(t, raw.value)"
@@ -184,6 +185,7 @@
             [value]="t.body ?? ''"
             [disabled]="!editable()"
             [imageUpload]="editable() ? imageUpload : null"
+            [ariaLabel]="'participant.top.protocol' | t"
             [placeholder]="'meetings.protocol.placeholder' | t"
             (valueChange)="onEditorChange(t, $event)"
           />

@@ -17,6 +17,7 @@ import type { Attendance, AttendanceStatus, Meeting, Uuid } from '@core/api/mode
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import type { LiveViewer } from '@core/ws/ws-messages';
 import {
   AvatarComponent,
   ButtonComponent,
@@ -167,7 +168,7 @@ export class AttendanceSheetComponent {
   readonly attendance = input.required<Attendance[]>();
   readonly saving = input(false);
   /** Names of the people who have the meeting open (WS presence). */
-  readonly viewers = input<readonly string[]>([]);
+  readonly viewers = input<readonly LiveViewer[]>([]);
   /** The member whose "present" the server refused with 409 `delegation_active`. */
   readonly conflictId = input<Uuid | null>(null);
 

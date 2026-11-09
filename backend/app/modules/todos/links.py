@@ -1,8 +1,8 @@
 """Link targets of a card: resolve them per viewer, and search them for the picker.
 
 A card links to an application, a meeting, an agenda item, a vote, a gremium, an
-invoice, a booking, a ticket or another card. Each kind has the read rule of its own
-module:
+invoice, a booking, a cost centre, a ticket or another card. Each kind has the read rule
+of its own module:
 
 * application — the application read access (``resolve_app_read``), confirmed only;
 * meeting — the meeting read scope (``meeting_read_scope``);
@@ -13,6 +13,9 @@ module:
   ``can_view_gremium``: ``gremium.view_all`` or an active membership);
 * invoice, expense — the gate of ``GET /api/invoices`` and ``GET /api/expenses``
   (``budget.access.has_budget_read``);
+* budget (a cost centre) — every reader of the card sees its name and path key (spec
+  000552); the url to the cost centre page and the link picker follow the gate of the
+  budget pages (``has_budget_read``), so only a budget reader links one;
 * ticket — ``ticket.manage``;
 * todo — the board read rule (``BoardAccess``).
 
@@ -75,13 +78,18 @@ from app.shared.search import dialect_of, escape_like, trigram_rank
 
 #: The most hits of one kind in the link picker.
 PER_KIND = 5
+#: The newest cards that ``recent_cards`` offers before a search term (spec 000548).
+RECENT_CARDS = 20
+#: The shortest search term.
+MIN_TERM = 2
 #: Every status of a vote: the picker also offers a draft, which a card often prepares.
 VOTE_STATUSES = ("open", "draft", "closed", "cancelled")
 
 LinkRef = tuple[str, uuid.UUID]
 #: The kinds that a card opens to its readers (spec 000487): every kind but the ticket,
-#: which holds the report of a person outside the team, and the gremium.
-GRANT_KINDS: frozenset[str] = frozenset(LINK_KINDS) - {"ticket", "gremium"}
+#: which holds the report of a person outside the team, the gremium, and the cost centre,
+#: which every reader of the card sees anyway.
+GRANT_KINDS: frozenset[str] = frozenset(LINK_KINDS) - {"ticket", "gremium", "budget"}
 #: No id passes the gate of its kind without the rule.
 NONE: frozenset[uuid.UUID] = frozenset()
 
@@ -297,6 +305,7 @@ class LinkResolver:
             "gremium": self._gremien,
             "invoice": self._invoices,
             "expense": self._expenses,
+            "budget": self._budgets,
             "ticket": self._tickets,
             "todo": self._todos,
         }
@@ -316,7 +325,12 @@ class LinkResolver:
         }
 
     async def readable(self, kind: str, target_id: uuid.UUID, principal: Principal) -> bool:
-        """Tell if the principal reads the target (the rule of ``POST .../links``)."""
+        """Tell if the principal reads the target (the rule of ``POST .../links``).
+
+        A cost centre shows to every reader of the card, but only a budget reader links one.
+        """
+        if kind == "budget" and not has_budget_read(principal):
+            return False
         resolved = await self.resolve([(kind, target_id)], principal, grants=False)
         return resolved[(kind, target_id)].accessible
 
@@ -557,6 +571,33 @@ class LinkResolver:
         ).all()
         return {exp.id: _expense_target(exp, path_key) for exp, path_key in rows}
 
+    async def _budgets(
+        self,
+        ids: AbstractSet[uuid.UUID],
+        principal: Principal,
+        open_ids: frozenset[uuid.UUID] = NONE,
+    ) -> dict[uuid.UUID, Resolved]:
+        """Resolve cost centre links: name and path key for each reader (spec 000552).
+
+        The url follows the gate of the budget pages, so a reader without budget read sees
+        the name without a way into the page.
+        """
+        rows = (
+            await self.session.execute(
+                select(Budget.id, Budget.name, Budget.path_key).where(Budget.id.in_(ids))
+            )
+        ).all()
+        reads = has_budget_read(principal)
+        return {
+            bid: Resolved(
+                accessible=True,
+                title=name,
+                url=f"/budget?ks={bid}" if reads else None,
+                detail=TodoLinkDetail(cost_centre=path_key),
+            )
+            for bid, name, path_key in rows
+        }
+
     async def _tickets(
         self,
         ids: AbstractSet[uuid.UUID],
@@ -611,8 +652,14 @@ class LinkResolver:
         *,
         exclude_card_id: uuid.UUID | None = None,
     ) -> list[TodoLinkTarget]:
-        """Search the link targets that the principal may read, ``PER_KIND`` per kind."""
+        """Search the link targets that the principal may read, ``PER_KIND`` per kind.
+
+        A term below ``MIN_TERM`` characters finds the newest cards for the kind ``todo``
+        (``recent_cards``) and nothing for any other kind.
+        """
         term = q.strip()
+        if len(term) < MIN_TERM:
+            return await self.recent_cards(principal) if kind == "todo" else []
         kinds: Sequence[str] = LINK_KINDS if kind == "all" else (kind,)
         per_kind = [
             await self._kind_targets(current, term, principal, exclude_card_id) for current in kinds
@@ -628,6 +675,12 @@ class LinkResolver:
     ) -> list[TodoLinkTarget]:
         """The readable targets of one kind that match ``term``, in candidate order."""
         ids = await self._candidates(kind, term, principal, exclude_card_id)
+        return await self._as_targets(kind, ids, principal)
+
+    async def _as_targets(
+        self, kind: str, ids: Sequence[uuid.UUID], principal: Principal
+    ) -> list[TodoLinkTarget]:
+        """The readable ones of ``ids`` as link targets, in the given order."""
         resolved = await self.resolve([(kind, i) for i in ids], principal, grants=False)
         return [
             TodoLinkTarget(
@@ -663,6 +716,8 @@ class LinkResolver:
                 return await self._invoice_candidates(term, principal)
             case "expense":
                 return await self._expense_candidates(term, principal)
+            case "budget":
+                return await self._budget_candidates(pattern, principal)
             case "ticket":
                 return await self._ticket_candidates(term, principal)
             case _:
@@ -772,6 +827,23 @@ class LinkResolver:
         )
         return [e.id for e in page.items]
 
+    async def _budget_candidates(self, pattern: str, principal: Principal) -> list[uuid.UUID]:
+        """Cost centres by name or path key, behind the gate of the budget pages."""
+        if not has_budget_read(principal):
+            return []
+        stmt = (
+            select(Budget.id)
+            .where(
+                or_(
+                    Budget.name.ilike(pattern, escape="\\"),
+                    Budget.path_key.ilike(pattern, escape="\\"),
+                )
+            )
+            .order_by(Budget.path_key, Budget.id)
+            .limit(PER_KIND)
+        )
+        return list((await self.session.scalars(stmt)).all())
+
     async def _ticket_candidates(self, term: str, principal: Principal) -> list[uuid.UUID]:
         """Reuses ``TicketService.list``, behind ``ticket.manage`` like ``GET /tickets``."""
         if not principal.has(TICKET_MANAGE):
@@ -780,6 +852,22 @@ class LinkResolver:
 
         page = await TicketService(self.session).list(q=term, limit=PER_KIND)
         return [t.id for t in page.items]
+
+    async def recent_cards(self, principal: Principal) -> list[TodoLinkTarget]:
+        """The newest readable open cards, ``RECENT_CARDS`` at most, as link targets."""
+        scope = await self.access.scope(principal)
+        ids = list(
+            (
+                await self.session.scalars(
+                    select(TodoCard.id)
+                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                    .where(scope.condition(), TodoCard.archived_at.is_(None))
+                    .order_by(TodoCard.updated_at.desc(), TodoCard.id)
+                    .limit(RECENT_CARDS)
+                )
+            ).all()
+        )
+        return await self._as_targets("todo", ids, principal)
 
     async def _todo_candidates(
         self, pattern: str, principal: Principal, exclude_card_id: uuid.UUID | None

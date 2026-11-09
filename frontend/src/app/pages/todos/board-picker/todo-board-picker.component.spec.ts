@@ -31,16 +31,15 @@ describe('TodoBoardPickerComponent', () => {
     expect(screen.getByText('Persönlich')).toBeInTheDocument();
     expect(screen.getByText('Gremien')).toBeInTheDocument();
     expect(screen.getByText('Team')).toBeInTheDocument();
-    expect(screen.getByText('1 offen · nur du')).toBeInTheDocument();
-    expect(screen.getByText('6 offen · für ticket.manage')).toBeInTheDocument();
-    expect(screen.getByText('4 offen')).toBeInTheDocument();
+    expect(screen.getByText('nur du')).toBeInTheDocument();
+    expect(screen.getByText('für ticket.manage')).toBeInTheDocument();
+    expect(screen.queryByText(/offen/)).toBeNull();
     const current = screen.getByRole('button', { name: /^Studierendenparlament/ });
     expect(current).toHaveAttribute('aria-current', 'true');
     expect(document.activeElement).toBe(current);
     expect(BOARD_ICON.team).toBe('ticket');
   });
 
-  /** "Alle" counts the open cards of every board: 1 + 2 + 4 + 6. */
   it('lists the meta-board "Alle" directly under "Meine To-Dos" and picks it', async () => {
     const { picked, flush } = await setup({ allId: 'alle' });
     fireEvent.click(screen.getByRole('button', { name: /Board:/ }));
@@ -49,7 +48,7 @@ describe('TodoBoardPickerComponent', () => {
     expect(rows[0].textContent).toContain('Meine To-Dos');
     expect(rows[1]).toBe(screen.getByTestId('bp-all'));
     expect(rows[1].textContent).toContain('Alle');
-    expect(rows[1].textContent).toContain('13 offen');
+    expect(rows[1].textContent).not.toMatch(/\d/);
     expect(rows[1].textContent).not.toContain('alle Boards');
     expect(rows[1]).not.toHaveAttribute('aria-current');
     fireEvent.click(rows[1]);

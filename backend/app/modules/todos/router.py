@@ -403,11 +403,15 @@ def _rows(
 async def link_targets(
     service: ServiceDep,
     principal: Member,
-    q: Annotated[str, Query(min_length=2, max_length=200)],
+    q: Annotated[str, Query(max_length=200)] = "",
     kind: TodoLinkKind | Literal["all"] = "all",
     exclude_card_id: Annotated[UUID | None, Query(alias="excludeCardId")] = None,
 ) -> list[TodoLinkTarget]:
-    """Search the link targets that the caller may read (at most 5 per kind)."""
+    """Search the link targets that the caller may read (at most 5 per kind).
+
+    Below two characters the kind ``todo`` lists the newest cards and any other kind
+    nothing (spec 000548).
+    """
     if not token_reads(principal):
         return []
     return await service.links.search(q, kind, principal, exclude_card_id=exclude_card_id)

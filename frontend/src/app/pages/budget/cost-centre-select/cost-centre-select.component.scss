@@ -31,7 +31,7 @@
 }
 .ccs__label {
   @include f.label;
-  right: 2.75rem;
+  padding-right: 2.75rem;
 }
 .ccs__box:focus-within .ccs__label,
 .ccs__box--open .ccs__label {
@@ -95,15 +95,14 @@
   border-radius: var(--radius-xl);
 }
 :host(.ccs--card) .ccs__label {
-  top: var(--space-4);
-  left: 18px;
+  padding: var(--space-4) 18px 0;
 }
 :host(.ccs--card) .ccs__trigger {
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
   height: auto;
-  padding: 2.5rem 18px var(--space-4);
+  padding: 0.5rem 18px var(--space-4);
 }
 :host(.ccs--card) .ccs__value {
   flex-wrap: wrap;

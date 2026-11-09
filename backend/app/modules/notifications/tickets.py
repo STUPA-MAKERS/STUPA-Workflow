@@ -52,10 +52,12 @@ TICKET_ANSWER_KEY = "ticket_answer"
 TICKET_MESSAGE_KEY = "ticket_message"
 
 _KIND_DE = (
-    "{% if kind == 'bug' %}Problem{% elif kind == 'question' %}Frage{% else %}Idee{% endif %}"
+    "{% if kind == 'bug' %}Problem{% elif kind == 'question' %}Frage"
+    "{% elif kind == 'barrier' %}Barriere{% else %}Idee{% endif %}"
 )
 _KIND_EN = (
-    "{% if kind == 'bug' %}problem{% elif kind == 'question' %}question{% else %}idea{% endif %}"
+    "{% if kind == 'bug' %}problem{% elif kind == 'question' %}question"
+    "{% elif kind == 'barrier' %}barrier{% else %}idea{% endif %}"
 )
 
 TICKET_CREATED_SUBJECT: dict[str, str] = {
@@ -72,7 +74,7 @@ TICKET_CREATED_PLACEHOLDERS: dict[str, str] = {
     "link": "Link zum Ticket (ohne den Platzhalter hängt die Mail ihn an)",
     "number": "Ticketnummer (T-0042)",
     "title": "Titel des Tickets",
-    "kind": "Art (bug/question/idea)",
+    "kind": "Art (bug/question/idea/barrier)",
     "reporter": "Name oder E-Mail der meldenden Person",
 }
 

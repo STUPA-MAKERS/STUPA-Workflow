@@ -12,9 +12,6 @@
         >
           <app-icon class="ms__radio" [name]="col.id === columnId() ? 'circleok' : 'circle'" [size]="20" />
           <span class="ms__name">{{ col.name }}</span>
-          @if (col.count !== null && col.count !== undefined) {
-            <span class="ms__count num">{{ col.count }}</span>
-          }
         </button>
       }
     </div>

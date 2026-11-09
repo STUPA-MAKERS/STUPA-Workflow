@@ -4,6 +4,7 @@ import { fireEvent, render } from '@testing-library/angular';
 import { Subject } from 'rxjs';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MarkdownImageUploadDirective, imageUploadErrorKey } from './markdown-image-upload.directive';
+import { ImageAltService } from './image-alt.service';
 import { MediaApiService, type MediaImage } from './media-api.service';
 
 const ID = '0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
@@ -34,6 +35,12 @@ function image(id: string): MediaImage {
   return { id, url: `/api/media/images/${id}`, mime: 'image/png', width: 1, height: 1, size: 1 };
 }
 
+/** Let the answer of the alt text dialog arrive. */
+const flush = () => new Promise((r) => setTimeout(r));
+
+/** The dialog answers with the file name without its extension; `null` skips the file. */
+const answer = (file: File): string | null => (file.name.startsWith('skip') ? null : file.name.replace(/\.[^.]*$/, ''));
+
 async function setup(initial = '') {
   const calls: Subject<MediaImage>[] = [];
   const uploadImage = jest.fn(() => {
@@ -42,7 +49,20 @@ async function setup(initial = '') {
     return s.asObservable();
   });
   const view = await render(HostComponent, {
-    providers: [{ provide: MediaApiService, useValue: { uploadImage } }],
+    providers: [
+      { provide: MediaApiService, useValue: { uploadImage } },
+      {
+        provide: ImageAltService,
+        useValue: {
+          askAll: jest.fn(async (files: readonly File[]) =>
+            files.flatMap((file) => {
+              const alt = answer(file);
+              return alt === null ? [] : [{ file, alt }];
+            }),
+          ),
+        },
+      },
+    ],
   });
   const host = view.fixture.componentInstance;
   host.text.set(initial);
@@ -77,6 +97,7 @@ describe('MarkdownImageUploadDirective', () => {
     area.setSelectionRange(4, 4);
     const ev = fireEvent.paste(area, { clipboardData: { files: [png()] } });
     expect(ev).toBe(false);
+    await flush();
     expect(host.text()).toMatch(/^Text\n!\[Bild wird hochgeladen … #\d+\]\(\)\n$/);
     expect(dir.uploading()).toBe(1);
     calls[0].next(image(ID));
@@ -97,7 +118,8 @@ describe('MarkdownImageUploadDirective', () => {
   it('uploads dropped images one after the other', async () => {
     const { host, area, calls } = await setup('a\n');
     area.setSelectionRange(2, 2);
-    expect(fireEvent.drop(area, { dataTransfer: { files: [png('x.png'), png('y.webp')] } })).toBe(false);
+    expect(fireEvent.drop(area, { dataTransfer: { files: [png('x.png'), png('skip.png'), png('y.webp')] } })).toBe(false);
+    await flush();
     expect(calls).toHaveLength(1);
     calls[0].next(image(ID));
     calls[0].complete();
@@ -122,6 +144,7 @@ describe('MarkdownImageUploadDirective', () => {
     const { host, area, calls, error } = await setup('vor\nnach');
     area.setSelectionRange(4, 4);
     fireEvent.paste(area, { clipboardData: { files: [png()] } });
+    await flush();
     calls[0].error({ status: 413 });
     expect(host.text()).toBe('vor\nnach');
     expect(error).toHaveBeenCalledWith('Bild zu groß (max. 10 MB).');
@@ -130,6 +153,7 @@ describe('MarkdownImageUploadDirective', () => {
   it('drops the image when the user deleted the placeholder', async () => {
     const { host, area, calls, dir } = await setup('x');
     fireEvent.paste(area, { clipboardData: { files: [png()] } });
+    await flush();
     area.value = 'neu';
     fireEvent.input(area);
     calls[0].next(image(ID));
@@ -141,6 +165,7 @@ describe('MarkdownImageUploadDirective', () => {
   it('drops the results when the textarea shows another text', async () => {
     const { host, area, calls, dir, error } = await setup('Dokument A');
     dir.upload([png(), png('b.png')]);
+    await flush();
     host.text.set('Dokument B');
     area.value = 'Dokument B';
     fireEvent.input(area);
@@ -178,11 +203,31 @@ describe('MarkdownImageUploadDirective', () => {
     expect(input.multiple).toBe(true);
     Object.defineProperty(input, 'files', { value: [png()], configurable: true });
     fireEvent.change(input);
+    await flush();
     expect(calls).toHaveLength(1);
     Object.defineProperty(input, 'files', { value: null, configurable: true });
     fireEvent.change(input);
+    await flush();
     expect(calls).toHaveLength(1);
     click.mockRestore();
+  });
+
+  it('uploads nothing when the alt text of every file is cancelled', async () => {
+    const { uploadImage, dir, host } = await setup('x');
+    dir.upload([png('skip.png')]);
+    await flush();
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(host.text()).toBe('x');
+  });
+
+  /** The textarea turned read-only while the dialog was open: the text must not change. */
+  it('uploads nothing when the textarea locked during the dialog', async () => {
+    const { uploadImage, dir, host, view } = await setup('x');
+    dir.upload([png()]);
+    host.ro.set(true);
+    view.detectChanges();
+    await flush();
+    expect(uploadImage).not.toHaveBeenCalled();
   });
 
   it('ignores a picked set without images', async () => {

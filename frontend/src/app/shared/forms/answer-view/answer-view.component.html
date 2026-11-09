@@ -1,5 +1,5 @@
 @for (block of blocks(); track block.key) {
-  <app-section class="av__sec" [heading]="block.label">
+  <app-section class="av__sec" [heading]="block.label" [headingLang]="block.labelLang">
     @for (chunk of block.chunks; track chunk.key) {
       @if (chunk.kind === 'positions') {
         <app-positions-view [label]="chunk.label" [value]="chunk.value" [surface]="surface()" />
@@ -10,26 +10,26 @@
               @case ('grid') {
                 <div class="av__grid">
                   @for (cell of row.cells; track cell.key) {
-                    <app-field-row [label]="cell.label" [mono]="cell.mono" [attr.data-key]="cell.key">
-                      {{ cell.value }}
+                    <app-field-row [label]="cell.label" [labelLang]="cell.labelLang" [mono]="cell.mono" [attr.data-key]="cell.key">
+                      <span [attr.lang]="cell.valueLang">{{ cell.value }}</span>
                     </app-field-row>
                   }
                 </div>
               }
               @case ('text') {
-                <app-field-row [label]="row.cell.label" [attr.data-key]="row.cell.key">
+                <app-field-row [label]="row.cell.label" [labelLang]="row.cell.labelLang" [attr.data-key]="row.cell.key">
                   @if (row.markdown) {
-                    <app-markdown-view [src]="row.cell.value" />
+                    <app-markdown-view [src]="row.cell.value" [attr.lang]="row.cell.valueLang" />
                   } @else {
-                    {{ row.cell.value }}
+                    <span [attr.lang]="row.cell.valueLang">{{ row.cell.value }}</span>
                   }
                 </app-field-row>
               }
               @case ('table') {
                 <div class="av__table" [attr.data-key]="row.key">
-                  <span class="av__tableLabel">{{ row.label }}</span>
+                  <span class="av__tableLabel" [attr.lang]="row.labelLang">{{ row.label }}</span>
                   <div class="av__tableScroll">
-                    <table>
+                    <table [attr.lang]="row.valueLang">
                       <thead>
                         <tr>
                           @for (c of row.columns; track c) {

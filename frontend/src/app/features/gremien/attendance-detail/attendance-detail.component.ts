@@ -24,6 +24,7 @@ import type { StatusView } from '@shared/status-kind.util';
 import {
   AvatarComponent,
   EmptyStateComponent,
+  FocusDialogDirective,
   MEDIA,
   mediaQuery,
   NoteComponent,
@@ -83,6 +84,7 @@ export const ATTENDANCE_STATE: Record<GremiumAttendanceState, StatusView> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FocusDialogDirective,
     NoteComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
@@ -219,7 +221,11 @@ export class AttendanceDetailComponent {
     if (phone) return;
     this.place();
     el.classList.add('gad--placed');
-    el.focus();
+    // Chrome drops a focus() in the same task that shows the popover and removes the
+    // hidden state, so the focus waits for the next frame (spec 000513).
+    requestAnimationFrame(() => {
+      if (this.shownEl === el) el.focus();
+    });
   }
 
   /** Under the cell, aligned to its start, inside the viewport; above it when there is no room. */

@@ -4,8 +4,13 @@ title: Each page has landmarks and one h1
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-08
+tests:
+  - "frontend/vendor/ui-kit/shell/src/shell/shell.component.spec.ts:ShellComponent"
+  - "frontend/src/app/layout/shell.component.spec.ts:ShellComponent"
+implementation:
+  - frontend/vendor/ui-kit/shell/src/shell/shell.component.html
+  - frontend/src/app/layout/public-header/public-header.component.html
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

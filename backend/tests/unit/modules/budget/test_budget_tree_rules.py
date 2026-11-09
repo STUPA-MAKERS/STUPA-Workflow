@@ -94,12 +94,12 @@ def test_rollup_committed() -> None:
 
 def _node(
     nid, parent, gremium, key, path, name="N", currency="EUR", active=True,
-    color=None, accepted=(), denied=(), fiscal_start_month=1, fiscal_start_day=1,
+    color=None, fiscal_start_month=1, fiscal_start_day=1,
     hidden_in_budget=False, view_gremium_id=None, decision_gremium_id=None,
 ):
     return (
         nid, parent, gremium, key, path, name, currency, active,
-        color, list(accepted), list(denied), fiscal_start_month, fiscal_start_day,
+        color, fiscal_start_month, fiscal_start_day,
         hidden_in_budget, view_gremium_id, decision_gremium_id,
     )
 

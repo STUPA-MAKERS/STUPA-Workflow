@@ -15,6 +15,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { LiveViewer } from '@core/ws/ws-messages';
 import type {
   AgendaItem,
   Attendance,
@@ -24,6 +25,7 @@ import type {
   Uuid,
 } from '@core/api/models';
 import {
+  AvatarComponent,
   ButtonComponent,
   IconComponent,
   MEDIA,
@@ -56,9 +58,10 @@ import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
 import { topApplicationLead } from '../top-application-lead.util';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
+import { pageItemTitle } from '../../../layout/page-title.service';
 
 /** The ids of the session menu. */
-type SessionAction = 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
+type SessionAction = 'todos' | 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
@@ -107,6 +110,7 @@ type SessionAction = 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | '
     VoteCardComponent,
     AttendanceSheetComponent,
     JoinQrComponent,
+    AvatarComponent,
   ],
   templateUrl: './meeting-page.component.html',
   styleUrl: './meeting-page.component.scss',
@@ -141,7 +145,7 @@ export class MeetingPageComponent {
   readonly saveState = input.required<SaveState>();
   readonly attendance = input.required<Attendance[]>();
   readonly savingAttendance = input.required<boolean>();
-  readonly viewers = input.required<readonly string[]>();
+  readonly viewers = input.required<readonly LiveViewer[]>();
   readonly casting = input.required<Uuid | null>();
   readonly deletingVote = input.required<Uuid | null>();
   readonly finalizing = input.required<boolean>();
@@ -204,6 +208,9 @@ export class MeetingPageComponent {
   readonly agendaOpen = signal(false);
   /** The bottom sheet of the vote cards on a phone. */
   readonly votesOpen = signal(false);
+  /** The sheet "To-Dos" with the cards that link the meeting (spec 000551). */
+  readonly todosOpen = signal(false);
+  protected readonly todoList = viewChild<TodoLinkedListComponent>('todoList');
   /** The list of the people who have the meeting open. */
   protected readonly presenceOpen = signal(false);
 
@@ -211,6 +218,7 @@ export class MeetingPageComponent {
   protected readonly revision = signal(0);
 
   constructor() {
+    pageItemTitle(() => this.meeting().title);
     observeElementSize(
       () => this.dock().nativeElement,
       (size) => this.dockHeight.set(size.height),
@@ -293,7 +301,7 @@ export class MeetingPageComponent {
   });
   protected readonly presenceTitle = computed(() =>
     this.viewers().length
-      ? this.i18n.translate('meetings.page.viewers', { names: this.viewers().join(', ') })
+      ? this.i18n.translate('meetings.page.viewers', { names: this.viewers().map((v) => v.name).join(', ') })
       : this.i18n.translate('meetings.viewers.empty'),
   );
 
@@ -348,6 +356,9 @@ export class MeetingPageComponent {
       }),
       // Below the wide layout the agenda is a sheet, and the menu opens it.
       ...when(!this.wide(), { id: 'agenda', label: t('meetings.agenda.title'), icon: 'list' }),
+      // The cards that link the meeting: a sheet, because a long agenda would push them out
+      // of sight (spec 000551).
+      { id: 'todos', label: t('todos.meeting.sheet'), icon: 'kanban' },
       ...when(m.canManage, { id: 'settings', label: t('meetings.settings.title'), icon: 'edit' }),
       ...when(!this.phone() || noDock, {
         id: 'attendance',
@@ -549,6 +560,9 @@ export class MeetingPageComponent {
 
   protected onMenu(item: RowMenuItem): void {
     switch (item.id as SessionAction) {
+      case 'todos':
+        this.todosOpen.set(true);
+        break;
       case 'open':
         this.startSession.emit();
         break;

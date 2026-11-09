@@ -99,6 +99,7 @@ import {
 } from './tickets.util';
 import { clock, dayMonth } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
+import { pageItemTitle } from '../../layout/page-title.service';
 
 type DetailTab = 'log' | 'details';
 
@@ -474,6 +475,7 @@ export class TicketDetailComponent {
   });
 
   constructor() {
+    pageItemTitle(() => this.ticket()?.title);
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.load(pm.get('id')!));
     if (!this.manager) return;
     this.api.assignees().subscribe({

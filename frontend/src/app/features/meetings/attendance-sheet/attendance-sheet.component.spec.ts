@@ -7,7 +7,9 @@ import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { Delegation, MeetingDelegationContext } from '@core/api/delegations.service';
 import type { Attendance, Meeting } from '@core/api/models';
-import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import type { LiveViewer } from '@core/ws/ws-messages';
+import { By } from '@angular/platform-browser';
+import { AvatarComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import {
   ATTENDANCE,
   DELEGATION_CONTEXT,
@@ -48,7 +50,7 @@ interface Inputs {
   meeting: Meeting;
   attendance: Attendance[];
   saving: boolean;
-  viewers: string[];
+  viewers: LiveViewer[];
   conflictId: string | null;
 }
 
@@ -83,7 +85,10 @@ async function setup(
       meeting: meeting(),
       attendance: ROSTER,
       saving: false,
-      viewers: ['Pia Protokoll', 'Alina Admin'],
+      viewers: [
+      { id: 'p-pia', name: 'Pia Protokoll' },
+      { id: null, name: 'Alina Admin' },
+    ],
       conflictId: null,
       ...over,
     },
@@ -277,7 +282,7 @@ describe('AttendanceSheetComponent', () => {
     expect(present).toHaveAttribute('title', 'Erst die Vertretung widerrufen.');
     expect(within(sheet()).getByText('Grund: Prüfung · vertreten durch Sven Stellvertreter · mit Stimmrecht')).toBeInTheDocument();
     const section = within(sheet()).getByRole('region', { name: 'Vertretungen' });
-    expect(within(section).getByText('Vertretungen · 1')).toBeInTheDocument();
+    expect(within(section).getByText('Vertretungen', { selector: 'h3' })).toBeInTheDocument();
     expect(within(section).getByText('Vera Vertretung → Sven Stellvertreter')).toBeInTheDocument();
     await userEvent.click(within(section).getByRole('button', { name: 'Widerrufen' }));
     const del = http.expectOne('/api/delegations/d-1');
@@ -469,8 +474,13 @@ describe('AttendanceSheetComponent', () => {
   it('lists the people who have the live meeting open', async () => {
     const { fixture } = await setup();
     const live = within(sheet()).getByRole('region', { name: 'Live dabei' });
-    expect(within(live).getByText('Live dabei · 2')).toBeInTheDocument();
+    expect(within(live).getByText('Live dabei', { selector: 'h3' })).toBeInTheDocument();
     expect(within(live).getByText('Alina Admin')).toBeInTheDocument();
+    const ids = fixture.debugElement
+      .queryAll(By.directive(AvatarComponent))
+      .filter((d) => live.contains(d.nativeElement as Node))
+      .map((d) => (d.componentInstance as AvatarComponent).principalId());
+    expect(ids).toEqual(['p-pia', null]);
     fixture.componentRef.setInput('viewers', []);
     fixture.detectChanges();
     expect(within(live).getByText('Niemand hat die Sitzung gerade geöffnet.')).toBeInTheDocument();

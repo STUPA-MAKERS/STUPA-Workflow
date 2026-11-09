@@ -186,7 +186,7 @@ function flushAll(http: HttpTestingController, id = 'app-1', form = true, over: 
 function flushAttachments(http: HttpTestingController) {
   flushTypes(http);
   for (const req of http.match(
-    (r) => r.method === 'GET' && /\/(attachments|timeline|mentionable)$/.test(r.url),
+    (r) => r.method === 'GET' && /\/(attachments|timeline|mentionable|links)$/.test(r.url),
   )) {
     req.flush([]);
   }
@@ -884,8 +884,6 @@ describe('ApplicationsDetailComponent', () => {
         currency: 'EUR',
         active: true,
         color: null,
-        acceptedStateKeys: [],
-        deniedStateKeys: [],
         hiddenInBudget: false,
         viewGremiumId: null,
         fiscalStartMonth: 1,
@@ -1213,7 +1211,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(entries[1].body).toBe('Übergang „Prüfung beginnen“\nBitte Angebote nachreichen.');
     expect(entries[1].kind).toBe('warn');
     expect(entries[2].changes?.[0]).toMatchObject({ tag: 'Geändert', label: 'title', old: 'Fest', new: 'Förderung Fest' });
-    expect(cmp.tabs().find((t) => t.id === 'history')?.count).toBe(3);
+    expect(cmp.tabs().find((t) => t.id === 'history')).toEqual({ id: 'history', label: 'Verlauf' });
     expect(container.querySelector('#ad-history app-history')).not.toBeNull();
     flushAttachments(http);
     http.verify();

@@ -740,8 +740,10 @@ async def test_available_flags_the_agenda_only_into_a_vote_state() -> None:
     to_done = _transition(flow_id=flow_id, from_id=draft, to_id=done, actions=action)
     plain = _transition(flow_id=flow_id, from_id=draft, to_id=voting)
     db = fake_session(result(app), result(to_vote, to_done, plain))
-    vote_state = SimpleNamespace(id=voting, kind="vote", config={"gremiumId": str(gid)})
-    done_state = SimpleNamespace(id=done, kind="normal", config={})
+    vote_state = SimpleNamespace(
+        id=voting, kind="vote", is_approved=False, config={"gremiumId": str(gid)}
+    )
+    done_state = SimpleNamespace(id=done, kind="normal", is_approved=False, config={})
     db.get_results = [vote_state, done_state, vote_state]
 
     out = {t.id: t for t in await FlowService(db).available_transitions(app.id, _principal())}

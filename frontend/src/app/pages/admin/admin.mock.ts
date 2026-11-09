@@ -490,6 +490,10 @@ export const MOCK_BRANDING: Branding = {
     applyInfo: {},
     submittedInternal: {},
     submittedExternal: {},
+    accessibilityStatement: {
+      de: '## Stand der Vereinbarkeit\n\nDiese Plattform ist **teilweise vereinbar**.',
+      en: '## Compliance status\n\nThis platform is **partially compliant**.',
+    },
   },
 };
 
@@ -699,8 +703,8 @@ export const MOCK_FLOW: FlowGraph = {
       /** The gremium comes from the cost center of the application. */
       config: { gremiumSource: 'budget' },
     },
-    { key: 'bewilligt', label: { de: 'Bewilligt', en: 'Approved' }, color: '#72a384', isTerminal: true, editAllowed: false },
-    { key: 'abgelehnt', label: { de: 'Abgelehnt', en: 'Rejected' }, color: '#ce1625', isTerminal: true, editAllowed: false },
+    { key: 'bewilligt', label: { de: 'Bewilligt', en: 'Approved' }, color: '#72a384', isTerminal: true, isApproved: true, editAllowed: false },
+    { key: 'abgelehnt', label: { de: 'Abgelehnt', en: 'Rejected' }, color: '#ce1625', isTerminal: true, isDenied: true, editAllowed: false },
     { key: 'zurueckgezogen', label: { de: 'Zurückgezogen', en: 'Withdrawn' }, isTerminal: true, editAllowed: false },
   ],
   transitions: [

@@ -1,6 +1,7 @@
 import {
   ACCENT_PROPERTIES,
   DEFAULT_ACCENT,
+  accentContrastIssues,
   accentPalette,
   applyAccent,
   contrast,
@@ -52,6 +53,29 @@ describe('accent palette', () => {
   it('puts white text on a dark fill and the dark tint on a light one', () => {
     expect(accentPalette('#003366')['--c-on-accent']).toBe('#ffffff');
     expect(accentPalette('#e6c619')['--c-on-accent']).not.toBe('#ffffff');
+  });
+
+  /** Spec 000501: the tint alone gave 4.3:1 on #0077ee; white or black takes over. */
+  it('falls back to white or black where the dark tint misses AA on the fill', () => {
+    const blue = accentPalette('#0077ee');
+    expect(contrast(blue['--c-on-accent'], '#0077ee')).toBeGreaterThanOrEqual(4.5);
+    expect(['#ffffff', '#000000']).toContain(blue['--c-on-accent']);
+  });
+
+  it('gives every accent a palette without a contrast issue in both themes (spec 000501)', () => {
+    const steps = [0, 0x33, 0x66, 0x77, 0x88, 0x99, 0xcc, 0xff];
+    const hexes = steps.flatMap((r) =>
+      steps.flatMap((g) => steps.map((b) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`)),
+    );
+    const failing = hexes.filter((hex) => accentContrastIssues(accentPalette(hex)).length > 0);
+    expect(failing).toEqual([]);
+  });
+
+  it('lists each text step that misses AA, with its surface and ratio', () => {
+    const palette = { ...accentPalette(DEFAULT_ACCENT), '--c-on-accent': DEFAULT_ACCENT, '--c-dark-onsel': '#243129' };
+    const issues = accentContrastIssues(palette);
+    expect(issues.map((i) => i.token)).toEqual(['--c-on-accent', '--c-dark-onsel']);
+    expect(issues[0].ratio).toBe(1);
   });
 
   it('turns the hue towards the pick', () => {

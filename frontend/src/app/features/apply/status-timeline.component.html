@@ -153,6 +153,7 @@
                   <app-answer-view
                     [sections]="eff.sections"
                     [data]="app.data"
+                    [contentLang]="app.lang ?? null"
                     [context]="{ has_budget: eff.hasBudget }"
                     [emptyText]="'status.data.empty' | t"
                   />

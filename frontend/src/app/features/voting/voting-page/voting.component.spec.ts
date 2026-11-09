@@ -10,7 +10,7 @@ import { AuthService } from '@core/auth/auth.service';
 import type { Meeting, Page, Vote, VoteListItem, VoteListQuery } from '@core/api/models';
 import { LiveVoteService, type ConnectionState } from '@core/ws/live-vote.service';
 import type { VoteClosedMsg, VoteOpenedMsg, VoteTallyMsg } from '@core/ws/ws-messages';
-import { LIVE_SEARCH_DEBOUNCE_MS, MEDIA } from '@stupa-makers/ui-kit';
+import { Announcer, LIVE_SEARCH_DEBOUNCE_MS, MEDIA } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { VotingComponent, VOTE_LIVE_DEBOUNCE, VOTE_MAX_LIMIT } from './voting.component';
 import { VotingNoneComponent } from './voting-none.component';
@@ -155,6 +155,19 @@ describe('VotingComponent', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
+  /** The one-tap way to the pull to refresh (app spec 000514). */
+  it('reloads the list from "Aktualisieren" in the phone menu', async () => {
+    const { cmp } = await start('/voting');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    expect(c.phoneMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['refresh']);
+    const reload = jest.spyOn(c, 'reload');
+    c.onPhoneMenu({ id: 'other', label: '' });
+    expect(reload).not.toHaveBeenCalled();
+    c.onPhoneMenu({ id: 'refresh', label: 'Aktualisieren' });
+    expect(reload).toHaveBeenCalled();
+  });
+
   describe('rows', () => {
     it('shows the question, the status, the meeting with the agenda item and the own ballot', async () => {
       await start('/voting', {
@@ -176,7 +189,7 @@ describe('VotingComponent', () => {
       expect(screen.getByText('Stimme offen')).toBeInTheDocument();
       const since = screen.getByText('seit 09:05');
       expect(since.getAttribute('title')).toMatch(/2026/);
-      expect(screen.getByText('1 offen')).toBeInTheDocument();
+      expect(screen.queryByText('1 offen')).toBeNull();
     });
 
     /** An empty question falls back, and there is no ballot state without a voting right. */
@@ -716,6 +729,47 @@ describe('VotingComponent', () => {
           queryParamsHandling: 'preserve',
           replaceUrl: false,
         });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    /** Spec 000518: the list reads out a vote that opened, with its TOP from the row. */
+    it.each([
+      ['with the TOP of its row', [item('v7', { meetingTitle: '34. Sitzung', agendaPosition: 2 })], { question: 'Haushalt' }, /^Abstimmung geöffnet: Haushalt – 34\. Sitzung.*2/],
+      ['with the meeting of its row', [item('v7', { meetingTitle: '34. Sitzung' })], { question: 'Haushalt' }, /^Abstimmung geöffnet: Haushalt – 34\. Sitzung$/],
+      ['without a row or a question', [], {}, /^Abstimmung geöffnet: Abstimmung$/],
+    ])('announces a vote that opened %s', async (_name, items, fresh, text) => {
+      jest.useFakeTimers({ doNotFake: ['Date'] });
+      try {
+        const { sessions, harness } = await start('/voting', {
+          live: [{ id: 'm1', status: 'live' }],
+          pages: [page(items)],
+          fresh: { canCast: false, ...fresh },
+        });
+        const say = jest.spyOn(TestBed.inject(Announcer), 'announce');
+        sessions.get('m1')!.openVote.set(opened('v7'));
+        harness.detectChanges();
+        jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+        expect(say).toHaveBeenCalledWith(expect.stringMatching(text));
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('leaves the vote in the detail to the detail', async () => {
+      jest.useFakeTimers({ doNotFake: ['Date'] });
+      try {
+        const { sessions, harness } = await start('/voting/v7', {
+          live: [{ id: 'm1', status: 'live' }],
+          pages: [page([item('v7')])],
+          fresh: { canCast: false },
+        });
+        const say = jest.spyOn(TestBed.inject(Announcer), 'announce');
+        sessions.get('m1')!.openVote.set(opened('v7'));
+        harness.detectChanges();
+        jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+        expect(say).not.toHaveBeenCalled();
       } finally {
         jest.useRealTimers();
       }

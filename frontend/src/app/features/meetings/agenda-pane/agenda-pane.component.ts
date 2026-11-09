@@ -3,11 +3,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
+  ElementRef,
   inject,
   input,
   model,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
@@ -15,7 +18,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, MeetingVote, Uuid } from '@core/api/models';
-import type { TodoCardDetail } from '@core/api/todos.service';
+import { TodosApiService, type TodoCardDetail } from '@core/api/todos.service';
 import {
   BadgeComponent,
   ConfirmDialogComponent,
@@ -31,11 +34,12 @@ import {
   type NewTodoLink,
 } from '../../todos/new-dialog/todo-new-dialog.component';
 import { BodyPortalDirective } from '@shared/ui/body-portal/body-portal.directive';
+import { TodoLinkCardDialogComponent } from '../../todos/link-card-dialog/todo-link-card-dialog.component';
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
 import { TopBadgeComponent } from '../top-badge/top-badge.component';
 
 /** The ids of the row menu items of an agenda item. */
-type AgendaAction = 'done' | 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo';
+type AgendaAction = 'done' | 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo' | 'link';
 
 /**
  * Add, rename, reorder and remove agenda items: the meeting lead with write access, while
@@ -52,7 +56,7 @@ export interface AgendaMove {
 }
 
 /**
- * The agenda of the session page ("Tagesordnung · n TOPs").
+ * The agenda of the session page ("Tagesordnung").
  *
  * A row shows the number, the title, the kind ("Antrag" or "Freitext"), an open vote
  * and the tag NÖ. The number is filled for the item that the room handles now, and a
@@ -96,6 +100,7 @@ export interface AgendaMove {
     ListItemComponent,
     RowMenuComponent,
     TodoNewDialogComponent,
+    TodoLinkCardDialogComponent,
     BodyPortalDirective,
   ],
   templateUrl: './agenda-pane.component.html',
@@ -105,6 +110,7 @@ export class AgendaPaneComponent {
   private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
   private readonly linkedRefresh = inject(TodoLinkedRefresh);
+  private readonly todosApi = inject(TodosApiService);
 
   readonly meeting = input.required<Meeting>();
   readonly agenda = input.required<AgendaItem[]>();
@@ -115,6 +121,12 @@ export class AgendaPaneComponent {
   readonly savingAgenda = input(false);
   readonly renamingTopId = input<Uuid | null>(null);
   readonly renameDraft = model<string>('');
+  private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
+  /**
+   * The rename field takes the focus when it opens. The `autofocus` attribute works only on
+   * page load, and the template lint refuses it (§ NF/accessibility/conformance/000492).
+   */
+  private readonly focusRename = effect(() => this.renameInput()?.nativeElement.focus());
   /**
    * Inside the agenda sheet, whose header names the agenda and holds the add: the heading
    * is for screen readers only, and the pane shows no add of its own.
@@ -145,6 +157,10 @@ export class AgendaPaneComponent {
   /** "Neues To-Do" from the menu of an item: open, and the links it starts with. */
   protected readonly todoOpen = signal(false);
   protected readonly todoLinks = signal<readonly NewTodoLink[]>([]);
+  /** "To-Do verknüpfen" from the menu of an item: the item, and the cards that link it already. */
+  protected readonly linkItem = signal<AgendaItem | null>(null);
+  protected readonly linkOpen = signal(false);
+  protected readonly linkExclude = signal<readonly Uuid[]>([]);
   /** The item that "TOP entfernen?" asks about. */
   protected readonly removing = signal<AgendaItem | null>(null);
   /** The person may write To-Dos on the board of the gremium of the meeting. */
@@ -159,13 +175,6 @@ export class AgendaPaneComponent {
   protected readonly canChangeAgenda = computed(() =>
     canChangeAgenda(this.meeting(), this.locked()),
   );
-
-  protected readonly headingText = computed(() => {
-    const n = this.agenda().length;
-    return this.i18n.translate(n === 1 ? 'meetings.agenda.headingOne' : 'meetings.agenda.heading', {
-      n,
-    });
-  });
 
   /**
    * The id of the item that the room handles now. Only a live or closed meeting has
@@ -246,11 +255,12 @@ export class AgendaPaneComponent {
   /** The row menu of an item. Empty when nothing on the agenda may change. */
   private menu(item: AgendaItem, index: number): readonly RowMenuSection[] {
     const todo: RowMenuItem = { id: 'todo', label: this.i18n.translate('meetings.agenda.todo'), icon: 'circleok' };
+    const link: RowMenuItem = { id: 'link', label: this.i18n.translate('meetings.agenda.link'), icon: 'link' };
     const key: TranslationKey = item.doneAt ? 'meetings.agenda.markOpen' : 'meetings.agenda.markDone';
     const done: RowMenuItem = { id: 'done', label: this.i18n.translate(key), icon: 'check' };
     return [
       ...(this.canTick() ? [{ items: [done] }] : []),
-      ...(this.canCreateTodo() ? [{ items: [todo] }] : []),
+      ...(this.canCreateTodo() ? [{ items: [todo, link] }] : []),
       ...this.agendaMenu(item, index),
     ];
   }
@@ -297,10 +307,13 @@ export class AgendaPaneComponent {
 
   protected onAction(item: AgendaItem, index: number, action: RowMenuItem): void {
     const id = action.id as AgendaAction;
-    if (id !== 'todo' && this.savingAgenda()) return;
+    if (id !== 'todo' && id !== 'link' && this.savingAgenda()) return;
     switch (id) {
       case 'todo':
         this.openTodo(item, index);
+        break;
+      case 'link':
+        this.openLink(item);
         break;
       case 'done':
         this.setDone.emit({ item, done: !item.doneAt });
@@ -353,6 +366,22 @@ export class AgendaPaneComponent {
     };
     this.todoLinks.set([...application, agendaItem]);
     this.todoOpen.set(true);
+  }
+
+  /**
+   * "To-Do verknüpfen": the search over the cards that the person writes (spec 000548). The
+   * cards that link the item already leave the list once the server answers.
+   */
+  private openLink(item: AgendaItem): void {
+    this.linkExclude.set([]);
+    this.linkItem.set(item);
+    this.linkOpen.set(true);
+    this.todosApi.linked('agenda_item', item.id).subscribe({
+      next: (cards) => {
+        if (this.linkItem()?.id === item.id) this.linkExclude.set(cards.map((c) => c.id));
+      },
+      error: () => undefined,
+    });
   }
 
   /** The new card shows at once in the "To-Dos" of the TOP and of its application. */

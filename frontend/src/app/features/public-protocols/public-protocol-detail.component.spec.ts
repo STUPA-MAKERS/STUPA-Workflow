@@ -146,6 +146,18 @@ describe('PublicProtocolDetailComponent', () => {
     expect(screen.queryByText(/finalisiert am/)).toBeNull();
   });
 
+  /** The protocol text is in the gremium's language; it is marked when the UI shows another. */
+  it('marks the protocol text with its language when it is not the UI language', async () => {
+    await setup(of(detailFixture({ lang: 'en' })));
+    const title = screen.getByRole('heading', { level: 1 });
+    expect(title.getAttribute('lang')).toBe('en');
+  });
+
+  it('leaves the lang off when the protocol is in the UI language', async () => {
+    await setup(of(detailFixture({ lang: 'de' })));
+    expect(screen.getByRole('heading', { level: 1 }).hasAttribute('lang')).toBe(false);
+  });
+
   it('loads the images of the text through the public protocol route', async () => {
     const img = '0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
     const fixture = detailFixture();

@@ -423,8 +423,6 @@ class BudgetNodeUpdate(WireModel, frozen=True):
     name: str | None = None
     active: bool | None = None
     color: str | None = None
-    acceptedStateKeys: list[str] | None = None
-    deniedStateKeys: list[str] | None = None
     hiddenInBudget: bool | None = Field(
         default=None,
         description="Hide this node (incl. subtree) in the budget tab — display only, "
@@ -725,10 +723,11 @@ TodoLinkKind = Literal[
     "gremium",
     "invoice",
     "expense",
+    "budget",
     "ticket",
     "todo",
 ]
-TicketKind = Literal["bug", "question", "idea"]
+TicketKind = Literal["bug", "question", "idea", "barrier"]
 TicketStatus = Literal["new", "in_progress", "done", "rejected"]
 
 

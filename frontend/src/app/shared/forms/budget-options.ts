@@ -42,8 +42,6 @@ function optionNode(o: FieldOption, lang: Lang): BudgetTreeNode {
     currency: 'EUR',
     active: true,
     color: o.color ?? null,
-    acceptedStateKeys: [],
-    deniedStateKeys: [],
     hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,

@@ -28,6 +28,7 @@ import { SelectFieldComponent, type SelectFieldOption } from '@stupa-makers/ui-k
       [placeholder]="props.placeholder || ('formly.select.placeholder' | t)"
       [options]="optionList"
       [hint]="props.description ?? ''"
+      [textLang]="props['textLang'] ?? null"
       [error]="showError ? (props['errorText'] ?? ('formly.select.error' | t)) : ''"
     />
   `,

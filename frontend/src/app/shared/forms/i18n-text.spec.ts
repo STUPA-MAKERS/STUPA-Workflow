@@ -1,4 +1,29 @@
-import { i18nLabel, langFieldLabel, resolveI18n, sameI18n, setI18n, trimI18n } from './i18n-text';
+import {
+  i18nLabel,
+  langAttr,
+  langFieldLabel,
+  resolvedI18nLang,
+  resolveI18n,
+  sameI18n,
+  setI18n,
+  trimI18n,
+} from './i18n-text';
+
+describe('resolvedI18nLang', () => {
+  it('names the language that resolveI18n shows', () => {
+    expect(resolvedI18nLang({ de: 'Titel', en: 'Title' }, 'en')).toBe('en');
+    expect(resolvedI18nLang({ de: 'Titel' }, 'fr')).toBe('de');
+    expect(resolvedI18nLang({ es: 'Título' }, 'de')).toBe('es');
+    expect(resolvedI18nLang({}, 'de')).toBeNull();
+    expect(resolvedI18nLang(null, 'de')).toBeNull();
+  });
+
+  it('gives a lang attribute only for another language', () => {
+    expect(langAttr('de', 'en')).toBe('de');
+    expect(langAttr('en', 'en')).toBeNull();
+    expect(langAttr(null, 'en')).toBeNull();
+  });
+});
 
 describe('resolveI18n', () => {
   const map = { de: 'Titel', en: 'Title' };

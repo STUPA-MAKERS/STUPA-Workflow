@@ -62,8 +62,4 @@ export class ParticipantRosterComponent {
       };
     }),
   );
-
-  protected readonly present = computed(
-    () => this.rows().filter((a) => a.status === 'present').length,
-  );
 }

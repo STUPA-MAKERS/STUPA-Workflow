@@ -32,6 +32,32 @@ describe('TodosApiService', () => {
     one.flush([]);
   });
 
+  it('searches series and writable Events, with the term only when given', () => {
+    api.series().subscribe();
+    expect(http.expectOne((r) => r.url === '/api/todos/series').request.params.keys()).toEqual([]);
+    api.series('Fest').subscribe();
+    http.expectOne((r) => r.url === '/api/todos/series' && r.params.get('q') === 'Fest').flush([]);
+    api.writableEvents().subscribe();
+    expect(http.expectOne((r) => r.url === '/api/todos/events').request.params.keys()).toEqual([]);
+    api.writableEvents('Ball').subscribe();
+    http.expectOne((r) => r.url === '/api/todos/events' && r.params.get('q') === 'Ball').flush([]);
+    api.createSeries('Neu').subscribe();
+    expect(http.expectOne('/api/todos/series').request.body).toEqual({ name: 'Neu' });
+  });
+
+  it('reads cards in a batch, a tile and the sheet of a link', () => {
+    api.cards(['k-1', 'k-2']).subscribe();
+    expect(http.expectOne((r) => r.url === '/api/todos/cards').request.params.getAll('ids')).toEqual(['k-1', 'k-2']);
+    api.cardTile('k-1').subscribe();
+    http.expectOne('/api/todos/cards/k-1/tile').flush({});
+    api.linkView('k-1', 'l-1').subscribe();
+    http.expectOne('/api/todos/cards/k-1/links/l-1/view').flush({});
+    api.card('k-1').subscribe();
+    expect(http.expectOne('/api/todos/cards/k-1').request.context.get(SKIP_LOADING)).toBe(true);
+    api.card('k-1', { detail: true }).subscribe();
+    http.expectOne('/api/todos/cards/k-1').flush({});
+  });
+
   it('reads a board and its members', () => {
     api.board('b-1').subscribe();
     http.expectOne('/api/todos/boards/b-1').flush({});

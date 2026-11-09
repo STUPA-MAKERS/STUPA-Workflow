@@ -1,9 +1,9 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 import { tap } from 'rxjs';
-import type { FieldType, FormFieldDef, FormSection, Lang } from '@core/api/models';
+import type { FieldType, FormFieldDef, FormSection, I18nMap, Lang } from '@core/api/models';
 import { evalJsonLogic, isFieldVisible, JsonLogicError } from './jsonlogic';
 import { CATALOG, de, type TranslationKey } from '@core/i18n/translations';
-import { resolveI18n } from './i18n-text';
+import { langAttr, resolvedI18nLang, resolveI18n } from './i18n-text';
 import { baseLocale, toFormatLocale } from '@core/i18n/i18n.service';
 import { formatMoney } from '@shared/format-money';
 import { normalizePositions, positionsTotal } from './positions';
@@ -64,7 +64,9 @@ const FORMLY_TYPE: Record<FieldType, string> = {
 /**
  * Translate an effective form definition (`FormFieldDef[]`) into Formly field configs.
  * The mapping covers:
- * - labels and help texts through `resolveI18n` (active UI locale).
+ * - labels and help texts through `resolveI18n` (active UI locale). A text in a fallback
+ *   language puts that language into `props.textLang`, and an option into its `lang`, so
+ *   the field marks it with `lang` (app spec 000523).
  * - `required` and `validation` (min/max/minLen/maxLen/pattern) → Formly props.
  * - `visibleIf` → `expressions.hide` (negated). An eval error keeps the field visible.
  * - `compute`/`computed` → `expressions['model.<key>']` (derived value).
@@ -134,7 +136,7 @@ export function toFormlySections(
     const heading: FormlyFieldConfig = {
       type: 'display',
       className: 'fe-full fe-heading',
-      props: { heading: true, label: resolveI18n(section.label, lang) },
+      props: { heading: true, label: resolveI18n(section.label, lang), ...textLangProp(section.label, lang) },
     };
     return fields.length ? [heading, ...fields.map(editField)] : [];
   };
@@ -149,7 +151,7 @@ function sectionHeading(f: FormFieldDef, lang: Lang): FormlyFieldConfig {
   const help = ownHelp(f, label, lang);
   return {
     type: 'display',
-    props: { heading: true, label, ...(help ? { description: help } : {}) },
+    props: { heading: true, label, ...(help ? { description: help } : {}), ...textLangProp(f.label, lang) },
   };
 }
 
@@ -160,6 +162,17 @@ function sectionHeading(f: FormFieldDef, lang: Lang): FormlyFieldConfig {
 function ownHelp(f: FormFieldDef, label: string, lang: Lang): string | undefined {
   const help = f.help ? resolveI18n(f.help, lang) : '';
   return help.trim() && help.trim() !== label.trim() ? help : undefined;
+}
+
+/** `textLang` for a form text in a fallback language; nothing when the UI language shows. */
+function textLangProp(map: I18nMap | null | undefined, lang: Lang): { readonly textLang?: string } {
+  const code = fallbackLang(map, lang);
+  return code ? { textLang: code } : {};
+}
+
+/** The language of a form text when it is not the UI language, else `null`. */
+function fallbackLang(map: I18nMap | null | undefined, lang: Lang): string | null {
+  return langAttr(resolvedI18nLang(map, lang), lang);
 }
 
 /** The keys of the `positions` fields: their total caps the requested funding. */
@@ -228,7 +241,10 @@ function choiceProps(f: FormFieldDef, lang: Lang): Readonly<Record<string, unkno
     f.type === 'multiselect' ||
     f.type === 'gremium_select' ||
     f.type === 'budget_select';
-  const options = f.options?.map((o) => ({ value: o.value, label: resolveI18n(o.label, lang) }));
+  const options = f.options?.map((o) => {
+    const code = fallbackLang(o.label, lang);
+    return { value: o.value, label: resolveI18n(o.label, lang), ...(code ? { lang: code } : {}) };
+  });
   return {
     ...(options && choice ? { options } : {}),
     ...(f.type === 'budget_select' ? { nodes: budgetOptionTree(f.options ?? [], lang) } : {}),
@@ -289,6 +305,7 @@ function mapField(
   const props: Record<string, unknown> = {
     ...(f.type === 'markdown' && !help ? {} : { label: text }),
     ...(help ? { description: help } : {}),
+    ...textLangProp(f.label, lang),
     ...(!isDisplay && f.required ? { required: true } : {}),
     ...(FORMLY_TYPE[f.type] === 'input' ? { type: INPUT_HTML_TYPE[f.type] ?? 'text' } : {}),
     ...choiceProps(f, lang),

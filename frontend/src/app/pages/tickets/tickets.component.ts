@@ -46,6 +46,11 @@ import {
   SkeletonComponent,
   StickyBarComponent,
   PageHeaderComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  MEDIA,
+  mediaQuery,
 } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { RailStatusService } from '../../layout/rail-status.service';
@@ -53,6 +58,7 @@ import { TicketsPageService } from './tickets-page.service';
 import { KIND_ICON, KIND_LABEL, STATUS_LABEL, reporterRowName, ticketAge } from './tickets.util';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
+import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 
 /** The state chip. `open` (the default) shows new and in progress, the closed ones folded. */
 export type TicketStatusFilter = 'open' | TicketStatus | 'all';
@@ -110,6 +116,7 @@ function statusOrder(status: TicketStatusFilter): readonly TicketStatus[] {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowMenuComponent,
     PullRefreshDirective,
     RowChevronComponent,
     NoteComponent,
@@ -137,6 +144,15 @@ function statusOrder(status: TicketStatusFilter): readonly TicketStatus[] {
 export class TicketsComponent {
   private readonly api = inject(TicketsApiService);
   private readonly i18n = inject(I18nService);
+  protected readonly phone = mediaQuery(MEDIA.phone);
+  /** The ⋮ menu of the phone header: "Aktualisieren", the one-tap way to the pull (app spec 000514). */
+  protected readonly phoneMenu = computed<RowMenuSection[]>(() => [
+    refreshMenuSection((key) => this.i18n.translate(key)),
+  ]);
+
+  protected onPhoneMenu(item: RowMenuItem): void {
+    if (isRefreshItem(item)) reloadLikePull(() => this.refreshList());
+  }
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(TicketsPageService);

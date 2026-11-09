@@ -29,7 +29,7 @@
       </app-side-sheet>
     } @else if (open()) {
       <button type="button" class="jq__backdrop" aria-hidden="true" tabindex="-1" (click)="open.set(false)"></button>
-      <div class="jq__pop" role="dialog" [attr.aria-label]="'guests.qr.title' | t">
+      <div class="jq__pop" role="dialog" appFocusDialog [attr.aria-label]="'guests.qr.title' | t">
         <ng-container [ngTemplateOutlet]="body" />
       </div>
     }

@@ -48,6 +48,19 @@
               </label>
             }
           </app-section>
+
+          <app-section class="br__sec" [level]="2" [heading]="'admin.brand.statement.group' | t">
+            <label class="br__area" data-testid="statement">
+              <span class="br__areaLabel">{{ withLang('admin.brand.statement.label' | t) }}</span>
+              <textarea
+                class="br__areaInput"
+                rows="12"
+                [ngModel]="statementMap(d)[lang()]"
+                (ngModelChange)="setText(statementMap(d), $event)"
+                name="statement"
+              ></textarea>
+            </label>
+          </app-section>
         </div>
 
         <div class="br__col">
@@ -147,6 +160,9 @@
                 </app-button>
               }
             </div>
+            @if (accentIssues().length > 0) {
+              <app-note kind="error" icon="alert" role="alert">{{ 'admin.brand.accent.lowContrast' | t }}</app-note>
+            }
           </app-section>
 
           <app-section class="br__sec" [level]="2" [heading]="'admin.brand.avatars.group' | t">
@@ -225,7 +241,7 @@
       icon="check"
       [label]="'action.save' | t"
       [loading]="saving()"
-      [disabled]="linkErrors().length > 0"
+      [disabled]="linkErrors().length > 0 || accentIssues().length > 0"
       (activate)="save()"
     />
   }

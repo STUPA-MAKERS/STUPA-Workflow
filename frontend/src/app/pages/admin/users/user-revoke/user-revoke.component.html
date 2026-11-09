@@ -11,7 +11,7 @@
     @if (loading()) {
       <app-skeleton variant="rows" [count]="4" [label]="'admin.users.revoke.loading' | t" />
     } @else if (failed() || !p) {
-      <app-note kind="error" icon="alert">
+      <app-note kind="error" icon="alert" role="alert">
         <span>{{ 'admin.users.revoke.loadFailed' | t }}</span>
       </app-note>
     } @else {
@@ -51,7 +51,7 @@
       }
 
       @if (p.gremien.length) {
-        <app-section class="ur__sec" [heading]="'admin.users.revoke.gremien' | t: { n: p.gremien.length }">
+        <app-section class="ur__sec" [heading]="'admin.users.revoke.gremien' | t">
           <app-button sectionAction variant="text" size="sm" [disabled]="p.isSelf" (click)="toggleAll()">{{
             (allSelected() ? 'admin.users.revoke.deselectAll' : 'admin.users.revoke.selectAll') | t
           }}</app-button>
@@ -95,7 +95,7 @@
       }
 
       @if (p.globalRoles.length) {
-        <app-section class="ur__sec" [heading]="'admin.users.revoke.roles' | t: { n: p.globalRoles.length }">
+        <app-section class="ur__sec" [heading]="'admin.users.revoke.roles' | t">
           <ul class="ur__items">
             @for (r of p.globalRoles; track r.roleId) {
               @let e = rEntry(r);

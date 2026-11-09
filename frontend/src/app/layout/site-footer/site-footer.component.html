@@ -2,19 +2,20 @@
   <div class="ft__line ft__clip">
     <div class="ft__sep ft__parts">
       <p class="ft__copy">{{ copyright() || ('footer.coBranding' | t) }}</p>
-      @if (legalLinks().length > 0) {
-        <div class="ft__legal">
-          <div class="ft__clip">
-            <ul class="ft__sep ft__links">
-              @for (link of legalLinks(); track link.url) {
-                <li>
-                  <a class="ft__link" [href]="link.url">{{ link.label }}</a>
-                </li>
-              }
-            </ul>
-          </div>
+      <div class="ft__legal">
+        <div class="ft__clip">
+          <ul class="ft__sep ft__links">
+            @for (link of legalLinks(); track link.url) {
+              <li>
+                <a class="ft__link" [href]="link.url">{{ link.label }}</a>
+              </li>
+            }
+            <li>
+              <a class="ft__link" routerLink="/barrierefreiheit">{{ 'a11yStatement.link' | t }}</a>
+            </li>
+          </ul>
         </div>
-      }
+      </div>
     </div>
   </div>
 </footer>

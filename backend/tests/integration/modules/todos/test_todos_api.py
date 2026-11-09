@@ -140,6 +140,9 @@ async def test_the_personal_board_flow(api: Api, maker: async_sessionmaker[Async
         assert again.status_code == 409
         hits = _ok(client.get("/api/todos/link-targets?q=Cee&kind=todo"))
         assert c["id"] in {h["targetId"] for h in hits}
+        newest = _ok(client.get("/api/todos/link-targets?kind=todo"))
+        assert c["id"] in {h["targetId"] for h in newest}
+        assert _ok(client.get("/api/todos/link-targets?q=C&kind=meeting")) == []
         mine = _ok(client.get("/api/todos/mine"))
         assert [i["title"] for i in mine["items"]] == ["A2"] and mine["dueSoonCount"] == 1
         assert client.delete(f"/api/todos/cards/{c['id']}").status_code == 204

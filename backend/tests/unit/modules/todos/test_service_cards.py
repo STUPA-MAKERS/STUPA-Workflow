@@ -268,6 +268,22 @@ async def test_create_in_the_first_column_with_everything() -> None:
     assert service.outbox == [TodoMail("assigned", new.id, (OTHER,), ME, None)]
 
 
+async def test_create_takes_the_checklist_of_a_duplicate_as_open_items() -> None:
+    """Spec 000554: a duplicate takes the checklist, every item open, in its order."""
+    b = board()
+    first = column(b.id, "Offen")
+    session = ScriptedSession(scalars=[[first], []])
+    session.put(b)
+    service = _svc(session)
+    _stub(service)
+    assert await service.create(_create(b, checklist=["Raum", " Technik "]), USER) is OUT
+    items = [o for o in session.added if isinstance(o, TodoCheckItem)]
+    assert [(i.text, i.done, i.position) for i in items] == [
+        ("Raum", False, 0),
+        ("Technik", False, 1),
+    ]
+
+
 async def test_create_in_the_done_column_completes_and_tells_the_tickets() -> None:
     b = board()
     done = column(b.id, "Erledigt", is_done=True)
@@ -816,9 +832,60 @@ async def test_links() -> None:
     with pytest.raises(NotFoundError):
         await service.remove_link(c.id, foreign.id, USER)
     await service.remove_link(c.id, new.id, USER)
-    assert session.deleted == [new]
+    removal = str(session.statements[-1])
+    assert removal.startswith("DELETE FROM todo_link") and " OR " not in removal
     assert [e.kind for e in _events(session)] == ["linked", "unlinked"]
     assert _events(session)[1].payload == {"linkKind": "ticket", "targetId": str(TICKET)}
+
+
+async def test_a_link_between_two_cards_shows_on_both() -> None:
+    """§ 000573: card B shows the link of card A to it, and each other card once."""
+    b = board()
+    col = column(b.id)
+    a_card, b_card = card(b, col), card(b, col)
+    hidden_src = uuid.uuid4()
+    to_b = link(a_card.id, todo_id=b_card.id)
+    back = link(b_card.id, todo_id=a_card.id)
+    unreadable = link(hidden_src, todo_id=b_card.id)
+    ticket_link = link(b_card.id, ticket_id=TICKET)
+    session = ScriptedSession()
+    session.put(b, col, a_card, b_card)
+    readable = Resolved(True, "Karte A", f"/todos?card={a_card.id}")
+    service = _svc(session, FakeLinks(resolved={("todo", a_card.id): readable}))
+    links, resolved = await service._card_links(
+        {b_card.id}, [ticket_link, to_b, back, unreadable], USER
+    )
+    assert [(ln.kind, ln.target_id) for ln in links[b_card.id]] == [
+        ("ticket", TICKET),
+        ("todo", a_card.id),
+    ]
+    assert links[b_card.id][1].id == back.id
+    assert ("todo", hidden_src) in resolved
+    only_incoming, _ = await service._card_links(
+        {b_card.id}, [to_b], USER
+    )
+    assert only_incoming[b_card.id][0].id == to_b.id
+
+
+async def test_a_card_link_goes_from_either_card() -> None:
+    """§ 000573: card B views and removes the link of card A; the removal takes both ways."""
+    session, _b, col, c, service = _setup()
+    other = card(_b, col)
+    incoming = link(other.id, todo_id=c.id)
+    session.put(other, incoming)
+    session.scalar_q[:] = [c, c]
+    service.links = FakeLinks(readable=[("todo", other.id)])  # type: ignore[assignment]
+    found = await service._card_link(c, incoming.id)
+    assert (found.kind, found.target_id) == ("todo", other.id)
+    await service.remove_link(c.id, incoming.id, USER)
+    removal = str(session.statements[-1])
+    assert removal.startswith("DELETE FROM todo_link") and " OR " in removal
+    assert _events(session)[-1].payload == {"linkKind": "todo", "targetId": str(other.id)}
+    session.scalar_q[:] = [c, uuid.uuid4()]
+    with pytest.raises(ConflictError) as exc:
+        await service.add_link(c.id, "todo", other.id, USER)
+    assert exc.value.code == "link_exists"
+    assert " OR " in str(session.statements[-1])
 
 
 async def test_comments(people: dict[uuid.UUID, PersonRef]) -> None:

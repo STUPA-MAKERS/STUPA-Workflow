@@ -244,6 +244,8 @@ function normalizeState(s: StateDef): StateDef {
     ...(s.editAllowed === false ? { editAllowed: false } : {}),
     ...(s.isInitial ? { isInitial: true } : {}),
     ...(s.isTerminal ? { isTerminal: true } : {}),
+    ...(s.isApproved ? { isApproved: true } : {}),
+    ...(s.isDenied ? { isDenied: true } : {}),
     ...(s.kind && s.kind !== 'normal' ? { kind: s.kind } : {}),
     ...(s.config && Object.keys(s.config).length > 0 ? { config: s.config } : {}),
   };

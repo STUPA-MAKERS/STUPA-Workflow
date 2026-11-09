@@ -27,6 +27,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from app.modules.admin.statement import default_statement
 from app.shared.i18n import I18nMap
 from app.shared.schemas import FrozenStrictCamelModel
 
@@ -199,7 +200,7 @@ class SiteFreetexts(FrozenStrictCamelModel, frozen=True):
     """The i18n freetexts of the site.
 
     They are the login hint, the welcome, the support text, the e-mail footer, the
-    apply info and the texts after the submission.
+    apply info, the texts after the submission and the accessibility statement.
     """
 
     login_hint: I18nMap = Field(default_factory=dict, alias="loginHint")
@@ -214,6 +215,11 @@ class SiteFreetexts(FrozenStrictCamelModel, frozen=True):
     #: back to the built-in text of the frontend.
     submitted_internal: I18nMap = Field(default_factory=dict, alias="submittedInternal")
     submitted_external: I18nMap = Field(default_factory=dict, alias="submittedExternal")
+    #: The accessibility statement of ``/barrierefreiheit``, Markdown, per language
+    #: (spec 000495). A config without it reads as the built-in draft.
+    accessibility_statement: I18nMap = Field(
+        default_factory=default_statement, alias="accessibilityStatement"
+    )
 
     @field_validator(
         "login_hint",
@@ -223,6 +229,7 @@ class SiteFreetexts(FrozenStrictCamelModel, frozen=True):
         "apply_info",
         "submitted_internal",
         "submitted_external",
+        "accessibility_statement",
     )
     @classmethod
     def _cap_text(cls, v: I18nMap) -> I18nMap:

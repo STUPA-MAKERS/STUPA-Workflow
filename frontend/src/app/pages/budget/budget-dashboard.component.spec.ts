@@ -1,4 +1,4 @@
-import { BehaviorSubject, Subject } from 'rxjs';
+import { BehaviorSubject, Subject, of } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -16,6 +16,8 @@ import type {
   Expense,
   FiscalYear,
 } from './budget-tree.api';
+import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { TodosApiService } from '@core/api/todos.service';
 import { PALETTE, shadeColor } from './budget-color.util';
 import { itemApp, itemBooking } from './budget-items/budget-items.fixtures';
 
@@ -47,8 +49,6 @@ function node(over: Partial<BudgetTreeNode> & { id: string }): BudgetTreeNode {
     currency: over.currency ?? 'EUR',
     active: over.active ?? true,
     color: over.color ?? null,
-    acceptedStateKeys: over.acceptedStateKeys ?? [],
-    deniedStateKeys: over.deniedStateKeys ?? [],
     hiddenInBudget: over.hiddenInBudget ?? false,
     viewGremiumId: over.viewGremiumId ?? null,
     fiscalStartMonth: over.fiscalStartMonth ?? 1,
@@ -156,6 +156,8 @@ interface SetupOpts {
   bookings?: Expense[];
   wide?: boolean;
   phone?: boolean;
+  /** The to-do API of the section "Verknüpft" of the cost centre card. */
+  todos?: object;
 }
 
 /**
@@ -167,6 +169,7 @@ function providers(opts: SetupOpts, params = new BehaviorSubject(convertToParamM
     provideHttpClient(),
     provideHttpClientTesting(),
     provideRouter([]),
+    opts.todos ? { provide: TodosApiService, useValue: opts.todos } : NO_LINKED_TODOS,
     { provide: AuthService, useValue: authStub(opts.perms) },
     {
       provide: ActivatedRoute,
@@ -1324,5 +1327,36 @@ describe('utilisation', () => {
     const f = { allocated: 100, requested: 0, bound: 20, expended: 30, income: 0, committed: 50, available: 50 };
     expect(utilisation(f)).toBe(50);
     expect(utilisation({ ...f, committed: 0, available: 0 })).toBeNull();
+  });
+});
+
+describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  it('shows the cards that link the cost centre on its card, with the actions', async () => {
+    const todos = {
+      linked: jest.fn(() =>
+        of([
+          {
+            id: 'k-1',
+            boardId: 'b-1',
+            boardName: 'StuPa',
+            title: 'Inventur Bühnentechnik',
+            columnName: 'Offen',
+            isDone: false,
+            dueDate: null,
+            assignees: [],
+            event: null,
+            balance: null,
+          },
+        ]),
+      ),
+      boards: jest.fn(() => of([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }])),
+    };
+    await setup({ queryParams: { ks: 'b-810' }, todos });
+    expect(todos.linked).toHaveBeenCalledWith('budget', 'b-810');
+    const list = document.querySelector('app-todo-linked-list[kind="budget"]') as HTMLElement;
+    expect(within(list).getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();
+    expect(within(list).getByRole('link', { name: 'Inventur Bühnentechnik' })).toHaveAttribute('href', '/todos?card=k-1');
+    expect(within(list).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
   });
 });

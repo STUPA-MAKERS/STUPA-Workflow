@@ -145,3 +145,70 @@ describe('TodoLinkedListComponent', () => {
     expect(second.componentInstance.cards().map((c) => c.id)).toEqual(['k-1']);
   });
 });
+
+describe('TodoLinkedListComponent actions (specs 000547, 000548)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  async function withActions(writes: boolean, linked: TodoLinkedCard[] = []) {
+    const api = {
+      linked: jest.fn(() => of(linked)),
+      boards: jest.fn(() => of([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: writes }])),
+    };
+    const view = await render(TodoLinkedListComponent, {
+      inputs: { kind: 'application', targetId: 'a-1', headingId: 'ad-todos', actions: true, gremiumId: 'g-1', linkLabel: 'Lerncafé' },
+      providers: [provideRouter([]), { provide: TodosApiService, useValue: api }],
+    });
+    return { ...view, api, cmp: view.fixture.componentInstance };
+  }
+
+  it('shows "Mit To-Do verknüpfen" and "To-Do anlegen" also without a linked card', async () => {
+    const { cmp } = await withActions(true);
+    expect(screen.getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mit To-Do verknüpfen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
+    expect(cmp.showActions()).toBe(true);
+  });
+
+  it('opens the create dialog of an Antrag with the link and the board of its Gremium', async () => {
+    const { cmp, fixture } = await withActions(true);
+    screen.getByRole('button', { name: 'To-Do anlegen' }).click();
+    fixture.detectChanges();
+    expect(cmp.newOpen()).toBe(true);
+    expect(cmp.newLinks()).toEqual([{ kind: 'application', targetId: 'a-1', label: 'Antrag · Lerncafé' }]);
+    expect(cmp.gremiumId()).toBe('g-1');
+    expect(document.querySelector('app-todo-new-dialog')).not.toBeNull();
+  });
+
+  it('opens the link dialog without the cards that link the element already', async () => {
+    const { cmp, fixture } = await withActions(true, [card()]);
+    screen.getByRole('button', { name: 'Mit To-Do verknüpfen' }).click();
+    fixture.detectChanges();
+    expect(cmp.linkOpen()).toBe(true);
+    expect(cmp.linkedIds()).toEqual(['k-1']);
+    expect(document.querySelector('app-todo-link-card-dialog')).not.toBeNull();
+  });
+
+  it('hides the actions from a person who writes no board', async () => {
+    await withActions(false);
+    expect(screen.queryByRole('button', { name: 'To-Do anlegen' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Verknüpft' })).toBeNull();
+  });
+
+  it('reads no boards without actions, and shows the empty state it is given', async () => {
+    const api = { linked: jest.fn(() => of([])), boards: jest.fn(() => of([])) };
+    await render(TodoLinkedListComponent, {
+      inputs: { kind: 'meeting', targetId: 'm-1', emptyHeading: 'Keine To-Dos zu dieser Sitzung' },
+      providers: [provideRouter([]), { provide: TodosApiService, useValue: api }],
+    });
+    expect(api.boards).not.toHaveBeenCalled();
+    expect(screen.getByText('Keine To-Dos zu dieser Sitzung')).toBeInTheDocument();
+  });
+
+  it('reads the list again after a new card', async () => {
+    const { cmp, api } = await withActions(true);
+    expect(api.linked).toHaveBeenCalledTimes(1);
+    cmp.created();
+    TestBed.tick();
+    expect(api.linked).toHaveBeenCalledTimes(2);
+  });
+});

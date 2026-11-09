@@ -33,6 +33,7 @@
         <app-search-pill
           [placeholder]="'invoices.search' | t"
           [label]="'invoices.searchLabel' | t"
+          [results]="loading() || reloading() ? null : total()"
           [value]="q()"
           (valueChange)="onSearch($event)"
         />
@@ -63,7 +64,6 @@
         <app-segmented
           class="inv__seg"
           width="fill"
-          [check]="false"
           [ariaLabel]="'invoices.segment.label' | t"
           [options]="segmentOptions()"
           [value]="segment()"

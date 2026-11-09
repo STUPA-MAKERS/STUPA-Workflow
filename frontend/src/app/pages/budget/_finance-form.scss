@@ -108,7 +108,10 @@
 .ff__box--static {
   flex-direction: column;
   align-items: stretch;
-  padding: 26px var(--space-4) 8px;
+  padding: 0 var(--space-4) 8px;
+}
+.ff__box--static .ff__label {
+  padding: 8px 0 2px;
 }
 .ff__static {
   color: var(--color-text);

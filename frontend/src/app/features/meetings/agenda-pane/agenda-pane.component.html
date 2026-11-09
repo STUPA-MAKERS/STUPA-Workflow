@@ -1,5 +1,5 @@
 <div class="ap__head" [class.ap__head--sheet]="inSheet()">
-  <h2 class="ap__title" [class.sr-only]="inSheet()">{{ headingText() }}</h2>
+  <h2 class="ap__title" [class.sr-only]="inSheet()">{{ 'meetings.agenda.title' | t }}</h2>
   @if (canChangeAgenda() && !inSheet()) {
     <button
       type="button"
@@ -44,7 +44,7 @@
               (blur)="renameTop.emit(item)"
               [placeholder]="'meetings.agenda.renamePlaceholder' | t"
               [attr.aria-label]="'meetings.agenda.rename' | t"
-              autofocus
+              #renameInput
             />
           </div>
         } @else {
@@ -90,6 +90,9 @@
 
 @if (todoOpen()) {
   <app-todo-new-dialog appBodyPortal [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
+}
+@if (linkOpen() && linkItem(); as item) {
+  <app-todo-link-card-dialog appBodyPortal [(open)]="linkOpen" kind="agenda_item" [targetId]="item.id" [exclude]="linkExclude()" />
 }
 
 <app-confirm-dialog

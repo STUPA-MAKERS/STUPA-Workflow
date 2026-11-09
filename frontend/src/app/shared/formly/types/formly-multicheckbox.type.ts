@@ -5,6 +5,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 interface MultiOption {
   readonly value: string;
   readonly label: string;
+  readonly lang?: string;
 }
 
 /**
@@ -21,7 +22,7 @@ interface MultiOption {
   template: `
     <fieldset class="multi">
       <legend class="multi__legend">
-        {{ props.label }}
+        <span [attr.lang]="props['textLang'] ?? null">{{ props.label }}</span>
         @if (props.required) {
           <span class="multi__req" aria-hidden="true">*</span>
         }
@@ -34,11 +35,11 @@ interface MultiOption {
             [checked]="isChecked(opt.value)"
             (change)="toggle(opt.value, $any($event.target).checked)"
           />
-          <span class="multi__label">{{ opt.label }}</span>
+          <span class="multi__label" [attr.lang]="opt.lang ?? null">{{ opt.label }}</span>
         </label>
       }
       @if (props.description && !showError) {
-        <p class="multi__hint">{{ props.description }}</p>
+        <p class="multi__hint" [attr.lang]="props['textLang'] ?? null">{{ props.description }}</p>
       }
       @if (showError) {
         <p class="multi__error" role="alert">

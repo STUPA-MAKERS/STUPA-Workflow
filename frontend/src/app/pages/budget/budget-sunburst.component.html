@@ -16,6 +16,12 @@
       <text [attr.x]="CX" [attr.y]="CY - 6" text-anchor="middle" class="sb__center-name">{{ root()?.name }}</text>
       <text [attr.x]="CX" [attr.y]="CY + 14" text-anchor="middle" class="sb__center-val">{{ total() | money: { whole: true } }}</text>
     </svg>
+    <!-- The values of the chart as a list for a screen reader (app spec 000507). -->
+    <ul class="sr-only" [attr.aria-label]="'budget.overview.values' | t: { name: root()?.name ?? '' }">
+      @for (s of segments(); track s.id + ':' + s.depth) {
+        <li>{{ s.pathKey | simplifyPath }} {{ s.name }}: {{ s.value | money: { whole: true } }} · {{ s.percent }} %</li>
+      }
+    </ul>
     @if (hovered(); as h) {
       <div class="sb__tip" [style.left.px]="tip().x" [style.top.px]="tip().y" role="status">
         <strong>{{ h.name }}</strong>

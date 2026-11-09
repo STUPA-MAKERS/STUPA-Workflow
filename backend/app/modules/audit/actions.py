@@ -69,6 +69,10 @@ class AuditAction(StrEnum):
             its status change (``reverted: true``). ``data`` carries the requested
             amount, the old and the new approved amount, the number of conditions and
             the vote and status-event ids, never the condition texts.
+        APPLICATION_LINK_SET: The Vorgänger of an application set or changed, at the
+            create or later. ``data`` carries the new and the old Vorgänger id.
+        APPLICATION_LINK_REMOVE: The Vorgänger of an application removed. ``data``
+            carries the removed Vorgänger id.
         ATTACHMENT_UPLOAD: ``data`` names the application, or carries ``draft: true``
             for a draft upload of the wizard, plus whether a field key is set, the
             MIME type and the size. It never carries the file name, because a file
@@ -164,6 +168,8 @@ class AuditAction(StrEnum):
     APPLICATION_ARCHIVE = "application_archive"
     APPLICATION_UNARCHIVE = "application_unarchive"
     APPLICATION_DECISION = "application_decision"
+    APPLICATION_LINK_SET = "application_link_set"
+    APPLICATION_LINK_REMOVE = "application_link_remove"
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_UPLOAD = "attachment_upload"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"

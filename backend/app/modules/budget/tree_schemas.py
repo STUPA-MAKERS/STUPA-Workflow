@@ -53,16 +53,14 @@ class BudgetNodeUpdate(FrozenCamelModel, frozen=True):
     """Partially update a cost center.
 
     The key and the parent stay immutable to keep the path stable. `None` means
-    unchanged. `color=""` clears the color. `acceptedStateKeys`,
-    `deniedStateKeys` and `fiscalStart*` make sense at the top level only.
+    unchanged. `color=""` clears the color. `fiscalStart*` makes sense at the top
+    level only.
     """
 
     key: str | None = Field(default=None, min_length=1, max_length=64)
     name: str | None = Field(default=None, min_length=1, max_length=200)
     active: bool | None = None
     color: str | None = None
-    accepted_state_keys: list[str] | None = Field(default=None, alias="acceptedStateKeys")
-    denied_state_keys: list[str] | None = Field(default=None, alias="deniedStateKeys")
     hidden_in_budget: bool | None = Field(default=None, alias="hiddenInBudget")
     #: Visibility Gremium. `None` in the payload clears the assignment.
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
@@ -86,8 +84,6 @@ class BudgetNodeOut(FrozenCamelModel, frozen=True):
     currency: str
     active: bool
     color: str | None = None
-    accepted_state_keys: tuple[str, ...] = Field(default_factory=tuple, alias="acceptedStateKeys")
-    denied_state_keys: tuple[str, ...] = Field(default_factory=tuple, alias="deniedStateKeys")
     hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
@@ -136,8 +132,6 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     currency: str
     active: bool
     color: str | None = None
-    accepted_state_keys: tuple[str, ...] = Field(default_factory=tuple, alias="acceptedStateKeys")
-    denied_state_keys: tuple[str, ...] = Field(default_factory=tuple, alias="deniedStateKeys")
     hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: The own deciding Gremium, the effective one (own or nearest ancestor) and the

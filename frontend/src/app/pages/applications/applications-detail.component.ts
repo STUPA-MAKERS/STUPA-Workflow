@@ -27,6 +27,9 @@ import type {
   ActorInfo,
   Application,
   ApplicationComment,
+  ApplicationLinks,
+  ApplicationListItem,
+  LinkedApplication,
   ApplicationType,
   ApplicationVersion,
   FormFieldDef,
@@ -36,7 +39,7 @@ import type {
   Transition,
   Uuid,
 } from '@core/api/models';
-import { resolveI18n } from '@shared/forms/i18n-text';
+import { resolveI18n, langAttr } from '@shared/forms/i18n-text';
 import { actorLabel } from '@shared/actor-label.util';
 import { toFormlySections } from '@shared/forms/formly-mapper';
 import { formatAnswer, formatFieldValue } from '@shared/forms/answer-format';
@@ -47,6 +50,7 @@ import {
 } from '@shared/forms/positions';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
+import { PredecessorFieldComponent } from '../../features/apply/predecessor-field/predecessor-field.component';
 import { ChatComponent, ChatDrafts, ChatOutbox, appendOnce, withScanStates, draftDropper, filesRefused, sendErrorKey, toChatAttachments, HistoryComponent, flowColorKind, chatPeople, type ChatEdit, type ChatPerson, type ChatMessage, type ChatRef, type ChatSend, type ChatVisibility, type HistoryChange, type HistoryEntry } from '@shared/ui';
 import {
   ButtonComponent,
@@ -54,9 +58,11 @@ import {
   DialogComponent,
   DropOverlayComponent,
   EmptyStateComponent,
+  FabComponent,
   FieldGroupComponent,
   FieldRowComponent,
   FileDropDirective,
+  revealFirstInvalid,
   IconComponent,
   ListDetailNav,
   type ListDetailTask,
@@ -66,6 +72,7 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  SectionComponent,
   SelectFieldComponent,
   type SelectOption,
   SheetBarComponent,
@@ -77,8 +84,6 @@ import {
   TabPagerComponent,
   TabsComponent,
   ToastService,
-  FabComponent,
-  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -97,12 +102,16 @@ import { DecisionSectionComponent } from '@shared/decision/decision-section.comp
 import { decisionHistoryLine } from '@shared/decision/decision.util';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
-import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
+import {
+  type LinkedLead,
+  TodoLinkedListComponent,
+} from '../../features/todos/linked-list/todo-linked-list.component';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { formatMoney } from '@shared/format-money';
 import { withoutKey } from '@shared/util/immutable';
+import { pageItemTitle } from '../../layout/page-title.service';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -199,6 +208,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     DecisionDialogComponent,
     DecisionSectionComponent,
     TodoLinkedListComponent,
+    PredecessorFieldComponent,
     SideSheetComponent,
   ],
   providers: [provideFormly(), ChatDrafts],
@@ -241,6 +251,12 @@ export class ApplicationsDetailComponent {
   readonly commentsLoading = signal(false);
   /** The status changes of the application, oldest first. */
   readonly timeline = signal<TimelineEntry[]>([]);
+  /** The Vorgänger, the Folgeanträge and the link history; null until they loaded. */
+  readonly links = signal<ApplicationLinks | null>(null);
+  /** The dialog that links, changes or removes the Vorgänger. */
+  readonly predecessorOpen = signal(false);
+  /** A change of the Vorgänger is out. */
+  readonly linking = signal(false);
   /** The sections of the pinned form. Empty until it loaded, and on an error. */
   readonly sections = signal<readonly FormSection[]>([]);
   /** The form is on its way; the answers wait for it, so no raw keys flash. */
@@ -297,8 +313,6 @@ export class ApplicationsDetailComponent {
   /** The comment that a link names: the sheet scrolls to it once the thread is there. */
   private readonly linkedComment = signal<string | null>(null);
   private readonly injector = inject(Injector);
-  /** The number of attachments, from the panel. `null` until it loaded them. */
-  readonly attachmentCount = signal<number | null>(null);
   private readonly filesPanel = viewChild(AttachmentsPanelComponent);
   /**
    * Files dropped anywhere on the application become its attachments. Not while another
@@ -455,6 +469,31 @@ export class ApplicationsDetailComponent {
    */
   readonly canDelete = computed(() => this.auth.can('application.delete'));
   readonly canArchive = computed(() => this.auth.can('application.archive'));
+  /**
+   * The Vorgänger can change: the edit right on this Antrag. The server also needs the
+   * edit right on the Vorgänger and answers 403 without it.
+   */
+  readonly canLink = computed(() => !!this.app()?.canEdit);
+  /**
+   * The Vorgänger and the Folgeanträge as rows of "Verknüpft". The server sends only the
+   * Anträge the reader may open; an Antrag can have many Folgeanträge, so they show only
+   * there, while the Vorgänger also has its row in the details.
+   */
+  readonly linkedRows = computed<readonly LinkedLead[]>(() => {
+    const l = this.links();
+    if (!l) return [];
+    const t = (key: TranslationKey) => this.i18n.translate(key);
+    const row = (a: LinkedApplication, kind: string): LinkedLead => ({
+      icon: 'file',
+      title: a.title || t('applications.list.untitled'),
+      sub: kind,
+      link: ['/applications', a.id],
+    });
+    return [
+      ...(l.predecessor ? [row(l.predecessor, t('applications.predecessor.field'))] : []),
+      ...l.successors.map((s) => row(s, t('applications.predecessor.successor'))),
+    ];
+  });
   readonly archiving = signal(false);
 
   /**
@@ -701,7 +740,20 @@ export class ApplicationsDetailComponent {
           changes,
         };
       });
-    return [...statusEntries, ...versionEntries];
+    const untitled = t('applications.list.untitled');
+    const linkEntries: HistoryEntry[] = (this.links()?.events ?? []).map((e) => ({
+      at: e.at,
+      icon: 'link',
+      title: t(
+        e.action === 'set' ? 'applications.history.predecessorSet' : 'applications.history.predecessorRemoved',
+      ),
+      actor: this.actor(e.actorInfo, null),
+      body: e.predecessor ? e.predecessor.title || untitled : t('applications.history.predecessorHidden'),
+      link: e.predecessor
+        ? { label: t('applications.predecessor.open'), route: ['/applications', e.predecessor.id] }
+        : null,
+    }));
+    return [...statusEntries, ...versionEntries, ...linkEntries];
   });
 
   private id: Uuid = '';
@@ -709,6 +761,12 @@ export class ApplicationsDetailComponent {
   readonly title = computed(() =>
     applicationTitle(this.app()?.data, this.i18n.translate('applications.list.untitled')),
   );
+
+  /**
+   * The language of the content of the application (the UI language at submit), as the
+   * `lang` of its title and answers when it is not the UI language (app spec 000523).
+   */
+  protected readonly contentLang = computed(() => langAttr(this.app()?.lang, this.i18n.uiLocale()));
 
   /** The application types, for "<Typ> · Version n". */
   private readonly types = signal<ApplicationType[]>([]);
@@ -791,19 +849,11 @@ export class ApplicationsDetailComponent {
     return [{ items: quick }, { items: more }, { items: danger }].filter((sec) => sec.items.length);
   });
 
-  /** The tabs of the narrow layout, with their counts. */
+  /** The tabs of the narrow layout, by their labels alone (spec 000560). */
   readonly tabs = computed<TabItem[]>(() => [
     { id: 'app', label: this.i18n.translate('applications.detail.tab.app') },
-    {
-      id: 'history',
-      label: this.i18n.translate('applications.detail.tab.history'),
-      count: this.historyEntries().length,
-    },
-    {
-      id: 'files',
-      label: this.i18n.translate('applications.detail.tab.files'),
-      count: this.attachmentCount(),
-    },
+    { id: 'history', label: this.i18n.translate('applications.detail.tab.history') },
+    { id: 'files', label: this.i18n.translate('applications.detail.tab.files') },
   ]);
 
   /**
@@ -811,6 +861,7 @@ export class ApplicationsDetailComponent {
    * detail-to-detail navigation and the constructor does not run again.
    */
   constructor() {
+    pageItemTitle(() => (this.app() ? this.title() : null));
     this.dockEditInBar();
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.loadApplication(pm.get('id') ?? '');
@@ -984,6 +1035,8 @@ export class ApplicationsDetailComponent {
     this.versions.set([]);
     this.comments.set([]);
     this.timeline.set([]);
+    this.links.set(null);
+    this.predecessorOpen.set(false);
     this.sections.set([]);
     this.formLoading.set(true);
     this.hasBudget.set(false);
@@ -993,9 +1046,56 @@ export class ApplicationsDetailComponent {
     this.error.set(false);
     this.transitions.set([]);
     this.agendaOpen.set(false);
-    this.attachmentCount.set(null);
     this.tab.set('app');
     this.transitionsLoading.set(false);
+  }
+
+  /**
+   * A Vorgänger is picked in the dialog: the link changes at once, the answers stay. A
+   * refusal gets its own text: no edit right on the Vorgänger, or a chain that would lead
+   * back to this Antrag.
+   */
+  setPredecessor(item: ApplicationListItem): void {
+    if (this.linking()) return;
+    const seq = this.loadSeq;
+    this.linking.set(true);
+    this.api.setPredecessor(this.id, item.id).subscribe({
+      next: (links) => {
+        this.linking.set(false);
+        if (seq !== this.loadSeq) return;
+        this.links.set(links);
+        this.predecessorOpen.set(false);
+        this.toast.success(this.i18n.translate('applications.predecessor.linked'));
+      },
+      error: (err: { status?: number; error?: ProblemDetail | null }) => {
+        this.linking.set(false);
+        this.toast.error(this.i18n.translate(predecessorErrorKey(err.status, err.error?.code)));
+      },
+    });
+  }
+
+  /** "Vorgänger entfernen": only the link goes. */
+  removePredecessor(): void {
+    if (this.linking()) return;
+    const seq = this.loadSeq;
+    this.linking.set(true);
+    this.api.removePredecessor(this.id).subscribe({
+      next: () => {
+        this.predecessorOpen.set(false);
+        this.api.applicationLinks(this.id, { quiet: true }).subscribe({
+          next: (links) => {
+            this.linking.set(false);
+            if (seq === this.loadSeq) this.links.set(links);
+          },
+          error: () => this.linking.set(false),
+        });
+        this.toast.success(this.i18n.translate('applications.predecessor.removed'));
+      },
+      error: (err: { status?: number; error?: ProblemDetail | null }) => {
+        this.linking.set(false);
+        this.toast.error(this.i18n.translate(predecessorErrorKey(err.status, err.error?.code)));
+      },
+    });
   }
 
   /**
@@ -1045,6 +1145,12 @@ export class ApplicationsDetailComponent {
     this.api.timeline(this.id, { quiet: true, detail }).subscribe({
       next: (events) => {
         if (seq === this.loadSeq) this.timeline.set(events);
+      },
+      error: () => {},
+    });
+    this.api.applicationLinks(this.id, { detail }).subscribe({
+      next: (links) => {
+        if (seq === this.loadSeq) this.links.set(links);
       },
       error: () => {},
     });
@@ -1213,14 +1319,12 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Scroll the first field with an error into view, after the form drew it. */
+  /**
+   * Focus the first field with an error after the form drew it (spec 000519); without a
+   * field in error, scroll to the first error text.
+   */
   private revealError(): void {
-    setTimeout(() => {
-      const el = document.querySelector<HTMLElement>(
-        '.ad__edit [aria-invalid="true"], .ad__edit [role="alert"]',
-      );
-      el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-    });
+    setTimeout(() => revealFirstInvalid(document.querySelector('.ad__edit')));
   }
 
   doDelete(): void {
@@ -1445,4 +1549,16 @@ function rowLines(value: unknown): string {
       .join('\n');
   }
   return formatFieldValue(value);
+}
+
+/** The text of a refused Vorgänger change, by the status and the problem code. */
+export function predecessorErrorKey(status: number | undefined, code: string | null | undefined): TranslationKey {
+  switch (code) {
+    case 'predecessor_cycle':
+      return 'applications.predecessor.errorCycle';
+    case 'predecessor_type_mismatch':
+      return 'applications.predecessor.errorType';
+    default:
+      return status === 403 ? 'applications.predecessor.errorForbidden' : 'applications.predecessor.error';
+  }
 }

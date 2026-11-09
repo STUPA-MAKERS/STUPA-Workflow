@@ -40,7 +40,7 @@
 
 .home__choices {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: var(--space-4);
   width: 100%;
 }
@@ -95,7 +95,7 @@
   font-weight: var(--fw-semibold);
 }
 .home__choices--three {
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
 }
 
 .home__latest {
@@ -117,7 +117,7 @@
 }
 .home__latestList {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: 10px;
   margin: 0;
   padding: 0;

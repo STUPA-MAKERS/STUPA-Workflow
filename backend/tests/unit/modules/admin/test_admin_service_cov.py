@@ -802,6 +802,8 @@ def _flow_state_row(key: str, **kw: Any) -> Any:
         "edit_allowed": True,
         "is_initial": False,
         "is_terminal": False,
+        "is_approved": False,
+        "is_denied": False,
         "kind": "normal",
         "config": {},
         "flow_version_id": uuid.uuid4(),
@@ -848,7 +850,7 @@ async def test_get_active_global_flow_returns_graph() -> None:
     """Queue: the version, the states, then the transitions."""
     version = _flow_version_row(editor_layout={"x": 1})
     s_init = _flow_state_row("draft", is_initial=True)
-    s_done = _flow_state_row("done", is_terminal=True, color="#0f0")
+    s_done = _flow_state_row("done", is_terminal=True, is_approved=True, color="#0f0")
     trans = _flow_transition_row(
         s_init.id,
         s_done.id,
@@ -862,6 +864,10 @@ async def test_get_active_global_flow_returns_graph() -> None:
     graph = await s.get_active_global_flow()
     assert graph is not None
     assert {st.key for st in graph.states} == {"draft", "done"}
+    assert {st.key: (st.is_approved, st.is_denied) for st in graph.states} == {
+        "draft": (False, False),
+        "done": (True, False),
+    }
     assert graph.transitions[0].from_ == "draft"
     assert graph.transitions[0].to == "done"
     assert graph.layout == {"x": 1}

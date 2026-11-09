@@ -232,7 +232,7 @@
       </app-section>
 
       @if (!app() && !inv()) {
-        <app-todo-linked-list class="bd__todos" kind="expense" headingId="bd-todos" [targetId]="e.id" />
+        <app-todo-linked-list class="bd__todos" kind="expense" headingId="bd-todos" [targetId]="e.id" [actions]="true" [linkLabel]="e.description" />
       }
     </div>
   </div>

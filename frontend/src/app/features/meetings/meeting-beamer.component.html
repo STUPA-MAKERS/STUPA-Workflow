@@ -97,6 +97,8 @@
         @if (topLine(); as top) {
           <p class="bm__cap">{{ 'beamer.now' | t }}</p>
           <h1 class="bm__nowTop">{{ top }}</h1>
+        } @else {
+          <h1 class="sr-only">{{ 'beamer.title' | t }}</h1>
         }
         <p class="bm__idleText">{{ 'beamer.idle' | t }}</p>
         @if (presence(); as p) {

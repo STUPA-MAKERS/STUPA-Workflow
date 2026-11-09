@@ -1,0 +1,15 @@
+@if (cards(); as list) {
+  @if (list.length) {
+    <app-todo-linked-list
+      kind="gremium"
+      headingId="gd-todos"
+      [showTitle]="false"
+      [targetId]="gremiumId()"
+      [items]="list"
+    />
+  } @else {
+    <app-empty-state shape="row" rows="3" [heading]="'gremien.todos.empty' | t" />
+  }
+} @else {
+  <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
+}

@@ -215,6 +215,7 @@ STATES = [
     {
         "key": "angenommen",
         "label": _i18n("Angenommen", "Approved"),
+        "isApproved": True,
         "editAllowed": False,
         "isTerminal": True,
         "color": "#16a34a",
@@ -222,6 +223,7 @@ STATES = [
     {
         "key": "abgelehnt",
         "label": _i18n("Abgelehnt", "Rejected"),
+        "isDenied": True,
         "editAllowed": False,
         "isTerminal": True,
         "color": "#dc2626",

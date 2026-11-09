@@ -54,24 +54,26 @@ import {
   ConfirmDialogComponent,
   DropOverlayComponent,
   EmptyStateComponent,
+  FabComponent,
   FileDropDirective,
+  revealFirstInvalid,
   IconComponent,
   MEDIA,
   mediaQuery,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  SectionComponent,
   SideSheetComponent,
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
-  FabComponent,
-  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
 import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
+import { pageItemTitle } from '../../layout/page-title.service';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
@@ -339,6 +341,7 @@ export class StatusTimelineComponent {
    * leak through Referer or logs. The query form (?t=&app=) stays as a fallback.
    */
   constructor() {
+    pageItemTitle(() => (this.application() ? this.title() : null));
     effect(() => {
       const panel = this.filesPanel();
       const files = this.droppedFiles();
@@ -575,6 +578,7 @@ export class StatusTimelineComponent {
     if (this.editForm.invalid) {
       this.editForm.markAllAsTouched();
       this.toast.error(this.i18n.translate('apply.error.invalid'));
+      setTimeout(() => revealFirstInvalid(document.querySelector('.sp__edit')));
       return;
     }
     this.saving.set(true);

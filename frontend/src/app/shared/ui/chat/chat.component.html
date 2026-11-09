@@ -117,6 +117,7 @@
                     [class.chat__bubble--failed]="m.state === 'failed'"
                     appPressSelect
                     [appPressSelectEnabled]="canAct(m) && touchMenu()"
+                    [appPressSelectActive]="true"
                     (appPressSelectToggle)="openMenu(m)"
                   >
                     @if (item.markLabel && item.mark === 'internal') {
@@ -189,7 +190,6 @@
       <app-segmented
         class="chat__vis"
         width="fill"
-        [check]="false"
         [ariaLabel]="'chat.visibility' | t"
         [options]="segmentOptions()"
         [value]="visibility()"
@@ -416,9 +416,11 @@
           [id]="p.optionId(i)"
           [class.chat__mentionOpt--active]="i === p.active()"
           [attr.aria-selected]="i === p.active()"
+          tabindex="-1"
           (mousedown)="$event.preventDefault()"
           (mouseenter)="p.active.set(i)"
           (click)="pickMention(p, o)"
+          (keydown.enter)="pickMention(p, o)"
         >
           <app-avatar
             size="sm"

@@ -89,6 +89,8 @@ export interface PublicAttendance {
 export interface PublicProtocolDetail extends Omit<PublicProtocolSummary, 'tops'> {
   readonly tops: readonly PublicTop[];
   readonly attendance: PublicAttendance;
+  /** The content language of the protocol text: the default language of the gremium. */
+  readonly lang?: string;
   /** The free text of a meeting without agenda items (then `tops` is empty). */
   readonly markdown: string | null;
 }

@@ -25,7 +25,7 @@ export interface GuardPriorityRow {
 
 /**
  * Inspector panel for the selected state. It edits key, labels, colour, the flags
- * (start, editing allowed, terminal), the kind with its gremium and the guard priority
+ * (start, editing allowed, terminal, approved, denied), the kind with its gremium and the guard priority
  * of the exits.
  */
 @Component({
@@ -63,6 +63,8 @@ export class StateInspectorComponent {
   readonly makeInitial = output<void>();
   readonly editAllowedChange = output<boolean>();
   readonly terminalChange = output<boolean>();
+  /** The flag `Bewilligt` or `Abgelehnt` of a normal state (spec 000571). */
+  readonly outcomeChange = output<{ outcome: 'approved' | 'denied'; on: boolean }>();
   readonly kindChange = output<string>();
   readonly gremiumChange = output<string>();
   readonly gremiumSourceChange = output<'fixed' | 'budget'>();

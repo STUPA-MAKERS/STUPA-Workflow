@@ -51,6 +51,10 @@ class State(UUIDPkMixin, Base):
     Attributes:
         is_terminal: Terminal state for GDPR retention. The platform may anonymize an
             application in a terminal state.
+        is_approved: An application in this state is approved (spec 000571). It counts
+            with its approved amount and a transition into it allows a decision.
+        is_denied: An application in this state is denied. It counts with 0 €. A state
+            has at most one of the two flags, a vote state neither.
         kind: `normal` has guarded manual or automatic transitions. `vote` means that a
             Gremium votes, with `config={gremiumId,...}` and two branch exits, pass and
             fail.
@@ -67,12 +71,18 @@ class State(UUIDPkMixin, Base):
     edit_allowed: Mapped[bool] = mapped_column(Boolean, server_default="true")
     is_initial: Mapped[bool] = mapped_column(Boolean, server_default="false")
     is_terminal: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    is_approved: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    is_denied: Mapped[bool] = mapped_column(Boolean, server_default="false")
     kind: Mapped[str] = mapped_column(Text, server_default="normal")
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
 
     __table_args__ = (
         UniqueConstraint("flow_version_id", "key"),
         CheckConstraint("kind IN ('normal','vote')", name="state_kind"),
+        CheckConstraint("NOT (is_approved AND is_denied)", name="state_one_outcome"),
+        CheckConstraint(
+            "kind = 'normal' OR NOT (is_approved OR is_denied)", name="state_outcome_normal"
+        ),
         Index(
             "uq_state_one_initial_per_flow",
             "flow_version_id",

@@ -100,6 +100,7 @@ import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton
 import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-view/todo-board-view.component';
 import { TodoListViewComponent } from './list-view/todo-list-view.component';
 import { isoDay } from '@shared/date-format';
+import { pageItemTitle } from '../../layout/page-title.service';
 
 /** The board reads itself again this often while the tab is visible. */
 export const BOARD_POLL_MS = 30_000;
@@ -540,6 +541,7 @@ export class TodosComponent implements OnDestroy {
    * open again on the way back.
    */
   constructor() {
+    pageItemTitle(() => this.board()?.name);
     this.api.boards().subscribe({
       next: (boards) => {
         this.boards.set(boards);
@@ -1154,9 +1156,9 @@ export class TodosComponent implements OnDestroy {
     this.tileMenuOpen.set(true);
   }
 
-  /** The columns of the sheet, with their counts. */
+  /** The columns of the sheet. */
   readonly tileColumns = computed<MoveColumn[]>(() =>
-    (this.tileMenu()?.columns ?? []).map((c) => ({ id: c.id, name: c.name, count: c.cardCount })),
+    (this.tileMenu()?.columns ?? []).map((c) => ({ id: c.id, name: c.name })),
   );
 
   /**

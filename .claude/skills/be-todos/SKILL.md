@@ -22,8 +22,9 @@ done (`completed_at`).
   target FK is `ON DELETE CASCADE`; `ck_todo_link_one_target` counts the columns of
   `LINK_COLUMNS`, partial indexes `uq_todo_link_<column>` and `ix_todo_link_<column>`).
   `LINK_KINDS` is also the picker order: application, meeting, agenda_item, vote,
-  gremium, invoice, expense (`budget_expense`), ticket, todo. Migration `527854b79d68`
-  adds `vote_id`, `gremium_id`, `invoice_id`, `expense_id`. Constants
+  gremium, invoice, expense (`budget_expense`), budget (the cost centre), ticket, todo.
+  Migration `527854b79d68` adds `vote_id`, `gremium_id`, `invoice_id`, `expense_id`;
+  `b3b70dda7d08` adds `budget_id`. Constants
   `DEFAULT_COLUMNS`, `PERSONAL_BOARD_NAME`, `TEAM_BOARD_NAME`/`TEAM_BOARD_PERMISSION`.
 - `access.py` — `BoardAccess` (per-request cache): `can_read` (write or `todo.read_all`),
   `can_write`, `can_configure`, `scope()` → `ReadScope.condition()` for the cross-board
@@ -45,7 +46,9 @@ done (`completed_at`).
   `assert_can_read`); gremium `auth.policy.gremium_view_scope` (the tab
   "Gremien": `gremium.view_all` or an active membership, cached per resolver); invoice and
   expense `budget.access.has_budget_read` (`budget.view`/`.structure`/`.book`, the gate
-  of `GET /invoices` and `/expenses`); ticket `ticket.manage`; todo the board rule.
+  of `GET /invoices` and `/expenses`); budget (cost centre): every card reader sees the
+  name and path key, the url `/budget?ks={id}` and a new link need `has_budget_read`
+  (spec 000552), and it is no grant kind; ticket `ticket.manage`; todo the board rule.
   Titles and urls: vote = question, else the application title when the viewer can read that application (`/voting/{id}`, detail
   `meetingTitle`, `date`, `voteStatus`, `voteResult`); gremium = name (`/gremien/{id}`);
   invoice = number, else supplier (`/invoices?id={id}`, detail `number`,
@@ -135,7 +138,11 @@ and every live card, done ones too; `cardCount` = the live cards of the column; 
 token gate (403), the same weak ETag and 304, and a constant number of queries: one for
 the boards, one for the cards, one each for columns and labels, and the tile facts),
 `GET /link-targets` (`kind` = `all` or a `TodoLinkKind`), `GET /linked?kind&targetId`
-(`TodoLinkedKind`: every kind but `todo`), `GET /cards?ids=` (the read-ahead of the board
+(`TodoLinkedKind`: every kind but `todo`; a card shows the cards that link it in its own
+`links` instead, as `todo` links with the id of the other card's row, each other card once,
+readable cards only; `DELETE /cards/{id}/links/{linkId}` takes such a link from either card
+and removes every link between the two, and `POST` answers 409 `link_exists` for a link in
+either direction; spec 000573, `service.card_links`), `GET /cards?ids=` (the read-ahead of the board
 page: up to 50 whole cards (`CARD_BATCH`) in the order of `ids`; an unreadable or unknown
 card is left out, not 404; `TodoService.cards`), `POST /cards`, `GET|PATCH
 /cards/{id}` (PATCH needs `version`, 409 `card_version_conflict`), `POST

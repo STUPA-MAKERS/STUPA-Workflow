@@ -9,9 +9,10 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { map } from 'rxjs';
+import { catchError, map, of, switchMap } from 'rxjs';
+import { TodosApiService } from '@core/api/todos.service';
 import type { GremiumOverview } from '@core/api/gremien.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -45,9 +46,10 @@ import { GremiumDecisionsComponent } from '../gremium-decisions/gremium-decision
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
 import { GremiumMeetingsComponent } from '../gremium-meetings/gremium-meetings.component';
 import { GremiumMembersComponent } from '../gremium-members/gremium-members.component';
+import { GremiumTodosComponent } from '../gremium-todos/gremium-todos.component';
 
 /** The sub-tabs of a gremium, as they stand in `?tab=`. */
-export const GREMIUM_TABS = ['sitzungen', 'mitglieder', 'anwesenheit', 'beschluesse'] as const;
+export const GREMIUM_TABS = ['sitzungen', 'mitglieder', 'anwesenheit', 'beschluesse', 'todos'] as const;
 export type GremiumTab = (typeof GREMIUM_TABS)[number];
 
 /**
@@ -72,6 +74,7 @@ export type GremiumTab = (typeof GREMIUM_TABS)[number];
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.gd-host--split]': 'split()' },
   imports: [
+    GremiumTodosComponent,
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,
@@ -102,6 +105,7 @@ export class GremiumDetailComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(GremienComponent, { optional: true });
   protected readonly store = inject(GremienStore);
+  private readonly todos = inject(TodosApiService);
 
   readonly phone = mediaQuery(MEDIA.phone);
   /** The list sits beside the sheet: the sheet fills the pane and scrolls inside. */
@@ -115,14 +119,30 @@ export class GremiumDetailComponent {
   });
 
   readonly gremium = computed<GremiumOverview | null>(() => this.store.find(this.id()));
+  /**
+   * The board of the Gremium when the person reads it (spec 000551): `undefined` while it
+   * loads, `null` without one. Only then the detail has the tab "To-Dos".
+   */
+  readonly boardId = toSignal(
+    toObservable(this.id).pipe(
+      switchMap((id) =>
+        id
+          ? this.todos.boards(id).pipe(
+              map((boards) => boards.find((b) => b.kind === 'gremium')?.id ?? null),
+              catchError(() => of(null)),
+            )
+          : of(null),
+      ),
+    ),
+    { initialValue: undefined },
+  );
   readonly tab = computed<GremiumTab>(() => {
     const t = this.tabParam();
+    if (t === 'todos' && this.boardId() === null) return 'sitzungen';
     return (GREMIUM_TABS as readonly string[]).includes(t ?? '') ? (t as GremiumTab) : 'sitzungen';
   });
   /** The tabs that were open once for this gremium: their panels stay rendered. */
   readonly visited = signal<ReadonlySet<string>>(new Set());
-  /** The number of meetings, once the tab "Sitzungen" loaded them. */
-  readonly meetingCount = signal<number | null>(null);
 
   readonly createOpen = signal(false);
   /** The gremium whose tabs `visited` holds: a new one starts the set again. */
@@ -163,15 +183,14 @@ export class GremiumDetailComponent {
     () => !!this.gremium()?.nextMeeting && (!this.phone() || !this.canPlan()),
   );
 
-  readonly tabs = computed<TabItem[]>(() => {
-    const g = this.gremium();
-    return [
-      { id: 'sitzungen', label: this.i18n.translate('gremien.tab.meetings'), count: this.meetingCount() },
-      { id: 'mitglieder', label: this.i18n.translate('gremien.tab.members'), count: g?.memberCount ?? null },
-      { id: 'anwesenheit', label: this.i18n.translate('gremien.tab.attendance') },
-      { id: 'beschluesse', label: this.i18n.translate('gremien.tab.decisions') },
-    ];
-  });
+  /** The tabs, by their labels alone: a tab shows no count (spec 000560). */
+  readonly tabs = computed<TabItem[]>(() => [
+    { id: 'sitzungen', label: this.i18n.translate('gremien.tab.meetings') },
+    { id: 'mitglieder', label: this.i18n.translate('gremien.tab.members') },
+    { id: 'anwesenheit', label: this.i18n.translate('gremien.tab.attendance') },
+    { id: 'beschluesse', label: this.i18n.translate('gremien.tab.decisions') },
+    ...(this.boardId() ? [{ id: 'todos', label: this.i18n.translate('gremien.tab.todos') }] : []),
+  ]);
 
   readonly menu = computed<RowMenuSection[]>(() => {
     const g = this.gremium();
@@ -179,6 +198,7 @@ export class GremiumDetailComponent {
     const phoneItems = this.phone() ? this.phoneMenu(g, t) : [];
     const items: RowMenuItem[] = [
       ...phoneItems,
+      ...(this.boardId() ? [{ id: 'board', label: t('gremien.detail.openBoard'), icon: 'kanban' as const }] : []),
       { id: 'meetings', label: t('gremien.detail.allMeetings'), icon: 'users' },
       { id: 'votes', label: t('gremien.detail.votes'), icon: 'vote' },
     ];
@@ -223,7 +243,6 @@ export class GremiumDetailComponent {
       const open = this.phone() ? GREMIUM_TABS.filter((_, j) => Math.abs(j - i) <= 1) : [tab];
       if (id !== this.shownId) {
         this.shownId = id;
-        this.meetingCount.set(null);
         this.visited.set(new Set(open));
         return;
       }
@@ -269,6 +288,9 @@ export class GremiumDetailComponent {
         break;
       case 'admin':
         this.openAdmin();
+        break;
+      case 'board':
+        void this.router.navigate(['/todos', this.boardId()]);
         break;
       case 'meetings':
         void this.router.navigate(['/meetings']);

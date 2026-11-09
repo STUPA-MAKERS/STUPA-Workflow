@@ -52,7 +52,6 @@
         <header class="bv__head">
           <h2 class="bv__name" [id]="'bv-col-' + col.id">
             {{ col.name }}
-            <span class="bv__count num">{{ count(col) }}</span>
           </h2>
           @if (col.isDone) {
             <span class="bv__doneTag">
@@ -82,7 +81,6 @@
           [cdkDropListConnectedTo]="canWrite() ? connectTo() : []"
           [cdkDropListEnterPredicate]="enter()"
           [attr.data-board-kind]="board().kind"
-          (cdkDropListEntered)="onEnter($event)"
           (cdkDropListDropped)="drop($event)"
         >
           @for (card of list(col); track card.id; let i = $index) {

@@ -68,12 +68,6 @@
 .br__name {
   min-width: 0;
 }
-.br__count {
-  flex: none;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-regular);
-}
 .br__tag {
   display: inline-flex;
   flex: none;
@@ -140,10 +134,6 @@
 .br__colName {
   min-width: 0;
   color: var(--color-text);
-}
-.br__colCount {
-  flex: none;
-  font-weight: var(--fw-regular);
 }
 .br__doneIcon {
   flex: none;

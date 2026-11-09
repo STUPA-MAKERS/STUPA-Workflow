@@ -4,6 +4,7 @@
   } @else if (notFound()) {
     <app-empty-state plain icon="archive"
       fill
+      level="1"
       code="404"
       [heading]="'publicProtocols.detail.notFound' | t"
       [body]="'publicProtocols.detail.notFoundBody' | t"
@@ -26,7 +27,7 @@
 
     <header class="pd__head">
       <div class="pd__titles">
-        <h1 class="pd__title">{{ p.title }}</h1>
+        <h1 class="pd__title" [attr.lang]="textLang()">{{ p.title }}</h1>
         <p class="pd__dates">
           <span>{{ p.gremium.name }}</span>
           <span>{{ 'publicProtocols.detail.meetingOn' | t: { date: when(p) } }}</span>
@@ -54,7 +55,7 @@
         @if (p.tops.length === 0) {
           <div class="pd__free">
             @if (p.markdown) {
-              <app-markdown-view [src]="p.markdown" [imageSrc]="imageSrc()" />
+              <app-markdown-view [src]="p.markdown" [imageSrc]="imageSrc()" [attr.lang]="textLang()" />
             } @else {
               <app-empty-state shape="text" rows="3" [heading]="'publicProtocols.detail.noText' | t" />
             }
@@ -82,11 +83,11 @@
                   <div class="pd__topBody">
                     <h3 class="pd__topTitle">
                       <span class="sr-only">{{ 'publicProtocols.detail.top' | t: { n: top.number } }}</span>
-                      {{ top.title }}
+                      <span [attr.lang]="textLang()">{{ top.title }}</span>
                     </h3>
                     @for (part of partsOf(top); track $index) {
                       @if (part.kind === 'text') {
-                        <app-markdown-view class="pd__md" [src]="part.markdown" [imageSrc]="imageSrc()" />
+                        <app-markdown-view class="pd__md" [src]="part.markdown" [imageSrc]="imageSrc()" [attr.lang]="textLang()" />
                       } @else {
                         <ng-container *ngTemplateOutlet="decisionBox; context: { $implicit: part.decision }" />
                       }

@@ -111,7 +111,7 @@
         </ng-template>
         <ng-template appCell="actions" let-row>
           @let n = $any(row).node;
-          <span class="bt__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+          <span class="bt__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
             <app-row-menu
               [label]="('budget.tree.rowActions' | t) + ': ' + n.name"
               [sections]="rowMenu()"
@@ -366,7 +366,7 @@
           }
         </ng-template>
         <ng-template appCell="actions" let-fy>
-          <span class="bt__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+          <span class="bt__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
             <app-row-menu
               [label]="('budget.tree.rowActions' | t) + ': ' + $any(fy).display"
               [sections]="fyMenu($any(fy))"
@@ -464,44 +464,3 @@
   </div>
 </app-dialog>
 
-<app-dialog
-  [open]="stateConfigOpen()"
-  [title]="'budget.tree.stateConfig' | t"
-  [subtitle]="selectedTopLabel()"
-  [closeLabel]="'action.close' | t"
-  (closed)="closeStateConfig()"
->
-  @if (stateOptions().length) {
-    <table class="bt__states">
-      <thead>
-        <tr>
-          <th scope="col" class="cap">{{ 'budget.tree.stateCol' | t }}</th>
-          <th scope="col" class="cap">{{ 'budget.tree.accepted' | t }}</th>
-          <th scope="col" class="cap">{{ 'budget.tree.denied' | t }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (s of stateOptions(); track s.value) {
-          <tr>
-            <th scope="row">{{ s.label }}</th>
-            <td>
-              <app-checkbox [ngModel]="isAccepted(s.value)" (ngModelChange)="toggleState('accepted', s.value)"
-                ><span class="sr-only">{{ ('budget.tree.accepted' | t) + ': ' + s.label }}</span></app-checkbox
-              >
-            </td>
-            <td>
-              <app-checkbox [ngModel]="isDenied(s.value)" (ngModelChange)="toggleState('denied', s.value)"
-                ><span class="sr-only">{{ ('budget.tree.denied' | t) + ': ' + s.label }}</span></app-checkbox
-              >
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  } @else {
-    <app-empty-state rows="3" [heading]="'budget.tree.noStates' | t" />
-  }
-  <div dialog-footer class="bt__foot">
-    <app-button variant="fill" (click)="closeStateConfig()">{{ 'budget.tree.done' | t }}</app-button>
-  </div>
-</app-dialog>

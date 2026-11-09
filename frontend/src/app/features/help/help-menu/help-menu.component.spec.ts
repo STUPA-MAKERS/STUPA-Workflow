@@ -1,4 +1,5 @@
 import { signal } from '@angular/core';
+import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -17,6 +18,7 @@ async function setup(opts: { variant?: HelpMenuVariant; signedIn?: boolean; publ
     inputs: { variant: opts.variant ?? 'rail' },
     on: { navigated },
     providers: [
+      provideRouter([{ path: 'barrierefreiheit', children: [] }]),
       { provide: AuthService, useValue: { isAuthenticated: signal(opts.signedIn ?? true) } },
       {
         provide: BrandingService,
@@ -116,6 +118,19 @@ describe('HelpMenuComponent', () => {
     const wiki = screen.getByRole('link', { name: /Handbuch im Wiki/ });
     wiki.addEventListener('click', (e) => e.preventDefault());
     wiki.click();
+    fixture.detectChanges();
+    expect(navigated).toHaveBeenCalled();
+    expect(panel()).toBeNull();
+  });
+
+  /** Spec 000496: the statement is one entry away on every page, with and without a login. */
+  it('links to the accessibility statement and closes when it is followed', async () => {
+    const { fixture, navigated } = await setup({ signedIn: false });
+    trigger().click();
+    fixture.detectChanges();
+    const link = screen.getByRole('link', { name: 'Barrierefreiheit' });
+    expect(link).toHaveAttribute('href', '/barrierefreiheit');
+    link.click();
     fixture.detectChanges();
     expect(navigated).toHaveBeenCalled();
     expect(panel()).toBeNull();

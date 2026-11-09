@@ -184,7 +184,7 @@ def fake_session(*results: _R, gets: list[Any] | None = None) -> Any:
 def _budget(
     *, id=None, parent_id=None, path_key="VS", gremium_id=None, key="VS", name="N",
     currency="EUR", fiscal_start_month=1, fiscal_start_day=1,
-    view_gremium_id=None, accepted=None, denied=None,
+    view_gremium_id=None,
 ):
     b = Budget(
         parent_id=parent_id, gremium_id=gremium_id, key=key,
@@ -193,8 +193,6 @@ def _budget(
         view_gremium_id=view_gremium_id,
     )
     b.id = id or uuid.uuid4()
-    b.accepted_state_keys = accepted or []
-    b.denied_state_keys = denied or []
     return b
 
 
@@ -1447,7 +1445,7 @@ async def test_actor_names_follow_a_merge() -> None:
 
 
 async def test_get_tree_accepted_remaining_nonpositive_skipped() -> None:
-    """Skip the bound row when an accepted application is spent in full.
+    """Skip the bound row when an approved application is spent in full.
 
     Expenses greater than or equal to the amount leave remaining <= 0 (branch
     1590->1582).
@@ -1456,9 +1454,9 @@ async def test_get_tree_accepted_remaining_nonpositive_skipped() -> None:
     """
     fy_id = uuid.uuid4()
     app_id = uuid.uuid4()
-    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", accepted=["approved"])
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
-    app_row = (app_id, "VS", fy_id, Decimal("100"), Decimal("100"), "approved")
+    app_row = (app_id, "VS", fy_id, Decimal("100"), Decimal("100"), True, False)
     exp_row = ("VS", fy_id, Decimal("100"), "expense", app_id)
     sess = fake_session(result(top), result(alloc), result(app_row), result(exp_row))
     svc = BudgetTreeService(sess)
@@ -1473,14 +1471,13 @@ async def test_get_tree_requested_remaining_nonpositive_skipped() -> None:
     Expenses greater than or equal to the amount leave remaining <= 0 (branch
     1599->1582).
 
-    The top budget has no accepted or denied keys, so the submitted application is in
-    flight.
+    The state of the submitted application has neither flag, so it is in flight.
     """
     fy_id = uuid.uuid4()
     app_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="500")
-    app_row = (app_id, "VS", fy_id, Decimal("80"), Decimal("80"), "submitted")
+    app_row = (app_id, "VS", fy_id, Decimal("80"), Decimal("80"), False, False)
     exp_row = ("VS", fy_id, Decimal("80"), "expense", app_id)
     sess = fake_session(result(top), result(alloc), result(app_row), result(exp_row))
     svc = BudgetTreeService(sess)
@@ -1491,9 +1488,9 @@ async def test_get_tree_requested_remaining_nonpositive_skipped() -> None:
 
 async def test_get_tree_denied_excluded() -> None:
     fy_id = uuid.uuid4()
-    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", denied=["rejected"])
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
-    app_row = (uuid.uuid4(), "VS", fy_id, Decimal("999"), Decimal("999"), "rejected")
+    app_row = (uuid.uuid4(), "VS", fy_id, Decimal("999"), Decimal("999"), False, True)
     sess = fake_session(result(top), result(alloc), result(app_row), result())
     svc = BudgetTreeService(sess)
     view = (await svc.get_tree())[0].by_fiscal_year[0]

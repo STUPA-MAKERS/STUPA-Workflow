@@ -34,6 +34,8 @@ import {
   formatBytes,
   IconComponent,
   InputComponent,
+  MEDIA,
+  mediaQuery,
   SegmentedComponent,
   type SegmentedOption,
   TextareaComponent,
@@ -73,6 +75,7 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
   bug: 'tickets.kind.bug',
   question: 'tickets.kind.question',
   idea: 'tickets.kind.idea',
+  barrier: 'tickets.kind.barrier',
 };
 
 /**
@@ -145,6 +148,12 @@ export class ReportDialogComponent {
   readonly tried = signal(false);
 
   readonly anonymous = computed(() => !this.auth.isAuthenticated());
+
+  /**
+   * The four kinds do not fit a phone with the check mark ("Barriere" breaks), so a phone
+   * leaves it out; the chosen segment keeps its fill and `aria-checked`.
+   */
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly kindOptions = computed<SegmentedOption[]>(() => {
     this.i18n.uiLocale();
@@ -228,6 +237,8 @@ export class ReportDialogComponent {
       this.email.set('');
       this.sentNumber.set(null);
     }
+    const preset = this.help.presetKind();
+    if (preset) this.kind.set(preset);
     this.resetAltcha();
     this.sending.set(false);
     this.error.set(null);
@@ -245,7 +256,8 @@ export class ReportDialogComponent {
   }
 
   setKind(value: string | null): void {
-    if (value === 'bug' || value === 'question' || value === 'idea') this.kind.set(value);
+    const kind = TICKET_KINDS.find((k) => k === value);
+    if (kind) this.kind.set(kind);
   }
 
   onAltcha(solution: string): void {

@@ -24,7 +24,7 @@ from app.shared.mentions import MAX_MENTIONS
 from app.shared.people import PersonRef
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
-TicketKind = Literal["bug", "question", "idea"]
+TicketKind = Literal["bug", "question", "idea", "barrier"]
 TicketStatus = Literal["new", "in_progress", "done", "rejected"]
 TicketEventKind = Literal["created", "status", "assignee", "kind", "todo_done"]
 NoteVisibility = Literal["internal", "public"]

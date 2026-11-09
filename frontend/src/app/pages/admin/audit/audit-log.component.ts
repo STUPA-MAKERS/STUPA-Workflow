@@ -95,6 +95,8 @@ export const AUDIT_ACTIONS = [
   'application_archive',
   'application_unarchive',
   'application_decision',
+  'application_link_set',
+  'application_link_remove',
   'application_delete',
   'comment_update',
   'comment_delete',

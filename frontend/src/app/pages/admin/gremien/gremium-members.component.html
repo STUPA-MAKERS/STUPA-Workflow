@@ -2,7 +2,6 @@
   <app-page-header
     [flush]="true"
     [title]="('admin.gremien.membersOf' | t) + ': ' + (gremium()?.name ?? '…')"
-    [meta]="!loading() && !failed() ? countLabel(members().length) : null"
   >
     <app-breadcrumbs crumbs />
   </app-page-header>

@@ -14,7 +14,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
     <div class="field">
       <div class="field__box" [class.field__box--invalid]="showError">
         <label class="field__label" [for]="controlId">
-          {{ props.label }}
+          <span [attr.lang]="props['textLang'] ?? null">{{ props.label }}</span>
           @if (props.required) {
             <span class="field__req" aria-hidden="true">*</span>
           }
@@ -31,7 +31,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
         ></textarea>
       </div>
       @if (props.description && !showError) {
-        <p class="field__hint" [id]="controlId + '-hint'">{{ props.description }}</p>
+        <p class="field__hint" [id]="controlId + '-hint'" [attr.lang]="props['textLang'] ?? null">{{ props.description }}</p>
       }
       @if (showError) {
         <p class="field__error" [id]="controlId + '-error'" role="alert">

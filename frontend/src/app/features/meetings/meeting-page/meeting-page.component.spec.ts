@@ -13,7 +13,9 @@ import type {
   Meeting,
   Protocol,
 } from '@core/api/models';
-import { MEDIA } from '@stupa-makers/ui-kit';
+import type { LiveViewer } from '@core/ws/ws-messages';
+import { By } from '@angular/platform-browser';
+import { AvatarComponent, MEDIA } from '@stupa-makers/ui-kit';
 import {
   AGENDA,
   ATTENDANCE,
@@ -45,7 +47,7 @@ type Inputs = {
   saveState: 'idle' | 'saving' | 'saved' | 'error';
   attendance: Attendance[];
   savingAttendance: boolean;
-  viewers: string[];
+  viewers: LiveViewer[];
   casting: string | null;
   deletingVote: string | null;
   finalizing: boolean;
@@ -67,7 +69,10 @@ function inputs(over: Partial<Inputs> = {}): Inputs {
     saveState: 'saved',
     attendance: ATTENDANCE,
     savingAttendance: false,
-    viewers: ['Pia Protokoll', 'Alina Admin'],
+    viewers: [
+      { id: 'p-pia', name: 'Pia Protokoll' },
+      { id: null, name: 'Alina Admin' },
+    ],
     casting: null,
     deletingVote: null,
     finalizing: false,
@@ -144,12 +149,17 @@ describe('MeetingPageComponent', () => {
     });
 
     it('lists the people who have the meeting open', async () => {
-      await setup();
+      const { fixture } = await setup();
       const chip = screen.getByRole('button', { name: '2 live' });
       expect(chip).toHaveAttribute('title', 'Live dabei: Pia Protokoll, Alina Admin');
       await userEvent.click(chip);
       const list = screen.getByRole('list', { name: 'Live dabei' });
       expect(within(list).getByText('Alina Admin')).toBeInTheDocument();
+      const avatars = fixture.debugElement
+        .query(By.css('.mp__viewers'))
+        .queryAll(By.directive(AvatarComponent))
+        .map((d) => (d.componentInstance as AvatarComponent).principalId());
+      expect(avatars).toEqual(['p-pia', null]);
       fireEvent.blur(chip);
       expect(screen.queryByRole('list', { name: 'Live dabei' })).toBeNull();
     });
@@ -216,6 +226,35 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'Anwesenheit erfassen' }));
       expect(screen.getByRole('dialog', { name: 'Anwesenheit' })).toBeInTheDocument();
       flushDelegations();
+    });
+
+    it('opens the cards that link the meeting in a sheet from the menu (spec 000551)', async () => {
+      const { http, fixture } = await setup({}, [MEDIA.wide]);
+      const menu = await openMenu();
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Dos' }));
+      fixture.detectChanges();
+      const linked = http.expectOne((r) => r.url.endsWith('/api/todos/linked') && r.params.get('kind') === 'meeting');
+      linked.flush([
+        {
+          id: 'k-1',
+          boardId: 'b-1',
+          boardName: 'StuPa',
+          title: 'Raum für die Sitzung buchen',
+          columnName: 'Offen',
+          isDone: false,
+          dueDate: null,
+          assignees: [],
+          event: null,
+          balance: null,
+        },
+      ]);
+      http.expectOne((r) => r.url.endsWith('/api/todos/boards')).flush([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }]);
+      fixture.detectChanges();
+      const sheet = await screen.findByRole('dialog', { name: 'To-Dos' });
+      expect(within(sheet).getByRole('link', { name: 'Raum für die Sitzung buchen' })).toHaveAttribute('href', '/todos?card=k-1');
+      expect(within(sheet).getByRole('button', { name: 'Mit To-Do verknüpfen' })).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
+      expect(document.querySelector('.mp__agenda app-todo-linked-list[kind="meeting"]')).toBeNull();
     });
 
     /** A final protocol needs `meeting.delete_finalized`: the server then sends no `canDelete`. */

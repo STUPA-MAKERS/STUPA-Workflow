@@ -20,14 +20,14 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
           [attr.aria-describedby]="showError ? controlId + '-error' : null"
         />
         <span class="check__label">
-          {{ props.label }}
+          <span [attr.lang]="props['textLang'] ?? null">{{ props.label }}</span>
           @if (props.required) {
             <span class="check__req" aria-hidden="true">*</span>
           }
         </span>
       </label>
       @if (props.description && !showError) {
-        <p class="check__hint">{{ props.description }}</p>
+        <p class="check__hint" [attr.lang]="props['textLang'] ?? null">{{ props.description }}</p>
       }
       @if (showError) {
         <p class="check__error" [id]="controlId + '-error'" role="alert">

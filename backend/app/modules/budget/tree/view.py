@@ -51,20 +51,17 @@ def _spent_per_app(expense_rows: Sequence[Sequence[Any]]) -> dict[object, Decima
 
 def _share(
     app_row: Sequence[Any],
-    top_config: dict[str, tuple[set[str], set[str]]],
     spent_per_app: dict[object, Decimal],
 ) -> tuple[Literal["bound", "denied", "requested"], object, str, Decimal]:
     """Classify an application and compute the share it still binds or requests.
 
-    The first path segment selects the state keys of the top budget. A bound
-    application binds its approved amount, a requested one its requested amount, and
-    both are reduced by the expenses already booked on it, so an expense never
-    counts twice.
+    The flags of its flow state classify it (spec 000572). A bound application binds
+    its approved amount, a requested one its requested amount, and both are reduced by
+    the expenses already booked on it, so an expense never counts twice.
     """
-    app_id, path, fy, amount, committed, state_key = app_row
-    accepted, denied = top_config.get(path.split("-")[0], (set(), set()))
+    app_id, path, fy, amount, committed, approved, denied = app_row
     bucket: Literal["bound", "denied", "requested"] = (
-        "bound" if state_key in accepted else ("denied" if state_key in denied else "requested")
+        "bound" if approved else ("denied" if denied else "requested")
     )
     base = committed if bucket == "bound" else amount
     return bucket, fy, path, (base or _ZERO) - spent_per_app.get(app_id, _ZERO)
@@ -106,11 +103,10 @@ class TreeViewOps(BudgetTreeServiceBase):
     ) -> list[BudgetTreeNodeOut]:
         """Build the cost-center tree with the sums per fiscal year.
 
-        Every node carries allocated, committed, requested and available. Each
-        top-level budget classifies its applications. An application counts as
-        committed when its current flow-state key is in `accepted_state_keys` of
-        the top budget. It then binds the approved amount of its decision,
-        else the requested amount. It counts as requested when it is neither accepted nor
+        Every node carries allocated, committed, requested and available. An
+        application counts as committed when its current flow state is approved
+        (spec 000572). It then binds the approved amount of its decision, else the
+        requested amount. It counts as requested when its state is neither approved nor
         denied. A denied application drops out.
 
         The nodes sort in natural order, so VSM-10 comes after VSM-9. Parents still come
@@ -121,8 +117,7 @@ class TreeViewOps(BudgetTreeServiceBase):
         committed amount. Sub-bookings do not count, because the parent amount is
         already their sum. Only expenses reduce the binding of an application, income
         does not. A requested (in-flight) application is reduced by its booked expenses
-        too, so an expense never counts twice. The first path segment of a node selects
-        the accepted and the denied state keys of its top budget.
+        too, so an expense never counts twice.
 
         Without a global ``budget.*`` permission only the assigned subtrees become
         roots: those whose ``view_gremium_id`` is one of the Gremien of the member.
@@ -140,7 +135,8 @@ class TreeViewOps(BudgetTreeServiceBase):
                     Application.fiscal_year_id,
                     Application.amount,
                     func.coalesce(Application.approved_amount, Application.amount),
-                    State.key,
+                    State.is_approved,
+                    State.is_denied,
                 )
                 .join(Application, Application.budget_id == Budget.id)
                 .join(State, State.id == Application.current_state_id)
@@ -166,13 +162,7 @@ class TreeViewOps(BudgetTreeServiceBase):
         ).all()
 
         spent_per_app = _spent_per_app(expense_rows)
-        top_config: dict[str, tuple[set[str], set[str]]] = {
-            n.path_key: (set(n.accepted_state_keys or []), set(n.denied_state_keys or []))
-            for n in nodes
-            if n.parent_id is None
-        }
-
-        shares = tuple(_share(row, top_config, spent_per_app) for row in app_rows)
+        shares = tuple(_share(row, spent_per_app) for row in app_rows)
         bound_rows = _positive_rows(shares, "bound")
         requested_rows = _positive_rows(shares, "requested")
 
@@ -198,8 +188,6 @@ class TreeViewOps(BudgetTreeServiceBase):
                 n.currency,
                 n.active,
                 n.color,
-                list(n.accepted_state_keys or []),
-                list(n.denied_state_keys or []),
                 n.fiscal_start_month,
                 n.fiscal_start_day,
                 bool(n.hidden_in_budget),

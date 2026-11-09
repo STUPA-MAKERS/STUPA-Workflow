@@ -3,7 +3,7 @@ import type { FieldType, FormFieldDef, FormSection } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { formatAnswer, formatFieldValue, isEmptyAnswer } from '../answer-format';
-import { resolveI18n } from '../i18n-text';
+import { langAttr, resolvedI18nLang, resolveI18n } from '../i18n-text';
 import { evalJsonLogic, isFieldVisible } from '../jsonlogic';
 import { PositionsViewComponent } from '../positions-view/positions-view.component';
 import { runs } from '@shared/util/immutable';
@@ -16,6 +16,10 @@ export interface AnswerCell {
   readonly value: string;
   /** Mono face: IBAN and amounts. */
   readonly mono: boolean;
+  /** `lang` of the label: a form text in a fallback language (app spec 000523). */
+  readonly labelLang: string | null;
+  /** `lang` of the value: the language of the application for free text. */
+  readonly valueLang: string | null;
 }
 
 /** A row of the field group: short fields side by side, or one long field. */
@@ -26,6 +30,8 @@ export type AnswerRow =
       readonly kind: 'table';
       readonly key: string;
       readonly label: string;
+      readonly labelLang: string | null;
+      readonly valueLang: string | null;
       readonly columns: readonly string[];
       readonly rows: readonly (readonly string[])[];
     };
@@ -44,6 +50,7 @@ export type AnswerChunk =
 export interface AnswerBlock {
   readonly key: string;
   readonly label: string;
+  readonly labelLang: string | null;
   readonly chunks: readonly AnswerChunk[];
 }
 
@@ -58,6 +65,10 @@ type AnswerPiece =
 const NOT_SHOWN: ReadonlySet<FieldType> = new Set(['markdown', 'section', 'file']);
 /** Field types in the mono face. */
 const MONO: ReadonlySet<FieldType> = new Set(['iban', 'currency', 'funding']);
+/** Field types whose answer is the free text of the applicant, in the language of the application. */
+const FREE_TEXT: ReadonlySet<FieldType> = new Set(['text', 'textarea']);
+/** Field types whose answer is the label of an option, a form text. */
+const OPTION: ReadonlySet<FieldType> = new Set(['select', 'gremium_select', 'budget_select']);
 
 /**
  * The answers of an application, read-only (the table "Darstellung der
@@ -95,6 +106,11 @@ export class AnswerViewComponent {
   readonly data = input.required<Readonly<Record<string, unknown>>>();
   /** More variables for `visibleIf` and `compute`, for example `has_budget`. */
   readonly context = input<Readonly<Record<string, unknown>>>({});
+  /**
+   * The language of the application (`lang`, the UI language at submit). Free text in
+   * another language than the UI gets it as `lang` (app spec 000523). `null`: unknown.
+   */
+  readonly contentLang = input<string | null>(null);
   /** Keys the page shows elsewhere, for example the title in the header. */
   readonly skipKeys = input<readonly string[]>(['title']);
   /** The text when no answer shows. Leave it empty to show nothing. */
@@ -113,9 +129,11 @@ export class AnswerViewComponent {
     );
     const shown = (f: FormFieldDef): boolean =>
       !skip.has(f.key) && !NOT_SHOWN.has(f.type) && isFieldVisible(f.visibleIf, ctx);
+    const textLang = langAttr(this.contentLang(), lang);
     const sectionBlocks = this.sections().map((section) => ({
       key: section.key,
       label: resolveI18n(section.label, lang),
+      labelLang: langAttr(resolvedI18nLang(section.label, lang), lang),
       chunks: chunksOf(section.fields.filter(shown).flatMap((f) => this.piece(f, data, ctx, lang))),
     }));
     const otherChunks = chunksOf(
@@ -123,12 +141,20 @@ export class AnswerViewComponent {
         .filter(([key, value]) => !known.has(key) && !skip.has(key) && !isEmptyAnswer(value))
         .map(([key, value]) => ({
           kind: 'cell' as const,
-          cell: { key, label: key, value: formatFieldValue(value), mono: false },
+          cell: {
+            key,
+            label: key,
+            value: formatFieldValue(value),
+            mono: false,
+            labelLang: null,
+            valueLang: textLang,
+          },
         })),
     );
     const other = {
       key: '__other',
       label: this.i18n.translate('forms.answers.other'),
+      labelLang: null,
       chunks: otherChunks,
     };
     return [...sectionBlocks, other].filter((b) => b.chunks.length);
@@ -144,23 +170,33 @@ export class AnswerViewComponent {
     const raw = f.type === 'computed' ? this.computedValue(f, data, ctx) : data[f.key];
     if (isEmptyAnswer(raw)) return [];
     const label = resolveI18n(f.label, lang);
+    const labelLang = langAttr(resolvedI18nLang(f.label, lang), lang);
     switch (f.type) {
       case 'positions':
         return [{ kind: 'positions', chunk: { kind: 'positions', key: f.key, label, value: raw } }];
       case 'table':
-        return [{ kind: 'row', row: tableRow(f.key, label, raw) }];
+        return [
+          {
+            kind: 'row',
+            row: tableRow(f.key, label, raw, labelLang, langAttr(this.contentLang(), lang)),
+          },
+        ];
       case 'textarea':
         return [
-          { kind: 'row', row: { kind: 'text', cell: this.cell(f, label, raw), markdown: true } },
+          {
+            kind: 'row',
+            row: { kind: 'text', cell: this.cell(f, label, labelLang, raw), markdown: true },
+          },
         ];
       default:
-        return [{ kind: 'cell', cell: this.cell(f, label, raw) }];
+        return [{ kind: 'cell', cell: this.cell(f, label, labelLang, raw) }];
     }
   }
 
-  private cell(f: FormFieldDef, label: string, raw: unknown): AnswerCell {
+  private cell(f: FormFieldDef, label: string, labelLang: string | null, raw: unknown): AnswerCell {
+    const lang = this.i18n.uiLocale();
     const value = formatAnswer(f, raw, {
-      lang: this.i18n.uiLocale(),
+      lang,
       yes: this.i18n.translate('common.yes'),
       no: this.i18n.translate('common.no'),
     });
@@ -172,7 +208,20 @@ export class AnswerViewComponent {
           : label,
       value,
       mono: MONO.has(f.type),
+      labelLang,
+      valueLang: this.valueLang(f, raw, lang),
     };
+  }
+
+  /**
+   * The language of a shown answer: the application language for free text, the language
+   * of the option label for a choice, else none (numbers, dates and Ja/Nein are UI text).
+   */
+  private valueLang(f: FormFieldDef, raw: unknown, lang: string): string | null {
+    if (FREE_TEXT.has(f.type)) return langAttr(this.contentLang(), lang);
+    if (!OPTION.has(f.type)) return null;
+    const option = f.options?.find((o) => o.value === raw);
+    return langAttr(resolvedI18nLang(option?.label, lang), lang);
   }
 
   /** The stored value of a computed field, else the value of its rule. */
@@ -217,7 +266,13 @@ function chunksOf(pieces: readonly AnswerPiece[]): readonly AnswerChunk[] {
  * A `table` answer: a list of rows. Rows that are objects give the columns by their keys;
  * any other value shows as text.
  */
-function tableRow(key: string, label: string, raw: unknown): AnswerRow {
+function tableRow(
+  key: string,
+  label: string,
+  raw: unknown,
+  labelLang: string | null,
+  valueLang: string | null,
+): AnswerRow {
   const list = Array.isArray(raw) ? raw : [];
   const objects = list.filter(
     (r): r is Record<string, unknown> => typeof r === 'object' && r !== null && !Array.isArray(r),
@@ -225,11 +280,11 @@ function tableRow(key: string, label: string, raw: unknown): AnswerRow {
   if (!objects.length || objects.length !== list.length) {
     return {
       kind: 'text',
-      cell: { key, label, value: formatFieldValue(raw), mono: false },
+      cell: { key, label, value: formatFieldValue(raw), mono: false, labelLang, valueLang },
       markdown: false,
     };
   }
   const columns = [...new Set(objects.flatMap((r) => Object.keys(r)))];
   const rows = objects.map((r) => columns.map((c) => formatFieldValue(r[c])));
-  return { kind: 'table', key, label, columns, rows };
+  return { kind: 'table', key, label, labelLang, valueLang, columns, rows };
 }

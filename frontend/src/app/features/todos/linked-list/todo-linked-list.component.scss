@@ -66,3 +66,7 @@
 .tl__neg {
   color: var(--color-danger);
 }
+.tl__actions {
+  display: inline-flex;
+  gap: var(--space-1);
+}

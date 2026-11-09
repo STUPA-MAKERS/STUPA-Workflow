@@ -4,12 +4,18 @@
       <app-page-header
         [pane]="true"
         titleId="tasks-title"
-        [title]="'tasks.title' | t"
-      />
+        [title]="'tasks.title' | t">
+        <ng-container ngProjectAs="[actions]">
+          @if (phone()) {
+            <app-row-menu [label]="'action.more' | t" [sections]="phoneMenu()" (selected)="onPhoneMenu($event)" />
+          }
+        </ng-container>
+      </app-page-header>
 
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [placeholder]="'tasks.search' | t"
+          [results]="loading() ? null : rows().length + todoRows().length"
           [value]="search.text()"
           [clearable]="true"
           (valueChange)="search.set($event)"

@@ -211,8 +211,50 @@ export function accentPalette(accent: string): Record<string, string> {
     ...derived,
     ...Object.fromEntries(fixes),
     '--c-accent': hex,
-    '--c-on-accent': contrast(tint, hex) >= contrast('#ffffff', hex) ? tint : '#ffffff',
+    '--c-on-accent': onAccent(tint, hex),
   };
+}
+
+/**
+ * The text on the accent fill: the dark tint of the accent where it reaches AA, else white
+ * or black, whichever gives more contrast. White or black reaches at least 4.58:1 on any
+ * colour, so every accent gets a readable fill text. The tint alone fell short on
+ * mid-tone accents such as #0077ee (4.3:1).
+ */
+function onAccent(tint: string, hex: string): string {
+  if (contrast(tint, hex) >= AA) return tint;
+  return contrast('#ffffff', hex) >= contrast('#000000', hex) ? '#ffffff' : '#000000';
+}
+
+/** A text step of a derived palette that misses AA on a surface it sits on. */
+export interface AccentContrastIssue {
+  readonly token: string;
+  readonly on: string;
+  readonly ratio: number;
+}
+
+/**
+ * Check a derived palette against every surface its text steps sit on, in both themes
+ * (spec 000501): the text on the fill, the accent text steps on the surfaces and the
+ * selected row, and the text on the container and on the selection. The branding page
+ * refuses an accent with an issue.
+ */
+export function accentContrastIssues(palette: Readonly<Record<string, string>>): readonly AccentContrastIssue[] {
+  const themePairs = (theme: 'light' | 'dark'): readonly (readonly [string, string])[] => {
+    const sel = palette[`--c-${theme}-sel`];
+    const surfaces = [...SURFACES[theme], sel];
+    return [
+      ...['pt', 'pt-hover', 'pt-active'].flatMap((step) =>
+        surfaces.map((on) => [`--c-${theme}-${step}`, on] as const),
+      ),
+      [`--c-${theme}-onpc`, palette[`--c-${theme}-pc`]],
+      [`--c-${theme}-onsel`, sel],
+    ];
+  };
+  const pairs = [['--c-on-accent', palette['--c-accent']] as const, ...themePairs('light'), ...themePairs('dark')];
+  return pairs
+    .map(([token, on]) => ({ token, on, ratio: contrast(palette[token], on) }))
+    .filter((issue) => issue.ratio < AA);
 }
 
 /**

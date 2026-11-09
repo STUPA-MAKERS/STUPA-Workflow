@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { catchError, map, of, switchMap } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { TodosApiService, type TodoLinkKind, type TodoLinkedCard } from '@core/api/todos.service';
@@ -7,14 +9,18 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate } from '@core/i18n/translations';
 import { dayMonth } from '@shared/date-format';
 import { formatMoney, moneyNumber } from '@shared/format-money';
-import { eventDays } from '../todos.util';
+import { LINK_KIND_LABEL, eventDays } from '../todos.util';
 import {
   type AvatarSize,
   AvatarStackComponent,
+  ButtonComponent,
+  EmptyStateComponent,
   IconComponent,
   type IconName,
   SectionComponent,
 } from '@stupa-makers/ui-kit';
+import { TodoLinkCardDialogComponent } from '../link-card-dialog/todo-link-card-dialog.component';
+import { type NewTodoLink, TodoNewDialogComponent } from '../new-dialog/todo-new-dialog.component';
 import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
 import { personName } from '@shared/person-label.util';
 
@@ -37,14 +43,33 @@ export interface LinkedLead {
  * The TOP sheet puts the application of an application item there, "Antrag · Entwurf ·
  * 1.250,00 €", above the cards of the TOP.
  *
+ * `rows` adds linked objects that are no cards: the Antrag page puts its Vorgänger and its
+ * Folgeanträge there.
+ *
  * A page that needs the cards itself (the ticket page counts the open ones) passes them
  * as `items`; the list then reads nothing.
+ *
+ * `actions` adds the icon buttons "Mit To-Do verknüpfen" and "To-Do anlegen" to the head
+ * (specs 000547, 000548), also without a linked card, for a person who writes a board.
+ * The new card links the element and starts on the board of `gremiumId`. A page with its
+ * own head for them (the To-Dos sheet of a meeting, `headActions`) opens the two dialogs
+ * through `newOpen` and `linkOpen`. `emptyHeading` shows an empty state when nothing is linked.
  */
 @Component({
   selector: 'app-todo-linked-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SectionComponent, RouterLink, TranslatePipe, AvatarStackComponent, IconComponent],
+  imports: [
+    SectionComponent,
+    RouterLink,
+    TranslatePipe,
+    AvatarStackComponent,
+    ButtonComponent,
+    EmptyStateComponent,
+    IconComponent,
+    TodoLinkCardDialogComponent,
+    TodoNewDialogComponent,
+  ],
   templateUrl: './todo-linked-list.component.html',
   styleUrl: './todo-linked-list.component.scss',
 })
@@ -69,6 +94,53 @@ export class TodoLinkedListComponent {
   readonly avatarSize = input<AvatarSize>('sm');
   /** The row above the cards. */
   readonly lead = input<LinkedLead | null>(null);
+  /**
+   * More objects of the same kind linked to the object, such as the Vorgänger and the
+   * Folgeanträge of an Antrag. They stand above the cards and open in the same tab.
+   */
+  readonly rows = input<readonly LinkedLead[]>([]);
+  /** The head holds "Mit To-Do verknüpfen" and "To-Do anlegen". */
+  readonly actions = input(false);
+  /**
+   * The page shows the two actions in a head of its own (the To-Dos sheet of a meeting)
+   * and opens the dialogs through `newOpen` and `linkOpen`; `canAct` tells it when.
+   */
+  readonly headActions = input(false);
+  /** The new card starts on the board of this Gremium, when the person writes it. */
+  readonly gremiumId = input<Uuid | null>(null);
+  /** The text of the element in the link chip of the new card. */
+  readonly linkLabel = input('');
+  /** Shown when no card links the element; empty: the list shows nothing then. */
+  readonly emptyHeading = input('');
+  readonly size = input<'md' | 'lg'>('md');
+
+  readonly newOpen = signal(false);
+  readonly linkOpen = signal(false);
+
+  /** The person writes a board, so the actions can do something (spec 000547). */
+  readonly canAct = toSignal(
+    toObservable(computed(() => this.actions() || this.headActions())).pipe(
+      switchMap((on) =>
+        on
+          ? this.api.boards().pipe(
+              map((boards) => boards.some((b) => b.canWrite)),
+              catchError(() => of(false)),
+            )
+          : of(false),
+      ),
+    ),
+    { initialValue: false },
+  );
+  readonly showActions = computed(() => this.actions() && this.canAct());
+  readonly newLinks = computed<NewTodoLink[]>(() => [
+    {
+      kind: this.kind(),
+      targetId: this.targetId(),
+      label: [this.t(LINK_KIND_LABEL[this.kind()]), this.linkLabel()].filter(Boolean).join(' · '),
+    },
+  ]);
+  readonly linkedIds = computed(() => this.cards().map((c) => c.id));
+  readonly hasRows = computed(() => !!(this.cards().length || this.lead() || this.rows().length));
 
   private readonly loaded = signal<readonly TodoLinkedCard[]>([]);
   readonly cards = computed(() => this.items() ?? this.loaded());
@@ -90,6 +162,11 @@ export class TodoLinkedListComponent {
         if (change.keys.has(linkedKey(this.kind(), this.targetId()))) this.load(this.kind(), this.targetId(), true);
       });
     });
+  }
+
+  /** A new card links the element: read the list again. */
+  created(): void {
+    this.refresh.touch([{ kind: this.kind(), targetId: this.targetId() }]);
   }
 
   private load(kind: Exclude<TodoLinkKind, 'todo'>, id: Uuid, keep: boolean): void {

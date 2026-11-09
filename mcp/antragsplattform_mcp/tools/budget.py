@@ -52,7 +52,8 @@ async def create_budget(node: S.BudgetNodeCreate) -> dict:
 async def update_budget(budget_id: str, patch: S.BudgetNodeUpdate) -> dict:
     """Patch a cost center node.
 
-    You can change `key`, `name`, `color`, `active`, `acceptedStateKeys` and more.
+    You can change `key`, `name`, `color`, `active` and more. Approved and denied
+    come from the flags of the flow states, not from the cost center.
     `decisionGremiumId` sets the deciding Gremium (null clears it; the node then
     inherits from its ancestors). An unknown Gremium gives 422
     `decision_gremium_invalid`. Requires budget.structure.

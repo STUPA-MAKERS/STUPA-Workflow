@@ -118,10 +118,30 @@ export function setStateTerminal(g: FlowGraph, key: string, on: boolean): FlowGr
   return patchState(g, key, { isTerminal: on });
 }
 
-/** Change the state kind. This resets the kind-specific config. */
+/**
+ * Mark the state as approved or denied (spec 000571). A state carries at most one of the
+ * two flags, so switching one on switches the other off.
+ */
+export function setStateOutcome(
+  g: FlowGraph,
+  key: string,
+  outcome: 'approved' | 'denied',
+  on: boolean,
+): FlowGraph {
+  return outcome === 'approved'
+    ? patchState(g, key, on ? { isApproved: true, isDenied: false } : { isApproved: false })
+    : patchState(g, key, on ? { isDenied: true, isApproved: false } : { isDenied: false });
+}
+
+/**
+ * Change the state kind. This resets the kind-specific config. A vote state carries
+ * neither outcome flag (spec 000571), so a switch to `vote` drops them.
+ */
 export function setStateKind(g: FlowGraph, key: string, kind: string): FlowGraph {
   const k = (kind || 'normal') as StateKind;
-  return patchState(g, key, { kind: k === 'normal' ? null : k, config: {} });
+  return k === 'normal'
+    ? patchState(g, key, { kind: null, config: {} })
+    : patchState(g, key, { kind: k, config: {}, isApproved: false, isDenied: false });
 }
 
 function patchConfig(g: FlowGraph, key: string, patch: Partial<StateConfig>): FlowGraph {
@@ -177,7 +197,10 @@ function patchTransition(
   };
 }
 
-export function addTransition(g: FlowGraph, t: TransitionDef): FlowGraph {
+export function addTransition(
+  g: FlowGraph,
+  t: TransitionDef,
+): FlowGraph & { readonly transitions: readonly TransitionDef[] } {
   return { ...g, transitions: [...(g.transitions ?? []), t] };
 }
 

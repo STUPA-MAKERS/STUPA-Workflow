@@ -184,6 +184,32 @@
   }
 </ng-template>
 
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.meeting.sheet' | t" [(open)]="todosOpen">
+  @if (todoList()?.canAct()) {
+    <span sheet-actions class="mp__sheet-actions">
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="todoList()?.linkOpen?.set(true)">
+        <app-icon name="link" />
+      </app-button>
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="todoList()?.newOpen?.set(true)">
+        <app-icon name="plus" />
+      </app-button>
+    </span>
+  }
+  @if (todosOpen()) {
+    <app-todo-linked-list
+      #todoList
+      kind="meeting"
+      headingId="mp-meeting-todos"
+      [showTitle]="false"
+      [targetId]="m.id"
+      [gremiumId]="m.gremiumId"
+      [linkLabel]="m.title"
+      [emptyHeading]="'todos.meeting.empty' | t"
+      [headActions]="true"
+    />
+  }
+</app-side-sheet>
+
 @if (!wide()) {
   <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'meetings.vote.count' | t" [(open)]="votesOpen">
     @if (votesOpen()) {
@@ -237,8 +263,11 @@
     </button>
     @if (presenceOpen()) {
       <ul class="mp__viewers" [attr.aria-label]="'meetings.viewers.title' | t">
-        @for (name of viewers(); track name) {
-          <li>{{ name }}</li>
+        @for (v of viewers(); track v.id ?? v.name) {
+          <li class="mp__viewer">
+            <app-avatar [name]="v.name" [principalId]="v.id" size="xs" [decorative]="true" />
+            <span class="ell">{{ v.name }}</span>
+          </li>
         } @empty {
           <li class="mp__muted">{{ 'meetings.viewers.empty' | t }}</li>
         }

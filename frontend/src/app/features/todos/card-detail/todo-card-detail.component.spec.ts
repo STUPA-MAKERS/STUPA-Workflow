@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, provideRouter } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
+import type { Meeting } from '@core/api/models';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
 import { TodosApiService, type TodoBoard, type TodoCardDetail, type TodoComment } from '@core/api/todos.service';
@@ -109,6 +110,8 @@ interface Opts {
   cache?: TodoCacheService;
   /** The card read: a subject keeps it in flight. */
   read?: Subject<TodoCardDetail>;
+  /** The meetings of the Gremium of the board (`GET /meetings`). */
+  meetings?: readonly Partial<Meeting>[];
 }
 
 async function setup(opts: Opts = {}) {
@@ -116,7 +119,12 @@ async function setup(opts: Opts = {}) {
   const api = makeApi(card);
   if (opts.read) api.card.mockReturnValue(opts.read);
   const toast = { success: jest.fn(), error: jest.fn() };
-  const files = { deleteDraftAttachment: jest.fn(() => of(undefined)), uploadDraftAttachment: jest.fn() };
+  const files = {
+    deleteDraftAttachment: jest.fn(() => of(undefined)),
+    uploadDraftAttachment: jest.fn(),
+    listMeetings: jest.fn(() => of(opts.meetings ?? [])),
+    addAgendaTodo: jest.fn(() => of([])),
+  };
   const out = { closed: jest.fn(), changed: jest.fn(), commentsChanged: jest.fn(), archived: jest.fn() };
   const view = await render(TodoCardDetailComponent, {
     inputs: { cardId: card.id, mode: opts.mode ?? 'drawer', board: opts.board ?? null, split: opts.split ?? false },
@@ -214,7 +222,7 @@ describe('TodoCardDetailComponent', () => {
     expect(screen.queryByRole('checkbox', { name: 'Termin klären' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /1 erledigte Punkte zeigen/ }));
     expect(screen.getByRole('checkbox', { name: 'Termin klären' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(screen.queryByText('1/2')).toBeNull();
     expect(container.querySelector('.cd__checkBar .bar__seg--filled')).toHaveStyle({ flexBasis: '50%' });
     expect(screen.queryByRole('link', { name: /Im Board öffnen/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Schließen' }));
@@ -395,7 +403,7 @@ describe('TodoCardDetailComponent', () => {
   });
 
   /** A tile of a row of another board is not held by the board of the page. */
-  it('counts no foreign columns while it loads a card of another board', async () => {
+  it('draws no composer while it loads a card of another board', async () => {
     const { cmp, api, detect, fixture } = await setup({ board: board({ id: 'b-0', name: 'Meine To-Dos' }) });
     const late = new Subject<TodoCardDetail>();
     api.card.mockReturnValueOnce(late);
@@ -405,7 +413,7 @@ describe('TodoCardDetailComponent', () => {
     expect(document.querySelector('.cd__chat .sk__composer')).toBeNull();
     late.next(detail({ id: 'k-9', boardId: 'b-7', boardName: 'AStA' }));
     detect();
-    expect(cmp.moveColumns().every((col) => col.count === null)).toBe(true);
+    expect(cmp.moveColumns().every((col) => !('count' in col))).toBe(true);
   });
 
   /**
@@ -492,9 +500,9 @@ describe('TodoCardDetailComponent', () => {
     });
     const { cmp, api, fixture } = await setup({ board: own });
     expect(cmp.moveColumns()).toEqual([
-      { id: 'c-1', name: 'Offen', count: 1 },
-      { id: 'c-2', name: 'In Arbeit', count: 2 },
-      { id: 'c-4', name: 'Erledigt', count: 0 },
+      { id: 'c-1', name: 'Offen' },
+      { id: 'c-2', name: 'In Arbeit' },
+      { id: 'c-4', name: 'Erledigt' },
     ]);
     cmp.moveTo({ columnId: 'c-2', position: 'top' });
     expect(api.moveCard).toHaveBeenLastCalledWith('k-1', { columnId: 'c-2', beforeId: 'k-5' });
@@ -791,6 +799,7 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.menuSections()[0].items.map((i) => [i.id, i.icon])).toEqual([
       ['rename', 'edit'],
       ['transfer', 'arrow'],
+      ['duplicate', 'copy'],
       ['makeEvent', 'cal'],
     ]);
     expect(cmp.menuSections()[1].items[0].id).toBe('archive');
@@ -1456,5 +1465,149 @@ describe('TodoCardDetailComponent', () => {
       const { cmp } = await setup({ card: detail({ columnId: 'c-4' }) });
       expect(cmp.menuSections()[0].items[0]).toMatchObject({ id: 'done', label: 'Wieder öffnen', icon: 'undo' });
     });
+  });
+});
+
+describe('TodoCardDetailComponent board work (specs 000553-000555)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => jest.useRealTimers());
+
+  const planned = (over: Partial<Meeting>): Partial<Meeting> => ({
+    status: 'planned',
+    canWrite: true,
+    startTime: '18:00',
+    ...over,
+  });
+  const ids = (cmp: TodoCardDetailComponent) => cmp.menuSections().flatMap((x) => x.items.map((i) => i.id));
+
+  it('offers the planned meetings of the Gremium whose agenda the person edits, the next first', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-16T10:00:00') });
+    const { cmp, files } = await setup({
+      meetings: [
+        planned({ id: 'm-3', title: 'Später', date: '2026-11-20' }),
+        planned({ id: 'm-1', title: 'Nächste', date: '2026-10-22' }),
+        planned({ id: 'm-0', title: 'Vorbei', date: '2026-10-01' }),
+        planned({ id: 'm-x', title: 'Fremd', date: '2026-10-20', canWrite: false }),
+        { id: 'm-l', title: 'Läuft', date: '2026-10-16', status: 'live', canWrite: true },
+      ],
+    });
+    expect(files.listMeetings).toHaveBeenCalledWith('g-1');
+    expect(cmp.agendaMeetings().map((m) => m.id)).toEqual(['m-1', 'm-3']);
+    expect(ids(cmp)).toContain('agenda');
+    cmp.onMenu({ id: 'agenda', label: '' });
+    expect(cmp.agendaOpen()).toBe(true);
+  });
+
+  it('puts the card on the next meeting from the dialog', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-16T10:00:00') });
+    const { cmp, files, detect } = await setup({ meetings: [planned({ id: 'm-1', title: 'Nächste', date: '2026-10-22' })] });
+    cmp.onMenu({ id: 'agenda', label: '' });
+    detect();
+    expect(screen.getByRole('radio', { name: /Nächste/ })).toBeChecked();
+    screen.getByRole('button', { name: /Als TOP hinzufügen/ }).click();
+    expect(files.addAgendaTodo).toHaveBeenCalledWith('m-1', 'k-1');
+  });
+
+  const meetings = [planned({ id: 'm-1', date: '2099-01-01' })];
+
+  it('hides "Auf Tagesordnung setzen" for a card on an agenda', async () => {
+    const { cmp, files } = await setup({ meetings, card: detail({ links: [link({ kind: 'agenda_item', targetId: 'ai-1' })] }) });
+    expect(files.listMeetings).not.toHaveBeenCalled();
+    expect(ids(cmp)).not.toContain('agenda');
+  });
+
+  it('hides "Auf Tagesordnung setzen" when the Gremium has no planned meeting', async () => {
+    const { cmp } = await setup({ meetings: [] });
+    expect(ids(cmp)).not.toContain('agenda');
+  });
+
+  it('hides "Auf Tagesordnung setzen" off a Gremium board', async () => {
+    const { cmp, files } = await setup({ meetings, card: detail({ boardKind: 'team' }) });
+    expect(files.listMeetings).not.toHaveBeenCalled();
+    expect(ids(cmp)).not.toContain('agenda');
+  });
+
+  it('duplicates a card with its fields and every checklist item open', async () => {
+    const card = detail({
+      assignees: [
+        { principalId: 'p-1', displayName: 'Selin Yıldız' },
+        { principalId: 'p-2', displayName: 'Jonas Weber' },
+      ],
+    });
+    const { cmp, detect } = await setup({ card });
+    expect(ids(cmp)).toContain('duplicate');
+    cmp.onMenu({ id: 'duplicate', label: '' });
+    detect();
+    expect(cmp.copy()).toEqual({
+      boardId: 'b-1',
+      descriptionMd: 'Raum **A 101**',
+      dueDate: '2026-10-23',
+      assigneeIds: ['p-1', 'p-2'],
+      labelIds: ['l-1'],
+      checklist: ['Termin klären', 'Raum anfragen'],
+    });
+    expect(cmp.copyLinks()).toEqual([{ kind: 'application', targetId: 'a-1', label: 'Antrag · Lerncafé' }]);
+    expect(screen.getByRole('dialog', { name: 'To-Do duplizieren' })).toBeInTheDocument();
+  });
+
+  it('offers no duplicate of an Event; it has "Folgeveranstaltung anlegen"', async () => {
+    const { cmp } = await setup({ card: detail({ event: EVENT, eventFacts: FACTS }) });
+    expect(ids(cmp)).not.toContain('duplicate');
+    expect(ids(cmp)).toContain('followUp');
+  });
+
+  it('puts a meeting without a date after the dated ones', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-16T10:00:00') });
+    const { cmp } = await setup({
+      meetings: [planned({ id: 'm-n', date: null }), planned({ id: 'm-1', date: '2026-10-22' })],
+    });
+    expect(cmp.agendaMeetings().map((m) => m.id)).toEqual(['m-1', 'm-n']);
+  });
+
+  it('reads no meetings when the board of the card is not among the boards', async () => {
+    const { cmp, files } = await setup({ meetings, card: detail({ boardId: 'b-unbekannt' }) });
+    expect(files.listMeetings).not.toHaveBeenCalled();
+    expect(ids(cmp)).not.toContain('agenda');
+  });
+
+  it('duplicates a card without description, due date or named assignee as empty fields', async () => {
+    const card = detail({
+      descriptionMd: null,
+      dueDate: null,
+      assignees: [{ principalId: null, displayName: 'Gast' }],
+    });
+    const { cmp } = await setup({ card });
+    cmp.duplicate();
+    expect(cmp.copy()).toEqual(expect.objectContaining({ descriptionMd: '', dueDate: '', assigneeIds: [] }));
+  });
+
+  it('does not duplicate an Event', async () => {
+    const { cmp } = await setup({ card: detail({ event: EVENT, eventFacts: FACTS }) });
+    cmp.duplicate();
+    expect(cmp.copyOpen()).toBe(false);
+  });
+
+  it('links no card while the card loads', async () => {
+    const { cmp } = await setup({ read: new Subject<TodoCardDetail>() });
+    expect(cmp.itemLinks()).toEqual([]);
+  });
+
+  it('deletes no item when the item dialog closes without one', async () => {
+    const { cmp, api } = await setup();
+    cmp.onItemCard();
+    expect(api.deleteCheckItem).not.toHaveBeenCalled();
+  });
+
+  it('makes a card of a checklist item and takes the item off the checklist', async () => {
+    const { cmp, api, detect } = await setup();
+    screen.getByRole('button', { name: 'Als Karte anlegen: Raum anfragen' }).click();
+    detect();
+    expect(cmp.itemOpen()).toBe(true);
+    expect(cmp.itemLinks()).toEqual([{ kind: 'todo', targetId: 'k-1', label: 'To-Do · Raum buchen' }]);
+    expect(cmp.itemAssignees()).toEqual(cmp.card()?.assignees.flatMap((a) => (a.principalId ? [a.principalId] : [])));
+    expect(screen.getByRole('dialog', { name: 'Als Karte anlegen' })).toBeInTheDocument();
+    cmp.onItemCard();
+    expect(api.addLink).not.toHaveBeenCalled();
+    expect(api.deleteCheckItem).toHaveBeenCalledWith('k-1', 'i-2');
   });
 });
