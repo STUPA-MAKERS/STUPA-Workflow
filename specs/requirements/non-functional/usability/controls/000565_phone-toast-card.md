@@ -4,8 +4,10 @@ title: A phone toast is a tinted glass card
 kind: non-functional
 status: draft
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-09
+implementation:
+  - frontend/vendor/ui-kit/src/lib/toast/toast.component.scss
+  - frontend/vendor/ui-kit/src/lib/toast/toast.component.html
 scope:
   - frontend/vendor/ui-kit
 ---

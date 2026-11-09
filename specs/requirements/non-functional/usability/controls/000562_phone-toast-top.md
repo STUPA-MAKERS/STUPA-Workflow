@@ -4,8 +4,10 @@ title: A phone toast shows at the top
 kind: non-functional
 status: draft
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-09
+implementation:
+  - frontend/vendor/ui-kit/src/lib/toast/toast.component.scss
+  - frontend/vendor/ui-kit/shell/src/shell/shell.component.scss
 scope:
   - frontend/vendor/ui-kit
 ---

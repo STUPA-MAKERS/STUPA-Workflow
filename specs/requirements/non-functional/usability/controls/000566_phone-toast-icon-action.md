@@ -4,8 +4,12 @@ title: A phone toast action is an icon button
 kind: non-functional
 status: draft
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-09
+implementation:
+  - frontend/vendor/ui-kit/src/lib/toast/toast.component.html
+  - frontend/vendor/ui-kit/src/lib/toast/toast.component.scss
+  - frontend/src/app/pages/applications/applications-list.component.ts
+  - frontend/src/app/pages/invoices/invoices.component.ts
 scope:
   - frontend/vendor/ui-kit
   - frontend/src/app/

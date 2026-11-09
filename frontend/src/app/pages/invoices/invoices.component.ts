@@ -954,6 +954,7 @@ export class InvoicesComponent implements InvoiceFormHost {
         this.toast.showAction({
           message: this.i18n.translate('invoices.toast.paid'),
           action: this.i18n.translate('action.undo'),
+          actionIcon: 'undo',
           variant: 'success',
           closed: (how) => {
             if (how !== 'action') {
