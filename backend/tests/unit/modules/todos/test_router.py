@@ -289,7 +289,8 @@ def test_cross_board_routes(env: _Env) -> None:
     hits = c.get(f"/api/todos/link-targets?q=ab&kind=ticket&excludeCardId={CID}")
     assert hits.json()[0]["targetId"] == str(XID)
     assert env.service.links.calls == [("ab", "ticket", CID)]
-    assert c.get("/api/todos/link-targets?q=a").status_code == 422
+    assert c.get("/api/todos/link-targets?kind=todo").status_code == 200
+    assert env.service.links.calls[-1] == ("", "todo", None)
     linked = c.get(f"/api/todos/linked?kind=meeting&targetId={XID}")
     assert linked.json()[0]["boardName"] == "B"
     assert c.get(f"/api/todos/linked?kind=todo&targetId={XID}").status_code == 422

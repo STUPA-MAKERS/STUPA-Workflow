@@ -124,6 +124,8 @@ export class TodoNewDialogComponent {
   readonly initialLinks = input<readonly NewTodoLink[]>([]);
   /** The card that "Duplizieren" copies. */
   readonly copy = input<TodoCardCopy | null>(null);
+  /** The people of a card made from a checklist item: those of its card (spec 000555). */
+  readonly initialAssigneeIds = input<readonly Uuid[]>([]);
   /** The title of the dialog. */
   readonly heading = input<TranslationKey>('todos.new.title');
   /** Offer the Markdown description. */
@@ -226,7 +228,7 @@ export class TodoNewDialogComponent {
     this.title.set(this.initialTitle());
     this.links.set([...this.initialLinks()]);
     const copy = this.copy();
-    this.wantAssignee = copy?.assigneeIds[0] ?? '';
+    this.wantAssignee = this.people()[0] ?? '';
     this.assignee.set('');
     this.due.set(copy?.dueDate ?? '');
     this.kind.set('todo');
@@ -381,15 +383,23 @@ export class TodoNewDialogComponent {
       });
   }
 
+  /** The people the dialog starts with: those of the copy, else the given ones. */
+  private people(): readonly Uuid[] {
+    return this.copy()?.assigneeIds ?? this.initialAssigneeIds();
+  }
+
   /** The people, the labels and the checklist of the new card, a copy's included. */
   private copied(): { assigneeIds: Uuid[]; labelIds?: Uuid[]; checklist?: string[] } {
-    const assigneeIds = this.assignee() ? [this.assignee()] : [];
+    const members = new Set(this.members().map((m) => m.principalId));
+    const others = this.people().filter((id) => id !== this.wantAssignee && members.has(id));
+    const assigneeIds = [
+      ...(this.assignee() ? [this.assignee()] : []),
+      ...others.filter((id) => id !== this.assignee()),
+    ];
     const copy = this.copy();
     if (!copy) return { assigneeIds };
-    const members = new Set(this.members().map((m) => m.principalId));
-    const others = copy.assigneeIds.filter((id) => id !== this.wantAssignee && members.has(id));
     return {
-      assigneeIds: [...assigneeIds, ...others.filter((id) => id !== this.assignee())],
+      assigneeIds,
       labelIds: copy.boardId === this.selectedBoard() ? [...copy.labelIds] : [],
       checklist: [...copy.checklist],
     };

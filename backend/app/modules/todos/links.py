@@ -78,6 +78,10 @@ from app.shared.search import dialect_of, escape_like, trigram_rank
 
 #: The most hits of one kind in the link picker.
 PER_KIND = 5
+#: The newest cards that ``recent_cards`` offers before a search term (spec 000548).
+RECENT_CARDS = 20
+#: The shortest search term.
+MIN_TERM = 2
 #: Every status of a vote: the picker also offers a draft, which a card often prepares.
 VOTE_STATUSES = ("open", "draft", "closed", "cancelled")
 
@@ -648,8 +652,14 @@ class LinkResolver:
         *,
         exclude_card_id: uuid.UUID | None = None,
     ) -> list[TodoLinkTarget]:
-        """Search the link targets that the principal may read, ``PER_KIND`` per kind."""
+        """Search the link targets that the principal may read, ``PER_KIND`` per kind.
+
+        A term below ``MIN_TERM`` characters finds the newest cards for the kind ``todo``
+        (``recent_cards``) and nothing for any other kind.
+        """
         term = q.strip()
+        if len(term) < MIN_TERM:
+            return await self.recent_cards(principal) if kind == "todo" else []
         kinds: Sequence[str] = LINK_KINDS if kind == "all" else (kind,)
         per_kind = [
             await self._kind_targets(current, term, principal, exclude_card_id) for current in kinds
@@ -665,6 +675,12 @@ class LinkResolver:
     ) -> list[TodoLinkTarget]:
         """The readable targets of one kind that match ``term``, in candidate order."""
         ids = await self._candidates(kind, term, principal, exclude_card_id)
+        return await self._as_targets(kind, ids, principal)
+
+    async def _as_targets(
+        self, kind: str, ids: Sequence[uuid.UUID], principal: Principal
+    ) -> list[TodoLinkTarget]:
+        """The readable ones of ``ids`` as link targets, in the given order."""
         resolved = await self.resolve([(kind, i) for i in ids], principal, grants=False)
         return [
             TodoLinkTarget(
@@ -836,6 +852,22 @@ class LinkResolver:
 
         page = await TicketService(self.session).list(q=term, limit=PER_KIND)
         return [t.id for t in page.items]
+
+    async def recent_cards(self, principal: Principal) -> list[TodoLinkTarget]:
+        """The newest readable open cards, ``RECENT_CARDS`` at most, as link targets."""
+        scope = await self.access.scope(principal)
+        ids = list(
+            (
+                await self.session.scalars(
+                    select(TodoCard.id)
+                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                    .where(scope.condition(), TodoCard.archived_at.is_(None))
+                    .order_by(TodoCard.updated_at.desc(), TodoCard.id)
+                    .limit(RECENT_CARDS)
+                )
+            ).all()
+        )
+        return await self._as_targets("todo", ids, principal)
 
     async def _todo_candidates(
         self, pattern: str, principal: Principal, exclude_card_id: uuid.UUID | None

@@ -105,19 +105,26 @@ export class TodoLinkCardDialogComponent {
     });
   }
 
+  /**
+   * A term from two characters searches every readable card. Below that the list holds the
+   * own cards first, then the newest cards (spec 000548).
+   */
   private search(q: string): Observable<TodoLinkTarget[]> {
+    const term = q.trim();
     const src: Observable<TodoLinkTarget[]> =
-      q.trim().length >= MIN_QUERY
-        ? this.api.linkTargets(q.trim(), 'todo')
-        : this.api.mine().pipe(
-            map((m) =>
-              m.items.map((c) => ({
+      term.length >= MIN_QUERY
+        ? this.api.linkTargets(term, 'todo')
+        : combineLatest([this.api.mine(), this.api.linkTargets('', 'todo')]).pipe(
+            map(([m, recent]) => {
+              const own = m.items.map((c) => ({
                 kind: 'todo' as const,
                 targetId: c.id,
                 title: c.title,
                 detail: { boardName: c.boardName, columnName: c.columnName },
-              })),
-            ),
+              }));
+              const seen = new Set(own.map((t) => t.targetId));
+              return [...own, ...recent.filter((t) => !seen.has(t.targetId))];
+            }),
           );
     return src.pipe(catchError(() => of([] as TodoLinkTarget[])));
   }

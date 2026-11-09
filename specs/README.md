@@ -137,6 +137,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/flow/000244](requirements/functional/applications/flow/000244_budget-locked-by-vote.md) | The cost centre is locked during a budget vote | approved |
 | [F/applications/flow/000245](requirements/functional/applications/flow/000245_applicant-transitions.md) | Applicant transitions need actorIsApplicant | approved |
 | [F/applications/flow/000459](requirements/functional/applications/flow/000459_vote-state-branches.md) | A vote state has exactly one pass and one fail branch | approved |
+| [F/applications/flow/000571](requirements/functional/applications/flow/000571_approved-state.md) | A flow state can mark an Antrag as approved or denied | approved |
+| [F/applications/flow/000572](requirements/functional/applications/flow/000572_approved-amount-from-state.md) | The approved amount follows the approved state | approved |
 | [F/applications/forms/000133](requirements/functional/applications/forms/000133_positions-shape.md) | A positions answer has label and offers | approved |
 | [F/applications/forms/000134](requirements/functional/applications/forms/000134_offer-limits.md) | Offer counts have limits | approved |
 | [F/applications/forms/000135](requirements/functional/applications/forms/000135_funding-field.md) | The requested funding is separate from the costs | approved |

@@ -62,9 +62,13 @@ describe('TodoLinkCardDialogComponent (spec 000548)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => jest.useRealTimers());
 
-  it('lists the own cards on writable boards, without the ones that link the element', async () => {
-    const { cmp } = await setup();
-    expect(cmp.rows()).toEqual([{ id: 'k-1', title: 'Beleg prüfen', sub: 'StuPa · Offen' }]);
+  it('lists the own cards, then the newest, on writable boards, without the ones that link the element', async () => {
+    const { cmp, api } = await setup();
+    expect(api.linkTargets).toHaveBeenCalledWith('', 'todo');
+    expect(cmp.rows()).toEqual([
+      { id: 'k-1', title: 'Beleg prüfen', sub: 'StuPa · Offen' },
+      { id: 'k-9', title: 'Kasse zählen', sub: 'StuPa · In Arbeit' },
+    ]);
     expect(cmp.pick()).toBe('k-1');
   });
 
@@ -101,7 +105,7 @@ describe('TodoLinkCardDialogComponent (spec 000548)', () => {
   it('shows the rows as radios in the dialog', async () => {
     await setup();
     expect(screen.getByRole('radiogroup', { name: 'To-Dos' })).toBeInTheDocument();
-    expect(screen.getByRole('radio')).toBeChecked();
+    expect(screen.getAllByRole('radio')[0]).toBeChecked();
   });
 
   it('lists nothing and picks nothing while the boards load', async () => {
