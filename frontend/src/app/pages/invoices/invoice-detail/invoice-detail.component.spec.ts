@@ -101,7 +101,7 @@ describe('InvoiceDetailComponent', () => {
     );
     await render(InvoiceDetailComponent, {
       inputs: { invoice: INVOICE, canManage: false, split: true },
-      providers: [provideRouter([]), { provide: TodosApiService, useValue: { linked } }],
+      providers: [provideRouter([]), { provide: TodosApiService, useValue: { linked, boards: () => of([]) } }],
     });
     expect(linked).toHaveBeenCalledWith('invoice', INVOICE.id);
     expect(screen.getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();

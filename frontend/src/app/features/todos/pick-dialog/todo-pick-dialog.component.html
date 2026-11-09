@@ -1,0 +1,65 @@
+<app-dialog
+  [open]="open()"
+  [title]="heading()"
+  [closeLabel]="'action.close' | t"
+  size="form"
+  (closed)="cancel()"
+>
+  <form class="pd" (submit)="$event.preventDefault(); submit()">
+    <div class="pd__area">
+      @if (searchLabel()) {
+        <app-search-pill
+          size="md"
+          [placeholder]="searchLabel()"
+          [value]="query()"
+          (valueChange)="query.set($event)"
+        />
+      }
+      <div class="pd__slot">
+        @if (rows(); as list) {
+          @if (list.length) {
+            <div
+              class="pd__list"
+              appScrollFade="y"
+              role="radiogroup"
+              [attr.aria-label]="listLabel()"
+            >
+              @for (r of list; track r.id) {
+                @let on = pick() === r.id;
+                <label class="pd__row" [class.pd__row--on]="on" data-testid="pick-row">
+                  <input
+                    class="pd__radio"
+                    type="radio"
+                    name="todo-pick"
+                    [value]="r.id"
+                    [checked]="on"
+                    (change)="pick.set(r.id)"
+                  />
+                  <app-icon class="pd__mark" [name]="on ? 'circleok' : 'circle'" [size]="20" />
+                  <span class="pd__text">
+                    <span class="pd__title ell">{{ r.title }}</span>
+                    @if (r.sub) {
+                      <span class="pd__sub ell">{{ r.sub }}</span>
+                    }
+                  </span>
+                </label>
+              }
+            </div>
+          } @else {
+            <app-empty-state shape="choice" [heading]="emptyHeading()" />
+          }
+        } @else {
+          <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
+        }
+      </div>
+    </div>
+    <button type="submit" hidden></button>
+  </form>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [disabled]="!pick() || busy()" (click)="submit()">
+    @if (submitIcon(); as icon) {
+      <app-icon [name]="icon" [size]="16" />
+    }
+    {{ submitLabel() }}
+  </app-button>
+</app-dialog>

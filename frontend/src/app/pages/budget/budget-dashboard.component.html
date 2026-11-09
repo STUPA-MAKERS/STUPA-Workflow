@@ -260,6 +260,9 @@
             <app-budget-item-list [items]="previewItems()" [names]="nodeNames()" />
           }
         </app-section>
+        @if (current(); as cur) {
+          <app-todo-linked-list class="bd__sec" size="lg" kind="budget" headingId="bd-todos" [targetId]="cur.id" [actions]="true" [linkLabel]="cur.name" />
+        }
       </div>
     </article>
   </div>

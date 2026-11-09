@@ -1,8 +1,8 @@
 """Link targets of a card: resolve them per viewer, and search them for the picker.
 
 A card links to an application, a meeting, an agenda item, a vote, a gremium, an
-invoice, a booking, a ticket or another card. Each kind has the read rule of its own
-module:
+invoice, a booking, a cost centre, a ticket or another card. Each kind has the read rule
+of its own module:
 
 * application — the application read access (``resolve_app_read``), confirmed only;
 * meeting — the meeting read scope (``meeting_read_scope``);
@@ -13,6 +13,9 @@ module:
   ``can_view_gremium``: ``gremium.view_all`` or an active membership);
 * invoice, expense — the gate of ``GET /api/invoices`` and ``GET /api/expenses``
   (``budget.access.has_budget_read``);
+* budget (a cost centre) — every reader of the card sees its name and path key (spec
+  000552); the url to the cost centre page and the link picker follow the gate of the
+  budget pages (``has_budget_read``), so only a budget reader links one;
 * ticket — ``ticket.manage``;
 * todo — the board read rule (``BoardAccess``).
 
@@ -80,8 +83,9 @@ VOTE_STATUSES = ("open", "draft", "closed", "cancelled")
 
 LinkRef = tuple[str, uuid.UUID]
 #: The kinds that a card opens to its readers (spec 000487): every kind but the ticket,
-#: which holds the report of a person outside the team, and the gremium.
-GRANT_KINDS: frozenset[str] = frozenset(LINK_KINDS) - {"ticket", "gremium"}
+#: which holds the report of a person outside the team, the gremium, and the cost centre,
+#: which every reader of the card sees anyway.
+GRANT_KINDS: frozenset[str] = frozenset(LINK_KINDS) - {"ticket", "gremium", "budget"}
 #: No id passes the gate of its kind without the rule.
 NONE: frozenset[uuid.UUID] = frozenset()
 
@@ -297,6 +301,7 @@ class LinkResolver:
             "gremium": self._gremien,
             "invoice": self._invoices,
             "expense": self._expenses,
+            "budget": self._budgets,
             "ticket": self._tickets,
             "todo": self._todos,
         }
@@ -316,7 +321,12 @@ class LinkResolver:
         }
 
     async def readable(self, kind: str, target_id: uuid.UUID, principal: Principal) -> bool:
-        """Tell if the principal reads the target (the rule of ``POST .../links``)."""
+        """Tell if the principal reads the target (the rule of ``POST .../links``).
+
+        A cost centre shows to every reader of the card, but only a budget reader links one.
+        """
+        if kind == "budget" and not has_budget_read(principal):
+            return False
         resolved = await self.resolve([(kind, target_id)], principal, grants=False)
         return resolved[(kind, target_id)].accessible
 
@@ -557,6 +567,33 @@ class LinkResolver:
         ).all()
         return {exp.id: _expense_target(exp, path_key) for exp, path_key in rows}
 
+    async def _budgets(
+        self,
+        ids: AbstractSet[uuid.UUID],
+        principal: Principal,
+        open_ids: frozenset[uuid.UUID] = NONE,
+    ) -> dict[uuid.UUID, Resolved]:
+        """Resolve cost centre links: name and path key for each reader (spec 000552).
+
+        The url follows the gate of the budget pages, so a reader without budget read sees
+        the name without a way into the page.
+        """
+        rows = (
+            await self.session.execute(
+                select(Budget.id, Budget.name, Budget.path_key).where(Budget.id.in_(ids))
+            )
+        ).all()
+        reads = has_budget_read(principal)
+        return {
+            bid: Resolved(
+                accessible=True,
+                title=name,
+                url=f"/budget?ks={bid}" if reads else None,
+                detail=TodoLinkDetail(cost_centre=path_key),
+            )
+            for bid, name, path_key in rows
+        }
+
     async def _tickets(
         self,
         ids: AbstractSet[uuid.UUID],
@@ -663,6 +700,8 @@ class LinkResolver:
                 return await self._invoice_candidates(term, principal)
             case "expense":
                 return await self._expense_candidates(term, principal)
+            case "budget":
+                return await self._budget_candidates(pattern, principal)
             case "ticket":
                 return await self._ticket_candidates(term, principal)
             case _:
@@ -771,6 +810,23 @@ class LinkResolver:
             q=term, limit=PER_KIND, offset=0
         )
         return [e.id for e in page.items]
+
+    async def _budget_candidates(self, pattern: str, principal: Principal) -> list[uuid.UUID]:
+        """Cost centres by name or path key, behind the gate of the budget pages."""
+        if not has_budget_read(principal):
+            return []
+        stmt = (
+            select(Budget.id)
+            .where(
+                or_(
+                    Budget.name.ilike(pattern, escape="\\"),
+                    Budget.path_key.ilike(pattern, escape="\\"),
+                )
+            )
+            .order_by(Budget.path_key, Budget.id)
+            .limit(PER_KIND)
+        )
+        return list((await self.session.scalars(stmt)).all())
 
     async def _ticket_candidates(self, term: str, principal: Principal) -> list[uuid.UUID]:
         """Reuses ``TicketService.list``, behind ``ticket.manage`` like ``GET /tickets``."""

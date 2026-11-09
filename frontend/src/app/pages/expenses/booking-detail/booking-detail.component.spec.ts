@@ -178,7 +178,7 @@ describe('BookingDetailComponent', () => {
     );
     await render(BookingDetailComponent, {
       inputs: { expense: EXPENSE },
-      providers: [provideRouter([]), { provide: TodosApiService, useValue: { linked } }],
+      providers: [provideRouter([]), { provide: TodosApiService, useValue: { linked, boards: () => of([]) } }],
     });
     expect(linked).toHaveBeenCalledWith('expense', EXPENSE.id);
     expect(screen.getByRole('link', { name: 'Beleg nachreichen' })).toBeInTheDocument();

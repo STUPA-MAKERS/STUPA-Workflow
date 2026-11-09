@@ -60,6 +60,20 @@ export interface NewTodoLink {
 }
 
 /**
+ * What a duplicate takes from its card (spec 000554). The labels go along only on the
+ * board of the card; the people go along where they are members of the picked board.
+ */
+export interface TodoCardCopy {
+  readonly boardId: Uuid;
+  readonly descriptionMd: string;
+  readonly dueDate: string;
+  readonly assigneeIds: readonly Uuid[];
+  readonly labelIds: readonly Uuid[];
+  /** The texts of the checklist, all open in the copy. */
+  readonly checklist: readonly string[];
+}
+
+/**
  * "Neues To-Do": the dialog of the board ("+ To-Do"), of the ⋮ of a TOP and
  * of a ticket ("To-Do aus Ticket anlegen").
  *
@@ -67,7 +81,8 @@ export interface NewTodoLink {
  * first board of `boardKinds`), else the first board that takes cards; the column as the
  * given or the first one. The person and the due date are optional. The given links go
  * along, each with a × to take it off, and the picker adds more. The ticket dialog
- * leaves out the description (`withDescription`).
+ * leaves out the description (`withDescription`). `copy` fills the dialog from a card
+ * ("Duplizieren"), and a copy is always a to-do.
  */
 @Component({
   selector: 'app-todo-new-dialog',
@@ -107,6 +122,8 @@ export class TodoNewDialogComponent {
   readonly boardKinds = input<readonly TodoBoardKind[]>([]);
   readonly initialTitle = input('');
   readonly initialLinks = input<readonly NewTodoLink[]>([]);
+  /** The card that "Duplizieren" copies. */
+  readonly copy = input<TodoCardCopy | null>(null);
   /** The title of the dialog. */
   readonly heading = input<TranslationKey>('todos.new.title');
   /** Offer the Markdown description. */
@@ -141,7 +158,9 @@ export class TodoNewDialogComponent {
     { value: NEW_SERIES, label: this.i18n.translate('todos.eventCard.newSeries') },
   ]);
   /** A personal board has no Events, so the switch needs a writable shared board. */
-  readonly canEvent = computed(() => this.boards().some((b) => b.canWrite && b.kind !== 'personal'));
+  readonly canEvent = computed(
+    () => !this.copy() && this.boards().some((b) => b.canWrite && b.kind !== 'personal'),
+  );
   readonly datesError = computed(() =>
     this.kind() === 'event' && this.endsOn() && (!this.startsOn() || this.endsOn() < this.startsOn())
       ? this.i18n.translate('todos.error.eventDates')
@@ -153,6 +172,8 @@ export class TodoNewDialogComponent {
   readonly saving = signal(false);
   readonly noBoard = signal(false);
   private seq = 0;
+  /** The person to pick once the members of the board are read. */
+  private wantAssignee: Uuid = '';
 
   readonly boardOptions = computed<SelectOption[]>(() =>
     this.boards()
@@ -204,15 +225,17 @@ export class TodoNewDialogComponent {
   private start(): void {
     this.title.set(this.initialTitle());
     this.links.set([...this.initialLinks()]);
+    const copy = this.copy();
+    this.wantAssignee = copy?.assigneeIds[0] ?? '';
     this.assignee.set('');
-    this.due.set('');
+    this.due.set(copy?.dueDate ?? '');
     this.kind.set('todo');
     this.startsOn.set('');
     this.endsOn.set('');
     this.place.set('');
     this.seriesId.set('');
     this.seriesName.set('');
-    this.description.set('');
+    this.description.set(copy?.descriptionMd ?? '');
     this.saving.set(false);
     this.noBoard.set(false);
     this.pickerOpen.set(false);
@@ -259,7 +282,9 @@ export class TodoNewDialogComponent {
     });
     this.api.members(id).subscribe({
       next: (list) => {
-        if (seq === this.seq) this.members.set(list);
+        if (seq !== this.seq) return;
+        this.members.set(list);
+        if (list.some((m) => m.principalId === this.wantAssignee)) this.assignee.set(this.wantAssignee);
       },
       error: () => {
         if (seq === this.seq) this.members.set([]);
@@ -338,7 +363,7 @@ export class TodoNewDialogComponent {
         title: this.title().trim(),
         descriptionMd: this.description().trim() || null,
         dueDate: this.due() || null,
-        assigneeIds: this.assignee() ? [this.assignee()] : [],
+        ...this.copied(),
         links: this.links().map((l) => ({ kind: l.kind, targetId: l.targetId })),
         ...(this.kind() === 'event' ? { event: this.event() } : {}),
       })
@@ -354,6 +379,20 @@ export class TodoNewDialogComponent {
           this.toast.error(this.i18n.translate(this.errorKey(err?.error?.code)));
         },
       });
+  }
+
+  /** The people, the labels and the checklist of the new card, a copy's included. */
+  private copied(): { assigneeIds: Uuid[]; labelIds?: Uuid[]; checklist?: string[] } {
+    const assigneeIds = this.assignee() ? [this.assignee()] : [];
+    const copy = this.copy();
+    if (!copy) return { assigneeIds };
+    const members = new Set(this.members().map((m) => m.principalId));
+    const others = copy.assigneeIds.filter((id) => id !== this.wantAssignee && members.has(id));
+    return {
+      assigneeIds: [...assigneeIds, ...others.filter((id) => id !== this.assignee())],
+      labelIds: copy.boardId === this.selectedBoard() ? [...copy.labelIds] : [],
+      checklist: [...copy.checklist],
+    };
   }
 
   private errorKey(code: string | undefined): TranslationKey {

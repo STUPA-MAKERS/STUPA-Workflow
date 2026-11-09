@@ -1,0 +1,108 @@
+@use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
+@use '../../../shared/ui/dialog-form' as df;
+
+@include df.host;
+
+.pd {
+  @include df.form;
+}
+
+// One height for every state, so the dialog keeps its height while the search runs.
+.pd__area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+  height: clamp(14rem, calc(78dvh - 21rem), 26rem);
+}
+@include bp.phone {
+  .pd__area {
+    height: auto;
+  }
+  .pd__list {
+    max-height: 22rem;
+  }
+}
+
+.pd__slot {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pd__list {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  @include fade.fade-y(var(--space-5));
+}
+
+.pd__row {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 14px;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .pd__row:hover {
+    background: var(--color-surface-2);
+  }
+}
+.pd__row--on {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+@media (hover: hover) {
+  .pd__row--on:hover {
+    background: var(--color-selected);
+  }
+}
+.pd__row:has(.pd__radio:focus-visible) {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.pd__radio {
+  position: absolute;
+  inset-inline-start: 14px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  opacity: 0;
+}
+.pd__mark {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.pd__row--on .pd__mark {
+  color: var(--color-accent-text);
+}
+.pd__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.pd__title {
+  min-width: 0;
+  font-weight: var(--fw-medium);
+}
+.pd__sub {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.pd__row--on .pd__sub {
+  color: inherit;
+}

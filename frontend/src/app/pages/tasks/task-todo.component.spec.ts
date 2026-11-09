@@ -25,7 +25,7 @@ async function start(withPage: boolean, split = true) {
         { path: 'tasks', component: ListStub },
         { path: 'tasks/todo/:cardId', component: TaskTodoComponent },
       ]),
-      { provide: TodosApiService, useValue: { card: jest.fn(() => of(detail())), members: jest.fn(() => of(MEMBERS)) } },
+      { provide: TodosApiService, useValue: { card: jest.fn(() => of(detail())), members: jest.fn(() => of(MEMBERS)), boards: jest.fn(() => of([])) } },
       provideFakeTodoLive(),
       { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
       ...(withPage ? [{ provide: TasksComponent, useValue: page }] : []),

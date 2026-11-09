@@ -177,7 +177,7 @@
         </app-section>
       }
 
-      <app-todo-linked-list class="id__todos" kind="invoice" headingId="id-todos" [targetId]="i.id" />
+      <app-todo-linked-list class="id__todos" kind="invoice" headingId="id-todos" [targetId]="i.id" [actions]="true" [linkLabel]="i.number || i.supplier || ''" />
     </div>
   </div>
 </article>

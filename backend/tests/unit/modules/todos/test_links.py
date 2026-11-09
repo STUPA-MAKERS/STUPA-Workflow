@@ -547,3 +547,30 @@ async def test_search_new_kinds_without_rights(gremium_scope: dict[str, Any]) ->
     for kind in ("gremium", "invoice", "expense"):
         assert await resolver.search("stu", kind, USER) == []
     assert session.statements == []
+
+
+async def test_a_cost_centre_shows_to_each_card_reader() -> None:
+    """Spec 000552: name and path key for each reader; url and link only with budget read."""
+    ks = uuid.uuid4()
+    session = ScriptedSession(execute=[[(ks, "Kultur", "SP.300")], [(ks, "Kultur", "SP.300")]])
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    seen = (await resolver.resolve([("budget", ks)], USER))[("budget", ks)]
+    assert seen.accessible and not seen.granted
+    assert (seen.title, seen.url) == ("Kultur", None)
+    assert seen.detail is not None and seen.detail.cost_centre == "SP.300"
+    booker = (await resolver.resolve([("budget", ks)], BOOKER))[("budget", ks)]
+    assert booker.url == f"/budget?ks={ks}"
+
+    session = ScriptedSession()
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    assert not await resolver.readable("budget", ks, USER)
+    assert await resolver.search("kul", "budget", USER) == []
+    assert await REAL_GRANTED(resolver, "budget", {ks}, USER) == set()
+    assert session.statements == []
+
+    session = ScriptedSession(scalars=[[ks]], execute=[[(ks, "Kultur", "SP.300")]] * 2)
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    (hit,) = await resolver.search("kul", "budget", BOOKER)
+    assert (hit.kind, hit.target_id, hit.title) == ("budget", ks, "Kultur")
+    assert "budget.path_key" in str(session.statements[0])
+    assert await resolver.readable("budget", ks, BOOKER)

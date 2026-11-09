@@ -22,8 +22,9 @@ done (`completed_at`).
   target FK is `ON DELETE CASCADE`; `ck_todo_link_one_target` counts the columns of
   `LINK_COLUMNS`, partial indexes `uq_todo_link_<column>` and `ix_todo_link_<column>`).
   `LINK_KINDS` is also the picker order: application, meeting, agenda_item, vote,
-  gremium, invoice, expense (`budget_expense`), ticket, todo. Migration `527854b79d68`
-  adds `vote_id`, `gremium_id`, `invoice_id`, `expense_id`. Constants
+  gremium, invoice, expense (`budget_expense`), budget (the cost centre), ticket, todo.
+  Migration `527854b79d68` adds `vote_id`, `gremium_id`, `invoice_id`, `expense_id`;
+  `b3b70dda7d08` adds `budget_id`. Constants
   `DEFAULT_COLUMNS`, `PERSONAL_BOARD_NAME`, `TEAM_BOARD_NAME`/`TEAM_BOARD_PERMISSION`.
 - `access.py` — `BoardAccess` (per-request cache): `can_read` (write or `todo.read_all`),
   `can_write`, `can_configure`, `scope()` → `ReadScope.condition()` for the cross-board
@@ -45,7 +46,9 @@ done (`completed_at`).
   `assert_can_read`); gremium `auth.policy.gremium_view_scope` (the tab
   "Gremien": `gremium.view_all` or an active membership, cached per resolver); invoice and
   expense `budget.access.has_budget_read` (`budget.view`/`.structure`/`.book`, the gate
-  of `GET /invoices` and `/expenses`); ticket `ticket.manage`; todo the board rule.
+  of `GET /invoices` and `/expenses`); budget (cost centre): every card reader sees the
+  name and path key, the url `/budget?ks={id}` and a new link need `has_budget_read`
+  (spec 000552), and it is no grant kind; ticket `ticket.manage`; todo the board rule.
   Titles and urls: vote = question, else the application title when the viewer can read that application (`/voting/{id}`, detail
   `meetingTitle`, `date`, `voteStatus`, `voteResult`); gremium = name (`/gremien/{id}`);
   invoice = number, else supplier (`/invoices?id={id}`, detail `number`,

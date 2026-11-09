@@ -43,6 +43,7 @@ export const LINK_ICON: Record<TodoLinkKind, IconName> = {
   gremium: 'landmark',
   invoice: 'receipt',
   expense: 'swap',
+  budget: 'pie',
   ticket: 'chat',
   todo: 'circleok',
 };
@@ -55,6 +56,7 @@ export const LINK_KIND_LABEL: Record<TodoLinkKind, TranslationKey> = {
   gremium: 'todos.linkKind.gremium',
   invoice: 'todos.linkKind.invoice',
   expense: 'todos.linkKind.expense',
+  budget: 'todos.linkKind.budget',
   ticket: 'todos.linkKind.ticket',
   todo: 'todos.linkKind.todo',
 };
@@ -172,6 +174,8 @@ function linkFacts(
     }
     case 'expense':
       return [d.costCentre, d.amount ? formatMoney(d.amount, locale) : null];
+    case 'budget':
+      return [d.costCentre];
     case 'ticket':
       return [
         numberPart(d.number, title),

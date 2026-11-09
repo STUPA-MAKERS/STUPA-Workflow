@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
 
-from app.modules.calendar.ics import MeetingEvent, build_calendar
+from app.modules.calendar.ics import DueCard, MeetingEvent, build_calendar
 
 DOMAIN = "stupa.example.org"
 STAMP = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
@@ -128,3 +128,22 @@ def test_empty_calendar() -> None:
 def test_multiple_events() -> None:
     out = _ics([_ev(uid="a"), _ev(uid="b")])
     assert out.count("BEGIN:VEVENT") == 2
+
+
+def test_due_card_is_an_all_day_event_with_the_card_url() -> None:
+    """Spec 000549: title, board and url of the card, on its due date."""
+    card = DueCard(
+        uid="c1",
+        title="Raum buchen",
+        due=date(2026, 11, 18),
+        stamp=STAMP,
+        board_name="Kultur",
+        url="https://stupa.example.org/todos?card=c1",
+    )
+    out = _ics([], due_cards=[card])
+    assert f"UID:due-c1@{DOMAIN}" in out
+    assert "SUMMARY:Raum buchen" in out
+    assert "DESCRIPTION:Board: Kultur" in out
+    assert "URL:https://stupa.example.org/todos?card=c1" in out
+    assert "DTSTART;VALUE=DATE:20261118" in out
+    assert "DTEND;VALUE=DATE:20261119" in out
