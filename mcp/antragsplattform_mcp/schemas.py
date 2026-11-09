@@ -725,6 +725,7 @@ TodoLinkKind = Literal[
     "gremium",
     "invoice",
     "expense",
+    "budget",
     "ticket",
     "todo",
 ]

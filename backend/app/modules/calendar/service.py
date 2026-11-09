@@ -2,8 +2,9 @@
 
 The feed token authenticates the `.ics` URL without a session or OIDC. Plaintext
 storage is acceptable here. The token only exposes the meeting titles and times
-of the Gremien of the principal, and the title, dates, place and board of the Events
-that the principal reads, which is low-sensitivity data. Every function
+of the Gremien of the principal, the title, dates, place and board of the Events
+that the principal reads, and the title, due date and board of the open cards assigned
+to the principal, which is low-sensitivity data. Every function
 binds to `principal.sub` and never commits.
 """
 
@@ -19,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.admin.gremium_roles import gremium_reader_ids
 from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.calendar.ics import CardEvent
+from app.modules.calendar.ics import CardEvent, DueCard
 from app.modules.livevote.models import Meeting
 
 #: 32 bytes give about 43 URL-safe characters. An unguessable token needs no rate limit.
@@ -128,4 +129,28 @@ async def readable_events(db: AsyncSession, row: PrincipalRow) -> list[CardEvent
             board_name=board.name,
         )
         for card, board, event in rows
+    ]
+
+
+async def due_cards(db: AsyncSession, row: PrincipalRow, base_url: str) -> list[DueCard]:
+    """The open cards with a due date that are assigned to the person (spec 000549).
+
+    The rights come from the `principal` row, as for the Events.
+    """
+    from app.modules.auth.rbac import resolve_principal
+    from app.modules.todos.links import card_url
+    from app.modules.todos.service import TodoService
+
+    principal = await resolve_principal(db, row, datetime.now(UTC))
+    rows = await TodoService(db).calendar_due_cards(principal)
+    return [
+        DueCard(
+            uid=str(card.id),
+            title=card.title,
+            due=cast(date, card.due_date),
+            stamp=card.created_at,
+            board_name=board.name,
+            url=f"{base_url.rstrip('/')}{card_url(card.id)}",
+        )
+        for card, board in rows
     ]

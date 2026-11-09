@@ -27,6 +27,7 @@ TodoLinkKind = Literal[
     "gremium",
     "invoice",
     "expense",
+    "budget",
     "ticket",
     "todo",
 ]
@@ -39,6 +40,7 @@ TodoLinkedKind = Literal[
     "gremium",
     "invoice",
     "expense",
+    "budget",
     "ticket",
 ]
 TodoEventKind = Literal[

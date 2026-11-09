@@ -974,9 +974,7 @@ class TodoService:
         link = await self.session.get(TodoLink, link_id)
         if link is None or link.card_id != card.id:
             raise NotFoundError(f"link {link_id} not found")
-        return await LinkViewer(self.session, self.links).view(
-            link.kind, link.target_id, principal
-        )
+        return await LinkViewer(self.session, self.links).view(link.kind, link.target_id, principal)
 
     async def cards(
         self, card_ids: Sequence[uuid.UUID], principal: Principal
@@ -2397,6 +2395,43 @@ class TodoService:
                     .join(TodoCardEvent, TodoCardEvent.card_id == TodoCard.id)
                     .where(scope.condition(), TodoCardEvent.starts_on.is_not(None))
                     .order_by(TodoCardEvent.starts_on, TodoCard.id)
+                )
+            )
+            .tuples()
+            .all()
+        )
+        return list(rows)
+
+    async def calendar_due_cards(self, principal: Principal) -> list[tuple[TodoCard, TodoBoard]]:
+        """The open cards with a due date assigned to the principal (spec 000549).
+
+        Only boards that the principal reads count. A done or archived card, a card on an
+        archived board and an Event (the feed has it as an Event already) stay out.
+        """
+        if not token_reads(principal):
+            return []
+        me = await self.access.me(principal)
+        if me is None:
+            return []
+        scope = await self.access.scope(principal)
+        rows = (
+            (
+                await self.session.execute(
+                    select(TodoCard, TodoBoard)
+                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                    .join(TodoColumn, TodoColumn.id == TodoCard.column_id)
+                    .join(TodoAssignee, TodoAssignee.card_id == TodoCard.id)
+                    .outerjoin(TodoCardEvent, TodoCardEvent.card_id == TodoCard.id)
+                    .where(
+                        TodoAssignee.principal_id == me,
+                        TodoCard.due_date.is_not(None),
+                        TodoCard.archived_at.is_(None),
+                        TodoColumn.is_done.is_(False),
+                        TodoBoard.archived_at.is_(None),
+                        TodoCardEvent.card_id.is_(None),
+                        scope.condition(),
+                    )
+                    .order_by(TodoCard.due_date, TodoCard.id)
                 )
             )
             .tuples()

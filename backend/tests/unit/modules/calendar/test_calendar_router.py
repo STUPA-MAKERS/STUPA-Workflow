@@ -15,7 +15,7 @@ from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
 from app.modules.calendar import service as calendar_service
-from app.modules.calendar.ics import CardEvent
+from app.modules.calendar.ics import CardEvent, DueCard
 from app.settings import get_settings, load_settings
 from tests._support.auth_fakes import fake_session, result
 
@@ -92,6 +92,19 @@ def test_feed_returns_ics_with_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
         return [event]
 
     monkeypatch.setattr(calendar_service, "readable_events", _events)
+    due = DueCard(
+        uid="d1",
+        title="Raum buchen",
+        due=date(2026, 11, 18),
+        stamp=datetime(2026, 1, 1, tzinfo=UTC),
+        board_name="Kultur",
+        url="https://stupa.example.org/todos?card=d1",
+    )
+
+    async def _due(_db: object, _row: object, _base: str) -> list[DueCard]:
+        return [due]
+
+    monkeypatch.setattr(calendar_service, "due_cards", _due)
     principal_row = SimpleNamespace(sub="u1")
     gid = uuid.uuid4()
     meeting = SimpleNamespace(
@@ -121,3 +134,5 @@ def test_feed_returns_ics_with_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "DTSTART;VALUE=DATE:20261120" in body
     assert "DTEND;VALUE=DATE:20261122" in body
     assert "LOCATION:Mensa" in body
+    assert "SUMMARY:Raum buchen" in body
+    assert "DTSTART;VALUE=DATE:20261118" in body
