@@ -2,7 +2,7 @@
 id: "000574"
 title: A live viewer shows with the own avatar
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 tests:
