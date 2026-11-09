@@ -1587,6 +1587,11 @@ describe('TodoCardDetailComponent board work (specs 000553-000555)', () => {
     expect(cmp.copyOpen()).toBe(false);
   });
 
+  it('links no card while the card loads', async () => {
+    const { cmp } = await setup({ read: new Subject<TodoCardDetail>() });
+    expect(cmp.itemLinks()).toEqual([]);
+  });
+
   it('deletes no item when the item dialog closes without one', async () => {
     const { cmp, api } = await setup();
     cmp.onItemCard();
