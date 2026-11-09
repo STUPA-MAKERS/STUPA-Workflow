@@ -2,7 +2,7 @@
 id: "000571"
 title: A flow state can mark an Antrag as approved or denied
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation: null

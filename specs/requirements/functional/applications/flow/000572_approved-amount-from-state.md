@@ -2,7 +2,7 @@
 id: "000572"
 title: The approved amount follows the approved state
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation: null
