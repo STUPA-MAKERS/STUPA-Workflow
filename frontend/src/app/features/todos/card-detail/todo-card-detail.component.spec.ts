@@ -1556,6 +1556,43 @@ describe('TodoCardDetailComponent board work (specs 000553-000555)', () => {
     expect(ids(cmp)).toContain('followUp');
   });
 
+  it('puts a meeting without a date after the dated ones', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-16T10:00:00') });
+    const { cmp } = await setup({
+      meetings: [planned({ id: 'm-n', date: null }), planned({ id: 'm-1', date: '2026-10-22' })],
+    });
+    expect(cmp.agendaMeetings().map((m) => m.id)).toEqual(['m-1', 'm-n']);
+  });
+
+  it('reads no meetings when the board of the card is not among the boards', async () => {
+    const { cmp, files } = await setup({ meetings, card: detail({ boardId: 'b-unbekannt' }) });
+    expect(files.listMeetings).not.toHaveBeenCalled();
+    expect(ids(cmp)).not.toContain('agenda');
+  });
+
+  it('duplicates a card without description, due date or named assignee as empty fields', async () => {
+    const card = detail({
+      descriptionMd: null,
+      dueDate: null,
+      assignees: [{ principalId: null, displayName: 'Gast' }],
+    });
+    const { cmp } = await setup({ card });
+    cmp.duplicate();
+    expect(cmp.copy()).toEqual(expect.objectContaining({ descriptionMd: '', dueDate: '', assigneeIds: [] }));
+  });
+
+  it('does not duplicate an Event', async () => {
+    const { cmp } = await setup({ card: detail({ event: EVENT, eventFacts: FACTS }) });
+    cmp.duplicate();
+    expect(cmp.copyOpen()).toBe(false);
+  });
+
+  it('deletes no item when the item dialog closes without one', async () => {
+    const { cmp, api } = await setup();
+    cmp.onItemCard();
+    expect(api.deleteCheckItem).not.toHaveBeenCalled();
+  });
+
   it('makes a card of a checklist item and takes the item off the checklist', async () => {
     const { cmp, api, detect } = await setup();
     screen.getByRole('button', { name: 'Als Karte anlegen: Raum anfragen' }).click();

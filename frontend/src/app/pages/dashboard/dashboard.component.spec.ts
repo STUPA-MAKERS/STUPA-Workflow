@@ -665,8 +665,8 @@ describe('Fällige To-Dos (spec 000550)', () => {
 
   it('keeps the cards due within 7 days or overdue, the oldest first, up to the cap', () => {
     const cards = [due('a', '2026-10-20'), due('b', null), due('c', '2026-10-10'), due('d', '2026-10-24'), due('e', '2026-10-23')];
-    expect(dueCards(cards, '2026-10-16', 5).map((c) => c.id)).toEqual(['c', 'a', 'e']);
-    expect(dueCards(cards, '2026-10-16', 2).map((c) => c.id)).toEqual(['c', 'a']);
+    expect(dueCards(cards, '2026-10-16', 5).map((r) => r.card.id)).toEqual(['c', 'a', 'e']);
+    expect(dueCards(cards, '2026-10-16', 2).map((r) => r.card.id)).toEqual(['c', 'a']);
   });
 
   it('shows an overdue card first, each row a link to its card', async () => {

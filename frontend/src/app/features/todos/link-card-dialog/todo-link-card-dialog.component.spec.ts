@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { render, screen } from '@testing-library/angular';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { TodosApiService } from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { TodoLinkedRefresh } from '../linked-list/todo-linked-refresh';
@@ -10,11 +10,11 @@ function mineItem(id: string, title: string, boardName: string) {
   return { id, title, boardName, columnName: 'Offen' };
 }
 
-async function setup(opts: { fail?: boolean; exclude?: string[] } = {}) {
+async function setup(opts: { fail?: boolean; exclude?: string[]; boardsPending?: boolean } = {}) {
   jest.useFakeTimers();
   const api = {
     boards: jest.fn(() =>
-      of([
+      opts.boardsPending ? NEVER : of([
         { id: 'b-1', name: 'StuPa', canWrite: true },
         { id: 'b-2', name: 'Finanzen', canWrite: false },
       ]),
@@ -37,6 +37,7 @@ async function setup(opts: { fail?: boolean; exclude?: string[] } = {}) {
           title: 'Kasse zählen',
           detail: { boardName: 'StuPa', columnName: 'In Arbeit' },
         },
+        { kind: 'todo', targetId: 'k-8', title: 'Ohne Board', detail: {} },
       ]),
     ),
     addLink: jest.fn(() => (opts.fail ? throwError(() => new Error('x')) : of({}))),
@@ -101,5 +102,11 @@ describe('TodoLinkCardDialogComponent (spec 000548)', () => {
     await setup();
     expect(screen.getByRole('radiogroup', { name: 'To-Dos' })).toBeInTheDocument();
     expect(screen.getByRole('radio')).toBeChecked();
+  });
+
+  it('lists nothing and picks nothing while the boards load', async () => {
+    const { cmp } = await setup({ boardsPending: true });
+    expect(cmp.rows()).toBeNull();
+    expect(cmp.pick()).toBeNull();
   });
 });

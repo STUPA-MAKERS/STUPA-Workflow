@@ -414,9 +414,9 @@ export class DashboardComponent {
   readonly dueTodos = computed(() => {
     const today = isoDay(new Date(Date.now()));
     const t: Translate = (key, params) => this.i18n.translate(key, params);
-    return dueCards(this.myCards(), today, this.phone() ? DUE_PHONE : DUE_MAX).map((card) => ({
+    return dueCards(this.myCards(), today, this.phone() ? DUE_PHONE : DUE_MAX).map(({ card, day }) => ({
       card,
-      due: dueInfo(card.dueDate ?? '', today, this.i18n.formatLocale(), t),
+      due: dueInfo(day, today, this.i18n.formatLocale(), t),
     }));
   });
 
@@ -537,10 +537,11 @@ export function dueCards<T extends { readonly dueDate: string | null }>(
   cards: readonly T[],
   today: string,
   max: number,
-): readonly T[] {
+): readonly { readonly card: T; readonly day: string }[] {
   const end = isoDay(new Date(Date.parse(`${today}T12:00:00`) + DUE_DAYS * 86_400_000));
   return cards
-    .filter((c) => !!c.dueDate && c.dueDate <= end)
-    .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))
-    .slice(0, max);
+    .filter((c): c is T & { readonly dueDate: string } => !!c.dueDate && c.dueDate <= end)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, max)
+    .map((card) => ({ card, day: card.dueDate }));
 }
