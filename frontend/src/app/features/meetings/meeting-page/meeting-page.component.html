@@ -186,12 +186,14 @@
 
 <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.meeting.sheet' | t" [(open)]="todosOpen">
   @if (todoList()?.canAct()) {
-    <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="todoList()?.linkOpen?.set(true)">
-      <app-icon name="link" />
-    </app-button>
-    <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="todoList()?.newOpen?.set(true)">
-      <app-icon name="plus" />
-    </app-button>
+    <span sheet-actions class="mp__sheet-actions">
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="todoList()?.linkOpen?.set(true)">
+        <app-icon name="link" />
+      </app-button>
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="todoList()?.newOpen?.set(true)">
+        <app-icon name="plus" />
+      </app-button>
+    </span>
   }
   @if (todosOpen()) {
     <app-todo-linked-list

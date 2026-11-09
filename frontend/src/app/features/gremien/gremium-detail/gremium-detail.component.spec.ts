@@ -316,6 +316,28 @@ describe('GremiumDetailComponent', () => {
       expect(d.menu()[0].items.map((i) => i.id)).toEqual(['meetings', 'votes']);
     });
 
+    it('has no tab To-Dos when the boards fail to load', async () => {
+      TestBed.overrideProvider(TodosApiService, {
+        useValue: { boards: jest.fn(() => throwError(() => new Error('x'))), board: jest.fn(), linked: jest.fn() },
+      });
+      const s = await start('/gremien/g-1?tab=todos');
+      restore = s.restore;
+      expect(s.detail().tabs().map((t) => t.id)).not.toContain('todos');
+    });
+
+    it('shows the empty state when the board fails to load', async () => {
+      TestBed.overrideProvider(TodosApiService, {
+        useValue: {
+          boards: jest.fn(() => of(boards)),
+          board: jest.fn(() => throwError(() => new Error('x'))),
+          linked: jest.fn(() => of([])),
+        },
+      });
+      const s = await start('/gremien/g-1?tab=todos');
+      restore = s.restore;
+      expect(screen.getByText('Keine offenen To-Dos')).toBeTruthy();
+    });
+
     it('says so when the board has no open card', async () => {
       const s = await start('/gremien/g-1?tab=todos', { boards, board: board({ id: 'b-7', cards: [] }) });
       restore = s.restore;

@@ -6,7 +6,7 @@ import { TodosApiService, type TodoBoard, type TodoLinkedCard } from '@core/api/
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { EmptyStateComponent, SkeletonComponent } from '@stupa-makers/ui-kit';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
-import { sortedColumns } from '../../todos/todos.util';
+import { cardsOf, sortedColumns } from '../../todos/todos.util';
 
 /**
  * The tab "To-Dos" of a Gremium (spec 000551): the open cards of the board of the
@@ -44,25 +44,18 @@ export class GremiumTodosComponent {
 
 /** The cards of the board outside its done columns, as rows of the linked list. */
 export function openCards(board: TodoBoard): readonly TodoLinkedCard[] {
-  const columns = sortedColumns(board.columns.filter((c) => !c.isDone));
-  const order = new Map(columns.map((c, i) => [c.id, i]));
-  return board.cards
-    .filter((c) => order.has(c.columnId))
-    .sort(
-      (a, b) =>
-        (order.get(a.columnId) ?? 0) - (order.get(b.columnId) ?? 0) ||
-        (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0),
-    )
-    .map((c) => ({
+  return sortedColumns(board.columns.filter((c) => !c.isDone)).flatMap((column) =>
+    cardsOf(board, column.id).map((c) => ({
       id: c.id,
       boardId: board.id,
       boardName: board.name,
       title: c.title,
-      columnName: columns[order.get(c.columnId) ?? 0]?.name ?? '',
+      columnName: column.name,
       isDone: false,
       dueDate: c.dueDate,
       assignees: c.assignees,
       event: c.event,
       balance: null,
-    }));
+    })),
+  );
 }
