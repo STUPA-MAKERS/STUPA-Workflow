@@ -2,7 +2,7 @@
 id: "000575"
 title: The details of a card cut at the lower screen edge
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation:
