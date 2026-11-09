@@ -235,13 +235,13 @@
     inset: auto 0 0;
     z-index: var(--z-dialog);
     height: var(--app-bottom-inset, 0px);
-    box-shadow: var(--edge-line-up);
+    border-top: var(--border-width) solid var(--color-border);
     pointer-events: none;
   }
   // A bottom sheet over the card is glass, so the line would show through it as a stray band
   // across the sheet. The sheet covers the bar, so the line goes while one is open.
   :host-context(body:has(.ss--bottom)) .td__barEdge {
-    box-shadow: none;
+    border-top: 0;
   }
   // The bar is frosted glass in the colour of the card while the card scrolls under it,
   // like the bar of every other phone detail.
