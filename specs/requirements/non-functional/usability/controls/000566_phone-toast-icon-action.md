@@ -2,7 +2,7 @@
 id: "000566"
 title: A phone toast action is an icon button
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation:

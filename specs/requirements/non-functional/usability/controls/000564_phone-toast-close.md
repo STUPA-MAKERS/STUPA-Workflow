@@ -2,7 +2,7 @@
 id: "000564"
 title: A phone toast closes by a swipe or by its time
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation:

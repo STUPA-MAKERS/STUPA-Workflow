@@ -2,7 +2,7 @@
 id: "000565"
 title: A phone toast is a tinted glass card
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation:

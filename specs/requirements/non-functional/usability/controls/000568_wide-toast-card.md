@@ -2,7 +2,7 @@
 id: "000568"
 title: A wide-screen toast is the same glass card
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation:

@@ -2,7 +2,7 @@
 id: "000567"
 title: A phone FAB folds to its icon on scroll
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation:

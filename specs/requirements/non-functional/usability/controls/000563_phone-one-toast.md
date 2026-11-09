@@ -2,7 +2,7 @@
 id: "000563"
 title: A phone shows one toast at a time
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation:

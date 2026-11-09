@@ -2,7 +2,7 @@
 id: "000562"
 title: A phone toast shows at the top
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation:
