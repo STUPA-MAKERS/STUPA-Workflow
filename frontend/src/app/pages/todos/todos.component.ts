@@ -1156,9 +1156,9 @@ export class TodosComponent implements OnDestroy {
     this.tileMenuOpen.set(true);
   }
 
-  /** The columns of the sheet, with their counts. */
+  /** The columns of the sheet. */
   readonly tileColumns = computed<MoveColumn[]>(() =>
-    (this.tileMenu()?.columns ?? []).map((c) => ({ id: c.id, name: c.name, count: c.cardCount })),
+    (this.tileMenu()?.columns ?? []).map((c) => ({ id: c.id, name: c.name })),
   );
 
   /**

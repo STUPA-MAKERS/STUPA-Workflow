@@ -2,7 +2,7 @@
 <section class="tl" [attr.aria-label]="'admin.flow.list.heading' | t">
   @for (col of columns(); track col.key) {
     <div class="tl__col">
-      <h3 class="cap ins__cap">{{ col.title | t }} ({{ col.rows.length }})</h3>
+      <h3 class="cap ins__cap">{{ col.title | t }}</h3>
       @if (col.rows.length) {
         <ul class="rowgroup rowgroup--bg3 tl__list">
           @for (r of col.rows; track r.index) {

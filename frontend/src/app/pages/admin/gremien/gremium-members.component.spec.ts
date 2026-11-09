@@ -105,12 +105,12 @@ const names = () =>
 describe('GremiumMembersComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('names the gremium and the member count and links to the group mappings', async () => {
+  it('names the gremium without a count (spec 000560) and links to the group mappings', async () => {
     await setup();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Mitglieder: Studierendenparlament',
     );
-    expect(screen.getByText('6 Mitglieder')).toBeInTheDocument();
+    expect(screen.queryByText('6 Mitglieder')).toBeNull();
     expect(screen.getByRole('link', { name: 'Gruppen-Zuordnung' })).toHaveAttribute(
       'href',
       '/admin/group-mappings',
@@ -193,10 +193,9 @@ describe('GremiumMembersComponent', () => {
     });
     expect(screen.getByText('Noch keine Mitglieder in diesem Gremium.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Mitglieder: …');
-    expect(screen.getByText('0 Mitglieder')).toBeInTheDocument();
   });
 
-  it('hides the inactive memberships and does not count them', async () => {
+  it('hides the inactive memberships', async () => {
     await setup({
       api: makeApi({
         listGremiumMemberships: jest.fn(() =>
@@ -204,7 +203,6 @@ describe('GremiumMembersComponent', () => {
         ),
       }),
     });
-    expect(screen.getByText('1 Mitglied')).toBeInTheDocument();
     expect(names()).toEqual(['Zoe']);
   });
 
@@ -217,11 +215,6 @@ describe('GremiumMembersComponent', () => {
     });
     fixture.destroy();
     expect(frame.crumbLabel()).toBeNull();
-  });
-
-  it('says "1 Mitglied" for one member', async () => {
-    await setup({ api: makeApi({ listGremiumMemberships: jest.fn(() => of([MEMBERS[0]])) }) });
-    expect(screen.getByText('1 Mitglied')).toBeInTheDocument();
   });
 
   it('shows each person once and an unknown gremium as an ellipsis', async () => {

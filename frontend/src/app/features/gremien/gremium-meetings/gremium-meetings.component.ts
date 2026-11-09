@@ -5,7 +5,6 @@ import {
   effect,
   inject,
   input,
-  output,
   signal,
   untracked,
 } from '@angular/core';
@@ -98,8 +97,6 @@ export class GremiumMeetingsComponent {
   private readonly now = inject(GREMIEN_NOW);
 
   readonly gremiumId = input.required<string>();
-  /** The number of meetings, for the tab bar. */
-  readonly count = output<number>();
 
   readonly phone = mediaQuery(MEDIA.phone);
 
@@ -202,7 +199,6 @@ export class GremiumMeetingsComponent {
       next: (rows) => {
         this.items.set(rows);
         this.loading.set(false);
-        this.count.emit(rows.length);
       },
       error: () => {
         this.items.set([]);

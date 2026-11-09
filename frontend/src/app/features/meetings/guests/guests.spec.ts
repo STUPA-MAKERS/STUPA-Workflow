@@ -79,7 +79,7 @@ describe('guests in the attendance sheet (variant A)', () => {
     expect(within(sheet()).getByText('Öffentliche Teilnahme an')).toBeInTheDocument();
     await userEvent.click(within(sheet()).getByRole('button', { name: /Groß zeigen/ }));
     expect(showQr).toHaveBeenCalled();
-    expect(within(sheet()).getByText('Beitrittsanfragen · 2')).toBeInTheDocument();
+    expect(within(sheet()).getByText('Beitrittsanfragen', { selector: 'h3' })).toBeInTheDocument();
     expect(within(sheet()).getByText(/^wartet seit \d\d:\d\d$/)).toBeInTheDocument();
     expect(within(sheet()).getByText('gerade eben')).toBeInTheDocument();
   });

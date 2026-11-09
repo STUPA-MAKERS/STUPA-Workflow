@@ -554,7 +554,7 @@ describe('TodosComponent', () => {
       await wait(settle);
       expect(cardTile).toHaveBeenCalledTimes(1);
       const view = (cmp as unknown as { boardView(): { ptr: { set(v: unknown): void } } }).boardView();
-      view.ptr.set({ from: 'c-1', over: 'c-1' });
+      view.ptr.set('c-1');
       read.next(tile({ id: 'k-1', columnId: 'c-2' }));
       view.ptr.set(null);
       await wait(settle);

@@ -55,10 +55,9 @@ function firefoxSpace(title: string): void {
 describe('TodoBoardViewComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('shows the columns with their counts, the done tag and the cards', async () => {
+  it('shows the columns by name without a count (spec 000560), the done tag and the cards', async () => {
     const { on } = await setup();
-    const open = screen.getByRole('heading', { name: /^Offen/ });
-    expect(open).toHaveTextContent('2');
+    expect(screen.getByRole('heading', { name: 'Offen' })).toHaveTextContent(/^\s*Offen\s*$/);
     expect(screen.getByText('Erledigt-Spalte')).toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: 'Offen' })).getAllByRole('listitem')).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: 'Raum buchen' }));
@@ -126,23 +125,6 @@ describe('TodoBoardViewComponent', () => {
   it('has no quick field in the done column', async () => {
     await setup();
     expect(screen.getAllByRole('button', { name: /To-Do hinzufügen/ })).toHaveLength(3);
-  });
-
-  it('moves the column counts with a pointer drag', async () => {
-    const { cmp } = await setup();
-    const [open, doing, , done] = cmp.columns();
-    const before = [open, doing, done].map((c) => cmp.count(c));
-    cmp.onEnter({ container: { data: doing.id } } as never);
-    expect(cmp.ptr()).toBeNull();
-    cmp.onDragStart(open);
-    expect(cmp.count(open)).toBe(before[0]);
-    cmp.onEnter({ container: { data: doing.id } } as never);
-    expect(cmp.count(open)).toBe(before[0] - 1);
-    expect(cmp.count(doing)).toBe(before[1] + 1);
-    expect(cmp.count(done)).toBe(before[2]);
-    expect(cmp.more(done)).toBe(Math.max(0, before[2] - DONE_PREVIEW));
-    cmp.ptr.set(null);
-    expect(cmp.count(open)).toBe(before[0]);
   });
 
   it('turns a pointer drop into a move with one neighbour', async () => {
@@ -222,8 +204,6 @@ describe('TodoBoardViewComponent', () => {
     await key('Raum buchen', 'ArrowRight');
     expect(cmp.kb()).toMatchObject({ col: 1, index: 0 });
     expect(container.querySelector('[aria-live]')).toHaveTextContent('Spalte In Arbeit, Position 1 von 1.');
-    expect(cmp.count(cmp.columns()[0])).toBe(1);
-    expect(cmp.count(cmp.columns()[1])).toBe(1);
     await key('Raum buchen', 'x');
     await key('Raum buchen', 'Enter');
     expect(on.moveCard).toHaveBeenCalledWith({ cardId: 'k-1', move: { columnId: 'c-2' } });
@@ -278,20 +258,26 @@ describe('TodoBoardViewComponent', () => {
    * card keeps the drag, and one on another card ends it. Without a drag a pointer or a focus
    * changes nothing.
    */
+  it('ends a keyboard drag on a pointer whose target is no element', async () => {
+    const { cmp, key } = await setup();
+    await key('Raum buchen', ' ');
+    expect(cmp.kb()).not.toBeNull();
+    cmp.leaveDrag({ target: null } as unknown as Event);
+    expect(cmp.kb()).toBeNull();
+  });
+
   it('ends a keyboard drag when the focus or a pointer goes elsewhere', async () => {
     const { cmp, on, key, fixture, container } = await setup();
     const elsewhere = document.createElement('button');
     document.body.appendChild(elsewhere);
     await key('Raum buchen', ' ');
     await key('Raum buchen', 'ArrowRight');
-    expect(cmp.count(cmp.columns()[1])).toBe(1);
+    expect(cmp.kb()?.col).toBe(1);
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Raum buchen' }));
     expect(cmp.kb()).not.toBeNull();
     elsewhere.focus();
     fixture.detectChanges();
     expect(cmp.kb()).toBeNull();
-    expect(cmp.count(cmp.columns()[0])).toBe(2);
-    expect(cmp.count(cmp.columns()[1])).toBe(0);
     expect(container.querySelector('[aria-live]')).toHaveTextContent('Verschieben von „Raum buchen“ abgebrochen.');
 
     await key('Raum buchen', ' ');
@@ -388,13 +374,13 @@ describe('TodoBoardViewComponent', () => {
     expect(cmp.kb()).toBeNull();
   });
 
-  it('counts a column without cards in the map as empty', async () => {
+  it('treats a column without cards in the map as empty, and its tab shows no count', async () => {
     const b = board();
     const { cmp, fixture } = await setup(b);
     fixture.componentRef.setInput('cards', new Map());
     fixture.detectChanges();
-    expect(cmp.count(cmp.columns()[0])).toBe(0);
-    expect(cmp.tabs()[0].count).toBe(0);
+    expect(cmp.list(cmp.columns()[0])).toEqual([]);
+    expect('count' in cmp.tabs()[0]).toBe(false);
     expect(cmp.list({ id: 'nope', name: '', position: 9, isDone: false, cardCount: 0 })).toEqual([]);
     expect(cmp.more({ id: 'nope', name: '', position: 9, isDone: false, cardCount: 0 })).toBe(0);
   });
@@ -449,10 +435,10 @@ describe('TodoBoardViewComponent', () => {
     it('shows one column behind tabs with the ink, and its cards', async () => {
       const { cmp, on, fixture, container } = await setup(board(), { phone: true });
       expect(screen.getAllByRole('tab').map((t) => t.textContent?.replace(/\s+/g, '').trim())).toEqual([
-        'Offen2',
-        'InArbeit0',
-        'Wartet0',
-        'Erledigt1',
+        'Offen',
+        'InArbeit',
+        'Wartet',
+        'Erledigt',
       ]);
       expect(within(screen.getByRole('list', { name: 'Offen' })).getAllByRole('listitem')).toHaveLength(2);
       expect(container.querySelector('.tp__ink')).not.toBeNull();

@@ -313,8 +313,6 @@ export class ApplicationsDetailComponent {
   /** The comment that a link names: the sheet scrolls to it once the thread is there. */
   private readonly linkedComment = signal<string | null>(null);
   private readonly injector = inject(Injector);
-  /** The number of attachments, from the panel. `null` until it loaded them. */
-  readonly attachmentCount = signal<number | null>(null);
   private readonly filesPanel = viewChild(AttachmentsPanelComponent);
   /**
    * Files dropped anywhere on the application become its attachments. Not while another
@@ -851,19 +849,11 @@ export class ApplicationsDetailComponent {
     return [{ items: quick }, { items: more }, { items: danger }].filter((sec) => sec.items.length);
   });
 
-  /** The tabs of the narrow layout, with their counts. */
+  /** The tabs of the narrow layout, by their labels alone (spec 000560). */
   readonly tabs = computed<TabItem[]>(() => [
     { id: 'app', label: this.i18n.translate('applications.detail.tab.app') },
-    {
-      id: 'history',
-      label: this.i18n.translate('applications.detail.tab.history'),
-      count: this.historyEntries().length,
-    },
-    {
-      id: 'files',
-      label: this.i18n.translate('applications.detail.tab.files'),
-      count: this.attachmentCount(),
-    },
+    { id: 'history', label: this.i18n.translate('applications.detail.tab.history') },
+    { id: 'files', label: this.i18n.translate('applications.detail.tab.files') },
   ]);
 
   /**
@@ -1056,7 +1046,6 @@ export class ApplicationsDetailComponent {
     this.error.set(false);
     this.transitions.set([]);
     this.agendaOpen.set(false);
-    this.attachmentCount.set(null);
     this.tab.set('app');
     this.transitionsLoading.set(false);
   }

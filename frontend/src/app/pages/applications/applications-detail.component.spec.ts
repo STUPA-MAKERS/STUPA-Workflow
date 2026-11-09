@@ -1213,7 +1213,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(entries[1].body).toBe('Übergang „Prüfung beginnen“\nBitte Angebote nachreichen.');
     expect(entries[1].kind).toBe('warn');
     expect(entries[2].changes?.[0]).toMatchObject({ tag: 'Geändert', label: 'title', old: 'Fest', new: 'Förderung Fest' });
-    expect(cmp.tabs().find((t) => t.id === 'history')?.count).toBe(3);
+    expect(cmp.tabs().find((t) => t.id === 'history')).toEqual({ id: 'history', label: 'Verlauf' });
     expect(container.querySelector('#ad-history app-history')).not.toBeNull();
     flushAttachments(http);
     http.verify();

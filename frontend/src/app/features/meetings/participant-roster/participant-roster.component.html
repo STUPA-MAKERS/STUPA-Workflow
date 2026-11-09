@@ -1,6 +1,6 @@
 <section class="pr" [attr.aria-labelledby]="capId">
   <h2 class="pr__cap cap" [id]="capId">
-    {{ 'participant.roster.title' | t }} · {{ 'participant.roster.present' | t: { n: present(), m: rows().length } }}
+    {{ 'participant.roster.title' | t }}
   </h2>
   @if (view().length) {
     <ul class="pr__rows rowgroup rowgroup--bg3">

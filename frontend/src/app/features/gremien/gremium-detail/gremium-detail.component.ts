@@ -121,8 +121,6 @@ export class GremiumDetailComponent {
   });
   /** The tabs that were open once for this gremium: their panels stay rendered. */
   readonly visited = signal<ReadonlySet<string>>(new Set());
-  /** The number of meetings, once the tab "Sitzungen" loaded them. */
-  readonly meetingCount = signal<number | null>(null);
 
   readonly createOpen = signal(false);
   /** The gremium whose tabs `visited` holds: a new one starts the set again. */
@@ -163,15 +161,13 @@ export class GremiumDetailComponent {
     () => !!this.gremium()?.nextMeeting && (!this.phone() || !this.canPlan()),
   );
 
-  readonly tabs = computed<TabItem[]>(() => {
-    const g = this.gremium();
-    return [
-      { id: 'sitzungen', label: this.i18n.translate('gremien.tab.meetings'), count: this.meetingCount() },
-      { id: 'mitglieder', label: this.i18n.translate('gremien.tab.members'), count: g?.memberCount ?? null },
-      { id: 'anwesenheit', label: this.i18n.translate('gremien.tab.attendance') },
-      { id: 'beschluesse', label: this.i18n.translate('gremien.tab.decisions') },
-    ];
-  });
+  /** The tabs, by their labels alone: a tab shows no count (spec 000560). */
+  readonly tabs = computed<TabItem[]>(() => [
+    { id: 'sitzungen', label: this.i18n.translate('gremien.tab.meetings') },
+    { id: 'mitglieder', label: this.i18n.translate('gremien.tab.members') },
+    { id: 'anwesenheit', label: this.i18n.translate('gremien.tab.attendance') },
+    { id: 'beschluesse', label: this.i18n.translate('gremien.tab.decisions') },
+  ]);
 
   readonly menu = computed<RowMenuSection[]>(() => {
     const g = this.gremium();
@@ -223,7 +219,6 @@ export class GremiumDetailComponent {
       const open = this.phone() ? GREMIUM_TABS.filter((_, j) => Math.abs(j - i) <= 1) : [tab];
       if (id !== this.shownId) {
         this.shownId = id;
-        this.meetingCount.set(null);
         this.visited.set(new Set(open));
         return;
       }

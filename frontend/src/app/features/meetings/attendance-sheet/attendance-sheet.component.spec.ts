@@ -277,7 +277,7 @@ describe('AttendanceSheetComponent', () => {
     expect(present).toHaveAttribute('title', 'Erst die Vertretung widerrufen.');
     expect(within(sheet()).getByText('Grund: Prüfung · vertreten durch Sven Stellvertreter · mit Stimmrecht')).toBeInTheDocument();
     const section = within(sheet()).getByRole('region', { name: 'Vertretungen' });
-    expect(within(section).getByText('Vertretungen · 1')).toBeInTheDocument();
+    expect(within(section).getByText('Vertretungen', { selector: 'h3' })).toBeInTheDocument();
     expect(within(section).getByText('Vera Vertretung → Sven Stellvertreter')).toBeInTheDocument();
     await userEvent.click(within(section).getByRole('button', { name: 'Widerrufen' }));
     const del = http.expectOne('/api/delegations/d-1');
@@ -469,7 +469,7 @@ describe('AttendanceSheetComponent', () => {
   it('lists the people who have the live meeting open', async () => {
     const { fixture } = await setup();
     const live = within(sheet()).getByRole('region', { name: 'Live dabei' });
-    expect(within(live).getByText('Live dabei · 2')).toBeInTheDocument();
+    expect(within(live).getByText('Live dabei', { selector: 'h3' })).toBeInTheDocument();
     expect(within(live).getByText('Alina Admin')).toBeInTheDocument();
     fixture.componentRef.setInput('viewers', []);
     fixture.detectChanges();

@@ -22,12 +22,10 @@
           @if (group.column.isDone) {
             <button type="button" class="lv__groupBtn" [attr.aria-expanded]="!folded(group)" (click)="toggleGroup(group)">
               {{ group.column.name }}
-              <span class="lv__count num">{{ group.rows.length }}</span>
               <app-icon [name]="folded(group) ? 'down' : 'up'" [size]="15" />
             </button>
           } @else {
             {{ group.column.name }}
-            <span class="lv__count num">{{ group.rows.length }}</span>
           }
         </span>
       </div>

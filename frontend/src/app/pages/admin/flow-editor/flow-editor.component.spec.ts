@@ -3050,8 +3050,8 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       const c = fixture.componentInstance as any;
       c.selection.set({ kind: 'state', key: 'v' });
       fixture.detectChanges();
-      expect(screen.getByRole('heading', { name: 'Eingehend (1)' })).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Ausgehend (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Eingehend' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Ausgehend' })).toBeInTheDocument();
       screen.getByRole('button', { name: /^Automatisch:/ }).click();
       expect(c.selection()).toEqual({ kind: 'transition', index: 0 });
     });

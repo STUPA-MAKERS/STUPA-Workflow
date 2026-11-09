@@ -189,7 +189,7 @@ describe('VotingComponent', () => {
       expect(screen.getByText('Stimme offen')).toBeInTheDocument();
       const since = screen.getByText('seit 09:05');
       expect(since.getAttribute('title')).toMatch(/2026/);
-      expect(screen.getByText('1 offen')).toBeInTheDocument();
+      expect(screen.queryByText('1 offen')).toBeNull();
     });
 
     /** An empty question falls back, and there is no ballot state without a voting right. */
