@@ -2,7 +2,7 @@
 id: "000573"
 title: A link between two cards shows on both cards
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 implementation: null
