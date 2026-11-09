@@ -164,10 +164,10 @@
             <div aria-live="polite">
               @if (viewers().length) {
                 <ul class="as__list rowgroup rowgroup--bg3">
-                  @for (name of viewers(); track name) {
+                  @for (v of viewers(); track v.id ?? v.name) {
                     <li class="as__item">
-                      <app-avatar [name]="name" size="sm" [decorative]="true" />
-                      <span class="as__itemText ell" [appTruncated]="name" #cut4="appTruncated" [attr.title]="cut4.truncated() ? name : null">{{ name }}</span>
+                      <app-avatar [name]="v.name" [principalId]="v.id" size="sm" [decorative]="true" />
+                      <span class="as__itemText ell" [appTruncated]="v.name" #cut4="appTruncated" [attr.title]="cut4.truncated() ? v.name : null">{{ v.name }}</span>
                     </li>
                   }
                 </ul>

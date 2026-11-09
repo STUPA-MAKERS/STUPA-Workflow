@@ -81,9 +81,12 @@ class _FakeSession:
     async def rollback(self) -> None:
         return None
 
-    async def scalar(self, _stmt: object) -> int:
-        """Return one live account row, because the cast reads the account again."""
-        return 1
+    async def scalar(self, stmt: object) -> int | None:
+        """Return one live account row, because the cast reads the account again.
+
+        The presence lookup of the principal id finds no row, so the viewer has no id.
+        """
+        return 1 if "count(" in str(stmt) else None
 
 
 class _FakeMeetingService:

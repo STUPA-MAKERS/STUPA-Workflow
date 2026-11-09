@@ -59,13 +59,14 @@ from app.modules.livevote.events import (
     CastMessage,
     ErrorEvent,
     MeetingStateEvent,
+    ViewerOut,
     ViewersEvent,
     VoteOpenedEvent,
     VoteTallyEvent,
 )
 from app.modules.livevote.locks import Locker
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
-from app.modules.livevote.presence import PRESENCE
+from app.modules.livevote.presence import PRESENCE, Viewer
 from app.modules.livevote.schemas import AGENDA_BODY_MAX
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
 from app.modules.voting.schemas import VoteOut
@@ -111,6 +112,11 @@ async def account_can_act(db: AsyncSession, sub: str) -> bool:
         )
     )
     return bool(count)
+
+
+def _viewers_event(viewers: list[Viewer]) -> ViewersEvent:
+    """Build the `viewers` event with id and name per viewer (spec 000574)."""
+    return ViewersEvent(viewers=[ViewerOut(id=v.id, name=v.name) for v in viewers])
 
 
 class LiveVoteConnection:
@@ -428,8 +434,13 @@ class LiveVoteConnection:
         if self.beamer:
             return None
         name = self.principal.display_name or self.principal.email or self.principal.sub
-        connection_id, names = PRESENCE.join(self.meeting_id, self.principal.sub, name)
-        await self.broker.publish(channel, ViewersEvent(viewers=names).dump())
+        principal_id = await self.voting.session.scalar(
+            select(PrincipalRow.id).where(PrincipalRow.sub == self.principal.sub)
+        )
+        connection_id, viewers = PRESENCE.join(
+            self.meeting_id, self.principal.sub, name, principal_id
+        )
+        await self.broker.publish(channel, _viewers_event(viewers).dump())
         return connection_id
 
     async def run(self) -> None:
@@ -473,6 +484,6 @@ class LiveVoteConnection:
                 if connection_id is not None:
                     left = PRESENCE.leave(self.meeting_id, connection_id)
                     try:
-                        await self.broker.publish(channel, ViewersEvent(viewers=left).dump())
+                        await self.broker.publish(channel, _viewers_event(left).dump())
                     except Exception:
                         logger.debug("viewers broadcast on leave failed", exc_info=True)

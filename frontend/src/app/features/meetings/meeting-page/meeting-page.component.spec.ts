@@ -13,7 +13,9 @@ import type {
   Meeting,
   Protocol,
 } from '@core/api/models';
-import { MEDIA } from '@stupa-makers/ui-kit';
+import type { LiveViewer } from '@core/ws/ws-messages';
+import { By } from '@angular/platform-browser';
+import { AvatarComponent, MEDIA } from '@stupa-makers/ui-kit';
 import {
   AGENDA,
   ATTENDANCE,
@@ -45,7 +47,7 @@ type Inputs = {
   saveState: 'idle' | 'saving' | 'saved' | 'error';
   attendance: Attendance[];
   savingAttendance: boolean;
-  viewers: string[];
+  viewers: LiveViewer[];
   casting: string | null;
   deletingVote: string | null;
   finalizing: boolean;
@@ -67,7 +69,10 @@ function inputs(over: Partial<Inputs> = {}): Inputs {
     saveState: 'saved',
     attendance: ATTENDANCE,
     savingAttendance: false,
-    viewers: ['Pia Protokoll', 'Alina Admin'],
+    viewers: [
+      { id: 'p-pia', name: 'Pia Protokoll' },
+      { id: null, name: 'Alina Admin' },
+    ],
     casting: null,
     deletingVote: null,
     finalizing: false,
@@ -144,12 +149,17 @@ describe('MeetingPageComponent', () => {
     });
 
     it('lists the people who have the meeting open', async () => {
-      await setup();
+      const { fixture } = await setup();
       const chip = screen.getByRole('button', { name: '2 live' });
       expect(chip).toHaveAttribute('title', 'Live dabei: Pia Protokoll, Alina Admin');
       await userEvent.click(chip);
       const list = screen.getByRole('list', { name: 'Live dabei' });
       expect(within(list).getByText('Alina Admin')).toBeInTheDocument();
+      const avatars = fixture.debugElement
+        .query(By.css('.mp__viewers'))
+        .queryAll(By.directive(AvatarComponent))
+        .map((d) => (d.componentInstance as AvatarComponent).principalId());
+      expect(avatars).toEqual(['p-pia', null]);
       fireEvent.blur(chip);
       expect(screen.queryByRole('list', { name: 'Live dabei' })).toBeNull();
     });

@@ -113,10 +113,15 @@ export interface ErrorMsg {
   readonly type: 'error';
   readonly code: string;
 }
-/** The people who have the meeting page open now, by display name. */
+/** One person with the meeting page open: the principal id for the avatar and the name. */
+export interface LiveViewer {
+  readonly id: string | null;
+  readonly name: string;
+}
+/** The people who have the meeting page open now, one entry per user (spec 000574). */
 export interface ViewersMsg {
   readonly type: 'viewers';
-  readonly viewers: readonly string[];
+  readonly viewers: readonly LiveViewer[];
 }
 
 /** Lead only: a new join request. */
