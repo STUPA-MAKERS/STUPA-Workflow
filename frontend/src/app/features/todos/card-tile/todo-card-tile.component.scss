@@ -12,7 +12,6 @@
   background: var(--tile-bg);
   color: var(--color-text);
   cursor: grab;
-  --stack-ring: var(--tile-bg);
   transition: scale var(--motion-xs) var(--ease-standard);
 }
 :host-context([data-theme='dark']) {

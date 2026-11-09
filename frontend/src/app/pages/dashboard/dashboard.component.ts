@@ -4,6 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, map, of, startWith, Subject, switchMap, type Observable } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
+import { TodosApiService, type TodoMineItem } from '@core/api/todos.service';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -12,12 +13,15 @@ import {
   calendarDaysSince,
   clock,
   daysUntil,
+  isoDay,
   shortDay,
   shortTime,
   weekdayName,
 } from '@shared/date-format';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
+import { TodoDueComponent } from '../../features/todos/card-facts/todo-due.component';
+import { dueInfo } from '../../features/todos/todos.util';
 import type {
   ApplicationListItem,
   ApplicationType,
@@ -158,6 +162,7 @@ interface Load<T> {
     NgTemplateOutlet,
     RouterLink,
     IconComponent,
+    TodoDueComponent,
     TranslatePipe,
     TabPageDirective,
     TabPagerComponent,
@@ -397,6 +402,24 @@ export class DashboardComponent {
       .map((m) => ({ meeting: m, note: this.delegationNote(m.id), when: this.plannedLabel(m) }));
   });
 
+  private readonly todos = inject(TodosApiService);
+  private readonly myCards = toSignal(
+    this.todos.mine().pipe(
+      map((m) => m.items),
+      catchError(() => of([] as TodoMineItem[])),
+    ),
+    { initialValue: [] as readonly TodoMineItem[] },
+  );
+  /** "Fällige To-Dos" (spec 000550): my cards due within 7 days or overdue, the oldest first. */
+  readonly dueTodos = computed(() => {
+    const today = isoDay(new Date(Date.now()));
+    const t: Translate = (key, params) => this.i18n.translate(key, params);
+    return dueCards(this.myCards(), today, this.phone() ? DUE_PHONE : DUE_MAX).map((card) => ({
+      card,
+      due: dueInfo(card.dueDate ?? '', today, this.i18n.formatLocale(), t),
+    }));
+  });
+
   /** A meeting runs or is planned for today: only then the sheet has the title "Heute". */
   readonly hasToday = computed(
     () =>
@@ -501,4 +524,23 @@ export class DashboardComponent {
   closeAccount(): void {
     this.accountOpen.set(false);
   }
+}
+
+/** The most due cards on the start page, and on a phone. */
+export const DUE_MAX = 5;
+export const DUE_PHONE = 3;
+/** Days ahead that count as due. */
+export const DUE_DAYS = 7;
+
+/** The cards due within {@link DUE_DAYS} days or overdue, the oldest due date first. */
+export function dueCards<T extends { readonly dueDate: string | null }>(
+  cards: readonly T[],
+  today: string,
+  max: number,
+): readonly T[] {
+  const end = isoDay(new Date(Date.parse(`${today}T12:00:00`) + DUE_DAYS * 86_400_000));
+  return cards
+    .filter((c) => !!c.dueDate && c.dueDate <= end)
+    .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))
+    .slice(0, max);
 }

@@ -133,6 +133,24 @@
       </app-section>
     }
 
+    @if (dueTodos().length) {
+      <app-section class="dash__block" [level]="hasToday() ? 3 : 2" [heading]="'dashboard.dueTodos' | t" data-testid="dash-due">
+        <a sectionAction class="dash__more" routerLink="/tasks">{{ 'dashboard.today.all' | t }}</a>
+        <div class="rowgroup">
+          @for (r of dueTodos(); track r.card.id) {
+            <app-list-item [title]="r.card.title" [link]="['/todos']" [linkQueryParams]="{ card: r.card.id }" [wrap]="true">
+              <app-icon lead class="dash__todoIcon" name="circle" [size]="20" />
+              <span sub class="dash__todoSub">
+                <app-todo-due class="dash__todoDue" [due]="r.due" />
+                <span class="dash__dot" aria-hidden="true">·</span>
+                <span class="ell">{{ r.card.boardName }}</span>
+              </span>
+            </app-list-item>
+          }
+        </div>
+      </app-section>
+    }
+
     @if (noMeetings()) {
       <app-empty-state shape="date"
         rows="3"

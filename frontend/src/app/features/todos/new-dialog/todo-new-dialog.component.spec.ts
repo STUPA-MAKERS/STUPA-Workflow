@@ -487,3 +487,49 @@ describe('TodoNewDialogComponent from a ticket', () => {
     expect(c.title()).toBe('Neu');
   });
 });
+
+describe('TodoNewDialogComponent duplicate (spec 000554)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  const copy = {
+    boardId: 'b-1',
+    descriptionMd: 'Raum **A 101**',
+    dueDate: '2026-10-23',
+    assigneeIds: ['p-1', 'p-2', 'p-9'],
+    labelIds: ['l-1'],
+    checklist: ['Termin klären', 'Raum anfragen'],
+  };
+
+  it('fills the dialog from the card and creates the copy with its labels, people and open checklist', async () => {
+    const { cmp, open, api } = await setup({
+      inputs: { boardId: 'b-1', initialTitle: 'Raum buchen', copy, heading: 'todos.new.duplicateTitle' },
+    });
+    open();
+    expect(screen.getByRole('dialog', { name: 'To-Do duplizieren' })).toBeInTheDocument();
+    expect(cmp.description()).toBe('Raum **A 101**');
+    expect(cmp.due()).toBe('2026-10-23');
+    expect(cmp.assignee()).toBe('p-1');
+    expect(cmp.canEvent()).toBe(false);
+    cmp.save();
+    expect(api.createCard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boardId: 'b-1',
+        title: 'Raum buchen',
+        descriptionMd: 'Raum **A 101**',
+        dueDate: '2026-10-23',
+        assigneeIds: ['p-1', 'p-2'],
+        labelIds: ['l-1'],
+        checklist: ['Termin klären', 'Raum anfragen'],
+      }),
+    );
+  });
+
+  it('leaves the labels behind on another board', async () => {
+    const { cmp, open, api } = await setup({ inputs: { boardId: 'b-1', initialTitle: 'Raum buchen', copy } });
+    open();
+    cmp.setBoard('b-2');
+    cmp.save();
+    expect(api.createCard).toHaveBeenCalledWith(expect.objectContaining({ boardId: 'b-2', labelIds: [] }));
+  });
+});
+

@@ -268,6 +268,22 @@ async def test_create_in_the_first_column_with_everything() -> None:
     assert service.outbox == [TodoMail("assigned", new.id, (OTHER,), ME, None)]
 
 
+async def test_create_takes_the_checklist_of_a_duplicate_as_open_items() -> None:
+    """Spec 000554: a duplicate takes the checklist, every item open, in its order."""
+    b = board()
+    first = column(b.id, "Offen")
+    session = ScriptedSession(scalars=[[first], []])
+    session.put(b)
+    service = _svc(session)
+    _stub(service)
+    assert await service.create(_create(b, checklist=["Raum", " Technik "]), USER) is OUT
+    items = [o for o in session.added if isinstance(o, TodoCheckItem)]
+    assert [(i.text, i.done, i.position) for i in items] == [
+        ("Raum", False, 0),
+        ("Technik", False, 1),
+    ]
+
+
 async def test_create_in_the_done_column_completes_and_tells_the_tickets() -> None:
     b = board()
     done = column(b.id, "Erledigt", is_done=True)

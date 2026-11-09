@@ -2,10 +2,14 @@
 id: "000552"
 title: A card can link a cost centre
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-09
+implementation:
+  - backend/app/modules/todos/links.py
+  - backend/app/modules/todos/models.py
+  - backend/migrations/versions/b3b70dda7d08_todo_link_budget.py
+  - frontend/src/app/pages/budget/budget-dashboard.component.html
 scope:
   - backend/app/modules/todos
   - backend/app/modules/budget

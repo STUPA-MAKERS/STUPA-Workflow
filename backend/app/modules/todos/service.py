@@ -1133,7 +1133,8 @@ class TodoService:
     async def create(self, payload: CardCreate, principal: Principal) -> TodoCardDetail:
         """Create a card at the end of its column (default: the first column).
 
-        ``event`` makes the card an Event (spec 000478).
+        ``event`` makes the card an Event (spec 000478). ``checklist`` holds the open items
+        of a duplicate (spec 000554).
 
         Raises:
             NotFoundError: The board is unknown or not readable (HTTP 404).
@@ -1184,6 +1185,16 @@ class TodoService:
             self.session.add(TodoCardLabel(card_id=card.id, label_id=label_id))
         for kind, target_id in links:
             self.session.add(_new_link(card.id, kind, target_id, actor))
+        for position, text in enumerate(payload.checklist):
+            self.session.add(
+                TodoCheckItem(
+                    id=uuid.uuid4(),
+                    card_id=card.id,
+                    text=text.strip() or text,
+                    done=False,
+                    position=position,
+                )
+            )
         if payload.event is not None:
             self.session.add(_event_row(card.id, payload.event))
         self._event(card, "created", actor)

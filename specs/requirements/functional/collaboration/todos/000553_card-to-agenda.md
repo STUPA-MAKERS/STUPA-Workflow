@@ -2,10 +2,12 @@
 id: "000553"
 title: A card is put on the agenda from the card
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-09
+implementation:
+  - frontend/src/app/features/todos/agenda-dialog/todo-agenda-dialog.component.ts
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts
 scope:
   - frontend/src/app/features/todos
   - backend/app/modules/livevote

@@ -7,11 +7,13 @@ import {
 } from '@angular/common/http/testing';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { DashboardComponent } from './dashboard.component';
+import { DashboardComponent, dueCards } from './dashboard.component';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { SKIP_LOADING } from '@stupa-makers/ui-kit';
 import { CommandPalette } from '@stupa-makers/ui-kit/shell';
+import { TodosApiService, type TodoMineItem } from '@core/api/todos.service';
+import { of } from 'rxjs';
 import type {
   ApplicationListItemWire,
   ApplicationTypeListItemWire,
@@ -144,6 +146,8 @@ interface SetupOpts {
   wide?: boolean;
   extraWide?: boolean;
   url?: string;
+  /** The open cards assigned to the person (`GET /todos/mine`). */
+  todos?: readonly Partial<TodoMineItem>[];
 }
 
 /** Answer a request with a body or with a 500, or leave it open. */
@@ -175,6 +179,10 @@ async function setup(principal: Principal, opts: SetupOpts = {}) {
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
+      {
+        provide: TodosApiService,
+        useValue: { mine: () => of({ items: opts.todos ?? [], dueSoonCount: 0 }) },
+      },
     ],
   });
   window.matchMedia = original;
@@ -648,3 +656,34 @@ describe('DashboardComponent', () => {
     });
   });
 });
+
+describe('Fällige To-Dos (spec 000550)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => jest.restoreAllMocks());
+
+  const due = (id: string, dueDate: string | null) => ({ id, title: `Karte ${id}`, dueDate, boardName: 'StuPa' });
+
+  it('keeps the cards due within 7 days or overdue, the oldest first, up to the cap', () => {
+    const cards = [due('a', '2026-10-20'), due('b', null), due('c', '2026-10-10'), due('d', '2026-10-24'), due('e', '2026-10-23')];
+    expect(dueCards(cards, '2026-10-16', 5).map((c) => c.id)).toEqual(['c', 'a', 'e']);
+    expect(dueCards(cards, '2026-10-16', 2).map((c) => c.id)).toEqual(['c', 'a']);
+  });
+
+  it('shows an overdue card first, each row a link to its card', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(new Date(2026, 9, 16, 10).getTime());
+    await setup(MEMBER, { todos: [due('k-2', '2026-10-18'), due('k-1', '2026-10-12'), due('k-9', '2026-12-01')] });
+    const block = screen.getByTestId('dash-due');
+    expect(within(block).getByRole('heading', { name: 'Fällige To-Dos' })).toBeInTheDocument();
+    const links = within(block).getAllByRole('link').filter((a) => a.textContent?.includes('Karte'));
+    expect(links.map((a) => a.textContent?.trim())).toEqual([expect.stringContaining('Karte k-1'), expect.stringContaining('Karte k-2')]);
+    expect(links[0]).toHaveAttribute('href', '/todos?card=k-1');
+    expect(within(block).getByText(/überfällig/)).toBeInTheDocument();
+  });
+
+  it('hides the block without a due card', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(new Date(2026, 9, 16, 10).getTime());
+    await setup(MEMBER, { todos: [due('k-9', '2026-12-01')] });
+    expect(screen.queryByTestId('dash-due')).toBeNull();
+  });
+});
+

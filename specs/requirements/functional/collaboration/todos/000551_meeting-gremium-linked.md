@@ -2,10 +2,13 @@
 id: "000551"
 title: A meeting shows its linked cards and a Gremium its board
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
-implementation: null
+implementation:
+  - frontend/src/app/features/meetings/meeting-page/meeting-page.component.html
+  - frontend/src/app/features/gremien/gremium-todos/gremium-todos.component.ts
+  - frontend/src/app/features/gremien/gremium-detail/gremium-detail.component.ts
 scope:
   - frontend/src/app/features/meetings
   - frontend/src/app/features/gremien

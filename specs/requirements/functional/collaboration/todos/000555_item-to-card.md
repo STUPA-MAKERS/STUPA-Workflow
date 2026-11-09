@@ -2,10 +2,12 @@
 id: "000555"
 title: A checklist item becomes a card
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-09
+implementation:
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.html
 scope:
   - frontend/src/app/features/todos
   - backend/app/modules/todos

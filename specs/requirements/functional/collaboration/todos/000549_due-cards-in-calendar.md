@@ -2,10 +2,13 @@
 id: "000549"
 title: A due card of a person is in their calendar
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-09
+implementation:
+  - backend/app/modules/calendar/ics.py
+  - backend/app/modules/calendar/service.py
+  - backend/app/modules/todos/service.py
 scope:
   - backend/app/modules/todos
   - backend/app/modules/calendar

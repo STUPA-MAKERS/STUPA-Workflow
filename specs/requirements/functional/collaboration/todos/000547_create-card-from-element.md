@@ -2,10 +2,16 @@
 id: "000547"
 title: A card is created from the detail of an element
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-09
+implementation:
+  - frontend/src/app/features/todos/linked-list/todo-linked-list.component.ts
+  - frontend/src/app/features/todos/new-dialog/todo-new-dialog.component.ts
+  - frontend/src/app/pages/applications/applications-detail.component.html
+  - frontend/src/app/features/voting/vote-cast.component.html
+  - frontend/src/app/pages/invoices/invoice-detail/invoice-detail.component.html
+  - frontend/src/app/pages/expenses/booking-detail/booking-detail.component.html
 scope:
   - frontend/src/app/features/todos
   - frontend/src/app/pages/applications

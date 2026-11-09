@@ -22,7 +22,7 @@ import type {
 import { TodosApiService } from '@core/api/todos.service';
 
 /** The Events of the `Veranstaltung` picker: none, and no linked Event. */
-const EVENTS_API = { writableEvents: () => of([]), linked: () => of([]) };
+const EVENTS_API = { writableEvents: () => of([]), linked: () => of([]), boards: () => of([]) };
 
 /**
  * An `ActivatedRoute` carrying query params.

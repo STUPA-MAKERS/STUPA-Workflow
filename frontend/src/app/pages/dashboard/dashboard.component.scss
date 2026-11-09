@@ -453,3 +453,18 @@
   gap: var(--space-2);
   min-width: 0;
 }
+
+// "Fällige To-Dos" (spec 000550): the due date in the tone of the board tiles.
+.dash__todoIcon {
+  display: inline-flex;
+  color: var(--color-text-muted);
+}
+.dash__todoSub {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.dash__todoDue {
+  flex: none;
+}

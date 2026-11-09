@@ -26,6 +26,7 @@ export type TodoLinkKind =
   | 'gremium'
   | 'invoice'
   | 'expense'
+  | 'budget'
   | 'ticket'
   | 'todo';
 export type TodoVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
@@ -299,6 +300,8 @@ export interface TodoCardCreate {
   readonly assigneeIds?: readonly Uuid[];
   readonly labelIds?: readonly Uuid[];
   readonly links?: readonly { readonly kind: TodoLinkKind; readonly targetId: Uuid }[];
+  /** The checklist, every item open (a duplicate, spec 000554). */
+  readonly checklist?: readonly string[];
   /** Makes the card an Event. */
   readonly event?: TodoEventIn | null;
 }

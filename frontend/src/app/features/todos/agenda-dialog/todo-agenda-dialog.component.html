@@ -1,0 +1,12 @@
+<app-todo-pick-dialog
+  [(open)]="open"
+  [heading]="heading"
+  [listLabel]="listLabel"
+  [emptyHeading]="emptyHeading"
+  [submitLabel]="submitLabel"
+  submitIcon="plus"
+  [rows]="rows()"
+  [(pick)]="pick"
+  [busy]="busy()"
+  (picked)="submit($event)"
+/>

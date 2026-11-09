@@ -2,10 +2,13 @@
 id: "000548"
 title: An element is linked to a card from its detail
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-09
+implementation:
+  - frontend/src/app/features/todos/link-card-dialog/todo-link-card-dialog.component.ts
+  - frontend/src/app/features/todos/pick-dialog/todo-pick-dialog.component.ts
+  - frontend/src/app/features/todos/linked-list/todo-linked-list.component.ts
 scope:
   - frontend/src/app/features/todos
   - frontend/src/app/pages/applications
