@@ -10,6 +10,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { BOARDS, MEMBERS, board, detail, link } from '../../../../testing/todo-fixtures';
 import { AGENDA, item, meeting, vote } from '../../../../testing/meeting-fixtures';
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
+import { TodoLinkCardDialogComponent } from '../../todos/link-card-dialog/todo-link-card-dialog.component';
 import { TodoNewDialogComponent } from '../../todos/new-dialog/todo-new-dialog.component';
 import { AgendaPaneComponent } from './agenda-pane.component';
 
@@ -62,7 +63,7 @@ async function setup(over: Partial<Inputs> = {}, canTodo?: boolean) {
     on,
     providers:
       canTodo === undefined
-        ? []
+        ? [{ provide: TodosApiService, useValue: {} }]
         : [
             { provide: AuthService, useValue: { canInGremium: jest.fn(() => canTodo) } },
             {
@@ -72,6 +73,8 @@ async function setup(over: Partial<Inputs> = {}, canTodo?: boolean) {
                 board: jest.fn(() => of(board())),
                 members: jest.fn(() => of(MEMBERS)),
                 linkTargets: jest.fn(() => of([])),
+                mine: jest.fn(() => of({ items: [] })),
+                linked: jest.fn(() => of([{ id: 'k-1' }])),
               },
             },
           ],
@@ -387,6 +390,19 @@ describe('AgendaPaneComponent', () => {
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Do anlegen' }));
       view.fixture.detectChanges();
       expect(document.querySelectorAll('.tn__chip')).toHaveLength(1);
+    });
+
+    it('opens "Karte verknüpfen" for the TOP and leaves out the cards that link it', async () => {
+      const view = await setup({ savingAgenda: true }, true);
+      const menu = await openMenu(2);
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Do verknüpfen' }));
+      view.fixture.detectChanges();
+      const dialog = view.fixture.debugElement.query(By.directive(TodoLinkCardDialogComponent));
+      const cmp = dialog.componentInstance as TodoLinkCardDialogComponent;
+      expect(cmp.kind()).toBe('agenda_item');
+      expect(cmp.targetId()).toBe('t-3');
+      expect(cmp.exclude()).toEqual(['k-1']);
+      expect(TestBed.inject(TodosApiService).linked).toHaveBeenCalledWith('agenda_item', 't-3');
     });
 
     it('is not offered without todo.write or without a gremium', async () => {

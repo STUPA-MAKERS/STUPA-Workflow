@@ -3830,6 +3830,7 @@
   "todos.archive.restoreOne": "„{title}“ wiederherstellen",
   "todos.archive.more": "Mehr laden",
   "meetings.agenda.todo": "To-Do anlegen",
+  "meetings.agenda.link": "To-Do verknüpfen",
   "meetings.agenda.kindTodo": "To-Do",
   "meetings.agenda.kindFreetext": "Freitext",
   "meetings.agenda.searchTodo": "To-Do suchen",
