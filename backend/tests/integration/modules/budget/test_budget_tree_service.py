@@ -228,8 +228,7 @@ async def test_expense_actor_resolved_to_display_name(session: AsyncSession) -> 
 async def test_committed_rollup(session: AsyncSession) -> None:
     """The committed amount rolls up from leaf to mid to top, 250 at each level.
 
-    An application counts as committed when its flow state is in the accepted_state_keys
-    of the top budget, here 'approved'.
+    An application counts as committed when its flow state is approved (spec 000572).
     """
     svc = BudgetTreeService(session)
     g = await _gremium(session)
@@ -248,7 +247,9 @@ async def test_committed_rollup(session: AsyncSession) -> None:
     flv = FlowVersion(version=1)
     session.add_all([fv, flv])
     await session.flush()
-    state = State(flow_version_id=flv.id, key="approved", label_i18n={}, kind="normal")
+    state = State(
+        flow_version_id=flv.id, key="approved", label_i18n={}, kind="normal", is_approved=True
+    )
     session.add(state)
     await session.flush()
     app = Application(
@@ -261,9 +262,6 @@ async def test_committed_rollup(session: AsyncSession) -> None:
         amount=Decimal("250"),
     )
     session.add(app)
-    top_row = await session.get(Budget, top.id)
-    assert top_row is not None
-    top_row.accepted_state_keys = ["approved"]
     await session.commit()
 
     tree = await svc.get_tree(gremium_id=g.id)

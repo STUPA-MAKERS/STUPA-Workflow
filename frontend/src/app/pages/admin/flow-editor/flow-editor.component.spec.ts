@@ -42,8 +42,6 @@ const BUDGET_TREE = [
     currency: 'EUR',
     active: true,
     color: null,
-    acceptedStateKeys: [],
-    deniedStateKeys: [],
     hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
@@ -60,8 +58,6 @@ const BUDGET_TREE = [
         currency: 'EUR',
         active: true,
         color: null,
-        acceptedStateKeys: [],
-        deniedStateKeys: [],
         hiddenInBudget: false,
         viewGremiumId: null,
         fiscalStartMonth: 1,
@@ -682,6 +678,29 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.setStateTerminal(key, true);
     expect(c.graph().states[0].isTerminal).toBe(true);
     expect(c.branchesFor(key)).toEqual([]);
+  });
+
+  /** § 000571: the switches "Bewilligt" and "Abgelehnt" sit on a normal state only. */
+  it('sets the outcome of a state with its switches', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addState();
+    const key = c.graph().states[0].key;
+    c.selection.set({ kind: 'state', key });
+    fixture.detectChanges();
+    const flip = (name: string): void => {
+      screen.getByRole('switch', { name }).click();
+      fixture.detectChanges();
+    };
+    flip('Bewilligt');
+    expect(c.graph().states[0].isApproved).toBe(true);
+    flip('Abgelehnt');
+    expect([c.graph().states[0].isApproved, c.graph().states[0].isDenied]).toEqual([false, true]);
+    c.setStateKind(key, 'vote');
+    fixture.detectChanges();
+    expect(screen.queryByRole('switch', { name: 'Bewilligt' })).toBeNull();
+    expect(c.graph().states[0].isDenied).toBe(false);
   });
 
   /**

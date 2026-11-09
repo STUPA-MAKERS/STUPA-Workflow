@@ -29,7 +29,6 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
@@ -59,10 +58,6 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
     #: Display color for the pie charts and the tree. NULL selects an auto color.
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
-    #: Top level only: flow-state keys that count as accepted (-> committed) or
-    #: as denied (-> excluded). Every other state counts as requested.
-    accepted_state_keys: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
-    denied_state_keys: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
     #: Hides the node in the budget tab. Display only: the values still count in
     #: the parent rollups and in the export. A Python default backs up the
     #: server default, so a new instance carries a bool before the flush.

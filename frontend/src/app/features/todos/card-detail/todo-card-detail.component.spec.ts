@@ -1594,8 +1594,7 @@ describe('TodoCardDetailComponent board work (specs 000553-000555)', () => {
 
   it('deletes no item when the item dialog closes without one', async () => {
     const { cmp, api } = await setup();
-    cmp.onItemCard(detail({ id: 'k-7' }));
-    expect(api.addLink).not.toHaveBeenCalled();
+    cmp.onItemCard();
     expect(api.deleteCheckItem).not.toHaveBeenCalled();
   });
 
@@ -1607,8 +1606,8 @@ describe('TodoCardDetailComponent board work (specs 000553-000555)', () => {
     expect(cmp.itemLinks()).toEqual([{ kind: 'todo', targetId: 'k-1', label: 'To-Do · Raum buchen' }]);
     expect(cmp.itemAssignees()).toEqual(cmp.card()?.assignees.flatMap((a) => (a.principalId ? [a.principalId] : [])));
     expect(screen.getByRole('dialog', { name: 'Als Karte anlegen' })).toBeInTheDocument();
-    cmp.onItemCard(detail({ id: 'k-7', title: 'Raum anfragen' }));
-    expect(api.addLink).toHaveBeenCalledWith('k-1', 'todo', 'k-7');
+    cmp.onItemCard();
+    expect(api.addLink).not.toHaveBeenCalled();
     expect(api.deleteCheckItem).toHaveBeenCalledWith('k-1', 'i-2');
   });
 });

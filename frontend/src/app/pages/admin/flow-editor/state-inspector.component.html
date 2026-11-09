@@ -27,6 +27,18 @@
   <app-switch [ngModel]="state().isTerminal === true" (ngModelChange)="terminalChange.emit($event)">
     {{ 'admin.flow.terminal' | t }}
   </app-switch>
+  @if ((state().kind ?? 'normal') === 'normal') {
+    <app-switch
+      data-testid="state-approved"
+      [ngModel]="state().isApproved === true"
+      (ngModelChange)="outcomeChange.emit({ outcome: 'approved', on: $event })"
+    >{{ 'admin.flow.approved' | t }}</app-switch>
+    <app-switch
+      data-testid="state-denied"
+      [ngModel]="state().isDenied === true"
+      (ngModelChange)="outcomeChange.emit({ outcome: 'denied', on: $event })"
+    >{{ 'admin.flow.denied' | t }}</app-switch>
+  }
 </div>
 
 <hr class="ins__rule" />

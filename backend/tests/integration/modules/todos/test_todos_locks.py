@@ -321,7 +321,8 @@ async def test_two_cards_on_two_boards_link_each_other_at_once(
     """Let two cards on two boards link each other at the same time.
 
     The link a1 -> b1 holds a1 the way ``add_link`` does. The link b1 -> a1 must not wait
-    for it, because its foreign key check needs only KEY SHARE on a1.
+    for it, because its foreign key check needs only KEY SHARE on a1. Then a1 shows the
+    link of b1 and refuses the second link back (spec 000573, ``link_exists``).
     """
     admin, _admin_id = await add_person(maker, "Admin")
     lead = Principal(sub=admin.sub, roles=["admin"])
@@ -346,7 +347,10 @@ async def test_two_cards_on_two_boards_link_each_other_at_once(
         await service._card(a1, lead, lock=True)
         linked = await asyncio.wait_for(asyncio.create_task(link_b_to_a()), 5)
         assert linked == 1
-        assert len((await service.add_link(a1, "todo", b1, lead)).links) == 1
+        assert len((await service.card(a1, lead)).links) == 1
+        with pytest.raises(ConflictError) as exc:
+            await service.add_link(a1, "todo", b1, lead)
+        assert exc.value.code == "link_exists"
 
 
 @pytest.mark.parametrize("write", ["move", "patch", "archive", "checklist"])

@@ -4,8 +4,8 @@ A decision holds an approved amount (NULL = as requested) and a list of conditio
 (Auflagen). Two paths write it, through the one function `record_decision`:
 
 * the close of a passed application vote that carries a proposal (`vote.proposal`),
-* a manual transition into an accepted state of the top budget of the application
-  (`accepted_state_keys`) with an optional `decision` in the request.
+* a manual transition into an approved state (`State.is_approved`, spec 000572) with
+  an optional `decision` in the request.
 
 The valid decision is the newest `application_decision` row with
 `superseded_at IS NULL`. `application.approved_amount` is its denormalized copy. A new
@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from pydantic import Field, ValidationError, field_validator
@@ -33,9 +33,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Application, ApplicationDecision
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.budget.tree_models import Budget
 from app.shared.errors import ValidationProblem
 from app.shared.schemas import FrozenStrictCamelModel
+
+if TYPE_CHECKING:
+    from app.modules.flow.models import State
 
 #: At most this many conditions, each 1 to MAX_CONDITION_LENGTH characters (trimmed).
 MAX_CONDITIONS = 20
@@ -142,37 +144,15 @@ def not_allowed_problem(msg: str) -> ValidationProblem:
     return ValidationProblem(msg, code=CODE_NOT_ALLOWED, errors=[{"field": "decision", "msg": msg}])
 
 
-async def accepted_state_keys(session: AsyncSession, budget_id: UUID | None) -> frozenset[str]:
-    """Return the `accepted_state_keys` of the top budget of a cost center.
-
-    The top budget is the node whose `path_key` is the first segment of the path of
-    `budget_id`, as the budget view classifies the applications. No cost center gives
-    an empty set.
-    """
-    if budget_id is None:
-        return frozenset()
-    top = (
-        select(func.split_part(Budget.path_key, "-", 1))
-        .where(Budget.id == budget_id)
-        .scalar_subquery()
-    )
-    keys = await session.scalar(select(Budget.accepted_state_keys).where(Budget.path_key == top))
-    return frozenset(k for k in keys or [] if isinstance(k, str))
-
-
-async def check_decision_target(
-    session: AsyncSession, app: Application, target_key: str | None
-) -> None:
-    """Admit a manual decision only for a target in the accepted states of the budget.
+def check_decision_target(target: State | None) -> None:
+    """Admit a manual decision only for a transition into an approved state (000572).
 
     Raises:
         ValidationProblem: `decision_not_allowed` (422).
     """
-    keys = await accepted_state_keys(session, app.budget_id)
-    if target_key is None or target_key not in keys:
+    if target is None or not target.is_approved:
         raise not_allowed_problem(
-            "A decision is allowed only on a transition into an accepted state of the "
-            "budget of the application."
+            "A decision is allowed only on a transition into an approved state."
         )
 
 

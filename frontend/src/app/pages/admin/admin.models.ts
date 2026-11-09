@@ -40,6 +40,10 @@ export interface StateDef {
   readonly isInitial?: boolean;
   /** Terminal state: terminal applications are subject to retention/anonymization. */
   readonly isTerminal?: boolean;
+  /** An Antrag in this state counts as approved (spec 000571). Never with `isDenied`. */
+  readonly isApproved?: boolean;
+  /** An Antrag in this state counts as denied (spec 000571). Never on a vote state. */
+  readonly isDenied?: boolean;
   /** State kind. Absent ⇒ `normal`. */
   readonly kind?: StateKind | null;
   /** Kind-specific configuration. */

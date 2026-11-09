@@ -413,15 +413,13 @@ export class TodoCardDetailComponent {
   }
 
   /**
-   * The item is a card now: this card links to it too, so "Verknüpft" shows it here as on
-   * the new card, and the item leaves the checklist.
+   * The item is a card now and leaves the checklist. The new card links this card, and
+   * "Verknüpft" of each card shows that one link (spec 000573).
    */
-  onItemCard(created: TodoCardDetail): void {
+  onItemCard(): void {
     const item = this.itemCard();
-    const c = this.card();
     this.itemCard.set(null);
-    if (!item || !c) return;
-    this.write(this.api.addLink(c.id, 'todo', created.id), () => this.deleteItem(item));
+    if (item) this.deleteItem(item);
   }
 
   /**

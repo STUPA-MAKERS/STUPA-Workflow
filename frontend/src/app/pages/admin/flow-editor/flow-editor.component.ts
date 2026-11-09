@@ -667,6 +667,10 @@ export class FlowEditorComponent {
     this.graph.update((g) => ops.setStateTerminal(g, key, on));
   }
 
+  protected setStateOutcome(key: string, outcome: 'approved' | 'denied', on: boolean): void {
+    this.graph.update((g) => ops.setStateOutcome(g, key, outcome, on));
+  }
+
   protected setStateKind(key: string, kind: string): void {
     this.graph.update((g) => ops.setStateKind(g, key, kind));
   }

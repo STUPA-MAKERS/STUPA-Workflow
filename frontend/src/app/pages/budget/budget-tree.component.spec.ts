@@ -33,8 +33,6 @@ function fullNode(over: Partial<BudgetTreeNode>): BudgetTreeNode {
     currency: 'EUR',
     active: true,
     color: null,
-    acceptedStateKeys: [],
-    deniedStateKeys: [],
     hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
@@ -51,8 +49,6 @@ const TREE: BudgetTreeNode[] = [
     key: 'VS',
     pathKey: 'VS',
     name: 'VS-Mittel',
-    acceptedStateKeys: ['accepted'],
-    deniedStateKeys: ['denied'],
     byFiscalYear: [
       {
         fiscalYearId: 'fy-1',
@@ -340,8 +336,6 @@ describe('BudgetTreeComponent', () => {
   it('opens the toolbar dialogs from the header menu on a phone', async () => {
     const { c } = await setup();
     expect(c.headerMenu()[0].items.every((i: { disabledReason: string | null }) => i.disabledReason === null)).toBe(true);
-    c.onHeaderMenu({ id: 'states', label: '' });
-    expect(c.stateConfigOpen()).toBe(true);
     c.onHeaderMenu({ id: 'cutoff', label: '' });
     expect(c.stichtagOpen()).toBe(true);
     c.onHeaderMenu({ id: 'fy', label: '' });
@@ -401,19 +395,6 @@ describe('BudgetTreeComponent', () => {
   it('clears gremium options when the gremien request fails', async () => {
     const { c } = await setup({ gremien: 'error', flow: 'null' });
     expect(c.gremiumOptions()).toEqual([]);
-  });
-
-  it('builds state options from the global flow (de label, key fallback)', async () => {
-    const { c } = await setup({ gremien: 'ok', flow: 'states' });
-    expect(c.stateOptions()).toEqual([
-      { value: 'accepted', label: 'Angenommen (accepted)' },
-      { value: 'orphan', label: 'orphan (orphan)' },
-    ]);
-  });
-
-  it('falls back to an empty state list when the flow request fails', async () => {
-    const { c } = await setup({ gremien: 'ok', flow: 'error' });
-    expect(c.stateOptions()).toEqual([]);
   });
 
   it('keeps the selection across reloads when the top still exists', async () => {
@@ -513,21 +494,6 @@ describe('BudgetTreeComponent', () => {
     expect(c.money(42, 'EUR')).toBe(eur(42, 0));
   });
 
-  it('reports accepted/denied membership for the selected top', async () => {
-    const { c } = await setup();
-    expect(c.isAccepted('accepted')).toBe(true);
-    expect(c.isAccepted('denied')).toBe(false);
-    expect(c.isDenied('denied')).toBe(true);
-    expect(c.isDenied('accepted')).toBe(false);
-  });
-
-  it('accepted/denied sets are empty when no top is selected', async () => {
-    const { c } = await setup();
-    c.selectedTopId.set('none');
-    expect([...c.acceptedKeys()]).toEqual([]);
-    expect([...c.deniedKeys()]).toEqual([]);
-  });
-
   it('selectTop sets the budget, clears the fy and loads fiscal years', async () => {
     const { c, http } = await setup();
     c.selectTop('b-vs');
@@ -581,72 +547,6 @@ describe('BudgetTreeComponent', () => {
     expect(c.editColorInvalid()).toBe(false);
     c.openEditNode(fullNode({ id: 'b-y', color: null }));
     expect(c.editColor()).toBe('');
-  });
-
-  it('toggleState does nothing when no top is selected', async () => {
-    const { c, http } = await setup();
-    c.selectedTopId.set('none');
-    c.toggleState('accepted', 'x');
-    http.verify();
-  });
-
-  it('toggleState removes an already-set key', async () => {
-    const { c, http } = await setup();
-    c.toggleState('accepted', 'accepted');
-    const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
-    expect(patch.request.body).toEqual({ acceptedStateKeys: [], deniedStateKeys: ['denied'] });
-    patch.flush({});
-    flushReload(http);
-  });
-
-  /** 'denied' sits in deniedKeys and moves to accepted. */
-  it('toggleState adds a new accepted key and removes it from denied (mutual exclusion)', async () => {
-    const { c, http } = await setup();
-    c.toggleState('accepted', 'denied');
-    const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
-    expect(patch.request.body).toEqual({
-      acceptedStateKeys: ['accepted', 'denied'],
-      deniedStateKeys: [],
-    });
-    patch.flush({});
-    flushReload(http);
-  });
-
-  it('toggleState adds a new denied key and removes it from accepted', async () => {
-    const { c, http } = await setup();
-    c.toggleState('denied', 'accepted');
-    const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
-    expect(patch.request.body).toEqual({
-      acceptedStateKeys: [],
-      deniedStateKeys: ['denied', 'accepted'],
-    });
-    patch.flush({});
-    flushReload(http);
-  });
-
-  it('toggles a state with the box of its row in the state dialog', async () => {
-    const { c, http, fixture } = await setup({ gremien: 'ok', flow: 'states' });
-    c.stateConfigOpen.set(true);
-    fixture.detectChanges();
-    await fixture.whenStable();
-    const accepted = screen.getByRole('checkbox', { name: 'Angenommen: Angenommen (accepted)' });
-    expect(accepted).toBeChecked();
-    const denied = screen.getByRole('checkbox', { name: /^Abgelehnt: orphan/ });
-    expect(denied).not.toBeChecked();
-    await userEvent.click(denied);
-    const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
-    expect(patch.request.body).toEqual({ acceptedStateKeys: ['accepted'], deniedStateKeys: ['denied', 'orphan'] });
-    patch.flush({});
-    flushReload(http);
-  });
-
-  it('toggleState toasts an error on failure', async () => {
-    const { c, http, toast } = await setup();
-    c.toggleState('accepted', 'new');
-    http
-      .expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH')
-      .flush(null, { status: 500, statusText: 'err' });
-    expect(toast.error).toHaveBeenCalled();
   });
 
   it('openTop resets the draft and opens; closeTop closes', async () => {
@@ -757,16 +657,12 @@ describe('BudgetTreeComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it('opens and closes the stichtag and state-config dialogs', async () => {
+  it('opens and closes the stichtag dialog', async () => {
     const { c } = await setup();
     c.openStichtag();
     expect(c.stichtagOpen()).toBe(true);
     c.closeStichtag();
     expect(c.stichtagOpen()).toBe(false);
-    c.openStateConfig();
-    expect(c.stateConfigOpen()).toBe(true);
-    c.closeStateConfig();
-    expect(c.stateConfigOpen()).toBe(false);
   });
 
   it('startAddChild opens the parent and resets the draft; cancelAddChild closes', async () => {

@@ -285,13 +285,13 @@ async def test_search_without_rights(
     meeting_scope["scope"] = (None, set())
     session = ScriptedSession(scalars=[[], [], []])
     resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
-    assert await resolver.search("x", "application", USER) == []
+    assert await resolver.search("xy", "application", USER) == []
     assert seen["owner_sub"] == "u" and seen["hide_pii_in_search"] is True
-    assert await resolver.search("x", "ticket", USER) == []
-    assert await resolver.search("x", "meeting", USER) == []
+    assert await resolver.search("xy", "ticket", USER) == []
+    assert await resolver.search("xy", "meeting", USER) == []
     assert "gremium_id IN" not in str(session.statements[-1])
-    assert await resolver.search("x", "agenda_item", USER) == []
-    assert await resolver.search("x", "todo", USER) == []
+    assert await resolver.search("xy", "agenda_item", USER) == []
+    assert await resolver.search("xy", "todo", USER) == []
     assert "!=" not in str(session.statements[-1])
 
 

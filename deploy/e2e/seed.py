@@ -197,6 +197,7 @@ def _seed_flow_graph() -> FlowGraph:
                 {
                     "key": "angenommen",
                     "label": _i18n("Angenommen", "Approved"),
+                    "isApproved": True,
                     "editAllowed": False,
                     "isTerminal": True,
                     "color": "#16a34a",
@@ -204,6 +205,7 @@ def _seed_flow_graph() -> FlowGraph:
                 {
                     "key": "abgelehnt",
                     "label": _i18n("Abgelehnt", "Rejected"),
+                    "isDenied": True,
                     "editAllowed": False,
                     "isTerminal": True,
                     "color": "#dc2626",

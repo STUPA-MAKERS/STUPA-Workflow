@@ -15,11 +15,13 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.applications.models import ApplicationDecision
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear
+from app.modules.flow.models import State
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.todos.service import TodoService
 from app.modules.voting.models import Vote
@@ -59,7 +61,9 @@ def _admin(sub: str) -> Principal:
 
 
 async def _money(maker: async_sessionmaker[AsyncSession]) -> dict[str, uuid.UUID]:
-    """An Antrag with a valid decision (500 of 800), a vote of a TOP, and three bookings.
+    """An approved Antrag with a decision (500 of 800), a vote of a TOP, and three bookings.
+
+    The Antrag sits in the state ``done``, which carries the flag approved (spec 000572).
 
     The booking ``parent`` (300) has the sub-booking ``child`` (100); ``income`` is 75.
     """
@@ -68,6 +72,12 @@ async def _money(maker: async_sessionmaker[AsyncSession]) -> dict[str, uuid.UUID
         app = await make_application(session, flow)
         app.amount = Decimal("800.00")
         app.email_confirmed_at = datetime(2026, 10, 1, tzinfo=UTC)
+        done = await session.scalar(
+            select(State).where(State.flow_version_id == app.flow_version_id, State.key == "done")
+        )
+        assert done is not None
+        done.is_approved = True
+        app.current_state_id = done.id
         meeting = Meeting(gremium_id=flow.gremium.id, title="StuPa 3", date=date(2026, 11, 1))
         session.add(meeting)
         await session.flush()

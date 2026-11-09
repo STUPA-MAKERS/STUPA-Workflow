@@ -52,7 +52,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.decision import (
     DecisionIn,
     DecisionSwap,
-    accepted_state_keys,
     check_approved_amount,
     check_decision_target,
     record_decision,
@@ -127,8 +126,8 @@ def _transition_out(
 ) -> TransitionOut:
     """Map a transition to its API shape.
 
-    `allows_decision` tells that the target is an accepted state of the top budget of
-    the application: a fire then takes a `decision`.
+    `allows_decision` tells that the target is an approved state: a fire then takes a
+    `decision`.
 
     `gremium_id` is the agenda Gremium (`FlowService._agenda_gremium`). It is set only
     when the transition carries an `addToNextSession` action, its target is a vote
@@ -298,15 +297,12 @@ class FlowService:
 
         A transition into a vote state whose Gremium does not resolve stays hidden
         (fail closed, the fire would give 409 `no_vote_gremium`). A transition into an
-        accepted state of the top budget carries `allowsDecision`.
+        approved state carries `allowsDecision` (spec 000572).
         """
-        accepted = await accepted_state_keys(self.session, app.budget_id)
-        outs = [await self._firable_out(app, t, accepted) for t in transitions]
+        outs = [await self._firable_out(app, t) for t in transitions]
         return [o for o in outs if o is not None]
 
-    async def _firable_out(
-        self, app: Application, transition: Transition, accepted: frozenset[str]
-    ) -> TransitionOut | None:
+    async def _firable_out(self, app: Application, transition: Transition) -> TransitionOut | None:
         """Map one transition to its API shape, or `None` when its target refuses the app."""
         target = await self.session.get(State, transition.to_state_id)
         if not await self._enterable(target, app.budget_id):
@@ -314,7 +310,7 @@ class FlowService:
         return _transition_out(
             transition,
             await self._agenda_gremium(transition, target, app.budget_id),
-            allows_decision=bool(accepted) and target is not None and target.key in accepted,
+            allows_decision=target is not None and target.is_approved,
         )
 
     async def _outgoing(self, app: Application) -> list[Transition]:
@@ -690,8 +686,7 @@ class FlowService:
         `allow_unconfirmed` works as in `_load_app`.
 
         `decision` writes the approved amount and the conditions as the decision
-        of the application. Only a transition into an accepted state of the top budget
-        of the application takes it.
+        of the application. Only a transition into an approved state takes it.
 
         Raises:
             NotFoundError: The application or the transition does not exist (404).
@@ -790,9 +785,7 @@ class FlowService:
         old_approved: Decimal | None = app.approved_amount if decision is not None else None
         if decision is not None:
             target_state = await self._load_state(transition.to_state_id)
-            await check_decision_target(
-                self.session, app, target_state.key if target_state is not None else None
-            )
+            check_decision_target(target_state)
             check_approved_amount(app.amount, decision.approved_amount)
             app.approved_amount = decision.approved_amount
         ctx = await flow_context.build_context(

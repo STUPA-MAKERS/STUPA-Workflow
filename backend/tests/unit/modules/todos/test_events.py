@@ -64,12 +64,12 @@ async def test_totals_sum_applications_and_bookings() -> None:
         link(CARD, expense_id=E4),
     ]
     session: Any = ScriptedSession(
-        scalars=[links, [A1, A3]],
+        scalars=[links],
         execute=[
             [
-                (A1, Decimal("100.00"), Decimal("80.00")),
-                (A2, Decimal("50.00"), None),
-                (A3, None, None),
+                (A1, Decimal("100.00"), Decimal("80.00"), True),
+                (A2, Decimal("50.00"), None, False),
+                (A3, None, None, True),
             ],
             [
                 (E1, "expense", Decimal("20.00"), None),
@@ -90,11 +90,22 @@ async def test_totals_sum_applications_and_bookings() -> None:
 
 async def test_totals_approved_falls_back_to_the_requested_amount() -> None:
     session: Any = ScriptedSession(
-        scalars=[[link(CARD, application_id=A1)], [A1]],
-        execute=[[(A1, Decimal("40.00"), None)]],
+        scalars=[[link(CARD, application_id=A1)]],
+        execute=[[(A1, Decimal("40.00"), None, True)]],
     )
     got = (await events.totals(session, [CARD]))[CARD]
     assert got.requested == got.approved == Decimal("40.00")
+
+
+async def test_totals_approved_skips_an_antrag_outside_an_approved_state() -> None:
+    """A decision alone does not count: the state must carry the approved flag (000572)."""
+    session: Any = ScriptedSession(
+        scalars=[[link(CARD, application_id=A1)]],
+        execute=[[(A1, Decimal("40.00"), Decimal("30.00"), False)]],
+    )
+    got = (await events.totals(session, [CARD]))[CARD]
+    assert got.requested == Decimal("40.00")
+    assert got.approved == Decimal("0")
 
 
 async def test_totals_count_a_sub_booking_alone_when_its_parent_is_not_linked() -> None:

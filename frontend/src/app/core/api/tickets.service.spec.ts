@@ -19,6 +19,21 @@ describe('TicketsApiService', () => {
 
   afterEach(() => http.verify());
 
+  it('reads and writes the own tickets of the reporter', () => {
+    api.mine().subscribe();
+    expect(http.expectOne((r) => r.url === '/api/tickets/mine').request.context.get(SKIP_LOADING)).toBe(true);
+    api.getMine('t-1').subscribe();
+    http.expectOne('/api/tickets/mine/t-1').flush({});
+    api.getMine('t-1', { detail: true }).subscribe();
+    http.expectOne('/api/tickets/mine/t-1').flush({});
+    api.addMyNote('t-1', 'Hallo').subscribe();
+    expect(http.expectOne('/api/tickets/mine/t-1/notes').request.body).toMatchObject({ body: 'Hallo' });
+    api.editMyNote('t-1', 'n-1', 'Neu').subscribe();
+    expect(http.expectOne('/api/tickets/mine/t-1/notes/n-1').request.method).toBe('PATCH');
+    api.deleteMyNote('t-1', 'n-1').subscribe();
+    expect(http.expectOne('/api/tickets/mine/t-1/notes/n-1').request.method).toBe('DELETE');
+  });
+
   it('sends a ticket', () => {
     let out: unknown;
     api.create({ kind: 'bug', title: 't', body: 'b', context: {} }).subscribe((r) => (out = r));

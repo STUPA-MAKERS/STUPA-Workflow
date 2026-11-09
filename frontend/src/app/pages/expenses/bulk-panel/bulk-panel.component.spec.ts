@@ -15,8 +15,6 @@ const TREE: BudgetTreeNode[] = [
     currency: 'EUR',
     active: true,
     color: '#72a384',
-    acceptedStateKeys: [],
-    deniedStateKeys: [],
     hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
