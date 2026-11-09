@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import ConfigDict, Field, JsonValue
@@ -27,6 +27,7 @@ TodoLinkKind = Literal[
     "gremium",
     "invoice",
     "expense",
+    "budget",
     "ticket",
     "todo",
 ]
@@ -39,6 +40,7 @@ TodoLinkedKind = Literal[
     "gremium",
     "invoice",
     "expense",
+    "budget",
     "ticket",
 ]
 TodoEventKind = Literal[
@@ -486,6 +488,9 @@ class CardCreate(FrozenStrictCamelModel, frozen=True):
     )
     label_ids: tuple[UUID, ...] = Field(default_factory=tuple, alias="labelIds", max_length=50)
     links: tuple[LinkIn, ...] = Field(default_factory=tuple, max_length=20)
+    checklist: tuple[Annotated[str, Field(min_length=1, max_length=500)], ...] = Field(
+        default_factory=tuple, max_length=100
+    )
     event: EventIn | None = None
 
 

@@ -52,6 +52,7 @@ import { formatMoney } from '@shared/format-money';
 import { BudgetItemListComponent } from './budget-items/budget-item-list.component';
 import { BudgetItemsDialogComponent } from './budget-items/budget-items-dialog.component';
 import { type BudgetItem, mergeBudgetItems } from './budget-items/budget-items';
+import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
 
 /** The amounts of one cost centre in one fiscal year, as numbers. */
 export interface Figures {
@@ -143,6 +144,7 @@ export const APPS_SHOWN = 5;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TodoLinkedListComponent,
     SectionComponent,
     NoteComponent,
     PageHeaderComponent,

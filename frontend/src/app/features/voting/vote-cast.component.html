@@ -88,7 +88,7 @@
               </span>
             }
           </app-vote-panel>
-          <app-todo-linked-list kind="vote" headingId="vc-todos" [targetId]="v.id" />
+          <app-todo-linked-list kind="vote" headingId="vc-todos" [targetId]="v.id" [actions]="true" [gremiumId]="context().meeting?.gremiumId ?? null" [linkLabel]="v.question ?? ''" />
         </div>
       </article>
     } @else {

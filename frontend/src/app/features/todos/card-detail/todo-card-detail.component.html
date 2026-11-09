@@ -147,6 +147,33 @@
     }
   </article>
 
+  @if (agendaOpen()) {
+    <app-todo-agenda-dialog [(open)]="agendaOpen" [cardId]="card.id" [meetings]="agendaMeetings()" (added)="onAgenda()" />
+  }
+  @if (copyOpen()) {
+    <app-todo-new-dialog
+      [(open)]="copyOpen"
+      heading="todos.new.duplicateTitle"
+      [boardId]="card.boardId"
+      [columnId]="card.columnId"
+      [initialTitle]="card.title"
+      [initialLinks]="copyLinks()"
+      [copy]="copy()"
+      (created)="onCopied($event)"
+    />
+  }
+  @if (itemOpen()) {
+    <app-todo-new-dialog
+      [(open)]="itemOpen"
+      heading="todos.new.itemTitle"
+      [boardId]="card.boardId"
+      [initialTitle]="itemCard()?.text ?? ''"
+      [initialLinks]="itemLinks()"
+      [withDescription]="false"
+      (created)="onItemCard()"
+    />
+  }
+
   <app-todo-move-sheet
     [(open)]="moveOpen"
     [columns]="moveColumns()"
@@ -655,6 +682,16 @@
       </button>
       @if (canWrite()) {
         <span class="cd__itemActions">
+          <app-button
+            variant="text"
+            size="sm"
+            [iconOnly]="true"
+            [attr.data-to-card]="item.id"
+            [ariaLabel]="'todos.card.itemToCard' | t: { text: item.text }"
+            (click)="makeCard(item)"
+          >
+            <app-icon name="kanban" />
+          </app-button>
           <app-button
             variant="text"
             size="sm"

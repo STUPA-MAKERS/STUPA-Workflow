@@ -14,6 +14,8 @@ import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import type { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
 import { CreateMeetingDialogComponent } from '../../meetings/create-meeting-dialog/create-meeting-dialog.component';
+import { TodosApiService, type TodoBoard, type TodoBoardSummary } from '@core/api/todos.service';
+import { board, tile } from '../../../../testing/todo-fixtures';
 import { GremienComponent } from '../gremien-page/gremien.component';
 import { GremiumDetailComponent } from './gremium-detail.component';
 
@@ -50,6 +52,9 @@ interface StartOptions {
   plan?: boolean;
   admin?: boolean;
   overview?: jest.Mock;
+  /** The boards the person reads in the Gremium. */
+  boards?: readonly Partial<TodoBoardSummary>[];
+  board?: TodoBoard;
 }
 
 async function start(url: string, opts: StartOptions = {}) {
@@ -59,6 +64,11 @@ async function start(url: string, opts: StartOptions = {}) {
   const auth = {
     can: jest.fn((p: string) => (p === 'admin.gremien' && opts.admin === true) || p === 'gremium.view_all'),
     canInGremium: jest.fn((_id: string, p: string) => opts.plan === true && p === 'session.manage'),
+  };
+  const todos = {
+    boards: jest.fn(() => of(opts.boards ?? [])),
+    board: jest.fn(() => of(opts.board)),
+    linked: jest.fn(() => of([])),
   };
   TestBed.overrideComponent(GremiumDetailComponent, {
     remove: { imports: [CreateMeetingDialogComponent] },
@@ -75,11 +85,13 @@ async function start(url: string, opts: StartOptions = {}) {
         { path: 'meetings', component: TargetStub },
         { path: 'meetings/:id', component: TargetStub },
         { path: 'voting', component: TargetStub },
+        { path: 'todos/:id', component: TargetStub },
         { path: 'admin/gremien/:id/members', component: TargetStub },
       ]),
       { provide: GremienApiService, useValue: api },
       { provide: AuthService, useValue: auth },
       { provide: ApiClient, useValue: {} },
+      { provide: TodosApiService, useValue: todos },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -94,7 +106,7 @@ async function start(url: string, opts: StartOptions = {}) {
   const detail = () =>
     harness.fixture.debugElement.query((d) => d.componentInstance instanceof GremiumDetailComponent)
       ?.componentInstance as GremiumDetailComponent;
-  return { harness, api, auth, restore, settle, router, detail, frame: TestBed.inject(PageFrameService) };
+  return { harness, api, auth, todos, restore, settle, router, detail, frame: TestBed.inject(PageFrameService) };
 }
 
 describe('GremiumDetailComponent', () => {
@@ -265,5 +277,71 @@ describe('GremiumDetailComponent', () => {
     const s = await start('/gremien/g-1', { overview: jest.fn(() => NEVER) });
     restore = s.restore;
     expect(s.harness.routeNativeElement?.querySelector('.gd--busy')).toBeTruthy();
+  });
+
+  describe('tab To-Dos (spec 000551)', () => {
+    const boards = [{ id: 'b-7', name: 'Studierendenparlament', kind: 'gremium' as const, gremiumId: 'g-1', canWrite: false }];
+    const gremiumBoard = board({
+      id: 'b-7',
+      cards: [
+        tile({ id: 'k-2', columnId: 'c-2', rank: 'a', title: 'In Arbeit zuerst?' }),
+        tile({ id: 'k-1', columnId: 'c-1', rank: 'b', title: 'Raum buchen' }),
+        tile({ id: 'k-3', columnId: 'c-4', title: 'Bus anfragen' }),
+      ],
+    });
+
+    it('shows the open cards of the board of the Gremium, in board order', async () => {
+      const s = await start('/gremien/g-1?tab=todos', { boards, board: gremiumBoard });
+      restore = s.restore;
+      const d = s.detail();
+      expect(s.todos.boards).toHaveBeenCalledWith('g-1');
+      expect(d.tab()).toBe('todos');
+      expect(d.tabs().map((t) => t.label)).toEqual(['Sitzungen', 'Mitglieder', 'Anwesenheit', 'Beschlüsse', 'To-Dos']);
+      expect(s.todos.board).toHaveBeenCalledWith('b-7');
+      const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/todos?card='));
+      expect(links.map((a) => a.textContent?.trim())).toEqual(['Raum buchen', 'In Arbeit zuerst?']);
+      expect(screen.queryByText('Bus anfragen')).toBeNull();
+      expect(d.menu()[0].items.map((i) => i.id)).toEqual(['board', 'meetings', 'votes']);
+      d.onMenu({ id: 'board', label: '' }, { open: jest.fn() } as unknown as CalendarSubscribeComponent);
+      await s.settle();
+      expect(s.router.url).toBe('/todos/b-7');
+    });
+
+    it('has no tab To-Dos when the person reads no board of the Gremium', async () => {
+      const s = await start('/gremien/g-1?tab=todos', { boards: [] });
+      restore = s.restore;
+      const d = s.detail();
+      expect(d.tab()).toBe('sitzungen');
+      expect(d.tabs().map((t) => t.id)).not.toContain('todos');
+      expect(d.menu()[0].items.map((i) => i.id)).toEqual(['meetings', 'votes']);
+    });
+
+    it('has no tab To-Dos when the boards fail to load', async () => {
+      TestBed.overrideProvider(TodosApiService, {
+        useValue: { boards: jest.fn(() => throwError(() => new Error('x'))), board: jest.fn(), linked: jest.fn() },
+      });
+      const s = await start('/gremien/g-1?tab=todos');
+      restore = s.restore;
+      expect(s.detail().tabs().map((t) => t.id)).not.toContain('todos');
+    });
+
+    it('shows the empty state when the board fails to load', async () => {
+      TestBed.overrideProvider(TodosApiService, {
+        useValue: {
+          boards: jest.fn(() => of(boards)),
+          board: jest.fn(() => throwError(() => new Error('x'))),
+          linked: jest.fn(() => of([])),
+        },
+      });
+      const s = await start('/gremien/g-1?tab=todos');
+      restore = s.restore;
+      expect(screen.getByText('Keine offenen To-Dos')).toBeTruthy();
+    });
+
+    it('says so when the board has no open card', async () => {
+      const s = await start('/gremien/g-1?tab=todos', { boards, board: board({ id: 'b-7', cards: [] }) });
+      restore = s.restore;
+      expect(screen.getByText('Keine offenen To-Dos')).toBeTruthy();
+    });
   });
 });

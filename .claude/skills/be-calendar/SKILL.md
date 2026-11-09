@@ -5,12 +5,12 @@ description: Backend calendar/ICS module. It serves a personal token-authenticat
 
 # Calendar / ICS Feed — `backend/app/modules/calendar`
 
-**Does:** Serves a personal token-authenticated iCal (`.ics`) subscription feed. The feed lists the dated meetings of every Gremium the token owner belongs to. Calendar clients cannot do OIDC, so a rotatable per-principal feed token authenticates the public feed URL.
+**Does:** Serves a personal token-authenticated iCal (`.ics`) subscription feed. The feed lists the dated meetings of every Gremium the token owner belongs to, and the open to-do cards assigned to the owner that have a due date, as all-day events (spec 000549, `service.due_cards` → `TodoService.calendar_due_cards`). Calendar clients cannot do OIDC, so a rotatable per-principal feed token authenticates the public feed URL.
 
 **Key files:**
 - `router.py` — the `/calendar` `APIRouter` with the three endpoints, the `_feed_url`/`_uid_domain` helpers and the `text/calendar` response building.
 - `service.py` — token CRUD + data access: generate/get/rotate token, resolve principal by token, `member_meetings` query. It does NOT commit. The caller commits.
-- `ics.py` — pure RFC5545 builder: `MeetingEvent` dataclass, `build_calendar()` → `bytes`. No DB. The module imports `icalendar` lazily, only on the feed path.
+- `ics.py` — pure RFC5545 builder: `MeetingEvent` and `DueCard` dataclasses, `build_calendar(..., due_cards=)` → `bytes`. No DB. The module imports `icalendar` lazily, only on the feed path.
 - `schemas.py` — `CalendarFeedOut {url: str | None}`.
 - `__init__.py` — module docstring (`#ics`).
 

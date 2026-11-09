@@ -116,6 +116,11 @@
           @case ('beschluesse') {
             <app-gremium-decisions [gremiumId]="g.id" />
           }
+          @case ('todos') {
+            @if (boardId(); as board) {
+              <app-gremium-todos [gremiumId]="g.id" [boardId]="board" />
+            }
+          }
         }
       }
     </ng-template>

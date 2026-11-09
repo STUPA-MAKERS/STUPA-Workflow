@@ -353,7 +353,7 @@
       }
     </app-field-group>
   </app-section>
-  <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" [rows]="linkedRows()" />
+  <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" [rows]="linkedRows()" [actions]="true" [gremiumId]="application.gremiumId ?? null" [linkLabel]="title()" />
 </ng-template>
 
 <ng-template #answers let-application>

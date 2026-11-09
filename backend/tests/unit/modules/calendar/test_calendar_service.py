@@ -5,11 +5,15 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime, time
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from app.modules.calendar import service
 from tests._support.auth_fakes import fake_session, result
+
+if TYPE_CHECKING:
+    from app.modules.auth.models import Principal
 
 
 def test_generate_token_is_url_safe() -> None:
@@ -90,3 +94,30 @@ async def test_member_meetings_include_the_substitute_pools() -> None:
     db = fake_session(result(), result(gid), result((meeting, "StuPa")))
     pairs = await service.member_meetings(db, "u1")
     assert pairs == [(meeting, "StuPa")]
+
+
+async def test_due_cards_map_the_cards_of_the_person(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Spec 000549: each due card with the board name and the absolute card url."""
+    from app.modules.auth import rbac
+    from app.modules.todos.service import TodoService
+
+    card = SimpleNamespace(
+        id=uuid.uuid4(),
+        title="Raum buchen",
+        due_date=date(2026, 11, 18),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    board = SimpleNamespace(name="Kultur")
+
+    async def _principal(_db: object, row: object, _now: object) -> object:
+        return row
+
+    async def _rows(_self: object, _principal: object) -> list[tuple[object, object]]:
+        return [(card, board)]
+
+    monkeypatch.setattr(rbac, "resolve_principal", _principal)
+    monkeypatch.setattr(TodoService, "calendar_due_cards", _rows)
+    user = cast("Principal", SimpleNamespace(sub="u1"))
+    (due,) = await service.due_cards(fake_session(), user, "https://s.example/")
+    assert (due.title, due.due, due.board_name) == ("Raum buchen", date(2026, 11, 18), "Kultur")
+    assert due.url == f"https://s.example/todos?card={card.id}"

@@ -218,6 +218,35 @@ describe('MeetingPageComponent', () => {
       flushDelegations();
     });
 
+    it('opens the cards that link the meeting in a sheet from the menu (spec 000551)', async () => {
+      const { http, fixture } = await setup({}, [MEDIA.wide]);
+      const menu = await openMenu();
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Dos' }));
+      fixture.detectChanges();
+      const linked = http.expectOne((r) => r.url.endsWith('/api/todos/linked') && r.params.get('kind') === 'meeting');
+      linked.flush([
+        {
+          id: 'k-1',
+          boardId: 'b-1',
+          boardName: 'StuPa',
+          title: 'Raum für die Sitzung buchen',
+          columnName: 'Offen',
+          isDone: false,
+          dueDate: null,
+          assignees: [],
+          event: null,
+          balance: null,
+        },
+      ]);
+      http.expectOne((r) => r.url.endsWith('/api/todos/boards')).flush([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }]);
+      fixture.detectChanges();
+      const sheet = await screen.findByRole('dialog', { name: 'To-Dos' });
+      expect(within(sheet).getByRole('link', { name: 'Raum für die Sitzung buchen' })).toHaveAttribute('href', '/todos?card=k-1');
+      expect(within(sheet).getByRole('button', { name: 'Mit To-Do verknüpfen' })).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
+      expect(document.querySelector('.mp__agenda app-todo-linked-list[kind="meeting"]')).toBeNull();
+    });
+
     /** A final protocol needs `meeting.delete_finalized`: the server then sends no `canDelete`. */
     it('offers no delete without canDelete', async () => {
       await setup({ meeting: meeting({ canDelete: false }) });

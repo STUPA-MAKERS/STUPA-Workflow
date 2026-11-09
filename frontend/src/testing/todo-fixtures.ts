@@ -16,8 +16,14 @@ import {
 
 export const TODAY = '2026-10-16';
 
-/** A to-do API without linked cards, for pages that show the back-references "To-Dos". */
-export const NO_LINKED_TODOS: Provider = { provide: TodosApiService, useValue: { linked: () => of([]) } };
+/**
+ * A to-do API without linked cards and without boards, for pages that show the
+ * back-references "Verknüpft", the due cards of the start page or the tab of a Gremium.
+ */
+export const NO_LINKED_TODOS: Provider = {
+  provide: TodosApiService,
+  useValue: { linked: () => of([]), boards: () => of([]), mine: () => of({ items: [], dueSoonCount: 0 }) },
+};
 
 export function link(over: Partial<TodoLink> = {}): TodoLink {
   return {
