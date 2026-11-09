@@ -533,3 +533,20 @@ describe('TodoNewDialogComponent duplicate (spec 000554)', () => {
   });
 });
 
+
+describe('TodoNewDialogComponent from a checklist item (spec 000555)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('starts with the people of the card and keeps the members among them', async () => {
+    const { cmp, open, api } = await setup({
+      inputs: { boardId: 'b-1', initialTitle: 'Raum anfragen', initialAssigneeIds: ['p-1', 'p-2', 'p-9'] },
+    });
+    open();
+    expect(cmp.assignee()).toBe('p-1');
+    cmp.save();
+    expect(api.createCard).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Raum anfragen', assigneeIds: ['p-1', 'p-2'] }),
+    );
+    expect(api.createCard).toHaveBeenCalledWith(expect.not.objectContaining({ checklist: expect.anything() }));
+  });
+});

@@ -352,6 +352,11 @@ export class TodoCardDetailComponent {
     return c ? [{ kind: 'todo', targetId: c.id, label: `${this.t('todos.linkKind.todo')} · ${c.title}` }] : [];
   });
 
+  /** The people of the card, for the card made of one of its items. */
+  readonly itemAssignees = computed<readonly Uuid[]>(() =>
+    (this.card()?.assignees ?? []).flatMap((a) => (a.principalId ? [a.principalId] : [])),
+  );
+
   private readAgendaMeetings(boardId: Uuid): Subscription {
     const today = isoDay(new Date(Date.now()));
     return this.api
@@ -407,11 +412,16 @@ export class TodoCardDetailComponent {
     this.itemOpen.set(true);
   }
 
-  /** The item is a card now, so it leaves the checklist. */
-  onItemCard(): void {
+  /**
+   * The item is a card now: this card links to it too, so "Verknüpft" shows it here as on
+   * the new card, and the item leaves the checklist.
+   */
+  onItemCard(created: TodoCardDetail): void {
     const item = this.itemCard();
+    const c = this.card();
     this.itemCard.set(null);
-    if (item) this.deleteItem(item);
+    if (!item || !c) return;
+    this.write(this.api.addLink(c.id, 'todo', created.id), () => this.deleteItem(item));
   }
 
   /**

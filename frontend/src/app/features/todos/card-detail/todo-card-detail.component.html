@@ -169,8 +169,9 @@
       [boardId]="card.boardId"
       [initialTitle]="itemCard()?.text ?? ''"
       [initialLinks]="itemLinks()"
+      [initialAssigneeIds]="itemAssignees()"
       [withDescription]="false"
-      (created)="onItemCard()"
+      (created)="onItemCard($event)"
     />
   }
 
@@ -446,7 +447,7 @@
     <app-section class="cd__sec" [heading]="'todos.card.links' | t">
       @if (canWrite()) {
         <app-button sectionAction class="cd__secAction" variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
-          <app-icon name="plus" />
+          <app-icon name="link" />
           {{ 'todos.card.link' | t }}
         </app-button>
       }
