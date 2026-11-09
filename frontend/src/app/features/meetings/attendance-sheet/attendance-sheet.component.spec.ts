@@ -7,7 +7,9 @@ import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { Delegation, MeetingDelegationContext } from '@core/api/delegations.service';
 import type { Attendance, Meeting } from '@core/api/models';
-import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import type { LiveViewer } from '@core/ws/ws-messages';
+import { By } from '@angular/platform-browser';
+import { AvatarComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import {
   ATTENDANCE,
   DELEGATION_CONTEXT,
@@ -48,7 +50,7 @@ interface Inputs {
   meeting: Meeting;
   attendance: Attendance[];
   saving: boolean;
-  viewers: string[];
+  viewers: LiveViewer[];
   conflictId: string | null;
 }
 
@@ -83,7 +85,10 @@ async function setup(
       meeting: meeting(),
       attendance: ROSTER,
       saving: false,
-      viewers: ['Pia Protokoll', 'Alina Admin'],
+      viewers: [
+      { id: 'p-pia', name: 'Pia Protokoll' },
+      { id: null, name: 'Alina Admin' },
+    ],
       conflictId: null,
       ...over,
     },
@@ -471,6 +476,11 @@ describe('AttendanceSheetComponent', () => {
     const live = within(sheet()).getByRole('region', { name: 'Live dabei' });
     expect(within(live).getByText('Live dabei', { selector: 'h3' })).toBeInTheDocument();
     expect(within(live).getByText('Alina Admin')).toBeInTheDocument();
+    const ids = fixture.debugElement
+      .queryAll(By.directive(AvatarComponent))
+      .filter((d) => live.contains(d.nativeElement as Node))
+      .map((d) => (d.componentInstance as AvatarComponent).principalId());
+    expect(ids).toEqual(['p-pia', null]);
     fixture.componentRef.setInput('viewers', []);
     fixture.detectChanges();
     expect(within(live).getByText('Niemand hat die Sitzung gerade geöffnet.')).toBeInTheDocument();

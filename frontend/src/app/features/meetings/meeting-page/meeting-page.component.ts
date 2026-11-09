@@ -15,6 +15,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { LiveViewer } from '@core/ws/ws-messages';
 import type {
   AgendaItem,
   Attendance,
@@ -24,6 +25,7 @@ import type {
   Uuid,
 } from '@core/api/models';
 import {
+  AvatarComponent,
   ButtonComponent,
   IconComponent,
   MEDIA,
@@ -108,6 +110,7 @@ type SessionAction = 'todos' | 'open' | 'agenda' | 'settings' | 'attendance' | '
     VoteCardComponent,
     AttendanceSheetComponent,
     JoinQrComponent,
+    AvatarComponent,
   ],
   templateUrl: './meeting-page.component.html',
   styleUrl: './meeting-page.component.scss',
@@ -142,7 +145,7 @@ export class MeetingPageComponent {
   readonly saveState = input.required<SaveState>();
   readonly attendance = input.required<Attendance[]>();
   readonly savingAttendance = input.required<boolean>();
-  readonly viewers = input.required<readonly string[]>();
+  readonly viewers = input.required<readonly LiveViewer[]>();
   readonly casting = input.required<Uuid | null>();
   readonly deletingVote = input.required<Uuid | null>();
   readonly finalizing = input.required<boolean>();
@@ -298,7 +301,7 @@ export class MeetingPageComponent {
   });
   protected readonly presenceTitle = computed(() =>
     this.viewers().length
-      ? this.i18n.translate('meetings.page.viewers', { names: this.viewers().join(', ') })
+      ? this.i18n.translate('meetings.page.viewers', { names: this.viewers().map((v) => v.name).join(', ') })
       : this.i18n.translate('meetings.viewers.empty'),
   );
 

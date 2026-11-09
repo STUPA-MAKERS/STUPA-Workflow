@@ -263,8 +263,11 @@
     </button>
     @if (presenceOpen()) {
       <ul class="mp__viewers" [attr.aria-label]="'meetings.viewers.title' | t">
-        @for (name of viewers(); track name) {
-          <li>{{ name }}</li>
+        @for (v of viewers(); track v.id ?? v.name) {
+          <li class="mp__viewer">
+            <app-avatar [name]="v.name" [principalId]="v.id" size="xs" [decorative]="true" />
+            <span class="ell">{{ v.name }}</span>
+          </li>
         } @empty {
           <li class="mp__muted">{{ 'meetings.viewers.empty' | t }}</li>
         }

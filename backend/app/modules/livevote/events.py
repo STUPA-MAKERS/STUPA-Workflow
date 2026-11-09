@@ -60,15 +60,23 @@ class MeetingStateEvent(_EventModel, frozen=True):
     status: Literal["planned", "live", "closed"]
 
 
+class ViewerOut(_EventModel, frozen=True):
+    """One live viewer: the principal id for the avatar and the display name."""
+
+    id: UUID | None
+    name: str
+
+
 class ViewersEvent(_EventModel, frozen=True):
     """Who has the meeting page open now.
 
-    The event carries display names, deduplicated per user. The server sends it
-    to the voter channel only, never to the beamer.
+    The event carries one entry per user with the principal id and the display
+    name, because the client shows the avatar of each viewer (spec 000574). The
+    server sends it to the voter channel only, never to the beamer.
     """
 
     type: Literal["viewers"] = "viewers"
-    viewers: list[str]
+    viewers: list[ViewerOut]
 
 
 class VoteOpenedEvent(_EventModel, frozen=True):

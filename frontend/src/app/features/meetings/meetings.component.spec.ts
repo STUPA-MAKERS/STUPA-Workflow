@@ -2202,8 +2202,8 @@ describe('MeetingsComponent — methods', () => {
 
     it('updates the viewer list from a viewers message', async () => {
       const { cmp, ws } = await loaded();
-      ws.subject.next({ type: 'viewers', viewers: ['Alice', 'Bob'] });
-      expect(cmp.viewers()).toEqual(['Alice', 'Bob']);
+      ws.subject.next({ type: 'viewers', viewers: [{ id: 'p-a', name: 'Alice' }, { id: null, name: 'Bob' }] });
+      expect(cmp.viewers()).toEqual([{ id: 'p-a', name: 'Alice' }, { id: null, name: 'Bob' }]);
     });
 
     /** The event leads to loadAgenda, the assignable list and the protocol GET. */
@@ -2309,7 +2309,7 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, ws } = await loaded();
       ws.subject.next({ type: 'pong' } as unknown as ServerMessage);
       cmp.meeting.set(null);
-      ws.subject.next({ type: 'viewers', viewers: ['X'] });
+      ws.subject.next({ type: 'viewers', viewers: [{ id: null, name: 'X' }] });
       expect(cmp.viewers()).toEqual([]);
     });
   });

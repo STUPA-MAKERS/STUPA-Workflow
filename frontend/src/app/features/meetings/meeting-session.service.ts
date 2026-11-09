@@ -26,7 +26,7 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
-import type { BodyDraftMsg, ServerMessage } from '@core/ws/ws-messages';
+import type { BodyDraftMsg, LiveViewer, ServerMessage } from '@core/ws/ws-messages';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingGuestsService } from './meeting-guests.service';
@@ -75,7 +75,7 @@ export class MeetingSessionService implements OnDestroy {
 
   readonly attendance = signal<Attendance[]>([]);
   /** Live viewers of the meeting page (WS `viewers`). */
-  readonly viewers = signal<readonly string[]>([]);
+  readonly viewers = signal<readonly LiveViewer[]>([]);
   readonly savingAttendance = signal(false);
   /**
    * The member whose "present" the server refused with 409 `delegation_active`. The
