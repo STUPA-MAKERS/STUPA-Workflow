@@ -10,7 +10,8 @@
     />
     @if (failed()) {
       <app-load-error [message]="'todos.archive.error' | t" (retry)="load()" />
-    } @else if (loading() && !items().length) {
+    }
+    @if (loading() && !items().length) {
       <ul class="as__list skel-in" aria-hidden="true">
         @for (w of ['72%', '58%', '66%', '50%', '62%']; track $index) {
           <li class="as__row">

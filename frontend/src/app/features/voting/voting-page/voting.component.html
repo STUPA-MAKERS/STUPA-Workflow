@@ -80,7 +80,8 @@
       >
         @if (error()) {
           <app-load-error [message]="'voting.list.error' | t" (retry)="reload()" />
-        } @else if (loading()) {
+        }
+        @if (loading()) {
           <div class="vl__skel skel-in">
             <app-list-group skeleton="7rem" />
             <app-skeleton

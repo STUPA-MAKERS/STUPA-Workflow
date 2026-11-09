@@ -354,9 +354,11 @@ describe('VotingComponent', () => {
   });
 
   describe('states', () => {
-    it('shows an error, not an empty list, when the request fails', async () => {
+    /** § 000576: a toast and the empty placeholder, no rows. */
+    it('shows an error toast and the empty placeholder when the request fails', async () => {
       await start('/voting', { listError: true });
       expect(loadErrorToast()).toContain('Die Abstimmungen konnten nicht geladen werden.');
+      expect(screen.getByRole('heading', { name: 'Keine Abstimmungen' })).toBeInTheDocument();
       expect(screen.queryByText(/offen$/)).not.toBeInTheDocument();
     });
 

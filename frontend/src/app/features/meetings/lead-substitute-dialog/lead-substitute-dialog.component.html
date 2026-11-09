@@ -23,7 +23,8 @@
       }
       @if (failed()) {
         <app-load-error [message]="'meetings.leadSubstitute.loadFailed' | t" (retry)="retry()" />
-      } @else if (pool() === null) {
+      }
+      @if (pool() === null) {
         <div class="dd__rows rowgroup rowgroup--bg3">
           <app-skeleton variant="items" [lead]="true" [count]="3" [label]="'meetings.leadSubstitute.loading' | t" />
         </div>

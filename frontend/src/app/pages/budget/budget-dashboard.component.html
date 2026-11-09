@@ -1,3 +1,6 @@
+@if (appsError()) {
+  <app-load-error [message]="(canSeeBookings() ? 'budget.dash.itemsError' : 'budget.dash.appsError') | t" (retry)="loadApps()" />
+}
 @if (error()) {
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
   <app-load-error [message]="'budget.error' | t" (retry)="load()" />
@@ -252,8 +255,6 @@
           }
           @if (apps() === null) {
             <app-skeleton variant="rows" [count]="3" [label]="(canSeeBookings() ? 'budget.dash.itemsLoading' : 'budget.dash.appsLoading') | t" />
-          } @else if (appsError()) {
-            <app-load-error [message]="(canSeeBookings() ? 'budget.dash.itemsError' : 'budget.dash.appsError') | t" (retry)="loadApps()" />
           } @else if (!previewItems().length) {
             <app-empty-state rows="3" [heading]="(canSeeBookings() ? 'budget.dash.itemsNone' : 'budget.dash.appsNone') | t" />
           } @else {

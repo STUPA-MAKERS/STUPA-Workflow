@@ -20,7 +20,8 @@
 
   @if (loadError()) {
     <app-load-error [message]="'admin.oauthGrants.error' | t" (retry)="load()" />
-  } @else if (loading()) {
+  }
+  @if (loading()) {
     <app-skeleton variant="rows" [count]="4" [label]="'admin.oauthGrants.loading' | t" />
   } @else {
     @if (grants().length) {

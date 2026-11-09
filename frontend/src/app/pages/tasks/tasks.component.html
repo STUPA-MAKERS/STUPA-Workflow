@@ -52,7 +52,8 @@
       >
         @if (error()) {
           <app-load-error [message]="'tasks.error' | t" (retry)="retry()" />
-        } @else if (loading()) {
+        }
+        @if (loading()) {
           <app-skeleton variant="rows" [count]="6" [label]="'tasks.loading' | t" />
         } @else if (query() && !rows().length && !todoRows().length) {
           <app-empty-state rows="3" [heading]="'tasks.noMatch' | t" />

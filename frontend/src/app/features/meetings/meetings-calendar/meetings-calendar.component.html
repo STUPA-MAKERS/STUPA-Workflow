@@ -108,7 +108,8 @@
       <section class="cal__daySec" aria-labelledby="cal-day" aria-live="polite">
         @if (error()) {
           <app-load-error [message]="'meetings.overview.calendarError' | t" (retry)="retry()" />
-        } @else if (loading() && !dayCards().length) {
+        }
+        @if (loading() && !dayCards().length) {
           <div class="skel-in cal__skCards" aria-busy="true">
             @for (w of [70, 55]; track $index) {
               <div class="cal__card" aria-hidden="true">

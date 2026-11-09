@@ -1,3 +1,6 @@
+@if (failed()) {
+  <app-load-error [message]="'admin.gremiumRoles.loadFailed' | t" (retry)="load()" />
+}
 <app-section
   class="rm"
   [class.rm--bg3]="surface() === 3"
@@ -16,8 +19,6 @@
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
-  } @else if (failed()) {
-    <app-load-error [message]="'admin.gremiumRoles.loadFailed' | t" (retry)="load()" />
   } @else if (!sorted().length) {
     <app-empty-state shape="table" rows="3" [heading]="'admin.gremiumRoles.empty' | t" />
   } @else {

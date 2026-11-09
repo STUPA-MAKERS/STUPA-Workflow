@@ -23,7 +23,7 @@ action "Erneut versuchen". The page must not show the error as a note in its con
 The action must load the content again.
 
 The content area must keep the content that it showed before the error. Without such
-content, the content area must stay empty.
+content, a list must show its placeholder for an empty list (`app-empty-state`).
 
 Reason: The error note filled the list with a red card. The toast says the same without
 covering the page, and it shows the same way on every page (000401).

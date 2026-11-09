@@ -284,13 +284,13 @@ describe('TasksComponent', () => {
   });
 
   /** "Erneut versuchen" sends the request again. */
-  it('shows an error, not an empty list, when the request fails', async () => {
+  it('shows an error toast and the empty placeholder when the request fails', async () => {
     const { cmp, listTasks, harness } = await start('/tasks', [[]], { tasksError: true });
     expect(cmp.tasks()).toEqual([]);
     expect(cmp.loading()).toBe(false);
     expect(cmp.error()).toBe(true);
     expect(loadErrorToast()).toContain('Aufgaben konnten nicht geladen werden.');
-    expect(screen.queryByText('Keine offenen Aufgaben.')).not.toBeInTheDocument();
+    expect(screen.getByText('Keine offenen Aufgaben.')).toBeInTheDocument();
     const calls = listTasks.mock.calls.length;
     retryLoadError();
     harness.detectChanges();

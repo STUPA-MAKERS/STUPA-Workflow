@@ -1,3 +1,6 @@
+@if (failed()) {
+  <app-load-error [message]="'admin.gremien.membersLoadFailed' | t" (retry)="loadMembers()" />
+}
 <section class="gmm admin-page">
   <app-page-header
     [flush]="true"
@@ -22,8 +25,6 @@
 
     @if (loading()) {
       <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
-    } @else if (failed()) {
-      <app-load-error [message]="'admin.gremien.membersLoadFailed' | t" (retry)="loadMembers()" />
     } @else if (!visible().length) {
       <app-empty-state shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
     } @else {

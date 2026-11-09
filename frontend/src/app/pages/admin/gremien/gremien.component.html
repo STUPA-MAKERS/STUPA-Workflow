@@ -1,3 +1,6 @@
+@if (loadError()) {
+  <app-load-error [message]="'admin.gremien.error' | t" (retry)="reload(true)" />
+}
 <section class="grem admin-page">
   <app-page-header
     [flush]="true"
@@ -16,8 +19,6 @@
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="4" [label]="'admin.gremien.loading' | t" />
-  } @else if (loadError()) {
-    <app-load-error [message]="'admin.gremien.error' | t" (retry)="reload(true)" />
   } @else if (gremien().length) {
     <ul class="rowgroup grem__list" [attr.aria-label]="'admin.gremien.title' | t">
       @for (g of gremien(); track g.id) {

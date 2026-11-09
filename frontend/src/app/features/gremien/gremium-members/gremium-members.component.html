@@ -1,3 +1,6 @@
+@if (error()) {
+  <app-load-error [message]="'gremien.members.error' | t" (retry)="load()" />
+}
 <app-sticky-bar [sticky]="phone()">
   <div class="gmb__tools">
     <app-search-pill
@@ -41,8 +44,6 @@
 
 @if (loading()) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.members.loading' | t" />
-} @else if (error()) {
-  <app-load-error [message]="'gremien.members.error' | t" (retry)="load()" />
 } @else if (!groups().length) {
   @if (filterActive()) {
     <app-empty-state shape="person" rows="3" [heading]="'gremien.members.noMatch' | t" />

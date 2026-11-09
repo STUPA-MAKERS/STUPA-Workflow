@@ -1,3 +1,6 @@
+@if (error() && !items().length) {
+  <app-load-error [message]="'budget.dash.itemsError' | t" (retry)="retry()" />
+}
 <app-dialog class="bid__dialog" [open]="open()" [title]="title()" [closeLabel]="'action.close' | t" size="lg" (closed)="close()">
   <div class="bid">
     <div class="bid__tools">
@@ -25,8 +28,6 @@
 
     @if (loadingFirst()) {
       <app-skeleton variant="rows" [count]="6" [label]="'budget.dash.itemsLoading' | t" />
-    } @else if (error() && !items().length) {
-      <app-load-error [message]="'budget.dash.itemsError' | t" (retry)="retry()" />
     } @else if (!items().length) {
       <app-empty-state rows="3" [heading]="'budget.dash.itemsNone' | t" />
     } @else {

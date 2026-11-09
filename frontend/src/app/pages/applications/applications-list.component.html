@@ -137,7 +137,8 @@
       >
         @if (error()) {
           <app-load-error [message]="'applications.list.error' | t" (retry)="reload()" />
-        } @else if (loading()) {
+        }
+        @if (loading()) {
           <div class="apps__skel skel-in">
             <app-list-group skeleton="7rem" />
             <app-skeleton
