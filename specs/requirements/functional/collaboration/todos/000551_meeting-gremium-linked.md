@@ -4,7 +4,7 @@ title: A meeting shows its linked cards and a Gremium its board
 kind: functional
 status: draft
 owner: frederikbeimgraben
-updated: 2026-11-08
+updated: 2026-11-09
 implementation: null
 scope:
   - frontend/src/app/features/meetings
@@ -14,7 +14,10 @@ scope:
 
 # A meeting shows its linked cards and a Gremium its board
 
-The meeting page must show the cards that link the meeting.
+The menu of the meeting page must have the item `To-Dos`. The item must open a sheet with the cards
+that link the meeting, from the side on a wide screen and from the bottom on a phone. The head of
+the sheet must have the actions `Verknüpfen` and `To-Do anlegen` as icon buttons. The agenda column
+must not show these cards, because a long agenda pushes them out of sight.
 
 The detail of a Gremium must have a tab `To-Dos`. The tab must show the open cards of the board
 of the Gremium, and it must link to that board. A card belongs to a Gremium because it is on the
