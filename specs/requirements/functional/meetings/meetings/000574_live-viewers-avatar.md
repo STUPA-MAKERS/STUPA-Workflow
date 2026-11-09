@@ -6,9 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-09
 tests:
-  - "backend/tests/unit/test_livevote_presence.py"
-  - "frontend/src/app/features/meetings/meeting-page/meeting-page.component.spec.ts"
-  - "frontend/src/app/features/meetings/attendance-sheet/attendance-sheet.component.spec.ts"
+  - "backend/tests/unit/modules/livevote/test_livevote_presence.py:test_viewers_event_dumps_id_and_name"
+  - "frontend/src/app/features/meetings/meeting-page/meeting-page.component.spec.ts:MeetingPageComponent.header"
+  - "frontend/src/app/features/meetings/attendance-sheet/attendance-sheet.component.spec.ts:AttendanceSheetComponent"
 implementation:
   - backend/app/modules/livevote/presence.py
   - backend/app/modules/livevote/events.py
