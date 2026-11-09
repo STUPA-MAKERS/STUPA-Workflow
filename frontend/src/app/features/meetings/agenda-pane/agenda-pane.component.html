@@ -91,6 +91,9 @@
 @if (todoOpen()) {
   <app-todo-new-dialog appBodyPortal [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
 }
+@if (linkOpen() && linkItem(); as item) {
+  <app-todo-link-card-dialog appBodyPortal [(open)]="linkOpen" kind="agenda_item" [targetId]="item.id" [exclude]="linkExclude()" />
+}
 
 <app-confirm-dialog
   appBodyPortal
