@@ -2,7 +2,7 @@
 id: "000598"
 title: Very high contrast highlights the fields black on yellow
 kind: non-functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
@@ -35,23 +35,20 @@ scope:
 
 # Very high contrast highlights the fields black on yellow
 
-While "Sehr hoher Kontrast" is on (000605), every input field (text, text area,
-select, date, time, amount and search field) must have a yellow background, black text, a black
-label, a black placeholder, black icons and a 2 px black edge. Every checkbox, radio button and
-switch must have a yellow box with a 2 px black edge, and its mark must be black. A Markdown editor and a chat composer are input fields too; in the protocol, the whole rounded pane of the TOP is the field, without inner boxes. The check box "Ich bin kein Roboter" (ALTCHA) is a field too. Every button with a label (filled, tonal,
-outlined and text buttons, pill buttons such as a picker, and floating action buttons (FAB)) must be black
-on yellow with a black 2 px edge. No yellow may show outside a black edge, also not at a
-rounded corner. The edge must stay inside the box, so that a scroll container does not cut it. A destructive button must be
-dark red on yellow with a dark red edge. A pressed toggle button must be yellow on black. The
-chosen option of a segmented control must be black on yellow with the same edge. The current step of a stepper must be black on yellow. A filter chip must be black on yellow with the same edge, and an active filter
-chip yellow on black. In a menu, a list of options and every other list, the chosen or current
-row (for example the open item of a list page) must be black on yellow with the same edge; the
-other rows stay as they are. A selected table row is black on yellow without the edge. A 3-dot menu is black on yellow with the black edge, and a destructive item in it is dark red. The open tab of a tab bar is black on yellow with the same edge. In a chosen row, the number badge of a TOP is a black ring. A toast and the toast bar must be black on yellow with the black edge and without glass; an error toast takes the dark red edge of a destructive button. A check box that a component draws itself reads the
-same yellow box and black mark. Every icon button (a symbol without text, also the 3-dot button of a menu and a tool of the editor) is black on yellow with the same edge; a pressed toggle and the button of an open menu are yellow on black. The buttons of the meeting dock (also "live" and the attendance) are black on yellow with the edge, with the same 6 px space between them. The count on a button is a black plate with a yellow number. A tag (for example "NÖ") is a black plate with yellow text. A progress bar is a yellow plate with black parts. Every tile on the start page is black on yellow with the edge. The focused element
-must have a double ring: 3 px black next to it and 3 px yellow outside the black. The error
-edge must stay visible on the yellow. This applies in both themes. The
-highlighting has no switch of its own, because a separate step between the normal display and
-very high contrast helps nobody.
+While "Sehr hoher Kontrast" is on (000605), every input field (text, text area, select, date,
+time, amount and search field) must have a yellow fill, black text, a black label, a black
+placeholder and black icons. A Markdown editor, a chat composer and the check box "Ich bin kein
+Roboter" (ALTCHA) are input fields too. In the protocol, the whole rounded pane of the TOP is
+the field, without inner boxes. Every button with a label and every icon button must have a
+yellow fill and black content. This includes the floating action button (FAB), the buttons of the
+meeting dock, a tool of the editor and the button in a file drop area. A destructive button
+must be dark red on yellow. A toast and the toast bar must be black on yellow. A tag (for
+example "NÖ") is a black plate with yellow text. A progress bar is a yellow plate with black
+parts. The focused element must have a double ring: 3 px black next to it and 3 px yellow
+outside the black. The error edge must stay visible on the yellow.
+
+The rules 000615 to 000620 control a choice, the navigation, a menu, a row, a switch, a
+checkbox and a radio button.
 
 Reason: A person with low vision or with a cognitive impairment must find the fields of a
 form at a glance.
