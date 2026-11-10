@@ -22,7 +22,7 @@ specs/
       meetings/        calendar, delegations, meetings, protocols, voting
       public/          public-pages
     non-functional/
-      accessibility/  conformance, documents, interaction, language, perception, statement
+      accessibility/  conformance, documents, interaction, language, perception, settings, statement
       compatibility/  deploy, pwa
       performance/    loading
       privacy/        personal-data
@@ -364,6 +364,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/perception/000504](requirements/non-functional/accessibility/perception/000504_text-spacing.md) | User text spacing does not cut text | approved |
 | [NF/accessibility/perception/000506](requirements/non-functional/accessibility/perception/000506_image-alt.md) | A Markdown image has an alternative text | approved |
 | [NF/accessibility/perception/000507](requirements/non-functional/accessibility/perception/000507_chart-text.md) | A chart has a text alternative | approved |
+| [NF/accessibility/settings/000593](requirements/non-functional/accessibility/settings/000593_display-settings-in-help-menu.md) | The help menu holds the display settings | approved |
+| [NF/accessibility/settings/000594](requirements/non-functional/accessibility/settings/000594_setting-overrides-system.md) | A display setting overrides the system setting | approved |
+| [NF/accessibility/settings/000595](requirements/non-functional/accessibility/settings/000595_more-contrast.md) | More contrast raises the contrast of text and borders | approved |
+| [NF/accessibility/settings/000596](requirements/non-functional/accessibility/settings/000596_less-transparency.md) | Less transparency makes the glass surfaces opaque | approved |
+| [NF/accessibility/settings/000598](requirements/non-functional/accessibility/settings/000598_highlight-fields.md) | Highlighted fields have black text on yellow | approved |
 | [NF/accessibility/statement/000495](requirements/non-functional/accessibility/statement/000495_statement-page.md) | A public page holds the accessibility statement | approved |
 | [NF/accessibility/statement/000496](requirements/non-functional/accessibility/statement/000496_statement-link.md) | Every page links to the accessibility statement | approved |
 | [NF/accessibility/statement/000497](requirements/non-functional/accessibility/statement/000497_barrier-report.md) | A user can report a barrier as a ticket | approved |
