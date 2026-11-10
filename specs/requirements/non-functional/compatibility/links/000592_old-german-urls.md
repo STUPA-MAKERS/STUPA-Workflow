@@ -21,7 +21,7 @@ new path. The frontend must read an old query key or value like its new one.
 
 | Old | New |
 |---|---|
-| `/antrag/<id>` (magic link) | `/status/<id>` |
+| `/antrag/<id>` (old magic link of one Antrag) | `/my-applications` (without a valid session: `/login`) |
 | `/protokolle`, `/protokolle/<id>` | `/protocols`, `/protocols/<id>` |
 | `/barrierefreiheit` | `/accessibility` |
 | `/gremien`, `/gremien/<id>` | `/committees`, `/committees/<id>` |
@@ -34,9 +34,13 @@ new path. The frontend must read an old query key or value like its new one.
 | `/api/public/gremien` | `/api/public/committees` |
 | `/api/admin/privacy/auskunft` | `/api/admin/privacy/export` |
 
+An old magic link of one Antrag must open the list of the own Anträge, because the e-mail
+login replaces the link of one Antrag (`F/applications/applications/000588`).
+
 Reason: Mails, bookmarks, printed QR codes and installed MCP servers hold the old URLs. A
 broken magic link locks a guest applicant out of the Antrag.
 
 Test: `frontend/src/app/app.routes.spec.ts`: every old route redirects to its new route with
-the same ID, query and fragment. `backend/tests/unit/test_legacy_paths.py`: every old API path
+the same ID, query and fragment, and `/antrag/<id>` redirects to `/my-applications`.
+`backend/tests/unit/test_legacy_paths.py`: every old API path
 answers like its new path.
