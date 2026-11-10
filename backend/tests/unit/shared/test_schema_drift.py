@@ -61,6 +61,7 @@ def test_equal_schema_gives_no_difference(engine: Engine) -> None:
 
 
 def test_each_kind_of_difference_is_named(engine: Engine) -> None:
+    """§000626: the compare covers tables, columns, types, nullability, indexes and checks."""
     lines = _differences(
         engine,
         (
@@ -157,6 +158,7 @@ def fake_database(engine: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[C
 def test_main_logs_each_difference_as_error_and_does_not_stop(
     fake_database: Connection, caplog: pytest.LogCaptureFixture
 ) -> None:
+    """§000627: each difference is a log line with the level `error`, and the exit is 0."""
     caplog.set_level(logging.INFO, logger="app.schema_drift")
     assert schema_drift.main(()) == 0
     errors = [r for r in caplog.records if r.levelno == logging.ERROR]

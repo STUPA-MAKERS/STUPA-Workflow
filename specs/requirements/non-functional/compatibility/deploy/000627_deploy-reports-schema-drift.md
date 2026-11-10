@@ -5,7 +5,12 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "backend/tests/integration/test_schema_drift.py:test_hand_made_check_constraint_is_logged_as_error"
+  - "backend/tests/unit/shared/test_schema_drift.py:test_main_logs_each_difference_as_error_and_does_not_stop"
+implementation:
+  - backend/app/shared/schema_drift.py
+  - deploy/docker-compose.yml
 scope:
   - backend/migrations
   - deploy/

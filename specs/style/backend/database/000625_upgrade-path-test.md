@@ -5,7 +5,9 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+implementation:
+  - .github/workflows/ci.yml
+  - backend/migrations/README.md
 scope:
   - backend/migrations
   - backend/tests/integration
