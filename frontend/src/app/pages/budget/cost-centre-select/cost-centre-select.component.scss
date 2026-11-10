@@ -154,7 +154,7 @@
   box-shadow: var(--field-edge, none);
 }
 .ccs__search:focus-within {
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+  box-shadow: var(--field-focus, inset 0 0 0 2px var(--color-focus-ring));
 }
 .ccs__search--sheet {
   margin: 0 0 var(--space-3);

@@ -293,7 +293,7 @@
   box-shadow: var(--field-edge, none);
 }
 .bt__numField:focus-within {
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+  box-shadow: var(--field-focus, inset 0 0 0 2px var(--color-focus-ring));
 }
 .bt__numLabel {
   font-size: var(--fs-xs);
