@@ -464,7 +464,9 @@ def test_admin_gremien_list_has_counts(app: FastAPI, client: TestClient) -> None
 
 def test_update_gremium_404(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
-    r = client.patch("/api/admin/committees/00000000-0000-0000-0000-000000000000", json={"name": "x"})
+    r = client.patch(
+        "/api/admin/committees/00000000-0000-0000-0000-000000000000", json={"name": "x"}
+    )
     assert r.status_code == 404
 
 

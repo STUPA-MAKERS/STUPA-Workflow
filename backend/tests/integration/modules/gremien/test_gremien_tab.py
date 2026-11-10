@@ -470,7 +470,8 @@ async def test_member_attendance_detail(
     ).json()
     assert [m["status"] for m in june["meetings"]] == ["absent"]
     outsider = client.get(
-        f"/api/committees/{w.gremium_id}/attendance/{w.ids['outsider']}", params={"month": "2026-05"}
+        f"/api/committees/{w.gremium_id}/attendance/{w.ids['outsider']}",
+        params={"month": "2026-05"},
     )
     assert outsider.status_code == 404
     assert outsider.json()["code"] == "member_not_found"
