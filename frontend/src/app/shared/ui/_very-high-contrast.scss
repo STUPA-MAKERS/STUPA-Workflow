@@ -6,6 +6,26 @@
 @use 'very-high' as vh;
 
 @include d.on(veryHigh) {
+  // A surface has the white edge (000605), because no shade sets it apart from the black
+  // page: on a wide screen the pane "Heute" of the start page, and the grid of the calendar.
+  .dash--wide .dash__today {
+    outline: var(--vh-edge);
+    outline-offset: -2px;
+  }
+  // The cells of the calendar paint over an outline, so its edge is a layer on top.
+  .cal__grid {
+    position: relative;
+  }
+  .cal__grid::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border: var(--vh-edge);
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
   // A menu (000617): the rows of the help menu and of the account menu.
   .hm__item {
     @include vh.text;

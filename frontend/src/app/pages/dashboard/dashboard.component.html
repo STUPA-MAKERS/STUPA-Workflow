@@ -199,7 +199,6 @@
     <div
       class="dash__panel"
       role="tabpanel"
-      appScrollFade="y"
       [id]="tabBar.panelId(tab())"
       [attr.aria-labelledby]="tabBar.tabId(tab())"
     >
@@ -257,6 +256,7 @@
   } @else {
     <app-data-table
       surface="rowgroup"
+      [stickyHead]="true"
       [columns]="workColumns()"
       [rows]="rowsOf(t)"
       [loading]="loadingOf(t)"

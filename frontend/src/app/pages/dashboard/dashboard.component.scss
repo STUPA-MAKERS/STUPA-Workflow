@@ -185,15 +185,25 @@
   @include surface.context(1);
   --dt-gap: var(--color-bg);
 }
+// Spec 000624: on a desktop the work list scrolls inside its panel. The column header of the
+// table sticks to the top of the panel, and the rows pass under it. The panel runs past the
+// foot gap of the page to the bottom edge of the window, so the rows cut hard at that edge,
+// without a fade. The round top corners of the panel clip the rows under the corners of the
+// header.
+:host(.dash--wide) > .dash__work {
+  margin-bottom: calc(-1 * var(--pane-foot-gap, 0px));
+  // The button keeps its place above the foot gap of the page.
+  --fab-inset: calc(var(--space-4) + var(--pane-foot-gap, 0px));
+}
 :host(.dash--wide) .dash__panel {
   flex: 1 1 auto;
-  padding-bottom: calc(56px + var(--space-6));
+  padding-bottom: calc(56px + var(--space-6) + var(--pane-foot-gap, 0px));
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scroll-padding-block: var(--dash-fade);
+  border-start-start-radius: var(--radius-lg);
+  border-start-end-radius: var(--radius-lg);
 }
-.dash__panel,
 .dash__todayBody {
   @include fade.fade-y(var(--dash-fade));
 }

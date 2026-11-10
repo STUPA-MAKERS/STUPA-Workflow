@@ -32,6 +32,13 @@ describe('veryHighContrastApp (§000614)', () => {
   });
 });
 
+describe('surfaceEdges (§000605)', () => {
+  it('draws the white edge around the calendar grid and the pane of the start page', () => {
+    expect(RULES).toMatch(/\.dash--wide \.dash__today \{\s*outline: var\(--vh-edge\);\s*outline-offset: -2px;/);
+    expect(RULES).toMatch(/\.cal__grid::after \{[^}]*border: var\(--vh-edge\);/);
+  });
+});
+
 describe('menuRows (§000617)', () => {
   it('gives the rows of the help menu yellow text', () => {
     expect(selectorsOf('  .hm__item {', 'text')).toContain('.hm__item');

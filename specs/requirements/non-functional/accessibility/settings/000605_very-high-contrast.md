@@ -7,6 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:veryHighContrast"
+  - "frontend/src/app/shared/very-high-contrast.styles.spec.ts:surfaceEdges"
 implementation:
   - frontend/vendor/ui-kit/src/styles/display-settings.scss
   - frontend/vendor/ui-kit/src/lib/switch/switch.component.scss
