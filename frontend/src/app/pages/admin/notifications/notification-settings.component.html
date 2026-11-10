@@ -1,6 +1,9 @@
 <section class="ns admin-page">
   <app-page-header [flush]="true" [title]="'admin.notifications.title' | t">
     <app-breadcrumbs crumbs />
+    @if (settings() && dirty()) {
+      <app-button actions variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
+    }
   </app-page-header>
 
   <app-load-state [state]="loadState()" [lines]="4" [errorText]="'admin.notifications.error' | t" (retry)="load()">

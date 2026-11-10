@@ -177,6 +177,7 @@ export class BrandingEditorComponent {
     this.api.getSiteConfig().subscribe({
       next: (cfg) => {
         this.draft.set(cfg.branding);
+        this.keepSaved(cfg.branding);
         this.markSaved(this.editRev());
         this.brand.applyBranding(cfg.branding);
         this.brand.previewAccent(undefined);
@@ -187,6 +188,21 @@ export class BrandingEditorComponent {
         this.loading.set(false);
       },
     });
+  }
+
+  /** A copy of the branding as the server has it, for "Verwerfen". The editor changes the draft in place. */
+  private saved: Branding | null = null;
+
+  private keepSaved(branding: Branding): void {
+    this.saved = JSON.parse(JSON.stringify(branding)) as Branding;
+  }
+
+  /** "Verwerfen": every field goes back to the stored value (§ 000635). */
+  protected discard(): void {
+    if (!this.saved) return;
+    this.draft.set(JSON.parse(JSON.stringify(this.saved)) as Branding);
+    this.markSaved(this.editRev());
+    this.brand.previewAccent(undefined);
   }
 
   /** Record that the server has the draft up to the edit count `rev`. */
@@ -409,6 +425,7 @@ export class BrandingEditorComponent {
     this.api.saveSiteConfig(d).subscribe({
       next: (cfg) => {
         this.saving.set(false);
+        this.keepSaved(d);
         this.markSaved(rev);
         this.brand.applyBranding(cfg.branding);
         this.brand.previewAccent(undefined);

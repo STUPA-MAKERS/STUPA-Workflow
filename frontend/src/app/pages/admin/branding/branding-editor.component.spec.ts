@@ -157,6 +157,22 @@ describe('BrandingEditorComponent', () => {
     }
   });
 
+  /** § 000635 */
+  it('"Verwerfen" sets the fields back and hides with "Speichern"', async () => {
+    const { api, fixture } = await setupWithStub({});
+    const field = (): HTMLInputElement => screen.getByRole('textbox', { name: 'Kurzname (PWA)' });
+    const before = field().value;
+    await userEvent.type(field(), 'AP');
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(field().value).toBe(before);
+    expect(api.saveSiteConfig).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('saves at once, without a version line or a version list', async () => {
     const { api, container, toast } = await setupWithStub({});
     expect(metaLine(container)).toBe('');

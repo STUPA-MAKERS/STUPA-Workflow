@@ -43,6 +43,7 @@
   "action.logout": "Sign out",
   "action.copy": "Copy",
   "action.save": "Save",
+  "action.discard": "Discard",
   "action.cancel": "Cancel",
   "action.refresh": "Refresh",
   "action.more": "More actions",

@@ -241,6 +241,13 @@ export class AdminRolesComponent {
   );
   protected readonly rolesDirty = computed(() => this.dirtyRoles().length > 0);
 
+  /** "Verwerfen": every role goes back to its stored name and rights (§ 000635). */
+  protected discardRoles(): void {
+    const saved = this.savedRoles();
+    this.roles.update((list) => list.map((r) => saved.get(r.id) ?? r));
+    this.nameDrafts.set({});
+  }
+
   private keepSaved(roles: Role[]): void {
     this.savedRoles.update((m) => new Map([...m, ...roles.map((r) => [r.id, r] as const)]));
   }

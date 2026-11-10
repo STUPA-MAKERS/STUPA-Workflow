@@ -173,6 +173,12 @@ export class MailTemplatesComponent {
     });
   }
 
+  /** "Verwerfen": the open template goes back to its stored texts (§ 000635). */
+  discard(): void {
+    const key = this.selectedKey();
+    if (key) this.select(key);
+  }
+
   patch(field: 'subjectI18n' | 'bodyI18n' | 'bodyHtmlI18n', value: string): void {
     const d = this.draft();
     if (!d) return;

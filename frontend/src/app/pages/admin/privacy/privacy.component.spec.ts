@@ -433,6 +433,23 @@ describe('PrivacyComponent', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  /** § 000635 */
+  it('"Verwerfen" sets the retention back and hides with "Speichern"', async () => {
+    const { fixture, api } = await setup();
+    const field = screen.getByDisplayValue('24');
+    await userEvent.clear(field);
+    await userEvent.type(field, '36');
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(screen.getByDisplayValue('24')).toBeInTheDocument();
+    expect(api.putPrivacySettings).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('shows "Speichern" only while the retention has a change', async () => {
     const api = makeApi({
       putPrivacySettings: jest.fn(() => of<PrivacySettings>({ defaultRetentionMonths: 36 })),

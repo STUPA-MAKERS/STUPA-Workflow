@@ -1,7 +1,12 @@
 <section class="ar admin-page">
   <app-page-header [flush]="true" [title]="'admin.roles.title' | t">
     <app-breadcrumbs crumbs />
-    <div actions><app-content-lang-switch [(value)]="contentLang.lang" [ariaLabel]="'admin.common.contentLang' | t" /></div>
+    <div actions class="ar__headTools">
+      @if (rolesDirty()) {
+        <app-button variant="text" [disabled]="savingRoles()" (click)="discardRoles()">{{ 'action.discard' | t }}</app-button>
+      }
+      <app-content-lang-switch [(value)]="contentLang.lang" [ariaLabel]="'admin.common.contentLang' | t" />
+    </div>
   </app-page-header>
 
   <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.roles.error' | t" (retry)="load()">

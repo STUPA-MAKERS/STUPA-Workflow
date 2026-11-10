@@ -62,6 +62,23 @@ describe('MailTemplatesComponent', () => {
     expect(screen.getByText(/name/)).toBeInTheDocument();
   });
 
+  /** § 000635 */
+  it('"Verwerfen" sets the open template back and hides with "Speichern"', async () => {
+    const { api, view } = await setup();
+    await screen.findByRole('button', { name: /Anmelde-Link/ });
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    await userEvent.type(screen.getByDisplayValue('Anmeldung'), ' neu');
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    view.fixture.detectChanges();
+    await view.fixture.whenStable();
+    expect(screen.getByDisplayValue('Anmeldung')).toBeInTheDocument();
+    expect(api.upsertMailTemplate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('shows "Speichern" only after an edit, saves it and renders a preview', async () => {
     const { api, view } = await setup();
     await screen.findByRole('button', { name: /Anmelde-Link/ });

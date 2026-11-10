@@ -8,6 +8,7 @@ import {
   ToastService,
   PageHeaderComponent,
   SectionComponent,
+  ButtonComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -30,6 +31,7 @@ import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ButtonComponent,
     SectionComponent,
     LoadStateComponent,
     FormsModule,
@@ -53,6 +55,8 @@ export class NotificationSettingsComponent {
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly dirty = signal(false);
+  /** The settings as the server has them, for "Verwerfen". */
+  private readonly saved = signal<NotificationSettings | null>(null);
   /** The read: loading, then the form, or the error note of a failed read. */
   protected readonly loadState = computed<LoadState>(() =>
     this.loading() ? 'loading' : this.settings() ? 'ok' : 'error',
@@ -84,6 +88,8 @@ export class NotificationSettingsComponent {
     this.api.getNotificationSettings().subscribe({
       next: (s) => {
         this.settings.set(s);
+        this.saved.set(s);
+        this.dirty.set(false);
         this.loading.set(false);
       },
       error: () => {
@@ -91,6 +97,12 @@ export class NotificationSettingsComponent {
         this.loading.set(false);
       },
     });
+  }
+
+  /** "Verwerfen": back to the stored values (§ 000635). */
+  discard(): void {
+    this.settings.set(this.saved());
+    this.dirty.set(false);
   }
 
   patch(change: Partial<NotificationSettings>): void {
@@ -112,6 +124,7 @@ export class NotificationSettingsComponent {
     this.api.putNotificationSettings(s).subscribe({
       next: (saved) => {
         this.settings.set(saved);
+        this.saved.set(saved);
         this.dirty.set(false);
         this.saving.set(false);
         this.toast.success(this.i18n.translate('admin.notifications.saved'));

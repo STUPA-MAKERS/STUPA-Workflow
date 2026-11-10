@@ -1,6 +1,9 @@
 <section class="dl admin-page">
   <app-page-header [flush]="true" [title]="'admin.deadlines.title' | t">
     <app-breadcrumbs crumbs />
+    @if (settingsDirty()) {
+      <app-button actions variant="text" [disabled]="settingsSaving()" (click)="discardSettings()">{{ 'action.discard' | t }}</app-button>
+    }
   </app-page-header>
 
   <app-meeting-window-settings />

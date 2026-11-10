@@ -39,6 +39,24 @@ describe('AdminDeadlinesComponent', () => {
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
+  /** § 000635 */
+  it('"Verwerfen" sets the fields back and hides with "Speichern"', async () => {
+    const { api, fixture } = await setup();
+    const hours = screen.getByLabelText<HTMLInputElement>('Unbestätigte Anträge verwerfen nach');
+    const before = hours.value;
+    await userEvent.clear(hours);
+    await userEvent.type(hours, '48');
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(hours.value).toBe(before);
+    expect(api.putGuestSettings).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('shows "Speichern" while a settings section has changes and saves only that section', async () => {
     const { api } = await setup();
     const hours = screen.getByLabelText('Unbestätigte Anträge verwerfen nach');

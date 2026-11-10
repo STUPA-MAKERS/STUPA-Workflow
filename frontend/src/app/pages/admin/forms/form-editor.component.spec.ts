@@ -137,6 +137,22 @@ describe('FormEditorComponent', () => {
    * With nothing changed the page shows no "Speichern", but the save itself still works. A
    * markerless single group serializes back to exactly the original flat fields.
    */
+  /** § 000635 */
+  it('"Verwerfen" reads the stored form again and hides with "Speichern"', async () => {
+    const { c, fixture, createFormVersion } = await setup(
+      draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }], { de: 'Hallo', en: '' }),
+    );
+    c.setDescription('de', 'Neu');
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    fixture.detectChanges();
+    expect(c.description()).toEqual({ de: 'Hallo', en: '' });
+    expect(createFormVersion).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('saves a normalized form version with the description', async () => {
     const { c, createFormVersion } = await setup(
       draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }], { de: 'Hallo', en: '' }),

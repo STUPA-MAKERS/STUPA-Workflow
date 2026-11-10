@@ -8,6 +8,9 @@
       </app-status-text>
     }
     <div actions class="fe__headTools">
+      @if (dirty() && !phone()) {
+        <app-button variant="text" [disabled]="saving()" (click)="loadFlow()">{{ 'action.discard' | t }}</app-button>
+      }
       <app-content-lang-switch [(value)]="contentLang.lang" [ariaLabel]="'admin.common.contentLang' | t" />
       @if (phone()) {
         <app-row-menu [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />

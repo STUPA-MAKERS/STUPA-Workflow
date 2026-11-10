@@ -1,6 +1,9 @@
 <section class="mt admin-page">
   <app-page-header [flush]="true" [title]="'admin.mailTemplates.title' | t">
     <app-breadcrumbs crumbs />
+    @if (dirty()) {
+      <app-button actions variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
+    }
   </app-page-header>
 
   <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.mailTemplates.loadFailed' | t" (retry)="load()">

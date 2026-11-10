@@ -4,6 +4,9 @@
     [title]="(section === 'texts' ? 'admin.texts.title' : 'admin.brand.title') | t"
   >
     <app-breadcrumbs crumbs />
+    @if (draft() && dirty()) {
+      <app-button actions variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
+    }
   </app-page-header>
 
   <app-load-state

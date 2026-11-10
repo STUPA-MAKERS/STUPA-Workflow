@@ -477,12 +477,16 @@ export class FlowEditorComponent {
           icon: 'history',
           checked: this.showVersions(),
         },
+        ...(this.dirty()
+          ? [{ id: 'discard', label: this.i18n.translate('action.discard'), icon: 'undo' as const }]
+          : []),
       ],
     },
   ]);
 
   protected onHeaderMenu(item: RowMenuItem): void {
     if (item.id === 'versions') this.toggleVersions();
+    if (item.id === 'discard') this.loadFlow();
   }
 
   /** Show the version history in the inspector, or go back to the selection. */
@@ -1027,7 +1031,10 @@ export class FlowEditorComponent {
     });
   }
 
-  /** Read the flow; also the retry of the load error (§ 000576). */
+  /**
+   * Read the flow; also the retry of the load error (§ 000576) and "Verwerfen" (§ 000635),
+   * which reads the stored flow again.
+   */
   protected loadFlow(): void {
     this.loading.set(true);
     this.loadFailed.set(false);
@@ -1036,10 +1043,10 @@ export class FlowEditorComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (graph) => {
-          if (graph && graph.states?.length) {
-            this.applyingHistory = true;
-            this.graph.set(autoLayout(normalizeFlowGraph(graph)));
-          }
+          this.applyingHistory = true;
+          this.graph.set(
+            autoLayout(graph && graph.states?.length ? normalizeFlowGraph(graph) : emptyFlowGraph()),
+          );
           this.savedJson.set(this.json());
           this.loaded.set(true);
           this.loading.set(false);

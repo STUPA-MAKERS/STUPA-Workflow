@@ -43,6 +43,7 @@
   "action.logout": "Abmelden",
   "action.copy": "Kopieren",
   "action.save": "Speichern",
+  "action.discard": "Verwerfen",
   "common.loading": "Wird geladen …",
   "ui.rowMenu.trigger": "Weitere Aktionen",
   "ui.selection.toolbar": "Auswahl",

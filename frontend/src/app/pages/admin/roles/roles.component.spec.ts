@@ -211,6 +211,21 @@ describe('AdminRolesComponent', () => {
     expect(screen.getByRole('button', { name: 'Rolle anlegen' })).toBeInTheDocument();
   });
 
+  /** § 000635 */
+  it('"Verwerfen" sets the rights back and hides with "Speichern"', async () => {
+    const { fixture, inst, api } = await setup();
+    const before = inst.roles().find((r: Role) => r.id === 'r-member').permissions;
+    inst.togglePerm(ROLES[1], 'flow.configure', true);
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    expect(inst.roles().find((r: Role) => r.id === 'r-member').permissions).toEqual(before);
+    expect(api.saveRolePermissions).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Rolle anlegen' })).toBeInTheDocument();
+  });
+
   it('a right switched on and off again is no change', async () => {
     const { inst } = await setup();
     inst.togglePerm(ROLES[1], 'flow.configure', true);

@@ -264,6 +264,11 @@ export class PrivacyComponent {
     });
   }
 
+  /** "Verwerfen": the retention goes back to the stored value (§ 000635). */
+  protected discardRetention(): void {
+    this.retentionMonths.set(this.savedRetention());
+  }
+
   private applyRetention(months: number): void {
     this.savedRetention.set(months);
     this.retentionMonths.set(months);

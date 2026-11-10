@@ -205,6 +205,23 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(graph.layout?.positions).toBeDefined();
   });
 
+  /** § 000635 */
+  it('"Verwerfen" reads the stored flow again and hides with "Speichern"', async () => {
+    const { fixture, createGlobalFlowVersion } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const before = c.json();
+    buildValid(c);
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    fixture.detectChanges();
+    expect(c.json()).toBe(before);
+    expect(createGlobalFlowVersion).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('shows "Speichern" only while the flow has unsaved changes', async () => {
     const { fixture, createGlobalFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
