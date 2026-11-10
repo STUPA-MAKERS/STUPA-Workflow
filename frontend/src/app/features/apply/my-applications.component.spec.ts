@@ -1,5 +1,5 @@
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { render, screen, waitFor } from '@testing-library/angular';
 import { ApiClient } from '@core/api/api-client.service';
 import type { ApplicantApplications } from '@core/api/models';
@@ -94,6 +94,19 @@ describe('MyApplicationsComponent', () => {
       'href',
       '/my-applications/a1',
     );
+  });
+
+  it('names an Antrag without a title and keeps an amount that is no number', async () => {
+    const odd = { ...LIST.items[0], id: 'a3', title: '  ', amount: 'k. A.', currency: null };
+    const { fixture } = await setup({ list: () => of({ ...LIST, items: [odd] } as ApplicantApplications) });
+    const rows = fixture.componentInstance.rows();
+    expect(rows[0].title).not.toBe('  ');
+    expect(rows[0].amount).toBe('k. A.');
+  });
+
+  it('has no rows before the list has loaded', async () => {
+    const { fixture } = await setup({ list: () => NEVER });
+    expect(fixture.componentInstance.rows()).toEqual([]);
   });
 
   it('shows no "Antrag stellen"', async () => {

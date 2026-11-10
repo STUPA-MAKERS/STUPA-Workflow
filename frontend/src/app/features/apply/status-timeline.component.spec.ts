@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError, type Observable } from 'rxjs';
+import { NEVER, of, throwError, type Observable } from 'rxjs';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
@@ -758,9 +758,12 @@ describe('StatusTimelineComponent', () => {
   /** F/applications/applications/000588: inside `/my-applications` an old link reloads the list. */
   it('reloads the list after an old link inside Meine Anträge and leaves the h1 to the list', async () => {
     const page = { split: signal(true), reload: jest.fn() };
-    await setup(fakeApi(), { t: 'tok' }, { pathParams: { id: ID }, providers: [{ provide: MY_APPLICATIONS_PAGE, useValue: page }] });
+    const { comp } = await setup(fakeApi(), { t: 'tok' }, { pathParams: { id: ID }, providers: [{ provide: MY_APPLICATIONS_PAGE, useValue: page }] });
     expect(await screen.findByRole('heading', { level: 2, name: 'Sommerfest' })).toBeInTheDocument();
     expect(page.reload).toHaveBeenCalled();
+    const tab = comp.tab();
+    comp.onFilesDropped([]);
+    expect(comp.tab()).toBe(tab);
   });
 
   /** F/applications/applications/000588: an invalid link inside `/my-applications` opens `/login`. */
@@ -787,6 +790,12 @@ describe('StatusTimelineComponent', () => {
     expect(comp.approvedAmount({ ...base, approvedAmount: null } as Application)).toBe('');
     expect(comp.approvedAmount({ ...base, approvedAmount: '1250' } as Application)).toBe('');
     expect(comp.approvedAmount({ ...base, approvedAmount: '1000.00' } as Application)).toMatch(/1\.000,00/);
+    expect(comp.amount({ ...base, amount: 'k. A.' })).toBe('k. A.');
+  });
+
+  it('names no type before the Antrag has loaded', async () => {
+    const { comp } = await setup({ ...fakeApi(), getApplication: () => NEVER });
+    expect(comp.typeName()).toBeNull();
   });
 
   it('names no type when the types cannot load, and keeps a tab choice to the known tabs', async () => {
