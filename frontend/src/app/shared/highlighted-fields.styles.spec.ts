@@ -60,6 +60,33 @@ describe('highlightedFields (§000598)', () => {
     expect(rule(css, ".bp__row[aria-current='true']")).toMatch(/@include f\.highlight-chosen;/);
   });
 
+  it.each([
+    [
+      'pages/budget/cost-centre-select/cost-centre-select.component.scss',
+      ".ccs__opt[aria-selected='true']",
+    ],
+    ['features/todos/move-sheet/todo-move-sheet.component.scss', '.ms__row--on'],
+    ['features/todos/link-picker/todo-link-picker.component.scss', '.lp__hit--on'],
+    ['features/todos/pick-dialog/todo-pick-dialog.component.scss', '.pd__row--on'],
+    [
+      'features/meetings/handover-dialog/handover-dialog.component.scss',
+      '.rowgroup.rowgroup--bg3 > .hd__mode--on',
+    ],
+    ['features/meetings/delegation-dialog/delegation-dialog.component.scss', '.dd__row--on'],
+    ['features/meetings/agenda-item-dialog/agenda-item-dialog.component.scss', '.aid__row--on'],
+  ])('%s %s paints the chosen row black on yellow', (file, selector) => {
+    const body = rule(readFileSync(join(APP, file), 'utf8'), selector);
+    expect(body).toMatch(/@include f\.highlight-chosen;/);
+  });
+
+  it('the role matrix check box reads the check tokens', () => {
+    const css = readFileSync(
+      join(APP, 'pages/admin/gremium-roles/gremium-role-matrix.component.scss'),
+      'utf8',
+    );
+    expect(css).toContain('var(--check-on, var(--color-accent))');
+  });
+
   it('the public protocol pill buttons include the highlight surface', () => {
     const css = readFileSync(
       join(APP, 'features/public-protocols/_public-protocols.shared.scss'),
