@@ -5,7 +5,9 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+implementation:
+  - backend/tests/integration
+  - .claude/skills/conventions/SKILL.md
 scope:
   - backend/tests
 ---
