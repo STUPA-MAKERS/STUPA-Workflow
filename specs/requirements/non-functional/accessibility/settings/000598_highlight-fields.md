@@ -1,5 +1,5 @@
 ---
-id: "000597"
+id: "000598"
 title: Highlighted fields have black text on yellow
 kind: non-functional
 status: draft
