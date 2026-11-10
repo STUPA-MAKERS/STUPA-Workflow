@@ -153,6 +153,7 @@
   background: var(--color-selected);
   color: var(--color-on-selected);
   font-weight: var(--fw-semibold);
+  @include f.highlight-chosen;
 }
 .as__opt[aria-disabled='true'] {
   cursor: not-allowed;

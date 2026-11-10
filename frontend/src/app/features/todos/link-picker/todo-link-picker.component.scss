@@ -111,6 +111,7 @@
 .lp__hit--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 @media (hover: hover) {
   .lp__hit:hover {
