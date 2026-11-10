@@ -54,7 +54,9 @@ services:
 
   migrate:
     # One-shot migrator. It runs `alembic upgrade head` against the DB before
-    # api and worker start. The run is race-free, because it waits for postgres healthy.
+    # api and worker start. Then it compares the schema with the models and writes each
+    # difference to the log with the level `error`. The compare always exits 0, because
+    # a stop of the deploy would keep a fix from production. The run is race-free, because it waits for postgres healthy.
     # It is idempotent, because alembic skips the revisions it already applied. There is
     # no restart loop: the job runs once until exit 0, and api and worker wait for it
     # through `service_completed_successfully`. Migration URL: env.py takes
@@ -63,7 +65,7 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
-    command: ["alembic", "upgrade", "head"]
+    command: ["sh", "-c", "alembic upgrade head && python -m app.shared.schema_drift"]
     restart: "no"
     env_file: .env
     depends_on:

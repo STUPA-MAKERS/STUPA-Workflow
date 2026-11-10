@@ -26,7 +26,7 @@ docker compose up -d --build
 | Service | Role | Host port |
 |---|---|---|
 | `web` | nginx, serves the built SPA, routes `/api` to `api` | `${WEB_HOST:-127.0.0.1}:${WEB_PORT:-8080}` |
-| `migrate` | one-shot: `alembic upgrade head`, then exit | — |
+| `migrate` | one-shot: `alembic upgrade head`, then a compare of the schema with the models that logs each difference as `error`, then exit | — |
 | `api` | FastAPI (uvicorn `--proxy-headers`) | — |
 | `worker` | arq (mail send, virus scan, deadlines, reminders, budget rollup, retention, draft purge, nightly backup and audit check) | — |
 | `postgres` | PostgreSQL 16 | `127.0.0.1:5433` (admin CLI) |
