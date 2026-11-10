@@ -84,6 +84,7 @@ import {
   TabPagerComponent,
   TabsComponent,
   ToastService,
+  scrollBehavior,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -945,7 +946,7 @@ export class ApplicationsDetailComponent {
       return;
     }
     const el = document.getElementById('ad-history');
-    el?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    el?.scrollIntoView?.({ behavior: scrollBehavior(), block: 'start' });
     el?.focus({ preventScroll: true });
   }
 

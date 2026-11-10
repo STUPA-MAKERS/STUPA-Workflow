@@ -37,6 +37,7 @@ import {
   ToastService,
   FabComponent,
   PageHeaderComponent,
+  scrollBehavior,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -569,7 +570,7 @@ export class FormEditorComponent {
       const card = this.host.nativeElement.querySelector<HTMLElement>(
         `[data-q="${pos.gi}:${pos.qi}"]`,
       );
-      card?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+      card?.scrollIntoView?.({ block: 'nearest', behavior: scrollBehavior() });
     });
   }
 
