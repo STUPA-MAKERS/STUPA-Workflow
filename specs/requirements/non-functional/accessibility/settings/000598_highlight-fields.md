@@ -1,6 +1,6 @@
 ---
 id: "000598"
-title: Highlighted fields have black text on yellow
+title: Very high contrast highlights the fields black on yellow
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
@@ -33,9 +33,9 @@ scope:
   - frontend/vendor/ui-kit
 ---
 
-# Highlighted fields have black text on yellow
+# Very high contrast highlights the fields black on yellow
 
-With the switch "Eingabefelder hervorheben" on (000593), every input field (text, text area,
+While "Sehr hoher Kontrast" is on (000605), every input field (text, text area,
 select, date, time, amount and search field) must have a yellow background, black text, a black
 label, a black placeholder, black icons and a 2 px black edge. Every checkbox, radio button and
 switch must have a yellow box with a 2 px black edge, and its mark must be black. A Markdown editor and a chat composer are input fields too; in the protocol, the whole rounded pane of the TOP is the field, without inner boxes. The check box "Ich bin kein Roboter" (ALTCHA) is a field too. Every button with a label (filled, tonal,
@@ -50,7 +50,8 @@ other rows stay as they are. A selected table row is black on yellow without the
 same yellow box and black mark. Every icon button (a symbol without text, also the 3-dot button of a menu and a tool of the editor) is black on yellow with the same edge; a pressed toggle and the button of an open menu are yellow on black. The buttons of the meeting dock (also "live" and the attendance) are black on yellow with the edge, with the same 6 px space between them. The count on a button is a black plate with a yellow number. A tag (for example "NÖ") is a black plate with yellow text. A progress bar is a yellow plate with black parts. Every tile on the start page is black on yellow with the edge. The focused element
 must have a double ring: 3 px black next to it and 3 px yellow outside the black. The error
 edge must stay visible on the yellow. This applies in both themes. The
-switch is off by default, because no system setting asks for it.
+highlighting has no switch of its own, because a separate step between the normal display and
+very high contrast helps nobody.
 
 Reason: A person with low vision or with a cognitive impairment must find the fields of a
 form at a glance.

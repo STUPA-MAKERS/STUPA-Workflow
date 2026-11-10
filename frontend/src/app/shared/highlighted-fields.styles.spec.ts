@@ -1,5 +1,5 @@
 /**
- * App spec 000598: with "Eingabefelder hervorheben" every input field is black on yellow.
+ * App spec 000598: with "Sehr hoher Kontrast" every input field is black on yellow.
  * Fields outside the kit field box draw their own surface, so each one reads the field
  * tokens. jsdom applies no component styles, so this spec reads the stylesheets.
  */

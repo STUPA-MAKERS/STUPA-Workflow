@@ -3,6 +3,7 @@
 @use 'scroll-fade' as fade;
 @use 'press';
 @use 'field' as f;
+@use 'display' as d;
 
 :host {
   --dash-fade: var(--space-6);
@@ -465,4 +466,12 @@
 }
 .dash__todoDue {
   flex: none;
+}
+
+// Very high contrast (spec 000605): the live meeting tile has the white edge of every surface.
+@include d.host-on(veryHigh) {
+  .dash__live {
+    outline: var(--vh-edge);
+    outline-offset: -2px;
+  }
 }
