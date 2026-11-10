@@ -8,6 +8,8 @@ updated: 2026-11-10
 tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:highlightedFields"
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:highlightedButtons"
+  - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:highlightedChips"
+  - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:highlightedChosenRow"
   - "frontend/src/app/shared/highlighted-fields.styles.spec.ts:highlightedFields"
 implementation:
   - frontend/vendor/ui-kit/src/styles/display-settings.scss
@@ -15,6 +17,9 @@ implementation:
   - frontend/vendor/ui-kit/src/styles/_check.scss
   - frontend/vendor/ui-kit/src/lib/button/button.component.scss
   - frontend/vendor/ui-kit/src/lib/segmented/segmented.component.scss
+  - frontend/vendor/ui-kit/src/lib/select/select.component.scss
+  - frontend/vendor/ui-kit/src/lib/filter-select/filter-select.component.scss
+  - frontend/vendor/ui-kit/src/lib/row-menu/row-menu.component.scss
   - frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.component.scss
 scope:
   - frontend/src/app/
@@ -31,7 +36,9 @@ editor and a chat composer are input fields too. Every button with a surface (fi
 outlined buttons, pill buttons such as a picker, and floating action buttons (FAB)) must be black
 on yellow with a black 2 px edge and no yellow outside the edge. A destructive button must be
 dark red on yellow with a dark red edge. A pressed toggle button must be yellow on black. The
-chosen option of a segmented control must be black on yellow with the same edge. A text button
+chosen option of a segmented control must be black on yellow with the same edge. A filter chip must be black on yellow with the same edge, and an active filter
+chip yellow on black. In a menu or a list of options, only the chosen row must be black on
+yellow with the same edge; the other rows stay as they are. A text button
 and an icon button without a surface stay as they are. The focused element
 must have a double ring: 3 px black next to it and 3 px yellow outside the black. The error
 edge must stay visible on the yellow. This applies in both themes. The

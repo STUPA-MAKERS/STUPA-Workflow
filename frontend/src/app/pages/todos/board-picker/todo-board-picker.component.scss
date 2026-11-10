@@ -87,6 +87,7 @@
 .bp__row[aria-current='true'] {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 @media (hover: hover) {
   .bp__row:hover {

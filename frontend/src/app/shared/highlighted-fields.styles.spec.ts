@@ -52,6 +52,14 @@ describe('highlightedFields (§000598)', () => {
     expect(body).toMatch(/@include f\.highlight-surface;/);
   });
 
+  it('the board picker paints the chosen row black on yellow', () => {
+    const css = readFileSync(
+      join(APP, 'pages/todos/board-picker/todo-board-picker.component.scss'),
+      'utf8',
+    );
+    expect(rule(css, ".bp__row[aria-current='true']")).toMatch(/@include f\.highlight-chosen;/);
+  });
+
   it('the public protocol pill buttons include the highlight surface', () => {
     const css = readFileSync(
       join(APP, 'features/public-protocols/_public-protocols.shared.scss'),
