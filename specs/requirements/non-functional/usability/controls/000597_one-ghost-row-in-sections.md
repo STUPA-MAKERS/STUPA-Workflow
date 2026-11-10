@@ -2,7 +2,7 @@
 id: "000597"
 title: A section in a detail and a small tile show one ghost row
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
