@@ -183,9 +183,9 @@
   overflow-y: auto;
   padding: var(--space-5) 28px;
 }
-/* Highlighted fields (000598): the whole editor area is the field, black on yellow, and the
-   editor inside it draws no surface of its own. The placeholder skeleton is not a field. */
-.ts__editor:not(.ts__editor--wait) {
+/* Highlighted fields (000598): the whole rounded pane of the TOP is the field, black on
+   yellow with the black edge, and the editor inside it draws no surface of its own. */
+.ts {
   @include f.highlight-surface;
 }
 @include d.host-on(fields) {
