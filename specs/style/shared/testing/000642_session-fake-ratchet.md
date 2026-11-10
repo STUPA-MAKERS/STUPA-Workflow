@@ -2,7 +2,7 @@
 id: "000642"
 title: A CI ratchet lowers the fake sessions in tests
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

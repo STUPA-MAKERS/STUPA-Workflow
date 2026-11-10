@@ -2,7 +2,7 @@
 id: "000474"
 title: Service functions do not commit
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:

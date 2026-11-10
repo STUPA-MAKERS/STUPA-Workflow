@@ -2,7 +2,7 @@
 id: "000640"
 title: A CI ratchet lowers the commits in services
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

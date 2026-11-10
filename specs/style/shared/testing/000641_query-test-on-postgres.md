@@ -2,7 +2,7 @@
 id: "000641"
 title: A test of a database query runs on Postgres
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null
