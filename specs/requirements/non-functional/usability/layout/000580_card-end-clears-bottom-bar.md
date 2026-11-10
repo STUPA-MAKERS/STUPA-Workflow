@@ -2,7 +2,7 @@
 id: "000580"
 title: The end of a card keeps room above the bottom bar
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
