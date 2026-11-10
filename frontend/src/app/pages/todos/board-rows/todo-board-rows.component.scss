@@ -1,4 +1,5 @@
 @use '../../../shared/ui/drag-preview' as dp;
+@use 'display' as d;
 
 
 :host {
@@ -171,7 +172,7 @@
 .br__cards.cdk-drop-list-dragging .br__item:not(.cdk-drag-placeholder) {
   transition: transform var(--motion-base) var(--ease-standard);
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .br__cards.cdk-drop-list-dragging .br__item {
     transition: none;
   }

@@ -2,10 +2,13 @@
 id: "000593"
 title: The help menu holds the display settings
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "frontend/src/app/features/help/help-menu/help-menu.component.spec.ts:HelpMenuComponent"
+implementation:
+  - frontend/src/app/features/help/help-menu
 scope:
   - frontend/src/app/features/help
   - frontend/vendor/ui-kit

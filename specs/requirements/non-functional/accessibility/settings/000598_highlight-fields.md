@@ -2,10 +2,15 @@
 id: "000598"
 title: Highlighted fields have black text on yellow
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:highlightedFields"
+implementation:
+  - frontend/vendor/ui-kit/src/styles/display-settings.scss
+  - frontend/vendor/ui-kit/src/styles/_field.scss
+  - frontend/vendor/ui-kit/src/styles/_check.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit
@@ -23,4 +28,4 @@ switch is off by default, because no system setting asks for it.
 Reason: A person with low vision or with a cognitive impairment must find the fields of a
 form at a glance.
 
-Test: `frontend/src/app/shared/ui/surface-contrast.spec.ts` with the field tokens.
+Test: `frontend/vendor/ui-kit/src/styles/display-settings.spec.ts`.

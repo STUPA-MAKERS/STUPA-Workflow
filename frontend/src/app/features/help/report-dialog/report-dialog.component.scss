@@ -1,5 +1,6 @@
 @use 'field' as f;
 @use '../../../shared/ui/dialog-form' as df;
+@use 'display' as d;
 
 @include df.host;
 
@@ -96,7 +97,7 @@
     transform: rotate(360deg);
   }
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .rd__spinner {
     animation: none;
   }

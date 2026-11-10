@@ -23,6 +23,7 @@ import { provideDetailPrefetch } from '@core/cache/detail-prefetch';
 import {
   loadingInterceptor,
   ThemeService,
+  DisplaySettingsService,
   UI_KIT_AVATAR_SOURCE,
 } from '@stupa-makers/ui-kit';
 import { provideRouteMotion, watchUAVisualTransitions } from '@stupa-makers/ui-kit/shell';
@@ -95,6 +96,7 @@ export const appConfig: ApplicationConfig = {
     { provide: UI_KIT_AVATAR_SOURCE, useExisting: AvatarService },
     provideAppInitializer(() => {
       inject(ThemeService).init();
+      inject(DisplaySettingsService).init();
       const i18n = inject(I18nService);
       inject(BrandingService).init();
       inject(AuthService).ensureLoaded().subscribe();

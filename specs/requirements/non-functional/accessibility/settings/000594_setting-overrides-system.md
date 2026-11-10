@@ -2,10 +2,14 @@
 id: "000594"
 title: A display setting overrides the system setting
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "frontend/vendor/ui-kit/src/lib/display/display-settings.service.spec.ts:DisplaySettingsService"
+implementation:
+  - frontend/vendor/ui-kit/src/lib/display/display-settings.service.ts
+  - frontend/src/app/features/help/help-menu
 scope:
   - frontend/src/app/features/help
   - frontend/vendor/ui-kit
