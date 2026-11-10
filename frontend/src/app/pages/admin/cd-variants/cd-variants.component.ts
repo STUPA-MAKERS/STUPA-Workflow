@@ -166,6 +166,7 @@ export class AdminCdVariantsComponent {
 
   readonly listOrder = CD_LOGO_LIST_ORDER;
   readonly minPx = SQUARE_LOGO_MIN_PX;
+  readonly maxPx = SQUARE_LOGO_MAX_PX;
 
   /** Ids of square logos whose image failed to load: they show the placeholder. */
   readonly brokenThumbs = signal<ReadonlySet<Uuid>>(new Set());
@@ -430,8 +431,8 @@ export class AdminCdVariantsComponent {
         this.saving.set(false);
         const key: TranslationKey =
           errorStatus(err) === 409 ? 'admin.cdVariants.keyExists' : 'admin.common.saveFailed';
-        this.formError.set(key);
-        this.toast.error(this.i18n.translate(key));
+        if (key === 'admin.common.saveFailed') this.toast.error(this.i18n.translate(key));
+        else this.formError.set(key);
       },
     });
   }
@@ -458,8 +459,8 @@ export class AdminCdVariantsComponent {
         this.deleting.set(false);
         const key: TranslationKey =
           errorStatus(err) === 409 ? 'admin.cdVariants.inUse' : 'admin.common.saveFailed';
-        this.deleteError.set(key);
-        this.toast.error(this.i18n.translate(key));
+        if (key === 'admin.common.saveFailed') this.toast.error(this.i18n.translate(key));
+        else this.deleteError.set(key);
       },
     });
   }
@@ -574,8 +575,8 @@ export class AdminCdVariantsComponent {
         const status = errorStatus(err);
         const key: TranslationKey =
           SQUARE_ERROR_KEYS[problemCode(err)] ?? squareStatusKey(status);
-        this.logoError.set(key);
-        this.toast.error(this.i18n.translate(key, { min: this.minPx, max: SQUARE_LOGO_MAX_PX }));
+        if (key === 'admin.common.saveFailed') this.toast.error(this.i18n.translate(key));
+        else this.logoError.set(key);
       },
     });
   }

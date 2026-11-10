@@ -3232,6 +3232,7 @@
   "admin.gremien.publicView": "View the public page",
   "admin.gremien.publicConfirm.title": "Publish the minutes?",
   "admin.gremien.publicConfirm.loading": "Counting the minutes …",
+  "admin.gremien.publicConfirm.loadFailed": "The count of the protocols could not be loaded.",
   "admin.gremien.publicConfirm.count": "After saving, {n} finalized minutes of {name} are readable without signing in, in their public version.",
   "admin.gremien.publicConfirm.generic": "After saving, all finalized minutes of {name} are readable without signing in, in their public version.",
   "admin.gremien.publicConfirm.missing": "{n} of them have no public version yet. The platform makes it now; until then they do not appear.",

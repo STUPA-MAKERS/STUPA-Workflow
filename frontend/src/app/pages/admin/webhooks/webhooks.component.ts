@@ -16,7 +16,6 @@ import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import {
   FabComponent,
   ButtonComponent,
-  CheckboxComponent,
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
@@ -113,7 +112,6 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
-    CheckboxComponent,
     DialogComponent,
     InputComponent,
     PageHeaderComponent,

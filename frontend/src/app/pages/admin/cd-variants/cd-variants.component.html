@@ -197,7 +197,7 @@
         }
       }
       @if (logoError(); as err) {
-        <app-note kind="error" icon="alert" role="alert">{{ err | t: { min: minPx } }}</app-note>
+        <app-note kind="error" icon="alert" role="alert">{{ err | t: { min: minPx, max: maxPx } }}</app-note>
       }
     </form>
   }

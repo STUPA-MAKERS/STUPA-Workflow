@@ -9,7 +9,6 @@ import {
   FilterSelectComponent,
   type FilterSelectOption,
   IconComponent,
-  InfiniteScrollDirective,
   InputComponent,
   NoteComponent,
   RowMenuComponent,
@@ -102,7 +101,6 @@ interface LanguageDraft {
     FilterSelectComponent,
     FormsModule,
     IconComponent,
-    InfiniteScrollDirective,
     InputComponent,
     NoteComponent,
     PageHeaderComponent,
@@ -434,7 +432,8 @@ export class AdminTranslationsComponent {
       error: (err: unknown) => {
         this.dialogBusy.set(false);
         const conflict = err instanceof HttpErrorResponse && err.status === 409;
-        this.dialogError.set(conflict ? 'admin.translations.codeTaken' : 'admin.common.saveFailed');
+        this.dialogError.set(conflict ? 'admin.translations.codeTaken' : null);
+        if (!conflict) this.toast.error(this.i18n.translate('admin.common.saveFailed'));
       },
     });
   }

@@ -8,6 +8,14 @@ function findToast(): Toast | undefined {
     .find((t) => t.variant === 'danger' && t.action === 'Erneut versuchen');
 }
 
+/** The messages of the open error toasts (§ 000633: a failed request shows as a toast). */
+export function errorToasts(): string[] {
+  return TestBed.inject(ToastService)
+    .toasts()
+    .filter((t) => t.variant === 'danger')
+    .map((t) => t.message);
+}
+
 /** The message of the open load error toast, or null without one. */
 export function loadErrorToast(): string | null {
   return findToast()?.message ?? null;

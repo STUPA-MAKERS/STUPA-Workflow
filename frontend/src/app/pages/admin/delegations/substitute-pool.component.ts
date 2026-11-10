@@ -246,13 +246,13 @@ export class SubstitutePoolComponent {
         },
         error: (err: { status?: number }) => {
           this.adding.set(false);
+          if (err.status !== 409 && err.status !== 422) {
+            this.toast.error(this.i18n.translate('admin.substitutes.failed'));
+            return;
+          }
           this.addError.set(
             this.i18n.translate(
-              err.status === 409
-                ? 'admin.substitutes.duplicate'
-                : err.status === 422
-                  ? 'admin.substitutes.invalid'
-                  : 'admin.substitutes.failed',
+              err.status === 409 ? 'admin.substitutes.duplicate' : 'admin.substitutes.invalid',
             ),
           );
         },

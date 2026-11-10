@@ -2,9 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
-  IconComponent,
   InputComponent,
-  NoteComponent,
   SwitchComponent,
   FabComponent,
   ToastService,
@@ -37,9 +35,7 @@ import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
     FormsModule,
     TranslatePipe,
     FabComponent,
-    IconComponent,
     InputComponent,
-    NoteComponent,
     SwitchComponent,
     PageHeaderComponent,
     BreadcrumbsComponent,
@@ -113,7 +109,6 @@ export class NotificationSettingsComponent {
     const s = this.settings();
     if (!s || !this.valid()) return;
     this.saving.set(true);
-    this.error.set(null);
     this.api.putNotificationSettings(s).subscribe({
       next: (saved) => {
         this.settings.set(saved);
@@ -122,7 +117,7 @@ export class NotificationSettingsComponent {
         this.toast.success(this.i18n.translate('admin.notifications.saved'));
       },
       error: () => {
-        this.error.set('admin.notifications.saveError');
+        this.toast.error(this.i18n.translate('admin.notifications.saveError'));
         this.saving.set(false);
       },
     });

@@ -3,10 +3,6 @@
     <app-breadcrumbs crumbs />
   </app-page-header>
 
-  @if (settings() && error()) {
-    <app-note kind="error" icon="alert" role="alert">{{ $any(error()) | t }}</app-note>
-  }
-
   <app-load-state [state]="loadState()" [lines]="4" [errorText]="'admin.notifications.error' | t" (retry)="load()">
     <ng-template #content>
       @if (settings(); as s) {

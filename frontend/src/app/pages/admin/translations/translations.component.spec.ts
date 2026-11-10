@@ -235,14 +235,15 @@ describe('AdminTranslationsComponent', () => {
     const api = makeApi({
       createLanguage: jest.fn(() => throwError(() => new HttpErrorResponse({ status: 409 }))),
     });
-    const { inst } = await setup(api);
+    const { inst, toast } = await setup(api);
     inst.openDialog(null);
     inst.patchDialog({ newCode: 'it', name: 'Italiano' });
     inst.submitDialog();
     expect(inst.dialogError()).toBe('admin.translations.codeTaken');
     api.createLanguage.mockReturnValueOnce(throwError(() => new Error('x')));
     inst.submitDialog();
-    expect(inst.dialogError()).toBe('admin.common.saveFailed');
+    expect(inst.dialogError()).toBeNull();
+    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 
   it('renames a language from its menu', async () => {

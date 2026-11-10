@@ -23,6 +23,7 @@ import {
   InputComponent,
   NoteComponent,
   SectionComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { GREMIUM_PERMISSIONS, ROLE_KEY_PATTERN, type GremiumRole } from '../admin.models';
@@ -74,6 +75,7 @@ export class GremiumRoleDialogComponent {
   protected readonly contentLang = inject(ContentLangState);
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
+  private readonly toast = inject(ToastService);
 
   readonly open = input(false);
   /** The role to edit. `null` creates a new role. */
@@ -99,7 +101,6 @@ export class GremiumRoleDialogComponent {
   /** The answer of the server to the last save, shown under the key (409, 422). */
   private readonly serverKeyError = signal('');
   /** The last save failed for another reason than the key. */
-  protected readonly saveFailed = signal(false);
 
   protected readonly isNew = computed(() => this.role() === null);
   protected readonly isMemberRole = computed(() => this.role()?.key === 'member');
@@ -125,7 +126,6 @@ export class GremiumRoleDialogComponent {
       const role = this.role();
       untracked(() => {
         this.serverKeyError.set('');
-        this.saveFailed.set(false);
         this.saving.set(false);
         this.draft.set(
           role
@@ -182,7 +182,6 @@ export class GremiumRoleDialogComponent {
       ? this.api.updateGremiumRole(role.id, { name, permissions })
       : this.api.createGremiumRole(this.gremiumId(), { key, name, permissions });
     this.saving.set(true);
-    this.saveFailed.set(false);
     req.subscribe({
       next: (saved) => {
         this.saving.set(false);
@@ -198,7 +197,7 @@ export class GremiumRoleDialogComponent {
           );
         } else {
           this.serverKeyError.set('');
-          this.saveFailed.set(true);
+          this.toast.error(this.i18n.translate('admin.common.saveFailed'));
         }
       },
     });

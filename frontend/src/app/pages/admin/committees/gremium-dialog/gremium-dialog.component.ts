@@ -24,6 +24,7 @@ import {
   type SelectOption,
   SkeletonComponent,
   SwitchComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import {
@@ -95,7 +96,7 @@ export function parseRecipients(raw: string): readonly string[] {
  * same dialog): it names how many final protocols become readable without a login and
  * how many still need their public version, which a job of the server makes.
  */
-import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 @Component({
   selector: 'app-gremium-dialog',
@@ -121,6 +122,7 @@ import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 export class GremiumDialogComponent {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
+  private readonly toast = inject(ToastService);
 
   readonly open = input(false);
   /** The gremium to edit. `null` creates a new gremium. */
@@ -161,6 +163,9 @@ export class GremiumDialogComponent {
   /** The counts of the question; `null` while they load or when the read failed. */
   protected readonly preview = signal<GremiumPublicPreview | null>(null);
   protected readonly previewLoading = signal(false);
+  /** The read of the counts failed: the question shows without them. */
+  protected readonly previewFailed = signal(false);
+  protected readonly previewState = loadStateOf(this.previewLoading, this.previewFailed);
 
   /** The implications of a public gremium ("Was das bedeutet"). */
   protected readonly implications = [
@@ -196,6 +201,7 @@ export class GremiumDialogComponent {
     this.confirmPublic.set(false);
     this.preview.set(null);
     this.previewLoading.set(false);
+    this.previewFailed.set(false);
     this.error.set('');
     this.saving.set(false);
     this.recipientsLoadFailed.set(false);
@@ -270,18 +276,29 @@ export class GremiumDialogComponent {
     const g = this.gremium();
     if (g && this.form().protocolsPublic && !g.protocolsPublic && !this.confirmPublic()) {
       this.confirmPublic.set(true);
-      this.preview.set(null);
-      this.previewLoading.set(true);
-      this.api.getGremiumPublicPreview(g.id).subscribe({
-        next: (p) => {
-          this.previewLoading.set(false);
-          this.preview.set(p);
-        },
-        error: () => this.previewLoading.set(false),
-      });
+      this.loadPreview();
       return;
     }
     this.save();
+  }
+
+  /** Read the counts of the question; also the retry of the load error (§ 000576). */
+  protected loadPreview(): void {
+    const g = this.gremium();
+    if (!g) return;
+    this.preview.set(null);
+    this.previewFailed.set(false);
+    this.previewLoading.set(true);
+    this.api.getGremiumPublicPreview(g.id).subscribe({
+      next: (p) => {
+        this.previewLoading.set(false);
+        this.preview.set(p);
+      },
+      error: () => {
+        this.previewFailed.set(true);
+        this.previewLoading.set(false);
+      },
+    });
   }
 
   /** "Veröffentlichen" in the question. */
@@ -355,6 +372,11 @@ export class GremiumDialogComponent {
       | 'admin.gremien.recipientsFailed',
   ): void {
     this.saving.set(false);
-    this.error.set(this.i18n.translate(key));
+    const text = this.i18n.translate(key);
+    if (key === 'admin.gremien.toast.failed' || key === 'admin.gremien.recipientsFailed') {
+      this.toast.error(text);
+    } else {
+      this.error.set(text);
+    }
   }
 }

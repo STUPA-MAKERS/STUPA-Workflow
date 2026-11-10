@@ -3232,6 +3232,7 @@
   "admin.gremien.publicView": "Öffentliche Seite ansehen",
   "admin.gremien.publicConfirm.title": "Protokolle veröffentlichen?",
   "admin.gremien.publicConfirm.loading": "Protokolle werden gezählt …",
+  "admin.gremien.publicConfirm.loadFailed": "Die Zahl der Protokolle konnte nicht geladen werden.",
   "admin.gremien.publicConfirm.count": "Nach dem Speichern sind {n} finalisierte Protokolle von {name} ohne Anmeldung lesbar, als öffentliche Fassung.",
   "admin.gremien.publicConfirm.generic": "Nach dem Speichern sind alle finalisierten Protokolle von {name} ohne Anmeldung lesbar, als öffentliche Fassung.",
   "admin.gremien.publicConfirm.missing": "Für {n} davon gibt es noch keine öffentliche Fassung. Die Plattform erzeugt sie jetzt; bis dahin erscheinen sie nicht.",

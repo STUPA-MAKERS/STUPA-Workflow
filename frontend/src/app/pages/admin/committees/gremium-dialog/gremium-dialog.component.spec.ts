@@ -1,3 +1,4 @@
+import { errorToasts } from '../../../../../testing/load-error';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { of, throwError } from 'rxjs';
@@ -184,7 +185,8 @@ describe('GremiumDialogComponent', () => {
     expect(baseSaved).toHaveBeenCalledWith(expect.objectContaining({ created: true }));
     expect(saved).not.toHaveBeenCalled();
     await userEvent.click(save());
-    expect(within(dialog()).getByRole('alert')).toHaveTextContent(/die Protokoll-Empfänger nicht/);
+    expect(within(dialog()).queryByRole('alert')).toBeNull();
+    expect(errorToasts().join()).toMatch(/die Protokoll-Empfänger nicht/);
     await userEvent.click(save());
     expect(api.createGremium).toHaveBeenCalledTimes(1);
     expect(api.updateGremium).toHaveBeenCalledTimes(2);
@@ -203,9 +205,8 @@ describe('GremiumDialogComponent', () => {
       'Die Protokoll-Empfänger konnten nicht geladen werden.',
     );
     await userEvent.click(save());
-    expect(within(dialog()).getByRole('alert')).toHaveTextContent(
-      'Gremium konnte nicht gespeichert werden.',
-    );
+    expect(within(dialog()).queryByRole('alert')).toBeNull();
+    expect(errorToasts()).toEqual(['Gremium konnte nicht gespeichert werden.']);
   });
 
   /** The empty field would delete the stored list, so it stays locked. */

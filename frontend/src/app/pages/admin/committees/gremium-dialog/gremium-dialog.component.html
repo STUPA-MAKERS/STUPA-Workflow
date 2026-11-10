@@ -7,7 +7,12 @@
 >
   @if (confirmPublic()) {
     <div class="gd gd--confirm" aria-live="polite">
-      <app-load-state [state]="previewLoading() ? 'loading' : 'ok'">
+      <app-load-state
+        [state]="previewState()"
+        [keepContent]="true"
+        [errorText]="'admin.gremien.publicConfirm.loadFailed' | t"
+        (retry)="loadPreview()"
+      >
         <ng-template #loading>
           <app-skeleton variant="lines" [count]="2" [label]="'admin.gremien.publicConfirm.loading' | t" />
         </ng-template>

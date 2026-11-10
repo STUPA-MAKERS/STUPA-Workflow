@@ -1,3 +1,4 @@
+import { errorToasts } from '../../../../testing/load-error';
 import { provideRouter } from '@angular/router';
 import { render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -153,11 +154,12 @@ describe('GremiumRoleDialogComponent', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('names another failure above the footer', async () => {
+  it('shows another failure as a toast', async () => {
     const api = makeApi({ updateGremiumRole: jest.fn(() => throwError(() => ({ status: 500 }))) });
     const { saved } = await setup(OWN, api);
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Speichern fehlgeschlagen.');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(errorToasts()).toEqual(['Speichern fehlgeschlagen.']);
     expect(saved).not.toHaveBeenCalled();
   });
 

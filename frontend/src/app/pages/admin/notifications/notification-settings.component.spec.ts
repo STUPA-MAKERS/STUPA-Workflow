@@ -1,3 +1,4 @@
+import { errorToasts } from '../../../../testing/load-error';
 import { of, throwError } from 'rxjs';
 import { render, screen, fireEvent } from '@testing-library/angular';
 import type { NotificationSettings } from '../admin.models';
@@ -90,7 +91,9 @@ describe('NotificationSettingsComponent', () => {
     c.save();
     expect(putNotificationSettings).toHaveBeenCalled();
     expect(c.saving()).toBe(false);
-    expect(c.error()).toBe('admin.notifications.saveError');
+    expect(c.error()).toBeNull();
+    expect(errorToasts()).toHaveLength(1);
+    expect(view.container.querySelector('app-note')).toBeNull();
   });
 
   it('patch is a no-op when settings are not loaded', async () => {
