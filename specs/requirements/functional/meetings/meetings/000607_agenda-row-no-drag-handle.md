@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
-  - "frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.spec.ts:reorders by drag and drop on the whole row, without a drag handle"
+  - "frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.spec.ts:AgendaPaneComponent"
 implementation:
   - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.html
   - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.scss
