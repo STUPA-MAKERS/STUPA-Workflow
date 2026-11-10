@@ -2,7 +2,7 @@
 id: "000603"
 title: Text, icons and counts of a control share one centre line
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:

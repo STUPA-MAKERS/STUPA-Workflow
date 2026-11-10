@@ -2,7 +2,7 @@
 id: "000604"
 title: A count in a button is the count plate of the kit button
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
