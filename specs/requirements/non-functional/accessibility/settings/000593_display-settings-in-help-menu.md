@@ -14,8 +14,8 @@ scope:
 # The help menu holds the display settings
 
 The help menu must show a group "Darstellung" between "Barrierefreiheit" and "Problem
-melden". The group must have one switch for each of these settings: "Mehr Kontrast"
-(000595), "Weniger Bewegung" (000219) and "Weniger Transparenz" (000596). The group must
+melden". The group must have one switch for each of these settings: "Dunkles Design"
+(000218), "Mehr Kontrast" (000595), "Weniger Bewegung" (000219) and "Weniger Transparenz" (000596). The group must
 show with and without a login, in the popover, in the phone sheet of the public header and
 in the "Mehr" sheet.
 
