@@ -1,4 +1,6 @@
 @use 'field' as f;
+@use '../widths' as w;
+
 :host {
   display: block;
   min-width: 0;
@@ -151,7 +153,7 @@
 
 // The matrix is about 49rem wide at a 960px viewport and about 54rem at 1440px, so 51rem puts the
 // first in the chip layout. The header rule is more specific than `.rm__row`, so it stays hidden.
-@container (max-width: 51rem) {
+@include w.wide {
   .rm__row.rm__row--head {
     display: none;
   }

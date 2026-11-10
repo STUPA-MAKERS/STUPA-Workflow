@@ -1,3 +1,5 @@
+@use '../widths' as w;
+
 :host {
   display: block;
   min-width: 0;
@@ -68,7 +70,7 @@
 .ge__compare > :first-child {
   grid-column: 1 / -1;
 }
-@container (min-width: 30rem) {
+@include w.above-fields {
   .ge__compare {
     grid-template-columns: minmax(0, 1fr) 7.5rem minmax(0, 1fr);
   }

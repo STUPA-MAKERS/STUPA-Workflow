@@ -1,4 +1,5 @@
 @use '../../../shared/ui/surface-card' as sc;
+@use '../widths' as w;
 
 :host {
   display: block;
@@ -102,7 +103,7 @@
   margin: 0;
 }
 
-@container (max-width: 40rem) {
+@include w.columns {
   .tr__row {
     grid-template-columns: minmax(0, 1fr) 2.5rem;
     grid-template-areas:

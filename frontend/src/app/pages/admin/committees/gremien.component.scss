@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use '../../../shared/ui/surface-card' as sc;
+@use '../widths' as w;
 
 :host {
   display: block;
@@ -43,13 +44,13 @@
   user-select: text;
 }
 
-@container (max-width: 44rem) {
+@include w.columns {
   .grem__grid {
     --kv-cols: 2;
   }
 }
 
-@container (max-width: 34rem) {
+@include w.fields {
   .grem__grid {
     --kv-cols: 1;
   }

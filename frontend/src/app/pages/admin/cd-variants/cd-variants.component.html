@@ -9,7 +9,7 @@
     </ng-template>
     <ng-template #content>
       @if (variants().length) {
-        <ul class="rowgroup cdv__list" [attr.aria-label]="'admin.cdVariants.title' | t">
+        <ul class="rowgroup rowgroup--records cdv__list" [attr.aria-label]="'admin.cdVariants.title' | t">
           @for (v of variants(); track v.id) {
             <li class="cdv__variant">
               <div class="cdv__head hitrow">
@@ -22,7 +22,7 @@
                   <span class="cdv__titleLine">
                     <button
                       type="button"
-                      class="hitrow__open cdv__name"
+                      class="hitrow__open cdv__name rowgroup__title"
                       [attr.aria-label]="('admin.common.edit' | t) + ': ' + v.name"
                       (click)="openEdit(v)"
                     >

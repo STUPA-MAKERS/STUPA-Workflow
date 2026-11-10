@@ -1,4 +1,6 @@
 @use '../../../shared/ui/surface-card' as sc;
+@use '../widths' as w;
+
 :host {
   display: block;
 }
@@ -12,22 +14,12 @@
   gap: var(--space-4);
 }
 
-@container (max-width: 34rem) {
+@include w.fields {
   .ns__fields {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-.ns__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow: hidden;
-  border-radius: var(--radius-field);
-}
 .ns__row {
-  min-height: 56px;
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-2);
   justify-content: center;
 }

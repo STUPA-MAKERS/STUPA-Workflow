@@ -1,3 +1,5 @@
+@use '../widths' as w;
+
 :host {
   display: block;
 }
@@ -27,11 +29,6 @@
   grid-template-columns: 2rem minmax(8rem, 1.2fr) minmax(10rem, 1.2fr) minmax(6rem, 0.7fr);
   align-items: center;
   gap: var(--space-2) var(--space-4);
-  min-height: 3.25rem;
-  padding: var(--space-2) var(--space-5) var(--space-2) var(--space-4);
-}
-.gmm__name {
-  font-weight: var(--fw-semibold);
 }
 .gmm__mail {
   font-size: var(--fs-sm);
@@ -48,7 +45,7 @@
   --button-font-size: var(--fs-sm);
 }
 
-@container (max-width: 40rem) {
+@include w.columns {
   .gmm__row {
     grid-template-columns: 2rem minmax(0, 1fr) auto;
     grid-template-areas:

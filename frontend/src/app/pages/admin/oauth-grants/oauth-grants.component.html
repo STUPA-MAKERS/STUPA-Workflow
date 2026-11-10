@@ -24,12 +24,12 @@
     </ng-template>
     <ng-template #content>
       @if (grants().length) {
-        <ul class="rowgroup og__list" [attr.aria-label]="'admin.oauthGrants.title' | t">
+        <ul class="rowgroup rowgroup--records og__list" [attr.aria-label]="'admin.oauthGrants.title' | t">
           @for (g of grants(); track g.id) {
             <li class="og__row">
               <app-avatar class="og__avatar" size="sm" [name]="ownerName(g)" [principalId]="g.principalId" [decorative]="true" />
               <div class="og__who">
-                <span class="og__name ell" [title]="ownerEmail(g) ?? ownerName(g)"
+                <span class="og__name rowgroup__title ell" [title]="ownerEmail(g) ?? ownerName(g)"
                   >{{ ownerName(g) }}@if (ownerEmail(g); as mail) {<span class="sr-only">, {{ mail }}</span>}</span
                 >
                 <span class="og__client mono">{{ g.clientId }}</span>

@@ -12,11 +12,11 @@
     </ng-template>
     <ng-template #content>
       @if (entries().length) {
-      <ul class="rowgroup sp__list" aria-labelledby="sp-title">
+      <ul class="rowgroup rowgroup--records sp__list" aria-labelledby="sp-title">
         @for (s of entries(); track s.id) {
           <li class="sp__row">
             <span class="sp__pair">
-              <span class="sp__member" [class.sp__all]="!memberName(s)">{{
+              <span class="sp__member rowgroup__title" [class.sp__all]="!memberName(s)">{{
                 memberName(s) || ('admin.substitutes.allMembers' | t)
               }}</span>
               <app-icon class="sp__arrow" name="arrow" [size]="16" />

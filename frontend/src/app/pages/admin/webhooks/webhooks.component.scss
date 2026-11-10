@@ -1,3 +1,5 @@
+@use '../widths' as w;
+
 :host {
   display: block;
 }
@@ -39,7 +41,7 @@
   --dialog-footer-gap: var(--space-2);
 }
 
-@container (max-width: 40rem) {
+@include w.columns {
       .wh__grid {
     --kv-cols: 2;
   }

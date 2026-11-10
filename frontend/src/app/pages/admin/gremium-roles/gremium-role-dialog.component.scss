@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use '../../../shared/ui/dialog-form' as df;
+@use '../widths' as w;
 
 @include df.host;
 
@@ -88,7 +89,7 @@
   flex: 1 1 auto;
 }
 
-@container (max-width: 34rem) {
+@include w.fields {
   .rd__names {
     grid-template-columns: 1fr;
   }

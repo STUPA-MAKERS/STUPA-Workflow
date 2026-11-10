@@ -16,17 +16,7 @@
   outline: none;
 }
 
-.ht__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow: hidden;
-  border-radius: var(--radius-field);
-}
 .ht__row {
-  min-height: 64px;
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-2);
   justify-content: center;
 }
 .ht__row--split {
@@ -56,8 +46,7 @@
   gap: 2px;
   min-width: 0;
 }
-.ht__block .ht__label {
-  flex: none;
+.ht__name {
   overflow-wrap: anywhere;
 }
 // Each part draws its dot in the --ht-sep strip before it, and the list starts --ht-sep before

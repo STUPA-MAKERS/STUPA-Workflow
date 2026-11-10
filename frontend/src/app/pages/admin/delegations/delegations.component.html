@@ -19,11 +19,11 @@
       <ng-template #content>
         <ng-template #rows let-list>
           @if (list.length) {
-            <ul class="rowgroup dl__list">
+            <ul class="rowgroup rowgroup--records dl__list">
               @for (d of list; track d.id) {
                 <li class="dl__row">
                   <span class="dl__meeting">
-                    <a class="dl__title" [routerLink]="['/meetings', d.meetingId]">{{
+                    <a class="dl__title rowgroup__title" [routerLink]="['/meetings', d.meetingId]">{{
                       d.meetingTitle || ('admin.deleg.meeting' | t)
                     }}</a>
                     @if (d.meetingDate) {

@@ -1,4 +1,6 @@
 @use '../../../shared/ui/surface-card' as sc;
+@use '../widths' as w;
+
 :host {
   display: block;
 }
@@ -66,7 +68,7 @@
   font-family: var(--font-mono);
 }
 
-@container (max-width: 40rem) {
+@include w.columns {
   .ar__key {
     display: none;
   }

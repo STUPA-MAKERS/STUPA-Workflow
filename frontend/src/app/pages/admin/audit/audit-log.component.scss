@@ -1,3 +1,5 @@
+@use '../widths' as w;
+
 :host {
   display: block;
 }
@@ -111,7 +113,7 @@
   color: var(--color-accent-text);
 }
 
-@container (max-width: 44rem) {
+@include w.columns {
   .al__action {
     grid-area: action;
   }

@@ -28,11 +28,11 @@
         @if (!visible().length) {
         <app-empty-state shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
       } @else {
-        <ul class="rowgroup gmm__list" [attr.aria-label]="'admin.gremien.members' | t">
+        <ul class="rowgroup rowgroup--records gmm__list" [attr.aria-label]="'admin.gremien.members' | t">
           @for (m of visible(); track m.id) {
             <li class="gmm__row">
               <app-avatar size="sm" [name]="m.name" [principalId]="m.id" [decorative]="true" />
-              <span class="gmm__name ell" [title]="m.name">{{ m.name }}</span>
+              <span class="gmm__name rowgroup__title ell" [title]="m.name">{{ m.name }}</span>
               <span class="gmm__mail mono">{{ m.email ?? '—' }}</span>
               <span class="gmm__role">{{ m.role | capitalize }}</span>
             </li>

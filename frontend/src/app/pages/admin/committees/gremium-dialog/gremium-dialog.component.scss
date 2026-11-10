@@ -1,5 +1,6 @@
 @use '../../../../shared/ui/dialog-form' as df;
 @use 'field' as f;
+@use '../../widths' as w;
 
 @include df.host;
 
@@ -94,7 +95,7 @@
   color: var(--field-text, var(--color-text-muted));
 }
 
-@container (max-width: 34rem) {
+@include w.fields {
   .gd__cols {
     grid-template-columns: 1fr;
   }
