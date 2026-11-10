@@ -32,7 +32,7 @@ describe('LoginComponent', () => {
     expect(screen.getByRole('heading', { name: 'Mit STUPA-Konto' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Per E-Mail-Link' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Mit SSO anmelden/ }));
-    expect(auth.login).toHaveBeenCalled();
+    expect(auth.login).toHaveBeenCalledWith('/dashboard');
   });
 
   it('sends only a well-formed address with a solved ALTCHA', async () => {
