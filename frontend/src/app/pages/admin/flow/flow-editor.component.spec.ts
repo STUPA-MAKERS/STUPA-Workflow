@@ -1,3 +1,4 @@
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { NEVER, Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -110,7 +111,7 @@ async function setup(over: Overrides = {}) {
     providers: [
       { provide: AdminApiService, useValue: api },
       { provide: BudgetTreeApi, useValue: budgetApi },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       { provide: FLOW_LAYOUTER, useValue: over.layouter ?? null },
     ],
   });
@@ -202,6 +203,23 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(graph.states.map((s) => s.key)).toEqual(['a', 'b']);
     expect(graph.states.filter((s) => s.isInitial)).toHaveLength(1);
     expect(graph.layout?.positions).toBeDefined();
+  });
+
+  /** § 000635 */
+  it('"Verwerfen" reads the stored flow again and hides with "Speichern"', async () => {
+    const { fixture, createGlobalFlowVersion } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const before = c.json();
+    buildValid(c);
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    fixture.detectChanges();
+    expect(c.json()).toBe(before);
+    expect(createGlobalFlowVersion).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('shows "Speichern" only while the flow has unsaved changes', async () => {
@@ -497,12 +515,13 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().states.map((s: { key: string }) => s.key)).toEqual(['a', 'b']);
   });
 
-  it('toasts when the global flow fails to load', async () => {
-    const { toast } = await setup({
-      getGlobalFlow: jest.fn(() => throwError(() => new Error('boom'))),
-    });
-    expect(toast.error).toHaveBeenCalled();
+  it('shows the load error toast with a retry when the global flow fails to load', async () => {
+    const getGlobalFlow = jest.fn(() => throwError(() => new Error('boom')));
+    await setup({ getGlobalFlow });
+    expect(loadErrorToast()).toBeTruthy();
     expect(document.querySelector('.fe__canvasSkel')).toBeNull();
+    retryLoadError();
+    expect(getGlobalFlow).toHaveBeenCalledTimes(2);
   });
 
   it('swallows errors from option/role/webhook/budget loads', async () => {
@@ -3061,6 +3080,12 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       expect(c.headerMenu()[0].items[0].checked).toBe(true);
       c.onHeaderMenu({ id: 'other', label: 'x' });
       expect(c.showVersions()).toBe(true);
+      const before = c.json();
+      buildValid(c);
+      expect(c.headerMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['versions', 'discard']);
+      c.onHeaderMenu({ id: 'discard', label: 'Verwerfen' });
+      expect(c.json()).toBe(before);
+      expect(c.headerMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['versions']);
     });
 
     it('lists the incoming and outgoing transitions of a selected state in the inspector', async () => {

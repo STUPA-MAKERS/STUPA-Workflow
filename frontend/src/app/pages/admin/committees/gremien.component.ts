@@ -28,7 +28,7 @@ import type { CdVariantOption, Gremium } from '../admin.models';
 import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
 import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
 import { expandSet } from '@shared/expand-set';
-import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /**
  * The message of a refused gremium delete. The delete applies the rules of the meeting
@@ -71,7 +71,7 @@ interface Setting {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LoadErrorComponent,
+    LoadStateComponent,
     SectionComponent,
     ExpandRowComponent,
     FabComponent,
@@ -102,6 +102,7 @@ export class AdminGremienComponent {
   readonly gremien = signal<Gremium[]>([]);
   readonly loading = signal(true);
   readonly loadError = signal(false);
+  readonly loadState = loadStateOf(this.loading, this.loadError);
   /** CD variants from `GET /cd-variants`: the dropdown source and the read-out names. */
   readonly cdVariants = signal<CdVariantOption[]>([]);
   /** The ids of the open rows. */

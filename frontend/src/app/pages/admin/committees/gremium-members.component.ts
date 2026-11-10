@@ -36,7 +36,7 @@ import {
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
 import { personLabel } from '@shared/person-label.util';
-import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /** One row of the member list. */
 interface Member {
@@ -66,7 +66,7 @@ export const MEMBER_PREVIEW = 7;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LoadErrorComponent,
+    LoadStateComponent,
     SectionComponent,
     ButtonComponent,
     EmptyStateComponent,
@@ -94,6 +94,7 @@ export class GremiumMembersComponent {
   /** True until the first answer, so the list does not claim there are no members. */
   protected readonly loading = signal(true);
   protected readonly failed = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.failed);
   protected readonly showAll = signal(false);
   protected readonly preview = MEMBER_PREVIEW;
 

@@ -1,0 +1,33 @@
+// The three widths at which a layout of Verwaltung changes (§ S/frontend/angular/000637).
+// A stylesheet of Verwaltung writes no other container width.
+//   @use '../widths' as w;
+
+//   @include w.fields { … }
+$fields: 34rem;
+$columns: 44rem;
+$wide: 56rem;
+
+// The fields of a form stack.
+@mixin fields {
+  @container (max-width: #{$fields}) {
+    @content;
+  }
+}
+// The opposite of `fields`: the layout for a container that is wider.
+@mixin above-fields {
+  @container (min-width: #{$fields}) {
+    @content;
+  }
+}
+// The columns of a row stack.
+@mixin columns {
+  @container (max-width: #{$columns}) {
+    @content;
+  }
+}
+// A wide row with five or more columns stacks.
+@mixin wide {
+  @container (max-width: #{$wide}) {
+    @content;
+  }
+}

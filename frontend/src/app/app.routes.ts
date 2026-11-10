@@ -434,7 +434,7 @@ export const routes: Routes = [
             },
             canActivate: [authGuard],
             loadComponent: () =>
-              import('./pages/admin/flow-editor/flow-editor.component').then(
+              import('./pages/admin/flow/flow-editor.component').then(
                 (m) => m.FlowEditorComponent,
               ),
           },
@@ -470,14 +470,14 @@ export const routes: Routes = [
             data: { title: 'admin.gremien.title', permission: 'admin.gremien', parent: ['admin'] },
             canActivate: [authGuard],
             loadComponent: () =>
-              import('./pages/admin/gremien/gremien.component').then((m) => m.AdminGremienComponent),
+              import('./pages/admin/committees/gremien.component').then((m) => m.AdminGremienComponent),
           },
           {
             path: 'committees/:id/members',
             data: { title: 'admin.gremien.membersOf', permission: 'admin.gremien', parent: ['admin', 'admin/committees'] },
             canActivate: [authGuard],
             loadComponent: () =>
-              import('./pages/admin/gremien/gremium-members.component').then(
+              import('./pages/admin/committees/gremium-members.component').then(
                 (m) => m.GremiumMembersComponent,
               ),
           },
@@ -522,7 +522,7 @@ export const routes: Routes = [
             data: { title: 'admin.webhook.title', permission: 'webhook.manage', parent: ['admin'] },
             canActivate: [authGuard],
             loadComponent: () =>
-              import('./pages/admin/config/webhooks.component').then((m) => m.WebhooksComponent),
+              import('./pages/admin/webhooks/webhooks.component').then((m) => m.WebhooksComponent),
           },
           {
             path: 'help-tickets',

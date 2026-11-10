@@ -5,7 +5,11 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "frontend/src/app/pages/admin/admin-load-state.templates.spec.ts:AdminLoadState"
+implementation:
+  - frontend/src/app/shared/ui/load-state/load-state.component.ts
+  - frontend/src/app/pages/admin/admin-load-state.templates.spec.ts
 scope:
   - frontend/src/app/pages/admin
   - frontend/src/app/shared/ui/load-state
@@ -19,9 +23,14 @@ goes into the `#loading` template. A template of Verwaltung must not place `app-
 or a loading skeleton by itself. A data table is the exception: it shows the load through
 its own `loading` input.
 
-Reason: Twelve pages wire the skeleton and the error by hand, each in another order. Six
-templates show a load error as a note in the page, which `NF/usability/controls/000576`
-forbids.
+A list that keeps its rows or its empty state below the load error sets `keepContent`. A
+template with a `#loading` template must not call a member `loading()`, because the
+reference hides the member in the whole template.
 
-Test: A source test reads every template below `pages/admin` and fails on `<app-load-error`
-and on `<app-skeleton` outside a `#loading` template.
+Reason: One component gives every page the same order of the states and the retry of
+`NF/usability/controls/000576`. A page that wires the skeleton and the error by hand can
+leave out the error or the retry.
+
+Test: A source test reads every template below `pages/admin`. It fails on `<app-load-error`,
+on `<app-skeleton` outside a `#loading` template, and on a call `loading()` in a template
+with a `#loading` template.

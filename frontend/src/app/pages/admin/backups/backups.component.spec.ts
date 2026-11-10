@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -63,7 +64,7 @@ async function setup(api = makeApi()) {
   const view = await render(BackupsComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   await view.fixture.whenStable();
@@ -234,7 +235,7 @@ describe('BackupsComponent', () => {
     const view = await render(BackupsComponent, {
       providers: [
         { provide: AdminApiService, useValue: api },
-        { provide: ToastService, useValue: toast },
+        { provide: ToastService, useFactory: () => toastWith(toast) },
       ],
     });
     jest.advanceTimersByTime(3000);
@@ -348,7 +349,7 @@ describe('BackupsComponent', () => {
       const view = await render(BackupsComponent, {
         providers: [
           { provide: AdminApiService, useValue: api },
-          { provide: ToastService, useValue: toast },
+          { provide: ToastService, useFactory: () => toastWith(toast) },
         ],
       });
       jest.advanceTimersByTime(3000);
@@ -367,7 +368,7 @@ describe('BackupsComponent', () => {
       const view = await render(BackupsComponent, {
         providers: [
           { provide: AdminApiService, useValue: api },
-          { provide: ToastService, useValue: toast },
+          { provide: ToastService, useFactory: () => toastWith(toast) },
         ],
       });
       jest.advanceTimersByTime(31 * 60 * 1000);
@@ -388,7 +389,7 @@ describe('BackupsComponent', () => {
       const view = await render(BackupsComponent, {
         providers: [
           { provide: AdminApiService, useValue: api },
-          { provide: ToastService, useValue: toast },
+          { provide: ToastService, useFactory: () => toastWith(toast) },
         ],
       });
       jest.advanceTimersByTime(3000);

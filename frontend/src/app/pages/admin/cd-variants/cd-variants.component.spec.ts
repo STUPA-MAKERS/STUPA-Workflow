@@ -1,6 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariant, CdVariantLogo } from '../admin.models';
@@ -76,7 +77,7 @@ async function setup(api: ReturnType<typeof makeApi> = makeApi()) {
   const view = await render(AdminCdVariantsComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,11 +138,17 @@ describe('AdminCdVariantsComponent', () => {
     expect(await screen.findByText('Noch keine Dokument-Varianten angelegt.')).toBeInTheDocument();
   });
 
-  it('shows an error when the list request fails', async () => {
-    const { c } = await setup(makeApi({ listCdVariants: jest.fn(() => httpError(500)) }));
+  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
+  it('names a failed list request in a toast with a retry, over the empty state', async () => {
+    const api = makeApi({ listCdVariants: jest.fn(() => httpError(500)) });
+    const { c, container } = await setup(api);
     expect(c.loadError()).toBe(true);
     expect(c.loading()).toBe(false);
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(loadErrorToast()).toBe('Die Dokument-Varianten konnten nicht geladen werden.');
+    expect(container.querySelector('app-note')).toBeNull();
+    expect(container.querySelector('app-empty-state')).toBeTruthy();
+    retryLoadError();
+    expect(api.listCdVariants).toHaveBeenCalledTimes(2);
   });
 
   it('sorts the logos of a slot by position and labels their source', async () => {
@@ -292,7 +299,8 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.formError()).toBe('admin.cdVariants.keyExists');
     expect(c.saving()).toBe(false);
     expect(c.dialogOpen()).toBe(true);
-    expect(toast.error).toHaveBeenCalledWith('Dieser Schlüssel ist bereits vergeben.');
+    expect(c.formError()).toBe('admin.cdVariants.keyExists');
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('falls back to the generic message on any other save failure', async () => {
@@ -302,7 +310,7 @@ describe('AdminCdVariantsComponent', () => {
     c.openCreate();
     c.patchName('StuPa');
     c.submit(new Event('submit'));
-    expect(c.formError()).toBe('admin.common.saveFailed');
+    expect(c.formError()).toBeNull();
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 
@@ -332,16 +340,15 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.deleteError()).toBe('admin.cdVariants.inUse');
     expect(c.deleting()).toBe(false);
     expect(c.confirmDelete()).not.toBeNull();
-    expect(toast.error).toHaveBeenCalledWith(
-      'Diese Variante ist noch einem Gremium zugewiesen. Ändere zuerst das Gremium.',
-    );
+    expect(c.deleteError()).toBe('admin.cdVariants.inUse');
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('shows the generic message on a non-409 delete failure', async () => {
     const { c, toast } = await setup(makeApi({ deleteCdVariant: jest.fn(() => httpError(500)) }));
     c.askDelete(VARIANT);
     c.doDelete();
-    expect(c.deleteError()).toBe('admin.common.saveFailed');
+    expect(c.deleteError()).toBeNull();
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 
@@ -548,7 +555,9 @@ describe('AdminCdVariantsComponent', () => {
       await fixture.whenStable();
       c.saveLogo();
       expect(c.logoError()).toBe(key);
-      expect(toast.error).toHaveBeenCalledWith(text);
+      expect(toast.error).not.toHaveBeenCalled();
+      fixture.detectChanges();
+      expect(document.querySelector('app-note[kind="error"]')?.textContent).toContain(text);
     });
 
     it('falls back to the status for an unknown code', async () => {
@@ -644,9 +653,10 @@ describe('AdminCdVariantsComponent', () => {
     c.openLogoDialog(VARIANT, 'title');
     c.onFileSelected([file]);
     c.saveLogo();
-    expect(c.logoError()).toBe(key);
+    const generic = key === 'admin.common.saveFailed';
+    expect(c.logoError()).toBe(generic ? null : key);
     expect(c.logoSaving()).toBe(false);
-    expect(toast.error).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledTimes(generic ? 1 : 0);
   });
 
   it('saveLogo and setSlot are no-ops without an open dialog', async () => {
@@ -725,7 +735,7 @@ describe('AdminCdVariantsComponent', () => {
       );
       c.askDelete(VARIANT);
       c.doDelete();
-      expect(c.deleteError()).toBe('admin.common.saveFailed');
+      expect(c.deleteError()).toBeNull();
       expect(toast.error).toHaveBeenCalled();
     },
   );

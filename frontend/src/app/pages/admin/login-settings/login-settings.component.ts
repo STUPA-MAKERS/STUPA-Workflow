@@ -6,7 +6,7 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
-import { FabComponent, InputComponent, PageHeaderComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, FabComponent, InputComponent, PageHeaderComponent } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import { type LoginSettings, MAX_SESSION_DAYS } from '../admin.models';
@@ -54,6 +54,7 @@ function draftOf(s: LoginSettings): Draft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ButtonComponent,
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,
@@ -107,6 +108,11 @@ export class LoginSettingsComponent {
 
   protected patch(change: Partial<Draft>): void {
     this.form.patch(change);
+  }
+
+  /** "Verwerfen": back to the stored values (§ 000635). */
+  protected discard(): void {
+    this.form.reset();
   }
 
   protected save(): void {

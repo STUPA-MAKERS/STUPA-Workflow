@@ -1,3 +1,5 @@
+@use '../../widths' as w;
+
 :host {
   display: contents;
 }
@@ -162,7 +164,7 @@
   display: block;
 }
 
-@container (max-width: 34rem) {
+@include w.fields {
   .um__pair {
     grid-template-columns: minmax(0, 1fr);
   }

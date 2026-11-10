@@ -1,17 +1,16 @@
 <section class="ns admin-page">
   <app-page-header [flush]="true" [title]="'admin.notifications.title' | t">
     <app-breadcrumbs crumbs />
+    @if (settings() && dirty()) {
+      <app-button actions variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
+    }
   </app-page-header>
-
-  @if (settings() && error()) {
-    <app-note kind="error" icon="alert" role="alert">{{ $any(error()) | t }}</app-note>
-  }
 
   <app-load-state [state]="loadState()" [lines]="4" [errorText]="'admin.notifications.error' | t" (retry)="load()">
     <ng-template #content>
       @if (settings(); as s) {
       <app-section class="ns__sec" [level]="2" [heading]="'admin.notifications.taskReminder' | t">
-        <div class="ns__rows">
+        <div class="rowgroup rowgroup--settings">
           <app-switch class="ns__row" [checked]="s.taskReminderEnabled" (checkedChange)="patch({ taskReminderEnabled: $event })">
             {{ 'admin.notifications.enabled' | t }}
           </app-switch>

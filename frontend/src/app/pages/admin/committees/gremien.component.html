@@ -1,0 +1,93 @@
+<section class="grem admin-page">
+  <app-page-header
+    [flush]="true"
+    [title]="'admin.gremien.title' | t"
+  >
+    <app-breadcrumbs crumbs />
+  </app-page-header>
+
+  @if (canMappings()) {
+    <app-note>
+      <a class="grem__noteLink" routerLink="/admin/group-mappings">{{
+        'admin.users.manageGroupMappings' | t
+      }}</a>
+    </app-note>
+  }
+
+  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.gremien.error' | t" (retry)="reload(true)">
+    <ng-template #loading>
+      <app-skeleton variant="rows" [count]="4" [label]="'admin.gremien.loading' | t" />
+    </ng-template>
+    <ng-template #content>
+      @if (gremien().length) {
+      <ul class="rowgroup grem__list" [attr.aria-label]="'admin.gremien.title' | t">
+        @for (g of gremien(); track g.id) {
+          <li class="grem__item">
+            <app-expand-row
+              [title]="g.name"
+              align="row"
+              [sub]="g.slug + (counts(g) ? ' · ' + counts(g) : '')"
+              [open]="isOpen(g)"
+              (openChange)="toggle(g)"
+            >
+              <app-icon lead class="grem__icon" name="landmark" [size]="20" />
+              @if (g.protocolsPublic) {
+                <app-status-text status kind="accent">{{ 'admin.gremien.publicTag' | t }}</app-status-text>
+              }
+              <app-row-menu
+                trail
+                [sections]="rowMenu()"
+                [label]="('ui.rowMenu.trigger' | t) + ': ' + g.name"
+                (selected)="onRowMenu($event, g)"
+              />
+            @if (isOpen(g)) {
+              <div class="grem__body">
+                <app-section class="grem__settings" [level]="2" [heading]="'admin.gremien.settings' | t">
+                  <dl class="kv grem__grid">
+                    @for (s of settings(g); track s.label) {
+                      <div [class.kv__wide]="s.copyable">
+                        <dt>{{ s.label }}</dt>
+                        <dd [class.grem__copy]="s.copyable">{{ s.value }}</dd>
+                      </div>
+                    }
+                  </dl>
+                </app-section>
+
+                <app-gremium-role-matrix
+                  [gremiumId]="g.id"
+                  [gremiumName]="g.name"
+                  [surface]="3"
+                  (countChange)="onRoleCount(g, $event)"
+                />
+              </div>
+            }
+            </app-expand-row>
+          </li>
+        }
+      </ul>
+    } @else {
+      <app-empty-state [heading]="'admin.gremien.empty' | t" />
+      }
+    </ng-template>
+  </app-load-state>
+
+  <app-fab [label]="'fab.gremium' | t" (activate)="openCreate()" />
+</section>
+
+<app-gremium-dialog
+  [open]="dialogGremium() !== undefined"
+  [gremium]="lastDialogGremium()"
+  [cdVariants]="cdVariants()"
+  (closed)="closeDialog()"
+  (saved)="onSaved($event)"
+  (baseSaved)="onBaseSaved($event)"
+/>
+
+<app-confirm-dialog
+  [open]="confirmDelete() !== null"
+  [title]="'admin.gremien.deleteTitle' | t"
+  [body]="'admin.gremien.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' }"
+  [busy]="deleting()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>

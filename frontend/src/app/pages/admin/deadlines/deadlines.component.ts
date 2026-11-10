@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, viewChild } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { FabComponent, PageHeaderComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, FabComponent, PageHeaderComponent } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
 import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.component';
@@ -19,6 +19,7 @@ import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ButtonComponent,
     FabComponent,
     TranslatePipe,
     PageHeaderComponent,
@@ -39,6 +40,11 @@ export class AdminDeadlinesComponent {
   protected readonly settingsDirty = computed(() => this.dirtySections().length > 0);
   protected readonly settingsSaving = computed(() => this.dirtySections().some((s) => s?.saving()));
   protected readonly settingsValid = computed(() => this.dirtySections().every((s) => s?.valid()));
+
+  /** "Verwerfen": every settings section goes back to its stored values (§ 000635). */
+  protected discardSettings(): void {
+    this.dirtySections().forEach((s) => s?.discard());
+  }
 
   /** "Speichern": send every settings section that has changes. */
   protected saveSettings(): void {

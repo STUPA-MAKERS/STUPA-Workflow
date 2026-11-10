@@ -378,7 +378,7 @@ describe('HelpTicketsComponent', () => {
 
     it('names a failed read', async () => {
       await setup({ perms: ['admin.site', 'ticket.manage'], tickets: makeTickets(throwError(() => new Error('x'))) });
-      expect(screen.getByText('Die gesperrten Absender konnten nicht geladen werden.')).toBeInTheDocument();
+      expect(loadErrorToast()).toBe('Die gesperrten Absender konnten nicht geladen werden.');
     });
 
     /** An unblock before the list arrives leaves an empty list. */

@@ -1,5 +1,6 @@
 @use 'scroll-fade' as fade;
 @use 'field' as f;
+@use '../widths' as w;
 
 :host {
   display: block;
@@ -15,7 +16,7 @@
   gap: var(--space-5);
   align-items: start;
 }
-@container (max-width: 44rem) {
+@include w.columns {
   .mt__layout {
     grid-template-columns: minmax(0, 1fr);
   }

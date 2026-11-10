@@ -34,6 +34,7 @@ import { UserRevokeComponent } from './user-revoke/user-revoke.component';
 import { personLabel } from '@shared/person-label.util';
 import type { TranslationKey } from '@core/i18n/translations';
 import { toggled } from '@shared/util/immutable';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /** The choices of the chip "Letzte Anmeldung": older than n days, or never. */
 export const LAST_LOGIN_FILTERS = ['', '90', '180', '365', 'never'] as const;
@@ -88,6 +89,7 @@ function lastLoginFilters(lastLogin: LastLoginFilter, now: number): PrincipalFil
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     ExpandRowComponent,
     RouterLink,
     TranslatePipe,
@@ -137,11 +139,12 @@ export class UsersComponent {
     },
     result: (list) => {
       this.principals.set(list);
+      this.loadError.set(false);
       this.loading.set(false);
     },
     error: () => {
+      this.loadError.set(true);
       this.loading.set(false);
-      this.toast.error(this.i18n.translate('admin.users.loadFailed'));
     },
   });
   protected readonly principals = signal<AdminPrincipal[]>([]);
@@ -193,6 +196,15 @@ export class UsersComponent {
    * the list does not jump on every key press.
    */
   protected readonly loading = signal(true);
+  /** The last read of the list failed (§ 000576). */
+  protected readonly loadError = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.loadError);
+
+  /** The retry of the load error: run the search again. */
+  protected retryLoad(): void {
+    this.loadError.set(false);
+    this.search.refresh();
+  }
 
   /**
    * Without the permission the mappings request answers 403, and the column then shows the

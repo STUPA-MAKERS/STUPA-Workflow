@@ -27,6 +27,7 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
 import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 type Lang = ContentLang;
 
@@ -53,6 +54,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     SectionComponent,
     ListItemComponent,
     SkeletonComponent,
@@ -88,6 +90,9 @@ export class MailTemplatesComponent {
   readonly draft = signal<MailTemplate | null>(null);
   /** The list has not arrived yet. */
   readonly loading = signal(true);
+  /** The read of the templates failed (§ 000576). */
+  protected readonly loadError = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.loadError);
   readonly lang = signal<Lang>('de');
   readonly saving = signal(false);
   readonly resetting = signal(false);
@@ -133,6 +138,13 @@ export class MailTemplatesComponent {
   });
 
   constructor() {
+    this.load();
+  }
+
+  /** Read the templates; also the retry of the load error. */
+  protected load(): void {
+    this.loading.set(true);
+    this.loadError.set(false);
     this.api.listMailTemplates().subscribe({
       next: (t) => {
         this.loading.set(false);
@@ -140,8 +152,8 @@ export class MailTemplatesComponent {
         if (t.length && !this.selectedKey()) this.select(t[0].key);
       },
       error: () => {
+        this.loadError.set(true);
         this.loading.set(false);
-        this.toast.error(this.i18n.translate('admin.mailTemplates.loadFailed'));
       },
     });
   }
@@ -159,6 +171,12 @@ export class MailTemplatesComponent {
       bodyHtmlI18n: { ...tpl.bodyHtmlI18n },
       placeholders: { ...tpl.placeholders },
     });
+  }
+
+  /** "Verwerfen": the open template goes back to its stored texts (§ 000635). */
+  discard(): void {
+    const key = this.selectedKey();
+    if (key) this.select(key);
   }
 
   patch(field: 'subjectI18n' | 'bodyI18n' | 'bodyHtmlI18n', value: string): void {

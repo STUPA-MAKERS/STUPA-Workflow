@@ -14,7 +14,6 @@ import {
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
-  IconComponent,
   InputComponent,
   keyParts,
   NoteComponent,
@@ -34,6 +33,7 @@ import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { expandSet } from '@shared/expand-set';
 import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /** Draft for a new global role. */
 interface RoleDraft {
@@ -65,6 +65,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
+    LoadStateComponent,
     SectionComponent,
     ContentLangSwitchComponent,
     ExpandRowComponent,
@@ -78,7 +79,6 @@ const FIXED_ROLES = new Set(['admin', 'member']);
     ButtonComponent,
     CheckboxComponent,
     DialogComponent,
-    IconComponent,
     InputComponent,
     NoteComponent,
     PageHeaderComponent,
@@ -122,16 +122,30 @@ export class AdminRolesComponent {
   /** True until the first answer, so the table does not claim there are no roles. */
   protected readonly loading = signal(true);
 
+  /** The read of the roles failed (§ 000576). */
+  protected readonly loadError = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.loadError);
+
   constructor() {
+    this.load();
+    this.api.listPermissions().subscribe((p) => this.permissions.set(p));
+  }
+
+  /** Read the roles; also the retry of the load error. */
+  protected load(): void {
+    this.loading.set(true);
+    this.loadError.set(false);
     this.api.listRoles().subscribe({
       next: (r) => {
         this.roles.set(r);
         this.keepSaved(r);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
+      error: () => {
+        this.loadError.set(true);
+        this.loading.set(false);
+      },
     });
-    this.api.listPermissions().subscribe((p) => this.permissions.set(p));
   }
 
   protected roleLabel(role: Role): string {
@@ -226,6 +240,13 @@ export class AdminRolesComponent {
     this.roles().filter((r) => this.permsChanged(r) || this.nameChanged(r)),
   );
   protected readonly rolesDirty = computed(() => this.dirtyRoles().length > 0);
+
+  /** "Verwerfen": every role goes back to its stored name and rights (§ 000635). */
+  protected discardRoles(): void {
+    const saved = this.savedRoles();
+    this.roles.update((list) => list.map((r) => saved.get(r.id) ?? r));
+    this.nameDrafts.set({});
+  }
 
   private keepSaved(roles: Role[]): void {
     this.savedRoles.update((m) => new Map([...m, ...roles.map((r) => [r.id, r] as const)]));

@@ -23,7 +23,7 @@ const DRAWS_RING = /--color-focus-ring|@include\s+(?:f\.box|om\.option-focus|fie
 /** Removals on targets that only the script focuses, by file and selector. */
 const SCRIPT_TARGETS: Readonly<Record<string, readonly string[]>> = {
   // The heading of the bar and the edited text: the route focus and the edit mode focus them.
-  'src/app/features/apply/status-timeline.component.scss': ['.sp__title:focus,\n.sp__editText strong:focus'],
+  'src/app/features/apply/status-timeline.component.scss': ['.sp__editText strong:focus'],
   // The section that a deep link scrolls to and focuses.
   'src/app/pages/admin/help-tickets/help-tickets.component.scss': ['.ht__sec:focus'],
   'src/app/pages/applications/applications-detail.component.scss': ['.ad__sec:focus'],

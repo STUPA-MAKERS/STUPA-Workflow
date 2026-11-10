@@ -38,7 +38,7 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['features/todos/link-picker/todo-link-picker.component.scss', '.lp__search'],
   ['pages/todos/board-view/todo-board-view.component.scss', '.bv__quick'],
   ['pages/applications/agenda-dialog/agenda-dialog.component.scss', '.agd__note'],
-  ['pages/admin/gremien/gremium-dialog/gremium-dialog.component.scss', '.gd__mail'],
+  ['pages/admin/committees/gremium-dialog/gremium-dialog.component.scss', '.gd__mail'],
   ['features/meetings/attendance-sheet/attendance-sheet.component.scss', '.as__note'],
   ['pages/admin/forms/form-editor.component.scss', '.fe__pv-control'],
   ['pages/dashboard/dashboard.component.scss', '.dash__btn--fill'],

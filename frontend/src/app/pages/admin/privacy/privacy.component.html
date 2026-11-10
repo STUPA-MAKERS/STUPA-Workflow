@@ -1,6 +1,9 @@
 <section class="pv admin-page">
   <app-page-header [flush]="true" [title]="'admin.privacy.title' | t">
     <app-breadcrumbs crumbs />
+    @if (retentionDirty()) {
+      <app-button actions variant="text" [disabled]="retentionSaving()" (click)="discardRetention()">{{ 'action.discard' | t }}</app-button>
+    }
   </app-page-header>
 
   <app-section class="pv__queue" [level]="2" [heading]="'admin.privacy.queueTitle' | t">

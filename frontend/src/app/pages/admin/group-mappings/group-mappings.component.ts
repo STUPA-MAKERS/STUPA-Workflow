@@ -35,6 +35,8 @@ import type {
   GroupMapping,
   Role,
 } from '../admin.models';
+import type { LoadState } from '@shared/forms/settings-form';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 
 /** The three separate mapping kinds. Each has its own table and dialog. */
 export type MappingKind = 'global' | 'membership' | 'role';
@@ -71,7 +73,7 @@ export interface MappingRow {
 export interface MappingSection {
   readonly kind: MappingKind;
   readonly rows: readonly MappingRow[];
-  readonly loading: boolean;
+  readonly state: LoadState;
 }
 
 /** The RBAC resolver reserves this group prefix. The backend refuses it with 422. */
@@ -98,6 +100,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     SectionComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -143,6 +146,12 @@ export class GroupMappingsComponent {
     global: true,
     membership: true,
     role: true,
+  });
+  /** The sections whose last read failed (§ 000576). */
+  private readonly failed = signal<Record<MappingKind, boolean>>({
+    global: false,
+    membership: false,
+    role: false,
   });
 
   /** The open add/edit dialog, or null. */
@@ -216,17 +225,17 @@ export class GroupMappingsComponent {
   readonly sections = computed<MappingSection[]>(() => [
     {
       kind: 'global',
-      loading: this.loading().global,
+      state: this.stateOf('global'),
       rows: this.globalRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.roleLabel, role: null })),
     },
     {
       kind: 'membership',
-      loading: this.loading().membership,
+      state: this.stateOf('membership'),
       rows: this.membershipRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.gremiumLabel, role: null })),
     },
     {
       kind: 'role',
-      loading: this.loading().role,
+      state: this.stateOf('role'),
       rows: this.roleRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.gremiumLabel, role: r.roleLabel })),
     },
   ]);
@@ -260,11 +269,23 @@ export class GroupMappingsComponent {
     this.refresh('role');
   }
 
+  /** The load state of one section. */
+  private stateOf(kind: MappingKind): LoadState {
+    return this.loading()[kind] ? 'loading' : this.failed()[kind] ? 'error' : 'ok';
+  }
+
+  /** The retry of the load error of one section. */
+  protected retry(kind: MappingKind): void {
+    this.loading.update((l) => ({ ...l, [kind]: true }));
+    this.refresh(kind);
+  }
+
   private refresh(kind: MappingKind): void {
+    this.failed.update((f) => ({ ...f, [kind]: false }));
     const done = (): void => this.loading.update((l) => ({ ...l, [kind]: false }));
     const fail = (): void => {
+      this.failed.update((f) => ({ ...f, [kind]: true }));
       done();
-      this.toast.error(this.i18n.translate('admin.groupMappings.loadFailed'));
     };
     if (kind === 'global') {
       this.api.listGroupMappings().subscribe({

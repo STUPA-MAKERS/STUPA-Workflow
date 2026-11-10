@@ -8,7 +8,7 @@ updated: 2026-11-06
 implementation:
   - backend/app/modules/admin/router.py
   - backend/app/modules/admin/service/webhooks.py
-  - frontend/src/app/pages/admin/config/webhooks.component.ts
+  - frontend/src/app/pages/admin/webhooks/webhooks.component.ts
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin

@@ -24,7 +24,7 @@ import { AdminApiService } from '../admin-api.service';
 import type { Gremium } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
 import { localToday } from '@shared/date-format';
-import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /**
  * The admin overview of the delegations (`/admin/delegations`).
@@ -45,8 +45,8 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     SectionComponent,
-    LoadErrorComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
@@ -73,6 +73,7 @@ export class DelegationsComponent {
   protected readonly delegations = signal<Delegation[]>([]);
   protected readonly loading = signal(true);
   protected readonly loadError = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.loadError);
   protected readonly busy = signal(false);
   protected readonly confirmRevoke = signal<Delegation | null>(null);
   protected readonly showPast = signal(false);

@@ -90,11 +90,15 @@ interface ConflictProblem {
  * decides; the dialog only shows its answers. `merged` fires after a successful merge,
  * `closed` when the dialog closes.
  */
+import type { LoadState } from '@shared/forms/settings-form';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
+
 @Component({
   selector: 'app-user-merge',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     SectionComponent,
     EmptyStateComponent,
     FormsModule,
@@ -126,18 +130,26 @@ export class UserMergeComponent {
   protected readonly step = signal<MergeStep>('pick');
   protected readonly candidates = signal<AdminPrincipal[]>([]);
   protected readonly searched = signal(false);
+  /** The read of the account list failed. */
+  protected readonly searchFailed = signal(false);
   protected readonly search = liveSearch<AdminPrincipal[]>({
     run: (q) => this.api.listPrincipals(q),
     result: (list) => {
       const own = this.source()?.id;
       this.candidates.set(list.filter((p) => p.id !== own && !p.mergedIntoId).slice(0, PICK_LIMIT));
+      this.searchFailed.set(false);
       this.searched.set(true);
     },
     error: () => {
       this.candidates.set([]);
+      this.searchFailed.set(true);
       this.searched.set(true);
     },
   });
+  /** The load state of the account list of the pick step. */
+  protected readonly pickState = computed<LoadState>(() =>
+    !this.searched() ? 'loading' : this.searchFailed() ? 'error' : 'ok',
+  );
 
   /** The account that stays, as picked. */
   private readonly target = signal<AdminPrincipal | null>(null);
@@ -146,6 +158,17 @@ export class UserMergeComponent {
   protected readonly previewFailed = signal(false);
   /** The message of a refused preview (a known code of the server), else the generic one. */
   protected readonly previewError = signal<TranslationKey>('admin.users.merge.previewFailed');
+  /**
+   * The load state of the preview. A refusal with a known code is a data state and shows as
+   * a note (§ 000633), so only a failed request is an error here.
+   */
+  protected readonly previewState = computed<LoadState>(() =>
+    this.loadingPreview()
+      ? 'loading'
+      : this.previewFailed() && this.previewError() === 'admin.users.merge.previewFailed'
+        ? 'error'
+        : 'ok',
+  );
   protected readonly understood = signal(false);
   protected readonly merging = signal(false);
   protected readonly result = signal<MergeResult | null>(null);
@@ -260,6 +283,13 @@ export class UserMergeComponent {
     this.step.set('pick');
     this.preview.set(null);
     this.understood.set(false);
+  }
+
+  /** The retry of the failed account list (§ 000576). */
+  protected retrySearch(): void {
+    this.searched.set(false);
+    this.searchFailed.set(false);
+    this.search.refresh();
   }
 
   protected retryPreview(): void {

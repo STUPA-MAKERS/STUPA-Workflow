@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/pages/admin/flow-editor/flow-elk.ts
+  - frontend/src/app/pages/admin/flow/flow-elk.ts
 scope:
   - frontend/src/app/pages/admin
 ---

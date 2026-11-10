@@ -98,11 +98,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * decides; the dialog only shows its answers. `revoked` fires after a successful revoke,
  * `closed` when the dialog closes.
  */
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+
 @Component({
   selector: 'app-user-revoke',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     SectionComponent,
     EmptyStateComponent,
     FormsModule,
@@ -134,6 +137,7 @@ export class UserRevokeComponent {
   protected readonly preview = signal<RevokePreview | null>(null);
   protected readonly loading = signal(false);
   protected readonly failed = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.failed);
   protected readonly selected = signal<ReadonlySet<RevokeEntry>>(new Set());
   protected readonly deactivate = signal(false);
   protected readonly submitting = signal(false);
