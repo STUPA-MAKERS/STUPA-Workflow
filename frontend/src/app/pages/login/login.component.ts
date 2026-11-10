@@ -67,9 +67,9 @@ export class LoginComponent {
       (!this.altchaRequired() || this.altchaSolution() !== null),
   );
 
-  /** Start the OIDC login. It leaves the SPA. */
+  /** Start the OIDC login. It leaves the SPA and comes back to the dashboard. */
   ssoLogin(): void {
-    this.auth.login();
+    this.auth.login('/dashboard');
   }
 
   onAltchaSolved(solution: string): void {

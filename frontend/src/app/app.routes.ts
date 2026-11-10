@@ -62,6 +62,7 @@ export const routes: Routes = [
       },
       {
         path: 'login',
+        canActivate: [homeRedirectGuard],
         data: { title: 'login.heading', footer: true },
         loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent),
       },
