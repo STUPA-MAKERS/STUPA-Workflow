@@ -3,117 +3,124 @@
     <app-breadcrumbs crumbs />
   </app-page-header>
 
-  <div class="mt__layout">
-    @if (phone()) {
-      <app-filter-select
-        size="md"
-        [label]="'admin.mailTemplates.template' | t"
-        [options]="templateOptions()"
-        [value]="selectedKey() ?? ''"
-        (valueChange)="select($event)"
-      />
-    } @else {
-      <nav class="mt__list" appScrollFade="y" [attr.aria-label]="'admin.mailTemplates.title' | t">
-        @if (loading()) {
-          <app-skeleton variant="items" [count]="8" />
+  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.mailTemplates.loadFailed' | t" (retry)="load()">
+    <ng-template #loading>
+      <div class="mt__layout">
+        @if (!phone()) {
+          <div class="mt__list">
+            <app-skeleton variant="items" [count]="8" />
+          </div>
         }
-        @for (tpl of templates(); track tpl.key) {
-          <app-list-item
-            [title]="keyLabel(tpl.key)"
-            [wrap]="true"
-            [selected]="selectedKey() === tpl.key"
-            [attr.title]="tpl.key"
-            (activate)="select(tpl.key)"
-          >
-            @if (tpl.source === 'override') {
-              <app-badge status variant="accent">{{ 'admin.mailTemplates.customized' | t }}</app-badge>
-            }
-          </app-list-item>
-        } @empty {
-          @if (!loading()) {
-            <app-empty-state rows="3" [heading]="'admin.mailTemplates.empty' | t" />
-          }
-        }
-      </nav>
-    }
-
-    @if (draft(); as d) {
-      <section class="mt__editor" appScrollFade="y" aria-labelledby="mt-title">
-        <header class="mt__head">
-          <h2 class="mt__title" id="mt-title">{{ keyLabel(d.key) }}</h2>
-          <span class="mt__headEnd">
-            @if (d.source === 'override') {
-              <app-badge variant="accent">{{ 'admin.mailTemplates.customized' | t }}</app-badge>
-            }
-            <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.mailTemplates.lang' | t" />
-          </span>
-        </header>
-
-        <app-input
-          class="mt__mono"
-          [label]="'admin.mailTemplates.subject' | t"
-          [ngModel]="d.subjectI18n[lang()]"
-          (ngModelChange)="patch('subjectI18n', $event)"
-          name="subject"
-        />
-        <label class="mt__area">
-          <span class="mt__areaLabel">{{ 'admin.mailTemplates.body' | t }}</span>
-          <textarea class="mt__areaInput" rows="8" [ngModel]="d.bodyI18n[lang()]" (ngModelChange)="patch('bodyI18n', $event)" name="body"></textarea>
-        </label>
-        <label class="mt__area">
-          <span class="mt__areaLabel">{{ 'admin.mailTemplates.bodyHtml' | t }}</span>
-          <textarea
-            class="mt__areaInput"
-            rows="3"
-            [ngModel]="d.bodyHtmlI18n[lang()]"
-            (ngModelChange)="patch('bodyHtmlI18n', $event)"
-            name="bodyHtml"
-            [placeholder]="'admin.mailTemplates.bodyHtmlPlaceholder' | t"
-          ></textarea>
-        </label>
-
-        @if (placeholderList().length) {
-          <app-section class="mt__block" [heading]="'admin.mailTemplates.placeholders' | t">
-            <ul class="mt__chips">
-              @for (p of placeholderList(); track p.key) {
-                <li><code class="code-tag code-tag--outlined mt__chip mono" [title]="p.desc">{{ p.token }}</code></li>
-              }
-            </ul>
-          </app-section>
-        }
-
-        @if (preview(); as pv) {
-          <app-section class="mt__block" [heading]="('admin.mailTemplates.previewHeading' | t) + ' (' + (pv.lang | uppercase) + ')'">
-            <div class="mt__preview">
-              <p class="mt__previewSubj">{{ pv.subject }}</p>
-              <p class="mt__previewText">{{ pv.text }}</p>
-              @if (pv.html) {
-                <div class="mt__previewHtml" [innerHTML]="pv.html"></div>
-              }
-            </div>
-          </app-section>
-        }
-
-        <div class="mt__actions">
-          @if (d.source === 'override') {
-            <app-button variant="danger" [loading]="resetting()" (click)="reset()">{{ 'admin.mailTemplates.reset' | t }}</app-button>
-          }
-          <span class="mt__actionsEnd">
-            <app-button variant="outlined" [loading]="previewing()" (click)="runPreview()">
-              <app-icon name="eye" /> {{ 'admin.mailTemplates.preview' | t }}
-            </app-button>
-          </span>
+        <div class="mt__editor">
+          <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+          <app-skeleton variant="panel" />
         </div>
-      </section>
-    } @else if (loading()) {
-      <div class="mt__editor">
-        <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
-        <app-skeleton variant="panel" />
       </div>
-    } @else {
-      <app-empty-state plain icon="mail" fill [heading]="'admin.mailTemplates.selectHint' | t" />
-    }
-  </div>
+    </ng-template>
+    <ng-template #content>
+      <div class="mt__layout">
+        @if (phone()) {
+          <app-filter-select
+            size="md"
+            [label]="'admin.mailTemplates.template' | t"
+            [options]="templateOptions()"
+            [value]="selectedKey() ?? ''"
+            (valueChange)="select($event)"
+          />
+        } @else {
+          <nav class="mt__list" appScrollFade="y" [attr.aria-label]="'admin.mailTemplates.title' | t">
+            @for (tpl of templates(); track tpl.key) {
+              <app-list-item
+                [title]="keyLabel(tpl.key)"
+                [wrap]="true"
+                [selected]="selectedKey() === tpl.key"
+                [attr.title]="tpl.key"
+                (activate)="select(tpl.key)"
+              >
+                @if (tpl.source === 'override') {
+                  <app-badge status variant="accent">{{ 'admin.mailTemplates.customized' | t }}</app-badge>
+                }
+              </app-list-item>
+            } @empty {
+              <app-empty-state rows="3" [heading]="'admin.mailTemplates.empty' | t" />
+            }
+          </nav>
+        }
+
+        @if (draft(); as d) {
+          <section class="mt__editor" appScrollFade="y" aria-labelledby="mt-title">
+            <header class="mt__head">
+              <h2 class="mt__title" id="mt-title">{{ keyLabel(d.key) }}</h2>
+              <span class="mt__headEnd">
+                @if (d.source === 'override') {
+                  <app-badge variant="accent">{{ 'admin.mailTemplates.customized' | t }}</app-badge>
+                }
+                <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.mailTemplates.lang' | t" />
+              </span>
+            </header>
+
+            <app-input
+              class="mt__mono"
+              [label]="'admin.mailTemplates.subject' | t"
+              [ngModel]="d.subjectI18n[lang()]"
+              (ngModelChange)="patch('subjectI18n', $event)"
+              name="subject"
+            />
+            <label class="mt__area">
+              <span class="mt__areaLabel">{{ 'admin.mailTemplates.body' | t }}</span>
+              <textarea class="mt__areaInput" rows="8" [ngModel]="d.bodyI18n[lang()]" (ngModelChange)="patch('bodyI18n', $event)" name="body"></textarea>
+            </label>
+            <label class="mt__area">
+              <span class="mt__areaLabel">{{ 'admin.mailTemplates.bodyHtml' | t }}</span>
+              <textarea
+                class="mt__areaInput"
+                rows="3"
+                [ngModel]="d.bodyHtmlI18n[lang()]"
+                (ngModelChange)="patch('bodyHtmlI18n', $event)"
+                name="bodyHtml"
+                [placeholder]="'admin.mailTemplates.bodyHtmlPlaceholder' | t"
+              ></textarea>
+            </label>
+
+            @if (placeholderList().length) {
+              <app-section class="mt__block" [heading]="'admin.mailTemplates.placeholders' | t">
+                <ul class="mt__chips">
+                  @for (p of placeholderList(); track p.key) {
+                    <li><code class="code-tag code-tag--outlined mt__chip mono" [title]="p.desc">{{ p.token }}</code></li>
+                  }
+                </ul>
+              </app-section>
+            }
+
+            @if (preview(); as pv) {
+              <app-section class="mt__block" [heading]="('admin.mailTemplates.previewHeading' | t) + ' (' + (pv.lang | uppercase) + ')'">
+                <div class="mt__preview">
+                  <p class="mt__previewSubj">{{ pv.subject }}</p>
+                  <p class="mt__previewText">{{ pv.text }}</p>
+                  @if (pv.html) {
+                    <div class="mt__previewHtml" [innerHTML]="pv.html"></div>
+                  }
+                </div>
+              </app-section>
+            }
+
+            <div class="mt__actions">
+              @if (d.source === 'override') {
+                <app-button variant="danger" [loading]="resetting()" (click)="reset()">{{ 'admin.mailTemplates.reset' | t }}</app-button>
+              }
+              <span class="mt__actionsEnd">
+                <app-button variant="outlined" [loading]="previewing()" (click)="runPreview()">
+                  <app-icon name="eye" /> {{ 'admin.mailTemplates.preview' | t }}
+                </app-button>
+              </span>
+            </div>
+          </section>
+        } @else {
+          <app-empty-state plain icon="mail" fill [heading]="'admin.mailTemplates.selectHint' | t" />
+        }
+      </div>
+    </ng-template>
+  </app-load-state>
 
   @if (dirty()) {
     <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" (activate)="save()" />

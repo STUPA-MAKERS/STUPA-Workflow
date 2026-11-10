@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../../testing/load-error';
 import { Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -86,7 +87,7 @@ async function setup(api = makeApi(), source: AdminPrincipal | null = OLD) {
     on: { closed, merged },
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   return { ...view, api, toast, closed, merged };

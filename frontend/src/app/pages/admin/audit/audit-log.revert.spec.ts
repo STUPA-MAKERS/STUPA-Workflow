@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { of, throwError } from 'rxjs';
 import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
@@ -70,7 +71,7 @@ async function setup(
     providers: [
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       { provide: AuthService, useValue: auth },
     ],
   });

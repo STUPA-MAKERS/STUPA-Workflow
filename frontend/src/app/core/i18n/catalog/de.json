@@ -2219,6 +2219,8 @@
   "admin.audit.revert.notRevertable": "Dieser Vorgang kann nicht zurückgenommen werden.",
   "admin.config.history.title": "Versionen",
   "admin.config.history.empty": "Noch keine Versionen.",
+  "admin.config.history.loadFailed": "Die Versionen konnten nicht geladen werden.",
+  "admin.config.history.diffFailed": "Die Änderungen konnten nicht geladen werden.",
   "admin.config.history.version": "Version {version}",
   "admin.config.history.current": "Aktiv",
   "admin.config.history.viewDiff": "Änderungen",

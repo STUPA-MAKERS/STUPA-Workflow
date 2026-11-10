@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   effect,
   inject,
   input,
@@ -24,6 +25,8 @@ import {
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
+import type { LoadState } from '@shared/forms/settings-form';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /**
  * Version sidebar for the immutable config snapshots of an entity.
@@ -39,6 +42,7 @@ import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     SectionComponent,
     EmptyStateComponent,
     TruncatedDirective,
@@ -71,6 +75,12 @@ export class VersionHistoryComponent {
 
   protected readonly revisions = signal<ConfigRevision[]>([]);
   protected readonly loading = signal(false);
+  /** The read of the versions failed (§ 000576). */
+  protected readonly loadError = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.loadError);
+  /** The read of the open diff failed. */
+  protected readonly diffFailed = signal(false);
+  protected readonly diffState = computed<LoadState>(() => (this.diff() ? 'ok' : this.diffFailed() ? 'error' : 'loading'));
   protected readonly openDiffId = signal<string | null>(null);
   protected readonly diff = signal<ConfigRevisionDiff | null>(null);
   protected readonly confirmRestore = signal<ConfigRevision | null>(null);
@@ -91,6 +101,7 @@ export class VersionHistoryComponent {
 
   private load(type: string, id: string): void {
     this.loading.set(true);
+    this.loadError.set(false);
     this.openDiffId.set(null);
     this.api.listConfigRevisions(type, id).subscribe({
       next: (rows) => {
@@ -100,6 +111,7 @@ export class VersionHistoryComponent {
       },
       error: () => {
         this.revisions.set([]);
+        this.loadError.set(true);
         this.loading.set(false);
       },
     });
@@ -111,10 +123,16 @@ export class VersionHistoryComponent {
       return;
     }
     this.openDiffId.set(rev.id);
+    this.loadDiff(rev.id);
+  }
+
+  /** Read the diff of the open version; also the retry of its load error. */
+  protected loadDiff(id: string): void {
     this.diff.set(null);
-    this.api.getConfigRevisionDiff(rev.id).subscribe({
+    this.diffFailed.set(false);
+    this.api.getConfigRevisionDiff(id).subscribe({
       next: (d) => this.diff.set(d),
-      error: () => this.diff.set(null),
+      error: () => this.diffFailed.set(true),
     });
   }
 

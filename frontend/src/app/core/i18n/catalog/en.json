@@ -2219,6 +2219,8 @@
   "admin.audit.revert.conflict": "A newer change exists. Revert that one first.",
   "admin.config.history.title": "Versions",
   "admin.config.history.empty": "No versions yet.",
+  "admin.config.history.loadFailed": "The versions could not be loaded.",
+  "admin.config.history.diffFailed": "The changes could not be loaded.",
   "admin.config.history.version": "Version {version}",
   "admin.config.history.current": "Active",
   "admin.config.history.viewDiff": "Changes",

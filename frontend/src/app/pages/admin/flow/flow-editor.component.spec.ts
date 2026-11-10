@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { NEVER, Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -110,7 +111,7 @@ async function setup(over: Overrides = {}) {
     providers: [
       { provide: AdminApiService, useValue: api },
       { provide: BudgetTreeApi, useValue: budgetApi },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       { provide: FLOW_LAYOUTER, useValue: over.layouter ?? null },
     ],
   });

@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute } from '@angular/router';
@@ -32,7 +33,7 @@ async function setup(section: BrandingSection = 'texts') {
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: true },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       route(section),
     ],
   });
@@ -77,7 +78,7 @@ async function setupWithStub(
   const view = await render(BrandingEditorComponent, {
     providers: [
       { provide: AdminApiService, useValue: fullApi },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       route(section),
     ],
   });

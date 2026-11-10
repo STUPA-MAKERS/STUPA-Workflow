@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { of } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -20,7 +21,7 @@ async function setup(api = makeApi()) {
   const view = await render(AdminDeadlinesComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       { provide: AuthService, useValue: { can: () => true } },
     ],
   });

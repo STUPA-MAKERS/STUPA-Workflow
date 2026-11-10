@@ -1,3 +1,4 @@
+import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -38,7 +39,7 @@ async function setup(api: MailApiMock = setupApi()) {
     providers: [
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   return { api, toast, view };
@@ -82,8 +83,8 @@ describe('MailTemplatesComponent', () => {
       ...setupApi(),
       listMailTemplates: jest.fn(() => throwError(() => new Error('boom'))),
     };
-    const { toast } = await setup(api);
-    expect(toast.error).toHaveBeenCalledWith('Vorlagen konnten nicht geladen werden.');
+    await setup(api);
+    expect(loadErrorToast()).toBe('Vorlagen konnten nicht geladen werden.');
     expect(document.querySelector('app-skeleton')).toBeNull();
   });
 

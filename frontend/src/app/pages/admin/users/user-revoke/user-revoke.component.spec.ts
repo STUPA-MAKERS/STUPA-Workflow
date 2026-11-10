@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../../testing/load-error';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -131,7 +132,7 @@ async function setup(api = makeApi(), source: AdminPrincipal | null = PERSON) {
     on: { closed, revoked },
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { render, screen, waitFor, within } from '@testing-library/angular';
@@ -52,7 +53,7 @@ async function setup(
   const view = await render(FormEditorComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       {
         provide: ActivatedRoute,
         useValue: { paramMap: of(convertToParamMap(id === null ? {} : { id })) },

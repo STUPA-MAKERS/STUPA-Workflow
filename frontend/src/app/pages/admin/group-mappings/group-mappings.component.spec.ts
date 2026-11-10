@@ -1,3 +1,4 @@
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -79,7 +80,7 @@ async function setup(api = makeApi(), toast = makeToast(), can = true) {
     providers: [
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       { provide: AuthService, useValue: { can: () => can } },
     ],
   });
@@ -183,9 +184,11 @@ describe('GroupMappingsComponent', () => {
     ['listRoleMappings', 'role'],
   ])('a failed %s shows a toast and ends the %s loading state', async (method, kind) => {
     const api = makeApi({ [method]: jest.fn(() => throwError(() => new Error('x'))) });
-    const { c, toast } = await setup(api);
-    expect(toast.error).toHaveBeenCalledWith('Die Zuordnungen konnten nicht geladen werden.');
+    const { c } = await setup(api);
+    expect(loadErrorToast()).toBe('Die Zuordnungen konnten nicht geladen werden.');
     expect(c.loading()[kind]).toBe(false);
+    retryLoadError();
+    expect((api as unknown as Record<string, jest.Mock>)[method]).toHaveBeenCalledTimes(2);
   });
 
   it('shows the empty state of each section', async () => {

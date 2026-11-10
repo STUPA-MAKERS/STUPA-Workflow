@@ -13,40 +13,45 @@
         }}<span class="sr-only">: {{ key(sec.kind, 'title') | t }}</span>
       </app-button>
 
-      @if (sec.loading) {
-        <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
-      } @else if (sec.rows.length) {
-        <ul class="rowgroup gm__list">
-          @for (r of sec.rows; track r.id) {
-            <li class="gm__row hitrow">
-              <button
-                type="button"
-                class="hitrow__open gm__group"
-                [attr.aria-label]="('action.edit' | t) + ': ' + r.oidcGroup"
-                (click)="openEdit(sec.kind, r.id)"
-              >
-                <code class="mono">{{ r.oidcGroup }}</code>
-              </button>
-              <app-icon class="gm__arrow" name="arrow" [size]="16" />
-              <span class="gm__target ell" [appTruncated]="r.role ? r.target + ' · ' + r.role : r.target" #cut="appTruncated" [attr.title]="cut.truncated() ? (r.role ? r.target + ' · ' + r.role : r.target) : null">
-                {{ r.target }}
-                @if (r.role) {
-                  · <strong class="gm__role">{{ r.role }}</strong>
-                }
-              </span>
-              <span class="gm__actions hitrow__keep">
-                <app-row-menu
-                  [sections]="rowMenu()"
-                  [label]="('ui.rowMenu.trigger' | t) + ': ' + r.oidcGroup"
-                  (selected)="askDelete(sec.kind, r.id)"
-                />
-              </span>
-            </li>
+      <app-load-state [state]="sec.state" [keepContent]="true" [errorText]="'admin.groupMappings.loadFailed' | t" (retry)="retry(sec.kind)">
+        <ng-template #loading>
+          <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
+        </ng-template>
+        <ng-template #content>
+          @if (sec.rows.length) {
+          <ul class="rowgroup gm__list">
+            @for (r of sec.rows; track r.id) {
+              <li class="gm__row hitrow">
+                <button
+                  type="button"
+                  class="hitrow__open gm__group"
+                  [attr.aria-label]="('action.edit' | t) + ': ' + r.oidcGroup"
+                  (click)="openEdit(sec.kind, r.id)"
+                >
+                  <code class="mono">{{ r.oidcGroup }}</code>
+                </button>
+                <app-icon class="gm__arrow" name="arrow" [size]="16" />
+                <span class="gm__target ell" [appTruncated]="r.role ? r.target + ' · ' + r.role : r.target" #cut="appTruncated" [attr.title]="cut.truncated() ? (r.role ? r.target + ' · ' + r.role : r.target) : null">
+                  {{ r.target }}
+                  @if (r.role) {
+                    · <strong class="gm__role">{{ r.role }}</strong>
+                  }
+                </span>
+                <span class="gm__actions hitrow__keep">
+                  <app-row-menu
+                    [sections]="rowMenu()"
+                    [label]="('ui.rowMenu.trigger' | t) + ': ' + r.oidcGroup"
+                    (selected)="askDelete(sec.kind, r.id)"
+                  />
+                </span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <app-empty-state rows="3" [heading]="key(sec.kind, 'empty') | t" />
           }
-        </ul>
-      } @else {
-        <app-empty-state rows="3" [heading]="key(sec.kind, 'empty') | t" />
-      }
+        </ng-template>
+      </app-load-state>
     </app-section>
   }
 
