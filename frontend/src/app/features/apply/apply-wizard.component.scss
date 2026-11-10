@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'frosted' as *;
+@use 'field' as f;
 
 :host {
   display: block;
@@ -102,6 +103,7 @@
 .wz__type.is-selected {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 // Highlighted fields (app spec 000598) set the `--check-*` tokens: a yellow box with a
 // black edge and a black dot.

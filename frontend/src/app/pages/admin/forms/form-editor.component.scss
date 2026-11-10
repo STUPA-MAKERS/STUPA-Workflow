@@ -171,6 +171,7 @@
 }
 .fe__row--on {
   background: var(--color-selected);
+  @include f.highlight-chosen;
 }
 @media (hover: hover) {
   .fe__row--on:hover {
