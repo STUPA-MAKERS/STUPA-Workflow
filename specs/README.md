@@ -527,6 +527,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/agents/000431](style/shared/agents/000431_plan-in-main.md) | Plan in the main session | approved |
 | [S/shared/agents/000432](style/shared/agents/000432_no-main-checkout.md) | Do not touch the main checkout | approved |
 | [S/shared/agents/000433](style/shared/agents/000433_no-imitation.md) | No page imitates an organization | approved |
+| [S/shared/agents/000600](style/shared/agents/000600_board-card-per-thread.md) | Every development thread has a card on the Plattform board | approved |
 | [S/shared/api/000039](style/shared/api/000039_same-names.md) | Field names are the same in frontend and backend | approved |
 | [S/shared/api/000040](style/shared/api/000040_camelcase-base-model.md) | Schemas use the shared camelCase base model | approved |
 | [S/shared/api/000041](style/shared/api/000041_one-source.md) | Shared data has one source | approved |
