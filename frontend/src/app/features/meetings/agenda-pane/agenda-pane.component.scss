@@ -81,32 +81,6 @@
   --li-color: var(--color-text-subtle);
 }
 
-.ap__lead {
-  position: relative;
-}
-
-// The box ends at the number, because the scrolling list clips anything left of the row padding.
-.ap__grip {
-  position: absolute;
-  inset-inline-end: 100%;
-  top: 50%;
-  display: grid;
-  place-items: center;
-  width: 1rem;
-  translate: 0 -50%;
-  color: var(--color-text-muted);
-  opacity: 0;
-  cursor: grab;
-}
-.ap__row--drag:focus-within .ap__grip {
-  opacity: 1;
-}
-@media (hover: hover) {
-  .ap__row--drag:hover .ap__grip {
-    opacity: 1;
-  }
-}
-
 .ap__trail {
   display: inline-flex;
   align-items: center;
@@ -162,9 +136,6 @@
   background: var(--color-surface-2);
   @include dp.lift(1deg);
   @include dp.smooth-edge;
-}
-.ap__preview .ap__grip {
-  opacity: 1;
 }
 .ap__preview .ap__menu {
   width: auto;

@@ -338,9 +338,10 @@ describe('AgendaPaneComponent', () => {
   });
 
   /** A drop at the same place moves nothing. */
-  it('reorders by drag and drop with the lift and the drop box of the board (frame 7)', async () => {
+  it('reorders by drag and drop on the whole row, without a drag handle (frame 7)', async () => {
     const { on, fixture } = await setup();
     expect(draggable(fixture)).toEqual([true, true, true]);
+    expect(fixture.nativeElement.querySelector('.ap__grip')).toBeNull();
     const row = fixture.debugElement.queryAll(By.directive(CdkDrag))[0].injector.get(CdkDrag);
     expect(row.previewClass).toBe('ap__preview');
     expect(row.dragStartDelay).toEqual({ touch: 400, mouse: 0 });
