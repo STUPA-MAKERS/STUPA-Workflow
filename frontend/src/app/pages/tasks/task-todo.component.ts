@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
+import { pageItemTitle } from '../../layout/page-title.service';
 import { TodoCardDetailComponent } from '../../features/todos/card-detail/todo-card-detail.component';
 import { TasksComponent } from './tasks.component';
 
@@ -9,7 +10,7 @@ import { TasksComponent } from './tasks.component';
  * The right pane of `/tasks/todo/:cardId`: the card detail of the boards, with
  * "Im Board öffnen" (on a phone in its ⋮ menu). Side by side it is a sheet; one pane at a
  * time it lies on the page. A change or an archive reads the group "To-Dos" of the page again; an
- * archived card closes the pane.
+ * archived card closes the pane. The document title names the card.
  */
 @Component({
   selector: 'app-task-todo',
@@ -31,6 +32,12 @@ export class TaskTodoComponent {
   readonly cardId = toSignal(this.route.paramMap.pipe(map((p) => p.get('cardId'))), {
     initialValue: this.route.snapshot.paramMap.get('cardId'),
   });
+
+  private readonly detail = viewChild(TodoCardDetailComponent);
+
+  constructor() {
+    pageItemTitle(() => this.detail()?.card()?.title);
+  }
 
   close(): void {
     void this.router.navigate(['/tasks']);
