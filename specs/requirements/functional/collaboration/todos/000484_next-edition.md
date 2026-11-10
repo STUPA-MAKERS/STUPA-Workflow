@@ -4,8 +4,11 @@ title: Folgeveranstaltung anlegen copies the plan, not the facts
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-10
+implementation:
+  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/router.py
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

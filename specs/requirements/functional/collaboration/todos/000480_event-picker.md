@@ -4,8 +4,11 @@ title: A Buchung can name its Event
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-10
+implementation:
+  - frontend/src/app/features/todos/event-link.state.ts
+  - frontend/src/app/pages/expenses/expense-dialogs.state.ts
+  - frontend/src/app/pages/expenses/booking-form/booking-form.component.html
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

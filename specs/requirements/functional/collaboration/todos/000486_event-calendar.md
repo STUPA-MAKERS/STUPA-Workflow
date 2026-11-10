@@ -4,8 +4,11 @@ title: An Event with a start is in the calendar
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-10
+implementation:
+  - backend/app/modules/calendar/service.py
+  - backend/app/modules/calendar/ics.py
+  - backend/app/modules/todos/service.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos
