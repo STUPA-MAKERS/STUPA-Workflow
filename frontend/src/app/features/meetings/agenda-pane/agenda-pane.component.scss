@@ -1,5 +1,6 @@
 @use '../../../shared/ui/drag-preview' as dp;
 @use 'display' as d;
+@use 'field' as f;
 
 :host {
   display: flex;
@@ -147,6 +148,7 @@
   color: var(--field-text, var(--color-text));
   font: inherit;
   box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .ap__input:focus-visible {
   outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));

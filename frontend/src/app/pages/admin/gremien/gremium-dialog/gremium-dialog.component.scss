@@ -91,7 +91,7 @@
   outline: none;
 }
 .gd__mailInput::placeholder {
-  color: var(--color-text-muted);
+  color: var(--field-text, var(--color-text-muted));
 }
 
 @container (max-width: 34rem) {

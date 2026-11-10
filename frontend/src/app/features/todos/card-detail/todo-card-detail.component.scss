@@ -89,6 +89,7 @@
   color: var(--field-text, var(--color-text));
   font: inherit;
   box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .cd__titleInput {
   font-size: var(--fs-lg);
@@ -641,6 +642,7 @@ button.cd__evText:focus-visible {
   font: inherit;
   font-size: 0.84375rem;
   box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .cd__evInput:focus-visible {
   outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));

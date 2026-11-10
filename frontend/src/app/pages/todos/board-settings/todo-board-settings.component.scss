@@ -1,4 +1,5 @@
 @use '../../../features/todos/todo-labels' as lbl;
+@use 'field' as f;
 
 @include lbl.colors;
 
@@ -81,6 +82,7 @@
   color: var(--field-text, var(--color-text));
   font: inherit;
   box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .bs__input:focus-visible {
   outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
@@ -173,4 +175,5 @@
   min-height: 36px;
   background: var(--field-bg, var(--color-surface-3));
   text-align: end;
+  @include f.ring;
 }

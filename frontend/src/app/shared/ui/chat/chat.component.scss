@@ -440,6 +440,7 @@
   field-sizing: content;
   overflow-y: auto;
   box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .chat__editInput:focus-visible {
   outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
