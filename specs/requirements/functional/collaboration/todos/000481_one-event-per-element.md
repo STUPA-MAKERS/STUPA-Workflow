@@ -4,8 +4,10 @@ title: An Antrag or a Buchung belongs to at most one Event
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-10
+implementation:
+  - backend/app/modules/todos/events.py
+  - backend/app/modules/todos/service.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos
