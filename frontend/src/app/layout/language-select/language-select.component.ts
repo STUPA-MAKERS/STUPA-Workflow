@@ -30,10 +30,7 @@ import { FilterSelectComponent, type FilterSelectOption } from '@stupa-makers/ui
       (valueChange)="choose($event)"
     />
   `,
-  // The chip shows only capitals ("DE") or a name, and IBM Plex Sans puts the capitals of a
-  // centred line box about 1px above the middle of the globe and the chevron. Two pixels of
-  // top padding move the centred box, and with it the text, 1px down.
-  styles: [':host { display: inline-flex; flex: none; } :host ::ng-deep .fs__text { padding-top: 2px; }'],
+  styles: [':host { display: inline-flex; flex: none; }'],
 })
 export class LanguageSelectComponent {
   protected readonly i18n = inject(I18nService);

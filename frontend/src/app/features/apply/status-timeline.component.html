@@ -65,13 +65,13 @@
               <app-button
                 variant="text"
                 [ariaLabel]="'applications.comments.open' | t: { n: comments().length }"
+                [count]="comments().length"
                 (click)="commentsOpen.set(true)"
               >
                 <app-icon name="chat" />
                 @if (!phone()) {
                   {{ 'status.comments.title' | t }}
                 }
-                <span class="ad__commentsN num" aria-hidden="true">{{ comments().length }}</span>
               </app-button>
               @if (!phone() && canEdit() && effForm()) {
                 <app-button

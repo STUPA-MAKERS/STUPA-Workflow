@@ -71,11 +71,11 @@
             class="cd__activityBtn"
             variant="text"
             [ariaLabel]="'todos.card.activityOpen' | t: { n: card.comments.length }"
+            [count]="card.comments.length"
             data-testid="cd-activity-open"
             (click)="activityOpen.set(true)"
           >
             <app-icon name="chat" />
-            <span class="cd__activityN num" aria-hidden="true">{{ card.comments.length }}</span>
           </app-button>
         }
         @if (menuSections().length) {

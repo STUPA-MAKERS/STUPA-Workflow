@@ -338,15 +338,3 @@
   min-width: 0;
   --section-gap: var(--space-2);
 }
-.ad__commentsN {
-  display: inline-grid;
-  place-items: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-3);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-medium);
-}

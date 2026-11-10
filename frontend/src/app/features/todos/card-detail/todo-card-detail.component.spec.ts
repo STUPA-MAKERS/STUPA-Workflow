@@ -1429,7 +1429,7 @@ describe('TodoCardDetailComponent', () => {
       cmp.transferOpen.set(false);
       detect();
       const open = screen.getByRole('button', { name: 'Aktivität, 1' });
-      expect(open.querySelector('.cd__activityN')?.textContent).toBe('1');
+      expect(open.querySelector('.btn__count')?.textContent).toBe('1');
       fireEvent.click(open);
       detect();
       expect(cmp.activityOpen()).toBe(true);
