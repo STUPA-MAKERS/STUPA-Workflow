@@ -2,6 +2,7 @@
 @use 'surface';
 @use 'scroll-fade' as fade;
 @use 'press';
+@use 'field' as f;
 
 :host {
   --dash-fade: var(--space-6);
@@ -90,6 +91,7 @@
 .dash__btn--fill {
   background: var(--color-accent);
   color: var(--color-on-accent);
+  @include f.highlight-surface;
 }
 @media (hover: hover) {
   .dash__btn--fill:hover {
