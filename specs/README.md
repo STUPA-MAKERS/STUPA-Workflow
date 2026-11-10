@@ -305,6 +305,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000449](requirements/functional/meetings/meetings/000449_delete-vote-count.md) | A meeting delete names the vote count | approved |
 | [F/meetings/meetings/000450](requirements/functional/meetings/meetings/000450_no-global-meeting-key.md) | No global key manages meetings | approved |
 | [F/meetings/meetings/000574](requirements/functional/meetings/meetings/000574_live-viewers-avatar.md) | A live viewer shows with the own avatar | approved |
+| [F/meetings/meetings/000607](requirements/functional/meetings/meetings/000607_agenda-row-no-drag-handle.md) | An agenda row shows no drag handle | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |
@@ -378,6 +379,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/settings/000598](requirements/non-functional/accessibility/settings/000598_highlight-fields.md) | Very high contrast highlights the fields black on yellow | approved |
 | [NF/accessibility/settings/000605](requirements/non-functional/accessibility/settings/000605_very-high-contrast.md) | Very high contrast shows the app in four colours | approved |
 | [NF/accessibility/settings/000606](requirements/non-functional/accessibility/settings/000606_very-high-contrast-includes-settings.md) | Very high contrast includes the other display settings | approved |
+| [NF/accessibility/settings/000608](requirements/non-functional/accessibility/settings/000608_display-reset-in-head-row.md) | The display reset lines up with the heading and the switches | approved |
 | [NF/accessibility/statement/000495](requirements/non-functional/accessibility/statement/000495_statement-page.md) | A public page holds the accessibility statement | approved |
 | [NF/accessibility/statement/000496](requirements/non-functional/accessibility/statement/000496_statement-link.md) | Every page links to the accessibility statement | approved |
 | [NF/accessibility/statement/000497](requirements/non-functional/accessibility/statement/000497_barrier-report.md) | A user can report a barrier as a ticket | approved |
