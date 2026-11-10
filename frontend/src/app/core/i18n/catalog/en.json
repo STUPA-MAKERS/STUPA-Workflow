@@ -1226,7 +1226,6 @@
   "meetings.agenda.removeTitle": "Remove agenda item?",
   "meetings.agenda.removeConfirm": "“{title}” is removed from the agenda with its text. This cannot be undone.",
   "meetings.agenda.rowMenu": "Actions for {title}",
-  "meetings.agenda.dragHandle": "Drag to reorder",
   "meetings.editor.toolbar": "Format",
   "meetings.editor.heading": "Heading",
   "meetings.editor.bold": "Bold",
