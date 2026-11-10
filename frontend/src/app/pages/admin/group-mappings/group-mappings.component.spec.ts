@@ -296,7 +296,7 @@ describe('GroupMappingsComponent', () => {
     c.onDialogGremium('g3');
     fixture.detectChanges();
     expect(screen.getByText('Dieses Gremium hat noch keine Rollen.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Rollen verwalten' })).toHaveAttribute('href', '/admin/gremien/g3/roles');
+    expect(screen.getByRole('link', { name: 'Rollen verwalten' })).toHaveAttribute('href', '/admin/committees/g3/roles');
   });
 
   it('hides the roles link without admin.gremium_roles', async () => {

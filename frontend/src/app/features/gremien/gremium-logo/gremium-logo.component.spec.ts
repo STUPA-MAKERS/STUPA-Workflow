@@ -14,11 +14,11 @@ describe('GremiumLogoComponent', () => {
   /** A new URL gets a new try. */
   it('shows the logo on white and falls back to the initials when it fails', async () => {
     const view = await render(GremiumLogoComponent, {
-      inputs: { name: 'Wahlausschuss', logoUrl: '/api/gremien/g-1/logo', size: 'lg' },
+      inputs: { name: 'Wahlausschuss', logoUrl: '/api/committees/g-1/logo', size: 'lg' },
     });
     const host = view.container as HTMLElement;
     const img = host.querySelector('img');
-    expect(img?.getAttribute('src')).toBe('/api/gremien/g-1/logo');
+    expect(img?.getAttribute('src')).toBe('/api/committees/g-1/logo');
     expect(img?.getAttribute('alt')).toBe('');
     expect(host.classList.contains('glo--img')).toBe(true);
     expect(host.classList.contains('glo--lg')).toBe(true);
@@ -28,8 +28,8 @@ describe('GremiumLogoComponent', () => {
     expect(host.querySelector('img')).toBeNull();
     expect(host.textContent?.trim()).toBe('WA');
 
-    view.fixture.componentRef.setInput('logoUrl', '/api/gremien/g-2/logo');
+    view.fixture.componentRef.setInput('logoUrl', '/api/committees/g-2/logo');
     view.fixture.detectChanges();
-    expect(host.querySelector('img')?.getAttribute('src')).toBe('/api/gremien/g-2/logo');
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('/api/committees/g-2/logo');
   });
 });

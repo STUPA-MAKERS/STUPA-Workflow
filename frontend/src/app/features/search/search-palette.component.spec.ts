@@ -232,7 +232,7 @@ describe('SearchPaletteComponent', () => {
     expect(cmp.open()).toBe(false);
   });
 
-  /** A cost-centre hit is `/budget?ks=…`, which `navigate` does not parse. */
+  /** A cost-centre hit is `/budget?costCentre=…`, which `navigate` does not parse. */
   it('navigates by URL, so a hit can carry a query string', async () => {
     const { cmp, fixture, http, router } = await setup([]);
     const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
@@ -245,7 +245,7 @@ describe('SearchPaletteComponent', () => {
           id: 'b-1',
           title: 'VS-Mittel',
           subtitle: 'VSM',
-          url: '/budget?ks=b-1',
+          url: '/budget?costCentre=b-1',
         },
       ],
       truncated: false,
@@ -254,7 +254,7 @@ describe('SearchPaletteComponent', () => {
     fixture.detectChanges();
 
     await userEvent.click(screen.getByText('VS-Mittel'), { advanceTimers: jest.advanceTimersByTime });
-    expect(nav).toHaveBeenCalledWith('/budget?ks=b-1');
+    expect(nav).toHaveBeenCalledWith('/budget?costCentre=b-1');
   });
 
   it('says so when a source had more than it returned', async () => {

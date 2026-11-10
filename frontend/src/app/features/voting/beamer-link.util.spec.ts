@@ -7,7 +7,7 @@ describe('beamer link', () => {
     TestBed.configureTestingModule({ providers: [provideRouter([])] });
     const router = TestBed.inject(Router);
     const tree = beamerUrl(router, 'm-1');
-    expect(router.serializeUrl(tree)).toBe('/voting/beamer/m-1?from=%2F');
+    expect(router.serializeUrl(tree)).toBe('/voting/projector/m-1?from=%2F');
     expect(tree.queryParamMap.get(BEAMER_FROM_PARAM)).toBe('/');
   });
 
@@ -20,7 +20,7 @@ describe('beamer link', () => {
     ['https://evil.example', null],
     ['//evil.example', null],
     ['/\\evil.example', null],
-    ['/voting/beamer/m-1', null],
+    ['/voting/projector/m-1', null],
   ])('accepts %p as origin: %p', (from, expected) => {
     expect(beamerOrigin(from)).toBe(expected);
   });

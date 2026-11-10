@@ -86,7 +86,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
 /**
  * Status page of the applicant (the same page on the desktop).
- * Routes `/status` and `/antrag/:id` (the magic link `#t=<token>`).
+ * Routes `/status` and `/my-applications/:id` (the magic link `#t=<token>`).
  *
  * The page verifies the token, strips it from the URL and loads the application with
  * the session cookie. It shows:
@@ -350,7 +350,7 @@ export class StatusTimelineComponent {
   });
 
   /**
-   * The magic-link target is /antrag/{id}#t={token}: the token is in the fragment, so it does not
+   * The magic-link target is /my-applications/{id}#t={token}: the token is in the fragment, so it does not
    * leak through Referer or logs. The query form (?t=&app=) stays as a fallback.
    */
   constructor() {

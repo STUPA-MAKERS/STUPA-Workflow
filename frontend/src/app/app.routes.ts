@@ -25,7 +25,8 @@ import {
  * owner and scope. The flow
  * editor lists both permission keys, because the save accepts either. The `frame` mode is
  * route data, because route data wins over a `?frame=` query parameter in the input
- * binding. The redirects keep old bookmarks and shared links working.
+ * binding. The redirects keep old bookmarks and shared links working. The old German URLs
+ * (spec 000592) have no route here: `LegacyUrlSerializer` reads them as their English URLs.
  */
 export const routes: Routes = [
   {
@@ -50,14 +51,6 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/apply/apply-confirmation.component').then(
             (m) => m.ApplyConfirmationComponent,
-          ),
-      },
-      {
-        path: 'status',
-        data: { title: 'status.heading', contextual: true, footer: true },
-        loadComponent: () =>
-          import('./features/apply/status-timeline.component').then(
-            (m) => m.StatusTimelineComponent,
           ),
       },
       {
@@ -91,15 +84,7 @@ export const routes: Routes = [
         ],
       },
       {
-        path: 'antrag/:id',
-        data: { title: 'status.heading', footer: true },
-        loadComponent: () =>
-          import('./features/apply/status-timeline.component').then(
-            (m) => m.StatusTimelineComponent,
-          ),
-      },
-      {
-        path: 'protokolle',
+        path: 'protocols',
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-protocols.component').then(
@@ -107,7 +92,7 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'protokolle/:id',
+        path: 'protocols/:id',
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-protocol-detail.component').then(
@@ -115,7 +100,7 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'barrierefreiheit',
+        path: 'accessibility',
         data: { title: 'a11yStatement.title', footer: true },
         loadComponent: () =>
           import('./features/accessibility/accessibility-statement.component').then(
@@ -192,14 +177,14 @@ export const routes: Routes = [
         ],
       },
       {
-        path: 'voting/beamer',
+        path: 'voting/projector',
         data: { title: 'beamer.title', gremiumPermission: 'session.manage', chrome: false },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/beamer.component').then((m) => m.BeamerComponent),
       },
       {
-        path: 'voting/beamer/:id',
+        path: 'voting/projector/:id',
         data: { title: 'beamer.title', gremiumPermission: 'session.manage', chrome: false },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -264,7 +249,7 @@ export const routes: Routes = [
           import('./features/meetings/meetings.component').then((m) => m.MeetingsComponent),
       },
       {
-        path: 'gremien',
+        path: 'committees',
         data: {
           title: 'nav.gremien',
           permission: ['gremium.view_all'],
@@ -287,7 +272,7 @@ export const routes: Routes = [
             path: ':id',
             data: {
               title: 'gremien.title',
-              parent: ['gremien'],
+              parent: ['committees'],
               permission: ['gremium.view_all'],
               allowCommitteeMember: true,
             },
@@ -480,15 +465,15 @@ export const routes: Routes = [
               ),
           },
           {
-            path: 'gremien',
+            path: 'committees',
             data: { title: 'admin.gremien.title', permission: 'admin.gremien', parent: ['admin'] },
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/gremien/gremien.component').then((m) => m.AdminGremienComponent),
           },
           {
-            path: 'gremien/:id/members',
-            data: { title: 'admin.gremien.membersOf', permission: 'admin.gremien', parent: ['admin', 'admin/gremien'] },
+            path: 'committees/:id/members',
+            data: { title: 'admin.gremien.membersOf', permission: 'admin.gremien', parent: ['admin', 'admin/committees'] },
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/gremien/gremium-members.component').then(
@@ -548,8 +533,8 @@ export const routes: Routes = [
               ),
           },
           {
-            path: 'gremien/:id/roles',
-            data: { title: 'admin.gremiumRoles.title', permission: 'admin.gremium_roles', parent: ['admin', 'admin/gremien'] },
+            path: 'committees/:id/roles',
+            data: { title: 'admin.gremiumRoles.title', permission: 'admin.gremium_roles', parent: ['admin', 'admin/committees'] },
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/gremium-roles/gremium-roles.component').then(

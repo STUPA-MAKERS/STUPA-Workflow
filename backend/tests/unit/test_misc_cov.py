@@ -556,7 +556,7 @@ def test_admin_delete_gremium_204(
     application, cfg, *_ = admin_app
     client = TestClient(application)
     gid = uuid4()
-    assert client.delete(f"/api/admin/gremien/{gid}").status_code == 204
+    assert client.delete(f"/api/admin/committees/{gid}").status_code == 204
     assert str(cfg.deleted_gremium) == str(gid)
 
 
@@ -601,15 +601,15 @@ def test_admin_gremium_role_crud(
     client = TestClient(application)
     gid, rid = uuid4(), uuid4()
     created = client.post(
-        f"/api/admin/gremien/{gid}/roles",
+        f"/api/admin/committees/{gid}/roles",
         json={"key": "kasse", "name": {"de": "Kasse"}, "permissions": ["vote.cast"]},
     )
     assert created.status_code == 201
     patched = client.patch(
-        f"/api/admin/gremium-roles/{rid}", json={"name": {"de": "Neu"}}
+        f"/api/admin/committee-roles/{rid}", json={"name": {"de": "Neu"}}
     )
     assert patched.status_code == 200
-    deleted = client.delete(f"/api/admin/gremium-roles/{rid}")
+    deleted = client.delete(f"/api/admin/committee-roles/{rid}")
     assert deleted.status_code == 204
     assert {"create_role", "update_role", "delete_role"} <= set(groles.events)
 

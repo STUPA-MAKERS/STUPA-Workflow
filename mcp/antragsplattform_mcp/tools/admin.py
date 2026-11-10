@@ -21,19 +21,19 @@ group = ToolGroup()
 @group.tool
 async def list_gremien() -> dict:
     """List all Gremien."""
-    return await api().get("/admin/gremien")
+    return await api().get("/admin/committees")
 
 
 @group.tool
 async def create_gremium(gremium: S.GremiumCreate) -> dict:
     """Create a Gremium. Requires admin.gremien."""
-    return await api().post("/admin/gremien", json=dump_create(gremium))
+    return await api().post("/admin/committees", json=dump_create(gremium))
 
 
 @group.tool
 async def update_gremium(gremium_id: str, patch: S.GremiumUpdate) -> dict:
     """Patch a Gremium. Requires admin.gremien."""
-    return await api().patch(f"/admin/gremien/{gremium_id}", json=dump_patch(patch))
+    return await api().patch(f"/admin/committees/{gremium_id}", json=dump_patch(patch))
 
 
 @group.tool
@@ -43,7 +43,7 @@ async def delete_gremium(gremium_id: str) -> dict:
     409 `gremium_decides_vote` while the Gremium decides the running vote of an
     application (`voteGremiumId`).
     """
-    return await api().delete(f"/admin/gremien/{gremium_id}")
+    return await api().delete(f"/admin/committees/{gremium_id}")
 
 
 @group.tool
@@ -104,7 +104,7 @@ async def get_gremium_mail_recipients(gremium_id: str) -> dict:
 
     A finalized protocol goes to the active members and also to these addresses.
     """
-    return await api().get(f"/admin/gremien/{gremium_id}/mail-recipients")
+    return await api().get(f"/admin/committees/{gremium_id}/mail-recipients")
 
 
 @group.tool
@@ -115,32 +115,32 @@ async def set_gremium_mail_recipients(gremium_id: str, recipients: list[str]) ->
     only. Requires admin.gremien.
     """
     return await api().put(
-        f"/admin/gremien/{gremium_id}/mail-recipients", json={"recipients": recipients}
+        f"/admin/committees/{gremium_id}/mail-recipients", json={"recipients": recipients}
     )
 
 
 @group.tool
 async def list_gremium_roles(gremium_id: str) -> dict:
     """List the roles that are scoped to a Gremium."""
-    return await api().get(f"/admin/gremien/{gremium_id}/roles")
+    return await api().get(f"/admin/committees/{gremium_id}/roles")
 
 
 @group.tool
 async def create_gremium_role(gremium_id: str, role: S.GremiumRoleCreate) -> dict:
     """Create a role that is scoped to a Gremium. Requires admin.gremien."""
-    return await api().post(f"/admin/gremien/{gremium_id}/roles", json=dump_create(role))
+    return await api().post(f"/admin/committees/{gremium_id}/roles", json=dump_create(role))
 
 
 @group.tool
 async def update_gremium_role(role_id: str, patch: S.GremiumRoleUpdate) -> dict:
     """Patch a role that is scoped to a Gremium. Requires admin.gremien."""
-    return await api().patch(f"/admin/gremium-roles/{role_id}", json=dump_patch(patch))
+    return await api().patch(f"/admin/committee-roles/{role_id}", json=dump_patch(patch))
 
 
 @group.tool
 async def delete_gremium_role(role_id: str) -> dict:
     """Delete a role that is scoped to a Gremium. Requires admin.gremien."""
-    return await api().delete(f"/admin/gremium-roles/{role_id}")
+    return await api().delete(f"/admin/committee-roles/{role_id}")
 
 
 @group.tool
@@ -155,7 +155,7 @@ async def list_gremium_memberships(gremium_id: str) -> dict:
     mappings and the Gremium role mappings. To change a membership, change a mapping
     or the groups in the IdP.
     """
-    return await api().get(f"/admin/gremien/{gremium_id}/memberships")
+    return await api().get(f"/admin/committees/{gremium_id}/memberships")
 
 
 @group.tool
@@ -166,7 +166,7 @@ async def list_gremium_membership_mappings() -> dict:
     becomes a member of the Gremium with the default Gremium role `member`. Requires
     admin.group_mappings.
     """
-    return await api().get("/admin/gremium-membership-mappings")
+    return await api().get("/admin/committee-membership-mappings")
 
 
 @group.tool
@@ -179,7 +179,7 @@ async def create_gremium_membership_mapping(
     Gremium that exists already gives 409. An unknown Gremium gives 404. A group with
     the prefix `vote:` gives 422.
     """
-    return await api().post("/admin/gremium-membership-mappings", json=dump_create(mapping))
+    return await api().post("/admin/committee-membership-mappings", json=dump_create(mapping))
 
 
 @group.tool
@@ -192,7 +192,7 @@ async def update_gremium_membership_mapping(
     principals.
     """
     return await api().patch(
-        f"/admin/gremium-membership-mappings/{mapping_id}", json=dump_patch(patch)
+        f"/admin/committee-membership-mappings/{mapping_id}", json=dump_patch(patch)
     )
 
 
@@ -202,7 +202,7 @@ async def delete_gremium_membership_mapping(mapping_id: str) -> dict:
 
     The platform then removes the memberships that only this mapping gave.
     """
-    return await api().delete(f"/admin/gremium-membership-mappings/{mapping_id}")
+    return await api().delete(f"/admin/committee-membership-mappings/{mapping_id}")
 
 
 @group.tool
@@ -213,7 +213,7 @@ async def list_gremium_role_mappings() -> dict:
     Gremium of the role. A role mapping applies only to a principal who is a member of
     that Gremium through a membership mapping. Requires admin.group_mappings.
     """
-    return await api().get("/admin/gremium-role-mappings")
+    return await api().get("/admin/committee-role-mappings")
 
 
 @group.tool
@@ -225,7 +225,7 @@ async def create_gremium_role_mapping(mapping: S.GremiumRoleMappingCreate) -> di
     all principals. A pair of group and role that exists already gives 409. An
     unknown role gives 404. A group with the prefix `vote:` gives 422.
     """
-    return await api().post("/admin/gremium-role-mappings", json=dump_create(mapping))
+    return await api().post("/admin/committee-role-mappings", json=dump_create(mapping))
 
 
 @group.tool
@@ -238,7 +238,7 @@ async def update_gremium_role_mapping(
     principals.
     """
     return await api().patch(
-        f"/admin/gremium-role-mappings/{mapping_id}", json=dump_patch(patch)
+        f"/admin/committee-role-mappings/{mapping_id}", json=dump_patch(patch)
     )
 
 
@@ -248,7 +248,7 @@ async def delete_gremium_role_mapping(mapping_id: str) -> dict:
 
     The platform then removes the Gremium roles that only this mapping gave.
     """
-    return await api().delete(f"/admin/gremium-role-mappings/{mapping_id}")
+    return await api().delete(f"/admin/committee-role-mappings/{mapping_id}")
 
 
 @group.tool

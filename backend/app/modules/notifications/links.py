@@ -10,7 +10,7 @@ The link of an application depends on the reader:
 
 - A team member and an applicant with an account open ``/applications/{id}``. The
   login is the usual one.
-- A guest applicant (``Application.created_by`` is None) opens ``/antrag/{id}``. The
+- A guest applicant (``Application.created_by`` is None) opens ``/my-applications/{id}``. The
   page loads the application with the applicant cookie of the last magic link. Without
   the cookie it asks the reader to open the link of the confirmation mail again. The
   mail never mints a new magic-link token, because a token in every status mail would
@@ -80,7 +80,7 @@ def application_link(
     guest stays without a fragment.
     """
     if guest:
-        return MailLink(f"{_base(settings)}/antrag/{application_id}", "application")
+        return MailLink(f"{_base(settings)}/my-applications/{application_id}", "application")
     fragment = f"#comment-{comment_id}" if comment_id is not None else ""
     return MailLink(f"{_base(settings)}/applications/{application_id}{fragment}", "application")
 
@@ -102,7 +102,7 @@ def protocol_link(settings: Settings, meeting_id: UUID | str) -> MailLink:
 
 def public_protocol_url(settings: Settings, protocol_id: UUID | str) -> str:
     """Return the URL of the public version of a protocol."""
-    return f"{_base(settings)}/protokolle/{protocol_id}"
+    return f"{_base(settings)}/protocols/{protocol_id}"
 
 
 def privacy_admin_link(settings: Settings) -> MailLink:

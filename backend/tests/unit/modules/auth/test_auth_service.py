@@ -59,7 +59,7 @@ async def test_request_magic_link_unlimited_by_default() -> None:
     )
     assert len(db.added) == 1
     link = sent[0][1]
-    assert "/antrag/aid-1#t=" in link
+    assert "/my-applications/aid-1#t=" in link
     assert db.added[0].expires_at is None
 
 
@@ -96,7 +96,7 @@ async def test_request_magic_link_awaits_async_deliver() -> None:
         sent.append((email, link))
 
     await service.request_magic_link(db, settings, email="x@y.de", deliver=deliver)
-    assert len(sent) == 1 and "/antrag/aid-1#t=" in sent[0][1]
+    assert len(sent) == 1 and "/my-applications/aid-1#t=" in sent[0][1]
 
 
 def _link(token: str, settings: Settings, **kw: object) -> MagicLink:

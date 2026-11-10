@@ -8,12 +8,12 @@ import { AdminApiService } from '../admin-api.service';
 import { GremiumRoleMatrixComponent } from './gremium-role-matrix.component';
 
 /**
- * The roles of one gremium on their own page (`/admin/gremien/:id/roles`, permission
+ * The roles of one gremium on their own page (`/admin/committees/:id/roles`, permission
  * `admin.gremium_roles`).
  *
  * The gremien page shows the same matrix inside the row of a gremium. This page serves a
  * principal with `admin.gremium_roles` but without `admin.gremien`, and the "Rollen"
- * links of the admin home page. The gremium name comes from `GET /gremien`, which every
+ * links of the admin home page. The gremium name comes from `GET /committees`, which every
  * signed-in principal may read.
  */
 @Component({

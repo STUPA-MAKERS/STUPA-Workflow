@@ -141,7 +141,7 @@ function monthReq(http: HttpTestingController): TestRequest {
 
 /** Answer the Gremien and the first month. */
 function load(view: View, items: MeetingOutWire[] = MONTH, gremien: { id: string; name: string }[] = []): TestRequest {
-  view.http.expectOne('/api/meetings/gremien').flush(gremien);
+  view.http.expectOne('/api/meetings/committees').flush(gremien);
   const req = monthReq(view.http);
   req.flush(items);
   view.fixture.detectChanges();
@@ -210,7 +210,7 @@ describe('MeetingsCalendarComponent', () => {
     const open = jest.spyOn(window, 'open').mockImplementation(() => null);
     await userEvent.click(within(card).getByRole('button', { name: /Beamer/ }));
     expect(open).toHaveBeenCalledWith(
-      expect.stringMatching(/^\/voting\/beamer\/m-34\?from=/),
+      expect.stringMatching(/^\/voting\/projector\/m-34\?from=/),
       '_blank',
       'noopener',
     );

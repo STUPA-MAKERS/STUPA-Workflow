@@ -102,7 +102,7 @@ interface BeamerText {
  *   rule, the quorum and the number of ballots. A tie is "Abgelehnt" with "Einfache
  *   Mehrheit nicht erreicht".
  *
- * The page (`voting/beamer`) reads the server and passes the data in.
+ * The page (`voting/projector`) reads the server and passes the data in.
  */
 @Component({
   selector: 'app-meeting-beamer',

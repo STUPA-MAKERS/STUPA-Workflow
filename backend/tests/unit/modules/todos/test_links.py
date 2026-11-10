@@ -370,7 +370,7 @@ async def test_gremien_follow_the_gremien_tab(gremium_scope: dict[str, Any]) -> 
     resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
     out = await resolver.resolve([("gremium", G1), ("gremium", G2)], USER)
     seen = out[("gremium", G1)]
-    assert (seen.title, seen.url) == ("StuPa", f"/gremien/{G1}")
+    assert (seen.title, seen.url) == ("StuPa", f"/committees/{G1}")
     assert out[("gremium", G2)] == HIDDEN
     await resolver.resolve([("gremium", G1)], USER)
     assert gremium_scope["calls"] == 1
@@ -559,7 +559,7 @@ async def test_a_cost_centre_shows_to_each_card_reader() -> None:
     assert (seen.title, seen.url) == ("Kultur", None)
     assert seen.detail is not None and seen.detail.cost_centre == "SP.300"
     booker = (await resolver.resolve([("budget", ks)], BOOKER))[("budget", ks)]
-    assert booker.url == f"/budget?ks={ks}"
+    assert booker.url == f"/budget?costCentre={ks}"
 
     session = ScriptedSession()
     resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]

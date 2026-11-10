@@ -18,7 +18,7 @@ async function setup(opts: { variant?: HelpMenuVariant; signedIn?: boolean; publ
     inputs: { variant: opts.variant ?? 'rail' },
     on: { navigated },
     providers: [
-      provideRouter([{ path: 'barrierefreiheit', children: [] }]),
+      provideRouter([{ path: 'accessibility', children: [] }]),
       { provide: AuthService, useValue: { isAuthenticated: signal(opts.signedIn ?? true) } },
       {
         provide: BrandingService,
@@ -129,7 +129,7 @@ describe('HelpMenuComponent', () => {
     trigger().click();
     fixture.detectChanges();
     const link = screen.getByRole('link', { name: 'Barrierefreiheit' });
-    expect(link).toHaveAttribute('href', '/barrierefreiheit');
+    expect(link).toHaveAttribute('href', '/accessibility');
     link.click();
     fixture.detectChanges();
     expect(navigated).toHaveBeenCalled();

@@ -937,7 +937,7 @@ async def test_public_join_only_without_a_quorum(
         assert created.status_code == 422
         detail = lead.get(f"/api/meetings/{s.meeting_id}").json()
         assert detail["publicJoinAllowed"] is False
-        defaults = lead.get(f"/api/gremien/{s.gremium_id}/meeting-defaults").json()
+        defaults = lead.get(f"/api/committees/{s.gremium_id}/meeting-defaults").json()
         assert defaults == {"publicJoinAllowed": False, "quorumPercent": 50}
 
 

@@ -158,7 +158,7 @@ const TARGET_ROUTES: Record<string, (id: string) => readonly string[]> = {
   application: (id) => ['/applications', id],
   vote: (id) => ['/voting', id],
   meeting: (id) => ['/meetings', id],
-  gremium: () => ['/admin/gremien'],
+  gremium: () => ['/admin/committees'],
   application_type: () => ['/admin/forms'],
   role: () => ['/admin/roles'],
   role_assignment: () => ['/admin/users'],

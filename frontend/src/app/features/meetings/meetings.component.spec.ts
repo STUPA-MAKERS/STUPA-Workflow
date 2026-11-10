@@ -172,7 +172,7 @@ function routerStub(navigate: jest.Mock = jest.fn(() => Promise.resolve(true))) 
 }
 
 /**
- * The Gremium dropdown loads `/gremien` at start, only for a meeting manager. The overview route
+ * The Gremium dropdown loads `/committees` at start, only for a meeting manager. The overview route
  * loads the timeline: one cursor page each for past and upcoming.
  */
 /** The vote button of the dock, which opens the vote cards below the wide layout. */
@@ -214,7 +214,7 @@ async function setup(
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  http.match((r) => r.url.endsWith('/gremien')).forEach((req) => req.flush(opts.gremien ?? []));
+  http.match((r) => r.url.endsWith('/committees')).forEach((req) => req.flush(opts.gremien ?? []));
   const isPast = (m: MeetingOutWire) => m.status === 'closed';
   if (!opts.skipTimelineFlush) {
     http
@@ -1002,7 +1002,7 @@ describe('MeetingsComponent — methods', () => {
       const open = jest.spyOn(window, 'open').mockReturnValue(null);
       try {
         cmp.openBeamer(cmp.meeting()!);
-        expect(open).toHaveBeenCalledWith('/voting/beamer/m-1', '_blank', 'noopener');
+        expect(open).toHaveBeenCalledWith('/voting/projector/m-1', '_blank', 'noopener');
       } finally {
         open.mockRestore();
       }
@@ -1793,7 +1793,7 @@ describe('MeetingsComponent — methods', () => {
       cmp.attendance.set([PR9, PR2]);
       cmp.askHandover('pr-9');
       cmp.handOver(cmp.meeting()!, 'now');
-      const now = http.expectOne('/api/meetings/m-1/protokollant-handover');
+      const now = http.expectOne('/api/meetings/m-1/minute-taker-handover');
       expect(now.request.method).toBe('POST');
       expect(now.request.body).toEqual({ principalId: 'pr-9', mode: 'now' });
       now.flush({ ...MEETING, protokollantId: 'pr-9', protokollantName: 'Neu' });
@@ -1812,7 +1812,7 @@ describe('MeetingsComponent — methods', () => {
         toPosition: null,
       };
       http
-        .expectOne('/api/meetings/m-1/protokollant-handover')
+        .expectOne('/api/meetings/m-1/minute-taker-handover')
         .flush({ ...MEETING, protokollantId: 'pr-9', plannedHandover: plan });
       expect(cmp.meeting()!.plannedHandover?.principalId).toBe('pr-2');
       expect(success).toHaveBeenLastCalledWith('Übergabe mit dem nächsten TOP geplant.');
@@ -1881,7 +1881,7 @@ describe('MeetingsComponent — methods', () => {
       cmp.askHandover('pr-9');
       cmp.handOver(cmp.meeting()!, 'now');
       http
-        .expectOne('/api/meetings/m-1/protokollant-handover')
+        .expectOne('/api/meetings/m-1/minute-taker-handover')
         .flush(
           { detail: 'x', code: 'protokollant_needs_protocol_write' },
           { status: 422, statusText: 'Unprocessable' },
@@ -1891,14 +1891,14 @@ describe('MeetingsComponent — methods', () => {
       expect(within(dialog).getByRole('alert')).toHaveTextContent('Diese Person hat im Gremium kein Protokollrecht.');
       cmp.handOver(cmp.meeting()!, 'next_item');
       http
-        .expectOne('/api/meetings/m-1/protokollant-handover')
+        .expectOne('/api/meetings/m-1/minute-taker-handover')
         .flush({ detail: 'last item', code: 'no_next_item' }, { status: 409, statusText: 'c' });
       fixture.detectChanges();
       expect(within(dialog).getByRole('alert')).toHaveTextContent('Der aktuelle TOP ist der letzte.');
       expect(error).not.toHaveBeenCalled();
       cmp.handOver(cmp.meeting()!, 'now');
       http
-        .expectOne('/api/meetings/m-1/protokollant-handover')
+        .expectOne('/api/meetings/m-1/minute-taker-handover')
         .flush(null, { status: 500, statusText: 'e' });
       expect(error.mock.lastCall?.[0]).toBe('Aktion fehlgeschlagen.');
     });
@@ -1921,7 +1921,7 @@ describe('MeetingsComponent — methods', () => {
       expect(next).toBeChecked();
       expect(screen.queryByText('Protokollführung übergeben an')).toBeNull();
       await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
-      const req = http.expectOne('/api/meetings/m-1/protokollant-handover');
+      const req = http.expectOne('/api/meetings/m-1/minute-taker-handover');
       expect(req.request.body).toEqual({ principalId: 'pr-9', mode: 'next_item' });
     });
 
@@ -1944,13 +1944,13 @@ describe('MeetingsComponent — methods', () => {
       const success = jest.spyOn(toast, 'success');
       const error = jest.spyOn(toast, 'error');
       cmp.cancelHandover(cmp.meeting()!);
-      const req = http.expectOne('/api/meetings/m-1/protokollant-handover');
+      const req = http.expectOne('/api/meetings/m-1/minute-taker-handover');
       expect(req.request.method).toBe('DELETE');
       req.flush({ ...MEETING, plannedHandover: null });
       expect(success).toHaveBeenLastCalledWith('Geplante Übergabe verworfen.');
       cmp.cancelHandover(cmp.meeting()!);
       http
-        .expectOne('/api/meetings/m-1/protokollant-handover')
+        .expectOne('/api/meetings/m-1/minute-taker-handover')
         .flush({ code: 'no_planned_handover' }, { status: 404, statusText: 'n' });
       expect(error).toHaveBeenCalled();
     });

@@ -9,7 +9,7 @@
       [heading]="'publicProtocols.detail.notFound' | t"
       [body]="'publicProtocols.detail.notFoundBody' | t"
     >
-      <a class="pd__btn pd__btn--tonal" routerLink="/protokolle">
+      <a class="pd__btn pd__btn--tonal" routerLink="/protocols">
         <app-icon name="back" [size]="16" />
         {{ 'publicProtocols.detail.back' | t }}
       </a>
@@ -20,7 +20,7 @@
     <nav class="pd__crumbs" [attr.aria-label]="'publicProtocols.crumbs' | t">
       <a routerLink="/">{{ 'publicProtocols.crumbHome' | t }}</a>
       <app-icon name="right" [size]="13" />
-      <a routerLink="/protokolle">{{ 'publicProtocols.title' | t }}</a>
+      <a routerLink="/protocols">{{ 'publicProtocols.title' | t }}</a>
       <app-icon name="right" [size]="13" />
       <span class="ell" aria-current="page" [title]="p.title">{{ p.title }}</span>
     </nav>
@@ -140,7 +140,7 @@
             <li>{{ 'publicProtocols.version.nonPublic' | t }}</li>
             <li>{{ 'publicProtocols.version.internal' | t }}</li>
           </ul>
-          <a class="pd__more" routerLink="/protokolle" [queryParams]="{ gremium: p.gremium.id }">
+          <a class="pd__more" routerLink="/protocols" [queryParams]="{ committee: p.gremium.id }">
             {{ 'publicProtocols.detail.allOf' | t: { name: p.gremium.name } }}
             <app-icon name="arrow" [size]="14" />
           </a>

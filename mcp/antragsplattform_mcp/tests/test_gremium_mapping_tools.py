@@ -135,7 +135,7 @@ def test_delete_group_mapping(fake_api: _FakeApi) -> None:
 
 def test_list_gremium_membership_mappings(fake_api: _FakeApi) -> None:
     asyncio.run(admin.list_gremium_membership_mappings())
-    assert fake_api.calls == [("GET", "/admin/gremium-membership-mappings", None)]
+    assert fake_api.calls == [("GET", "/admin/committee-membership-mappings", None)]
 
 
 def test_create_gremium_membership_mapping(fake_api: _FakeApi) -> None:
@@ -144,7 +144,7 @@ def test_create_gremium_membership_mapping(fake_api: _FakeApi) -> None:
     assert fake_api.calls == [
         (
             "POST",
-            "/admin/gremium-membership-mappings",
+            "/admin/committee-membership-mappings",
             {"oidcGroup": "stupa-members", "gremiumId": "g1"},
         )
     ]
@@ -154,13 +154,13 @@ def test_update_gremium_membership_mapping_sends_only_set_keys(fake_api: _FakeAp
     patch = S.GremiumMembershipMappingUpdate(gremiumId="g2")
     asyncio.run(admin.update_gremium_membership_mapping("m1", patch))
     assert fake_api.calls == [
-        ("PATCH", "/admin/gremium-membership-mappings/m1", {"gremiumId": "g2"})
+        ("PATCH", "/admin/committee-membership-mappings/m1", {"gremiumId": "g2"})
     ]
 
 
 def test_delete_gremium_membership_mapping(fake_api: _FakeApi) -> None:
     asyncio.run(admin.delete_gremium_membership_mapping("m1"))
-    assert fake_api.calls == [("DELETE", "/admin/gremium-membership-mappings/m1", None)]
+    assert fake_api.calls == [("DELETE", "/admin/committee-membership-mappings/m1", None)]
 
 
 # Role mappings: OIDC group to a role in a Gremium.
@@ -168,7 +168,7 @@ def test_delete_gremium_membership_mapping(fake_api: _FakeApi) -> None:
 
 def test_list_gremium_role_mappings(fake_api: _FakeApi) -> None:
     asyncio.run(admin.list_gremium_role_mappings())
-    assert fake_api.calls == [("GET", "/admin/gremium-role-mappings", None)]
+    assert fake_api.calls == [("GET", "/admin/committee-role-mappings", None)]
 
 
 def test_create_gremium_role_mapping(fake_api: _FakeApi) -> None:
@@ -177,7 +177,7 @@ def test_create_gremium_role_mapping(fake_api: _FakeApi) -> None:
     assert fake_api.calls == [
         (
             "POST",
-            "/admin/gremium-role-mappings",
+            "/admin/committee-role-mappings",
             {"oidcGroup": "stupa-vorstand", "gremiumRoleId": "r1"},
         )
     ]
@@ -187,15 +187,15 @@ def test_update_gremium_role_mapping_sends_only_set_keys(fake_api: _FakeApi) -> 
     patch = S.GremiumRoleMappingUpdate(oidcGroup="stupa-board")
     asyncio.run(admin.update_gremium_role_mapping("m1", patch))
     assert fake_api.calls == [
-        ("PATCH", "/admin/gremium-role-mappings/m1", {"oidcGroup": "stupa-board"})
+        ("PATCH", "/admin/committee-role-mappings/m1", {"oidcGroup": "stupa-board"})
     ]
 
 
 def test_delete_gremium_role_mapping(fake_api: _FakeApi) -> None:
     asyncio.run(admin.delete_gremium_role_mapping("m1"))
-    assert fake_api.calls == [("DELETE", "/admin/gremium-role-mappings/m1", None)]
+    assert fake_api.calls == [("DELETE", "/admin/committee-role-mappings/m1", None)]
 
 
 def test_list_gremium_memberships_stays_read_only(fake_api: _FakeApi) -> None:
     asyncio.run(admin.list_gremium_memberships("g1"))
-    assert fake_api.calls == [("GET", "/admin/gremien/g1/memberships", None)]
+    assert fake_api.calls == [("GET", "/admin/committees/g1/memberships", None)]

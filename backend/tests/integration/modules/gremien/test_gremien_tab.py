@@ -287,7 +287,7 @@ async def test_overview_member_and_view_all(
 ) -> None:
     """List the members for a member and for view-all: me and alice, not bob, who is inactive."""
     w = await _world(maker)
-    rows = _client(app_for, w.me).get("/api/gremien/overview").json()
+    rows = _client(app_for, w.me).get("/api/committees/overview").json()
     assert [r["id"] for r in rows] == [str(w.gremium_id)]
     row = rows[0]
     assert row["isMember"] is True
@@ -300,7 +300,7 @@ async def test_overview_member_and_view_all(
     assert row["logoUrl"] is None
 
     viewer = Principal(sub="viewer-x", permissions={"gremium.view_all"})
-    ids = {r["id"] for r in _client(app_for, viewer).get("/api/gremien/overview").json()}
+    ids = {r["id"] for r in _client(app_for, viewer).get("/api/committees/overview").json()}
     assert {str(w.gremium_id), str(w.other_id)} <= ids
 
 
@@ -331,8 +331,8 @@ async def test_overview_logo_url_follows_the_square_logo(
         gremium.cd_variant_id = variant.id
         await s.commit()
     try:
-        row = _client(app_for, w.me).get("/api/gremien/overview").json()[0]
-        assert row["logoUrl"] == f"/api/gremien/{w.gremium_id}/logo"
+        row = _client(app_for, w.me).get("/api/committees/overview").json()[0]
+        assert row["logoUrl"] == f"/api/committees/{w.gremium_id}/logo"
     finally:
         async with maker() as s:
             gremium = await s.get(Gremium, w.gremium_id)
@@ -350,13 +350,13 @@ async def test_gate_hides_foreign_gremium(
     outsider = Principal(sub=f"outsider-{w.me.sub.split('-', 1)[1]}")
     client = _client(app_for, outsider)
     for path in ("members", "meetings", "attendance", "decisions"):
-        resp = client.get(f"/api/gremien/{w.gremium_id}/{path}")
+        resp = client.get(f"/api/committees/{w.gremium_id}/{path}")
         assert resp.status_code == 404, path
         assert resp.headers["content-type"].startswith("application/problem+json")
         assert resp.json()["code"] == "gremium_not_found"
-    assert client.get(f"/api/gremien/{uuid.uuid4()}/members").status_code == 404
+    assert client.get(f"/api/committees/{uuid.uuid4()}/members").status_code == 404
     admin = Principal(sub="admin-x", roles=["admin"])
-    assert _client(app_for, admin).get(f"/api/gremien/{w.gremium_id}/members").status_code == 200
+    assert _client(app_for, admin).get(f"/api/committees/{w.gremium_id}/members").status_code == 200
 
 
 async def test_members_and_former(
@@ -364,11 +364,11 @@ async def test_members_and_former(
 ) -> None:
     w = await _world(maker)
     client = _client(app_for, w.me)
-    rows = client.get(f"/api/gremien/{w.gremium_id}/members").json()
+    rows = client.get(f"/api/committees/{w.gremium_id}/members").json()
     assert [r["displayName"] for r in rows] == ["Me", "Alice"]
     assert rows[0]["isSelf"] is True and rows[0]["roleKey"] == "vorstand"
     assert rows[1]["email"].startswith("alice-")
-    former = client.get(f"/api/gremien/{w.gremium_id}/members", params={"former": "true"}).json()
+    former = client.get(f"/api/committees/{w.gremium_id}/members", params={"former": "true"}).json()
     assert [r["displayName"] for r in former] == ["Bob"]
 
 
@@ -379,7 +379,7 @@ async def test_meetings_counts(maker: async_sessionmaker[AsyncSession], app_for:
     alice and bob, and sub, who is recorded.
     """
     w = await _world(maker)
-    rows = _client(app_for, w.me).get(f"/api/gremien/{w.gremium_id}/meetings").json()
+    rows = _client(app_for, w.me).get(f"/api/committees/{w.gremium_id}/meetings").json()
     by_id = {r["id"]: r for r in rows}
     assert [r["id"] for r in rows][:2] == [str(w.ids["m5"]), str(w.ids["m4"])]
     m1 = by_id[str(w.ids["m1"])]
@@ -399,7 +399,7 @@ async def test_attendance_matrix(maker: async_sessionmaker[AsyncSession], app_fo
     """
     w = await _world(maker)
     resp = _client(app_for, w.me).get(
-        f"/api/gremien/{w.gremium_id}/attendance", params={"from": "2026-05", "to": "2026-07"}
+        f"/api/committees/{w.gremium_id}/attendance", params={"from": "2026-05", "to": "2026-07"}
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -444,7 +444,7 @@ async def test_attendance_range_errors(
 ) -> None:
     w = await _world(maker)
     client = _client(app_for, w.me)
-    url = f"/api/gremien/{w.gremium_id}/attendance"
+    url = f"/api/committees/{w.gremium_id}/attendance"
     too_long = client.get(url, params={"from": "2024-01", "to": "2026-01"})
     assert too_long.status_code == 422
     assert too_long.json()["code"] == "invalid_month_range"
@@ -459,18 +459,18 @@ async def test_member_attendance_detail(
     w = await _world(maker)
     client = _client(app_for, w.me)
     body = client.get(
-        f"/api/gremien/{w.gremium_id}/attendance/{w.ids['alice']}", params={"month": "2026-05"}
+        f"/api/committees/{w.gremium_id}/attendance/{w.ids['alice']}", params={"month": "2026-05"}
     ).json()
     assert body["displayName"] == "Alice"
     states = [(m["title"], m["status"], m["delegateName"]) for m in body["meetings"]]
     assert states == [("Sitzung m1", "delegated", "Sub"), ("Sitzung m2", "present", None)]
     assert "krank" not in str(body)
     june = client.get(
-        f"/api/gremien/{w.gremium_id}/attendance/{w.ids['alice']}", params={"month": "2026-06"}
+        f"/api/committees/{w.gremium_id}/attendance/{w.ids['alice']}", params={"month": "2026-06"}
     ).json()
     assert [m["status"] for m in june["meetings"]] == ["absent"]
     outsider = client.get(
-        f"/api/gremien/{w.gremium_id}/attendance/{w.ids['outsider']}", params={"month": "2026-05"}
+        f"/api/committees/{w.gremium_id}/attendance/{w.ids['outsider']}", params={"month": "2026-05"}
     )
     assert outsider.status_code == 404
     assert outsider.json()["code"] == "member_not_found"
@@ -479,7 +479,7 @@ async def test_member_attendance_detail(
 async def test_decisions(maker: async_sessionmaker[AsyncSession], app_for: FastAPI) -> None:
     w = await _world(maker)
     client = _client(app_for, w.me)
-    url = f"/api/gremien/{w.gremium_id}/decisions"
+    url = f"/api/committees/{w.gremium_id}/decisions"
     page = client.get(url).json()
     assert page["nextCursor"] is None
     items = page["items"]

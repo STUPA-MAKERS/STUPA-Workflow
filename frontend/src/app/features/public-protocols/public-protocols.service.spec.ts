@@ -34,7 +34,7 @@ describe('PublicProtocolsService', () => {
 
   it('reads the public routes', () => {
     api.gremien().subscribe();
-    http.expectOne('/api/public/gremien').flush([]);
+    http.expectOne('/api/public/committees').flush([]);
     api.list({ limit: 3 }).subscribe();
     http.expectOne('/api/public/protocols?limit=3').flush({ items: [], total: 0, limit: 3, offset: 0 });
     api.list().subscribe();

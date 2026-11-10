@@ -86,7 +86,7 @@ async function setup(
             pathFromRoot: [
               { url: [] },
               { url: [{ path: 'admin' }] },
-              { url: [{ path: 'gremien' }, { path: 'g-1' }, { path: 'members' }] },
+              { url: [{ path: 'committees' }, { path: 'g-1' }, { path: 'members' }] },
             ],
           },
         },
@@ -210,7 +210,7 @@ describe('GremiumMembersComponent', () => {
     const { fixture } = await setup();
     const frame = fixture.debugElement.injector.get(PageFrameService);
     expect(frame.crumbLabel()).toEqual({
-      url: '/admin/gremien/g-1/members',
+      url: '/admin/committees/g-1/members',
       label: 'Studierendenparlament',
     });
     fixture.destroy();

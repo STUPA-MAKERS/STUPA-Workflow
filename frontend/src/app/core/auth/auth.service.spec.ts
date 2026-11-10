@@ -122,7 +122,7 @@ describe('AuthService', () => {
     expect(loginReturnTo('/api/auth/me')).toBeNull();
     expect(loginReturnTo('https://evil.example/x')).toBeNull();
     expect(loginReturnTo('//evil.example/x')).toBeNull();
-    expect(loginReturnTo('/antrag/a1#t=secret')).toBe('/antrag/a1');
+    expect(loginReturnTo('/my-applications/a1#t=secret')).toBe('/my-applications/a1');
     expect(loginReturnTo('/status?t=secret&app=a1')).toBe('/status?app=a1');
     expect(loginReturnTo('/applications/a1#comments')).toBe('/applications/a1#comments');
     expect(loginReturnTo('/applications/a1#comment-0d4c-11')).toBe('/applications/a1#comment-0d4c-11');

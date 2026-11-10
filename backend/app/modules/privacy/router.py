@@ -250,7 +250,7 @@ async def put_settings(
     return PrivacySettingsOut.model_validate(settings, from_attributes=True)
 
 
-@router.get("/auskunft", dependencies=[_CONFIG], responses=_errors(401, 403, 422))
+@router.get("/export", dependencies=[_CONFIG], responses=_errors(401, 403, 422))
 async def auskunft(
     session: DbSession,
     principal: ConfigPrincipal,

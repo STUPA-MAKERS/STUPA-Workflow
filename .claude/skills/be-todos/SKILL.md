@@ -47,10 +47,10 @@ done (`completed_at`).
   "Gremien": `gremium.view_all` or an active membership, cached per resolver); invoice and
   expense `budget.access.has_budget_read` (`budget.view`/`.structure`/`.book`, the gate
   of `GET /invoices` and `/expenses`); budget (cost centre): every card reader sees the
-  name and path key, the url `/budget?ks={id}` and a new link need `has_budget_read`
+  name and path key, the url `/budget?costCentre={id}` and a new link need `has_budget_read`
   (spec 000552), and it is no grant kind; ticket `ticket.manage`; todo the board rule.
   Titles and urls: vote = question, else the application title when the viewer can read that application (`/voting/{id}`, detail
-  `meetingTitle`, `date`, `voteStatus`, `voteResult`); gremium = name (`/gremien/{id}`);
+  `meetingTitle`, `date`, `voteStatus`, `voteResult`); gremium = name (`/committees/{id}`);
   invoice = number, else supplier (`/invoices?id={id}`, detail `number`,
   `counterparty`, `amount`, `date` = issue date, `invoiceStatus`); expense = description
   (`/expenses?id={id}`, a sub-booking links its parent row; detail `amount`,

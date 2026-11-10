@@ -21,7 +21,7 @@ scope:
 
 # A public page holds the accessibility statement
 
-The route `/barrierefreiheit` must show the Erklärung zur Barrierefreiheit without a login.
+The route `/accessibility` must show the Erklärung zur Barrierefreiheit without a login.
 The statement must state the conformance status, the parts that are not accessible and why,
 the date of the last check, the feedback route and the Schlichtungsstelle.
 

@@ -412,12 +412,12 @@ def _as_admin(app: FastAPI) -> None:
 
 
 def test_requires_auth_401(client: TestClient) -> None:
-    assert client.get("/api/admin/gremien").status_code == 401
+    assert client.get("/api/admin/committees").status_code == 401
 
 
 def test_forbidden_without_permission(app: FastAPI, client: TestClient) -> None:
     _as(app, set())
-    r = client.get("/api/admin/gremien")
+    r = client.get("/api/admin/committees")
     assert r.status_code == 403
     assert r.json()["code"] == "forbidden"
 
@@ -445,26 +445,26 @@ def test_config_schemas_includes_branding(app: FastAPI, client: TestClient) -> N
 
 def test_list_create_update_gremium(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
-    assert client.get("/api/admin/gremien").json()[0]["cdVariantId"] is None
-    r = client.post("/api/admin/gremien", json={"name": "AStA", "slug": "asta"})
+    assert client.get("/api/admin/committees").json()[0]["cdVariantId"] is None
+    r = client.post("/api/admin/committees", json={"name": "AStA", "slug": "asta"})
     assert r.status_code == 201 and r.json()["defaultLang"] == "de"
-    patched = client.patch(f"/api/admin/gremien/{uuid4()}", json={"name": "Neu"})
+    patched = client.patch(f"/api/admin/committees/{uuid4()}", json={"name": "Neu"})
     assert patched.status_code == 200
 
 
 def test_admin_gremien_list_has_counts(app: FastAPI, client: TestClient) -> None:
     """The admin list names the member and role counts; the public list does not."""
     _as_admin(app)
-    row = client.get("/api/admin/gremien").json()[0]
+    row = client.get("/api/admin/committees").json()[0]
     assert row["memberCount"] == 23
     assert row["roleCount"] == 4
-    public = client.get("/api/gremien").json()[0]
+    public = client.get("/api/committees").json()[0]
     assert "memberCount" not in public and "roleCount" not in public
 
 
 def test_update_gremium_404(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
-    r = client.patch("/api/admin/gremien/00000000-0000-0000-0000-000000000000", json={"name": "x"})
+    r = client.patch("/api/admin/committees/00000000-0000-0000-0000-000000000000", json={"name": "x"})
     assert r.status_code == 404
 
 
@@ -475,10 +475,10 @@ def test_gremium_mail_recipients_roundtrip(app: FastAPI, client: TestClient) -> 
     """
     _as_admin(app)
     gid = uuid4()
-    r = client.get(f"/api/admin/gremien/{gid}/mail-recipients")
+    r = client.get(f"/api/admin/committees/{gid}/mail-recipients")
     assert r.status_code == 200 and r.json() == {"recipients": ["list@x.de"]}
     r = client.put(
-        f"/api/admin/gremien/{gid}/mail-recipients",
+        f"/api/admin/committees/{gid}/mail-recipients",
         json={"recipients": ["a@x.de", " a@X.de ", "b@y.org"]},
     )
     assert r.status_code == 200
@@ -490,27 +490,27 @@ def test_gremium_mail_recipients_rejects_implausible_address(
 ) -> None:
     _as_admin(app)
     r = client.put(
-        f"/api/admin/gremien/{uuid4()}/mail-recipients",
+        f"/api/admin/committees/{uuid4()}/mail-recipients",
         json={"recipients": ["not-an-email"]},
     )
     assert r.status_code == 422
 
 
 def test_gremien_authed_list_without_admin_perm(app: FastAPI, client: TestClient) -> None:
-    """Every logged-in principal may read `GET /api/gremien`.
+    """Every logged-in principal may read `GET /api/committees`.
 
     The endpoint feeds a dropdown, so it also works without ``admin.config``.
 
     The test principal is logged in, but has no permission.
     """
     _as(app, set())
-    r = client.get("/api/gremien")
+    r = client.get("/api/committees")
     assert r.status_code == 200
     assert r.json()[0]["cdVariantId"] is None
 
 
 def test_gremien_authed_requires_auth_401(client: TestClient) -> None:
-    assert client.get("/api/gremien").status_code == 401
+    assert client.get("/api/committees").status_code == 401
 
 
 def test_application_types_crud(app: FastAPI, client: TestClient) -> None:
@@ -595,8 +595,8 @@ def test_gremien_admin_can_manage_members_without_admin_roles(
     app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
     _as(app, {"admin.gremien"})
     gid = uuid4()
-    assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 200
-    assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 200
+    assert client.get(f"/api/admin/committees/{gid}/memberships").status_code == 200
+    assert client.get(f"/api/admin/committees/{gid}/roles").status_code == 200
     assert client.get("/api/admin/principals").status_code == 200
 
 
@@ -609,9 +609,9 @@ def test_delegations_admin_reads_members_and_principals(app: FastAPI, client: Te
     app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
     _as(app, {"admin.delegations"})
     gid = uuid4()
-    assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 200
+    assert client.get(f"/api/admin/committees/{gid}/memberships").status_code == 200
     assert client.get("/api/admin/principals?q=max").status_code == 200
-    assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 403
+    assert client.get(f"/api/admin/committees/{gid}/roles").status_code == 403
 
 
 def test_members_endpoints_forbidden_for_unrelated_area(app: FastAPI, client: TestClient) -> None:
@@ -619,8 +619,8 @@ def test_members_endpoints_forbidden_for_unrelated_area(app: FastAPI, client: Te
     app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
     _as(app, {"admin.types"})
     gid = uuid4()
-    assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 403
-    assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 403
+    assert client.get(f"/api/admin/committees/{gid}/memberships").status_code == 403
+    assert client.get(f"/api/admin/committees/{gid}/roles").status_code == 403
 
 
 def test_flow_editor_can_read_its_sources_without_admin_types(
@@ -772,10 +772,10 @@ def test_gremium_membership_writes_are_gone(app: FastAPI, client: TestClient) ->
     _as_admin(app)
     gid, mid = uuid4(), uuid4()
     body = {"principalId": str(uuid4()), "gremiumRoleId": str(uuid4())}
-    assert client.post(f"/api/admin/gremien/{gid}/memberships", json=body).status_code == 405
+    assert client.post(f"/api/admin/committees/{gid}/memberships", json=body).status_code == 405
     assert client.patch(f"/api/admin/gremium-memberships/{mid}", json={}).status_code == 404
     assert client.delete(f"/api/admin/gremium-memberships/{mid}").status_code == 404
-    listed = client.get(f"/api/admin/gremien/{gid}/memberships").json()
+    listed = client.get(f"/api/admin/committees/{gid}/memberships").json()
     assert "validFrom" not in listed[0] and listed[0]["gremiumId"] == str(gid)
 
 
@@ -792,12 +792,12 @@ def test_global_group_mapping_has_no_gremium(app: FastAPI, client: TestClient) -
     ("base", "body", "patch_body"),
     [
         (
-            "/api/admin/gremium-membership-mappings",
+            "/api/admin/committee-membership-mappings",
             {"oidcGroup": "stupa", "gremiumId": str(uuid4())},
             {"oidcGroup": "asta"},
         ),
         (
-            "/api/admin/gremium-role-mappings",
+            "/api/admin/committee-role-mappings",
             {"oidcGroup": "stupa-board", "gremiumRoleId": str(uuid4())},
             {"oidcGroup": "stupa-chair"},
         ),
@@ -839,7 +839,7 @@ def test_gremium_mappings_crud_and_gate(
 def test_gremium_group_mapping_routes_are_gone(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     gid = uuid4()
-    assert client.get(f"/api/admin/gremien/{gid}/group-mappings").status_code == 404
+    assert client.get(f"/api/admin/committees/{gid}/group-mappings").status_code == 404
     assert client.delete(f"/api/admin/gremium-group-mappings/{gid}").status_code == 404
 
 
@@ -847,7 +847,7 @@ def test_group_mappings_page_reads_gremium_roles(app: FastAPI, client: TestClien
     """The gremium role dropdown of the mappings page needs the roles of a gremium."""
     app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
     _as(app, {"admin.group_mappings"})
-    assert client.get(f"/api/admin/gremien/{uuid4()}/roles").status_code == 200
+    assert client.get(f"/api/admin/committees/{uuid4()}/roles").status_code == 200
 
 
 def test_site_config_save_cycle(app: FastAPI, client: TestClient) -> None:
@@ -899,16 +899,16 @@ def test_public_site_config_no_auth_and_cache_header(client: TestClient) -> None
 def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
     spec = app.openapi()
     cases = [
-        ("/api/admin/gremien", "post"),
-        ("/api/admin/gremien/{gremium_id}", "patch"),
+        ("/api/admin/committees", "post"),
+        ("/api/admin/committees/{gremium_id}", "patch"),
         ("/api/admin/application-types", "post"),
         ("/api/admin/application-types/{type_id}", "patch"),
         ("/api/admin/roles", "post"),
         ("/api/admin/roles/{role_id}", "patch"),
-        ("/api/admin/gremium-membership-mappings", "post"),
-        ("/api/admin/gremium-membership-mappings/{mapping_id}", "patch"),
-        ("/api/admin/gremium-role-mappings", "post"),
-        ("/api/admin/gremium-role-mappings/{mapping_id}", "patch"),
+        ("/api/admin/committee-membership-mappings", "post"),
+        ("/api/admin/committee-membership-mappings/{mapping_id}", "patch"),
+        ("/api/admin/committee-role-mappings", "post"),
+        ("/api/admin/committee-role-mappings/{mapping_id}", "patch"),
         ("/api/admin/group-mappings", "post"),
         ("/api/admin/group-mappings/{mapping_id}", "patch"),
         ("/api/admin/webhooks", "post"),
@@ -949,18 +949,18 @@ def test_gremium_switch_on_schedules_the_backfill(
     monkeypatch.setattr(protocol_router, "schedule_public_backfill", _schedule)
     _as_admin(app)
     gid = uuid4()
-    r = client.patch(f"/api/admin/gremien/{gid}", json={"protocolsPublic": True})
+    r = client.patch(f"/api/admin/committees/{gid}", json={"protocolsPublic": True})
     assert r.status_code == 200 and r.json()["protocolsPublic"] is True
     assert seen == [gid]
-    client.patch(f"/api/admin/gremien/{gid}", json={"protocolsPublic": False})
+    client.patch(f"/api/admin/committees/{gid}", json={"protocolsPublic": False})
     assert seen == [gid]
 
 
 def test_gremium_public_preview(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
-    r = client.get(f"/api/admin/gremien/{uuid4()}/public-preview")
+    r = client.get(f"/api/admin/committees/{uuid4()}/public-preview")
     assert r.json() == {"finalCount": 6, "missingCount": 5}
-    r = client.get("/api/admin/gremien/00000000-0000-0000-0000-000000000000/public-preview")
+    r = client.get("/api/admin/committees/00000000-0000-0000-0000-000000000000/public-preview")
     assert r.status_code == 404
 
 

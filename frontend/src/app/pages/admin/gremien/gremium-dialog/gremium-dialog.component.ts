@@ -85,7 +85,7 @@ export function parseRecipients(raw: string): readonly string[] {
  * It holds every setting of a gremium (gaps N38): name (the slug comes from the name of
  * a new gremium and never changes after), CD variant, default language, quorum, vote
  * delegation with its lead time and the delegation to external persons, and the extra
- * protocol recipients (`PUT /admin/gremien/{id}/mail-recipients`, after the base data).
+ * protocol recipients (`PUT /admin/committees/{id}/mail-recipients`, after the base data).
  * If the dialog cannot read the recipients, the field stays locked and a save sends only
  * the base data: the PUT replaces the list, so an empty field would delete it.
  * There is no switch for changing a ballot after casting: a ballot never changes.

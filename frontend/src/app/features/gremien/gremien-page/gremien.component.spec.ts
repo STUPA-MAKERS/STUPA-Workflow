@@ -29,7 +29,7 @@ const ITEMS: GremiumOverview[] = [
     roleName: { de: 'Vorstand', en: 'Board' },
     memberCount: 1,
     live: true,
-    logoUrl: '/api/gremien/g-2/logo',
+    logoUrl: '/api/committees/g-2/logo',
   }),
   gremium({
     id: 'g-3',
@@ -55,7 +55,7 @@ async function start(
     providers: [
       provideRouter([
         {
-          path: 'gremien',
+          path: 'committees',
           component: GremienComponent,
           children: [
             { path: '', component: GremienNoneComponent },
@@ -88,11 +88,11 @@ describe('GremienComponent', () => {
   });
 
   it('opens the first own gremium by itself when the panes sit side by side', async () => {
-    const s = await start('/gremien', { media: [MEDIA.wide] });
+    const s = await start('/committees', { media: [MEDIA.wide] });
     restore = s.restore;
     expect(s.cmp.split()).toBe(true);
     expect(s.frame.fill()).toBe(true);
-    expect(s.router.url).toBe('/gremien/g-1');
+    expect(s.router.url).toBe('/committees/g-1');
     expect(s.cmp.selectedId()).toBe('g-1');
     expect(screen.getByText('Detail')).toBeTruthy();
     s.harness.fixture.destroy();
@@ -101,10 +101,10 @@ describe('GremienComponent', () => {
 
   /** Without gremium.view_all there is no other gremium and no chip. */
   it('shows the own gremien with role, members and the next meeting', async () => {
-    const s = await start('/gremien');
+    const s = await start('/committees');
     restore = s.restore;
     expect(s.cmp.split()).toBe(false);
-    expect(s.router.url).toBe('/gremien');
+    expect(s.router.url).toBe('/committees');
     expect(s.api.overview).toHaveBeenCalledTimes(1);
     const rows = s.cmp.mine();
     expect(rows.map((r) => r.sub)).toEqual(['Mitglied · 31 Mitglieder', 'Vorstand · 1 Mitglied']);
@@ -117,13 +117,13 @@ describe('GremienComponent', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Meine Gremien' }).textContent?.trim()).toBe('Meine Gremien');
     expect(screen.getByText('Sitzung läuft')).toBeTruthy();
     const link = screen.getByRole('link', { name: /Studierendenparlament/ });
-    expect(link.getAttribute('href')).toBe('/gremien/g-1');
+    expect(link.getAttribute('href')).toBe('/committees/g-1');
     expect(s.cmp.searchPlaceholder()).toBe('2 Gremien durchsuchen');
     expect(await runAxe(s.harness.routeNativeElement as HTMLElement)).toHaveNoViolations();
   });
 
   it('shows every gremium with gremium.view_all, and only the own ones on request', async () => {
-    const s = await start('/gremien', { viewAll: true });
+    const s = await start('/committees', { viewAll: true });
     restore = s.restore;
     expect(s.cmp.others().map((r) => r.item.id)).toEqual(['g-3']);
     expect(s.cmp.others()[0].sub).toBe('12 Mitglieder');
@@ -142,7 +142,7 @@ describe('GremienComponent', () => {
   });
 
   it('searches the name and the slug in the browser', async () => {
-    const s = await start('/gremien', { viewAll: true });
+    const s = await start('/committees', { viewAll: true });
     restore = s.restore;
     s.cmp.query.set('WAHL');
     expect(s.cmp.mine().map((r) => r.item.id)).toEqual(['g-2']);
@@ -155,15 +155,15 @@ describe('GremienComponent', () => {
   });
 
   it('says that the person is in no gremium', async () => {
-    const s = await start('/gremien', { items: [], media: [MEDIA.wide] });
+    const s = await start('/committees', { items: [], media: [MEDIA.wide] });
     restore = s.restore;
-    expect(s.router.url).toBe('/gremien');
+    expect(s.router.url).toBe('/committees');
     expect(screen.getAllByText('Keine Gremien').length).toBeGreaterThan(0);
   });
 
   it('reports a failed read and reads again', async () => {
     const overview = jest.fn((): ReturnType<GremienApiService['overview']> => throwError(() => new Error('x')));
-    const s = await start('/gremien', { overview });
+    const s = await start('/committees', { overview });
     restore = s.restore;
     expect(loadErrorToast()).toContain('Die Gremien konnten nicht geladen werden.');
     overview.mockReturnValue(of(ITEMS));
@@ -174,17 +174,17 @@ describe('GremienComponent', () => {
   });
 
   it('follows the open gremium and closes it, keeping the query', async () => {
-    const s = await start('/gremien/g-2?tab=mitglieder');
+    const s = await start('/committees/g-2?tab=members');
     restore = s.restore;
     expect(s.cmp.selectedId()).toBe('g-2');
     s.cmp.closeDetail();
     await s.settle();
-    expect(s.router.url).toBe('/gremien?tab=mitglieder');
+    expect(s.router.url).toBe('/committees?tab=members');
     expect(s.cmp.selectedId()).toBeNull();
   });
 
   it('puts the calendar into the ⋮ menu on a phone', async () => {
-    const s = await start('/gremien', { media: [MEDIA.phone] });
+    const s = await start('/committees', { media: [MEDIA.phone] });
     restore = s.restore;
     expect(screen.queryByRole('button', { name: 'Sitzungen abonnieren' })).toBeNull();
     expect(s.cmp.phoneMenu().map((sec) => sec.items.map((i) => i.id))).toEqual([['calendar'], ['refresh']]);
@@ -200,7 +200,7 @@ describe('GremienComponent', () => {
   });
 
   it('shows the calendar button on a wider screen', async () => {
-    const s = await start('/gremien');
+    const s = await start('/committees');
     restore = s.restore;
     expect(screen.getByRole('button', { name: 'Sitzungen abonnieren' })).toBeTruthy();
   });

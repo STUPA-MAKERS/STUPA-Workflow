@@ -18,7 +18,7 @@ scope:
 
 # Every page links to the accessibility statement
 
-The footer and the help menu must link to `/barrierefreiheit` on every page. The link must
+The footer and the help menu must link to `/accessibility` on every page. The link must
 be there with and without a login.
 
 Reason: The law requires that a user can find the statement from every page.

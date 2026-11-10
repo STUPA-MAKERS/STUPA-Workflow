@@ -27,12 +27,12 @@ ID = uuid.uuid4()
 
 def test_url_builders_point_at_the_frontend_routes() -> None:
     assert application_link(SETTINGS, ID).url == f"{BASE}/applications/{ID}"
-    assert application_link(SETTINGS, ID, guest=True).url == f"{BASE}/antrag/{ID}"
+    assert application_link(SETTINGS, ID, guest=True).url == f"{BASE}/my-applications/{ID}"
     assert task_link(SETTINGS, ID).url == f"{BASE}/tasks/{ID}"
     assert meeting_link(SETTINGS, ID).url == f"{BASE}/meetings/{ID}"
     assert protocol_link(SETTINGS, ID).url == f"{BASE}/meetings/{ID}"
     assert protocol_link(SETTINGS, ID).target == "protocol"
-    assert public_protocol_url(SETTINGS, ID) == f"{BASE}/protokolle/{ID}"
+    assert public_protocol_url(SETTINGS, ID) == f"{BASE}/protocols/{ID}"
     assert privacy_admin_link(SETTINGS).url == f"{BASE}/admin/privacy"
     ticket = ticket_link(SETTINGS, "t-1")
     assert (ticket.url, ticket.target) == (f"{BASE}/tickets/t-1", "ticket")
@@ -47,7 +47,7 @@ def test_application_link_points_at_a_comment_except_for_a_guest() -> None:
     )
     assert (
         application_link(SETTINGS, ID, guest=True, comment_id=comment).url
-        == f"{BASE}/antrag/{ID}"
+        == f"{BASE}/my-applications/{ID}"
     )
 
 

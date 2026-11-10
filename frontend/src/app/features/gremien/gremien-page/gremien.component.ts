@@ -65,14 +65,14 @@ export interface GremiumRow {
 }
 
 /**
- * The tab "Gremien" (`/gremien`): a list/detail pane page like the votes.
+ * The tab "Gremien" (`/committees`): a list/detail pane page like the votes.
  *
  * - Left: the title with the calendar subscription, the search and, with
  *   `gremium.view_all`, the chip "Anzeigen: Meine Gremien | Alle Gremien". Then the groups
  *   "Meine Gremien" (with the own role) and "Weitere Gremien". A row shows the square logo
  *   or the initials, the role and the number of members, and the next meeting ("Läuft",
  *   a date or "keine geplant").
- * - Right: the child route `/gremien/:id` with the open gremium (`GremiumDetailComponent`).
+ * - Right: the child route `/committees/:id` with the open gremium (`GremiumDetailComponent`).
  *   Side by side the first own gremium opens by itself.
  * - One pane at a time (narrow, phone): the list, then the gremium with a way back.
  *
@@ -200,7 +200,7 @@ export class GremienComponent {
       const first = this.mine()[0] ?? this.others()[0];
       untracked(() => {
         if (!split || loading || this.selectedId() || !first) return;
-        void this.router.navigate(['/gremien', first.item.id], {
+        void this.router.navigate(['/committees', first.item.id], {
           queryParamsHandling: 'preserve',
           replaceUrl: true,
         });
@@ -210,7 +210,7 @@ export class GremienComponent {
 
   /** "Zur Liste": close the gremium, keep the tab. */
   closeDetail(): void {
-    void this.router.navigate(['/gremien'], { queryParamsHandling: 'preserve' });
+    void this.router.navigate(['/committees'], { queryParamsHandling: 'preserve' });
   }
 
   setScope(value: string): void {

@@ -838,7 +838,7 @@ describe('StatusTimelineComponent', () => {
   });
 
   it('strips a fragment token and keeps the other fragment params', async () => {
-    history.replaceState(null, '', `/antrag/${ID}#t=frag-token&foo=bar`);
+    history.replaceState(null, '', `/my-applications/${ID}#t=frag-token&foo=bar`);
     await setup(fakeApi(), {}, { pathParams: { id: ID }, fragment: 't=frag-token&foo=bar' });
     await screen.findByRole('heading', { level: 1 });
     expect(window.location.hash).not.toContain('frag-token');
@@ -847,17 +847,17 @@ describe('StatusTimelineComponent', () => {
   });
 
   it('strips only the token of a fragment that holds nothing else', async () => {
-    history.replaceState(null, '', `/antrag/${ID}#t=frag-token`);
+    history.replaceState(null, '', `/my-applications/${ID}#t=frag-token`);
     await setup(fakeApi(), {}, { pathParams: { id: ID }, fragment: 't=frag-token' });
     await screen.findByRole('heading', { level: 1 });
     expect(window.location.hash).toBe('');
   });
 
   it('leaves a URL without a token alone', async () => {
-    history.replaceState(null, '', `/antrag/${ID}`);
+    history.replaceState(null, '', `/my-applications/${ID}`);
     await setup(fakeApi(), { t: 'tok' }, { pathParams: { id: ID } });
     await screen.findByRole('heading', { level: 1 });
-    expect(window.location.pathname).toBe(`/antrag/${ID}`);
+    expect(window.location.pathname).toBe(`/my-applications/${ID}`);
   });
 
   it('loads with the cookie session when only an id is there', async () => {

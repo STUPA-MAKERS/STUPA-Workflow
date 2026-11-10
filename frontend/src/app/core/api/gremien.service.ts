@@ -1,5 +1,5 @@
 /**
- * API of the tab "Gremien" (`/api/gremien`). Every call reads only.
+ * API of the tab "Gremien" (`/api/committees`). Every call reads only.
  *
  * The server shows a gremium to an active member, to `gremium.view_all` and to the admin
  * role. Any other caller gets 404 for a gremium, so a hidden gremium looks like a missing
@@ -40,7 +40,7 @@ export interface GremiumNextMeeting {
   readonly status: GremiumMeetingStatus;
 }
 
-/** One row of `GET /gremien/overview`. */
+/** One row of `GET /committees/overview`. */
 export interface GremiumOverview {
   readonly id: Uuid;
   readonly name: string;
@@ -56,11 +56,11 @@ export interface GremiumOverview {
   readonly quorumPercent: number | null;
   readonly protocolsPublic: boolean;
   readonly allowVoteDelegation: boolean;
-  /** The square logo of the CD variant (`/api/gremien/{id}/logo`), else null. */
+  /** The square logo of the CD variant (`/api/committees/{id}/logo`), else null. */
   readonly logoUrl: string | null;
 }
 
-/** One membership (`GET /gremien/{id}/members`). */
+/** One membership (`GET /committees/{id}/members`). */
 export interface GremiumMember {
   readonly principalId: Uuid;
   readonly displayName: string | null;
@@ -71,7 +71,7 @@ export interface GremiumMember {
   readonly isSelf: boolean;
 }
 
-/** One meeting of a gremium (`GET /gremien/{id}/meetings`). */
+/** One meeting of a gremium (`GET /committees/{id}/meetings`). */
 export interface GremiumMeeting {
   readonly id: Uuid;
   readonly title: string;
@@ -114,7 +114,7 @@ export interface GremiumAttendanceRow {
   readonly cells: readonly GremiumAttendanceCell[];
 }
 
-/** `GET /gremien/{id}/attendance`: the matrix of a range of months. */
+/** `GET /committees/{id}/attendance`: the matrix of a range of months. */
 export interface GremiumAttendance {
   readonly fromMonth: string;
   readonly toMonth: string;
@@ -133,7 +133,7 @@ export interface GremiumMemberMeeting {
   readonly delegateName: string | null;
 }
 
-/** `GET /gremien/{id}/attendance/{principalId}?month=`. */
+/** `GET /committees/{id}/attendance/{principalId}?month=`. */
 export interface GremiumMemberAttendance {
   readonly principalId: Uuid;
   readonly displayName: string | null;
@@ -179,7 +179,7 @@ export interface GremiumDecisionPage {
   readonly nextCursor: string | null;
 }
 
-/** The filters of `GET /gremien/{id}/decisions`. An empty value is no filter. */
+/** The filters of `GET /committees/{id}/decisions`. An empty value is no filter. */
 export interface GremiumDecisionQuery {
   readonly cursor?: string | null;
   readonly q?: string | null;
@@ -199,14 +199,14 @@ export class GremienApiService {
   private readonly base = inject(API_BASE_URL);
 
   overview(): Observable<GremiumOverview[]> {
-    return this.http.get<GremiumOverview[]>(`${this.base}/gremien/overview`, {
+    return this.http.get<GremiumOverview[]>(`${this.base}/committees/overview`, {
       context: skipLoading(),
     });
   }
 
   members(gremiumId: Uuid, former = false): Observable<GremiumMember[]> {
     const params = former ? new HttpParams().set('former', 'true') : undefined;
-    return this.http.get<GremiumMember[]>(`${this.base}/gremien/${gremiumId}/members`, {
+    return this.http.get<GremiumMember[]>(`${this.base}/committees/${gremiumId}/members`, {
       params,
       context: skipLoading(),
     });
@@ -214,7 +214,7 @@ export class GremienApiService {
 
   /** Kept for the read ahead of the gremien list: the first tab of a gremium shows at once. */
   meetings(gremiumId: Uuid): Observable<GremiumMeeting[]> {
-    return this.http.get<GremiumMeeting[]>(`${this.base}/gremien/${gremiumId}/meetings`, {
+    return this.http.get<GremiumMeeting[]>(`${this.base}/committees/${gremiumId}/meetings`, {
       context: detailContext(),
     });
   }
@@ -222,7 +222,7 @@ export class GremienApiService {
   /** The months `from` to `to` (`YYYY-MM`). Without them the server gives the last six. */
   attendance(gremiumId: Uuid, range: { from?: string; to?: string } = {}): Observable<GremiumAttendance> {
     const params = httpParams({ from: range.from || undefined, to: range.to || undefined });
-    return this.http.get<GremiumAttendance>(`${this.base}/gremien/${gremiumId}/attendance`, {
+    return this.http.get<GremiumAttendance>(`${this.base}/committees/${gremiumId}/attendance`, {
       params,
       context: skipLoading(),
     });
@@ -234,7 +234,7 @@ export class GremienApiService {
     month: string,
   ): Observable<GremiumMemberAttendance> {
     return this.http.get<GremiumMemberAttendance>(
-      `${this.base}/gremien/${gremiumId}/attendance/${principalId}`,
+      `${this.base}/committees/${gremiumId}/attendance/${principalId}`,
       { params: new HttpParams().set('month', month), context: skipLoading() },
     );
   }
@@ -243,7 +243,7 @@ export class GremienApiService {
     const params = httpParams(
       Object.fromEntries(Object.entries(query).map(([key, value]) => [key, value || undefined])),
     );
-    return this.http.get<GremiumDecisionPage>(`${this.base}/gremien/${gremiumId}/decisions`, {
+    return this.http.get<GremiumDecisionPage>(`${this.base}/committees/${gremiumId}/decisions`, {
       params,
       context: skipLoading(),
     });

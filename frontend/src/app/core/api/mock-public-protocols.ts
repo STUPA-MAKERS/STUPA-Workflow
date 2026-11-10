@@ -1,5 +1,5 @@
 /**
- * Mock of the public protocol routes (`/public/gremien`, `/public/protocols…`) for the
+ * Mock of the public protocol routes (`/public/committees`, `/public/protocols…`) for the
  * dev mock mode. Two fictional protocols of one public gremium. The interceptor loads
  * this file on first use.
  */
@@ -66,7 +66,7 @@ export function mockPublicProtocols(
   path: string,
 ): { readonly body: unknown } | undefined {
   if (method !== 'GET') return undefined;
-  if (path.endsWith('/public/gremien')) {
+  if (path.endsWith('/public/committees')) {
     const body: PublicGremium[] = [{ ...GREMIUM, protocolCount: PROTOCOLS.length }];
     return { body };
   }

@@ -70,7 +70,7 @@
         [active]="tab()"
         (activeChange)="selectTab($event)"
       />
-      <div class="gd__body" [class.gd__body--fill]="tab() === 'anwesenheit'">
+      <div class="gd__body" [class.gd__body--fill]="tab() === 'attendance'">
         @for (t of tabs(); track t.id) {
           <section
             class="gd__panel"
@@ -104,16 +104,16 @@
     <ng-template #page let-id let-g="g">
       @if (visited().has(id)) {
         @switch (id) {
-          @case ('sitzungen') {
+          @case ('meetings') {
             <app-gremium-meetings [gremiumId]="g.id" />
           }
-          @case ('mitglieder') {
+          @case ('members') {
             <app-gremium-members [gremiumId]="g.id" [gremiumName]="g.name" />
           }
-          @case ('anwesenheit') {
+          @case ('attendance') {
             <app-gremium-attendance [gremiumId]="g.id" [gremiumName]="g.name" [fill]="split()" />
           }
-          @case ('beschluesse') {
+          @case ('decisions') {
             <app-gremium-decisions [gremiumId]="g.id" />
           }
           @case ('todos') {

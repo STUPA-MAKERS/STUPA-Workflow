@@ -255,7 +255,7 @@ async def test_public_list_and_detail_hide_names_and_non_public_tops(
             assert name not in text
         assert SECRET_BODY not in text
 
-        gremien = client.get("/api/public/gremien").json()
+        gremien = client.get("/api/public/committees").json()
         ours = [g for g in gremien if g["id"] == str(gremium_id)]
         assert ours and ours[0]["protocolCount"] == 1
         assert set(ours[0]) == {"id", "name", "slug", "protocolCount"}
@@ -338,7 +338,7 @@ async def test_hidden_protocols_answer_404_with_noindex(
             params={"gremium": [str(private_gid), str(withheld_gid)]},
         ).json()
         assert listed["total"] == 0
-        ids = {g["id"] for g in client.get("/api/public/gremien").json()}
+        ids = {g["id"] for g in client.get("/api/public/committees").json()}
         assert str(private_gid) not in ids
         assert str(withheld_gid) not in ids
 
@@ -425,21 +425,21 @@ async def test_switch_on_backfills_and_audits(
 
     with TestClient(api) as client:
         _enter(client, api, storage)
-        preview = client.get(f"/api/admin/gremien/{gremium_id}/public-preview").json()
+        preview = client.get(f"/api/admin/committees/{gremium_id}/public-preview").json()
         assert preview == {"finalCount": 1, "missingCount": 1}
-        assert client.get(f"/api/admin/gremien/{uuid.uuid4()}/public-preview").status_code == 404
+        assert client.get(f"/api/admin/committees/{uuid.uuid4()}/public-preview").status_code == 404
 
-        res = client.patch(f"/api/admin/gremien/{gremium_id}", json={"protocolsPublic": True})
+        res = client.patch(f"/api/admin/committees/{gremium_id}", json={"protocolsPublic": True})
         assert res.status_code == 200
         assert res.json()["protocolsPublic"] is True
         detail = client.get(f"/api/public/protocols/{protocol_id}")
         assert detail.status_code == 200
         assert detail.json()["tops"][0]["markdown"] == PUBLIC_BODY
         _assert_no_names(detail.json())
-        preview = client.get(f"/api/admin/gremien/{gremium_id}/public-preview").json()
+        preview = client.get(f"/api/admin/committees/{gremium_id}/public-preview").json()
         assert preview == {"finalCount": 1, "missingCount": 0}
 
-        client.patch(f"/api/admin/gremien/{gremium_id}", json={"protocolsPublic": False})
+        client.patch(f"/api/admin/committees/{gremium_id}", json={"protocolsPublic": False})
         assert client.get(f"/api/public/protocols/{protocol_id}").status_code == 404
 
     entries = [e for e in await _audit(maker, gremium_id) if e.action == "config_change"]

@@ -274,7 +274,7 @@ export const MOCK_GREMIUM_ROLE_MAPPINGS: readonly GremiumRoleMapping[] = [
   { id: 'grm-4', gremiumId: 'g-asta', gremiumRoleId: 'gr-asta-vorstand', oidcGroup: 'asta-vorstand' },
 ];
 
-/** Extra protocol recipients per gremium (`/admin/gremien/{id}/mail-recipients`). */
+/** Extra protocol recipients per gremium (`/admin/committees/{id}/mail-recipients`). */
 export const MOCK_GREMIUM_MAIL_RECIPIENTS: Record<string, readonly string[]> = {
   [MOCK_GREMIUM_STUPA_ID]: ['protokolle@stupa.example', 'verteiler@lists.stupa.example'],
 };

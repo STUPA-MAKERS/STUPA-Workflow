@@ -42,7 +42,7 @@ describe('PageTitleService', () => {
             ],
           },
           { path: 'untitled', component: PlainPage },
-          { path: 'gremien/:id', component: PlainPage, data: { title: 'nav.gremien' } },
+          { path: 'committees/:id', component: PlainPage, data: { title: 'nav.gremien' } },
         ]),
         { provide: TitleStrategy, useExisting: PageTitleService },
       ],
@@ -93,10 +93,10 @@ describe('PageTitleService', () => {
 
   it('takes the breadcrumb label of a page for its URL', async () => {
     const frame = TestBed.inject(PageFrameService);
-    await harness.navigateByUrl('/gremien/7');
-    frame.crumbLabel.set({ url: '/gremien/7', label: 'StuPa' });
+    await harness.navigateByUrl('/committees/7');
+    frame.crumbLabel.set({ url: '/committees/7', label: 'StuPa' });
     expect(current()).toBe(`StuPa – ${app}`);
-    frame.crumbLabel.set({ url: '/gremien/8', label: 'AStA' });
+    frame.crumbLabel.set({ url: '/committees/8', label: 'AStA' });
     expect(current()).toBe(`${tr('nav.gremien')} – ${app}`);
   });
 

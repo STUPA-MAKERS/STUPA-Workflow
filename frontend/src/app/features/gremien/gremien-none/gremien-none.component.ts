@@ -4,7 +4,7 @@ import { DetailNoneComponent, type DetailNoneState } from '@stupa-makers/ui-kit'
 import { GremienStore } from '../gremien.store';
 
 /**
- * The detail pane of `/gremien` before a gremium is open. Only the side-by-side layout
+ * The detail pane of `/committees` before a gremium is open. Only the side-by-side layout
  * shows it, and only for a moment: the page opens the first gremium by itself. Without
  * a gremium it shows the empty state; while the list loads or after an error the empty
  * sheet only, because the list pane says what happens.

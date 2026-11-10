@@ -98,7 +98,7 @@ export async function fetchMagicLinkToken(
   throw new Error(`Kein Magic-Link-Token in mailpit für ${email}. Letzter Body: ${lastBody}`);
 }
 
-/** Extract the token from a link `…/antrag/<id>#t=<token>` or `?t=…`. */
+/** Extract the token from a link `…/my-applications/<id>#t=<token>` or `?t=…`. */
 export function extractToken(body: string): string | null {
   const m = body.match(/[#?]t=([A-Za-z0-9._-]+)/);
   return m ? m[1] : null;

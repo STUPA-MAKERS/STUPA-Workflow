@@ -95,7 +95,7 @@ async def test_dispatch_notify_links_a_guest_to_the_applicant_page(
     await disp.dispatch([action])
     kw = captured["kw"]
     base = SETTINGS.public_base_url.rstrip("/")
-    assert kw["applicant_link"].url == f"{base}/antrag/{action.application_id}"  # type: ignore[index]
+    assert kw["applicant_link"].url == f"{base}/my-applications/{action.application_id}"  # type: ignore[index]
     assert kw["team_link"].url == f"{base}/applications/{action.application_id}"  # type: ignore[index]
 
 

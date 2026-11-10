@@ -2023,7 +2023,7 @@ export interface GuestMe {
   readonly view: GuestView | null;
 }
 
-/** `GET /gremien/{id}/meeting-defaults`: what a new meeting of the gremium allows. */
+/** `GET /committees/{id}/meeting-defaults`: what a new meeting of the gremium allows. */
 export interface MeetingDefaults {
   readonly publicJoinAllowed: boolean;
   readonly quorumPercent: number | null;

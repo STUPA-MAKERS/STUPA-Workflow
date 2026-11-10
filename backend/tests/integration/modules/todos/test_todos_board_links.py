@@ -63,7 +63,7 @@ async def test_cost_centre_link_shows_to_every_card_reader(
             201,
         )
         (own,) = card["links"]
-        assert own["url"] == f"/budget?ks={ks}"
+        assert own["url"] == f"/budget?costCentre={ks}"
         linked = _ok(client.get("/api/todos/linked", params={"kind": "budget", "targetId": ks}))
         assert [c["title"] for c in linked] == ["Haushaltsplan Kultur"]
 

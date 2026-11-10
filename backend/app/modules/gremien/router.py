@@ -1,7 +1,7 @@
-"""Routes of the tab "Gremien" under ``/api/gremien``. Every route reads only.
+"""Routes of the tab "Gremien" under ``/api/committees``. Every route reads only.
 
-``GET /gremien/overview`` lists the gremien that the caller sees. Every route of one
-gremium (``/gremien/{id}/...``) first runs the gate ``access.require_gremium``: an
+``GET /committees/overview`` lists the gremien that the caller sees. Every route of one
+gremium (``/committees/{id}/...``) first runs the gate ``access.require_gremium``: an
 active member, ``gremium.view_all`` or the admin role, else 404 problem+json.
 """
 
@@ -28,7 +28,7 @@ from app.modules.gremien.schemas import (
 from app.modules.gremien.service import GremienService
 from app.shared.errors import ProblemDetail, ValidationProblem
 
-router = APIRouter(prefix="/gremien", tags=["gremien"])
+router = APIRouter(prefix="/committees", tags=["gremien"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _FIRST_DAY = date(1900, 1, 1)

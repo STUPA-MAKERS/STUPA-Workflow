@@ -493,7 +493,7 @@ describe('BrandingEditorComponent', () => {
       expect(saved.freetexts.submittedExternal).toEqual({});
     });
 
-    /** Spec 000495: the statement of `/barrierefreiheit` is an admin text. */
+    /** Spec 000495: the statement of `/accessibility` is an admin text. */
     it('edits the accessibility statement per language', async () => {
       const { fixture, api } = await setupWithStub({}, 'texts');
       await fixture.whenStable();

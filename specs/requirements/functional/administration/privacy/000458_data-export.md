@@ -15,5 +15,5 @@ scope:
 
 # The data export is an audited XLSX
 
-`GET /privacy/auskunft` must need `privacy.manage`. It must return all data of one e-mail
+`GET /admin/privacy/export` must need `privacy.manage`. It must return all data of one e-mail
 address as XLSX and must write `pii_export` with that address as `target_id`.

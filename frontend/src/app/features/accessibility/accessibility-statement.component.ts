@@ -8,7 +8,7 @@ import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component'
 import { HelpService } from '../help/help.service';
 
 /**
- * The accessibility statement (`/barrierefreiheit`, no login; specs 000495 and 000497).
+ * The accessibility statement (`/accessibility`, no login; specs 000495 and 000497).
  *
  * The text is the free text `freetexts.accessibilityStatement` of the site config, Markdown
  * per language, which the admin edits on `/admin/texts`. The server answers a config
