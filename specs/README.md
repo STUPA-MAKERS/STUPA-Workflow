@@ -502,6 +502,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/000575](requirements/non-functional/usability/layout/000575_card-sheet-cut-at-edge.md) | The details of a card cut at the lower screen edge | approved |
 | [NF/usability/layout/000580](requirements/non-functional/usability/layout/000580_card-end-clears-bottom-bar.md) | The end of a card keeps room above the bottom bar | approved |
 | [NF/usability/layout/000599](requirements/non-functional/usability/layout/000599_glass-head-top-fade.md) | A glass list head fades into the page colour at the top screen edge | approved |
+| [NF/usability/layout/000601](requirements/non-functional/usability/layout/000601_scrollbar-below-glass-head.md) | The scroll bar of a list column starts below its glass head | draft |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
 | [S/backend/database/000070](style/backend/database/000070_idempotent-tables.md) | A migration that adds a table is idempotent | approved |
