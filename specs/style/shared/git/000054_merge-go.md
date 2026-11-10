@@ -2,9 +2,9 @@
 id: "000054"
 title: A merge needs the go of the owner
 kind: style
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-10
 implementation:
   - .
 scope:
@@ -13,5 +13,9 @@ scope:
 
 # A merge needs the go of the owner
 
-An agent must merge a pull request only after the owner says so. After the go, it must wait for
-green CI. While CI is known to be broken, it must merge at once after the go.
+An agent must merge a pull request only after the owner says so. The owner can give a standing
+go for one kind of pull request. After the go, the agent must wait until every required check
+(000628) is green. When a required check fails for a cause outside the pull request, the agent
+must tell the owner and must not merge.
+
+Reason: A merge with a red check hides the next real failure of that check.

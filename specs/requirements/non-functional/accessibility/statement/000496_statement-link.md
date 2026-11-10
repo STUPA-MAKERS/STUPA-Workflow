@@ -2,9 +2,9 @@
 id: "000496"
 title: Every page links to the accessibility statement
 kind: non-functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-08
+updated: 2026-11-10
 tests:
   - "frontend/src/app/layout/site-footer/site-footer.component.spec.ts:SiteFooterComponent"
   - "frontend/src/app/features/help/help-menu/help-menu.component.spec.ts:HelpMenuComponent"
@@ -18,7 +18,7 @@ scope:
 
 # Every page links to the accessibility statement
 
-The footer and the help menu must link to `/accessibility` on every page. The link must
-be there with and without a login.
+The help menu must link to `/accessibility` on every page. The footer must link to it on every
+page where the footer shows (000199). The link must be there with and without a login.
 
 Reason: The law requires that a user can find the statement from every page.

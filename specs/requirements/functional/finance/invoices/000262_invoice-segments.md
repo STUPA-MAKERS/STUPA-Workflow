@@ -1,10 +1,10 @@
 ---
 id: "000262"
-title: The invoice list has three segments
+title: The invoice list has four segments
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-10
 implementation:
   - frontend/src/app/pages/invoices/invoices.component.ts
 scope:
@@ -12,7 +12,7 @@ scope:
   - frontend/src/app/pages/budget
 ---
 
-# The invoice list has three segments
+# The invoice list has four segments
 
-The invoice list must show "Eingang" (open, no booking), "Verbucht" (open, with a booking) and
-"Bezahlt". Each segment must show its count under the other filters.
+The invoice list must have the segments "Alle", "Eingang" (open, no booking), "Verbucht"
+(open, with a booking) and "Bezahlt". A segment must show only its name (000560).
