@@ -554,6 +554,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/backend/python/000066](style/backend/python/000066_public-routes.md) | Public endpoints are a fixed list | replaced |
 | [S/backend/python/000473](style/backend/python/000473_no-role-check.md) | A permission check never reads principal.roles | approved |
 | [S/backend/python/000474](style/backend/python/000474_services-do-not-commit.md) | Service functions do not commit | approved |
+| [S/backend/python/000640](style/backend/python/000640_service-commit-ratchet.md) | A CI ratchet lowers the commits in services | approved |
 | [S/frontend/angular/000073](style/frontend/angular/000073_i18n-parity.md) | Every UI text is in both catalogs | approved |
 | [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | approved |
 | [S/frontend/angular/000075](style/frontend/angular/000075_narrow-with-as.md) | A template narrows a signal with as | approved |
@@ -626,6 +627,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/testing/000050](style/shared/testing/000050_mockups-from-real-app.md) | UI mockups come from the real app | approved |
 | [S/shared/testing/000223](style/shared/testing/000223_test-refers-to-rule.md) | A test refers back to its rule | approved |
 | [S/shared/testing/000476](style/shared/testing/000476_fake-principal.md) | Test doubles of Principal model the admin bypass | approved |
+| [S/shared/testing/000641](style/shared/testing/000641_query-test-on-postgres.md) | A test of a database query runs on Postgres | approved |
+| [S/shared/testing/000642](style/shared/testing/000642_session-fake-ratchet.md) | A CI ratchet lowers the fake sessions in tests | approved |
 | [S/shared/tooling/000067](style/shared/tooling/000067_nix-dev-shell.md) | Commands run in the Nix dev shell | approved |
 | [S/shared/writing/000034](style/shared/writing/000034_ste-english.md) | Repository texts are written in STE English | approved |
 | [S/shared/writing/000035](style/shared/writing/000035_stupa-in-capitals.md) | STUPA is written in capitals | approved |

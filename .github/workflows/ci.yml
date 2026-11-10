@@ -153,6 +153,61 @@ jobs:
       - name: Pytest (Integration, Docker)
         run: pytest -m integration
 
+  # Upgrade path of production: the baseline builds a fresh database from the models of
+  # the same commit, so on a fresh database a later migration finds its tables and
+  # columns in place and changes nothing. This job builds the database with the code of
+  # the newest release tag, runs the migrations of this commit on it and compares the
+  # result with the models. The tag code runs in its own virtualenv, because its
+  # dependencies can differ from the dependencies of this commit.
+  be-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: antrag_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: "postgresql+asyncpg://app:pw@localhost:5432/antrag_test"
+      SESSION_SECRET: "ci-session-secret"
+      MAGIC_LINK_SECRET: "ci-magic-link-secret"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Code of the newest release tag
+        run: |
+          tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+          test -n "$tag"
+          echo "Newest release tag: $tag"
+          git worktree add ../release "$tag"
+      - name: Database with the schema of the release
+        working-directory: ../release/backend
+        run: |
+          python -m venv ../../release-venv
+          ../../release-venv/bin/pip install -e .
+          ../../release-venv/bin/alembic upgrade head
+      - name: Migrations of this commit on that database
+        working-directory: backend
+        run: |
+          pip install -e .
+          alembic upgrade head
+      - name: Schema equals the models
+        working-directory: backend
+        run: python -m app.shared.schema_drift --strict
+
   be-contract:
     runs-on: ubuntu-latest
     defaults:

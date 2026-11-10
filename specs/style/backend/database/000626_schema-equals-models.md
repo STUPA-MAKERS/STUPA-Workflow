@@ -5,7 +5,12 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "backend/tests/unit/shared/test_schema_drift.py:test_each_kind_of_difference_is_named"
+  - "backend/tests/integration/test_schema_drift.py:test_migrated_database_equals_the_models"
+implementation:
+  - backend/app/shared/schema_drift.py
+  - .github/workflows/ci.yml
 scope:
   - backend/migrations
   - backend/app/models.py
