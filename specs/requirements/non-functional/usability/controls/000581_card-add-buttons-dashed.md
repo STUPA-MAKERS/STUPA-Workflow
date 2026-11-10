@@ -2,7 +2,7 @@
 id: "000581"
 title: The add buttons of a card look like its chips with a dashed border
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
