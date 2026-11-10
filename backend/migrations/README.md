@@ -53,3 +53,20 @@ alembic history | head # chain ok
 # against a real Postgres (compose or throwaway container):
 alembic upgrade head
 ```
+
+## Upgrade path and schema compare
+
+The baseline builds a fresh database from the models of the same commit. On a fresh
+database, a later migration finds its tables and columns in place and changes nothing.
+Only a database with an older schema runs the `ALTER` statements that production runs.
+
+The CI job `be-migrations` therefore builds a database with the code of the newest release
+tag, runs `alembic upgrade head` of the pull request on it, and then runs
+`python -m app.shared.schema_drift --strict`. The compare fails on each difference between
+the database and `Base.metadata`: tables, columns, types, nullability, indexes, unique
+constraints, check constraints and foreign keys.
+
+A difference that must stay is an entry in `EXCEPTIONS` in
+`backend/app/shared/schema_drift.py`, with its cause. The `migrate` service of the deploy
+runs the same compare without `--strict`: it logs each difference with the level `error`
+and does not stop the deploy.
