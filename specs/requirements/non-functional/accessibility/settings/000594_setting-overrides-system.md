@@ -21,8 +21,10 @@ Each switch of 000593 that has a system setting must show the state that is in e
 that is the state of the system setting (`prefers-color-scheme`, `prefers-contrast`,
 `prefers-reduced-motion`, `prefers-reduced-transparency`). When the person sets a switch, the
 choice must override the system setting in this browser on this device, and it must stay after
-a reload. The choice must not be stored in the account. The entry "Systemeinstellungen
-verwenden" must remove every choice of the group, and it must show only while a choice exists.
+a reload. The choice must not be stored in the account. A circle-arrow button across
+from the group heading, named "Systemeinstellungen verwenden" (label and tooltip), must remove
+every choice of the group, and it must show only while a choice exists. A change must apply at
+once, without a reload, and the glass on the screen must stay intact.
 
 Reason: The system setting is the right default. Some people cannot change it, for example
 on a shared or a managed computer.

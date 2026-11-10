@@ -2,7 +2,7 @@
 id: "000599"
 title: A glass list head fades into the page colour at the top screen edge
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:

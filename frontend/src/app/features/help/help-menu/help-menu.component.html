@@ -19,7 +19,20 @@
   </a>
   <div class="hm__sep" role="separator"></div>
   <div class="hm__display" role="group" [attr.aria-labelledby]="panelId + '-display'">
-    <p class="hm__group" [id]="panelId + '-display'">{{ 'help.display' | t }}</p>
+    <div class="hm__groupHead">
+      <p class="hm__group" [id]="panelId + '-display'">{{ 'help.display' | t }}</p>
+      @if (hasDisplayChoice()) {
+        <button
+          type="button"
+          class="hm__reset"
+          [attr.aria-label]="'help.display.reset' | t"
+          [title]="'help.display.reset' | t"
+          (click)="resetDisplay()"
+        >
+          <app-icon name="reset" [size]="18" />
+        </button>
+      }
+    </div>
     @for (row of displayRows(); track row.key) {
       <div class="hm__toggle">
         <app-icon [name]="row.icon" [size]="19" />
@@ -31,11 +44,6 @@
           >{{ row.label | t }}</app-switch
         >
       </div>
-    }
-    @if (hasDisplayChoice()) {
-      <button type="button" class="hm__reset" (click)="resetDisplay()">
-        {{ 'help.display.reset' | t }}
-      </button>
     }
   </div>
   @if (canReport()) {

@@ -84,9 +84,10 @@
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-field);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
+  background: var(--field-bg, var(--color-surface-sunken));
+  color: var(--field-text, var(--color-text));
   font: inherit;
+  box-shadow: var(--field-edge, none);
 }
 .cd__titleInput {
   font-size: var(--fs-lg);
@@ -94,7 +95,8 @@
 }
 .cd__titleInput:focus-visible,
 .cd__itemInput:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
+  box-shadow: var(--field-focus, var(--field-edge, none));
 }
 .cd__seg {
   display: inline-block;
@@ -632,13 +634,15 @@ button.cd__evText:focus-visible {
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-field);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
+  background: var(--field-bg, var(--color-surface-sunken));
+  color: var(--field-text, var(--color-text));
   font: inherit;
   font-size: 0.84375rem;
+  box-shadow: var(--field-edge, none);
 }
 .cd__evInput:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
+  box-shadow: var(--field-focus, var(--field-edge, none));
 }
 .cd__evNeg {
   color: var(--color-danger);
