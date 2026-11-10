@@ -22,6 +22,9 @@ melden". The group must have one switch for each of these settings: "Dunkles Des
 (000596) and "Eingabefelder hervorheben" (000598). The group must show with and without a login, in the popover, in the phone sheet
 of the public header and in the "Mehr" sheet.
 
+The public header must show its controls in this order: the language select, the help
+button, the theme switch, then "Anmelden" or "Abmelden".
+
 Reason: A person who needs one of these settings must find it in one place on every page,
 also without an account and without a change in the system settings.
 
