@@ -230,6 +230,13 @@ describe('TodoCardDetailComponent', () => {
     expect(closed).toHaveBeenCalled();
   });
 
+  /** Spec 000580: both add buttons carry the class of the dashed chip box. */
+  it('draws the add buttons of the assignees and the labels as dashed chips', async () => {
+    await setup();
+    expect(document.querySelector('app-filter-select.cd__addPerson')).not.toBeNull();
+    expect(document.querySelector('app-filter-select.cd__addLabel')).not.toBeNull();
+  });
+
   /**
    * Beside the list the pane is a sheet, and the bar bleeds into its padding. The link sits in the
    * bar, so the menu does not repeat it.

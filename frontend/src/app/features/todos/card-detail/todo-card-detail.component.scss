@@ -217,14 +217,21 @@
 .cd__dot {
   @include lbl.dot;
 }
-// "+ Label" has the box and the type of a label chip, with a dashed border.
-.cd__addLabel ::ng-deep .fs__chip {
+// "+ Label" and the "+" beside the assignees have the box and the type of a chip of the card,
+// with a dashed border (spec 000580).
+.cd__addLabel ::ng-deep .fs__chip,
+.cd__addPerson ::ng-deep .fs__chip {
   gap: 5px;
   height: 30px;
   padding: 1px 10px;
   border-style: dashed;
   font-size: 0.8125rem;
   font-weight: var(--fw-regular);
+}
+// The "+" beside the assignees shows only the icon: a square of the chip height.
+.cd__addPerson ::ng-deep .fs__chip {
+  width: 30px;
+  padding: 0;
 }
 .cd__muted {
   color: var(--color-text-muted);
