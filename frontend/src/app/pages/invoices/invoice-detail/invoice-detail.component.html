@@ -131,7 +131,7 @@
             </app-button>
           }
           @if (!bookings().length) {
-            <app-empty-state rows="3" [heading]="'invoices.detail.noBookings' | t" />
+            <app-empty-state rows="1" [heading]="'invoices.detail.noBookings' | t" />
           } @else {
             <div class="rowgroup">
               @for (b of bookings(); track b.id) {

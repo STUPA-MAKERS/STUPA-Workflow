@@ -228,7 +228,7 @@
             </section>
 
             @if (group.fields.length === 0) {
-              <app-empty-state rows="3" [heading]="'admin.form.groupEmpty' | t" />
+              <app-empty-state rows="1" [heading]="'admin.form.groupEmpty' | t" />
             }
 
             @for (field of group.fields; track $index; let qi = $index) {

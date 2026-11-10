@@ -38,7 +38,7 @@
       <app-button variant="tonal" size="sm" (click)="load()">{{ 'meetings.overview.selRetry' | t }}</app-button>
     </div>
   } @else {
-    <app-empty-state rows="2" [heading]="'account.calendar.none' | t">
+    <app-empty-state rows="1" [heading]="'account.calendar.none' | t">
       <app-button variant="tonal" size="sm" [loading]="busy()" (click)="rotate()">
         <app-icon name="link" />
         {{ 'account.calendar.generate' | t }}

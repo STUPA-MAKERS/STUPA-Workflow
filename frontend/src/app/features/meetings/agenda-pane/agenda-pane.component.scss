@@ -1,4 +1,5 @@
 @use '../../../shared/ui/drag-preview' as dp;
+@use 'display' as d;
 
 :host {
   display: flex;
@@ -175,7 +176,7 @@
 .ap__row.cdk-drag-animating {
   transition: transform var(--motion-base) var(--ease-standard);
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .ap__list.cdk-drop-list-dragging .ap__row,
   .ap__row.cdk-drag-animating {
     transition: none;

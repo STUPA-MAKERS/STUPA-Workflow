@@ -1,4 +1,5 @@
 @use 'option-menu' as menu;
+@use 'display' as d;
 
 // Custom properties of a consumer: `--chat-log-max` bounds the log; `--chat-log-basis: 0` makes
 // the log add only `--chat-log-min` to a growing column; `--chat-composer-bottom`, `-foot`,
@@ -575,7 +576,7 @@
     transform: rotate(360deg);
   }
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .chat__spinner::before {
     animation: none;
   }

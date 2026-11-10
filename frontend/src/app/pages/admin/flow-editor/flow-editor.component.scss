@@ -1,6 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 @use 'press';
+@use 'display' as d;
 
 :host {
   display: flex;
@@ -260,7 +261,7 @@
 .fe__tongue[data-side='down'] svg {
   rotate: -90deg;
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .fe__tongue {
     transition: none;
   }
@@ -311,7 +312,7 @@
 .fe__edge-g.fe__dim {
   opacity: 0.12;
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .fe__node-g,
   .fe__edge-g {
     transition: none;

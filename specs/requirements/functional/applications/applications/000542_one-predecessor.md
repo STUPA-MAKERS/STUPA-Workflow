@@ -4,8 +4,11 @@ title: An Antrag can have one Vorgänger
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-10
+implementation:
+  - backend/app/modules/applications/service/links.py
+  - backend/app/modules/applications/links_router.py
+  - backend/app/modules/applications/models.py
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

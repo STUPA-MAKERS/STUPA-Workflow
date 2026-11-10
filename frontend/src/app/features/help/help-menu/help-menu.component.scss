@@ -205,6 +205,59 @@
   }
 }
 
+// The group "Darstellung": a caption, a row per switch with its icon, and the reset.
+.hm__group {
+  margin: 0;
+  padding: 8px var(--space-4) 4px;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+}
+.hm__toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+  padding: 6px var(--space-4);
+}
+.hm__toggle > app-icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.hm__switch {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hm__reset {
+  align-self: flex-start;
+  min-height: 24px;
+  margin: 2px var(--space-4) 6px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
+}
+.hm__reset:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.hm__display {
+  display: flex;
+  flex-direction: column;
+}
+.hm--sheet .hm__group,
+.hm--sheet .hm__toggle {
+  padding-inline: var(--space-2);
+}
+.hm--sheet .hm__reset {
+  margin-inline: var(--space-2);
+}
+
 /* The phone sheet of the public header sits in the top layer, so no glass or scroll box
    of the header clips it. In the sheet the entries need no rule below them. */
 .hm__layer {

@@ -4,8 +4,11 @@ title: A Vorgänger chosen at creation prefills the form
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-10
+implementation:
+  - backend/app/modules/applications/service/links.py
+  - backend/app/modules/applications/links_router.py
+  - frontend/src/app/features/apply/apply-wizard.component.ts
 scope:
   - backend/app/modules/applications
   - frontend/src/app/features/apply

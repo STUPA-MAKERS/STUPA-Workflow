@@ -1,6 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 @use '../../../shared/ui/drag-preview' as dp;
+@use 'display' as d;
 
 :host {
   display: flex;
@@ -126,7 +127,7 @@
 .cdk-drag-animating {
   transition: transform var(--motion-base) var(--ease-standard);
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .bv__cards.cdk-drop-list-dragging .bv__item,
   .cdk-drag-animating {
     transition: none;

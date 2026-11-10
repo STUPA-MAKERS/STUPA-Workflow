@@ -1,3 +1,5 @@
+@use 'display' as d;
+
 :host {
   display: block;
   min-width: 0;
@@ -82,7 +84,7 @@
     transform: rotate(360deg);
   }
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .df__spinner {
     animation-duration: 2s;
   }

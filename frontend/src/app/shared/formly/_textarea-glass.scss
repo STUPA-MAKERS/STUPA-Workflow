@@ -5,6 +5,8 @@
 // to transparent below it, so the text passes under it without a hard edge.
 //
 // Use `box` on the box and `label` on the label; give the textarea `appScrollFade="y"`.
+// The glass takes the colour of a highlighted field (`--field-bg`, app spec 000598) and
+// turns solid with less transparency (`--glass-tint`, app spec 000596).
 
 $-glass-height: 34px;
 $-glass-solid: 26px;
@@ -12,11 +14,14 @@ $-glass-solid: 26px;
 $-glass-layer: 40px;
 
 @mixin box {
-  --ta-glass: var(--color-surface-sunken);
+  --ta-glass: var(--field-bg, var(--color-surface-sunken));
 
   @media (hover: hover) {
     &:hover {
-      --ta-glass: color-mix(in srgb, var(--color-surface-sunken) 60%, var(--color-surface-3));
+      --ta-glass: var(
+        --field-bg-hover,
+        color-mix(in srgb, var(--color-surface-sunken) 60%, var(--color-surface-3))
+      );
     }
   }
 
@@ -39,7 +44,7 @@ $-glass-layer: 40px;
     pointer-events: none;
 
     @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-      background: color-mix(in srgb, var(--ta-glass) 70%, transparent);
+      background: color-mix(in srgb, var(--ta-glass) var(--glass-tint, 70%), transparent);
       -webkit-backdrop-filter: blur(8px) saturate(1.8);
       backdrop-filter: blur(8px) saturate(1.8);
     }
