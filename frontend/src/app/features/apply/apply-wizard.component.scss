@@ -114,6 +114,7 @@
   border-radius: var(--radius-pill);
   background: var(--check-bg, transparent);
   box-shadow: inset 0 0 0 2px var(--check-edge, var(--color-border-strong));
+  @include f.ring;
 }
 .is-selected .wz__radio {
   box-shadow: inset 0 0 0 2px var(--check-edge, var(--color-accent));

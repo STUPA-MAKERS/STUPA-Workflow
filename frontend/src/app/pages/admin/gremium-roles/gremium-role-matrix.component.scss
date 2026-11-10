@@ -1,3 +1,4 @@
+@use 'field' as f;
 :host {
   display: block;
   min-width: 0;
@@ -125,6 +126,7 @@
   background: var(--check-bg, transparent);
   box-shadow: inset 0 0 0 2px var(--check-edge, var(--color-border-strong));
   cursor: inherit;
+  @include f.ring;
 }
 .rm__box:checked {
   background: var(--check-on, var(--color-accent))

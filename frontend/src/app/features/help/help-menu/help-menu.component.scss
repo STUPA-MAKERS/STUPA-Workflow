@@ -1,6 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'frosted' as *;
 @use 'option-menu' as om;
+@use 'field' as f;
 
 :host {
   display: block;
@@ -83,6 +84,7 @@
   font-weight: var(--fw-semibold);
   white-space: nowrap;
   cursor: pointer;
+  @include f.highlight-surface;
 }
 .hm__head.is-open {
   background: var(--color-surface-2);

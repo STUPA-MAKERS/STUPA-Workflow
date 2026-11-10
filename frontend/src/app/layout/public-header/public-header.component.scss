@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'frosted' as *;
+@use 'field' as f;
 
 // The bar sticks to the top of the window. It is glass while content runs under it and the
 // solid page colour at rest (`frosted-rest`), as the bar of a detail.
@@ -91,6 +92,7 @@
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
+  @include f.highlight-surface;
 }
 @media (hover: hover) {
   .pub__icon:hover {

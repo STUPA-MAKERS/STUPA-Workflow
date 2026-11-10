@@ -1,4 +1,5 @@
 @use 'field' as f;
+@use 'display' as d;
 @use 'option-menu' as om;
 @use 'scroll-fade' as fade;
 
@@ -194,6 +195,13 @@
   overscroll-behavior: contain;
   padding: 0 var(--space-2) var(--space-2);
   @include fade.fade-y(var(--space-5));
+}
+// The black ring of a highlighted chosen row reaches 1px past the row (000598), so the
+// scrolling list leaves it room at the top, or the list cuts it off.
+@include d.host-on(fields) {
+  .ccs__list {
+    padding-top: 2px;
+  }
 }
 // A limit of its own, because a flex item in a box with only a `max-height` does not shrink.
 .ccs__menu .ccs__list {
