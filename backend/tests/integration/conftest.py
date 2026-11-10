@@ -110,7 +110,8 @@ def engine(migrated: tuple[str, str]) -> Iterator[Engine]:
 #: would leak between tests (``uq_flow_version_version``, vote or ballot collisions);
 #: their CASCADE clears the children. The single-row settings fall back to the defaults
 #: after the truncate, so a changed setting does not leak. ``attachment_draft_token``,
-#: ``audit_verification`` and ``ticket_sender_block`` have no FK that a CASCADE follows.
+#: ``email_login_link``, ``audit_verification`` and ``ticket_sender_block`` have no FK
+#: that a CASCADE follows.
 #: ``ticket`` and ``todo_board`` clear their child rows by CASCADE; a test creates the
 #: boards it needs (``ensure_gremium_board``, ``GET /todos/boards``).
 _DATA_TABLES = (
@@ -130,6 +131,7 @@ _DATA_TABLES = (
     "meeting_settings",
     "login_settings",
     "attachment_draft_token",
+    "email_login_link",
     "audit_verification",
     "ticket",
     "ticket_sender_block",

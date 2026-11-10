@@ -20,10 +20,12 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Respons
 
 from app.db import get_sessionmaker
 from app.deps import (
+    Applicant,
     DbSession,
     Principal,
     SettingsDep,
     get_current_principal,
+    require_applicant,
     require_principal,
 )
 from app.modules.applications.access import (
@@ -40,6 +42,7 @@ from app.modules.applications.access import (
     resolve_app_read,
 )
 from app.modules.applications.schemas import (
+    ApplicantApplicationsOut,
     ApplicantCandidateOut,
     ApplicationCreate,
     ApplicationCreated,
@@ -56,7 +59,7 @@ from app.modules.applications.schemas import (
 from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.auth import service as auth_service
+from app.modules.auth import email_login
 from app.modules.files.service import FilesService
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
@@ -111,28 +114,24 @@ ServiceDep = Annotated[ApplicationsService, Depends(get_applications_service)]
 async def _deliver_magic_link(
     settings: Settings, email: str, application_id: UUID, pool: object
 ) -> None:
-    """Issue and send the magic link for a new application in its own session.
+    """Issue and send the login link for a new application in its own session.
 
-    This runs as a background task after the 201 response. The scope follows the
-    initial state and is ``edit``. The mail is in the language of the application,
-    because this is the first mail the applicant gets and it gates the
-    confirmation. The mail queue delivers the message. Without an arq pool,
-    `NotificationService` logs the mail and drops it.
+    This runs as a background task after the 201 response. The link is the e-mail
+    login of the address (`email_login.issue_confirm_link`): it opens every Antrag of
+    the address and ends with the confirmation window. The mail is in the language
+    of the application, because this is the first mail the applicant gets and it
+    gates the confirmation. The mail queue delivers the message. Without an arq
+    pool, `NotificationService` logs the mail and drops it.
     """
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
-
-        async def deliver(recipient: str, link: str) -> None:
-            lang = await resolve_application_lang(
-                db, application_id=application_id, settings=settings
-            )
-            await NotificationService(db, queue=queue, settings=settings).send_magic_link(
-                email=recipient, link=link, lang=lang
-            )
-
-        await auth_service.request_magic_link(
-            db, settings, email=email, application_id=application_id, deliver=deliver
+        link = await email_login.issue_confirm_link(db, settings, email=email)
+        lang = await resolve_application_lang(
+            db, application_id=application_id, settings=settings
+        )
+        await NotificationService(db, queue=queue, settings=settings).send_email_login(
+            email=email, link=link, lang=lang
         )
         await db.commit()
 
@@ -1054,3 +1053,26 @@ async def request_erasure(
         subject_type="applicant",
     )
     return Response(status_code=202)
+
+
+@router.get(
+    "/applicant/applications",
+    response_model=ApplicantApplicationsOut,
+    responses=_errors(401),
+)
+async def list_applicant_applications(
+    service: ServiceDep,
+    applicant: Annotated[Applicant, Depends(require_applicant())],
+) -> ApplicantApplicationsOut:
+    """List the Anträge of the applicant session, newest first.
+
+    An e-mail session lists every Antrag of its address as it is now; the link of one
+    Antrag lists that Antrag. 401 without an applicant session.
+    """
+    ids = (
+        applicant.application_ids
+        if applicant.email is not None
+        else frozenset({applicant.application_id} if applicant.application_id else ())
+    )
+    items = await service.list_for_applicant(ids)
+    return ApplicantApplicationsOut(email=applicant.email, items=tuple(items))

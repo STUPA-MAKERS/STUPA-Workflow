@@ -1,0 +1,77 @@
+@use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
+@use 'list-pane' as lp;
+
+// The page reuses the list "Anträge" of a member. The public frame has no rail, so a round
+// box takes the place of the app window (only as layout, it has no surface or line): everything between the header and the footer
+// sits in it, and inside it the list and the detail look as they do in the app.
+:host {
+  @include lp.stack;
+}
+:host(:not(.pane-page)) {
+  flex: 1 0 auto;
+}
+.ma__box {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  // The public frame pads the main area for text pages; this page fills the screen, so it
+  // keeps only a small gap to the header and the footer.
+  margin-block: calc(var(--space-2) - var(--main-pad-top, 0px))
+    calc(var(--space-2) - var(--main-pad-bottom, 0px));
+}
+.ma {
+  min-width: 0;
+}
+.ma:not(.ma--split) {
+  @include lp.single-column;
+}
+.ma:not(.ma--split) > app-list-detail {
+  flex: 1 0 auto;
+}
+.ma--split {
+  @include lp.split-column;
+}
+
+.ma__scroll {
+  @include lp.scroll(--ma-fade);
+  padding-bottom: var(--space-4);
+}
+.ma--split .ma__scroll {
+  @include lp.split-scroll(--ma-fade);
+}
+.ma--split .ma__scroll > * {
+  flex: none;
+}
+.ma__scroll {
+  @include fade.fade-y(var(--ma-fade));
+}
+.ma__rows {
+  @include lp.stack;
+}
+.ma__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+.ma__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.ma__chev {
+  display: inline-flex;
+  color: var(--color-text-muted);
+}
+.ma__detail {
+  @include lp.detail;
+}
+
+// A phone shows the page as the app does: full width, no box around it.
+@include bp.phone {
+  .ma__box {
+    margin-block: 0;
+  }
+}

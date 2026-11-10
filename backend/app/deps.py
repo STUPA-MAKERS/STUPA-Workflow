@@ -162,6 +162,10 @@ async def get_current_applicant(
 
     An applicant session has no scope: each action checks the current state, and the
     edit service answers 409 in a locked state.
+
+    A session of the e-mail login is bound to an address. It is resolved fresh at
+    each request (`email_login.resolve_session`), so the applications of the address
+    are read again.
     """
     token = _bearer_token(request, settings)
     if not token:
@@ -175,6 +179,10 @@ async def get_current_applicant(
     )
     if row is None:
         return None
+    if row.email is not None:
+        from app.modules.auth.email_login import resolve_session
+
+        return await resolve_session(db, row.email)
     return Applicant(application_id=str(row.application_id))
 
 

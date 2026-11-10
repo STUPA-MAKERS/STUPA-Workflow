@@ -61,6 +61,8 @@ import type {
   HandoverMode,
   LogoutOut,
   MagicLinkVerifyResult,
+  EmailLoginRequest,
+  ApplicantApplications,
   Meeting,
   MeetingCreateBody,
   MeetingMember,
@@ -179,6 +181,27 @@ export class ApiClient {
     return this.http.post<MagicLinkVerifyResult>(`${this.base}/auth/magic-link/verify`, {
       token,
     });
+  }
+
+  /**
+   * POST /auth/email-login — ask for a login link for an address without an account. The
+   * server answers 202 for every address, so the answer tells nothing about it.
+   */
+  requestEmailLogin(body: EmailLoginRequest): Observable<void> {
+    return this.http.post<void>(`${this.base}/auth/email-login`, body);
+  }
+
+  /**
+   * POST /auth/email-login/verify — exchange the token of a login link for an HttpOnly
+   * applicant session of the address. The response carries no session token.
+   */
+  verifyEmailLogin(token: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/auth/email-login/verify`, { token });
+  }
+
+  /** GET /applicant/applications — the Anträge of the address of the e-mail session. */
+  applicantApplications(): Observable<ApplicantApplications> {
+    return this.http.get<ApplicantApplications>(`${this.base}/applicant/applications`);
   }
 
   /**

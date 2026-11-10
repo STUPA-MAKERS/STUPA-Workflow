@@ -717,3 +717,88 @@ def test_callback_oauth_finish_wins_over_return_to(
     resp = enabled_client.get("/api/auth/callback?code=c&state=st", follow_redirects=False)
     assert resp.status_code == 307
     assert resp.headers["location"].endswith("/api/oauth/finish")
+
+
+def test_email_login_request_is_202_and_runs_in_the_background(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The e-mail login answers 202 with a constant body and delivers in the background."""
+    scheduled: list[str] = []
+
+    async def _capture(settings: object, email: str, pool: object) -> None:
+        scheduled.append(email)
+
+    monkeypatch.setattr(router_mod, "_deliver_email_login", _capture)
+    resp = enabled_client.post("/api/auth/email-login", json={"email": "x@y.de"})
+    assert resp.status_code == 202
+    assert resp.json() == {"status": "accepted"}
+    assert scheduled == ["x@y.de"]
+
+
+@pytest.mark.parametrize("newest", [None, SimpleNamespace(id=uuid.UUID(int=7))])
+async def test_deliver_email_login_sends_in_the_newest_language(
+    monkeypatch: pytest.MonkeyPatch, newest: object
+) -> None:
+    """The link mail goes out in the language of the newest application; then commit."""
+    db = fake_session()
+
+    class _ACM:
+        async def __aenter__(self) -> object:
+            return db
+
+        async def __aexit__(self, *exc: object) -> bool:
+            return False
+
+    sent: list[tuple[str, str, str | None]] = []
+    lang_for: list[object] = []
+
+    class _Notifications:
+        def __init__(self, session: object, *, queue: object, settings: object) -> None:
+            self._s = session
+
+        async def send_email_login(self, *, email: str, link: str, lang: str | None) -> None:
+            sent.append((email, link, lang))
+
+    async def _resolve(_db: object, *, email: str, application_id: object) -> object:
+        return newest
+
+    async def _lang(_db: object, *, application_id: object, settings: object) -> str:
+        lang_for.append(application_id)
+        return "en"
+
+    async def _request(_db: object, _settings: object, *, email: str, send_link: object) -> None:
+        await send_link(email, "https://link")  # type: ignore[operator]
+
+    monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
+    monkeypatch.setattr(router_mod, "mail_queue_from_pool", lambda pool: None)
+    monkeypatch.setattr(router_mod, "NotificationService", _Notifications)
+    monkeypatch.setattr(router_mod.service, "resolve_application", _resolve)
+    monkeypatch.setattr(router_mod, "resolve_application_lang", _lang)
+    monkeypatch.setattr(router_mod.email_login, "request_email_login", _request)
+    await router_mod._deliver_email_login(ENABLED, "x@y.de", None)
+    assert sent == [("x@y.de", "https://link", "en")]
+    assert lang_for == [getattr(newest, "id", None)]
+    assert db.committed == 1
+
+
+def test_email_login_verify_sets_the_cookie(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _verify(*a: object, **k: object) -> str:
+        return "email-session"
+
+    monkeypatch.setattr(router_mod.email_login, "verify_email_login", _verify)
+    resp = enabled_client.post("/api/auth/email-login/verify", json={"token": "tok"})
+    assert resp.status_code == 204
+    assert ENABLED.applicant_cookie_name in resp.headers.get("set-cookie", "")
+
+
+def test_email_login_verify_gone(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _verify(*a: object, **k: object) -> str:
+        raise GoneError("expired")
+
+    monkeypatch.setattr(router_mod.email_login, "verify_email_login", _verify)
+    resp = enabled_client.post("/api/auth/email-login/verify", json={"token": "tok"})
+    assert resp.status_code == 410

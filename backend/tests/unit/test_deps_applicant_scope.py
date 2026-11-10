@@ -30,7 +30,7 @@ async def test_valid_session_gives_the_bound_applicant(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _load(*_a: Any, **_k: Any) -> Any:
-        return SimpleNamespace(application_id="aid-1")
+        return SimpleNamespace(application_id="aid-1", email=None)
 
     monkeypatch.setattr(deps, "_bearer_token", lambda *_a: "sid")
     monkeypatch.setattr(deps.sessions, "load_applicant_session", _load)

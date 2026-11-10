@@ -1,10 +1,10 @@
 """Access resolution for application endpoints.
 
 A principal reaches an application route with a session and a permission. An
-applicant reaches it with a magic-link token. The token binds to exactly one
-``application_id``. These dependencies merge both identities into
-one `Access` object. They raise 401 without an identity and 403 without
-sufficient rights.
+applicant reaches it with a magic-link session. The link of one Antrag binds it to
+that ``application_id``; the e-mail login binds it to every Antrag of the address.
+These dependencies merge both identities into one `Access` object. They raise 401
+without an identity and 403 without sufficient rights.
 
 `Access.can_see_internal` alone controls internal-comment visibility. Only a
 principal that reads as a member gets it. The magic-link applicant and the
@@ -145,7 +145,7 @@ def resolve_access(
             return Access(application_id, principal, None)
         raise ForbiddenError(f"Missing permission: {perm}")
     if applicant is not None:
-        if str(applicant.application_id) == str(application_id):
+        if applicant.covers(application_id):
             return Access(application_id, None, applicant, via="applicant")
         raise ForbiddenError("Magic-link does not grant access to this application.")
     raise UnauthorizedError("Authentication required.")

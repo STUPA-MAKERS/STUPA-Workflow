@@ -5,9 +5,9 @@ gets one mail with a link:
 
 - An applicant account gets the normal link to the application
   (``/applications/{id}``). The login is the usual one.
-- A guest applicant gets a magic link (``/antrag/{id}#t=…``), as after a guest
-  submission. The link comes from ``auth.service.request_magic_link``, so the token
-  rules are the same.
+- A guest applicant gets the login link of the e-mail login
+  (``/my-applications#t=…``), as after a guest submission. The link comes from
+  ``auth.email_login.issue_confirm_link``, so the token rules are the same.
 
 The mail is not opt-outable: its kind is not in ``NOTIFICATION_KINDS``, like the magic
 link. It is the only notice that an application in the name of the person exists.
@@ -97,13 +97,13 @@ async def notify_application_captured(
 ) -> None:
     """Send the mail to the applicant of a captured application.
 
-    ``guest`` selects the link: a magic link for a guest, the normal link for an
+    ``guest`` selects the link: the e-mail login link for a guest, the normal link for an
     account. The idempotency key holds only the application, so a retry or a second
     call for the same application coalesces into one mail.
     """
     from app.modules.admin.models import Gremium
     from app.modules.applications.models import Applicant, Application
-    from app.modules.auth import service as auth_service
+    from app.modules.auth import email_login
 
     try:
         async with get_sessionmaker()() as session:
@@ -145,13 +145,8 @@ async def notify_application_captured(
                 )
 
             if guest:
-                await auth_service.request_magic_link(
-                    session,
-                    settings,
-                    email=email,
-                    application_id=application_id,
-                    deliver=deliver,
-                )
+                link = await email_login.issue_confirm_link(session, settings, email=email)
+                await deliver(email, link)
                 await session.commit()
             else:
                 base = settings.public_base_url.rstrip("/")

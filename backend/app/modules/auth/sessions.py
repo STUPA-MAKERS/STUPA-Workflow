@@ -70,19 +70,23 @@ async def create_applicant_session(
     db: AsyncSession,
     *,
     secret: str,
-    application_id: UUID,
     expires_at: datetime,
+    application_id: UUID | None = None,
+    email: str | None = None,
 ) -> str:
     """Create an `applicant_session` row and return the signed `sid` cookie.
 
     This mirrors `create_principal_session`. The opaque `sid` is the only anchor.
-    Without an existing row there is no access, even with `SESSION_SECRET`.
+    Without an existing row there is no access, even with `SESSION_SECRET`. The row
+    binds either one `application_id` or one `email`; the table CHECK refuses both
+    and neither.
     """
     sid = secrets.token_urlsafe(_SID_BYTES)
     db.add(
         ApplicantSession(
             sid=sid,
             application_id=application_id,
+            email=email,
             expires_at=expires_at,
         )
     )

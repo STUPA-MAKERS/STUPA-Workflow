@@ -346,6 +346,19 @@ describe('ApiClient', () => {
       .flush({ title: 'Conflict', status: 409 }, { status: 409, statusText: 'Conflict' });
   });
 
+  it('POSTs the e-mail login request and its token, and reads the Anträge of the address', () => {
+    api.requestEmailLogin({ email: 'a@b.de', altcha: null }).subscribe();
+    const ask = http.expectOne('/api/auth/email-login');
+    expect(ask.request.body).toEqual({ email: 'a@b.de', altcha: null });
+    ask.flush(null, { status: 202, statusText: 'Accepted' });
+    api.verifyEmailLogin('tok-2').subscribe();
+    const verify = http.expectOne('/api/auth/email-login/verify');
+    expect(verify.request.body).toEqual({ token: 'tok-2' });
+    verify.flush(null, { status: 204, statusText: 'No Content' });
+    api.applicantApplications().subscribe((res) => expect(res.items).toEqual([]));
+    http.expectOne('/api/applicant/applications').flush({ email: 'a@b.de', items: [] });
+  });
+
   it('POSTs the magic-link token to verify (snake_case response)', () => {
     api.verifyMagicLink('tok-1').subscribe();
     const req = http.expectOne('/api/auth/magic-link/verify');

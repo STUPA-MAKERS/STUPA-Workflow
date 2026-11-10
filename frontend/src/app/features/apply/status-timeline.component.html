@@ -48,7 +48,8 @@
         </article>
       } @else {
         <article
-          class="sp"
+          class="ad"
+          [class.ad--split]="split()"
           aria-labelledby="sp-title"
           appFileDrop
           #drop="appFileDrop"
@@ -58,26 +59,50 @@
           @if (drop.active()) {
             <app-drop-overlay fit="view" [label]="'applications.attachments.drop' | t" />
           }
-          <header class="sp__head">
-            <div class="sp__headTop">
-              <span class="sp__ref">{{ 'status.case' | t: { id: ref() } }}</span>
-              <app-row-menu
-                class="sp__menu"
-                [sections]="menu()"
-                [label]="'status.menu' | t"
-                (selected)="onMenu($event)"
-              />
-            </div>
-            <h1 class="sp__title" id="sp-title" tabindex="-1" #pageTitle>{{ title() }}</h1>
-            <p class="sp__state">
-              <app-status-text [kind]="stateKind()">{{ app.state?.label }}</app-status-text>
-              @if (app.stateSince) {
-                <span class="sp__sep" aria-hidden="true">·</span>
-                <span>{{ 'status.since' | t: { date: (app.stateSince | ldate: 'mediumDate') } }}</span>
+          <header class="sheet-head ad__head">
+            <app-sheet-bar [bleed]="split()">
+              <h2 appSheetBarTitle id="sp-title" class="sheet-title ad__title" tabindex="-1" [attr.aria-level]="headingLevel" #pageTitle>{{ title() }}</h2>
+              <app-button
+                variant="text"
+                [ariaLabel]="'applications.comments.open' | t: { n: comments().length }"
+                (click)="commentsOpen.set(true)"
+              >
+                <app-icon name="chat" />
+                @if (!phone()) {
+                  {{ 'status.comments.title' | t }}
+                }
+                <span class="ad__commentsN num" aria-hidden="true">{{ comments().length }}</span>
+              </app-button>
+              @if (!phone() && canEdit() && effForm()) {
+                <app-button
+                  #editRow
+                  variant="text"
+                  [iconOnly]="true"
+                  [ariaLabel]="'status.edit.row' | t"
+                  (click)="startEdit()"
+                ><app-icon name="edit" /></app-button>
               }
+              <app-row-menu [sections]="menu()" [label]="'status.menu' | t" (selected)="onMenu($event)" />
+            </app-sheet-bar>
+
+            <p class="sheet-line ad__line ad__seps">
+              <span class="ad__parts">
+                @if (app.state) {
+                  <span class="ad__part">
+                    <app-status-text [kind]="stateKind()">{{ app.state.label }}</app-status-text>
+                  </span>
+                }
+                @if (typeName(); as type) {
+                  <span class="ad__part ell" [title]="type">{{ type }}</span>
+                }
+                @if (app.amount !== null) {
+                  <span class="ad__part"><app-amount [amount]="amount(app)" [approved]="approvedAmount(app)" /></span>
+                }
+              </span>
             </p>
+
             @if (actions().length) {
-              <div class="sp__actions" role="group" [attr.aria-label]="'status.actions.title' | t">
+              <div class="ad__transitions" role="group" [attr.aria-label]="'status.actions.title' | t">
                 @for (t of actions(); track t.id) {
                   <app-button
                     [variant]="looks().get(t.id) ?? 'tonal'"
@@ -90,104 +115,89 @@
                 }
               </div>
             }
+            @if (lockReason(); as reason) {
+              <app-note class="ad__note" icon="lock" role="status">{{ reason | t }}</app-note>
+            }
           </header>
 
-          <div class="sp__grid">
-            <div class="sp__main">
-              @if (app.decision) {
-                <app-decision-section
-                  headingId="sp-decision"
-                  [decision]="app.decision"
-                  [currency]="app.currency"
-                  [applicant]="true"
-                />
-              }
-              <ul class="rowgroup sp__rows">
-                <li>
-                  <button
-                    #editRow
-                    type="button"
-                    class="sp__row"
-                    [disabled]="!canEdit() || !effForm()"
-                    [attr.aria-describedby]="lockReason() ? 'sp-locked' : null"
-                    (click)="startEdit()"
-                  >
-                    <app-icon class="sp__rowIcon" name="edit" [size]="20" />
-                    <span class="sp__rowText">
-                      <span class="sp__rowTitle">{{ 'status.edit.row' | t }}</span>
-                      @if (lockReason(); as reason) {
-                        <span class="sp__rowSub" id="sp-locked">{{ reason | t }}</span>
-                      }
-                    </span>
-                  </button>
-                </li>
-                <li>
-                  <button type="button" class="sp__row" (click)="filesOpen.set(true)">
-                    <app-icon class="sp__rowIcon" name="clip" [size]="20" />
-                    <span class="sp__rowText">
-                      <span class="sp__rowTitle">{{ 'status.files.title' | t }}</span>
-                      @if (filesSub()) {
-                        <span class="sp__rowSub">{{ filesSub() }}</span>
-                      }
-                    </span>
-                    <app-icon class="sp__rowChev" name="right" [size]="18" />
-                  </button>
-                </li>
-                <li>
-                  <button type="button" class="sp__row" (click)="commentsOpen.set(true)">
-                    <app-icon class="sp__rowIcon" name="chat" [size]="20" />
-                    <span class="sp__rowText">
-                      <span class="sp__rowTitle">{{ 'status.comments.title' | t }}</span>
-                      <span class="sp__rowSub">{{ commentsSub() }}</span>
-                    </span>
-                    <app-icon class="sp__rowChev" name="right" [size]="18" />
-                  </button>
-                </li>
-              </ul>
-              @if (linkTtlLoaded() && linkTtlDays() === null) {
-                <p class="sp__link">{{ 'status.linkUnlimited' | t }}</p>
-              }
-
-              @if (effForm(); as eff) {
-                <section class="sp__sec sp__answers" [attr.aria-label]="'status.data.title' | t">
-                  <app-answer-view
-                    [sections]="eff.sections"
-                    [data]="app.data"
-                    [contentLang]="app.lang ?? null"
-                    [context]="{ has_budget: eff.hasBudget }"
-                    [emptyText]="'status.data.empty' | t"
-                  />
-                </section>
-              }
+          @if (split()) {
+            <div class="ad__cols">
+              <div class="ad__col">
+                <ng-container *ngTemplateOutlet="answers; context: { $implicit: app }" />
+                <ng-container *ngTemplateOutlet="files; context: { $implicit: app }" />
+              </div>
+              <div class="ad__col">
+                <ng-container *ngTemplateOutlet="decision; context: { $implicit: app }" />
+                <ng-container *ngTemplateOutlet="history" />
+              </div>
             </div>
-
-            <app-section class="sp__sec sp__history" [level]="2" [heading]="'status.history.title' | t">
-              @if (historyEntries().length) {
-                <app-history [entries]="historyEntries()" />
-              } @else {
-                <app-empty-state rows="1" [heading]="'status.history.empty' | t" />
-              }
-            </app-section>
-          </div>
+          } @else {
+            <app-tab-pager
+              class="ad__tabs"
+              idPrefix="sp"
+              [ariaLabel]="title()"
+              [tabs]="tabs()"
+              [active]="tab()"
+              [paged]="phone()"
+              (activeChange)="selectTab($event)"
+            >
+              <ng-template appTabPage="app">
+                <section class="ad__panel">
+                  <ng-container *ngTemplateOutlet="decision; context: { $implicit: app }" />
+                  <ng-container *ngTemplateOutlet="answers; context: { $implicit: app }" />
+                </section>
+              </ng-template>
+              <ng-template appTabPage="history">
+                <section class="ad__panel">
+                  <ng-container *ngTemplateOutlet="history" />
+                </section>
+              </ng-template>
+              <ng-template appTabPage="files">
+                <section class="ad__panel">
+                  <ng-container *ngTemplateOutlet="files; context: { $implicit: app }" />
+                </section>
+              </ng-template>
+            </app-tab-pager>
+          }
         </article>
       }
 
-      <app-side-sheet
-        [open]="filesOpen()"
-        (openChange)="filesOpen.set($event)"
-        [heading]="'status.files.title' | t"
-        [side]="phone() ? 'bottom' : 'end'"
-      >
-        @if (filesOpen()) {
-          <app-attachments-panel
-            [applicationId]="app.id"
-            [canUpload]="canUploadAttachments()"
-            [canDelete]="canEdit()"
-            [titled]="false"
-            (countChange)="attachmentCount.set($event)"
+      <ng-template #decision let-a>
+        @if (a.decision) {
+          <app-decision-section headingId="sp-decision" [decision]="a.decision" [currency]="a.currency" [applicant]="true" />
+        }
+      </ng-template>
+
+      <ng-template #answers let-a>
+        @if (effForm(); as eff) {
+          <app-answer-view
+            [sections]="eff.sections"
+            [data]="a.data"
+            [contentLang]="a.lang ?? null"
+            [context]="{ has_budget: eff.hasBudget }"
+            [emptyText]="'status.data.empty' | t"
           />
         }
-      </app-side-sheet>
+      </ng-template>
+
+      <ng-template #files let-a>
+        <app-attachments-panel
+          [applicationId]="a.id"
+          [canUpload]="canUploadAttachments()"
+          [canDelete]="canEdit()"
+          [dropTarget]="false"
+        />
+      </ng-template>
+
+      <ng-template #history>
+        <app-section class="ad__sec" [heading]="'status.history.title' | t" [hideHeading]="!split()">
+          @if (historyEntries().length) {
+            <app-history [entries]="historyEntries()" />
+          } @else {
+            <app-empty-state rows="1" [heading]="'status.history.empty' | t" />
+          }
+        </app-section>
+      </ng-template>
 
       <app-side-sheet
         [open]="commentsOpen()"

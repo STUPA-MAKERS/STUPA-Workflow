@@ -22,11 +22,12 @@ from sqlalchemy import select
 from app.db import get_sessionmaker
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.admin.models import Gremium
-from app.modules.auth import oidc, service, sessions
+from app.modules.auth import email_login, oidc, service, sessions
 from app.modules.auth.login_settings import load_login_settings, session_days
 from app.modules.auth.models import SESSION_CLIENT_WEB, AuthSession
 from app.modules.auth.oidc import OidcError, OidcUnavailableError
 from app.modules.auth.schemas import (
+    EmailLoginRequest,
     GremiumRef,
     LogoutOut,
     MagicLinkRequest,
@@ -532,3 +533,90 @@ async def verify_magic_link(
         **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
     return MagicLinkVerifyOut(application_id=UUID(app_id))
+
+
+async def _deliver_email_login(settings: Settings, email: str, pool: object) -> None:
+    """Make and send the login link of the e-mail login in its own DB session.
+
+    This runs as a background task after the 202 response, so the response time is the
+    same for every address. The link mail is in the language of the newest application
+    of the address.
+    """
+    queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as db:
+        newest = await service.resolve_application(db, email=email, application_id=None)
+        lang = await resolve_application_lang(
+            db,
+            application_id=newest.id if newest is not None else None,
+            settings=settings,
+        )
+        notifications = NotificationService(db, queue=queue, settings=settings)
+
+        async def send_link(recipient: str, link: str) -> None:
+            await notifications.send_email_login(email=recipient, link=link, lang=lang)
+
+        await email_login.request_email_login(
+            db, settings, email=email, send_link=send_link
+        )
+        await db.commit()
+
+
+@router.post(
+    "/email-login",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[
+        Depends(enforce_auth_payload_limit),
+        Depends(rate_limit_magic_link),
+        Depends(verify_altcha),
+    ],
+    responses=_errors(400, 413, 429),
+)
+async def request_email_login(
+    body: EmailLoginRequest,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+) -> dict[str, str]:
+    """Request a login link for every application of an address.
+
+    The route always answers 202 with a constant body, so it never tells whether the
+    address has applications. It shares the rate limits of the
+    magic-link request. The DB work and the mail run in the background.
+    """
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(_deliver_email_login, settings, str(body.email), pool)
+    return {"status": "accepted"}
+
+
+@router.post(
+    "/email-login/verify",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[
+        Depends(enforce_auth_payload_limit),
+        Depends(rate_limit_magic_link_verify),
+    ],
+    responses=_errors(400, 410, 413, 429),
+)
+async def verify_email_login(
+    body: MagicLinkVerifyRequest,
+    db: DbSession,
+    settings: SettingsDep,
+    response: Response,
+    dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
+) -> None:
+    """Redeem a login link and open an applicant session for its address.
+
+    A used, expired or unknown token gives 410. The session travels only in the
+    HttpOnly cookie.
+    """
+    token = await email_login.verify_email_login(
+        db, settings, token=body.token, dispatcher=dispatcher
+    )
+    await db.commit()
+    response.set_cookie(
+        settings.applicant_cookie_name,
+        token,
+        max_age=settings.applicant_session_ttl_hours * 3600,
+        **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
+    )
