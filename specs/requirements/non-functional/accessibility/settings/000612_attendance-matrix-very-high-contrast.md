@@ -2,7 +2,7 @@
 id: "000612"
 title: The attendance matrix follows very high contrast
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

@@ -2,7 +2,7 @@
 id: "000611"
 title: An attendance cell holds its badges
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

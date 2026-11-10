@@ -2,7 +2,7 @@
 id: "000609"
 title: The attendance matrix looks like a row group
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
