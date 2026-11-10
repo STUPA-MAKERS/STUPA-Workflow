@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'frosted' as *;
+@use 'field' as f;
 
 :host {
   display: flex;
@@ -186,6 +187,7 @@
   border: 0;
   background: transparent;
   font-size: 0.96875rem;
+  @include f.highlight-surface;
 }
 .ts__editor ::ng-deep .mde__host .ProseMirror {
   min-height: 16rem;
@@ -352,6 +354,7 @@
   line-height: 1.7;
   resize: none;
   outline: none;
+  @include f.highlight-surface;
 }
 .ts__raw::placeholder {
   color: var(--color-text-muted);

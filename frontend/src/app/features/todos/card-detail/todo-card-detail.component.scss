@@ -3,6 +3,7 @@
 @use 'press';
 @use 'scroll-fade' as fade;
 @use '../todo-labels' as lbl;
+@use 'field' as f;
 
 @include lbl.colors;
 
@@ -371,6 +372,7 @@ button.cd__linkOpen {
   display: block;
   border-radius: var(--radius-field);
   background: var(--color-surface-sunken);
+  @include f.highlight-surface;
 }
 .cd__area:focus-within {
   outline: 2px solid var(--color-focus-ring);

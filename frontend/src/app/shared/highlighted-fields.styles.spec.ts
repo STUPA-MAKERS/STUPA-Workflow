@@ -32,7 +32,34 @@ function rule(css: string, selector: string): string {
   return all.map((m) => m[1]).join('\n');
 }
 
+const SURFACES: readonly (readonly [string, string])[] = [
+  ['shared/ui/chat/chat.component.scss', '.chat__box'],
+  ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__area'],
+  ['features/todos/link-picker/todo-link-picker.component.scss', '.lp__search'],
+  ['pages/todos/board-view/todo-board-view.component.scss', '.bv__quick'],
+  ['pages/applications/agenda-dialog/agenda-dialog.component.scss', '.agd__note'],
+  ['pages/admin/gremien/gremium-dialog/gremium-dialog.component.scss', '.gd__mail'],
+  ['features/meetings/attendance-sheet/attendance-sheet.component.scss', '.as__note'],
+  ['pages/admin/forms/form-editor.component.scss', '.fe__pv-control'],
+  ['pages/dashboard/dashboard.component.scss', '.dash__btn--fill'],
+  ['pages/todos/board-picker/todo-board-picker.component.scss', '.bp__chip'],
+  ['features/meetings/top-sheet/top-sheet.component.scss', '.ts__raw'],
+];
+
 describe('highlightedFields (§000598)', () => {
+  it.each(SURFACES)('%s %s includes the highlight surface', (file, selector) => {
+    const body = rule(readFileSync(join(APP, file), 'utf8'), selector);
+    expect(body).toMatch(/@include f\.highlight-surface;/);
+  });
+
+  it('the public protocol pill buttons include the highlight surface', () => {
+    const css = readFileSync(
+      join(APP, 'features/public-protocols/_public-protocols.shared.scss'),
+      'utf8',
+    );
+    expect(css).toMatch(/@mixin pill-button[\s\S]*@include f\.highlight-surface;/);
+  });
+
   it.each(FIELDS)('%s %s reads the yellow field tokens', (file, selector) => {
     const body = rule(readFileSync(join(APP, file), 'utf8'), selector);
     expect(body).toMatch(/background: var\(--field-bg, /);

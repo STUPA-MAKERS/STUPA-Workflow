@@ -1,4 +1,5 @@
 @use '../../../../shared/ui/dialog-form' as df;
+@use 'field' as f;
 
 @include df.host;
 
@@ -67,6 +68,7 @@
   padding: var(--space-2) var(--space-4) var(--space-3);
   border-radius: var(--radius-field);
   background: var(--color-surface-sunken);
+  @include f.highlight-surface;
 }
 .gd__mail:focus-within {
   box-shadow: inset 0 0 0 2px var(--color-focus-ring);
