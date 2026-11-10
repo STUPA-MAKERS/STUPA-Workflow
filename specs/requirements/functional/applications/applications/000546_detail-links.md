@@ -4,8 +4,10 @@ title: The detail shows Vorgänger and Folgeanträge
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-10
+implementation:
+  - frontend/src/app/pages/applications/applications-detail.component.ts
+  - frontend/src/app/features/todos/linked-list/todo-linked-list.component.ts
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

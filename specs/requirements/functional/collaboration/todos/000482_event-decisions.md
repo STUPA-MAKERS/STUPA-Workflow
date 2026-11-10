@@ -4,8 +4,10 @@ title: An Event lists its decisions
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-10
+implementation:
+  - backend/app/modules/todos/events.py
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

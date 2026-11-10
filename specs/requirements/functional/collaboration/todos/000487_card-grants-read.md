@@ -4,8 +4,10 @@ title: A card gives read access to its links
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-10
+implementation:
+  - backend/app/modules/todos/links.py
+  - backend/app/modules/todos/link_view.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos
