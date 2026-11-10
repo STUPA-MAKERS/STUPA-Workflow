@@ -14,8 +14,11 @@
   min-width: 0;
   min-height: 0;
 }
+// The overlays take no place in the column, so no gap of the column follows the composer
+// (000602). The file viewer draws a fixed layer of its own.
 :host > app-dialog,
-:host > app-side-sheet {
+:host > app-side-sheet,
+:host > app-file-viewer {
   position: absolute;
 }
 

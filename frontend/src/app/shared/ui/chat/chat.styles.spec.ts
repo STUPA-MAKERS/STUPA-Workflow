@@ -51,4 +51,11 @@ describe('chat styles', () => {
   it('never scrolls the log sideways', () => {
     expect(rule('.chat__log')).toMatch(/overflow-x: hidden;/);
   });
+
+  /** An overlay in the flow adds one gap of the column below the composer (000602). */
+  it('takes the overlays out of the column', () => {
+    expect(rule(':host > app-dialog,\n:host > app-side-sheet,\n:host > app-file-viewer')).toMatch(
+      /position: absolute;/,
+    );
+  });
 });
