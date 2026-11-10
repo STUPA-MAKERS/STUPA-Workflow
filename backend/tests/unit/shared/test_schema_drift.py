@@ -39,6 +39,16 @@ def _models() -> MetaData:
     return metadata
 
 
+@pytest.fixture(autouse=True)
+def _logger_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Enable the logger of the compare.
+
+    An Alembic run in the same process loads `alembic.ini`, which disables every logger
+    that exists at that time, and the log assertions then see no record.
+    """
+    monkeypatch.setattr(logging.getLogger("app.schema_drift"), "disabled", False)
+
+
 @pytest.fixture
 def engine() -> Iterator[Engine]:
     eng = create_engine("sqlite://")
