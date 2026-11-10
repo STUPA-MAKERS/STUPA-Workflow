@@ -22,7 +22,7 @@ description: Admin/config API — gremien, gremium-roles, the OIDC group mapping
 - `oidc_mappings.py` — `OidcMappingService`: CRUD for the gremium membership mappings and gremium role mappings; each write audits, runs `sync_all_memberships`, commits.
 - `membership_sync.py` — `sync_principal_memberships` / `sync_all_memberships`: the ONLY writer of `gremium_membership`. Runs at OIDC login (`auth/service.oidc_callback`), after each mapping change (all principals), at principal erasure and at an account merge. A merged principal (`merged_into` set) counts as without groups, so it holds no membership.
 - `principal_merge.py` — `PrincipalMergeService` (account merge, "Konten zusammenführen"): `preview(old, new)` counts per area what a merge rewrites, combines and removes, and lists the real conflicts; `merge(old, new, actor=)` runs the same checks under `FOR UPDATE` locks and applies everything in ONE transaction, then commits. `SUB_COLUMNS` / `ID_COLUMNS` / `REMOVED_ROWS` list every column that references a principal. A new column that stores a principal `sub` or id MUST go into one of these lists (or into a combine step), else a merge leaves it on the old account.
-- `models.py` — SQLAlchemy: `CdVariant`, `CdVariantLogo`, `Gremium`, `GremiumRole`, `GremiumGroupMapping`, `GremiumMembership`, `ApplicationType`, `Webhook`, `WebhookDelivery`, `SiteConfigVersion`.
+- `models.py` — SQLAlchemy: `CdVariant`, `CdVariantLogo`, `SiteConfigVersion`. The committee models are in `gremien/models.py`, `ApplicationType` is in `application_types/models.py`, and the webhook models are in `webhooks/models.py` (§S/backend/python/000645).
 - `schemas.py` — camelCase DTOs (`populate_by_name`, `serialization_alias` on Out models).
 
 **Domain / data model:**

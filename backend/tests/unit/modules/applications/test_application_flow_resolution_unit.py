@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.admin.models import ApplicationType
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.service import ApplicationsService
 from app.shared.errors import NotFoundError
 from tests._support.auth_fakes import fake_session, result

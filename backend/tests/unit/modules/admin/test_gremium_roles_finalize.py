@@ -15,8 +15,8 @@ from app.modules.admin.gremium_roles import (
     GremiumRoleService,
     _sanitize_perms,
 )
-from app.modules.admin.models import GremiumRole
 from app.modules.admin.schemas import GremiumRoleCreate, GremiumRoleUpdate
+from app.modules.gremien.models import GremiumRole
 from app.shared.permissions import PERMISSION_CATALOGUE
 from tests._support.auth_fakes import fake_session, result
 

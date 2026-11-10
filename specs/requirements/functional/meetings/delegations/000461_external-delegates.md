@@ -9,7 +9,7 @@ implementation:
   - backend/app/modules/delegations/service.py
 scope:
   - backend/app/modules/delegations
-  - backend/app/modules/admin/models.py
+  - backend/app/modules/gremien/models.py
 ---
 
 # External delegates need a Gremium switch

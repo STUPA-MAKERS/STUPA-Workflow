@@ -12,7 +12,7 @@ description: Public read-only listing of application types — each binds an i18
 - `service.py` — `ApplicationTypesService(session)`. `list_types()` queries `ApplicationType`, filters `active_form_version_id IS NOT NULL` for the public view, orders by `key`, and builds a `Page`. `_to_item()` resolves the i18n name.
 - `schemas.py` — `ApplicationTypeListQuery` (PageParams + `extra="forbid"`, `offset` capped at int4-max, `lang: Lang`) and `ApplicationTypeListItem` (camelCase aliases through `populate_by_name`).
 - `__init__.py` — module docstring. It notes that the per-type form endpoint lives in the forms module and that config CRUD lives under `/api/admin/application-types`.
-- Model lives in `app/modules/admin/models.py` → `ApplicationType` (NOT in this module).
+- `models.py` — the model `ApplicationType`.
 
 **Domain / data model:** Entity `ApplicationType` (table `application_type`, `UUIDPkMixin` + `CreatedAtMixin`). Columns: `id`, `gremium_id` (FK `gremium.id` ON DELETE CASCADE, nullable), `key` (Text, unique), `name_i18n` (JSONB, default `{}`), `has_budget` (bool, default false), `comparison_offers` (JSONB, nullable). `retention_months` is a nullable int, and NULL means the global DSGVO default. `active_form_version_id` is a nullable FK to `form_version.id` ON DELETE SET NULL. It sets `use_alter=True` for the circular FK with form/flow versions. The DTO derives "active" from `active_form_version_id is not None`. The type carries no flow-version FK column here. The flow is the global versioned flow (see the flow module).
 

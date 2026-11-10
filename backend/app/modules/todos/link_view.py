@@ -29,12 +29,12 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import pii_keys_for_type
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
 from app.modules.forms.models import FormField
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.todos.links import GRANT_KINDS, LinkResolver
 from app.modules.todos.models import TodoBoard, TodoCard, TodoCheckItem, TodoColumn

@@ -23,17 +23,13 @@ import pytest
 from sqlalchemy import Engine, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import (
-    ApplicationType,
-    Gremium,
-    GremiumMembership,
-    GremiumRole,
-)
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormVersion
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.locks import RedisLocker

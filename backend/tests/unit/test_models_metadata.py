@@ -158,3 +158,31 @@ def test_circular_fk_uses_alter() -> None:
     ]
     assert {fk.elements[0].column.table.name for fk in circular} == {"form_version"}
     assert all(fk.use_alter for fk in circular)
+
+
+MODEL_MODULES = {
+    "gremium": "app.modules.gremien.models",
+    "gremium_role": "app.modules.gremien.models",
+    "gremium_membership": "app.modules.gremien.models",
+    "gremium_membership_mapping": "app.modules.gremien.models",
+    "gremium_role_mapping": "app.modules.gremien.models",
+    "application_type": "app.modules.application_types.models",
+    "webhook": "app.modules.webhooks.models",
+    "webhook_delivery": "app.modules.webhooks.models",
+    "cd_variant": "app.modules.admin.models",
+    "cd_variant_logo": "app.modules.admin.models",
+    "site_config_version": "app.modules.admin.models",
+}
+
+
+def test_model_in_module_of_its_subject() -> None:
+    """Each model is in the module of its subject (§S/backend/python/000645)."""
+    modules = {
+        mapper.local_table.name: mapper.class_.__module__
+        for mapper in Base.registry.mappers
+        if isinstance(mapper.local_table, Table)
+    }
+    assert {table: modules[table] for table in MODEL_MODULES} == MODEL_MODULES
+    assert {
+        table for table, module in modules.items() if module == "app.modules.admin.models"
+    } == {"cd_variant", "cd_variant_logo", "site_config_version"}

@@ -37,7 +37,7 @@ from app.modules.admin.cd_logos import (
     check_square_logo,
     sniff_cd_logo,
 )
-from app.modules.admin.models import CdVariant, CdVariantLogo, Gremium
+from app.modules.admin.models import CdVariant, CdVariantLogo
 from app.modules.admin.schemas import (
     CdVariantCreate,
     CdVariantLogoOut,
@@ -51,6 +51,7 @@ from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.audit.actions import AuditAction
 from app.modules.files.scanner import scan_or_raise
 from app.modules.files.storage import ObjectStorage, StorageError
+from app.modules.gremien.models import Gremium
 from app.settings import Settings, get_settings
 from app.shared.errors import (
     ConflictError,

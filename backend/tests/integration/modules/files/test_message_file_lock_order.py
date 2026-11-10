@@ -24,7 +24,6 @@ import pytest
 from sqlalchemy import Engine, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import Gremium
 from app.modules.admin.service import ConfigService
 from app.modules.applications.models import Comment
 from app.modules.applications.service import ApplicationsService
@@ -35,6 +34,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
+from app.modules.gremien.models import Gremium
 from app.modules.privacy.service import PrincipalService
 from app.modules.tickets.models import Ticket, TicketNote
 from app.modules.todos.boards import ensure_gremium_board, ensure_personal_board

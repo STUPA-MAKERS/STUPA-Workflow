@@ -22,8 +22,8 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import ColumnElement, or_, select
 
-from app.modules.admin.models import GremiumMembership
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.gremien.models import GremiumMembership
 from app.modules.livevote.models import Meeting, MeetingAttendance
 
 

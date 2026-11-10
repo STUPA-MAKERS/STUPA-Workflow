@@ -19,7 +19,7 @@ from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import get_current_principal
-from app.modules.admin.models import ApplicationType
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import (
     Application,
     ApplicationLink,

@@ -16,7 +16,6 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumMembership, GremiumRole, GremiumRoleMapping
 from app.modules.admin.schemas import (
     GremiumMembershipOut,
     GremiumRoleCreate,
@@ -26,6 +25,7 @@ from app.modules.admin.schemas import (
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.gremien.models import GremiumMembership, GremiumRole, GremiumRoleMapping
 from app.shared.errors import ConflictError, NotFoundError
 
 #: Granular per-gremium-role permissions of the meeting domain. The global

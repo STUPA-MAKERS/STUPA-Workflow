@@ -28,7 +28,6 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumMembership
 from app.modules.applications.access import (
     MEMBER_PERMISSIONS,
     READ_ALL_PERMISSION,
@@ -37,6 +36,7 @@ from app.modules.applications.access import (
 )
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.gremien.models import GremiumMembership
 from app.shared.people import PersonRef, permission_holders, person_of
 
 Row = tuple[UUID, str | None, str | None]

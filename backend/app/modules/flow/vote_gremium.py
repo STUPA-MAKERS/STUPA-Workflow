@@ -23,10 +23,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.budget.decision import effective_decision_gremium
 from app.modules.flow.models import State
+from app.modules.gremien.models import Gremium
 from app.shared.errors import ConflictError
 from app.shared.guards import GREMIUM_SOURCE_BUDGET
 

@@ -15,10 +15,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.auth.models import GroupMapping, Role, RoleAssignment, RolePermission
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import GremiumMembership, GremiumRole
 
 #: The internal namespace of the voting eligibility. It belongs to this resolver alone.
 #: `resolve_principal` drops every incoming OIDC group claim that uses it, so a key in

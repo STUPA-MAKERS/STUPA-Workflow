@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from app.modules.admin.models import ApplicationType
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.decision import CODE_AMOUNT_EXCEEDS
 from app.modules.applications.diff import DataDiff, compute_diff, is_empty_diff
 from app.modules.applications.models import MagicLink, SubmissionVersion

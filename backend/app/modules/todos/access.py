@@ -38,10 +38,10 @@ from datetime import UTC, datetime
 from sqlalchemy import ColumnElement, false, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.policy import AllGremien, GremiumScope, gremium_ids_with
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import GremiumMembership, GremiumRole
 from app.modules.todos.models import TodoBoard
 from app.modules.todos.schemas import TodoMember
 from app.shared.people import permission_holders, person_of

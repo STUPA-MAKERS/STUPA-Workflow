@@ -22,10 +22,10 @@ import app.main as main_mod
 from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
-from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import DelegationSubstitute
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.publisher import NullPublisher, get_meeting_publisher

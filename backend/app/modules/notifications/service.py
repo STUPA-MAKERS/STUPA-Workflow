@@ -979,8 +979,8 @@ async def resolve_application_lang(
     """
     if application_id is None:
         return settings.mail_default_lang
-    from app.modules.admin.models import Gremium
     from app.modules.applications.models import Application
+    from app.modules.gremien.models import Gremium
 
     row = (
         await session.execute(

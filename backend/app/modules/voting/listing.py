@@ -25,9 +25,9 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, Text, and_, case, false, func, or_, select, true
 from sqlalchemy import cast as sql_cast
 
-from app.modules.admin.models import Gremium
 from app.modules.auth.policy import admin_bypass, held_gremium_ids
 from app.modules.auth.rbac import VOTE_GROUP_PREFIX
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.voting.models import Vote, VotedMarker
 from app.modules.voting.schemas import MyBallot, VoteKind, VoteListItem, VoteStatus

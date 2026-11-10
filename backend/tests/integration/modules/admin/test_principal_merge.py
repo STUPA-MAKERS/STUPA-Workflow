@@ -33,11 +33,7 @@ from sqlalchemy import Engine, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin import principal_merge as merge_mod
-from app.modules.admin.models import (
-    GremiumMembership,
-    GremiumRole,
-    SiteConfigVersion,
-)
+from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.applications.models import (
     Application,
@@ -72,6 +68,7 @@ from app.modules.delegations.models import (
     MeetingDelegation,
 )
 from app.modules.forms.models import FormVersion
+from app.modules.gremien.models import GremiumMembership, GremiumRole
 from app.modules.livevote.models import (
     Meeting,
     MeetingAgendaItem,
@@ -1266,8 +1263,8 @@ async def test_merged_principal_gets_no_membership_and_no_bootstrap_admin(
     The test deletes its mapping, because the mapping table is not cleared between tests.
     """
     from app.modules.admin.membership_sync import sync_all_memberships
-    from app.modules.admin.models import GremiumMembershipMapping
     from app.modules.auth.bootstrap import ensure_bootstrap_admins
+    from app.modules.gremien.models import GremiumMembershipMapping
     from app.settings import load_settings
 
     w = await _seed(maker)
