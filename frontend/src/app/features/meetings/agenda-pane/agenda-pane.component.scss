@@ -143,9 +143,10 @@
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-field);
-  background: var(--color-surface-3);
-  color: var(--color-text);
+  background: var(--field-bg, var(--color-surface-3));
+  color: var(--field-text, var(--color-text));
   font: inherit;
+  box-shadow: var(--field-edge, none);
 }
 .ap__input:focus-visible {
   outline: 2px solid var(--color-focus-ring);

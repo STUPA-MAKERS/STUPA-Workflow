@@ -228,23 +228,38 @@
   flex: 1 1 auto;
   min-width: 0;
 }
+.hm__groupHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding-inline-end: var(--space-2);
+}
+/* "Systemeinstellungen verwenden": a circle arrow across from the group name. The name
+   is in the label and the tooltip. */
 .hm__reset {
-  align-self: flex-start;
-  min-height: 24px;
-  margin: 2px var(--space-4) 6px;
-  padding: 6px 0;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
   border: 0;
+  border-radius: 50%;
   background: none;
   color: var(--color-accent-text);
-  font: inherit;
-  font-size: var(--fs-small);
-  font-weight: var(--fw-medium);
-  text-align: start;
   cursor: pointer;
+}
+@media (hover: hover) {
+  .hm__reset:hover {
+    background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  }
 }
 .hm__reset:focus-visible {
   outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline-offset: 0;
 }
 .hm__display {
   display: flex;
@@ -254,8 +269,8 @@
 .hm--sheet .hm__toggle {
   padding-inline: var(--space-2);
 }
-.hm--sheet .hm__reset {
-  margin-inline: var(--space-2);
+.hm--sheet .hm__groupHead {
+  padding-inline-end: 0;
 }
 
 /* The phone sheet of the public header sits in the top layer, so no glass or scroll box
