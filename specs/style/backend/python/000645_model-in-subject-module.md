@@ -2,7 +2,7 @@
 id: "000645"
 title: A model is in the module of its subject
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

@@ -2,7 +2,7 @@
 id: "000646"
 title: A CI ratchet lowers the accepted import violations
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

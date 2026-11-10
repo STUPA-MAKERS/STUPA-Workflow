@@ -2,7 +2,7 @@
 id: "000644"
 title: The shared code imports no module
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null
