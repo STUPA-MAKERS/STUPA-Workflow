@@ -221,7 +221,7 @@ describe('HelpMenuComponent', () => {
     }
   });
 
-  /** §000593 the group "Darstellung" with its five switches, with and without a login. */
+  /** §000593 the group "Darstellung" with its six switches, with and without a login. */
   it('shows the display switches in the order of the spec, also for a visitor', async () => {
     await setup({ variant: 'sheet', signedIn: false });
     const group = screen.getByRole('group', { name: 'Darstellung' });
@@ -234,7 +234,31 @@ describe('HelpMenuComponent', () => {
       'Weniger Bewegung',
       'Weniger Transparenz',
       'Eingabefelder hervorheben',
+      'Sehr hoher Kontrast',
     ]);
+  });
+
+  /** §000606 very high contrast turns the other switches on and disables them. */
+  it('locks the other switches on while very high contrast is on', async () => {
+    const { fixture } = await setup({ variant: 'sheet' });
+    const display = fixture.debugElement.injector.get(DisplaySettingsService);
+    display.reset();
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('switch', { name: 'Sehr hoher Kontrast' }));
+    fixture.detectChanges();
+    for (const name of [
+      'Dunkles Design',
+      'Mehr Kontrast',
+      'Weniger Bewegung',
+      'Weniger Transparenz',
+      'Eingabefelder hervorheben',
+    ]) {
+      const toggle = screen.getByRole('switch', { name });
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+      expect(toggle).toBeDisabled();
+    }
+    expect(screen.getByRole('switch', { name: 'Sehr hoher Kontrast' })).toBeEnabled();
+    display.reset();
   });
 
   /** §000594 a switch shows the state in effect and overrides the system; the reset clears all. */

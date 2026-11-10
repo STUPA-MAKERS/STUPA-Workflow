@@ -2,10 +2,18 @@
 id: "000605"
 title: Very high contrast shows the app in four colours
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:veryHighContrast"
+implementation:
+  - frontend/vendor/ui-kit/src/styles/display-settings.scss
+  - frontend/vendor/ui-kit/src/lib/switch/switch.component.scss
+  - frontend/vendor/ui-kit/src/lib/seg-bar/seg-bar.component.scss
+  - frontend/src/app/pages/budget/budget-pie.component.scss
+  - frontend/src/app/pages/budget/budget-sunburst.component.scss
+  - frontend/src/app/features/help/help-menu/help-menu.component.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

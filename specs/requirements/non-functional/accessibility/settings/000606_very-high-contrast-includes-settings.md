@@ -2,10 +2,17 @@
 id: "000606"
 title: Very high contrast includes the other display settings
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "frontend/vendor/ui-kit/src/lib/display/display-settings.service.spec.ts:DisplaySettingsService"
+  - "frontend/vendor/ui-kit/src/lib/theme/theme.service.spec.ts:ThemeService"
+  - "frontend/src/app/features/help/help-menu/help-menu.component.spec.ts:HelpMenuComponent"
+implementation:
+  - frontend/vendor/ui-kit/src/lib/display/display-settings.service.ts
+  - frontend/vendor/ui-kit/src/lib/theme/theme.service.ts
+  - frontend/src/app/features/help/help-menu
 scope:
   - frontend/src/app/features/help
   - frontend/vendor/ui-kit

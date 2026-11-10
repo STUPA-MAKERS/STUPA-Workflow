@@ -40,6 +40,7 @@
           class="hm__switch"
           [id]="panelId + '-' + row.key"
           [checked]="row.on"
+          [disabled]="row.locked"
           (checkedChange)="setDisplay(row.key, $event)"
           >{{ row.label | t }}</app-switch
         >
