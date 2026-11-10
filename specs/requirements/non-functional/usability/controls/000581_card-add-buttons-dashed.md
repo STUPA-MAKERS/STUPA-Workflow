@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
-  - "frontend/src/app/features/todos/card-detail/todo-card-detail.component.spec.ts:draws the add buttons of the assignees and the labels as dashed chips"
+  - "frontend/src/app/features/todos/card-detail/todo-card-detail.component.spec.ts:TodoCardDetailComponent"
 implementation:
   - frontend/src/app/features/todos/card-detail/todo-card-detail.component.scss
 scope:
