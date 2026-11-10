@@ -236,7 +236,12 @@
   justify-content: space-between;
   gap: var(--space-2);
   min-height: 36px;
-  padding-inline-end: var(--space-2);
+  padding: 4px var(--space-4) 0;
+}
+/* In the head the caption takes the inline and block room of the row, so its text and the
+   reset share one centre line. */
+.hm__groupHead > .hm__group {
+  padding: 0;
 }
 /* "Systemeinstellungen verwenden": a circle arrow across from the group name. The name
    is in the label and the tooltip. */
@@ -272,7 +277,7 @@
   padding-inline: var(--space-2);
 }
 .hm--sheet .hm__groupHead {
-  padding-inline-end: 0;
+  padding-inline: var(--space-2);
 }
 
 /* The phone sheet of the public header sits in the top layer, so no glass or scroll box
