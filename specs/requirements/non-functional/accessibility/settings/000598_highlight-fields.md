@@ -20,12 +20,14 @@ implementation:
   - frontend/vendor/ui-kit/src/lib/segmented/segmented.component.scss
   - frontend/vendor/ui-kit/src/lib/select/select.component.scss
   - frontend/vendor/ui-kit/src/lib/filter-select/filter-select.component.scss
-  - frontend/vendor/ui-kit/src/lib/row-menu/row-menu.component.scss
   - frontend/vendor/ui-kit/src/lib/data-table/data-table.component.scss
   - frontend/vendor/ui-kit/src/lib/list-item/list-item.component.scss
+  - frontend/vendor/ui-kit/src/lib/row-menu/row-menu.component.scss
   - frontend/vendor/ui-kit/src/lib/toast/toast.component.scss
   - frontend/vendor/ui-kit/src/lib/toast/toast-bar.component.scss
   - frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.component.scss
+  - frontend/vendor/ui-kit/src/lib/badge/badge.component.scss
+  - frontend/vendor/ui-kit/src/lib/seg-bar/seg-bar.component.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit
@@ -36,19 +38,16 @@ scope:
 With the switch "Eingabefelder hervorheben" on (000593), every input field (text, text area,
 select, date, time, amount and search field) must have a yellow background, black text, a black
 label, a black placeholder, black icons and a 2 px black edge. Every checkbox, radio button and
-switch must have a yellow box with a 2 px black edge, and its mark must be black. A Markdown
-editor and a chat composer are input fields too. Every button with a label (filled, tonal,
+switch must have a yellow box with a 2 px black edge, and its mark must be black. A Markdown editor and a chat composer are input fields too; in the protocol, the whole rounded pane of the TOP is the field, without inner boxes. The check box "Ich bin kein Roboter" (ALTCHA) is a field too. Every button with a label (filled, tonal,
 outlined and text buttons, pill buttons such as a picker, and floating action buttons (FAB)) must be black
 on yellow with a black 2 px edge. No yellow may show outside a black edge, also not at a
-rounded corner. A destructive button must be
+rounded corner. The edge must stay inside the box, so that a scroll container does not cut it. A destructive button must be
 dark red on yellow with a dark red edge. A pressed toggle button must be yellow on black. The
 chosen option of a segmented control must be black on yellow with the same edge. The current step of a stepper must be black on yellow. A filter chip must be black on yellow with the same edge, and an active filter
 chip yellow on black. In a menu, a list of options and every other list, the chosen or current
 row (for example the open item of a list page) must be black on yellow with the same edge; the
-other rows stay as they are. A selected table row is black on yellow without the edge. A toast and the toast bar must be black on yellow with the black edge and without glass; an error toast takes the dark red edge of a destructive button. A check box that a component draws itself reads the
-same yellow box and black mark. An icon button
-without a surface stays as it is, except the theme switch in the header, which is black on
-yellow like the help button beside it. The focused element
+other rows stay as they are. A selected table row is black on yellow without the edge. A 3-dot menu is black on yellow with the black edge, and a destructive item in it is dark red. The open tab of a tab bar is black on yellow with the same edge. In a chosen row, the number badge of a TOP is a black ring. A toast and the toast bar must be black on yellow with the black edge and without glass; an error toast takes the dark red edge of a destructive button. A check box that a component draws itself reads the
+same yellow box and black mark. Every icon button (a symbol without text, also the 3-dot button of a menu and a tool of the editor) is black on yellow with the same edge; a pressed toggle and the button of an open menu are yellow on black. The buttons of the meeting dock (also "live" and the attendance) are black on yellow with the edge, with the same 6 px space between them. The count on a button is a black plate with a yellow number. A tag (for example "NÖ") is a black plate with yellow text. A progress bar is a yellow plate with black parts. Every tile on the start page is black on yellow with the edge. The focused element
 must have a double ring: 3 px black next to it and 3 px yellow outside the black. The error
 edge must stay visible on the yellow. This applies in both themes. The
 switch is off by default, because no system setting asks for it.

@@ -45,7 +45,9 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['pages/todos/board-picker/todo-board-picker.component.scss', '.bp__chip'],
   ['layout/public-header/public-header.component.scss', '.pub__icon'],
   ['features/help/help-menu/help-menu.component.scss', '.hm__head'],
-  ['features/meetings/top-sheet/top-sheet.component.scss', '.ts__raw'],
+  ['features/meetings/top-sheet/top-sheet.component.scss', '.ts'],
+  ['pages/home.component.scss', '.home__latestItem'],
+  ['features/apply/altcha.component.scss', '.altcha__btn'],
 ];
 
 describe('highlightedFields (§000598)', () => {
@@ -117,5 +119,22 @@ describe('highlightedFields (§000598)', () => {
   it.each(FIELDS)('%s %s reads the yellow field tokens', (file, selector) => {
     const body = rule(readFileSync(join(APP, file), 'utf8'), selector);
     expect(body).toMatch(/background: var\(--field-bg, /);
+  });
+
+  it('the TOP badge in a chosen row is a black ring, the current one black with a yellow number', () => {
+    const css = readFileSync(join(APP, 'features/meetings/top-badge/top-badge.component.scss'), 'utf8');
+    expect(css).toMatch(
+      /:host-context\(:root\[data-fields='highlight'\] \.li--on\) \{[^}]*border: 2px solid var\(--field-text\);/,
+    );
+    expect(css).toMatch(/\.tb--now \{\s*background: var\(--field-text\);\s*color: var\(--field-bg\);/);
+  });
+
+  it.each([
+    ['features/meetings/session-dock/session-dock.component.scss', '.sd__chip:not(.sd__chip--static)'],
+    ['features/meetings/meeting-page/meeting-page.component.scss', '.mp__chip'],
+  ])('%s %s is a black on yellow pill button', (file, selector) => {
+    const css = readFileSync(join(APP, file), 'utf8');
+    const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    expect(css).toMatch(new RegExp(`${esc} \\{[^}]*background: var\\(--field-bg\\);[^}]*box-shadow: inset 0 0 0 1px var\\(--field-text\\);`));
   });
 });

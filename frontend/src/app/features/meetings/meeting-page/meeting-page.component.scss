@@ -1,6 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 @use 'frosted' as *;
+@use 'display' as d;
 
 :host {
   display: flex;
@@ -270,4 +271,33 @@
   flex: none;
   align-items: center;
   gap: var(--space-1);
+}
+
+/* Highlighted fields (000598): a chip button of the dock is a pill button, black on yellow
+   with the black edge; open, it is yellow on black. Its count badge is black with yellow. */
+@include d.host-on(fields) {
+  .mp__chip {
+    --color-text: var(--field-text);
+    --color-text-muted: var(--field-text);
+    --color-warning: var(--field-text);
+    border-color: var(--field-text);
+    background: var(--field-bg);
+    color: var(--field-text);
+    box-shadow: inset 0 0 0 1px var(--field-text);
+    outline: 2px solid var(--field-text);
+    outline-offset: -2px;
+  }
+  .mp__chip[aria-expanded='true'] {
+    --color-text: var(--field-bg);
+    --color-text-muted: var(--field-bg);
+    background: var(--field-text);
+    color: var(--field-bg);
+  }
+}
+@media (hover: hover) {
+  @include d.host-on(fields) {
+    .mp__chip:not([aria-expanded='true']):hover {
+      background: var(--field-bg-hover);
+    }
+  }
 }
