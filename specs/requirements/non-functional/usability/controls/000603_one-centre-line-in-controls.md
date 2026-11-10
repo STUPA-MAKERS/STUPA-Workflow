@@ -23,12 +23,13 @@ must be on the centre line of the control. The centre of each icon and of each c
 must be on the same line. The digits of a count plate must have their centre in the centre
 of the plate. An icon in a round button must start on a whole pixel.
 
-Reason: The line box of a text puts the capitals about 1px off its middle, and the offset
-depends on the font metrics. A position that corrects the offset by a fixed padding is
-right on one screen and wrong on another, so the controls trim the text box to the
-capitals (`text-box: trim-both cap alphabetic`).
+Reason: A count plate inside the text line made the line box higher than the text, so the
+text and the icon moved about 1px up. The line box of a chip text puts the capitals off its
+middle by an amount that differs between browsers, so a fixed padding is right in one
+browser and wrong in another. A chip trims its text box to the capitals
+(`text-box: trim-both cap alphabetic`) where the browser supports it.
 
-Test: The style spec of the kit button checks the trimmed label and the count plate.
+Test: The style spec of the kit checks the count plate and the trimmed chip text.
 Zoomed screenshot (DPR 4) of the "Kommentare" button of an application, with and without
 "Felder hervorheben", and of the public top bar: the centre of the capitals, of the icons
 and of the count plate are within 0.5px of the centre of the control.
