@@ -31,6 +31,8 @@ from __future__ import annotations
 import inspect
 from collections.abc import Awaitable, Callable, Iterable
 from datetime import UTC, datetime, timedelta
+from itertools import groupby
+from operator import itemgetter
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -151,9 +153,9 @@ async def assign_to_accounts(db: AsyncSession, app_ids: Iterable[object]) -> Non
             .order_by(Application.id, PrincipalRow.last_login.desc().nulls_last())
         )
     ).all()
-    owners: dict[object, tuple[object, str]] = {}
-    for app_id, principal_id, sub in rows:
-        owners.setdefault(app_id, (principal_id, sub))
+    owners = {
+        app_id: next(group)[1:] for app_id, group in groupby(rows, key=itemgetter(0))
+    }
     for app_id, (principal_id, sub) in owners.items():
         await db.execute(
             update(Application)
