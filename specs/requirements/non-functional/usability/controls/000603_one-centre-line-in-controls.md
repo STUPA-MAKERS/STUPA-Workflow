@@ -31,5 +31,5 @@ browser and wrong in another. A chip trims its text box to the capitals
 
 Test: The style spec of the kit checks the count plate and the trimmed chip text.
 Zoomed screenshot (DPR 4) of the "Kommentare" button of an application, with and without
-"Felder hervorheben", and of the public top bar: the centre of the capitals, of the icons
+"Felder hervorheben", of the FAB "Antrag erfassen", and of the public top bar: the centre of the capitals, of the icons
 and of the count plate are within 0.5px of the centre of the control.
