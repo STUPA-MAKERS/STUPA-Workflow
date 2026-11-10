@@ -38,7 +38,7 @@ import {
   sortGremiumRoles,
 } from '../admin.models';
 import { GremiumRoleDialogComponent } from './gremium-role-dialog.component';
-import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 let nextId = 0;
 
@@ -61,8 +61,8 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     SectionComponent,
-    LoadErrorComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FabComponent,
@@ -102,6 +102,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
 
   protected readonly loading = signal(true);
   protected readonly failed = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.failed);
   private readonly roles = signal<GremiumRole[]>([]);
   private readonly roleMappings = signal<GremiumRoleMapping[]>([]);
   private readonly membershipMappings = signal<GremiumMembershipMapping[]>([]);

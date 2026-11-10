@@ -1,6 +1,3 @@
-@if (failed()) {
-  <app-load-error [message]="'admin.substitutes.loadFailed' | t" (retry)="retry()" />
-}
 <app-section class="sp" headingId="sp-title" [level]="2" [heading]="'admin.substitutes.title' | t">
   <span sectionAction class="sp__actions">
     <ng-content select="[poolActions]" />
@@ -9,34 +6,39 @@
     </app-button>
   </span>
 
-  @if (loading()) {
-    <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
-  } @else if (entries().length) {
-    <ul class="rowgroup sp__list" aria-labelledby="sp-title">
-      @for (s of entries(); track s.id) {
-        <li class="sp__row">
-          <span class="sp__pair">
-            <span class="sp__member" [class.sp__all]="!memberName(s)">{{
-              memberName(s) || ('admin.substitutes.allMembers' | t)
-            }}</span>
-            <app-icon class="sp__arrow" name="arrow" [size]="16" />
-            <span class="sr-only">{{ 'admin.substitutes.by' | t }}</span>
-            <span class="sp__who">
-              <app-avatar size="sm" [name]="entryName(s)" [principalId]="s.substituteId" [decorative]="true" />
-              <span class="sp__name">{{ entryName(s) }}</span>
+  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.substitutes.loadFailed' | t" (retry)="retry()">
+    <ng-template #loading>
+      <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
+    </ng-template>
+    <ng-template #content>
+      @if (entries().length) {
+      <ul class="rowgroup sp__list" aria-labelledby="sp-title">
+        @for (s of entries(); track s.id) {
+          <li class="sp__row">
+            <span class="sp__pair">
+              <span class="sp__member" [class.sp__all]="!memberName(s)">{{
+                memberName(s) || ('admin.substitutes.allMembers' | t)
+              }}</span>
+              <app-icon class="sp__arrow" name="arrow" [size]="16" />
+              <span class="sr-only">{{ 'admin.substitutes.by' | t }}</span>
+              <span class="sp__who">
+                <app-avatar size="sm" [name]="entryName(s)" [principalId]="s.substituteId" [decorative]="true" />
+                <span class="sp__name">{{ entryName(s) }}</span>
+              </span>
             </span>
-          </span>
-<app-row-menu
-            [sections]="rowMenu()"
-            [label]="('ui.rowMenu.trigger' | t) + ': ' + entryName(s)"
-            (selected)="remove(s)"
-          />
-        </li>
+  <app-row-menu
+              [sections]="rowMenu()"
+              [label]="('ui.rowMenu.trigger' | t) + ': ' + entryName(s)"
+              (selected)="remove(s)"
+            />
+          </li>
+        }
+      </ul>
+    } @else {
+      <app-empty-state shape="person" rows="3" [heading]="'admin.substitutes.empty' | t" />
       }
-    </ul>
-  } @else {
-    <app-empty-state shape="person" rows="3" [heading]="'admin.substitutes.empty' | t" />
-  }
+    </ng-template>
+  </app-load-state>
 </app-section>
 
 <app-dialog

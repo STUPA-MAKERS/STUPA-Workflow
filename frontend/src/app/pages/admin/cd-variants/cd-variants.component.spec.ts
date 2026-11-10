@@ -1,6 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariant, CdVariantLogo } from '../admin.models';
@@ -76,7 +77,7 @@ async function setup(api: ReturnType<typeof makeApi> = makeApi()) {
   const view = await render(AdminCdVariantsComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,11 +138,17 @@ describe('AdminCdVariantsComponent', () => {
     expect(await screen.findByText('Noch keine Dokument-Varianten angelegt.')).toBeInTheDocument();
   });
 
-  it('shows an error when the list request fails', async () => {
-    const { c } = await setup(makeApi({ listCdVariants: jest.fn(() => httpError(500)) }));
+  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
+  it('names a failed list request in a toast with a retry, over the empty state', async () => {
+    const api = makeApi({ listCdVariants: jest.fn(() => httpError(500)) });
+    const { c, container } = await setup(api);
     expect(c.loadError()).toBe(true);
     expect(c.loading()).toBe(false);
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(loadErrorToast()).toBe('Die Dokument-Varianten konnten nicht geladen werden.');
+    expect(container.querySelector('app-note')).toBeNull();
+    expect(container.querySelector('app-empty-state')).toBeTruthy();
+    retryLoadError();
+    expect(api.listCdVariants).toHaveBeenCalledTimes(2);
   });
 
   it('sorts the logos of a slot by position and labels their source', async () => {

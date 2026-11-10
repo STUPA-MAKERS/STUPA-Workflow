@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { loadCatalog } from '@core/i18n/translations';
@@ -43,7 +44,7 @@ async function setup(api = makeApi(), toast = makeToast()) {
   const view = await render(AdminTranslationsComponent, {
     providers: [
       { provide: TranslationsApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   // The page waits for the lazy EN catalog (loaded in `beforeAll`) before it shows the list.
@@ -78,9 +79,14 @@ describe('AdminTranslationsComponent', () => {
     expect(inst.reference('action.save')).toBe('Save');
   });
 
-  it('shows a load error', async () => {
-    await setup(makeApi({ languages: jest.fn(() => throwError(() => new Error('x'))) }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Übersetzungen konnten nicht geladen werden.');
+  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
+  it('names a failed read in a toast with a retry', async () => {
+    const api = makeApi({ languages: jest.fn(() => throwError(() => new Error('x'))) });
+    const { container } = await setup(api);
+    expect(loadErrorToast()).toBe('Übersetzungen konnten nicht geladen werden.');
+    expect(container.querySelector('app-note[kind="error"], .note--error')).toBeNull();
+    retryLoadError();
+    expect(api.languages).toHaveBeenCalledTimes(2);
   });
 
   it('filters by search, area and changed texts', async () => {

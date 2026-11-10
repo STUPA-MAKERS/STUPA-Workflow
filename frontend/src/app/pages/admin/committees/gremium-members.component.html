@@ -1,6 +1,3 @@
-@if (failed()) {
-  <app-load-error [message]="'admin.gremien.membersLoadFailed' | t" (retry)="loadMembers()" />
-}
 <section class="gmm admin-page">
   <app-page-header
     [flush]="true"
@@ -23,37 +20,42 @@
     [heading]="'admin.gremien.members' | t"
   >
 
-    @if (loading()) {
-      <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
-    } @else if (!visible().length) {
-      <app-empty-state shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
-    } @else {
-      <ul class="rowgroup gmm__list" [attr.aria-label]="'admin.gremien.members' | t">
-        @for (m of visible(); track m.id) {
-          <li class="gmm__row">
-            <app-avatar size="sm" [name]="m.name" [principalId]="m.id" [decorative]="true" />
-            <span class="gmm__name ell" [title]="m.name">{{ m.name }}</span>
-            <span class="gmm__mail mono">{{ m.email ?? '—' }}</span>
-            <span class="gmm__role">{{ m.role | capitalize }}</span>
-          </li>
+    <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.gremien.membersLoadFailed' | t" (retry)="loadMembers()">
+      <ng-template #loading>
+        <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
+      </ng-template>
+      <ng-template #content>
+        @if (!visible().length) {
+        <app-empty-state shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
+      } @else {
+        <ul class="rowgroup gmm__list" [attr.aria-label]="'admin.gremien.members' | t">
+          @for (m of visible(); track m.id) {
+            <li class="gmm__row">
+              <app-avatar size="sm" [name]="m.name" [principalId]="m.id" [decorative]="true" />
+              <span class="gmm__name ell" [title]="m.name">{{ m.name }}</span>
+              <span class="gmm__mail mono">{{ m.email ?? '—' }}</span>
+              <span class="gmm__role">{{ m.role | capitalize }}</span>
+            </li>
+          }
+        </ul>
+        @if (members().length > preview) {
+          <app-button
+            class="gmm__more"
+            variant="text"
+            size="sm"
+            [ariaExpanded]="showAll()"
+            (click)="showAll.set(!showAll())"
+          >
+            {{
+              showAll()
+                ? ('admin.gremien.showLess' | t)
+                : ('admin.gremien.showAll' | t: { count: members().length })
+            }}
+          </app-button>
         }
-      </ul>
-      @if (members().length > preview) {
-        <app-button
-          class="gmm__more"
-          variant="text"
-          size="sm"
-          [ariaExpanded]="showAll()"
-          (click)="showAll.set(!showAll())"
-        >
-          {{
-            showAll()
-              ? ('admin.gremien.showLess' | t)
-              : ('admin.gremien.showAll' | t: { count: members().length })
-          }}
-        </app-button>
-      }
-    }
+        }
+      </ng-template>
+    </app-load-state>
   </app-section>
 
   @if (canPool()) {

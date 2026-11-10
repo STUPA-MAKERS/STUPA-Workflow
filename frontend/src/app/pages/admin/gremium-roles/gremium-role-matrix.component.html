@@ -1,6 +1,3 @@
-@if (failed()) {
-  <app-load-error [message]="'admin.gremiumRoles.loadFailed' | t" (retry)="load()" />
-}
 <app-section
   class="rm"
   [class.rm--bg3]="surface() === 3"
@@ -17,101 +14,106 @@
     <app-fab [label]="'fab.gremiumRole' | t" (activate)="openAdd()" />
   }
 
-  @if (loading()) {
-    <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
-  } @else if (!sorted().length) {
-    <app-empty-state shape="table" rows="3" [heading]="'admin.gremiumRoles.empty' | t" />
-  } @else {
-    <div
-      class="rowgroup rm__table"
-      [class.rowgroup--bg3]="surface() === 3"
-      role="table"
-      [attr.aria-label]="
-        ('admin.gremiumRoles.matrixTitle' | t) + (gremiumName() ? ': ' + gremiumName() : '')
-      "
-    >
-      <div class="rm__row rm__row--head" role="row">
-        <span class="rm__colRole" role="columnheader">{{ 'admin.gremiumRoles.colRole' | t }}</span>
-        @for (p of permissions; track p) {
-          <span class="rm__colPerm" role="columnheader">
-            <span class="rm__colLabel">{{ permLabel(p) | t }}</span>
-            <span class="mono rm__colKey">{{ keyHead(p) }}.<wbr />{{ keyTail(p) }}</span>
-          </span>
-        }
-        <span class="rm__colAct" role="columnheader"
-          ><span class="sr-only">{{ 'admin.common.actions' | t }}</span></span
-        >
-      </div>
-
-      @for (r of sorted(); track r.id) {
-        <div class="rm__row" [class.hitrow]="canEdit()" role="row">
-          <div class="rm__role" role="rowheader">
-            <span class="rm__nameLine">
-              @if (canEdit()) {
-                <button
-                  type="button"
-                  class="hitrow__open rm__name ell"
-                  [title]="label(r) | capitalize"
-                  [attr.aria-label]="('action.edit' | t) + ': ' + (label(r) | capitalize)"
-                  (click)="openEdit(r)"
-                >
-                  {{ label(r) | capitalize }}
-                </button>
-              } @else {
-                <span class="rm__name ell" [title]="label(r) | capitalize">{{
-                  label(r) | capitalize
-                }}</span>
-              }
-              @if (r.forced) {
-                <app-status-text kind="muted" [title]="'admin.gremiumRoles.forced' | t">{{
-                  'admin.gremiumRoles.forcedTag' | t
-                }}</app-status-text>
-              }
-            </span>
-            @if (canGroups()) {
-              @let groups = groupsOf(r);
-              @if (isMember(r)) {
-                <span class="rm__groups">
-                  {{ 'admin.gremiumRoles.memberVia' | t }}
-                  <span class="mono">{{ groups.length ? groups.join(', ') : '—' }}</span>
-                </span>
-              } @else if (groups.length) {
-                <span class="rm__groups mono">{{ groups.join(', ') }}</span>
-              }
-            }
-          </div>
+  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.gremiumRoles.loadFailed' | t" (retry)="load()">
+    <ng-template #loading>
+      <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
+    </ng-template>
+    <ng-template #content>
+      @if (!sorted().length) {
+      <app-empty-state shape="table" rows="3" [heading]="'admin.gremiumRoles.empty' | t" />
+    } @else {
+      <div
+        class="rowgroup rm__table"
+        [class.rowgroup--bg3]="surface() === 3"
+        role="table"
+        [attr.aria-label]="
+          ('admin.gremiumRoles.matrixTitle' | t) + (gremiumName() ? ': ' + gremiumName() : '')
+        "
+      >
+        <div class="rm__row rm__row--head" role="row">
+          <span class="rm__colRole" role="columnheader">{{ 'admin.gremiumRoles.colRole' | t }}</span>
           @for (p of permissions; track p) {
-            <div class="rm__cell hitrow__keep" role="cell">
-              <label
-                class="rm__chip"
-                [class.rm__chip--on]="has(r, p)"
-                [class.rm__chip--off]="!canEdit()"
-              >
-                <input
-                  type="checkbox"
-                  class="rm__box"
-                  [checked]="has(r, p)"
-                  [disabled]="!canEdit() || busy().has(r.id)"
-                  [attr.aria-label]="(permLabel(p) | t) + ': ' + (label(r) | capitalize)"
-                  (change)="toggle(r, p, $event)"
-                />
-                <span class="rm__chipText" aria-hidden="true">{{ permLabel(p) | t }}</span>
-              </label>
-            </div>
+            <span class="rm__colPerm" role="columnheader">
+              <span class="rm__colLabel">{{ permLabel(p) | t }}</span>
+              <span class="mono rm__colKey">{{ keyHead(p) }}.<wbr />{{ keyTail(p) }}</span>
+            </span>
           }
-          <div class="rm__act hitrow__keep" role="cell">
-            @if (canEdit()) {
-              <app-row-menu
-                [sections]="rowMenu(r)"
-                [label]="('ui.rowMenu.trigger' | t) + ': ' + (label(r) | capitalize)"
-                (selected)="askDelete(r)"
-              />
-            }
-          </div>
+          <span class="rm__colAct" role="columnheader"
+            ><span class="sr-only">{{ 'admin.common.actions' | t }}</span></span
+          >
         </div>
+
+        @for (r of sorted(); track r.id) {
+          <div class="rm__row" [class.hitrow]="canEdit()" role="row">
+            <div class="rm__role" role="rowheader">
+              <span class="rm__nameLine">
+                @if (canEdit()) {
+                  <button
+                    type="button"
+                    class="hitrow__open rm__name ell"
+                    [title]="label(r) | capitalize"
+                    [attr.aria-label]="('action.edit' | t) + ': ' + (label(r) | capitalize)"
+                    (click)="openEdit(r)"
+                  >
+                    {{ label(r) | capitalize }}
+                  </button>
+                } @else {
+                  <span class="rm__name ell" [title]="label(r) | capitalize">{{
+                    label(r) | capitalize
+                  }}</span>
+                }
+                @if (r.forced) {
+                  <app-status-text kind="muted" [title]="'admin.gremiumRoles.forced' | t">{{
+                    'admin.gremiumRoles.forcedTag' | t
+                  }}</app-status-text>
+                }
+              </span>
+              @if (canGroups()) {
+                @let groups = groupsOf(r);
+                @if (isMember(r)) {
+                  <span class="rm__groups">
+                    {{ 'admin.gremiumRoles.memberVia' | t }}
+                    <span class="mono">{{ groups.length ? groups.join(', ') : '—' }}</span>
+                  </span>
+                } @else if (groups.length) {
+                  <span class="rm__groups mono">{{ groups.join(', ') }}</span>
+                }
+              }
+            </div>
+            @for (p of permissions; track p) {
+              <div class="rm__cell hitrow__keep" role="cell">
+                <label
+                  class="rm__chip"
+                  [class.rm__chip--on]="has(r, p)"
+                  [class.rm__chip--off]="!canEdit()"
+                >
+                  <input
+                    type="checkbox"
+                    class="rm__box"
+                    [checked]="has(r, p)"
+                    [disabled]="!canEdit() || busy().has(r.id)"
+                    [attr.aria-label]="(permLabel(p) | t) + ': ' + (label(r) | capitalize)"
+                    (change)="toggle(r, p, $event)"
+                  />
+                  <span class="rm__chipText" aria-hidden="true">{{ permLabel(p) | t }}</span>
+                </label>
+              </div>
+            }
+            <div class="rm__act hitrow__keep" role="cell">
+              @if (canEdit()) {
+                <app-row-menu
+                  [sections]="rowMenu(r)"
+                  [label]="('ui.rowMenu.trigger' | t) + ': ' + (label(r) | capitalize)"
+                  (selected)="askDelete(r)"
+                />
+              }
+            </div>
+          </div>
+        }
+      </div>
       }
-    </div>
-  }
+    </ng-template>
+  </app-load-state>
 </app-section>
 
 <app-gremium-role-dialog

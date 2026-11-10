@@ -1,6 +1,3 @@
-@if (loadError()) {
-  <app-load-error [message]="'admin.deleg.error' | t" (retry)="reload()" />
-}
 <section class="dl admin-page">
   <app-page-header
     [flush]="true"
@@ -15,71 +12,74 @@
     [heading]="'admin.deleg.active' | t"
   >
 
-    @if (loading()) {
-      <app-skeleton variant="rows" [count]="3" [label]="'admin.deleg.loading' | t" />
-    } @else {
-      <ng-template #rows let-list>
-        @if (list.length) {
-          <ul class="rowgroup dl__list">
-            @for (d of list; track d.id) {
-              <li class="dl__row">
-                <span class="dl__meeting">
-                  <a class="dl__title" [routerLink]="['/meetings', d.meetingId]">{{
-                    d.meetingTitle || ('admin.deleg.meeting' | t)
-                  }}</a>
-                  @if (d.meetingDate) {
-                    <span class="dl__date">{{ d.meetingDate | ldate: 'mediumDate' }}</span>
-                  }
-                </span>
-                <span class="dl__who">
-                  <span class="dl__person">{{ who(d, 'from') }}</span>
-                  <app-icon class="dl__arrow" name="arrow" [size]="16" />
-                  <span class="sr-only">{{ 'admin.deleg.to' | t }}</span>
-                  <span class="dl__person">{{ who(d, 'to') }}</span>
-                </span>
-                <span class="dl__tags">
-                  @if (d.delegateVoting) {
-                    <span class="dl__tag dl__tag--vote">{{ 'admin.deleg.votingTag' | t }}</span>
-                  }
-                  @if (d.viaPool) {
-                    <span class="dl__tag">{{ 'admin.deleg.poolTag' | t }}</span>
-                  }
-                </span>
-                <span class="dl__act">
-                  <app-row-menu
-                    [sections]="rowMenu()"
-                    [label]="('ui.rowMenu.trigger' | t) + ': ' + who(d, 'from') + ' → ' + who(d, 'to')"
-                    (selected)="askRevoke(d)"
-                  />
-                </span>
-              </li>
-            }
-          </ul>
-        } @else {
-          <app-empty-state shape="person" rows="3" [heading]="'admin.deleg.none' | t" />
+    <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.deleg.error' | t" (retry)="reload()">
+      <ng-template #loading>
+        <app-skeleton variant="rows" [count]="3" [label]="'admin.deleg.loading' | t" />
+      </ng-template>
+      <ng-template #content>
+        <ng-template #rows let-list>
+          @if (list.length) {
+            <ul class="rowgroup dl__list">
+              @for (d of list; track d.id) {
+                <li class="dl__row">
+                  <span class="dl__meeting">
+                    <a class="dl__title" [routerLink]="['/meetings', d.meetingId]">{{
+                      d.meetingTitle || ('admin.deleg.meeting' | t)
+                    }}</a>
+                    @if (d.meetingDate) {
+                      <span class="dl__date">{{ d.meetingDate | ldate: 'mediumDate' }}</span>
+                    }
+                  </span>
+                  <span class="dl__who">
+                    <span class="dl__person">{{ who(d, 'from') }}</span>
+                    <app-icon class="dl__arrow" name="arrow" [size]="16" />
+                    <span class="sr-only">{{ 'admin.deleg.to' | t }}</span>
+                    <span class="dl__person">{{ who(d, 'to') }}</span>
+                  </span>
+                  <span class="dl__tags">
+                    @if (d.delegateVoting) {
+                      <span class="dl__tag dl__tag--vote">{{ 'admin.deleg.votingTag' | t }}</span>
+                    }
+                    @if (d.viaPool) {
+                      <span class="dl__tag">{{ 'admin.deleg.poolTag' | t }}</span>
+                    }
+                  </span>
+                  <span class="dl__act">
+                    <app-row-menu
+                      [sections]="rowMenu()"
+                      [label]="('ui.rowMenu.trigger' | t) + ': ' + who(d, 'from') + ' → ' + who(d, 'to')"
+                      (selected)="askRevoke(d)"
+                    />
+                  </span>
+                </li>
+              }
+            </ul>
+          } @else {
+            <app-empty-state shape="person" rows="3" [heading]="'admin.deleg.none' | t" />
+          }
+        </ng-template>
+
+        <ng-container *ngTemplateOutlet="rows; context: { $implicit: active() }" />
+
+        @if (past().length) {
+          <button
+            type="button"
+            class="dl__more"
+            [attr.aria-expanded]="showPast()"
+            aria-controls="dl-past"
+            (click)="showPast.set(!showPast())"
+          >
+            <app-icon [name]="showPast() ? 'up' : 'down'" />
+            {{ 'admin.deleg.past' | t }}
+          </button>
+          @if (showPast()) {
+            <div id="dl-past">
+              <ng-container *ngTemplateOutlet="rows; context: { $implicit: past() }" />
+            </div>
+          }
         }
       </ng-template>
-
-      <ng-container *ngTemplateOutlet="rows; context: { $implicit: active() }" />
-
-      @if (past().length) {
-        <button
-          type="button"
-          class="dl__more"
-          [attr.aria-expanded]="showPast()"
-          aria-controls="dl-past"
-          (click)="showPast.set(!showPast())"
-        >
-          <app-icon [name]="showPast() ? 'up' : 'down'" />
-          {{ 'admin.deleg.past' | t }}
-        </button>
-        @if (showPast()) {
-          <div id="dl-past">
-            <ng-container *ngTemplateOutlet="rows; context: { $implicit: past() }" />
-          </div>
-        }
-      }
-    }
+    </app-load-state>
   </app-section>
 
   @if (poolGremiumId()) {

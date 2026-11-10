@@ -35,6 +35,7 @@ import { placeholdersOf, samePlaceholders } from '@core/i18n/placeholders';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { type TranslationKey, de, loadCatalog } from '@core/i18n/translations';
 import { type AdminUiLanguage, TranslationsApiService } from './translations-api.service';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /** Every key of the catalog, in catalog order. */
 const ALL_KEYS = Object.keys(de) as readonly TranslationKey[];
@@ -89,6 +90,7 @@ interface LanguageDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     SectionComponent,
     ListItemComponent,
     LoadMoreComponent,
@@ -124,6 +126,7 @@ export class AdminTranslationsComponent {
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.loadError);
   protected readonly languages = signal<AdminUiLanguage[]>([]);
 
   /** The locale that the list edits. */
@@ -148,6 +151,13 @@ export class AdminTranslationsComponent {
   protected readonly toggling = signal<string | null>(null);
 
   constructor() {
+    this.load();
+  }
+
+  /** Read the languages and the stored texts; also the retry of the load error. */
+  protected load(): void {
+    this.loading.set(true);
+    this.loadError.set(false);
     forkJoin({
       catalog: from(loadCatalog('en')),
       languages: this.api.languages(),

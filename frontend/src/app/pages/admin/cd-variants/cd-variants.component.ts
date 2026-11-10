@@ -57,6 +57,7 @@ import {
   squareVerdict,
   variantInitials,
 } from './cd-variants.util';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
@@ -111,6 +112,7 @@ function emptyForm(): VariantForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     FilePickerComponent,
     FabComponent,
     ConfirmDialogComponent,
@@ -142,6 +144,7 @@ export class AdminCdVariantsComponent {
   readonly variants = signal<CdVariant[]>([]);
   readonly loading = signal(true);
   readonly loadError = signal(false);
+  readonly loadState = loadStateOf(this.loading, this.loadError);
 
   readonly expandedId = signal<Uuid | null>(null);
 
@@ -200,6 +203,11 @@ export class AdminCdVariantsComponent {
       },
       error: () => this.usedBy.set(new Map()),
     });
+  }
+
+  /** The retry of the load error. */
+  protected retryLoad(): void {
+    this.reload();
   }
 
   private reload(): void {
