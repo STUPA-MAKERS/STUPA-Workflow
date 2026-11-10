@@ -72,6 +72,8 @@ export interface MonthHead {
   readonly short: string;
   readonly long: string;
   readonly meetings: string;
+  /** No closed meeting in the month. */
+  readonly empty: boolean;
 }
 
 /** One cell, ready for the template. */
@@ -81,6 +83,8 @@ export interface CellModel {
   readonly label: string;
   /** The accent share of the background, in percent. */
   readonly strength: number;
+  /** No closed meeting in the month. */
+  readonly empty: boolean;
 }
 
 /** One person, ready for the template. */
@@ -95,10 +99,15 @@ export interface RowModel {
 /**
  * The sub-tab "Anwesenheit" of a gremium: one row per person, one column per month.
  *
- * - A head cell holds the month and the number of closed meetings. A cell shows
- *   "anwesend/Sitzungen", coloured by the share; a warning badge with a number counts
- *   the excused meetings and a grey badge "nV" the meetings with a transferred vote. A
- *   hatched cell is a month without a membership, "–" a month without a meeting.
+ * - The matrix looks like the row group of the tab "Mitglieder" (spec 000609): a plain
+ *   line of column titles, the persons as rows of a row group, the average as a plain line.
+ * - A head cell holds the month and the number of closed meetings. A cell is a pill with
+ *   "anwesend/Sitzungen", coloured by the share. Inside it, a warning badge "nE" counts
+ *   the excused meetings and a grey badge "nV" the meetings with a transferred vote
+ *   (spec 000611). A hatched cell is a month without a membership. A month without a
+ *   meeting is a narrow column with "–" in every row (spec 000610).
+ * - With "Sehr hoher Kontrast" a cell is black on yellow and the legend shows no colour
+ *   steps (spec 000612).
  * - The last column sums the months with a membership, with the quota; the foot gives
  *   "Ø anwesend je Sitzung". The head row and the first column stick while the matrix
  *   scrolls in both directions.
@@ -198,6 +207,7 @@ export class GremiumAttendanceComponent {
       short: monthShort(m.month, locale),
       long: monthYear(m.month, locale),
       meetings: this.meetingsText(m.meetings),
+      empty: m.meetings === 0,
     }));
   });
   readonly totalMeetings = computed(() => this.months().reduce((n, m) => n + m.meetings, 0));
@@ -221,11 +231,13 @@ export class GremiumAttendanceComponent {
         totals: rowTotals(row, data.months),
         cells: row.cells.map((cell, i) => {
           const view = cellView(cell, data.months[i]?.meetings ?? 0);
+          const empty = (data.months[i]?.meetings ?? 0) === 0;
           return {
             view,
             month: cell.month,
-            label: this.cellLabel(name, cell.month, view),
+            label: this.cellLabel(name, cell.month, empty ? 'none' : view.kind, view),
             strength: cellStrength(view.share),
+            empty,
           };
         }),
       };
@@ -395,9 +407,9 @@ export class GremiumAttendanceComponent {
     return parts.join(', ');
   }
 
-  private cellLabel(name: string, month: string, view: CellView): string {
+  private cellLabel(name: string, month: string, kind: CellView['kind'], view: CellView): string {
     const when = monthYear(month, this.i18n.formatLocale());
-    switch (view.kind) {
+    switch (kind) {
       case 'na':
         return this.i18n.translate('gremien.attendance.cellNa', { name, month: when });
       case 'none':
@@ -407,7 +419,7 @@ export class GremiumAttendanceComponent {
         return `${name}, ${when}: ${summary}`;
       }
       default:
-        return assertNever(view.kind);
+        return assertNever(kind);
     }
   }
 }

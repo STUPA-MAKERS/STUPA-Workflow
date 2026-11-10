@@ -108,7 +108,7 @@
       <colgroup>
         <col class="gat__colName" />
         @for (h of heads(); track h.month) {
-          <col class="gat__colMonth" />
+          <col class="gat__colMonth" [class.gat__colMonth--empty]="h.empty" />
         }
         <col class="gat__colTotal" />
       </colgroup>
@@ -116,9 +116,11 @@
         <tr>
           <th scope="col" class="gat__th gat__th--name">{{ 'gremien.attendance.member' | t }}</th>
           @for (h of heads(); track h.month) {
-            <th scope="col" class="gat__th">
+            <th scope="col" class="gat__th" [class.gat__th--empty]="h.empty">
               <abbr class="gat__month" [title]="h.long">{{ h.short }}</abbr>
-              <span class="gat__meetings">{{ h.meetings }}</span>
+              @if (!h.empty) {
+                <span class="gat__meetings">{{ h.meetings }}</span>
+              }
             </th>
           }
           <th
@@ -156,26 +158,27 @@
               </span>
             </th>
             @for (c of m.cells; track c.month) {
-              <td class="gat__td">
-                @if (c.view.kind === 'count') {
+              <td class="gat__td" [class.gat__td--empty]="c.empty">
+                @if (c.empty) {
+                  <span class="gat__dash" role="img" [attr.aria-label]="c.label">–</span>
+                } @else if (c.view.kind === 'count') {
                   <button
                     type="button"
                     class="gat__cell"
                     [class.gat__cell--full]="c.strength === 100"
+                    [class.gat__cell--zero]="c.view.present === 0"
                     [style.--gat-s]="c.strength + '%'"
                     [attr.aria-label]="c.label"
                     (click)="openCell(m, c, $event.currentTarget)"
                   >
                     <span class="mono">{{ c.view.present }}/{{ c.view.held }}</span>
                     @if (c.view.excused) {
-                      <span class="gat__ex" aria-hidden="true">{{ c.view.excused }}</span>
+                      <span class="gat__ex" aria-hidden="true">{{ c.view.excused }}E</span>
                     }
                     @if (c.view.delegated) {
                       <span class="gat__ex gat__ex--dv" aria-hidden="true">{{ c.view.delegated }}V</span>
                     }
                   </button>
-                } @else if (c.view.kind === 'none') {
-                  <span class="gat__cell gat__cell--none" role="img" [attr.aria-label]="c.label">—</span>
                 } @else {
                   <span class="gat__cell gat__cell--na" role="img" [attr.aria-label]="c.label"></span>
                 }
@@ -192,7 +195,7 @@
         <tr>
           <th scope="row" class="gat__foot gat__foot--name">{{ 'gremien.attendance.average' | t }}</th>
           @for (a of averages().months; track $index) {
-            <td class="gat__foot mono">{{ a }}</td>
+            <td class="gat__foot mono" [class.gat__td--empty]="heads()[$index]?.empty">{{ a }}</td>
           }
           <td class="gat__foot gat__td--total mono">{{ averages().total }}</td>
         </tr>
@@ -201,11 +204,11 @@
   </div>
 
   <ul class="gat__legend" [attr.aria-label]="'gremien.attendance.legend' | t">
-    <li><span class="gat__swatch gat__swatch--full"></span>{{ 'gremien.attendance.legendAll' | t }}</li>
-    <li><span class="gat__swatch gat__swatch--some"></span>{{ 'gremien.attendance.legendSome' | t }}</li>
-    <li><span class="gat__swatch"></span>{{ 'gremien.attendance.legendNone' | t }}</li>
-    <li><span class="gat__swatch gat__cell--na"></span>{{ 'gremien.attendance.legendNa' | t }}</li>
-    <li><span class="gat__ex gat__ex--static">1</span>{{ 'gremien.attendance.state.excused' | t }}</li>
+    <li class="gat__legendTone"><span class="gat__swatch gat__swatch--full"></span>{{ 'gremien.attendance.legendAll' | t }}</li>
+    <li class="gat__legendTone"><span class="gat__swatch gat__swatch--some"></span>{{ 'gremien.attendance.legendSome' | t }}</li>
+    <li class="gat__legendTone"><span class="gat__swatch"></span>{{ 'gremien.attendance.legendNone' | t }}</li>
+    <li><span class="gat__swatch gat__swatch--na"></span>{{ 'gremien.attendance.legendNa' | t }}</li>
+    <li><span class="gat__ex gat__ex--static">1E</span>{{ 'gremien.attendance.state.excused' | t }}</li>
     <li><span class="gat__ex gat__ex--dv gat__ex--static">1V</span>{{ 'gremien.attendance.state.delegated' | t }}</li>
   </ul>
 }
