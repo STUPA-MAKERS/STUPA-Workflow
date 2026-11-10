@@ -2,7 +2,7 @@
 id: "000601"
 title: The scroll bar of a list column starts below its glass head
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
