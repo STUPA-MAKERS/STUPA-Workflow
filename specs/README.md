@@ -620,7 +620,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/git/000628](style/shared/git/000628_required-checks.md) | The branches development and main require the CI checks | approved |
 | [S/shared/testing/000044](style/shared/testing/000044_test-first.md) | Tests come first | approved |
 | [S/shared/testing/000045](style/shared/testing/000045_coverage-gates.md) | Coverage gates hold | draft |
-| [S/shared/testing/000046](style/shared/testing/000046_critical-modules.md) | Critical modules have full branch coverage | approved |
+| [S/shared/testing/000046](style/shared/testing/000046_critical-modules.md) | Critical modules have full branch coverage | draft |
 | [S/shared/testing/000047](style/shared/testing/000047_own-test-keys.md) | An integration test uses its own keys | approved |
 | [S/shared/testing/000048](style/shared/testing/000048_run-integration.md) | CI runs the full suites | approved |
 | [S/shared/testing/000049](style/shared/testing/000049_check-pixels.md) | A visual bug is checked on pixels | approved |

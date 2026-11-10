@@ -2,9 +2,9 @@
 id: "000046"
 title: Critical modules have full branch coverage
 kind: style
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-10
 implementation:
   - backend/scripts/coverage_critical.py
   - .github/workflows/ci.yml
@@ -15,7 +15,8 @@ scope:
 # Critical modules have full branch coverage
 
 The modules `auth`, `voting`, `flow`, `budget`, `webhooks`, `audit` and `backup` and the files
-`app/shared/ssrf.py` and `worker/backup.py` must have 100 % branch coverage. A change in one of
+`app/shared/ssrf.py` and `worker/backup.py` must have 100 % branch coverage. The unit tests and the
+integration tests count together for this value, as in 000045. A change in one of
 them must get a security review before the merge.
 
 Test: `backend/scripts/coverage_critical.py`
