@@ -56,7 +56,7 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'roles', title: 'admin.nav.roles', desc: 'admin.nav.rolesDesc', icon: 'shield', group: 'people', permissions: ['admin.roles'] },
   { link: 'group-mappings', title: 'admin.nav.groupMappings', desc: 'admin.nav.groupMappingsDesc', icon: 'key', group: 'people', permissions: ['admin.group_mappings'] },
   { link: 'oauth-grants', title: 'admin.nav.oauthGrants', desc: 'admin.nav.oauthGrantsDesc', icon: 'key', group: 'people', permissions: ['admin.users'] },
-  { link: 'gremien', title: 'admin.nav.gremien', desc: 'admin.nav.gremienDesc', icon: 'landmark', group: 'gremien', permissions: ['admin.gremien'] },
+  { link: 'committees', title: 'admin.nav.gremien', desc: 'admin.nav.gremienDesc', icon: 'landmark', group: 'gremien', permissions: ['admin.gremien'] },
   { link: 'delegations', title: 'admin.nav.delegations', desc: 'admin.nav.delegationsDesc', icon: 'repeat', group: 'gremien', permissions: ['admin.delegations'] },
   { link: 'forms', title: 'admin.nav.forms', desc: 'admin.nav.formsDesc', icon: 'form', group: 'applications', permissions: ['form.configure'] },
   { link: 'flow', title: 'admin.nav.flow', desc: 'admin.nav.flowDesc', icon: 'flow', group: 'applications', permissions: ['flow.configure', 'admin.types'] },
