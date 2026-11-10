@@ -2,7 +2,7 @@
 id: "000622"
 title: A heading that a script focuses shows no focus ring
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

@@ -2,7 +2,7 @@
 id: "000623"
 title: A script reads the motion setting, not the system
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

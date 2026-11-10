@@ -2,7 +2,7 @@
 id: "000618"
 title: In very high contrast, a choice card has a yellow edge and a yellow circle
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

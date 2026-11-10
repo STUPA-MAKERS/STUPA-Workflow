@@ -2,7 +2,7 @@
 id: "000617"
 title: In very high contrast, every menu is black with yellow rows
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

@@ -2,7 +2,7 @@
 id: "000616"
 title: In very high contrast, the navigation has yellow text and yellow icons
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

@@ -376,20 +376,20 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/settings/000594](requirements/non-functional/accessibility/settings/000594_setting-overrides-system.md) | A display setting overrides the system setting | approved |
 | [NF/accessibility/settings/000595](requirements/non-functional/accessibility/settings/000595_more-contrast.md) | More contrast raises the contrast of text and borders | approved |
 | [NF/accessibility/settings/000596](requirements/non-functional/accessibility/settings/000596_less-transparency.md) | Less transparency makes the glass surfaces opaque | approved |
-| [NF/accessibility/settings/000598](requirements/non-functional/accessibility/settings/000598_highlight-fields.md) | Very high contrast highlights the fields black on yellow | draft |
+| [NF/accessibility/settings/000598](requirements/non-functional/accessibility/settings/000598_highlight-fields.md) | Very high contrast highlights the fields black on yellow | approved |
 | [NF/accessibility/settings/000605](requirements/non-functional/accessibility/settings/000605_very-high-contrast.md) | Very high contrast shows the app in four colours | approved |
 | [NF/accessibility/settings/000606](requirements/non-functional/accessibility/settings/000606_very-high-contrast-includes-settings.md) | Very high contrast includes the other display settings | approved |
 | [NF/accessibility/settings/000608](requirements/non-functional/accessibility/settings/000608_display-reset-in-head-row.md) | The display reset lines up with the heading and the switches | approved |
-| [NF/accessibility/settings/000614](requirements/non-functional/accessibility/settings/000614_yellow-means-press.md) | In very high contrast, yellow shows what a person can press | draft |
-| [NF/accessibility/settings/000615](requirements/non-functional/accessibility/settings/000615_chosen-is-yellow-fill.md) | In very high contrast, the chosen control of a choice is yellow filled | draft |
-| [NF/accessibility/settings/000616](requirements/non-functional/accessibility/settings/000616_navigation-yellow-text.md) | In very high contrast, the navigation has yellow text and yellow icons | draft |
-| [NF/accessibility/settings/000617](requirements/non-functional/accessibility/settings/000617_menus-black-yellow-rows.md) | In very high contrast, every menu is black with yellow rows | draft |
-| [NF/accessibility/settings/000618](requirements/non-functional/accessibility/settings/000618_choice-cards-keep-circle.md) | In very high contrast, a choice card has a yellow edge and a yellow circle | draft |
-| [NF/accessibility/settings/000619](requirements/non-functional/accessibility/settings/000619_row-title-yellow.md) | In very high contrast, a row that opens something has a yellow title | draft |
-| [NF/accessibility/settings/000620](requirements/non-functional/accessibility/settings/000620_switch-off-edge-on-fill.md) | In very high contrast, a switch, a checkbox and a radio button are filled only when on | draft |
-| [NF/accessibility/settings/000621](requirements/non-functional/accessibility/settings/000621_black-on-yellow-fill.md) | In very high contrast, everything on a yellow fill is black | draft |
-| [NF/accessibility/settings/000622](requirements/non-functional/accessibility/settings/000622_no-ring-on-script-focus.md) | A heading that a script focuses shows no focus ring | draft |
-| [NF/accessibility/settings/000623](requirements/non-functional/accessibility/settings/000623_scripts-read-motion-setting.md) | A script reads the motion setting, not the system | draft |
+| [NF/accessibility/settings/000614](requirements/non-functional/accessibility/settings/000614_yellow-means-press.md) | In very high contrast, yellow shows what a person can press | approved |
+| [NF/accessibility/settings/000615](requirements/non-functional/accessibility/settings/000615_chosen-is-yellow-fill.md) | In very high contrast, the chosen control of a choice is yellow filled | approved |
+| [NF/accessibility/settings/000616](requirements/non-functional/accessibility/settings/000616_navigation-yellow-text.md) | In very high contrast, the navigation has yellow text and yellow icons | approved |
+| [NF/accessibility/settings/000617](requirements/non-functional/accessibility/settings/000617_menus-black-yellow-rows.md) | In very high contrast, every menu is black with yellow rows | approved |
+| [NF/accessibility/settings/000618](requirements/non-functional/accessibility/settings/000618_choice-cards-keep-circle.md) | In very high contrast, a choice card has a yellow edge and a yellow circle | approved |
+| [NF/accessibility/settings/000619](requirements/non-functional/accessibility/settings/000619_row-title-yellow.md) | In very high contrast, a row that opens something has a yellow title | approved |
+| [NF/accessibility/settings/000620](requirements/non-functional/accessibility/settings/000620_switch-off-edge-on-fill.md) | In very high contrast, a switch, a checkbox and a radio button are filled only when on | approved |
+| [NF/accessibility/settings/000621](requirements/non-functional/accessibility/settings/000621_black-on-yellow-fill.md) | In very high contrast, everything on a yellow fill is black | approved |
+| [NF/accessibility/settings/000622](requirements/non-functional/accessibility/settings/000622_no-ring-on-script-focus.md) | A heading that a script focuses shows no focus ring | approved |
+| [NF/accessibility/settings/000623](requirements/non-functional/accessibility/settings/000623_scripts-read-motion-setting.md) | A script reads the motion setting, not the system | approved |
 | [NF/accessibility/statement/000495](requirements/non-functional/accessibility/statement/000495_statement-page.md) | A public page holds the accessibility statement | approved |
 | [NF/accessibility/statement/000496](requirements/non-functional/accessibility/statement/000496_statement-link.md) | Every page links to the accessibility statement | approved |
 | [NF/accessibility/statement/000497](requirements/non-functional/accessibility/statement/000497_barrier-report.md) | A user can report a barrier as a ticket | approved |

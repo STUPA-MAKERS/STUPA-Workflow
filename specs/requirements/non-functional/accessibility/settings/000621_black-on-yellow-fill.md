@@ -2,7 +2,7 @@
 id: "000621"
 title: In very high contrast, everything on a yellow fill is black
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

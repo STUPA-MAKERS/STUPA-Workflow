@@ -2,7 +2,7 @@
 id: "000620"
 title: In very high contrast, a switch, a checkbox and a radio button are filled only when on
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

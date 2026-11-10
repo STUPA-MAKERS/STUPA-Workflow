@@ -2,7 +2,7 @@
 id: "000615"
 title: In very high contrast, the chosen control of a choice is yellow filled
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

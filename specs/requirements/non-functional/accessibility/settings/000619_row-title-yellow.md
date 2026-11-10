@@ -2,7 +2,7 @@
 id: "000619"
 title: In very high contrast, a row that opens something has a yellow title
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

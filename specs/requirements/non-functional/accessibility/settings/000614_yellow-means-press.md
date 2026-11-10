@@ -2,7 +2,7 @@
 id: "000614"
 title: In very high contrast, yellow shows what a person can press
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

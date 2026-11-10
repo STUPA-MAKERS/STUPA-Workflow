@@ -2,7 +2,7 @@
 id: "000598"
 title: Very high contrast highlights the fields black on yellow
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
