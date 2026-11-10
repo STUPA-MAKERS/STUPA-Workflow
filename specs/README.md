@@ -306,6 +306,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000450](requirements/functional/meetings/meetings/000450_no-global-meeting-key.md) | No global key manages meetings | approved |
 | [F/meetings/meetings/000574](requirements/functional/meetings/meetings/000574_live-viewers-avatar.md) | A live viewer shows with the own avatar | approved |
 | [F/meetings/meetings/000607](requirements/functional/meetings/meetings/000607_agenda-row-no-drag-handle.md) | An agenda row shows no drag handle | approved |
+| [F/meetings/meetings/000610](requirements/functional/meetings/meetings/000610_attendance-month-without-meeting.md) | A month without a meeting is a narrow column with a dash | approved |
+| [F/meetings/meetings/000611](requirements/functional/meetings/meetings/000611_attendance-cell-badges.md) | An attendance cell holds its badges | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |
@@ -380,6 +382,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/settings/000605](requirements/non-functional/accessibility/settings/000605_very-high-contrast.md) | Very high contrast shows the app in four colours | approved |
 | [NF/accessibility/settings/000606](requirements/non-functional/accessibility/settings/000606_very-high-contrast-includes-settings.md) | Very high contrast includes the other display settings | approved |
 | [NF/accessibility/settings/000608](requirements/non-functional/accessibility/settings/000608_display-reset-in-head-row.md) | The display reset lines up with the heading and the switches | approved |
+| [NF/accessibility/settings/000612](requirements/non-functional/accessibility/settings/000612_attendance-matrix-very-high-contrast.md) | The attendance matrix follows very high contrast | approved |
 | [NF/accessibility/statement/000495](requirements/non-functional/accessibility/statement/000495_statement-page.md) | A public page holds the accessibility statement | approved |
 | [NF/accessibility/statement/000496](requirements/non-functional/accessibility/statement/000496_statement-link.md) | Every page links to the accessibility statement | approved |
 | [NF/accessibility/statement/000497](requirements/non-functional/accessibility/statement/000497_barrier-report.md) | A user can report a barrier as a ticket | approved |
@@ -511,6 +514,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/000599](requirements/non-functional/usability/layout/000599_glass-head-top-fade.md) | A glass list head fades into the page colour at the top screen edge | approved |
 | [NF/usability/layout/000601](requirements/non-functional/usability/layout/000601_scrollbar-below-glass-head.md) | The scroll bar of a list column starts below its glass head | approved |
 | [NF/usability/layout/000602](requirements/non-functional/usability/layout/000602_composer-bottom-gap.md) | The comment input has the same gap below as at its side | approved |
+| [NF/usability/layout/000609](requirements/non-functional/usability/layout/000609_attendance-matrix-row-group.md) | The attendance matrix looks like a row group | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
 | [S/backend/database/000070](style/backend/database/000070_idempotent-tables.md) | A migration that adds a table is idempotent | approved |
