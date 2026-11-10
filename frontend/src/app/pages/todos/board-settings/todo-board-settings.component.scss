@@ -77,12 +77,14 @@
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-field);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
+  background: var(--field-bg, var(--color-surface-sunken));
+  color: var(--field-text, var(--color-text));
   font: inherit;
+  box-shadow: var(--field-edge, none);
 }
 .bs__input:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
+  box-shadow: var(--field-focus, var(--field-edge, none));
 }
 .bs__confirm {
   display: flex;
@@ -169,6 +171,6 @@
   flex: none;
   width: 4.5rem;
   min-height: 36px;
-  background: var(--color-surface-3);
+  background: var(--field-bg, var(--color-surface-3));
   text-align: end;
 }

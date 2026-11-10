@@ -4,8 +4,10 @@ title: The Vorgänger picker lists only readable Anträge
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation: null
+updated: 2026-11-10
+implementation:
+  - backend/app/modules/applications/links_router.py
+  - frontend/src/app/features/apply/predecessor-field/predecessor-field.component.ts
 scope:
   - backend/app/modules/applications
   - frontend/src/app/features/apply

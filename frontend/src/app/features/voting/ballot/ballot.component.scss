@@ -1,4 +1,5 @@
 @use 'frosted' as *;
+@use 'display' as d;
 :host {
   display: flex;
   flex-direction: column;
@@ -237,7 +238,7 @@
   margin-top: calc(-1 * var(--space-5));
 }
 
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .choice {
     transition: none;
   }

@@ -29,6 +29,7 @@ from app.modules.applications.models import (
 )
 from app.modules.applications.router import get_capture_mail_sender
 from app.modules.audit.models import AuditEntry
+from app.modules.auth.models import EmailLoginLink
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.notifications import captured as captured_mod
@@ -486,13 +487,19 @@ async def test_capture_mail_links(
         links = (
             await session.scalars(select(MagicLink).where(MagicLink.application_id == app_id))
         ).all()
+        email_links = (
+            await session.scalars(
+                select(EmailLoginLink).where(EmailLoginLink.email == "gisela@example.org")
+            )
+        ).all()
+    assert links == []
     if guest:
-        assert f"/antrag/{app_id}#t=" in msg.text
-        assert len(links) == 1
+        assert "/my-applications#t=" in msg.text
+        assert len(email_links) == 1
     else:
         assert f"/applications/{app_id}\n" in msg.text
         assert "#t=" not in msg.text
-        assert links == []
+        assert email_links == []
     again = _Queue()
     await captured_mod.notify_application_captured(
         queue=again,

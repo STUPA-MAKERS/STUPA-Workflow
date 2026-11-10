@@ -1,3 +1,5 @@
+@use 'display' as d;
+
 .altcha {
   display: flex;
   flex-direction: column;
@@ -78,7 +80,7 @@
     transform: rotate(360deg);
   }
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .altcha__spinner {
     animation-duration: 1.8s;
   }

@@ -33,14 +33,14 @@
       </a>
     }
 
-    <button type="button" class="home__choice" (click)="login()">
+    <a routerLink="/login" class="home__choice">
       <app-icon class="home__icon" name="user" [size]="24" />
       <span class="home__choice-title">{{ 'home.choice.login.title' | t }}</span>
-      <span class="home__choice-desc">{{ 'home.choice.login.desc' | t }}</span>
+      <span class="home__choice-desc">{{ 'home.choice.login.desc' | t: { account: ('login.accountName' | t) } }}</span>
       <span class="home__go" aria-hidden="true">
         {{ 'home.choice.go' | t }} <app-icon name="arrow" [size]="15" />
       </span>
-    </button>
+    </a>
   </div>
 
   @if (protocolTotal() > 0) {

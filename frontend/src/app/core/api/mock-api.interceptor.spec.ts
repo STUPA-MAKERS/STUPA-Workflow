@@ -1441,6 +1441,13 @@ describe('mockApiInterceptor', () => {
       expect(m.status).toBe('planned');
     });
 
+    it('GET /applicant/applications and POST /auth/email-login(/verify) → the e-mail session', async () => {
+      const res = await get<{ items: unknown[] }>('/api/applicant/applications');
+      expect(res.items.length).toBe(3);
+      await expect(firstValueFrom(http.post('/api/auth/email-login', { email: 'a@b.de' }))).resolves.toBeNull();
+      await expect(firstValueFrom(http.post('/api/auth/email-login/verify', { token: 't' }))).resolves.toBeNull();
+    });
+
     it('POST /auth/magic-link/verify → scope edit', async () => {
       const res = await firstValueFrom(
         http.post<{ scope: string }>('/api/auth/magic-link/verify', { token: 't' }),

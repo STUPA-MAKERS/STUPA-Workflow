@@ -1,3 +1,5 @@
+@use 'display' as d;
+
 :host {
   display: block;
   min-width: 0;
@@ -55,7 +57,7 @@
 .pv__chev--open {
   transform: rotate(180deg);
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .pv__chev {
     transition: none;
   }

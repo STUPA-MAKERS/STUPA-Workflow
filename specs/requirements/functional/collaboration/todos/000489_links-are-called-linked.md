@@ -4,8 +4,12 @@ title: The cards of an element are under Verknüpft
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-10
+implementation:
+  - frontend/src/app/features/todos/linked-list/todo-linked-list.component.ts
+  - frontend/src/app/pages/applications/applications-detail.component.html
+  - frontend/src/app/pages/expenses/booking-detail/booking-detail.component.html
+  - frontend/src/app/pages/invoices/invoice-detail/invoice-detail.component.html
 scope:
   - frontend/src/app/features/todos
   - frontend/src/app/pages/applications

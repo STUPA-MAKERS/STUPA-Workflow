@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError, type Observable } from 'rxjs';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
+import { NEVER, of, throwError, type Observable } from 'rxjs';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
@@ -15,6 +15,7 @@ import type {
   Transition,
 } from '@core/api/models';
 import { provideFormly } from '@shared/formly/formly.providers';
+import { MY_APPLICATIONS_PAGE } from './my-applications-page';
 import { StatusTimelineComponent } from './status-timeline.component';
 
 const ID = '3f9a2c71-1111-2222-3333-444444444444';
@@ -166,6 +167,7 @@ function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
     deleteComment: (o.deleteComment ?? jest.fn()) as unknown as ApiClient['deleteComment'],
     requestErasure: (o.requestErasure ?? jest.fn(() => of(undefined))) as unknown as ApiClient['requestErasure'],
     attachmentUrl: jest.fn(),
+    applicationTypes: (() => of([{ id: 't1', name: 'Finanzantrag' }])) as unknown as ApiClient['applicationTypes'],
   };
 }
 
@@ -175,6 +177,8 @@ interface RouteOpts {
   linkTtlDays?: number | null;
   /** The public config loaded (default true). */
   loaded?: boolean;
+  /** More providers, for example the list of `/my-applications`. */
+  providers?: unknown[];
 }
 
 async function setup(api: Partial<ApiClient>, params: Record<string, string> = { app: ID }, opts: RouteOpts = {}) {
@@ -192,6 +196,7 @@ async function setup(api: Partial<ApiClient>, params: Record<string, string> = {
           loaded: signal(opts.loaded ?? true),
         },
       },
+      ...((opts.providers ?? []) as never[]),
       {
         provide: ActivatedRoute,
         useValue: {
@@ -214,18 +219,15 @@ describe('StatusTimelineComponent', () => {
   });
   afterEach(() => localStorage.clear());
 
-  it('verifies the token and shows reference, title, status and since', async () => {
+  it('verifies the token and shows title, status, type and the comments', async () => {
     const verify = jest.fn(() => of({ application_id: ID, scope: 'edit' as const }));
     await setup(fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }), { t: 'tok', app: ID });
     expect(await screen.findByRole('heading', { level: 1, name: 'Sommerfest' })).toBeInTheDocument();
     expect(verify).toHaveBeenCalledWith('tok');
-    expect(screen.getByText('Vorgang 3F9A2C71')).toBeInTheDocument();
     expect(screen.queryByText(ID)).toBeNull();
     expect(screen.getAllByText('Auf Tagesordnung')[0].tagName).toBe('APP-STATUS-TEXT');
-    expect(screen.getByText(/^seit /)).toBeInTheDocument();
-    expect(screen.getByText('1 Datei')).toBeInTheDocument();
-    expect(screen.getByText('2 Kommentare')).toBeInTheDocument();
-    expect(screen.getByText('Dein Link ist unbegrenzt gültig.')).toBeInTheDocument();
+    expect(screen.getByText('Finanzantrag')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kommentare, 2' })).toBeInTheDocument();
   });
 
   it('builds the history: status changes with the transition and versions as metadata', async () => {
@@ -240,8 +242,8 @@ describe('StatusTimelineComponent', () => {
     ]);
     expect(entries[0].icon).toBe('send');
     expect(entries[1].kind).toBe('accent');
-    const history = document.querySelector('.sp__history') as HTMLElement;
-    expect(within(history).getByText('Version 2 gespeichert')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Verlauf' }));
+    expect(await screen.findByText('Version 2 gespeichert')).toBeInTheDocument();
   });
 
   it('keeps version 1 when the timeline is empty, and shows an empty history', async () => {
@@ -293,12 +295,11 @@ describe('StatusTimelineComponent', () => {
     expect(comp.noteText('vote:repeat')).toBe('Erneute Abstimmung');
   });
 
-  it('locks the edit row in a locked status and says why', async () => {
+  it('offers no edit in a locked status and says why', async () => {
     await setup(fakeApi({ application: app(false) }));
-    const row = (await screen.findByText('Angaben bearbeiten')).closest('button') as HTMLButtonElement;
-    expect(row).toBeDisabled();
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: 'Angaben bearbeiten' })).toBeNull();
     expect(screen.getByText('Im aktuellen Status gesperrt')).toBeInTheDocument();
-    expect(row).toHaveAttribute('aria-describedby', 'sp-locked');
   });
 
   /**
@@ -399,19 +400,16 @@ describe('StatusTimelineComponent', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it('opens the attachments in a sheet with the panel', async () => {
-    const { comp, fixture } = await setup(fakeApi());
-    await userEvent.click(await screen.findByRole('button', { name: /Anhänge/ }));
-    expect(comp.filesOpen()).toBe(true);
-    fixture.detectChanges();
-    const dialog = await screen.findByRole('dialog', { name: 'Anhänge' });
-    expect(await within(dialog).findByText('Angebot.pdf')).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Schließen' }));
-    expect(comp.filesOpen()).toBe(false);
+  it('shows the attachments in their tab', async () => {
+    const { comp } = await setup(fakeApi());
+    await screen.findByRole('heading', { level: 1 });
+    await userEvent.click(screen.getByRole('tab', { name: 'Anhänge' }));
+    expect(comp.tab()).toBe('files');
+    expect(await screen.findByText('Angebot.pdf')).toBeInTheDocument();
   });
 
   /** The open sheet takes its own drop. */
-  it('opens the sheet with a file dropped anywhere on the page and uploads it', async () => {
+  it('opens the attachments tab with a file dropped anywhere on the page and uploads it', async () => {
     const uploadAttachment = jest.fn(() =>
       of({ id: 'f2', filename: 'Beleg.pdf', mime: 'application/pdf', size: 10, scanned: false, scanState: 'scanning' as const }),
     );
@@ -420,27 +418,20 @@ describe('StatusTimelineComponent', () => {
       uploadAttachment: uploadAttachment as unknown as ApiClient['uploadAttachment'],
     });
     await screen.findByRole('heading', { level: 1 });
-    const page = container.querySelector('article.sp') as HTMLElement;
+    const page = container.querySelector('article.ad') as HTMLElement;
     fireEvent.dragEnter(page, { dataTransfer: { types: ['Files'] } });
     fixture.detectChanges();
     expect(container.querySelector('app-drop-overlay')).toHaveTextContent('Dateien zum Hochladen ablegen');
 
     const pdf = new File(['x'], 'Beleg.pdf', { type: 'application/pdf' });
     fireEvent.drop(page, { dataTransfer: { types: ['Files'], files: [pdf] } });
-    expect(comp.filesOpen()).toBe(true);
+    expect(comp.tab()).toBe('files');
     fixture.detectChanges();
-    const dialog = await screen.findByRole('dialog', { name: 'Anhänge' });
-    expect(await within(dialog).findByText('Beleg.pdf')).toBeInTheDocument();
+    expect(await screen.findByText('Beleg.pdf')).toBeInTheDocument();
     expect(uploadAttachment).toHaveBeenCalledWith(ID, pdf);
     expect(container.querySelector('app-drop-overlay')).toBeNull();
-    expect(fireEvent.dragEnter(page, { dataTransfer: { types: ['Files'] } })).toBe(true);
   });
 
-  it('hides the count when the attachments cannot be listed', async () => {
-    await setup(fakeApi({ listAttachments: () => throwError(() => new Error('x')) }));
-    await screen.findByRole('heading', { level: 1 });
-    expect(screen.queryByText(/Datei/)).toBeNull();
-  });
 
   /** The Gremium is named; an own comment stands right without a name. */
   it('opens the comments in the chat and posts a public comment at once', async () => {
@@ -465,15 +456,13 @@ describe('StatusTimelineComponent', () => {
   it('names an author by kind without a name, and shows an empty comment list', async () => {
     const { comp, fixture } = await setup(fakeApi({ comments: () => of([]) }));
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByText('0 Kommentare')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kommentare, 0' })).toBeInTheDocument();
     comp.commentsOpen.set(true);
     fixture.detectChanges();
     expect(await screen.findByText('Noch keine Nachrichten.')).toBeInTheDocument();
     expect(comp.authorName({ ...COMMENTS[0], author: null })).toBe('Gremium');
     expect(comp.authorName({ ...COMMENTS[0], author: null, authorKind: 'applicant' })).toBe('Antragsteller:in');
     expect(comp.authorName(COMMENTS[1])).toBe('Du');
-    comp.comments.set([COMMENTS[0]]);
-    expect(comp.commentsSub()).toBe('1 Kommentar');
   });
 
   /**
@@ -677,20 +666,10 @@ describe('StatusTimelineComponent', () => {
     expect(requestErasure).toHaveBeenCalledTimes(1);
   });
 
-  it('hides the link line when links have a lifetime', async () => {
-    await setup(fakeApi(), { app: ID }, { linkTtlDays: 30 });
-    await screen.findByRole('heading', { level: 1 });
-    expect(screen.queryByText(/unbegrenzt/)).toBeNull();
-  });
 
-  it('hides the link line until the config loaded', async () => {
-    await setup(fakeApi(), { app: ID }, { loaded: false });
-    await screen.findByRole('heading', { level: 1 });
-    expect(screen.queryByText(/unbegrenzt/)).toBeNull();
-  });
 
   /** Without the form there is nothing to edit. */
-  it('counts several files and names the changed keys without a form', async () => {
+  it('names the changed keys without a form', async () => {
     const two = [0, 1].map((i) => ({
       id: `f${i}`,
       filename: `f${i}.pdf`,
@@ -711,7 +690,7 @@ describe('StatusTimelineComponent', () => {
         application: { ...app(true), hiddenKeys: undefined } as unknown as Application,
       }),
     );
-    expect(await screen.findByText('2 Dateien')).toBeInTheDocument();
+    await screen.findByRole('heading', { level: 1 });
     expect(comp.historyEntries().map((e) => e.body)).toContain('Geändert: participants');
     comp.startEdit();
     expect(comp.editing()).toBe(false);
@@ -729,7 +708,7 @@ describe('StatusTimelineComponent', () => {
       }),
     );
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Angaben bearbeiten/ })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Angaben bearbeiten/ })).toBeNull();
   });
 
   it('shows the end states: expired link, error, no link', async () => {
@@ -776,12 +755,78 @@ describe('StatusTimelineComponent', () => {
     expect(screen.queryByText('Im aktuellen Status gesperrt')).toBeNull();
   });
 
+  /** F/applications/applications/000588: inside `/my-applications` an old link reloads the list. */
+  it('reloads the list after an old link inside Meine Anträge and leaves the h1 to the list', async () => {
+    const page = { split: signal(true), reload: jest.fn() };
+    const { comp } = await setup(fakeApi(), { t: 'tok' }, { pathParams: { id: ID }, providers: [{ provide: MY_APPLICATIONS_PAGE, useValue: page }] });
+    expect(await screen.findByRole('heading', { level: 2, name: 'Sommerfest' })).toBeInTheDocument();
+    expect(page.reload).toHaveBeenCalled();
+    const tab = comp.tab();
+    comp.onFilesDropped([]);
+    expect(comp.tab()).toBe(tab);
+  });
+
+  /** F/applications/applications/000588: an invalid link inside `/my-applications` opens `/login`. */
+  it('sends an invalid link inside Meine Anträge to the login page', async () => {
+    const page = { split: signal(false), reload: jest.fn() };
+    const verify = jest.fn(() => throwError(() => ({ status: 410 })));
+    const navigate = jest.spyOn(Router.prototype, 'navigate').mockResolvedValue(true);
+    await setup(
+      fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }),
+      { t: 'tok' },
+      { pathParams: { id: ID }, providers: [{ provide: MY_APPLICATIONS_PAGE, useValue: page }] },
+    );
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(['/login'], { queryParams: { link: 'invalid' }, replaceUrl: true }));
+    expect(page.reload).not.toHaveBeenCalled();
+    navigate.mockRestore();
+  });
+
+  it('shows the amount and a deviating approved amount, and nothing without an amount', async () => {
+    const { comp } = await setup(fakeApi());
+    await screen.findByRole('heading', { level: 1 });
+    const base = { ...app(true), amount: '1250.00', currency: 'EUR' } as Application;
+    expect(comp.amount({ ...base, amount: null })).toBe('');
+    expect(comp.amount(base)).toMatch(/1\.250,00/);
+    expect(comp.approvedAmount({ ...base, approvedAmount: null } as Application)).toBe('');
+    expect(comp.approvedAmount({ ...base, approvedAmount: '1250' } as Application)).toBe('');
+    expect(comp.approvedAmount({ ...base, approvedAmount: '1000.00' } as Application)).toMatch(/1\.000,00/);
+    expect(comp.amount({ ...base, amount: 'k. A.' })).toBe('k. A.');
+  });
+
+  it('names no type before the Antrag has loaded', async () => {
+    const { comp } = await setup({ ...fakeApi(), getApplication: () => NEVER });
+    expect(comp.typeName()).toBeNull();
+  });
+
+  it('names no type when the types cannot load, and keeps a tab choice to the known tabs', async () => {
+    const { comp } = await setup({ ...fakeApi(), applicationTypes: (() => throwError(() => new Error('x'))) as unknown as ApiClient['applicationTypes'] });
+    await screen.findByRole('heading', { level: 1 });
+    expect(comp.typeName()).toBeNull();
+    comp.selectTab('nope');
+    expect(comp.tab()).toBe('app');
+    comp.selectTab('history');
+    expect(comp.tab()).toBe('history');
+  });
+
+  /** F/applications/applications/000588: a lost session inside `/my-applications` opens `/login`. */
+  it('sends a lost session inside Meine Anträge to the login page', async () => {
+    const page = { split: signal(false), reload: jest.fn() };
+    const navigate = jest.spyOn(Router.prototype, 'navigate').mockResolvedValue(true);
+    await setup(
+      fakeApi({ getApplication: () => throwError(() => ({ status: 401 })) }),
+      {},
+      { pathParams: { id: ID }, providers: [{ provide: MY_APPLICATIONS_PAGE, useValue: page }] },
+    );
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(['/login'], { replaceUrl: true }));
+    navigate.mockRestore();
+  });
+
   it('localizes the page in English', async () => {
     localStorage.setItem('ap.locale', 'en');
     await setup(fakeApi());
-    expect(await screen.findByText('Case 3F9A2C71')).toBeInTheDocument();
-    expect(screen.getByText('Edit details')).toBeInTheDocument();
-    expect(screen.getByText('History')).toBeInTheDocument();
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByRole('button', { name: 'Edit details' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'History' })).toBeInTheDocument();
   });
 
   it('strips a query token from the URL and keeps the id for a reload', async () => {

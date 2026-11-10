@@ -25,7 +25,7 @@ from app.modules.applications.models import Applicant, Application, MagicLink
 from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.auth.models import AuthSession
+from app.modules.auth.models import AuthSession, EmailLoginLink
 from app.modules.files.service import FilesService
 from app.modules.files.storage import ObjectStorage, build_object_storage
 from app.modules.flow.models import State
@@ -125,13 +125,15 @@ async def _anonymize_one(
 async def _purge_expired(
     maker: async_sessionmaker[AsyncSession], now: datetime
 ) -> tuple[int, int]:
-    """Delete the expired sessions and the used or expired magic links.
+    """Delete the expired sessions and the used or expired login links.
 
+    The login links are the magic links of one Antrag and the e-mail login links. An
+    e-mail login link holds the address, so it must not stay after its use or its end.
     The function touches auth artifacts only. The `budget*`, `expense` and `invoice` rows
     are financial records. The job NEVER deletes them here.
 
     Returns:
-        The number of deleted sessions and the number of deleted magic links.
+        The number of deleted sessions and the number of deleted login links.
     """
     async with maker() as session:
         sessions = cast(
@@ -148,8 +150,16 @@ async def _purge_expired(
                 )
             ),
         )
+        email_links = cast(
+            "CursorResult[Any]",
+            await session.execute(
+                delete(EmailLoginLink).where(
+                    or_(EmailLoginLink.used_at.is_not(None), EmailLoginLink.expires_at < now)
+                )
+            ),
+        )
         await session.commit()
-        return sessions.rowcount or 0, links.rowcount or 0
+        return sessions.rowcount or 0, (links.rowcount or 0) + (email_links.rowcount or 0)
 
 
 async def process_retention(ctx: dict[str, Any]) -> str:

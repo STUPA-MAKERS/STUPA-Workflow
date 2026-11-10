@@ -394,6 +394,37 @@ class ApplicationListItem(FrozenCamelModel, frozen=True):
     state_since: datetime | None = Field(default=None, alias="stateSince")
 
 
+class ApplicantApplicationItem(FrozenCamelModel, frozen=True):
+    """One Antrag on the page of an applicant session (``/my-applications``).
+
+    It carries what a row of the list "Anträge" shows: title, state, type and amount.
+
+    Attributes:
+        approved_amount: The approved amount of the valid decision, null = as
+            requested or no decision.
+    """
+
+    id: UUID
+    title: str | None = None
+    state: StateOut | None = None
+    type_id: UUID = Field(alias="typeId")
+    amount: Decimal | None = None
+    approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
+    currency: str | None = None
+    created_at: datetime = Field(alias="createdAt")
+
+
+class ApplicantApplicationsOut(FrozenCamelModel, frozen=True):
+    """The Anträge of an applicant session, newest first.
+
+    Attributes:
+        email: The address of an e-mail session; null for the link of one Antrag.
+    """
+
+    email: str | None = None
+    items: tuple[ApplicantApplicationItem, ...] = ()
+
+
 class CommentCreate(MessageFilesIn):
     """A new comment. ``attachmentIds`` and ``draftToken`` bind its files.
 

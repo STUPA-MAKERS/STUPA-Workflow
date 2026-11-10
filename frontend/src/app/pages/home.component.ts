@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -38,7 +37,6 @@ export const LATEST_COUNT = 3;
   styleUrl: './home.component.scss',
 })
 export class HomeComponent {
-  private readonly auth = inject(AuthService);
   private readonly branding = inject(BrandingService);
   private readonly i18n = inject(I18nService);
   private readonly protocols = inject(PublicProtocolsService);
@@ -85,8 +83,4 @@ export class HomeComponent {
     return p.tops.filter((t) => !t.nonPublic).length;
   }
 
-  /** Start the OIDC login. It leaves the SPA, so there is no route to navigate to. */
-  login(): void {
-    this.auth.login();
-  }
 }

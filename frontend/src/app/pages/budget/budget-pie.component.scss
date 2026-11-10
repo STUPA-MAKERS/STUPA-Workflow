@@ -1,4 +1,5 @@
 @use 'swatch';
+@use 'display' as d;
 
 :host {
   display: block;
@@ -144,7 +145,7 @@
   width: 60%;
 }
 
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .pie__slice {
     transition: none;
   }

@@ -39,6 +39,18 @@ export class AuthService {
   readonly principal = this._principal.asReadonly();
   readonly isAuthenticated = computed(() => this._principal() !== null);
 
+  private readonly _applicantSession = signal(false);
+  /**
+   * An applicant session of the e-mail login is open in this tab. "Meine Anträge" sets it
+   * after its first answer, and the public header then hides "Anmelden". It is only UX:
+   * the cookie is HttpOnly, so the page learns of the session from the answer.
+   */
+  readonly applicantSession = this._applicantSession.asReadonly();
+  /** Mark that the applicant session answered. */
+  markApplicantSession(): void {
+    this._applicantSession.set(true);
+  }
+
   /** Display name. It falls back to the email and then to "—". */
   readonly displayName = computed(() => {
     const p = this._principal();
@@ -192,6 +204,7 @@ export class AuthService {
       .pipe(catchError(() => of({ logout_url: null })))
       .subscribe((res) => {
         this._principal.set(null);
+        this._applicantSession.set(false);
         this.principal$ = undefined;
         this.cache.clear();
         this.location.assign(res.logout_url ?? '/');

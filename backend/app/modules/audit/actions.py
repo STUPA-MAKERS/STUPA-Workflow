@@ -58,6 +58,10 @@ class AuditAction(StrEnum):
             discarded after ``guest_application_settings.confirm_ttl_hours``.
             ``data`` carries the type, the gremium, the attachment count and the
             window.
+        APPLICATION_OWNER_MATCH: A guest application whose e-mail was just confirmed
+            went to the active account of that e-mail. The actor is
+            ``system:email-login``. ``data`` carries the principal id and
+            ``matchedByEmail: true``.
         APPLICATION_UPDATE: Application data edited (PATCH). ``data`` carries the new
             version number and the keys of the added, removed and changed fields,
             never a value, because a field value can hold PII. The version diff keeps
@@ -164,6 +168,7 @@ class AuditAction(StrEnum):
     APPLICATION_CREATE = "application_create"
     APPLICATION_CREATE_ON_BEHALF = "application_create_on_behalf"
     GUEST_APPLICATION_DISCARD = "guest_application_discard"
+    APPLICATION_OWNER_MATCH = "application_owner_match"
     APPLICATION_UPDATE = "application_update"
     APPLICATION_ARCHIVE = "application_archive"
     APPLICATION_UNARCHIVE = "application_unarchive"

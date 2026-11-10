@@ -1,0 +1,69 @@
+<div class="ma__box">
+  <div class="ma" [class.ma--split]="split()">
+    <app-list-detail [detailOpen]="selectedId() !== null" (back)="onBack()">
+      <section list class="ld-pane" aria-labelledby="ma-title">
+        <app-page-header [pane]="true" titleId="ma-title" [title]="'myApps.heading' | t" />
+
+        <app-sticky-bar class="ld-pane__filters">
+          <app-search-pill
+            [placeholder]="searchPlaceholder()"
+            [label]="'applications.list.searchLabel' | t"
+            [value]="query()"
+            (valueChange)="query.set($event)"
+          />
+        </app-sticky-bar>
+
+        <div class="ma__scroll" appScrollFade="y">
+          @if (loading()) {
+            <div class="skel-in">
+              <app-list-group skeleton="7rem" />
+              <app-skeleton variant="items" [count]="4" [grouped]="!split()" [label]="'applications.list.loading' | t" />
+            </div>
+          } @else if (!rows().length) {
+            <app-empty-state [heading]="(query() ? 'applications.list.empty' : 'myApps.empty') | t" />
+          } @else {
+            <div class="ma__groups" animate.enter="motion-fade-in">
+              @for (group of groups(); track group.key + $index) {
+                <app-list-group [label]="group.label">
+                  <div class="ma__rows" [class.rowgroup]="!split()" role="list">
+                    @for (r of group.items; track r.id) {
+                      <app-list-item
+                        role="listitem"
+                        [title]="r.title"
+                        [link]="['/my-applications', r.id]"
+                        [selected]="r.id === selectedId()"
+                      >
+                        <span sub>
+                          @if (r.stateLabel) {
+                            <app-status-text [kind]="r.stateKind">{{ r.stateLabel }}</app-status-text>
+                          }
+                          @if (r.stateLabel && r.typeLabel) {
+                            <span class="ma__dot" aria-hidden="true">·</span>
+                          }
+                          @if (r.typeLabel) {
+                            <span>{{ r.typeLabel }}</span>
+                          }
+                        </span>
+                        <span trail class="ma__trail">
+                          <app-amount [amount]="r.amount" [approved]="r.approved" layout="stack" />
+                          @if (!split()) {
+                            <app-icon class="ma__chev" name="right" [size]="17" />
+                          }
+                        </span>
+                      </app-list-item>
+                    }
+                  </div>
+                </app-list-group>
+              }
+            </div>
+          }
+        </div>
+
+      </section>
+
+      <div detail class="ma__detail">
+        <router-outlet />
+      </div>
+    </app-list-detail>
+  </div>
+</div>

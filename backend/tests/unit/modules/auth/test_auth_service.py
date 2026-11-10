@@ -210,6 +210,7 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
     UPDATE that expires the older links, `FlowService._load_app` and the latest status
     event of the task mail.
     """
+    from app.modules.auth import email_login
     from app.modules.flow.service import FlowService
 
     settings = _settings()
@@ -219,6 +220,11 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
         return None
 
     monkeypatch.setattr(FlowService, "auto_advance", _advance)
+
+    async def _assign(_db: object, _ids: object) -> None:
+        return None
+
+    monkeypatch.setattr(email_login, "assign_to_accounts", _assign)
     row = _link("tok", settings)
     app = _app(state_id="s1")
     app.email_confirmed_at = NOW

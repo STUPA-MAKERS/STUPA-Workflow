@@ -325,7 +325,7 @@ async def rate_limit_attachments(
     """``POST /attachments`` and ``POST /apply/attachments``: 30/h per identity.
 
     The key follows the identity. It uses the principal ``sub``, or the bound
-    ``application_id`` of the applicant, or the IP when neither exists. The auth
+    ``application_id`` or address of the applicant, or the IP when neither exists. The auth
     dependency (401/403) runs separately. This dependency only throttles the frequency.
     A logged-in OAuth (MCP) caller is not throttled.
     """
@@ -334,7 +334,7 @@ async def rate_limit_attachments(
     key = (
         f"attachments:principal:{principal.sub}"
         if principal is not None
-        else f"attachments:applicant:{applicant.application_id}"
+        else f"attachments:applicant:{applicant.identity}"
         if applicant is not None
         else f"attachments:ip:{client_ip(request)}"
     )

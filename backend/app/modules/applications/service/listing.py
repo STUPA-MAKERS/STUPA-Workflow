@@ -26,7 +26,11 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Application
-from app.modules.applications.schemas import ApplicationListItem, StateOut
+from app.modules.applications.schemas import (
+    ApplicantApplicationItem,
+    ApplicationListItem,
+    StateOut,
+)
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
     _title_of,
@@ -330,6 +334,38 @@ class ListingOps(ApplicationsServiceBase):
         gremium_rows = (await self.session.execute(select(Gremium.id, Gremium.name))).all()
         gremium_names = dict(gremium_rows)
         return type_names, gremium_names
+
+    async def list_for_applicant(
+        self, application_ids: frozenset[str]
+    ) -> list[ApplicantApplicationItem]:
+        """List the Anträge of an applicant session, newest first.
+
+        The caller passes the ids that the session reaches (`Applicant`), so the list
+        never shows more than the item routes open.
+        """
+        if not application_ids:
+            return []
+        rows = (
+            await self.session.execute(
+                select(Application, State)
+                .outerjoin(State, State.id == Application.current_state_id)
+                .where(Application.id.in_([UUID(i) for i in application_ids]))
+                .order_by(Application.created_at.desc())
+            )
+        ).all()
+        return [
+            ApplicantApplicationItem(
+                id=app.id,
+                title=_title_of(app.data),
+                state=await self._state_out_resolved(state),
+                typeId=app.type_id,
+                amount=app.amount,
+                approvedAmount=app.approved_amount,
+                currency=app.currency,
+                createdAt=app.created_at,
+            )
+            for app, state in rows
+        ]
 
     async def list_tasks(self, principal: Principal) -> list[ApplicationListItem]:
         """List the open tasks of the principal.
