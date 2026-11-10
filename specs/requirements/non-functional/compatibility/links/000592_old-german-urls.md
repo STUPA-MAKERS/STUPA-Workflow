@@ -18,12 +18,12 @@ scope:
 An old German URL must keep working. The frontend must redirect an old route to its new
 route and keep the ID, the query and the fragment. The API must answer an old path like its
 new path. The frontend must read an old query key or value like its new one. The old link of one Antrag
-must open the list of the own Anträge, because the e-mail login replaces the view of one
-Antrag by link (`F/applications/applications/000588`).
+must open the Antrag in the list of the own Anträge with its fragment, because the e-mail
+login replaces the view of one Antrag by link (`F/applications/applications/000588`).
 
 | Old | New |
 |---|---|
-| `/antrag/<id>` (old link of one Antrag) | `/my-applications` (without a valid session: `/login`) |
+| `/antrag/<id>` (old link of one Antrag) | `/my-applications/<id>` |
 | `/protokolle`, `/protokolle/<id>` | `/protocols`, `/protocols/<id>` |
 | `/barrierefreiheit` | `/accessibility` |
 | `/gremien`, `/gremien/<id>` | `/committees`, `/committees/<id>` |
