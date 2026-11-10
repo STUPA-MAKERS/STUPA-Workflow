@@ -218,7 +218,7 @@
   @include lbl.dot;
 }
 // "+ Label" and the "+" beside the assignees have the box and the type of a chip of the card,
-// with a dashed border (spec 000580).
+// with a dashed border (spec 000581).
 .cd__addLabel ::ng-deep .fs__chip,
 .cd__addPerson ::ng-deep .fs__chip {
   gap: 5px;

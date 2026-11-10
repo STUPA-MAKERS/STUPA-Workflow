@@ -1,5 +1,5 @@
 ---
-id: "000580"
+id: "000581"
 title: The add buttons of a card look like its chips with a dashed border
 kind: non-functional
 status: draft
