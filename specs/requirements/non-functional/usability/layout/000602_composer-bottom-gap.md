@@ -2,7 +2,7 @@
 id: "000602"
 title: The comment input has the same gap below as at its side
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
