@@ -290,8 +290,14 @@
 }
 
 /* Highlighted fields (000598): a chip button of the dock is a pill button, black on yellow
-   with the black edge; open, it is yellow on black. Its count badge is black with yellow. */
+   with the black edge; open, it is yellow on black. Its count badge is black with yellow.
+   Every button of the dock has its own edge, so the buttons keep the same 6px space as the
+   rest of the dock; with 2px the edges of the format tools touch. */
 @include d.host-on(fields) {
+  .sd__tools,
+  .sd__format {
+    gap: 6px;
+  }
   .sd__chip:not(.sd__chip--static) {
     --color-text: var(--field-text);
     --color-text-muted: var(--field-text);
@@ -301,7 +307,7 @@
     color: var(--field-text);
     box-shadow: inset 0 0 0 1px var(--field-text);
     outline: 2px solid var(--field-text);
-    outline-offset: -1px;
+    outline-offset: -2px;
   }
   .sd__chip--open {
     --color-text: var(--field-bg);

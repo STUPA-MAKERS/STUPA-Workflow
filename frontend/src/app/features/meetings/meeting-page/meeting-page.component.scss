@@ -285,7 +285,7 @@
     color: var(--field-text);
     box-shadow: inset 0 0 0 1px var(--field-text);
     outline: 2px solid var(--field-text);
-    outline-offset: -1px;
+    outline-offset: -2px;
   }
   .mp__chip[aria-expanded='true'] {
     --color-text: var(--field-bg);

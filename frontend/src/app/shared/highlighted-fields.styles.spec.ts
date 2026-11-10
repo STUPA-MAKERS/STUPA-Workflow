@@ -46,6 +46,8 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['layout/public-header/public-header.component.scss', '.pub__icon'],
   ['features/help/help-menu/help-menu.component.scss', '.hm__head'],
   ['features/meetings/top-sheet/top-sheet.component.scss', '.ts'],
+  ['pages/home.component.scss', '.home__latestItem'],
+  ['features/apply/altcha.component.scss', '.altcha__btn'],
 ];
 
 describe('highlightedFields (§000598)', () => {

@@ -1,5 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'press';
+@use 'field' as f;
+@use 'display' as d;
 
 :host {
   display: flex;
@@ -180,5 +182,26 @@
   .home__choice {
     padding: var(--space-5);
     border-radius: var(--radius-xl);
+  }
+}
+
+/* Highlighted fields (000598): every tile is a link, so it is black on yellow with the black
+   edge, as a button. The date of a protocol is a black plate with yellow text. */
+.home__choice,
+.home__latestItem {
+  @include f.highlight-surface;
+}
+@include d.host-on(fields) {
+  .home__latestItem ::ng-deep .db {
+    background: var(--field-text);
+    color: var(--field-bg);
+  }
+}
+@media (hover: hover) {
+  @include d.host-on(fields) {
+    .home__choice:hover,
+    .home__latestItem:hover {
+      background: var(--field-bg-hover);
+    }
   }
 }
