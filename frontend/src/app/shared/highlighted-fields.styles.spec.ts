@@ -43,6 +43,8 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['pages/admin/forms/form-editor.component.scss', '.fe__pv-control'],
   ['pages/dashboard/dashboard.component.scss', '.dash__btn--fill'],
   ['pages/todos/board-picker/todo-board-picker.component.scss', '.bp__chip'],
+  ['layout/public-header/public-header.component.scss', '.pub__icon'],
+  ['features/help/help-menu/help-menu.component.scss', '.hm__head'],
   ['features/meetings/top-sheet/top-sheet.component.scss', '.ts__raw'],
 ];
 
@@ -86,6 +88,14 @@ describe('highlightedFields (§000598)', () => {
   ])('%s %s paints the chosen row black on yellow', (file, selector) => {
     const body = rule(readFileSync(join(APP, file), 'utf8'), selector);
     expect(body).toMatch(/@include f\.highlight-chosen;/);
+  });
+
+  it.each([
+    ['features/apply/apply-wizard.component.scss', '.wz__radio'],
+    ['pages/admin/gremium-roles/gremium-role-matrix.component.scss', '.rm__box'],
+  ])('%s %s covers its outer rim with the black ring', (file, selector) => {
+    const body = rule(readFileSync(join(APP, file), 'utf8'), selector);
+    expect(body).toMatch(/@include f\.ring;/);
   });
 
   it('the role matrix check box reads the check tokens', () => {

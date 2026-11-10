@@ -45,7 +45,8 @@ chip yellow on black. In a menu, a list of options and every other list, the cho
 row (for example the open item of a list page) must be black on yellow with the same edge; the
 other rows stay as they are. A selected table row is black on yellow without the edge. A check box that a component draws itself reads the
 same yellow box and black mark. An icon button
-without a surface stays as it is. The focused element
+without a surface stays as it is, except the theme switch in the header, which is black on
+yellow like the help button beside it. The focused element
 must have a double ring: 3 px black next to it and 3 px yellow outside the black. The error
 edge must stay visible on the yellow. This applies in both themes. The
 switch is off by default, because no system setting asks for it.
