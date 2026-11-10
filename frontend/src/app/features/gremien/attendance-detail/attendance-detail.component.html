@@ -5,7 +5,7 @@
   @if (loading()) {
     <app-skeleton variant="lines" [count]="2" [label]="'gremien.attendance.detailLoading' | t" />
   } @else if (empty()) {
-    <app-empty-state rows="3" [heading]="'gremien.attendance.detailEmpty' | t" />
+    <app-empty-state rows="1" [heading]="'gremien.attendance.detailEmpty' | t" />
   } @else {
     @for (g of groups(); track g.month) {
       @if (g.meetings.length) {

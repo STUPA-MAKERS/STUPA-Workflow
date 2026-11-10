@@ -256,7 +256,7 @@
           @if (apps() === null) {
             <app-skeleton variant="rows" [count]="3" [label]="(canSeeBookings() ? 'budget.dash.itemsLoading' : 'budget.dash.appsLoading') | t" />
           } @else if (!previewItems().length) {
-            <app-empty-state rows="3" [heading]="(canSeeBookings() ? 'budget.dash.itemsNone' : 'budget.dash.appsNone') | t" />
+            <app-empty-state rows="1" [heading]="(canSeeBookings() ? 'budget.dash.itemsNone' : 'budget.dash.appsNone') | t" />
           } @else {
             <app-budget-item-list [items]="previewItems()" [names]="nodeNames()" />
           }
@@ -340,7 +340,7 @@
             </button>
           </div>
         } @empty {
-          <app-empty-state rows="3" [heading]="'budget.dash.searchNone' | t" />
+          <app-empty-state rows="1" [heading]="'budget.dash.searchNone' | t" />
         }
       </nav>
     </div>
