@@ -27,6 +27,12 @@
     border-radius: inherit;
     pointer-events: none;
   }
+  // A meeting in the day pane is a card of its own, so it has an edge too.
+  .cal__panel .cal__card {
+    padding: var(--space-4);
+    border: var(--vh-edge);
+    border-radius: var(--radius-lg);
+  }
 
   // A menu (000617): the rows of the help menu and of the account menu.
   .hm__item {

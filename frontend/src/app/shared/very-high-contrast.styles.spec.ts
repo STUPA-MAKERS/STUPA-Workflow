@@ -37,6 +37,10 @@ describe('surfaceEdges (§000605)', () => {
     expect(RULES).toMatch(/\.dash--wide \.dash__today,\s*\.cal__panel \{\s*outline: var\(--vh-edge\);\s*outline-offset: -2px;/);
     expect(RULES).toMatch(/\.cal__grid::after \{[^}]*border: var\(--vh-edge\);/);
   });
+
+  it('draws the white edge around a meeting in the day pane of the calendar', () => {
+    expect(RULES).toMatch(/\.cal__panel \.cal__card \{[^}]*border: var\(--vh-edge\);/);
+  });
 });
 
 describe('menuRows (§000617)', () => {
