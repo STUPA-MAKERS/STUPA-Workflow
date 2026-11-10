@@ -2,7 +2,7 @@
 id: "000624"
 title: The work list on Start keeps its column header and cuts at the window edge
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
