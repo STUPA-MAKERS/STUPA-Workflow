@@ -507,6 +507,10 @@ button.cd__linkOpen {
   gap: var(--space-6);
   padding-top: var(--space-4);
 }
+// On a phone the panel ends on the bottom bar. The last row keeps room above the bar (000580).
+:host(.cd--phone) .cd__panel {
+  padding-bottom: var(--space-6);
+}
 :host(.cd--phone) .cd__head {
   border-bottom: 0;
   padding-bottom: 0;
