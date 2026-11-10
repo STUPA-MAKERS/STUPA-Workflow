@@ -1,4 +1,4 @@
-import { toastWith } from '../../../../../testing/load-error';
+import { loadErrorToast, toastWith } from '../../../../../testing/load-error';
 import { Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -275,7 +275,7 @@ describe('UserMergeComponent', () => {
     });
     await setup(api);
     await pickNew();
-    expect(screen.getByText('Die Vorschau konnte nicht geladen werden.')).toBeInTheDocument();
+    expect(loadErrorToast()).toBe('Die Vorschau konnte nicht geladen werden.');
     await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
     expect(screen.getByText('3 übertragen')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zurück' }));

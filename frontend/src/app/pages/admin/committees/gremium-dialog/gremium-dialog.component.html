@@ -7,21 +7,26 @@
 >
   @if (confirmPublic()) {
     <div class="gd gd--confirm" aria-live="polite">
-      @if (previewLoading()) {
-        <app-skeleton variant="lines" [count]="2" [label]="'admin.gremien.publicConfirm.loading' | t" />
-      } @else if (preview(); as pv) {
-        <p class="gd__text">
-          {{ 'admin.gremien.publicConfirm.count' | t: { n: pv.finalCount, name: gremium()?.name ?? '' } }}
-        </p>
-        @if (pv.missingCount > 0) {
-          <div class="gd__box gd__box--row">
-            <app-icon name="file" [size]="16" />
-            <span>{{ 'admin.gremien.publicConfirm.missing' | t: { n: pv.missingCount } }}</span>
-          </div>
-        }
-      } @else {
-        <p class="gd__text">{{ 'admin.gremien.publicConfirm.generic' | t: { name: gremium()?.name ?? '' } }}</p>
-      }
+      <app-load-state [state]="previewLoading() ? 'loading' : 'ok'">
+        <ng-template #loading>
+          <app-skeleton variant="lines" [count]="2" [label]="'admin.gremien.publicConfirm.loading' | t" />
+        </ng-template>
+        <ng-template #content>
+          @if (preview(); as pv) {
+            <p class="gd__text">
+              {{ 'admin.gremien.publicConfirm.count' | t: { n: pv.finalCount, name: gremium()?.name ?? '' } }}
+            </p>
+            @if (pv.missingCount > 0) {
+              <div class="gd__box gd__box--row">
+                <app-icon name="file" [size]="16" />
+                <span>{{ 'admin.gremien.publicConfirm.missing' | t: { n: pv.missingCount } }}</span>
+              </div>
+            }
+          } @else {
+            <p class="gd__text">{{ 'admin.gremien.publicConfirm.generic' | t: { name: gremium()?.name ?? '' } }}</p>
+          }
+        </ng-template>
+      </app-load-state>
     </div>
   } @else {
   <form class="gd" (submit)="$event.preventDefault(); submit()">

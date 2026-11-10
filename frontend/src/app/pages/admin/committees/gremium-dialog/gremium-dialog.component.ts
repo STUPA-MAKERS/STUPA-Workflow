@@ -95,11 +95,14 @@ export function parseRecipients(raw: string): readonly string[] {
  * same dialog): it names how many final protocols become readable without a login and
  * how many still need their public version, which a job of the server makes.
  */
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
+
 @Component({
   selector: 'app-gremium-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     NoteComponent,
     SkeletonComponent,
     FormsModule,

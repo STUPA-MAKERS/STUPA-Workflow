@@ -16,6 +16,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
+import type { LoadState } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 import {
   ButtonComponent,
@@ -116,7 +117,11 @@ export class HelpTicketsComponent {
   protected readonly canBlock = computed(() => this.auth.can('ticket.manage'));
 
   /** The page needs the site right. The server checks it again. */
-  protected readonly form: SettingsForm<HelpTicketsSettings, HelpTicketsSettings> = settingsForm<HelpTicketsSettings, HelpTicketsSettings, HelpTicketsSettings>({
+  protected readonly form: SettingsForm<HelpTicketsSettings, HelpTicketsSettings> = settingsForm<
+    HelpTicketsSettings,
+    HelpTicketsSettings,
+    HelpTicketsSettings
+  >({
     allowed: () => this.auth.can('admin.site'),
     load: () => this.api.getHelpTickets(),
     put: (body) => this.api.putHelpTickets(body),
@@ -159,6 +164,9 @@ export class HelpTicketsComponent {
   /** null while loading; the read failed: `blockedError`. */
   protected readonly blocked = signal<TicketBlockedSender[] | null>(null);
   protected readonly blockedError = signal(false);
+  protected readonly blockedState = computed<LoadState>(() =>
+    this.blockedError() ? 'error' : this.blocked() === null ? 'loading' : 'ok',
+  );
   /** The block whose unblock is in flight. */
   protected readonly unblocking = signal<string | null>(null);
 
@@ -166,7 +174,9 @@ export class HelpTicketsComponent {
     if (this.canBlock()) this.loadBlocked();
   }
 
-  private loadBlocked(): void {
+  protected loadBlocked(): void {
+    this.blocked.set(null);
+    this.blockedError.set(false);
     this.tickets.blockedSenders().subscribe({
       next: (list) => {
         this.blockedError.set(false);

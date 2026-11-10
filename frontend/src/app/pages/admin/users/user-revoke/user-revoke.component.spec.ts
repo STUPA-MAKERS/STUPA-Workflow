@@ -1,4 +1,4 @@
-import { toastWith } from '../../../../../testing/load-error';
+import { loadErrorToast, toastWith } from '../../../../../testing/load-error';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -318,7 +318,7 @@ describe('UserRevokeComponent', () => {
   it('a failed preview offers a retry', async () => {
     const api = makeApi({ previewPrincipalRevoke: jest.fn(() => throwError(() => new Error('x'))) });
     await setup(api);
-    expect(screen.getByText('Die Rechte der Person konnten nicht geladen werden.')).toBeInTheDocument();
+    expect(loadErrorToast()).toBe('Die Rechte der Person konnten nicht geladen werden.');
     api.previewPrincipalRevoke.mockReturnValue(of(preview()));
     await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
     expect(screen.getByText('Gremien')).toBeInTheDocument();

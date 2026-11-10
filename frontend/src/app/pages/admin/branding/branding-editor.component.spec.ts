@@ -1,4 +1,4 @@
-import { toastWith } from '../../../../testing/load-error';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute } from '@angular/router';
@@ -89,6 +89,18 @@ async function setupWithStub(
 
 describe('BrandingEditorComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('shows the load error toast with a retry when the branding fails to load', async () => {
+    let calls = 0;
+    const getSiteConfig = jest.fn(() =>
+      ++calls === 1 ? throwError(() => new Error('x')) : of({ ...STUB_CFG, branding: emptyBranding() }),
+    );
+    await setupWithStub({ getSiteConfig });
+    expect(loadErrorToast()).toBe('Das Branding konnte nicht geladen werden.');
+    expect(screen.queryByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeNull();
+    retryLoadError();
+    expect(await screen.findByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeInTheDocument();
+  });
 
   it('shows the texts on the page "Texte" and nothing of the branding', async () => {
     const { container } = await setup('texts');

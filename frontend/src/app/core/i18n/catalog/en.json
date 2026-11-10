@@ -2011,6 +2011,8 @@
   "admin.flow.addActionPh": "Choose an action …",
   "admin.brand.title": "Branding",
   "admin.texts.title": "Texts",
+  "admin.brand.loadFailed": "The branding could not be loaded.",
+  "admin.texts.loadFailed": "The texts could not be loaded.",
   "admin.brand.appName.group": "App name",
   "admin.brand.appName.full": "Full name (browser tab)",
   "admin.brand.appName.short": "Short name (PWA)",
