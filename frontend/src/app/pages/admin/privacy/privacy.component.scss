@@ -97,10 +97,11 @@
   padding: var(--space-2) var(--space-3);
   border: 0;
   border-radius: var(--radius-field);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
+  background: var(--field-bg, var(--color-surface-sunken));
+  color: var(--field-text, var(--color-text));
   font: inherit;
   font-size: var(--fs-md);
+  box-shadow: var(--field-edge, none);
 }
 .pv__textarea:focus-visible {
   outline: none;

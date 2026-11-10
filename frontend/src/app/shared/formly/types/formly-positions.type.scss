@@ -240,12 +240,13 @@
   @include f.box-labelled;
   cursor: text;
 }
+// A highlighted field (app spec 000598) keeps its yellow.
 .pf {
-  background: var(--color-surface-3);
+  background: var(--field-bg, var(--color-surface-3));
 }
 @media (hover: hover) {
   .pf:hover {
-    background: var(--color-surface-3);
+    background: var(--field-bg-hover, var(--color-surface-3));
   }
 }
 .pf--invalid {

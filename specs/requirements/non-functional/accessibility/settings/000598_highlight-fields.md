@@ -7,6 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:highlightedFields"
+  - "frontend/src/app/shared/highlighted-fields.styles.spec.ts:highlightedFields"
 implementation:
   - frontend/vendor/ui-kit/src/styles/display-settings.scss
   - frontend/vendor/ui-kit/src/styles/_field.scss

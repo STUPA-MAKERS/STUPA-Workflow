@@ -77,9 +77,10 @@
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-field);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
+  background: var(--field-bg, var(--color-surface-sunken));
+  color: var(--field-text, var(--color-text));
   font: inherit;
+  box-shadow: var(--field-edge, none);
 }
 .bs__input:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -169,6 +170,6 @@
   flex: none;
   width: 4.5rem;
   min-height: 36px;
-  background: var(--color-surface-3);
+  background: var(--field-bg, var(--color-surface-3));
   text-align: end;
 }
