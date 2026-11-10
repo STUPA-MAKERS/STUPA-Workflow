@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use 'field' as f;
 
 :host {
   display: contents;
@@ -101,6 +102,7 @@
   color: var(--color-text);
   font: inherit;
   font-size: var(--fs-small);
+  @include f.highlight-surface;
 }
 .as__note:focus-visible {
   outline: none;

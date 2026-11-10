@@ -1,3 +1,4 @@
+@use 'field' as f;
 .dd {
   display: flex;
   flex-direction: column;
@@ -68,6 +69,7 @@
 .dd__row--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 @media (hover: hover) {
   .dd__row--on:hover:not(.dd__row--off) {

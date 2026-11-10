@@ -1,5 +1,6 @@
 @use 'scroll-fade' as fade;
 @use '../../../shared/ui/dialog-form' as df;
+@use 'field' as f;
 
 @include df.host;
 
@@ -111,6 +112,7 @@
   border-radius: var(--radius-field);
   background: var(--color-surface-sunken);
   cursor: text;
+  @include f.highlight-surface;
 }
 .agd__note:focus-within {
   box-shadow: inset 0 0 0 2px var(--color-focus-ring);

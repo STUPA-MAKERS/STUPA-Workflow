@@ -1,5 +1,6 @@
 @use 'option-menu' as menu;
 @use 'display' as d;
+@use 'field' as f;
 
 // Custom properties of a consumer: `--chat-log-max` bounds the log; `--chat-log-basis: 0` makes
 // the log add only `--chat-log-min` to a growing column; `--chat-composer-bottom`, `-foot`,
@@ -499,6 +500,7 @@
   padding: 6px 6px 6px 18px;
   border-radius: 26px;
   background: var(--color-surface-3);
+  @include f.highlight-surface;
 }
 .chat__box:has(.chat__input:focus-visible) {
   box-shadow: inset 0 0 0 2px var(--color-focus-ring);

@@ -1,3 +1,5 @@
+@use 'field' as f;
+
 @mixin crumbs($sel) {
   #{$sel} {
     display: flex;
@@ -59,6 +61,7 @@
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
+    @include f.highlight-surface;
   }
   @media (hover: hover) {
     #{$sel}:hover {

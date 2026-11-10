@@ -227,6 +227,7 @@
 .ccs__opt[aria-selected='true'] {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 .ccs__opt[aria-selected='true'] .ccs__optName {
   font-weight: var(--fw-semibold);
