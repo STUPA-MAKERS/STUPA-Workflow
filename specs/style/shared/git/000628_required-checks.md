@@ -2,7 +2,7 @@
 id: "000628"
 title: The branches development and main require the CI checks
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

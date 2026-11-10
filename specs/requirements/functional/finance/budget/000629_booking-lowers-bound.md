@@ -2,7 +2,7 @@
 id: "000629"
 title: A booking lowers the bound amount of its Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:

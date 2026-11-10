@@ -2,7 +2,7 @@
 id: "000338"
 title: A text without the extra language falls back to English
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:

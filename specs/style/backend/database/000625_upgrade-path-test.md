@@ -2,7 +2,7 @@
 id: "000625"
 title: CI runs the new migrations on the schema of the last release
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

@@ -2,7 +2,7 @@
 id: "000496"
 title: Every page links to the accessibility statement
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:

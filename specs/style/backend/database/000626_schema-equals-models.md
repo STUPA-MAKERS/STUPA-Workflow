@@ -2,7 +2,7 @@
 id: "000626"
 title: A migrated database has the schema of the models
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

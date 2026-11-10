@@ -2,7 +2,7 @@
 id: "000630"
 title: A magic link opens one Antrag, a login link opens an address
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:

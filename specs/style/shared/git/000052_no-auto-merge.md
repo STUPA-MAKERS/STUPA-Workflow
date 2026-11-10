@@ -2,7 +2,7 @@
 id: "000052"
 title: A pull request is never set to auto-merge
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:

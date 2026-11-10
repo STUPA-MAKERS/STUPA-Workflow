@@ -2,7 +2,7 @@
 id: "000627"
 title: A deploy reports a schema that differs from the models
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

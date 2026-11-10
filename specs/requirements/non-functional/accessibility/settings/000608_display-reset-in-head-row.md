@@ -2,7 +2,7 @@
 id: "000608"
 title: The display reset lines up with the heading and the switches
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
