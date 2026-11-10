@@ -2,7 +2,7 @@
 id: "000638"
 title: Each entry of the admin menu has its own icon
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

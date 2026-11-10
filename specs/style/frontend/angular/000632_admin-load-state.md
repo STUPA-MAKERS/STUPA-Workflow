@@ -2,7 +2,7 @@
 id: "000632"
 title: An admin page shows its load states through app-load-state
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

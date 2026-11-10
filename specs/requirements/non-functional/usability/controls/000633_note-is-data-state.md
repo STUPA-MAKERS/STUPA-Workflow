@@ -2,7 +2,7 @@
 id: "000633"
 title: A note shows a state of the data, not a failed request
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

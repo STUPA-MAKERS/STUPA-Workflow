@@ -2,7 +2,7 @@
 id: "000637"
 title: Container queries in Verwaltung use three named widths
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

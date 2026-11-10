@@ -2,7 +2,7 @@
 id: "000636"
 title: A component stylesheet has no class without a use
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

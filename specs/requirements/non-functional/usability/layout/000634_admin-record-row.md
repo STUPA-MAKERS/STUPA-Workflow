@@ -2,7 +2,7 @@
 id: "000634"
 title: A record row in Verwaltung has one anatomy
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

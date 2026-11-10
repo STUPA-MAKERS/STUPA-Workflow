@@ -2,7 +2,7 @@
 id: "000639"
 title: The folder of an admin page has the name of its route
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

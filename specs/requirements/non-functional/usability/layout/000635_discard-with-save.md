@@ -2,7 +2,7 @@
 id: "000635"
 title: A page with Speichern offers Verwerfen in its header
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null

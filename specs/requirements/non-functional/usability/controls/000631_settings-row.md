@@ -2,7 +2,7 @@
 id: "000631"
 title: A settings row is a row of a row group, 56 px high
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation: null
