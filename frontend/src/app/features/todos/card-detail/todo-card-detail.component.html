@@ -494,6 +494,8 @@
             </li>
           }
         </ul>
+      } @else {
+        <app-empty-state shape="row" rows="3" data-testid="cd-links-empty" [heading]="'todos.card.noLinks' | t" />
       }
     </app-section>
 

@@ -110,8 +110,8 @@
           }
         }
       </ul>
-    } @else if (emptyHeading()) {
-      <app-empty-state shape="row" rows="3" [heading]="emptyHeading()" />
+    } @else {
+      <app-empty-state shape="row" rows="3" data-testid="tl-empty" [heading]="emptyHeading() || ('todos.linked.empty' | t)" />
     }
   </app-section>
 } @else if (emptyHeading()) {
