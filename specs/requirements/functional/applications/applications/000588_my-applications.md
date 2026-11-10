@@ -2,10 +2,13 @@
 id: "000588"
 title: Meine Anträge lists the Anträge of the address
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+implementation:
+  - frontend/src/app/features/apply/my-applications.component.ts
+  - frontend/src/app/features/apply/status-timeline.component.ts
+  - frontend/src/app/layout/public-header/public-header.component.html
 scope:
   - backend/app/modules/applications
   - frontend/src/app/features/apply

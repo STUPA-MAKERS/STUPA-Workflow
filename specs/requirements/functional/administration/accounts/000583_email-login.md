@@ -2,10 +2,14 @@
 id: "000583"
 title: An applicant logs in with an e-mail link
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+implementation:
+  - backend/app/modules/auth/email_login.py
+  - backend/app/modules/auth/router.py
+  - backend/app/modules/applications/router.py
+  - backend/app/modules/notifications/captured.py
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py
@@ -28,6 +32,6 @@ the same view (`F/applications/applications/000588`).
 Reason: An applicant files several Anträge over time. Each Antrag had its own link in its own
 mail, and an old mail gets lost. One login for the address finds them all.
 
-Test: `backend/tests/unit/test_email_login.py`: a session of the address reads and edits two
+Test: `backend/tests/integration/modules/auth/test_email_login.py`: a session of the address reads and edits two
 Anträge of the address and gets 403 for an Antrag of another address; the submit mail carries a
 login link.

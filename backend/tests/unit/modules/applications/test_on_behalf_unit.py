@@ -450,7 +450,7 @@ class _Rows:
 
 @pytest.mark.parametrize("guest", [False, True])
 async def test_mail_links(monkeypatch: pytest.MonkeyPatch, guest: bool) -> None:
-    from app.modules.auth import service as auth_service
+    from app.modules.auth import email_login
     from app.settings import load_settings
 
     app = _Row(
@@ -463,12 +463,11 @@ async def test_mail_links(monkeypatch: pytest.MonkeyPatch, guest: bool) -> None:
     session = _MailSession(app)
     monkeypatch.setattr(captured_mod, "get_sessionmaker", lambda: lambda: session)
 
-    async def _magic(
-        _db: Any, _settings: Any, *, email: str, application_id: Any, deliver: Any
-    ) -> None:
-        await deliver(email, f"https://x/antrag/{application_id}#t=tok")
+    async def _confirm_link(_db: Any, _settings: Any, *, email: str) -> str:
+        assert email == "a@example.org"
+        return "https://x/my-applications#t=tok"
 
-    monkeypatch.setattr(auth_service, "request_magic_link", _magic)
+    monkeypatch.setattr(email_login, "issue_confirm_link", _confirm_link)
     queue = _Queue()
     settings = load_settings(public_base_url="https://x/")
     await captured_mod.notify_application_captured(
@@ -476,7 +475,7 @@ async def test_mail_links(monkeypatch: pytest.MonkeyPatch, guest: bool) -> None:
     )
     (msg,) = queue.messages
     if guest:
-        assert f"https://x/antrag/{app.id}#t=tok" in msg.text
+        assert "https://x/my-applications#t=tok" in msg.text
         assert session.committed is True
     else:
         assert f"https://x/applications/{app.id}" in msg.text

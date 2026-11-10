@@ -2,10 +2,11 @@
 id: "000585"
 title: A login link works once and ends after a fixed time
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+implementation:
+  - backend/app/modules/auth/email_login.py
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py
@@ -22,5 +23,5 @@ Reason: The link opens every Antrag of the address, so a forwarded or old mail m
 later. A request must not end other links, because anybody who knows the address can request one
 (`F/administration/accounts/000268`).
 
-Test: `backend/tests/unit/test_email_login.py`: a second redeem and a redeem after the end give
+Test: `backend/tests/integration/modules/auth/test_email_login.py`: a second redeem and a redeem after the end give
 410.

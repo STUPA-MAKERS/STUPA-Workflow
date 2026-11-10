@@ -1,7 +1,6 @@
 import { signal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
-import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { of, throwError, type Observable } from 'rxjs';
@@ -57,18 +56,17 @@ describe('HomeComponent', () => {
   afterEach(() => localStorage.clear());
 
   /**
-   * The apply choice is a router link. The login choice is a button, because the OIDC redirect
-   * leaves the SPA and has no route of its own. Nothing else competes with them: the body holds one
-   * link and one button.
+   * Both choices are router links: the login choice opens `/login`, which offers the account and
+   * the e-mail link (F/public/public-pages/000589). Nothing else competes with them.
    */
   it('offers exactly two ways in and nothing else without public protocols', async () => {
     const { protocols } = await setup();
     expect(protocols.list).toHaveBeenCalledWith({ limit: 3 });
     const apply = screen.getByRole('link', { name: /Antrag stellen/ });
     expect(apply).toHaveAttribute('href', '/apply');
-    expect(screen.getByRole('button', { name: /Gremiumsmitglied anmelden/ })).toBeInTheDocument();
-    expect(screen.getAllByRole('link')).toHaveLength(1);
-    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /^Anmelden/ })).toHaveAttribute('href', '/login');
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
   it('shows the configured welcome text below the heading, in the active language', async () => {
@@ -81,20 +79,12 @@ describe('HomeComponent', () => {
     expect(container.querySelector('.home__welcome')).toBeNull();
   });
 
-  it('starts the OIDC login from the member choice', async () => {
-    const { auth } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: /Gremiumsmitglied anmelden/ }));
-    expect(auth.login).toHaveBeenCalled();
-  });
-
   it('localizes both choices to English', async () => {
     localStorage.setItem('ap.locale', 'en');
     await setup();
     expect(screen.getByRole('heading', { level: 1, name: 'Welcome' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Submit an application/ })).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Sign in as a committee member/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Log in/ })).toHaveAttribute('href', '/login');
   });
 
   describe('refused login', () => {
@@ -145,13 +135,13 @@ describe('HomeComponent', () => {
         'href',
         '/protokolle',
       );
-      expect(screen.getByRole('button', { name: /Gremiumsmitglied anmelden/ })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /^Anmelden/ })).toHaveAttribute('href', '/login');
     });
 
     it('looks as before when the protocols cannot load', async () => {
       await setup(undefined, {}, protocolsApi(throwError(() => new Error('down'))));
       expect(screen.queryByText('Zuletzt veröffentlicht')).toBeNull();
-      expect(screen.getAllByRole('link')).toHaveLength(1);
+      expect(screen.getAllByRole('link')).toHaveLength(2);
     });
   });
 });

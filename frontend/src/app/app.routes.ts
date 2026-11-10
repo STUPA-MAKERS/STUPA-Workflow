@@ -61,6 +61,36 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'login',
+        data: { title: 'login.heading', footer: true },
+        loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent),
+      },
+      {
+        path: 'my-applications',
+        data: { title: 'myApps.heading', wide: true },
+        loadComponent: () =>
+          import('./features/apply/my-applications.component').then(
+            (m) => m.MyApplicationsComponent,
+          ),
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/apply/my-applications-none.component').then(
+                (m) => m.MyApplicationsNoneComponent,
+              ),
+          },
+          {
+            path: ':id',
+            data: { title: 'status.heading', parent: ['my-applications'] },
+            loadComponent: () =>
+              import('./features/apply/status-timeline.component').then(
+                (m) => m.StatusTimelineComponent,
+              ),
+          },
+        ],
+      },
+      {
         path: 'antrag/:id',
         data: { title: 'status.heading', footer: true },
         loadComponent: () =>

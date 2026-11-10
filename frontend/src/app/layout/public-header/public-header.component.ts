@@ -4,7 +4,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ThemeService, ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ThemeService, ButtonComponent, ButtonLinkComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { HelpMenuComponent } from '../../features/help/help-menu/help-menu.component';
 import { LanguageSelectComponent } from '../language-select/language-select.component';
 
@@ -27,6 +27,7 @@ import { LanguageSelectComponent } from '../language-select/language-select.comp
     RouterLink,
     TranslatePipe,
     ButtonComponent,
+    ButtonLinkComponent,
     IconComponent,
     HelpMenuComponent,
     LanguageSelectComponent,
@@ -65,7 +66,4 @@ export class PublicHeaderComponent {
   /** The mark alone, for a phone, where the wordmark does not fit beside the controls. */
   readonly markSrc = this.branding.markSrc;
 
-  login(): void {
-    this.auth.login();
-  }
 }

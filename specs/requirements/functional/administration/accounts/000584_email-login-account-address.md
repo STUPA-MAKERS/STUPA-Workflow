@@ -2,10 +2,12 @@
 id: "000584"
 title: An account address gets the applicant view only
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+implementation:
+  - backend/app/modules/auth/email_login.py
+  - backend/app/deps.py
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py
@@ -21,5 +23,5 @@ every address (`NF/security/access/000278`).
 Reason: A person with an account can still look at the own Anträge by mail. The account login
 stays the SSO, so the mail login must not skip the SSO, its groups or a deactivation.
 
-Test: `backend/tests/unit/test_email_login.py`: a link for the address of an active, a
-deactivated and a merged account opens an applicant session that gets 401 on an account route.
+Test: `backend/tests/integration/modules/auth/test_email_login.py`: a link for the address of an
+account opens an applicant session of the address without a principal.

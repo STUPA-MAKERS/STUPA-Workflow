@@ -2,10 +2,12 @@
 id: "000587"
 title: A confirmed guest Antrag of an account address belongs to the account
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+implementation:
+  - backend/app/modules/auth/email_login.py
+  - backend/app/modules/auth/service.py
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py
@@ -22,5 +24,5 @@ the account. The audit entry must have `matchedByEmail`.
 Reason: Anybody can type an address into the public form. Only the confirmation proves that the
 mailbox owner filed the Antrag, so only then may it show up in the account.
 
-Test: `backend/tests/unit/test_email_login.py`: a guest Antrag of an account address belongs to
+Test: `backend/tests/integration/modules/auth/test_email_login.py`: a guest Antrag of an account address belongs to
 nobody before the redeem and to the account after it.

@@ -22,9 +22,9 @@
     <app-icon [name]="theme.resolved() === 'dark' ? 'sun' : 'moon'" [size]="19" />
   </button>
 
-  @if (!auth.isAuthenticated()) {
-    <app-button class="pub__login" variant="outlined" (click)="login()">{{
-      'action.login' | t
-    }}</app-button>
+  @if (auth.applicantSession()) {
+    <app-button class="pub__login" variant="outlined" (click)="auth.logout()">{{ 'action.logout' | t }}</app-button>
+  } @else if (!auth.isAuthenticated()) {
+    <a class="pub__login" appButton="outlined" routerLink="/login">{{ 'action.login' | t }}</a>
   }
 </header>

@@ -211,6 +211,9 @@ async def verify_magic_link(
         expires_at=expires_at,
     )
     if confirmed is not None:
+        from app.modules.auth.email_login import assign_to_accounts
+
+        await assign_to_accounts(db, [row.application_id])
         await FlowService(db, dispatcher).start_confirmed(row.application_id)
     return app_id, session_token
 

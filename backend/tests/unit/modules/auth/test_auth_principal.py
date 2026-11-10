@@ -42,3 +42,15 @@ def test_principal_defaults_empty() -> None:
 def test_applicant_binds_one_application() -> None:
     a = Applicant(application_id="app-1")
     assert a.application_id == "app-1"
+
+
+def test_applicant_covers_its_application_or_its_address_list() -> None:
+    """A link session covers its one application, an e-mail session its list."""
+    link = Applicant(application_id="a1")
+    assert link.covers("a1")
+    assert not link.covers("a2")
+    assert link.identity == "a1"
+    mail = Applicant(email="lena@example.org", application_ids=frozenset({"a2", "a3"}))
+    assert mail.covers("a3")
+    assert not mail.covers("a1")
+    assert mail.identity == "email:lena@example.org"

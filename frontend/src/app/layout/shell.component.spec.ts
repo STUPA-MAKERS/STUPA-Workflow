@@ -134,7 +134,7 @@ describe('ShellComponent', () => {
     /** With nobody signed in there is no search palette either. */
     it('frames a signed-out visitor with the public bar and the footer, and only the home link as navigation', async () => {
       const { container } = await setup(null);
-      expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Anmelden' })).toHaveAttribute('href', '/login');
       expect(container.querySelector('app-nav-rail, app-bottom-bar')).toBeNull();
       expect(within(mainNav() as HTMLElement).getAllByRole('link')).toHaveLength(1);
       expect(container.querySelector('app-site-footer')).not.toBeNull();

@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     PrimaryKeyConstraint,
     Text,
     func,
@@ -201,7 +202,9 @@ class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
     """Server session of a magic-link applicant.
 
     This table is the counterpart to `AuthSession`. The browser holds only a signed,
-    opaque `sid`. The `application_id` stays on the server. Nobody can forge
+    opaque `sid`. The binding stays on the server: either one `application_id` (the
+    link of one Antrag) or one `email` (the e-mail login, which reads every Antrag of
+    the address at each request). A CHECK keeps exactly one of the two. Nobody can forge
     an applicant token from `SESSION_SECRET` alone, because the token also needs an
     existing row. The server can revoke the token: a logout deletes the row, and the kill
     switch sets `revoked_at`, for example on anonymization. The `application_id` foreign
@@ -211,9 +214,10 @@ class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
     __tablename__ = "applicant_session"
 
     sid: Mapped[str] = mapped_column(Text, unique=True)
-    application_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("application.id", ondelete="CASCADE")
+    application_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
+    email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -221,7 +225,30 @@ class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         Index("ix_applicant_session_application_id", "application_id"),
+        CheckConstraint("(application_id IS NULL) <> (email IS NULL)", name="one_binding"),
     )
+
+
+class EmailLoginLink(UUIDPkMixin, CreatedAtMixin, Base):
+    """Login link of the e-mail login for an address without an account.
+
+    The database holds only the HMAC of the token, as for `MagicLink`. The link
+    works once (`used_at`) and ends at `expires_at`, 30 minutes after the request,
+    because it opens every Antrag of the address. A request does not end an older
+    link: anybody who knows the address can request one. The retention cron deletes
+    the expired rows, so the address does not stay here.
+    """
+
+    __tablename__ = "email_login_link"
+
+    email: Mapped[str] = mapped_column(CITEXT)
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (Index("ix_email_login_link_expires_at", "expires_at"),)
 
 
 class GroupMapping(UUIDPkMixin, Base):

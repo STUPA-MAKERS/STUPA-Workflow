@@ -2,10 +2,11 @@
 id: "000589"
 title: Anmelden offers the account login and the e-mail link
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+implementation:
+  - frontend/src/app/pages/login/login.component.ts
 scope:
   - frontend/src/app/layout/public-header
   - frontend/src/app/pages
