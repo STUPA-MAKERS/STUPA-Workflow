@@ -3,6 +3,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angul
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { AdminPrincipal, GroupMapping, Role, RoleAssignment } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
@@ -102,7 +103,7 @@ async function setup(
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
       { provide: AuthService, useValue: auth },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       {
         provide: ActivatedRoute,
         useValue: {
@@ -284,10 +285,14 @@ describe('UsersComponent', () => {
     });
   });
 
-  it('search error path shows an error toast', async () => {
+  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry. */
+  it('search error path shows a toast with a retry', async () => {
     const api = makeApi({ listPrincipals: jest.fn(() => throwError(() => new Error('x'))) });
-    const { toast } = await setup(api);
-    expect(toast.error).toHaveBeenCalled();
+    await setup(api);
+    expect(loadErrorToast()).toBe('Benutzer konnten nicht geladen werden.');
+    const calls = api.listPrincipals.mock.calls.length;
+    retryLoadError();
+    expect(api.listPrincipals.mock.calls.length).toBe(calls + 1);
   });
 
   it('setActive activates and deactivates with the matching toast', async () => {

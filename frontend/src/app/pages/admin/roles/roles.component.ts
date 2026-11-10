@@ -34,6 +34,7 @@ import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { expandSet } from '@shared/expand-set';
 import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /** Draft for a new global role. */
 interface RoleDraft {
@@ -65,6 +66,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
+    LoadStateComponent,
     SectionComponent,
     ContentLangSwitchComponent,
     ExpandRowComponent,
@@ -122,16 +124,30 @@ export class AdminRolesComponent {
   /** True until the first answer, so the table does not claim there are no roles. */
   protected readonly loading = signal(true);
 
+  /** The read of the roles failed (§ 000576). */
+  protected readonly loadError = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.loadError);
+
   constructor() {
+    this.load();
+    this.api.listPermissions().subscribe((p) => this.permissions.set(p));
+  }
+
+  /** Read the roles; also the retry of the load error. */
+  protected load(): void {
+    this.loading.set(true);
+    this.loadError.set(false);
     this.api.listRoles().subscribe({
       next: (r) => {
         this.roles.set(r);
         this.keepSaved(r);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
+      error: () => {
+        this.loadError.set(true);
+        this.loading.set(false);
+      },
     });
-    this.api.listPermissions().subscribe((p) => this.permissions.set(p));
   }
 
   protected roleLabel(role: Role): string {

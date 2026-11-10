@@ -13,6 +13,11 @@
   }
   @case ('error') {
     <app-load-error [message]="errorText()" (retry)="retry.emit()" />
+    @if (keepContent()) {
+      @if (content(); as tpl) {
+        <ng-container [ngTemplateOutlet]="tpl" />
+      }
+    }
   }
   @default {
     @if (content(); as tpl) {

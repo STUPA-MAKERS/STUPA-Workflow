@@ -6,6 +6,7 @@ import type { WebhookConfig, WebhookDeliveryStatus } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { WebhooksComponent } from './webhooks.component';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 
 const SENT: WebhookDeliveryStatus = {
   webhookId: 'wh-1',
@@ -58,7 +59,7 @@ async function setup(seed: WebhookConfig[] = [], opts: Opts = {}) {
   const view = await render(WebhooksComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       { provide: AuthService, useValue: auth },
     ],
   });
@@ -376,10 +377,14 @@ describe('WebhooksComponent', () => {
     expect(screen.getAllByRole('button', { name: /^Zustellstatus/ })).toHaveLength(2);
   });
 
-  /** Otherwise the table keeps its skeleton rows and never says that something went wrong. */
-  it('stops loading when the list fails, rather than spinning forever', async () => {
-    const { fixture } = await setup([], { listError: true });
+  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry. */
+  it('names a failed read in a toast with a retry, and shows the empty state under it', async () => {
+    const { fixture, api } = await setup([], { listError: true });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((fixture.componentInstance as any).loading()).toBe(false);
+    expect(loadErrorToast()).toBe('Webhooks konnten nicht geladen werden.');
+    expect(screen.getByText('Keine Webhooks konfiguriert.')).toBeInTheDocument();
+    retryLoadError();
+    expect(api.listWebhooks).toHaveBeenCalledTimes(2);
   });
 });

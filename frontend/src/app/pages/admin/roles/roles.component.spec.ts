@@ -1,6 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { Role } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
@@ -33,7 +34,7 @@ async function setup(api = makeApi(), toast = makeToast()) {
   const view = await render(AdminRolesComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -370,5 +371,15 @@ describe('AdminRolesComponent', () => {
     inst.askDelete(ROLES[1]);
     inst.confirmDelete();
     expect(toast.error).toHaveBeenCalled();
+  });
+
+  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry. */
+  it('names a failed read in a toast with a retry', async () => {
+    const api = makeApi();
+    api.listRoles.mockReturnValueOnce(throwError(() => new Error('boom')));
+    await setup(api);
+    expect(loadErrorToast()).toBe('Rollen konnten nicht geladen werden.');
+    retryLoadError();
+    expect(api.listRoles).toHaveBeenCalledTimes(2);
   });
 });

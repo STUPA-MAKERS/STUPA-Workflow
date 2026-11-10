@@ -4,76 +4,79 @@
     <div actions><app-content-lang-switch [(value)]="contentLang.lang" [ariaLabel]="'admin.common.contentLang' | t" /></div>
   </app-page-header>
 
-  @if (loading()) {
-    <app-skeleton variant="rows" [count]="5" [label]="'admin.roles.loading' | t" />
-  } @else {
-    @if (roles().length) {
-      <ul class="rowgroup ar__list">
-        @for (r of roles(); track r.id) {
-          <li>
-            <app-expand-row
-              [title]="roleLabel(r) | capitalize"
-              [sub]="r.key + ' · ' + count(r) + ' / ' + permissions().length"
-              [open]="isOpen(r)"
-              (openChange)="toggle(r.id)"
-            >
-              @if (isFixed(r)) {
-                <app-status-text status kind="muted" [title]="'admin.roles.fixedHint' | t">{{ 'admin.roles.fixed' | t }}</app-status-text>
-              }
-              @if (!isFixed(r)) {
-                <app-row-menu
-                  trail
-                  [sections]="rowMenu()"
-                  [label]="('ui.rowMenu.trigger' | t) + ': ' + (roleLabel(r) | capitalize)"
-                  (selected)="askDelete(r)"
-                />
-              }
-            @if (isOpen(r)) {
-              <div class="ar__body">
-                <div class="ar__names">
-                  <app-input
-                    class="ar__keyField"
-                    [label]="'admin.roles.roleKey' | t"
-                    [ngModel]="r.key"
-                    [disabled]="true"
-                    [name]="r.id + '-key'"
+  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.roles.error' | t" (retry)="load()">
+    <ng-template #loading>
+      <app-skeleton variant="rows" [count]="5" [label]="'admin.roles.loading' | t" />
+    </ng-template>
+    <ng-template #content>
+      @if (roles().length) {
+        <ul class="rowgroup ar__list">
+          @for (r of roles(); track r.id) {
+            <li>
+              <app-expand-row
+                [title]="roleLabel(r) | capitalize"
+                [sub]="r.key + ' · ' + count(r) + ' / ' + permissions().length"
+                [open]="isOpen(r)"
+                (openChange)="toggle(r.id)"
+              >
+                @if (isFixed(r)) {
+                  <app-status-text status kind="muted" [title]="'admin.roles.fixedHint' | t">{{ 'admin.roles.fixed' | t }}</app-status-text>
+                }
+                @if (!isFixed(r)) {
+                  <app-row-menu
+                    trail
+                    [sections]="rowMenu()"
+                    [label]="('ui.rowMenu.trigger' | t) + ': ' + (roleLabel(r) | capitalize)"
+                    (selected)="askDelete(r)"
                   />
-                  <app-i18n-input [value]="nameDraft(r)" (valueChange)="patchName(r, $event)" />
+                }
+              @if (isOpen(r)) {
+                <div class="ar__body">
+                  <div class="ar__names">
+                    <app-input
+                      class="ar__keyField"
+                      [label]="'admin.roles.roleKey' | t"
+                      [ngModel]="r.key"
+                      [disabled]="true"
+                      [name]="r.id + '-key'"
+                    />
+                    <app-i18n-input [value]="nameDraft(r)" (valueChange)="patchName(r, $event)" />
+                  </div>
+
+                  @if (isLocked(r)) {
+                    <app-note icon="lock">{{ 'admin.roles.adminLocked' | t }}</app-note>
+                  }
+
+                  @for (sec of sections(); track sec.key) {
+                    <app-section [heading]="sec.title | t">
+                      <div class="ar__grid">
+                        @for (perm of sec.keys; track perm) {
+                          <app-checkbox
+                            [ngModel]="isLocked(r) || r.permissions.includes(perm)"
+                            [disabled]="isLocked(r)"
+                            (ngModelChange)="togglePerm(r, perm, $event)"
+                            [name]="r.id + '-' + perm"
+                            ><span class="ar__perm mono" [title]="perm"
+                              >
+                              <span aria-hidden="true">@for (part of permParts(perm); track $index) {{{ part }}<wbr />}</span
+                              ><span class="sr-only">{{ perm }}</span></span
+                            ></app-checkbox
+                          >
+                        }
+                      </div>
+                    </app-section>
+                  }
                 </div>
-
-                @if (isLocked(r)) {
-                  <app-note icon="lock">{{ 'admin.roles.adminLocked' | t }}</app-note>
-                }
-
-                @for (sec of sections(); track sec.key) {
-                  <app-section [heading]="sec.title | t">
-                    <div class="ar__grid">
-                      @for (perm of sec.keys; track perm) {
-                        <app-checkbox
-                          [ngModel]="isLocked(r) || r.permissions.includes(perm)"
-                          [disabled]="isLocked(r)"
-                          (ngModelChange)="togglePerm(r, perm, $event)"
-                          [name]="r.id + '-' + perm"
-                          ><span class="ar__perm mono" [title]="perm"
-                            >
-                            <span aria-hidden="true">@for (part of permParts(perm); track $index) {{{ part }}<wbr />}</span
-                            ><span class="sr-only">{{ perm }}</span></span
-                          ></app-checkbox
-                        >
-                      }
-                    </div>
-                  </app-section>
-                }
-              </div>
-            }
-            </app-expand-row>
-          </li>
-        }
-      </ul>
-    } @else {
-      <app-empty-state [heading]="'admin.roles.empty' | t" />
-    }
-  }
+              }
+              </app-expand-row>
+            </li>
+          }
+        </ul>
+      } @else {
+        <app-empty-state [heading]="'admin.roles.empty' | t" />
+      }
+    </ng-template>
+  </app-load-state>
 
   @if (rolesDirty()) {
     <app-fab

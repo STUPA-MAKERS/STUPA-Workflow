@@ -39,6 +39,7 @@ import {
   type WebhookDeliveryState,
   type WebhookDeliveryStatus,
 } from '../admin.models';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 function emptyHook(): WebhookConfig {
   return { id: '', name: '', url: '', active: true };
@@ -102,6 +103,7 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     SectionComponent,
     ExpandRowComponent,
     FabComponent,
@@ -135,6 +137,9 @@ export class WebhooksComponent {
    * request is still out, which asserts there is nothing when nothing has arrived yet.
    */
   protected readonly loading = signal(true);
+  /** The read of the webhooks failed (§ 000576). */
+  protected readonly loadError = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.loadError);
 
   protected readonly hooks = signal<readonly WebhookConfig[]>([]);
   protected readonly draft = signal<WebhookConfig | null>(null);
@@ -171,17 +176,27 @@ export class WebhooksComponent {
    * permission and a user without it never triggers a 403.
    */
   constructor() {
+    this.load();
+    effect(() => {
+      if (!this.canManage() || this.statusRequested) return;
+      this.statusRequested = true;
+      this.loadDeliveryStatus();
+    });
+  }
+
+  /** Read the webhooks; also the retry of the load error. */
+  protected load(): void {
+    this.loading.set(true);
+    this.loadError.set(false);
     this.api.listWebhooks().subscribe({
       next: (h) => {
         this.hooks.set(h);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
-    });
-    effect(() => {
-      if (!this.canManage() || this.statusRequested) return;
-      this.statusRequested = true;
-      this.loadDeliveryStatus();
+      error: () => {
+        this.loadError.set(true);
+        this.loading.set(false);
+      },
     });
   }
 

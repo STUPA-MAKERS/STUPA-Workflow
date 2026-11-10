@@ -1,6 +1,8 @@
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 import { render, screen } from '@testing-library/angular';
 import { runAxe } from '../../../../testing/a11y';
-import { LoadStateComponent } from './load-state.component';
+import { LoadStateComponent, loadStateOf } from './load-state.component';
 import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 const TEMPLATE = `
@@ -69,5 +71,28 @@ describe('LoadStateComponent', () => {
       imports: [LoadStateComponent],
     });
     expect(container.querySelector('app-load-state')?.textContent?.trim()).toBe('');
+  });
+
+  /** § 000576: a list keeps its content, or its empty state, under the error toast. */
+  it('keeps the content in the error state when the page asks for it', async () => {
+    await render(
+      `<app-load-state state="error" errorText="Laden fehlgeschlagen." [keepContent]="true">
+         <ng-template #content><p>Inhalt</p></ng-template>
+       </app-load-state>`,
+      { imports: [LoadStateComponent] },
+    );
+    expect(loadErrorToast()).toBe('Laden fehlgeschlagen.');
+    expect(screen.getByText('Inhalt')).toBeInTheDocument();
+  });
+
+  it('derives the state of a list from its loading and its error signal', () => {
+    const loading = signal(true);
+    const failed = signal(false);
+    const state = TestBed.runInInjectionContext(() => loadStateOf(loading, failed));
+    expect(state()).toBe('loading');
+    loading.set(false);
+    expect(state()).toBe('ok');
+    failed.set(true);
+    expect(state()).toBe('error');
   });
 });
