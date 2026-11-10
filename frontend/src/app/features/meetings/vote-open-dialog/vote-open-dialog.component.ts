@@ -151,9 +151,6 @@ export class VoteOpenDialogComponent {
   readonly item = input<AgendaItem | null>(null);
   /** The 1-based number of the item on the agenda. */
   readonly topNumber = input(0);
-  /** The members on the roster and the present ones, for the line of the voters. */
-  readonly rosterCount = input(0);
-  readonly presentMembers = input(0);
   /** The roster of the meeting: the persons the lead can pick as candidates. */
   readonly members = input<readonly Attendance[]>([]);
   /** The vote to change or to repeat, or `null` for a new vote. */
@@ -280,23 +277,6 @@ export class VoteOpenDialogComponent {
   );
   /** A non-public item never lets guests vote. */
   readonly guestsLocked = computed(() => !!this.item()?.nonPublic);
-  /** "Stimmberechtigt jetzt: 26 (19 Mitglieder + 7 Gäste anwesend)", or the members line. */
-  readonly votersLine = computed(() => {
-    const members = this.presentMembers();
-    if (this.guestsVote()) {
-      const guests = this.meeting().admittedGuests;
-      return this.i18n.translate('guests.vote.votersWith', {
-        n: members + guests,
-        members,
-        guests,
-      });
-    }
-    return this.i18n.translate('guests.vote.votersMembers', {
-      n: this.rosterCount(),
-      present: members,
-    });
-  });
-
   /** "TOP 3 · Zuschuss Erstsemester-Party WS 26/27". */
   readonly subtitle = computed(() => {
     const it = this.item();

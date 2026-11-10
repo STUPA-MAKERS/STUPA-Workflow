@@ -3028,8 +3028,6 @@
   "guests.toast.admittedAll": "{n} guests admitted.",
   "guests.toast.guestVoteOpen": "A vote with guests is open. Close it before guests only watch.",
   "guests.vote.switch": "Guests vote too",
-  "guests.vote.votersWith": "Eligible now: {n} ({members} members + {guests} guests present)",
-  "guests.vote.votersMembers": "Eligible: {n} members ({present} present)",
   "guests.vote.composition": "{members} members + {guests} guests present",
   "guests.vote.resultCaption": "Result without quorum",
   "guests.vote.cast": "Cast",

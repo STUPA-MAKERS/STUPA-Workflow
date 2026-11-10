@@ -320,7 +320,10 @@ describe('AgendaPaneComponent', () => {
 
   /** A row in rename is no drag source. */
   it('renames inline: enter saves, escape cancels, blur saves', async () => {
-    const { on, fixture } = await setup({ renamingTopId: 't-1', renameDraft: 'Begrüßung neu' });
+    const { on, fixture } = await setup({ renameDraft: 'Begrüßung neu' });
+    await userEvent.click(within(await openMenu(0)).getByRole('menuitem', { name: 'TOP umbenennen' }));
+    fixture.componentRef.setInput('renamingTopId', 't-1');
+    fixture.detectChanges();
     const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
     expect(input).toHaveValue('Begrüßung neu');
     expect(input).toHaveFocus();
@@ -345,6 +348,12 @@ describe('AgendaPaneComponent', () => {
     expect(on.move).toHaveBeenCalledWith({ from: 2, to: 0 });
     drop(fixture, 1, 1);
     expect(on.move).toHaveBeenCalledTimes(1);
+  });
+
+  /** A rename from the heading of the TOP opens the field there, not in the agenda as well. */
+  it('shows no rename field for a rename that started elsewhere', async () => {
+    await setup({ renamingTopId: 't-1', renameDraft: 'Begrüßung neu' });
+    expect(screen.queryByRole('textbox', { name: 'TOP umbenennen' })).not.toBeInTheDocument();
   });
 
   it('lifts no row and drops nothing while the agenda saves', async () => {

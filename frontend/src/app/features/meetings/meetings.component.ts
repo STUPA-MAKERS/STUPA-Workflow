@@ -163,11 +163,6 @@ export class MeetingsComponent {
   readonly selectedTop = this.agendaSvc.selectedTop;
   readonly selectedIndex = this.agendaSvc.selectedIndex;
 
-  /** The present members, for the voters line of the vote dialog. */
-  readonly presentMembers = computed(
-    () => this.attendance().filter((a) => a.status === 'present').length,
-  );
-
   /** The 1-based agenda number of the item that gets the vote. */
   readonly voteTopNumber = computed(() => {
     const it = this.dialogs.voteItem();

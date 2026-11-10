@@ -1,6 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'frosted' as *;
 @use 'field' as f;
+@use 'display' as d;
 
 :host {
   display: flex;
@@ -182,13 +183,30 @@
   overflow-y: auto;
   padding: var(--space-5) 28px;
 }
+/* Highlighted fields (000598): the whole editor area is the field, black on yellow, and the
+   editor inside it draws no surface of its own. The placeholder skeleton is not a field. */
+.ts__editor:not(.ts__editor--wait) {
+  @include f.highlight-surface;
+}
+@include d.host-on(fields) {
+  .ts__editor ::ng-deep .mde__host {
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+  }
+  .ts__raw,
+  .ts__raw:focus-within {
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+  }
+}
 .ts__editor ::ng-deep .mde__host {
   min-height: 100%;
   padding: 0;
   border: 0;
   background: transparent;
   font-size: 0.96875rem;
-  @include f.highlight-surface;
 }
 .ts__editor ::ng-deep .mde__host .ProseMirror {
   min-height: 16rem;
@@ -355,7 +373,6 @@
   line-height: 1.7;
   resize: none;
   outline: none;
-  @include f.highlight-surface;
 }
 .ts__raw::placeholder {
   color: var(--field-text, var(--color-text-muted));

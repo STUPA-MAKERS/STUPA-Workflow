@@ -128,6 +128,20 @@ export class AgendaPaneComponent {
    */
   private readonly focusRename = effect(() => this.renameInput()?.nativeElement.focus());
   /**
+   * The item whose rename started from the row menu of this pane. The heading of the TOP
+   * shows its own field for a rename from the title; with both fields open, the second took
+   * the focus, the blur of the first saved the unchanged title and closed both.
+   */
+  private readonly renamingHere = signal<Uuid | null>(null);
+  /** The row shows the rename field. */
+  protected renaming(item: AgendaItem): boolean {
+    return this.renamingTopId() === item.id && this.renamingHere() === item.id;
+  }
+  /** A rename that ended or moved to another item clears the start of this pane. */
+  private readonly clearRename = effect(() => {
+    if (this.renamingTopId() === null) this.renamingHere.set(null);
+  });
+  /**
    * Inside the agenda sheet, whose header names the agenda and holds the add: the heading
    * is for screen readers only, and the pane shows no add of its own.
    */
@@ -187,7 +201,7 @@ export class AgendaPaneComponent {
   });
   /** A row lifts while the agenda may change, is not saving and the row is not in rename. */
   protected canDrag(item: AgendaItem): boolean {
-    return this.canChangeAgenda() && !this.savingAgenda() && this.renamingTopId() !== item.id;
+    return this.canChangeAgenda() && !this.savingAgenda() && !this.renaming(item);
   }
 
   /** A row dropped at another place of the agenda. */
@@ -319,6 +333,7 @@ export class AgendaPaneComponent {
         this.setDone.emit({ item, done: !item.doneAt });
         break;
       case 'rename':
+        this.renamingHere.set(item.id);
         this.startRename.emit(item);
         break;
       case 'up':

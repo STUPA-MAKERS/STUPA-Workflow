@@ -45,7 +45,7 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['pages/todos/board-picker/todo-board-picker.component.scss', '.bp__chip'],
   ['layout/public-header/public-header.component.scss', '.pub__icon'],
   ['features/help/help-menu/help-menu.component.scss', '.hm__head'],
-  ['features/meetings/top-sheet/top-sheet.component.scss', '.ts__raw'],
+  ['features/meetings/top-sheet/top-sheet.component.scss', '.ts__editor:not(.ts__editor--wait)'],
 ];
 
 describe('highlightedFields (§000598)', () => {
@@ -117,5 +117,13 @@ describe('highlightedFields (§000598)', () => {
   it.each(FIELDS)('%s %s reads the yellow field tokens', (file, selector) => {
     const body = rule(readFileSync(join(APP, file), 'utf8'), selector);
     expect(body).toMatch(/background: var\(--field-bg, /);
+  });
+
+  it('the TOP badge in a chosen row is a black ring, the current one black with a yellow number', () => {
+    const css = readFileSync(join(APP, 'features/meetings/top-badge/top-badge.component.scss'), 'utf8');
+    expect(css).toMatch(
+      /:host-context\(:root\[data-fields='highlight'\] \.li--on\) \{[^}]*border: 2px solid var\(--field-text\);/,
+    );
+    expect(css).toMatch(/\.tb--now \{\s*background: var\(--field-text\);\s*color: var\(--field-bg\);/);
   });
 });

@@ -3028,8 +3028,6 @@
   "guests.toast.admittedAll": "{n} Gäste zugelassen.",
   "guests.toast.guestVoteOpen": "Eine Abstimmung mit Gästen ist offen. Schließe sie, bevor Gäste nur noch zuschauen.",
   "guests.vote.switch": "Gäste stimmen mit ab",
-  "guests.vote.votersWith": "Stimmberechtigt jetzt: {n} ({members} Mitglieder + {guests} Gäste anwesend)",
-  "guests.vote.votersMembers": "Stimmberechtigt: {n} Mitglieder ({present} anwesend)",
   "guests.vote.composition": "{members} Mitglieder + {guests} Gäste anwesend",
   "guests.vote.resultCaption": "Ergebnis ohne Quorum",
   "guests.vote.cast": "Abgegeben",

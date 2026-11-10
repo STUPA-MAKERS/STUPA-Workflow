@@ -177,7 +177,7 @@ describe('VoteOpenDialogComponent', () => {
     async function open(meeting: Meeting, item: AgendaItem = APP_TOP) {
       const opened = jest.fn();
       const view = await render(VoteOpenDialogComponent, {
-        inputs: { meeting, item, topNumber: 3, rosterCount: 23, presentMembers: 19 },
+        inputs: { meeting, item, topNumber: 3 },
         on: { opened },
         providers: [provideHttpClient(), provideHttpClientTesting()],
       });
@@ -189,13 +189,11 @@ describe('VoteOpenDialogComponent', () => {
       return { http, submit };
     }
 
-    it('lets guests vote by default, with the voters of the room, and sends the choice', async () => {
+    it('lets guests vote by default and sends the choice', async () => {
       const { http, submit } = await open(PUBLIC);
       const sw = screen.getByRole('switch', { name: 'Gäste stimmen mit ab' });
       expect(sw).toHaveAttribute('aria-checked', 'true');
-      expect(screen.getByRole('status')).toHaveTextContent('Stimmberechtigt jetzt: 26 (19 Mitglieder + 7 Gäste anwesend)');
       await userEvent.click(sw);
-      expect(screen.getByRole('status')).toHaveTextContent('Stimmberechtigt: 23 Mitglieder (19 anwesend)');
       await submit();
       expect(http.expectOne('/api/meetings/m-1/votes').request.body).toEqual(
         expect.objectContaining({ guestsVote: false }),
