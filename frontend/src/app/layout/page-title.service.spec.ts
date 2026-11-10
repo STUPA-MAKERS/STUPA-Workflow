@@ -1,10 +1,13 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Title } from '@angular/platform-browser';
-import { Router, TitleStrategy, provideRouter } from '@angular/router';
+import { type Route, Router, TitleStrategy, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { BrandingService } from '@core/branding/branding.service';
+import de from '@core/i18n/catalog/de.json';
+import en from '@core/i18n/catalog/en.json';
 import { I18nService } from '@core/i18n/i18n.service';
+import { routes } from '../app.routes';
 import { PageFrameService } from './page-frame.service';
 import { PageTitleService, pageItemTitle } from './page-title.service';
 
@@ -113,5 +116,24 @@ describe('PageTitleService', () => {
     titles.setItem({}, 'Fremd');
     titles.setItem(mine, null);
     expect(titles.page()).toBe('Fremd');
+  });
+});
+
+/** Every `data.title` key of a route tree. */
+function titleKeys(tree: readonly Route[]): string[] {
+  return tree.flatMap((r) => {
+    const own = typeof r.data?.['title'] === 'string' ? [r.data['title'] as string] : [];
+    return [...own, ...titleKeys(r.children ?? [])];
+  });
+}
+
+/** The router fills no placeholder: a route title with `{name}` shows the braces in the tab. */
+describe('route titles', () => {
+  it('are texts without a placeholder in every catalog', () => {
+    const catalogs: readonly Record<string, string>[] = [de, en];
+    const keys = [...new Set(titleKeys(routes))];
+    expect(keys.length).toBeGreaterThan(20);
+    const bad = keys.filter((k) => catalogs.some((c) => !(k in c) || /\{\w+\}/.test(c[k])));
+    expect(bad).toEqual([]);
   });
 });

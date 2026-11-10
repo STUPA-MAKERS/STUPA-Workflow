@@ -178,7 +178,7 @@ export const routes: Routes = [
           },
           {
             path: 'todo/:cardId',
-            data: { title: 'todos.card.kicker', parent: ['tasks'] },
+            data: { title: 'todos.card.pageTitle', parent: ['tasks'] },
             loadComponent: () =>
               import('./pages/tasks/task-todo.component').then((m) => m.TaskTodoComponent),
           },

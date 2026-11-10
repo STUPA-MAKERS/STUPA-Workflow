@@ -3651,7 +3651,7 @@
   "todos.linked.empty": "No linked to-dos",
   "todos.linked.title": "Linked",
   "todos.linked.due": "due {date}",
-  "todos.card.kicker": "{board} · To-do",
+  "todos.card.pageTitle": "To-do",
   "todos.card.createdBy": "Created by {name}",
   "todos.card.archivedOn": "Archived on {date}",
   "todos.card.loading": "Loading the card…",
