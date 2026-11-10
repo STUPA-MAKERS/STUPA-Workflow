@@ -7,12 +7,11 @@ owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:chosenIsYellowFill"
+  - "frontend/src/app/shared/very-high-contrast.styles.spec.ts:permissionChips"
 implementation:
   - frontend/vendor/ui-kit/src/styles/display-settings.scss
-  - frontend/vendor/ui-kit/src/lib/segmented/segmented.component.scss
-  - frontend/vendor/ui-kit/src/lib/tabs/tabs.component.scss
-  - frontend/vendor/ui-kit/src/lib/stepper/stepper.component.scss
-  - frontend/vendor/ui-kit/src/lib/button/button.component.scss
+  - frontend/vendor/ui-kit/src/styles/_very-high.scss
+  - frontend/src/app/shared/ui/_very-high-contrast.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

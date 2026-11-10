@@ -7,12 +7,10 @@ owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:menusBlackYellowRows"
+  - "frontend/src/app/shared/very-high-contrast.styles.spec.ts:menuRows"
 implementation:
-  - frontend/vendor/ui-kit/src/lib/row-menu/row-menu.component.scss
-  - frontend/vendor/ui-kit/src/lib/filter-select/filter-select.component.scss
-  - frontend/vendor/ui-kit/src/lib/select/select.component.scss
-  - frontend/vendor/ui-kit/shell/src/account-menu
-  - frontend/src/app/features/help/help-menu/help-menu.component.scss
+  - frontend/vendor/ui-kit/src/styles/display-settings.scss
+  - frontend/src/app/shared/ui/_very-high-contrast.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

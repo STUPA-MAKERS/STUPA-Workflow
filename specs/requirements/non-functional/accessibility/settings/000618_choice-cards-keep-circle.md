@@ -6,10 +6,10 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
-  - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:choiceCards"
+  - "frontend/src/app/shared/very-high-contrast.styles.spec.ts:choiceCards"
 implementation:
-  - frontend/src/app/features/voting/ballot/ballot.component.scss
-  - frontend/src/app/features/apply
+  - frontend/src/app/shared/ui/_very-high-contrast.scss
+  - frontend/vendor/ui-kit/src/styles/_very-high.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit
@@ -25,5 +25,5 @@ a person that the voter stands in for, and a card of the Antrag type in the wiza
 Reason: The circle shows that exactly one option applies, also before a person chose one. A vote
 must leave no doubt about that.
 
-Test: `frontend/vendor/ui-kit/src/styles/display-settings.spec.ts` expects the yellow edge and the
+Test: `frontend/src/app/shared/very-high-contrast.styles.spec.ts` expects the yellow edge and the
 circle on a choice card and the yellow fill on the chosen card.

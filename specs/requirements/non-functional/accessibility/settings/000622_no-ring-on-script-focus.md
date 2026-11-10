@@ -9,6 +9,7 @@ tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:noRingOnScriptFocus"
 implementation:
   - frontend/vendor/ui-kit/src/styles/display-settings.scss
+  - frontend/vendor/ui-kit/src/styles/base.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

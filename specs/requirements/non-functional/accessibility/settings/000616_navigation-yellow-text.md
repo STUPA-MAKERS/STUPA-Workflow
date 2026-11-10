@@ -8,10 +8,7 @@ updated: 2026-11-10
 tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:navigationYellowText"
 implementation:
-  - frontend/vendor/ui-kit/shell/src/nav-rail
-  - frontend/vendor/ui-kit/shell/src/bottom-bar
-  - frontend/vendor/ui-kit/shell/src/account-menu
-  - frontend/src/app/features/help/help-menu/help-menu.component.scss
+  - frontend/vendor/ui-kit/src/styles/display-settings.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

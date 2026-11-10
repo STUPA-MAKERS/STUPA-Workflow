@@ -1,0 +1,82 @@
+// The controls of the app in very high contrast (specs 000614 to 000621). The kit has the
+// rules for its own controls (`display-settings.scss`) and the three forms as mixins
+// (`_very-high.scss`); this file gives the forms to the controls that the app draws itself.
+// It is global, so one file holds the look of the mode for every page.
+@use 'display' as d;
+@use 'very-high' as vh;
+
+@include d.on(veryHigh) {
+  // A menu (000617): the rows of the help menu and of the account menu.
+  .hm__item {
+    @include vh.text;
+  }
+  .af__item:not(.af__item--on) .af__icon {
+    color: var(--vh-hi) !important;
+  }
+
+  // A choice card (000618): a vote option, a vote option for a person that the voter
+  // stands in for, and a card of the Antrag type.
+  .choice,
+  .pchoice,
+  .wz__type {
+    @include vh.edge;
+  }
+  .choice--on,
+  .pchoice--on,
+  .wz__type.is-selected {
+    @include vh.fill;
+  }
+  .choice__mark {
+    box-shadow: inset 0 0 0 2px var(--vh-ink) !important;
+  }
+  .choice--on .choice__mark {
+    background: var(--vh-bg) !important;
+    color: var(--vh-hi) !important;
+  }
+  // An option that the voter can no longer press is no control: white with a dashed edge.
+  .choice:disabled:not(.choice--on),
+  .pchoice:disabled:not(.pchoice--on) {
+    @include vh.ink(var(--vh-fg));
+    color: var(--vh-fg) !important;
+    opacity: 1 !important;
+    outline: 2px dashed var(--vh-fg) !important;
+  }
+
+  .wz__radio {
+    outline: 2px solid var(--vh-ink) !important;
+    outline-offset: -2px !important;
+    box-shadow: none !important;
+  }
+  .is-selected .wz__radio {
+    background: radial-gradient(circle, var(--vh-bg) 0 4px, var(--vh-hi) 4.5px) !important;
+  }
+
+  // A permission of a Gremium role is a check box with a text: the chip follows the box
+  // (000615, 000620).
+  .rm__chip--on {
+    @include vh.fill;
+  }
+  .rm__chip:not(.rm__chip--on, .rm__chip--off) {
+    @include vh.edge;
+  }
+
+  // A row that opens something (000619): a day of the calendar has a yellow number.
+  .cal__num:not(.cal__num--today) {
+    color: var(--vh-hi) !important;
+  }
+
+  // The open page of the admin frame, its chosen tile, the chosen node of the budget tree
+  // and a live meeting in the calendar are yellow fills (000619, 000621).
+  .af__item--on,
+  .ah__tile--on {
+    @include vh.fill;
+  }
+  .tn--on,
+  .cal__entry--live {
+    @include vh.ink(var(--vh-bg), var(--vh-bg));
+  }
+  .tn--on :is(.tn__main, .tn__name, .tn__amt),
+  .cal__entry--live :is(.cal__entryTime, .cal__entryTitle) {
+    color: var(--vh-bg) !important;
+  }
+}

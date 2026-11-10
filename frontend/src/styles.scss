@@ -4,6 +4,7 @@
 @use 'surface';
 @use 'skeleton';
 @use 'display-settings';
+@use './app/shared/ui/very-high-contrast';
 @use 'breakpoints' as bp;
 @use 'press';
 @use 'sass:meta';

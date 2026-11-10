@@ -7,8 +7,13 @@ owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
   - "frontend/e2e/06-axe.spec.ts:textOnYellowIsBlack"
+  - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:textOnYellowIsBlack"
+  - "frontend/src/app/shared/very-high-contrast.styles.spec.ts:rowsAndFills"
 implementation:
   - frontend/vendor/ui-kit/src/styles/display-settings.scss
+  - frontend/vendor/ui-kit/src/styles/_very-high.scss
+  - frontend/src/app/shared/ui/_very-high-contrast.scss
+  - frontend/e2e/very-high-contrast.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

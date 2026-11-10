@@ -3,6 +3,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import { AXE_ROUTES, type Ids } from './axe-routes';
 import { ADMIN_STATE } from './global-setup';
 import { createApplication, readArtifacts, uniqueEmail } from './helpers';
+import { measureYellow } from './very-high-contrast';
 
 /**
  * § NF/accessibility/conformance/000491: every route passes an axe check in both themes.
@@ -103,3 +104,31 @@ for (const theme of THEMES) {
     }
   });
 }
+
+/**
+ * § NF/accessibility/settings/000614 and 000621: with "Sehr hoher Kontrast" every control of
+ * every route shows yellow, and every text on a yellow fill is black. The names
+ * `everyControlShowsYellow` and `textOnYellowIsBlack` are the tests of the two rules.
+ */
+test.describe('veryHighContrast: everyControlShowsYellow, textOnYellowIsBlack', () => {
+  for (const route of AXE_ROUTES) {
+    test(`@a11y ${route.path || '/'} (very high contrast)`, async ({ browser, baseURL }) => {
+      const context = await browser.newContext({
+        baseURL,
+        locale: 'de-DE',
+        storageState: route.public ? undefined : ADMIN_STATE,
+      });
+      await context.addInitScript(() =>
+        localStorage.setItem('ap.theme.display', JSON.stringify({ veryHigh: true })),
+      );
+      const page = await context.newPage();
+      await page.goto(route.url(ids));
+      await settle(page);
+      await expect(page.locator('html')).toHaveAttribute('data-very-high-contrast', 'on');
+      const report = await page.evaluate(measureYellow);
+      expect(report.noYellow, 'everyControlShowsYellow').toEqual([]);
+      expect(report.lowOnYellow, 'textOnYellowIsBlack').toEqual([]);
+      await context.close();
+    });
+  }
+});

@@ -7,10 +7,10 @@ owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:rowTitleYellow"
+  - "frontend/src/app/shared/very-high-contrast.styles.spec.ts:rowsAndFills"
 implementation:
-  - frontend/vendor/ui-kit/src/lib/list-item/list-item.component.scss
-  - frontend/vendor/ui-kit/src/lib/data-table/data-table.component.scss
   - frontend/vendor/ui-kit/src/styles/display-settings.scss
+  - frontend/src/app/shared/ui/_very-high-contrast.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

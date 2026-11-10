@@ -9,9 +9,8 @@ tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:switchOffEdgeOnFill"
 implementation:
   - frontend/vendor/ui-kit/src/styles/display-settings.scss
-  - frontend/vendor/ui-kit/src/styles/_check.scss
   - frontend/vendor/ui-kit/src/lib/switch/switch.component.scss
-  - frontend/vendor/ui-kit/src/lib/filter-select/filter-select.component.scss
+  - frontend/src/app/shared/ui/_very-high-contrast.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit
