@@ -292,6 +292,9 @@
     outline: var(--vh-edge);
     outline-offset: -2px;
   }
+  .hm__rail.is-open {
+    color: var(--vh-hi);
+  }
   .hm__rail.is-open .hm__ind {
     background: var(--vh-hi);
     color: var(--vh-bg);

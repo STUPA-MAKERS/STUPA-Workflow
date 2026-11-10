@@ -375,7 +375,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/settings/000594](requirements/non-functional/accessibility/settings/000594_setting-overrides-system.md) | A display setting overrides the system setting | approved |
 | [NF/accessibility/settings/000595](requirements/non-functional/accessibility/settings/000595_more-contrast.md) | More contrast raises the contrast of text and borders | approved |
 | [NF/accessibility/settings/000596](requirements/non-functional/accessibility/settings/000596_less-transparency.md) | Less transparency makes the glass surfaces opaque | approved |
-| [NF/accessibility/settings/000598](requirements/non-functional/accessibility/settings/000598_highlight-fields.md) | Highlighted fields have black text on yellow | approved |
+| [NF/accessibility/settings/000598](requirements/non-functional/accessibility/settings/000598_highlight-fields.md) | Very high contrast highlights the fields black on yellow | approved |
 | [NF/accessibility/settings/000605](requirements/non-functional/accessibility/settings/000605_very-high-contrast.md) | Very high contrast shows the app in four colours | approved |
 | [NF/accessibility/settings/000606](requirements/non-functional/accessibility/settings/000606_very-high-contrast-includes-settings.md) | Very high contrast includes the other display settings | approved |
 | [NF/accessibility/statement/000495](requirements/non-functional/accessibility/statement/000495_statement-page.md) | A public page holds the accessibility statement | approved |

@@ -221,7 +221,7 @@ describe('HelpMenuComponent', () => {
     }
   });
 
-  /** §000593 the group "Darstellung" with its six switches, with and without a login. */
+  /** §000593 the group "Darstellung" with its five switches, with and without a login. */
   it('shows the display switches in the order of the spec, also for a visitor', async () => {
     await setup({ variant: 'sheet', signedIn: false });
     const group = screen.getByRole('group', { name: 'Darstellung' });
@@ -233,7 +233,6 @@ describe('HelpMenuComponent', () => {
       'Mehr Kontrast',
       'Weniger Bewegung',
       'Weniger Transparenz',
-      'Eingabefelder hervorheben',
       'Sehr hoher Kontrast',
     ]);
   });
@@ -251,13 +250,13 @@ describe('HelpMenuComponent', () => {
       'Mehr Kontrast',
       'Weniger Bewegung',
       'Weniger Transparenz',
-      'Eingabefelder hervorheben',
     ]) {
       const toggle = screen.getByRole('switch', { name });
       expect(toggle).toHaveAttribute('aria-checked', 'true');
       expect(toggle).toBeDisabled();
     }
     expect(screen.getByRole('switch', { name: 'Sehr hoher Kontrast' })).toBeEnabled();
+    expect(document.documentElement.getAttribute('data-fields')).toBe('highlight');
     display.reset();
   });
 
@@ -271,12 +270,12 @@ describe('HelpMenuComponent', () => {
     fixture.detectChanges();
     expect(screen.queryByRole('button', { name: 'Systemeinstellungen verwenden' })).toBeNull();
 
-    const fields = screen.getByRole('switch', { name: 'Eingabefelder hervorheben' });
-    expect(fields).toHaveAttribute('aria-checked', 'false');
-    await userEvent.click(fields);
-    expect(display.effective().fields).toBe(true);
-    expect(document.documentElement.getAttribute('data-fields')).toBe('highlight');
-    expect(fields).toHaveAttribute('aria-checked', 'true');
+    const transparency = screen.getByRole('switch', { name: 'Weniger Transparenz' });
+    expect(transparency).toHaveAttribute('aria-checked', 'false');
+    await userEvent.click(transparency);
+    expect(display.effective().transparency).toBe(true);
+    expect(document.documentElement.getAttribute('data-transparency')).toBe('reduce');
+    expect(transparency).toHaveAttribute('aria-checked', 'true');
 
     await userEvent.click(screen.getByRole('switch', { name: 'Dunkles Design' }));
     expect(theme.preference()).toBe('dark');

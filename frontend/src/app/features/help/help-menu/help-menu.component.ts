@@ -27,7 +27,7 @@ import {
   ThemeService,
   mediaQuery,
   showInTopLayer,
-  type DisplaySetting,
+  type DisplayChoice,
   type IconName,
 } from '@stupa-makers/ui-kit';
 import { HelpService } from '../help.service';
@@ -42,7 +42,7 @@ import { HelpService } from '../help.service';
 export type HelpMenuVariant = 'rail' | 'header' | 'sheet';
 
 /** A switch of the group "Darstellung": `dark` is the theme, the rest are display settings. */
-export type DisplayKey = 'dark' | DisplaySetting;
+export type DisplayKey = 'dark' | DisplayChoice;
 
 /** The switches of the group "Darstellung", in their order (app spec 000593). */
 const DISPLAY_ROWS: readonly {
@@ -54,7 +54,6 @@ const DISPLAY_ROWS: readonly {
   { key: 'contrast', icon: 'half', label: 'help.display.contrast' },
   { key: 'motion', icon: 'play', label: 'help.display.motion' },
   { key: 'transparency', icon: 'square', label: 'help.display.transparency' },
-  { key: 'fields', icon: 'edit', label: 'help.display.fields' },
   { key: 'veryHigh', icon: 'palette', label: 'help.display.veryHigh' },
 ];
 
@@ -70,8 +69,8 @@ let nextId = 0;
  * dialog.
  *
  * "Darstellung" (specs 000593, 000594) has one switch per display setting: the dark theme,
- * more contrast, less motion, less transparency, highlighted fields and, last, very high
- * contrast. A switch shows the
+ * more contrast, less motion, less transparency and, last, very high contrast, which also
+ * highlights the fields (spec 000598). A switch shows the
  * state in effect, which is the system setting until the person sets it. The choice holds
  * in this browser only. "Systemeinstellungen verwenden" removes every choice, the theme
  * included, and shows only while a choice exists. Very high contrast turns every other
