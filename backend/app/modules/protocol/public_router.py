@@ -75,7 +75,7 @@ def _filter(
 
 
 @router.get(
-    "/gremien",
+    "/committees",
     response_model=list[PublicGremiumOut],
     dependencies=[_READ_LIMIT],
     responses=_errors(429),

@@ -62,7 +62,7 @@ function flushGremien(
   fixture: { detectChanges(): void },
   rows = GREMIEN,
 ): void {
-  http.expectOne('/api/gremien').flush(rows);
+  http.expectOne('/api/committees').flush(rows);
   fixture.detectChanges();
 }
 
@@ -87,7 +87,7 @@ describe('CreateMeetingDialogComponent', () => {
     const { http, cmp, fixture } = await setup();
     flushGremien(http, fixture);
     await pickOption(screen.getByLabelText(/Gremium/), 'Studierendenparlament');
-    http.expectOne('/api/gremien/g-1/meeting-members').flush(MEMBERS);
+    http.expectOne('/api/committees/g-1/meeting-members').flush(MEMBERS);
     cmp.date.set('2026-11-10');
     cmp.time.set('18:00');
     fixture.detectChanges();
@@ -104,7 +104,7 @@ describe('CreateMeetingDialogComponent', () => {
     const { http, cmp, fixture, closed, navigate, toasts } = await setup();
     flushGremien(http, fixture);
     cmp.onGremiumChange('g-1');
-    http.expectOne('/api/gremien/g-1/meeting-members').flush(MEMBERS);
+    http.expectOne('/api/committees/g-1/meeting-members').flush(MEMBERS);
     cmp.date.set('2026-11-10');
     cmp.time.set('18:00');
     cmp.endTime.set('20:00');
@@ -134,7 +134,7 @@ describe('CreateMeetingDialogComponent', () => {
     const { http, cmp, closed, toasts, fixture } = await setup();
     flushGremien(http, fixture);
     cmp.onGremiumChange('g-2');
-    http.expectOne('/api/gremien/g-2/meeting-members').flush([]);
+    http.expectOne('/api/committees/g-2/meeting-members').flush([]);
     cmp.date.set('2026-11-10');
     cmp.time.set('18:00');
     cmp.submit();
@@ -156,7 +156,7 @@ describe('CreateMeetingDialogComponent', () => {
     cmp.next();
     expect(cmp.step()).toBe(1);
     cmp.onGremiumChange('g-1');
-    http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
+    http.expectOne('/api/committees/g-1/meeting-members').flush([]);
     cmp.date.set('2026-11-10');
     cmp.time.set('18:00');
     cmp.endTime.set('17:00');
@@ -169,7 +169,7 @@ describe('CreateMeetingDialogComponent', () => {
     const { http, cmp, fixture } = await setup();
     flushGremien(http, fixture);
     cmp.onGremiumChange('g-1');
-    http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
+    http.expectOne('/api/committees/g-1/meeting-members').flush([]);
     cmp.date.set('2026-11-10');
     cmp.time.set('18:00');
     cmp.next();
@@ -186,7 +186,7 @@ describe('CreateMeetingDialogComponent', () => {
     const { http, cmp, fixture } = await setup();
     flushGremien(http, fixture);
     cmp.onGremiumChange('g-1');
-    http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
+    http.expectOne('/api/committees/g-1/meeting-members').flush([]);
     cmp.date.set('2026-11-10');
     cmp.time.set('18:00');
     cmp.next();
@@ -205,14 +205,14 @@ describe('CreateMeetingDialogComponent', () => {
 
   it('says so when there is no Gremium to choose, also when the list fails', async () => {
     const { http, fixture } = await setup();
-    http.expectOne('/api/gremien').flush(null, { status: 500, statusText: 'e' });
+    http.expectOne('/api/committees').flush(null, { status: 500, statusText: 'e' });
     fixture.detectChanges();
     expect(screen.getByRole('status')).toHaveTextContent('Kein Gremium verfügbar');
   });
 
   it('preselects the Gremium of the list filter', async () => {
     const { http, cmp, fixture } = await setup({ gremiumId: 'g-1' });
-    http.expectOne('/api/gremien/g-1/meeting-members').flush(MEMBERS);
+    http.expectOne('/api/committees/g-1/meeting-members').flush(MEMBERS);
     flushGremien(http, fixture);
     expect(cmp.gremium()).toBe('g-1');
     expect(cmp.members()).toEqual(MEMBERS);
@@ -220,7 +220,7 @@ describe('CreateMeetingDialogComponent', () => {
 
   it('drops a preselected Gremium that the user cannot manage', async () => {
     const { http, cmp, fixture } = await setup({ gremiumId: 'g-9' });
-    http.expectOne('/api/gremien/g-9/meeting-members').flush(MEMBERS);
+    http.expectOne('/api/committees/g-9/meeting-members').flush(MEMBERS);
     flushGremien(http, fixture);
     expect(cmp.gremium()).toBe('');
     expect(cmp.members()).toEqual([]);
@@ -228,20 +228,20 @@ describe('CreateMeetingDialogComponent', () => {
 
   it('starts empty on every opening and loads the Gremien once', async () => {
     const { http, cmp, fixture } = await setup({ open: false });
-    http.expectNone('/api/gremien');
+    http.expectNone('/api/committees');
     fixture.componentRef.setInput('open', true);
     fixture.detectChanges();
     flushGremien(http, fixture);
     cmp.onGremiumChange('g-1');
-    http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
+    http.expectOne('/api/committees/g-1/meeting-members').flush([]);
     cmp.date.set('2026-11-10');
     fixture.componentRef.setInput('open', false);
     fixture.detectChanges();
     fixture.componentRef.setInput('gremiumId', 'g-2');
     fixture.componentRef.setInput('open', true);
     fixture.detectChanges();
-    http.expectNone('/api/gremien');
-    http.expectOne('/api/gremien/g-2/meeting-members').flush([]);
+    http.expectNone('/api/committees');
+    http.expectOne('/api/committees/g-2/meeting-members').flush([]);
     expect(cmp.date()).toBe('');
     expect(cmp.gremium()).toBe('g-2');
   });
@@ -250,11 +250,11 @@ describe('CreateMeetingDialogComponent', () => {
     const { http, cmp, fixture } = await setup();
     flushGremien(http, fixture);
     cmp.onGremiumChange('g-1');
-    const stale = http.expectOne('/api/gremien/g-1/meeting-members');
+    const stale = http.expectOne('/api/committees/g-1/meeting-members');
     cmp.onGremiumChange('g-2');
     stale.flush(MEMBERS);
     expect(cmp.members()).toEqual([]);
-    http.expectOne('/api/gremien/g-2/meeting-members').flush(null, { status: 500, statusText: 'e' });
+    http.expectOne('/api/committees/g-2/meeting-members').flush(null, { status: 500, statusText: 'e' });
     expect(cmp.members()).toEqual([]);
     cmp.onGremiumChange('');
     http.expectNone((r) => r.url.includes('meeting-members'));
@@ -265,7 +265,7 @@ describe('CreateMeetingDialogComponent', () => {
     flushGremien(http, fixture);
     expect(await runAxe(document.body)).toHaveNoViolations();
     cmp.onGremiumChange('g-1');
-    http.expectOne('/api/gremien/g-1/meeting-members').flush(MEMBERS);
+    http.expectOne('/api/committees/g-1/meeting-members').flush(MEMBERS);
     cmp.date.set('2026-11-10');
     cmp.time.set('18:00');
     cmp.next();
@@ -292,7 +292,7 @@ describe('CreateMeetingDialogComponent', () => {
     fixture.debugElement.injector.get(I18nService).setLocale('en');
     flushGremien(http, fixture);
     cmp.onGremiumChange('g-1');
-    http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
+    http.expectOne('/api/committees/g-1/meeting-members').flush([]);
     cmp.date.set('2026-11-10');
     cmp.time.set('18:00');
     cmp.next();
@@ -307,16 +307,16 @@ describe('CreateMeetingDialogComponent', () => {
       fixture.detectChanges();
       flushGremien(http, fixture);
       cmp.onGremiumChange('g-1');
-      http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
-      http.expectOne('/api/gremien/g-1/meeting-defaults').flush({ publicJoinAllowed: false, quorumPercent: 50 });
+      http.expectOne('/api/committees/g-1/meeting-members').flush([]);
+      http.expectOne('/api/committees/g-1/meeting-defaults').flush({ publicJoinAllowed: false, quorumPercent: 50 });
       cmp.publicJoin.set(true);
       cmp.onGremiumChange('g-2');
-      http.expectOne('/api/gremien/g-2/meeting-members').flush([]);
-      const late = http.expectOne('/api/gremien/g-2/meeting-defaults');
+      http.expectOne('/api/committees/g-2/meeting-members').flush([]);
+      const late = http.expectOne('/api/committees/g-2/meeting-defaults');
       cmp.onGremiumChange('g-1');
       late.flush({ publicJoinAllowed: true, quorumPercent: null });
-      http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
-      http.expectOne('/api/gremien/g-1/meeting-defaults').flush({ publicJoinAllowed: false, quorumPercent: 50 });
+      http.expectOne('/api/committees/g-1/meeting-members').flush([]);
+      http.expectOne('/api/committees/g-1/meeting-defaults').flush({ publicJoinAllowed: false, quorumPercent: 50 });
       expect(cmp.publicJoin()).toBe(false);
       cmp.date.set('2026-11-10');
       cmp.time.set('18:00');
@@ -326,8 +326,8 @@ describe('CreateMeetingDialogComponent', () => {
       expect(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ })).toBeDisabled();
 
       cmp.onGremiumChange('g-2');
-      http.expectOne('/api/gremien/g-2/meeting-members').flush([]);
-      http.expectOne('/api/gremien/g-2/meeting-defaults').error(new ProgressEvent('x'));
+      http.expectOne('/api/committees/g-2/meeting-members').flush([]);
+      http.expectOne('/api/committees/g-2/meeting-defaults').error(new ProgressEvent('x'));
       cmp.publicJoin.set(true);
       cmp.submit();
       const req = http.expectOne('/api/meetings');

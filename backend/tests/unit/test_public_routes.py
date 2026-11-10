@@ -122,7 +122,7 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("DELETE", "/api/public/meetings/{code}/me"),
         ("POST", "/api/public/meetings/{code}/votes/{vote_id}/ballot"),
         ("WS", "/api/public/meetings/{code}/ws"),
-        ("GET", "/api/public/gremien"),
+        ("GET", "/api/public/committees"),
         ("GET", "/api/public/protocols"),
         ("GET", "/api/public/protocols/semesters"),
         ("GET", "/api/public/protocols/{protocol_id}"),

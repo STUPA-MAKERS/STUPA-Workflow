@@ -35,7 +35,7 @@ def fake_api(monkeypatch: pytest.MonkeyPatch) -> _FakeApi:
 def test_handover_defaults_to_now(fake_api: _FakeApi) -> None:
     asyncio.run(meetings.protokollant_handover("m1", "p1"))
     assert fake_api.calls == [
-        ("POST", "/meetings/m1/protokollant-handover", {"principalId": "p1", "mode": "now"})
+        ("POST", "/meetings/m1/minute-taker-handover", {"principalId": "p1", "mode": "now"})
     ]
 
 
@@ -46,4 +46,4 @@ def test_handover_next_item(fake_api: _FakeApi) -> None:
 
 def test_cancel_handover(fake_api: _FakeApi) -> None:
     asyncio.run(meetings.cancel_protokollant_handover("m1"))
-    assert fake_api.calls == [("DELETE", "/meetings/m1/protokollant-handover", None)]
+    assert fake_api.calls == [("DELETE", "/meetings/m1/minute-taker-handover", None)]

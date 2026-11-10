@@ -76,7 +76,7 @@ export const ATTENDANCE_STATE: Record<GremiumAttendanceState, StatusView> = {
  * The component has no trigger of its own. The matrix calls `open(request, anchor)`.
  * The popover sits under the cell, inside the viewport; Escape and a pointer down outside
  * close it, and the focus goes back to the cell. It reads
- * `GET /gremien/{id}/attendance/{principalId}?month=` once per month. The excuse text is
+ * `GET /committees/{id}/attendance/{principalId}?month=` once per month. The excuse text is
  * never in the answer, so it never shows.
  */
 @Component({

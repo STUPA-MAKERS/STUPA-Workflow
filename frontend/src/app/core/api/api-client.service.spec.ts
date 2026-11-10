@@ -759,7 +759,7 @@ describe('ApiClient', () => {
       expect(members).toEqual([{ principalId: 'p-1', displayName: 'Mia' }]);
       done();
     });
-    const req = http.expectOne('/api/gremien/g-1/meeting-members');
+    const req = http.expectOne('/api/committees/g-1/meeting-members');
     expect(req.request.method).toBe('GET');
     req.flush([{ principalId: 'p-1', displayName: 'Mia' }]);
   });
@@ -828,7 +828,7 @@ describe('ApiClient', () => {
       expect(g).toEqual([{ id: 'g-1', name: 'STUPA' }]);
       done();
     });
-    const req = http.expectOne('/api/meetings/gremien');
+    const req = http.expectOne('/api/meetings/committees');
     expect(req.request.method).toBe('GET');
     req.flush([{ id: 'g-1', name: 'STUPA' }]);
   });

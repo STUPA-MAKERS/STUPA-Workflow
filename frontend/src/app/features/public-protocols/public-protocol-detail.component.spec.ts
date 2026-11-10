@@ -47,7 +47,7 @@ describe('PublicProtocolDetailComponent', () => {
     expect(att).not.toHaveTextContent('Gäste');
     expect(screen.getByRole('link', { name: /Alle Protokolle: Studierendenparlament/ })).toHaveAttribute(
       'href',
-      '/protokolle?gremium=g-1',
+      '/protocols?committee=g-1',
     );
   });
 
@@ -176,7 +176,7 @@ describe('PublicProtocolDetailComponent', () => {
   it('answers 404 with "not found" and a way back', async () => {
     await setup(throwError(() => new HttpErrorResponse({ status: 404 })));
     expect(screen.getByRole('heading', { name: 'Protokoll nicht gefunden' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Alle Protokolle/ })).toHaveAttribute('href', '/protokolle');
+    expect(screen.getByRole('link', { name: /Alle Protokolle/ })).toHaveAttribute('href', '/protocols');
   });
 
   it('reports another failure as an error', async () => {

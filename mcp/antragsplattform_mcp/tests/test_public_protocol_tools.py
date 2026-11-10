@@ -42,7 +42,7 @@ def test_create_gremium_sends_protocols_public(fake_api: _FakeApi) -> None:
 
 def test_update_gremium_sends_only_the_flag(fake_api: _FakeApi) -> None:
     asyncio.run(admin.update_gremium("g1", S.GremiumUpdate(protocolsPublic=True)))
-    assert fake_api.calls == [("PATCH", "/admin/gremien/g1", {"protocolsPublic": True})]
+    assert fake_api.calls == [("PATCH", "/admin/committees/g1", {"protocolsPublic": True})]
 
 
 def test_finalize_passes_the_withhold_option(fake_api: _FakeApi) -> None:

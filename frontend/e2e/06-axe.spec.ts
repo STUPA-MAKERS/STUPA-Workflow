@@ -39,7 +39,7 @@ async function createIds(api: APIRequestContext, pub: APIRequestContext): Promis
     email: uniqueEmail('axe'),
     title: 'Barrierefreiheit prüfen',
   });
-  const gremium = art.gremiumId ?? (await json<{ id: string }[]>(await api.get('/api/gremien')))[0].id;
+  const gremium = art.gremiumId ?? (await json<{ id: string }[]>(await api.get('/api/committees')))[0].id;
   const meeting = await json<{ id: string }>(
     await api.post('/api/meetings', {
       headers,

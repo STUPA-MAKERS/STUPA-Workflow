@@ -387,7 +387,7 @@ async def test_votes_gremien_invoices_and_bookings_as_link_targets(
         assert by_kind["vote"]["url"] == f"/voting/{ids['vote']}"
         assert by_kind["vote"]["detail"]["voteResult"] == "passed"
         assert by_kind["gremium"]["title"] == "Finanzer"
-        assert by_kind["gremium"]["url"] == f"/gremien/{gid}"
+        assert by_kind["gremium"]["url"] == f"/committees/{gid}"
         assert by_kind["invoice"]["title"] == "RE-77"
         assert by_kind["invoice"]["detail"]["amount"] == "119.00"
         assert by_kind["expense"]["detail"]["costCentre"] == node.path_key

@@ -19,7 +19,7 @@ Groups of ``OBJECT_CHECK_ROUTES`` that authorize no object:
 
 - Self: the route reads or writes only the data of the caller (``/auth/me``, the
   own grants, preferences, calendar feed and avatar, the OAuth consent).
-- Master data: ``GET /api/gremien`` serves id, name and variant to any member, and
+- Master data: ``GET /api/committees`` serves id, name and variant to any member, and
   the avatar of a principal is the same Gravatar image that the person list shows.
 """
 
@@ -81,19 +81,19 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/delegations/votes/{vote_id}/status"): (
         "DelegationService.vote_status (own delegations only)"
     ),
-    ("GET", "/api/gremien"): "master data: id, name and variant of every gremium",
-    ("GET", "/api/gremien/overview"): "GremienService.overview (policy.GREMIUM_VIEW_ALL)",
-    ("GET", "/api/gremien/{gremium_id}/attendance"): _GREMIUM_VIEW,
-    ("GET", "/api/gremien/{gremium_id}/attendance/{principal_id}"): _GREMIUM_VIEW,
-    ("GET", "/api/gremien/{gremium_id}/decisions"): _GREMIUM_VIEW,
-    ("GET", "/api/gremien/{gremium_id}/logo"): "policy.can_view_gremium",
-    ("GET", "/api/gremien/{gremium_id}/meeting-defaults"): _MEETING_MANAGE,
-    ("GET", "/api/gremien/{gremium_id}/meeting-members"): _MEETING_MANAGE,
-    ("GET", "/api/gremien/{gremium_id}/meetings"): _GREMIUM_VIEW,
-    ("GET", "/api/gremien/{gremium_id}/members"): _GREMIUM_VIEW,
+    ("GET", "/api/committees"): "master data: id, name and variant of every gremium",
+    ("GET", "/api/committees/overview"): "GremienService.overview (policy.GREMIUM_VIEW_ALL)",
+    ("GET", "/api/committees/{gremium_id}/attendance"): _GREMIUM_VIEW,
+    ("GET", "/api/committees/{gremium_id}/attendance/{principal_id}"): _GREMIUM_VIEW,
+    ("GET", "/api/committees/{gremium_id}/decisions"): _GREMIUM_VIEW,
+    ("GET", "/api/committees/{gremium_id}/logo"): "policy.can_view_gremium",
+    ("GET", "/api/committees/{gremium_id}/meeting-defaults"): _MEETING_MANAGE,
+    ("GET", "/api/committees/{gremium_id}/meeting-members"): _MEETING_MANAGE,
+    ("GET", "/api/committees/{gremium_id}/meetings"): _GREMIUM_VIEW,
+    ("GET", "/api/committees/{gremium_id}/members"): _GREMIUM_VIEW,
     ("GET", "/api/meetings"): "PermissionOps._visible_gremium_ids",
     ("POST", "/api/meetings"): _MEETING_MANAGE,
-    ("GET", "/api/meetings/gremien"): "PermissionOps._visible_gremium_ids",
+    ("GET", "/api/meetings/committees"): "PermissionOps._visible_gremium_ids",
     ("GET", "/api/meetings/timeline"): "PermissionOps._visible_gremium_ids",
     ("GET", "/api/meetings/{meeting_id}"): _LIVE,
     ("PATCH", "/api/meetings/{meeting_id}"): (
@@ -126,8 +126,8 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/meetings/{meeting_id}/join-code/rotate"): _MEETING_MANAGE,
     ("GET", "/api/meetings/{meeting_id}/protocol"): "ProtocolService.authorize_read_meeting",
     ("POST", "/api/meetings/{meeting_id}/protocol"): "ProtocolService.authorize_write_meeting",
-    ("POST", "/api/meetings/{meeting_id}/protokollant-handover"): "HandoverOps.can_hand_over",
-    ("DELETE", "/api/meetings/{meeting_id}/protokollant-handover"): "HandoverOps.can_hand_over",
+    ("POST", "/api/meetings/{meeting_id}/minute-taker-handover"): "HandoverOps.can_hand_over",
+    ("DELETE", "/api/meetings/{meeting_id}/minute-taker-handover"): "HandoverOps.can_hand_over",
     ("POST", "/api/meetings/{meeting_id}/votes"): (
         f"{_MEETING_VOTES} + PermissionOps.assert_can_run_votes"
     ),
@@ -217,7 +217,9 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/votes/{vote_id}/draw-lot"): _MANAGE_VOTE,
     ("POST", "/api/votes/{vote_id}/open"): _RUN_VOTE,
     ("WS", "/api/ws/meetings/{meeting_id}"): "livevote.router._authorize (is_participant)",
-    ("WS", "/api/ws/meetings/{meeting_id}/beamer"): "livevote.router._authorize (is_participant)",
+    ("WS", "/api/ws/meetings/{meeting_id}/projector"): (
+        "livevote.router._authorize (is_participant)"
+    ),
     ("WS", "/api/ws/todos"): "TodoLiveConnection (BoardAccess.can_read per board)",
 }
 

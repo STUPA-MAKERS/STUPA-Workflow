@@ -2611,14 +2611,14 @@ def test_create_meeting_ok_schedules_mail(app: FastAPI, client: TestClient) -> N
 def test_list_meeting_members_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._can_manage = False
     _login(app, "x")
-    r = client.get(f"/api/gremien/{uuid4()}/meeting-members")
+    r = client.get(f"/api/committees/{uuid4()}/meeting-members")
     assert r.status_code == 403
     assert r.headers["content-type"] == "application/problem+json"
 
 
 def test_list_meeting_members_ok(app: FastAPI, client: TestClient) -> None:
     _login(app)
-    r = client.get(f"/api/gremien/{uuid4()}/meeting-members")
+    r = client.get(f"/api/committees/{uuid4()}/meeting-members")
     assert r.status_code == 200
     assert len(r.json()) == 1
 
@@ -2656,7 +2656,7 @@ def test_list_meetings_timeline_ok(app: FastAPI, client: TestClient) -> None:
 
 def test_list_meeting_filter_gremien_ok(app: FastAPI, client: TestClient) -> None:
     _login(app)
-    r = client.get("/api/meetings/gremien")
+    r = client.get("/api/meetings/committees")
     assert r.status_code == 200
     assert r.json()[0]["name"] == "StuPa"
 

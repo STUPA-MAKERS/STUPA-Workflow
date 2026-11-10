@@ -10,11 +10,13 @@ import {
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   TitleStrategy,
+  UrlSerializer,
   provideRouter,
   withComponentInputBinding,
   withInMemoryScrolling,
 } from '@angular/router';
 import { authInterceptor } from '@core/auth/auth.interceptor';
+import { LegacyUrlSerializer } from '@core/routing/legacy-url.serializer';
 import { AuthService } from '@core/auth/auth.service';
 import { lazyMockApiInterceptor } from '@core/api/mock-api.lazy';
 import { cacheInterceptor } from '@core/cache/cache.interceptor';
@@ -87,6 +89,7 @@ export const appConfig: ApplicationConfig = {
       ),
     ),
     provideDetailPrefetch(),
+    { provide: UrlSerializer, useClass: LegacyUrlSerializer },
     { provide: TitleStrategy, useExisting: PageTitleService },
     {
       provide: LIVE_VOTE_SOURCE,

@@ -10,7 +10,7 @@
 /** A personnel election gives `elected`, `runoff`, `tie` or `rejected`. */
 export type PublicVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
 
-/** A gremium that publishes its protocols (`GET /public/gremien`). */
+/** A gremium that publishes its protocols (`GET /public/committees`). */
 export interface PublicGremium {
   readonly id: string;
   readonly name: string;

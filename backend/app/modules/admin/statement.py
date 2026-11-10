@@ -3,7 +3,7 @@
 The statement is a free text of the site config (``freetexts.accessibilityStatement``),
 Markdown per language, so the admin edits it on ``/admin/texts``. A config without the
 field reads as this draft. The admin fills the brackets: the date of the last check, a
-contact address and the Schlichtungsstelle. The page ``/barrierefreiheit`` adds the
+contact address and the Schlichtungsstelle. The page ``/accessibility`` adds the
 button "Barriere melden" below the text, so the text needs no link to the form.
 
 The draft names the parts that are not accessible: the zoom block of the installed app

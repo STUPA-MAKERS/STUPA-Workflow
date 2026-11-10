@@ -208,7 +208,7 @@ async def test_list_timeline_rejects_bad_cursor(session: AsyncSession) -> None:
 async def test_list_filter_gremien_visibility(session: AsyncSession) -> None:
     """List only the Gremien that have at least ONE visible meeting.
 
-    `/meetings/gremien` hides a Gremium of the member that has no
+    `/meetings/committees` hides a Gremium of the member that has no
     meeting. It also hides a Gremium with a meeting where the principal is NOT a member.
     An admin sees every Gremium that has any meeting.
 

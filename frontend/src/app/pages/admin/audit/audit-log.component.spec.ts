@@ -553,7 +553,7 @@ describe('AuditLogComponent', () => {
       'v-9',
     ]);
     expect(cmp.targetLink(entry(1, { targetType: 'gremium', targetId: 'g-9' }))).toEqual([
-      '/admin/gremien',
+      '/admin/committees',
     ]);
     expect(cmp.targetLink(entry(1, { targetType: 'budget_expense', targetId: 'e-9' }))).toEqual([
       '/expenses',

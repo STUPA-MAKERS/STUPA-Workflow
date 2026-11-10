@@ -114,7 +114,7 @@
             <p class="gm__dialogNote">
               {{ 'admin.groupMappings.gremiumRolesEmpty' | t }}
               @if (canManageGremiumRoles()) {
-                <a [routerLink]="['/admin/gremien', gremiumId(), 'roles']">{{ 'admin.gremiumRoles.manage' | t }}</a>
+                <a [routerLink]="['/admin/committees', gremiumId(), 'roles']">{{ 'admin.gremiumRoles.manage' | t }}</a>
               }
             </p>
           }

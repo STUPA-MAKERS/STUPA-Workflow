@@ -310,7 +310,7 @@ def test_router_lists_with_filters_and_noindex(
     assert http.get("/api/public/protocols", params={"limit": 51}).status_code == 422
     sem = http.get("/api/public/protocols/semesters", params={"q": "a"})
     assert sem.json() == [{"key": "ws-2026", "count": 1}]
-    gremien = http.get("/api/public/gremien")
+    gremien = http.get("/api/public/committees")
     assert gremien.json()[0]["protocolCount"] == 1
     assert gremien.headers["X-Robots-Tag"] == "noindex"
 
@@ -375,7 +375,7 @@ def test_unhandled_error_on_a_public_route_keeps_noindex() -> None:
     app.dependency_overrides[get_public_protocol_service] = _Broken
     app.dependency_overrides[antiabuse.get_rate_limiter] = InMemoryRateLimiter
     http = TestClient(app, raise_server_exceptions=False)
-    res = http.get("/api/public/gremien")
+    res = http.get("/api/public/committees")
     assert res.status_code == 500
     assert res.headers["X-Robots-Tag"] == "noindex"
     assert res.headers["content-type"].startswith("application/problem+json")

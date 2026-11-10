@@ -155,7 +155,7 @@ async def test_handover_now_moves_the_keeper_rights(
         before = client.get(url).json()
         assert (before["canWrite"], before["canManageVotes"]) == (True, True)
         resp = client.post(
-            f"{url}/protokollant-handover", json={"principalId": str(bert), "mode": "now"}
+            f"{url}/minute-taker-handover", json={"principalId": str(bert), "mode": "now"}
         )
         assert resp.status_code == 200, resp.text
         after_anna = client.get(url).json()
@@ -196,7 +196,7 @@ async def test_handover_now_ends_the_running_period(
         _as(api, None)
         assert moved.status_code == 200, moved.text
         resp = client.post(
-            f"{url}/protokollant-handover", json={"principalId": str(bert), "mode": "now"}
+            f"{url}/minute-taker-handover", json={"principalId": str(bert), "mode": "now"}
         )
         assert resp.status_code == 200, resp.text
     periods = resp.json()["keeperPeriods"]
@@ -223,7 +223,7 @@ async def test_next_item_starts_on_a_forward_move(
     with TestClient(api) as client:
         assert client.patch(url, json={"status": "live"}).status_code == 200
         planned = client.post(
-            f"{url}/protokollant-handover",
+            f"{url}/minute-taker-handover",
             json={"principalId": str(bert), "mode": "next_item"},
         )
         assert planned.status_code == 200, planned.text
@@ -269,7 +269,7 @@ async def test_planned_keeper_is_checked_again_on_the_move(
     url = f"/api/meetings/{s.meeting_id}"
     with TestClient(api) as client:
         planned = client.post(
-            f"{url}/protokollant-handover",
+            f"{url}/minute-taker-handover",
             json={"principalId": str(bert), "mode": "next_item"},
         )
         assert planned.status_code == 200, planned.text
@@ -310,7 +310,7 @@ async def test_new_plan_replaces_the_old_and_delete_discards_it(
     _, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
     _, cora = await _member(maker, s.gremium_id, "Cora", ["protocol.write"])
     await _set_keeper(maker, s.meeting_id, anna, current=s.item_ids[0])
-    url = f"/api/meetings/{s.meeting_id}/protokollant-handover"
+    url = f"/api/meetings/{s.meeting_id}/minute-taker-handover"
     with TestClient(api) as client:
         _as(api, anna_sub)
         first = client.post(url, json={"principalId": str(bert), "mode": "next_item"})
@@ -341,9 +341,9 @@ async def test_next_item_on_the_last_item_is_409(
     _, carl = await _member(maker, empty.gremium_id, "Carl", ["protocol.write"])
     body = {"principalId": str(bert), "mode": "next_item"}
     with TestClient(api) as client:
-        last = client.post(f"/api/meetings/{s.meeting_id}/protokollant-handover", json=body)
+        last = client.post(f"/api/meetings/{s.meeting_id}/minute-taker-handover", json=body)
         none = client.post(
-            f"/api/meetings/{empty.meeting_id}/protokollant-handover",
+            f"/api/meetings/{empty.meeting_id}/minute-taker-handover",
             json={"principalId": str(carl), "mode": "next_item"},
         )
     assert last.status_code == 409, last.text
@@ -358,7 +358,7 @@ async def test_handover_only_while_live(
 ) -> None:
     s = await seed(maker, status=status, items=1)
     _, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
-    url = f"/api/meetings/{s.meeting_id}/protokollant-handover"
+    url = f"/api/meetings/{s.meeting_id}/minute-taker-handover"
     with TestClient(api) as client:
         post = client.post(url, json={"principalId": str(bert)})
         delete = client.delete(url)
@@ -375,7 +375,7 @@ async def test_target_rules(maker: async_sessionmaker[AsyncSession], api: FastAP
     other = await seed(maker, status="live", items=0)
     _, stranger = await _member(maker, other.gremium_id, "Sven", ["protocol.write"])
     await _set_keeper(maker, s.meeting_id, anna)
-    url = f"/api/meetings/{s.meeting_id}/protokollant-handover"
+    url = f"/api/meetings/{s.meeting_id}/minute-taker-handover"
     with TestClient(api) as client:
         no_right = client.post(url, json={"principalId": str(voter)})
         no_member = client.post(url, json={"principalId": str(stranger)})
@@ -398,7 +398,7 @@ async def test_only_the_lead_or_the_keeper_hands_over(
     _, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     bert_sub, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
     await _set_keeper(maker, s.meeting_id, anna)
-    url = f"/api/meetings/{s.meeting_id}/protokollant-handover"
+    url = f"/api/meetings/{s.meeting_id}/minute-taker-handover"
     _as(api, bert_sub)
     with TestClient(api) as client:
         post = client.post(url, json={"principalId": str(bert)})
@@ -469,7 +469,7 @@ async def test_members_and_roster_mark_the_possible_keepers(
     _, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     _, vera = await _member(maker, s.gremium_id, "Vera", ["vote.cast"])
     with TestClient(api) as client:
-        members = client.get(f"/api/gremien/{s.gremium_id}/meeting-members")
+        members = client.get(f"/api/committees/{s.gremium_id}/meeting-members")
         roster = client.get(f"/api/meetings/{s.meeting_id}/attendance")
     for resp in (members, roster):
         assert resp.status_code == 200, resp.text

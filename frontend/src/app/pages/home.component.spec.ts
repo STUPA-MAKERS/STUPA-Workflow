@@ -126,14 +126,14 @@ describe('HomeComponent', () => {
         offset: 0,
       };
       await setup(undefined, {}, protocolsApi(of(page)));
-      expect(screen.getByRole('link', { name: /^Protokolle/ })).toHaveAttribute('href', '/protokolle');
+      expect(screen.getByRole('link', { name: /^Protokolle/ })).toHaveAttribute('href', '/protocols');
       expect(screen.getByRole('heading', { name: 'Zuletzt veröffentlicht' })).toBeInTheDocument();
       const first = screen.getByRole('link', { name: /34\. Sitzung des Studierendenparlaments/ });
-      expect(first).toHaveAttribute('href', '/protokolle/p-1');
+      expect(first).toHaveAttribute('href', '/protocols/p-1');
       expect(first).toHaveTextContent('Studierendenparlament · 2 öffentliche TOPs');
       expect(screen.getByRole('link', { name: /Alle 23 Protokolle/ })).toHaveAttribute(
         'href',
-        '/protokolle',
+        '/protocols',
       );
       expect(screen.getByRole('link', { name: /^Anmelden/ })).toHaveAttribute('href', '/login');
     });

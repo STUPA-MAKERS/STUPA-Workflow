@@ -467,7 +467,7 @@ describe('Kern-Views a11y (axe)', () => {
       expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
 
-    it('/admin/gremien (open row with settings and role matrix) has no violations', async () => {
+    it('/admin/committees (open row with settings and role matrix) has no violations', async () => {
       const { container, fixture } = await render(GremienHost, {
         providers: [provideRouter([]), ...adminHttp, { provide: USE_MOCK_API, useValue: true }, adminAuth],
       });
@@ -476,7 +476,7 @@ describe('Kern-Views a11y (axe)', () => {
       expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
 
-    it('/admin/gremien/:id/members (with the substitute pool) has no violations', async () => {
+    it('/admin/committees/:id/members (with the substitute pool) has no violations', async () => {
       const { container, fixture } = await render(MembersHost, {
         providers: [
           provideRouter([]),

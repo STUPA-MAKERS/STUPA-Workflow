@@ -309,7 +309,7 @@ describe('GremiumDialogComponent', () => {
       expect(screen.getByText(/Sitzungen selbst erscheinen nie öffentlich/)).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /Öffentliche Seite ansehen/ })).toHaveAttribute(
         'href',
-        '/protokolle',
+        '/protocols',
       );
     });
 

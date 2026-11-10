@@ -52,7 +52,7 @@ async function setup(opts: { media?: string[]; view?: string; managed?: string[]
   const injector = view.fixture.debugElement.injector;
   const http = injector.get(HttpTestingController);
   const frame = injector.get(PageFrame);
-  http.match('/api/meetings/gremien').forEach((r) => r.flush([]));
+  http.match('/api/meetings/committees').forEach((r) => r.flush([]));
   return { ...view, http, frame };
 }
 
@@ -98,7 +98,7 @@ describe('MeetingsOverviewComponent', () => {
     const { http } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Sitzung anlegen' }));
     expect(screen.getByRole('dialog', { name: 'Sitzung anlegen' })).toBeInTheDocument();
-    http.match('/api/gremien').forEach((r) => r.flush([]));
+    http.match('/api/committees').forEach((r) => r.flush([]));
   });
 
   it('offers no create without the right', async () => {

@@ -6,7 +6,7 @@ export type GremiumLogoSize = 'md' | 'lg';
 
 /**
  * The square logo of a gremium: the square logo of its CD variant
- * (`GET /api/gremien/{id}/logo`) on white, else the initials of the gremium, by the
+ * (`GET /api/committees/{id}/logo`) on white, else the initials of the gremium, by the
  * rule of the CD variants page (`variantInitials`: "STUPA" → "ST").
  *
  * The image is decorative: the name of the gremium stands beside it. A logo that does not

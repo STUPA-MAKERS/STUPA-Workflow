@@ -301,7 +301,7 @@ describe('BudgetDashboardComponent', () => {
      * above, it takes the palette colour of its position.
      */
     it('gives a node its own or inherited colour and draws the swatch only then', async () => {
-      const view = await setup({ queryParams: { ks: 'b-810' } });
+      const view = await setup({ queryParams: { costCentre: 'b-810' } });
       const rows = view.c.treeRows() as { node: { id: string }; color: string; swatch: boolean }[];
       const row = (id: string) => rows.find((r) => r.node.id === id);
       expect(row('b-800')?.color).toBe('#0075bf');
@@ -339,7 +339,7 @@ describe('BudgetDashboardComponent', () => {
     });
 
     it('opens the path to a cost centre the URL names', async () => {
-      const view = await setup({ queryParams: { ks: 'b-810' } });
+      const view = await setup({ queryParams: { costCentre: 'b-810' } });
       const tree = within(view.container.querySelector('.bd__tree') as HTMLElement);
       expect(tree.getByText('Werkstatt')).toBeTruthy();
       expect(view.container.querySelector('.tn--on .tn__name')?.textContent).toContain('Werkstatt');
@@ -418,7 +418,7 @@ describe('BudgetDashboardComponent', () => {
     });
 
     it('shows a negative available amount in the error colour', async () => {
-      const view = await setup({ queryParams: { ks: 'b-900' } });
+      const view = await setup({ queryParams: { costCentre: 'b-900' } });
       const neg = view.container.querySelector('.bd__fig--main .bd__figValue');
       expect(neg?.classList).toContain('bd__neg');
     });
@@ -437,7 +437,7 @@ describe('BudgetDashboardComponent', () => {
      * shows the path, so the bar holds no breadcrumb.
      */
     it('puts the name in the title of the shared sheet bar, the actions at its end', async () => {
-      const view = await setup({ queryParams: { ks: 'b-810' } });
+      const view = await setup({ queryParams: { costCentre: 'b-810' } });
       const head = view.container.querySelector('article.bd__sheet > header.sheet-head') as HTMLElement;
       expect(head.nextElementSibling).toHaveClass('bd__sheetBody');
       const bar = head.querySelector(':scope > app-sheet-bar') as HTMLElement;
@@ -454,7 +454,7 @@ describe('BudgetDashboardComponent', () => {
     });
 
     it('says the key, the parent and the year in the status line below the title', async () => {
-      const view = await setup({ queryParams: { ks: 'b-810' } });
+      const view = await setup({ queryParams: { costCentre: 'b-810' } });
       const line = view.container.querySelector('header.sheet-head > p.sheet-line') as HTMLElement;
       const parts = Array.from(line.querySelectorAll('.bd__part')).map((el) => el.textContent?.trim());
       expect(parts).toEqual(['VS-800-810', 'Dezentrale Einrichtungen', expect.stringContaining('HHJ')]);
@@ -597,7 +597,7 @@ describe('BudgetDashboardComponent', () => {
     });
 
     it('leaves the chart out for a cost centre without sub cost centres', async () => {
-      const view = await setup({ queryParams: { ks: 'b-900' } });
+      const view = await setup({ queryParams: { costCentre: 'b-900' } });
       expect(screen.queryByText('Verteilung')).toBeNull();
       expect(view.container.querySelector('.bd__cols--single')).toBeTruthy();
       const c = view.fixture.componentInstance as unknown as Inst;
@@ -640,7 +640,7 @@ describe('BudgetDashboardComponent', () => {
 
     /** The row takes the inherited colour of the faculty above. */
     it('shows the cost centre itself when it has no sub cost centres', async () => {
-      const { c } = await setup({ queryParams: { ks: 'b-810' } });
+      const { c } = await setup({ queryParams: { costCentre: 'b-810' } });
       const rows = c.usageRows();
       expect(rows.map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-810']);
       expect(rows[0].color).toBe('#0075bf');
@@ -870,7 +870,7 @@ describe('BudgetDashboardComponent', () => {
   describe('narrow layout', () => {
     /** A pick closes the sheet again. */
     it('puts the tree in a side sheet that the path chip opens', async () => {
-      const view = await setup({ wide: false, queryParams: { ks: 'b-800' } });
+      const view = await setup({ wide: false, queryParams: { costCentre: 'b-800' } });
       const c = view.fixture.componentInstance as unknown as Inst;
       expect(view.container.querySelector('.bd__pane')).toBeNull();
       const chip = view.container.querySelector('.bd__pathChip') as HTMLButtonElement;
@@ -1050,7 +1050,7 @@ describe('BudgetDashboardComponent', () => {
     expect(c.apps()).toEqual([]);
     c['syncUrl']();
     expect(nav).toHaveBeenLastCalledWith([], expect.objectContaining({
-      queryParams: { budget: null, ks: null, fy: null },
+      queryParams: { budget: null, costCentre: null, fy: null },
     }));
   });
 
@@ -1189,7 +1189,7 @@ describe('BudgetDashboardComponent', () => {
 
   describe('selection from the URL', () => {
     it('restores budget, cost centre and year from the query params', async () => {
-      const { c } = await setup({ fys: [FY, FY2], queryParams: { budget: 'b-vs', ks: 'b-800', fy: 'fy-2' } });
+      const { c } = await setup({ fys: [FY, FY2], queryParams: { budget: 'b-vs', costCentre: 'b-800', fy: 'fy-2' } });
       expect(c.selectedBudgetId()).toBe('b-vs');
       expect(c.selectedKsId()).toBe('b-800');
       expect(c.selectedFyId()).toBe('fy-2');
@@ -1198,7 +1198,7 @@ describe('BudgetDashboardComponent', () => {
     it('follows the URL when the palette sends it here while it is already here', async () => {
       const { c, params, http } = await setup();
       expect(c.selectedKsId()).toBe('b-vs');
-      params.next(convertToParamMap({ ks: 'b-800' }));
+      params.next(convertToParamMap({ costCentre: 'b-800' }));
       expect(c.selectedKsId()).toBe('b-800');
       flushApps(http);
     });
@@ -1208,7 +1208,7 @@ describe('BudgetDashboardComponent', () => {
         node({ id: 'b-other', key: 'OTHER', name: 'Andere', byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })] }),
         ...TREE,
       ];
-      const { c } = await setup({ tree, queryParams: { ks: 'b-800' } });
+      const { c } = await setup({ tree, queryParams: { costCentre: 'b-800' } });
       expect(c.selectedKsId()).toBe('b-800');
       expect(c.selectedBudgetId()).toBe('b-vs');
     });
@@ -1216,7 +1216,7 @@ describe('BudgetDashboardComponent', () => {
     it('leaves the selection alone when the URL repeats what is already shown', async () => {
       const { c, params } = await setup();
       const before = [c.selectedBudgetId(), c.selectedKsId(), c.selectedFyId()];
-      params.next(convertToParamMap({ budget: 'b-vs', ks: 'b-vs', fy: 'fy-1' }));
+      params.next(convertToParamMap({ budget: 'b-vs', costCentre: 'b-vs', fy: 'fy-1' }));
       expect([c.selectedBudgetId(), c.selectedKsId(), c.selectedFyId()]).toEqual(before);
     });
 
@@ -1230,13 +1230,13 @@ describe('BudgetDashboardComponent', () => {
           ],
         }),
       ];
-      const { c } = await setup({ tree, queryParams: { ks: 'b-leaf' } });
+      const { c } = await setup({ tree, queryParams: { costCentre: 'b-leaf' } });
       expect(c.selectedKsId()).toBe('b-leaf');
       expect(c.selectedBudgetId()).toBe('b-sub');
     });
 
     it('ignores invalid query params and defaults to the first root and year', async () => {
-      const { c } = await setup({ queryParams: { budget: 'ghost', ks: 'ghost', fy: 'ghost' } });
+      const { c } = await setup({ queryParams: { budget: 'ghost', costCentre: 'ghost', fy: 'ghost' } });
       expect(c.selectedBudgetId()).toBe('b-vs');
       expect(c.selectedKsId()).toBe('b-vs');
       expect(c.selectedFyId()).toBe('fy-1');
@@ -1353,7 +1353,7 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       ),
       boards: jest.fn(() => of([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }])),
     };
-    await setup({ queryParams: { ks: 'b-810' }, todos });
+    await setup({ queryParams: { costCentre: 'b-810' }, todos });
     expect(todos.linked).toHaveBeenCalledWith('budget', 'b-810');
     const list = document.querySelector('app-todo-linked-list[kind="budget"]') as HTMLElement;
     expect(within(list).getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();

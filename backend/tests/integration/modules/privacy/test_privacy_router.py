@@ -542,7 +542,7 @@ async def test_auskunft_xlsx_and_audit_records_subject_email(
     _, email = await svc.create(_create_payload(app_type.id))
 
     _as_dpo(app)
-    r = client.get("/api/admin/privacy/auskunft", params={"email": email})
+    r = client.get("/api/admin/privacy/export", params={"email": email})
     assert r.status_code == 200, r.text
     assert r.headers["content-type"] == XLSX_MEDIA_TYPE
     assert "attachment" in r.headers["content-disposition"]

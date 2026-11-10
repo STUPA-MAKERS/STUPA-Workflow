@@ -231,7 +231,7 @@ export interface Gremium {
   readonly delegationAllowExternal?: boolean;
   /** Default quorum as a percent of eligible voters who must attend. null = none. */
   readonly quorumPercent?: number | null;
-  /** Number of members. Only the admin list (`GET /admin/gremien`) gives it. */
+  /** Number of members. Only the admin list (`GET /admin/committees`) gives it. */
   readonly memberCount?: number;
   /** Number of gremium roles, the forced roles included. Admin list only. */
   readonly roleCount?: number;
@@ -239,7 +239,7 @@ export interface Gremium {
   readonly protocolsPublic?: boolean;
 }
 
-/** `GET /admin/gremien/{id}/public-preview`: what a switch to "public" publishes. */
+/** `GET /admin/committees/{id}/public-preview`: what a switch to "public" publishes. */
 export interface GremiumPublicPreview {
   /** The final protocols that are not held back. */
   readonly finalCount: number;
@@ -247,7 +247,7 @@ export interface GremiumPublicPreview {
   readonly missingCount: number;
 }
 
-/** Body for `POST /admin/gremien` (`GremiumCreate`). */
+/** Body for `POST /admin/committees` (`GremiumCreate`). */
 export interface GremiumCreateBody {
   readonly name: string;
   readonly slug: string;
@@ -260,7 +260,7 @@ export interface GremiumCreateBody {
   readonly protocolsPublic?: boolean;
 }
 
-/** Body for `PATCH /admin/gremien/{id}` (`GremiumUpdate`) — all fields optional. */
+/** Body for `PATCH /admin/committees/{id}` (`GremiumUpdate`) — all fields optional. */
 export interface GremiumUpdateBody {
   readonly name?: string;
   readonly slug?: string;
@@ -907,7 +907,7 @@ export function isActiveMembership(m: GremiumMembership): boolean {
 }
 
 /**
- * OIDC group → membership in one gremium (`/admin/gremium-membership-mappings`).
+ * OIDC group → membership in one gremium (`/admin/committee-membership-mappings`).
  *
  * Each person in the group becomes a member of the gremium, with the default
  * gremium role `member`. Only this mapping gives a membership.
@@ -925,7 +925,7 @@ export interface GremiumMembershipMappingBody {
 }
 
 /**
- * OIDC group → role of one gremium (`/admin/gremium-role-mappings`).
+ * OIDC group → role of one gremium (`/admin/committee-role-mappings`).
  *
  * The role applies only to persons who are members of that gremium through a
  * {@link GremiumMembershipMapping}. It never gives a membership. `gremiumId` is the
@@ -1214,7 +1214,7 @@ export interface SiteFreetexts {
    */
   submittedInternal?: I18nMap;
   submittedExternal?: I18nMap;
-  /** The accessibility statement of `/barrierefreiheit` — Markdown, each i18n. */
+  /** The accessibility statement of `/accessibility` — Markdown, each i18n. */
   readonly accessibilityStatement?: I18nMap;
 }
 

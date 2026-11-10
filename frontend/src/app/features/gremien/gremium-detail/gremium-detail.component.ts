@@ -49,11 +49,11 @@ import { GremiumMembersComponent } from '../gremium-members/gremium-members.comp
 import { GremiumTodosComponent } from '../gremium-todos/gremium-todos.component';
 
 /** The sub-tabs of a gremium, as they stand in `?tab=`. */
-export const GREMIUM_TABS = ['sitzungen', 'mitglieder', 'anwesenheit', 'beschluesse', 'todos'] as const;
+export const GREMIUM_TABS = ['meetings', 'members', 'attendance', 'decisions', 'todos'] as const;
 export type GremiumTab = (typeof GREMIUM_TABS)[number];
 
 /**
- * One gremium (`/gremien/:id`): the detail sheet beside the list.
+ * One gremium (`/committees/:id`): the detail sheet beside the list.
  *
  * The header holds the kicker "Gremium · Deine Rolle: X", the calendar subscription, "In
  * der Verwaltung öffnen" (only with `admin.gremien`) and the ⋮ menu; then the logo, the
@@ -138,8 +138,8 @@ export class GremiumDetailComponent {
   );
   readonly tab = computed<GremiumTab>(() => {
     const t = this.tabParam();
-    if (t === 'todos' && this.boardId() === null) return 'sitzungen';
-    return (GREMIUM_TABS as readonly string[]).includes(t ?? '') ? (t as GremiumTab) : 'sitzungen';
+    if (t === 'todos' && this.boardId() === null) return 'meetings';
+    return (GREMIUM_TABS as readonly string[]).includes(t ?? '') ? (t as GremiumTab) : 'meetings';
   });
   /** The tabs that were open once for this gremium: their panels stay rendered. */
   readonly visited = signal<ReadonlySet<string>>(new Set());
@@ -185,10 +185,10 @@ export class GremiumDetailComponent {
 
   /** The tabs, by their labels alone: a tab shows no count (spec 000560). */
   readonly tabs = computed<TabItem[]>(() => [
-    { id: 'sitzungen', label: this.i18n.translate('gremien.tab.meetings') },
-    { id: 'mitglieder', label: this.i18n.translate('gremien.tab.members') },
-    { id: 'anwesenheit', label: this.i18n.translate('gremien.tab.attendance') },
-    { id: 'beschluesse', label: this.i18n.translate('gremien.tab.decisions') },
+    { id: 'meetings', label: this.i18n.translate('gremien.tab.meetings') },
+    { id: 'members', label: this.i18n.translate('gremien.tab.members') },
+    { id: 'attendance', label: this.i18n.translate('gremien.tab.attendance') },
+    { id: 'decisions', label: this.i18n.translate('gremien.tab.decisions') },
     ...(this.boardId() ? [{ id: 'todos', label: this.i18n.translate('gremien.tab.todos') }] : []),
   ]);
 
@@ -253,7 +253,7 @@ export class GremiumDetailComponent {
     const frame = inject(PageFrameService);
     effect(() => {
       const g = this.gremium();
-      frame.crumbLabel.set(g ? { url: `/gremien/${g.id}`, label: g.name } : null);
+      frame.crumbLabel.set(g ? { url: `/committees/${g.id}`, label: g.name } : null);
     });
     inject(DestroyRef).onDestroy(() => frame.crumbLabel.set(null));
   }
@@ -261,7 +261,7 @@ export class GremiumDetailComponent {
   selectTab(id: string | null): void {
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { tab: id === 'sitzungen' ? null : id },
+      queryParams: { tab: id === 'meetings' ? null : id },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
@@ -275,7 +275,7 @@ export class GremiumDetailComponent {
 
   openAdmin(): void {
     const id = this.id();
-    if (id) void this.router.navigate(['/admin/gremien', id, 'members']);
+    if (id) void this.router.navigate(['/admin/committees', id, 'members']);
   }
 
   onMenu(item: RowMenuItem, abo: CalendarSubscribeComponent): void {
@@ -296,7 +296,7 @@ export class GremiumDetailComponent {
         void this.router.navigate(['/meetings']);
         break;
       case 'votes':
-        void this.router.navigate(['/voting'], { queryParams: { gremium: this.id() } });
+        void this.router.navigate(['/voting'], { queryParams: { committee: this.id() } });
         break;
     }
   }

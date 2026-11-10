@@ -93,8 +93,10 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
  * and a reset is simply every filter back to `empty`.
  */
 interface FilterDef {
-  /** Query-parameter name. Also the request field. */
+  /** Query-parameter name. Also the request field, unless `field` names another one. */
   readonly param: string;
+  /** The request field, where it differs from the query parameter. */
+  readonly field?: string;
   readonly signal: WritableSignal<string>;
   readonly empty: string;
   /** Narrow a raw parameter to an allowed value. A hand-edited URL reaches this. */
@@ -249,7 +251,7 @@ export class ApplicationsListComponent {
 
   readonly types = signal<ApplicationType[]>([]);
 
-  /** `gremium` has no visible control. It still mirrors the URL. */
+  /** The committee filter (`?committee=`) has no visible control. It still mirrors the URL. */
   readonly gremium = signal('');
   /**
    * `mine=true`: only the own applications ("Alle ansehen" under "Meine Anträge" on the
@@ -868,7 +870,7 @@ export class ApplicationsListComponent {
   private readonly filters: readonly FilterDef[] = [
     { param: 'q', signal: this.q, empty: '', trim: true },
     { param: 'type', signal: this.typeId, empty: '' },
-    { param: 'gremium', signal: this.gremium, empty: '' },
+    { param: 'committee', field: 'gremium', signal: this.gremium, empty: '' },
     { param: 'mine', signal: this.mine, empty: '', parse: (raw) => (raw === 'true' ? raw : '') },
     { param: 'budget', signal: this.budgetId, empty: '' },
     { param: 'amountMin', signal: this.amountMin, empty: '', numeric: true, trim: true },
@@ -947,7 +949,7 @@ export class ApplicationsListComponent {
     const filters = this.filters.flatMap((f) => {
       const raw = f.signal();
       const value = f.trim ? raw.trim() : raw;
-      return value === f.empty ? [] : [[f.param, f.numeric ? Number(value) : value] as const];
+      return value === f.empty ? [] : [[f.field ?? f.param, f.numeric ? Number(value) : value] as const];
     });
     const states = this.states().length ? { state: [...this.states()] } : {};
     return {

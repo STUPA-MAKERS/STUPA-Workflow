@@ -78,7 +78,7 @@ async function start(url: string, opts: StartOptions = {}) {
     providers: [
       provideRouter([
         {
-          path: 'gremien',
+          path: 'committees',
           component: GremienComponent,
           children: [{ path: ':id', component: GremiumDetailComponent }],
         },
@@ -86,7 +86,7 @@ async function start(url: string, opts: StartOptions = {}) {
         { path: 'meetings/:id', component: TargetStub },
         { path: 'voting', component: TargetStub },
         { path: 'todos/:id', component: TargetStub },
-        { path: 'admin/gremien/:id/members', component: TargetStub },
+        { path: 'admin/committees/:id/members', component: TargetStub },
       ]),
       { provide: GremienApiService, useValue: api },
       { provide: AuthService, useValue: auth },
@@ -118,7 +118,7 @@ describe('GremiumDetailComponent', () => {
   });
 
   it('shows the head with role, facts and actions, and the meetings tab', async () => {
-    const s = await start('/gremien/g-1', { media: [MEDIA.wide] });
+    const s = await start('/committees/g-1', { media: [MEDIA.wide] });
     restore = s.restore;
     const d = s.detail();
     expect(d.split()).toBe(true);
@@ -131,11 +131,11 @@ describe('GremiumDetailComponent', () => {
       'Protokolle öffentlich',
       'Stimmübertragung erlaubt',
     ]);
-    expect(d.tab()).toBe('sitzungen');
+    expect(d.tab()).toBe('meetings');
     expect(s.api.meetings).toHaveBeenCalledWith('g-1');
     expect(s.api.members).not.toHaveBeenCalled();
     expect(d.tabs().map((t) => t.label)).toEqual(['Sitzungen', 'Mitglieder', 'Anwesenheit', 'Beschlüsse']);
-    expect(s.frame.crumbLabel()).toEqual({ url: '/gremien/g-1', label: 'Studierendenparlament' });
+    expect(s.frame.crumbLabel()).toEqual({ url: '/committees/g-1', label: 'Studierendenparlament' });
     const sheet = within(s.harness.fixture.nativeElement.querySelector('app-gremium-detail') as HTMLElement);
     expect(sheet.getByRole('button', { name: 'Sitzungen abonnieren' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Gremium verwalten' })).toBeNull();
@@ -150,47 +150,47 @@ describe('GremiumDetailComponent', () => {
   });
 
   it('keeps the tab in the URL and the visited panels rendered', async () => {
-    const s = await start('/gremien/g-1');
+    const s = await start('/committees/g-1');
     restore = s.restore;
     const d = s.detail();
-    d.selectTab('mitglieder');
+    d.selectTab('members');
     await s.settle();
-    expect(s.router.url).toBe('/gremien/g-1?tab=mitglieder');
+    expect(s.router.url).toBe('/committees/g-1?tab=members');
     expect(s.api.members).toHaveBeenCalledWith('g-1', false);
-    d.selectTab('anwesenheit');
+    d.selectTab('attendance');
     await s.settle();
-    expect([...d.visited()]).toEqual(['sitzungen', 'mitglieder', 'anwesenheit']);
+    expect([...d.visited()]).toEqual(['meetings', 'members', 'attendance']);
     expect(s.api.attendance).toHaveBeenCalled();
-    d.selectTab('beschluesse');
+    d.selectTab('decisions');
     await s.settle();
     expect(s.api.decisions).toHaveBeenCalled();
-    d.selectTab('sitzungen');
+    d.selectTab('meetings');
     await s.settle();
-    expect(s.router.url).toBe('/gremien/g-1');
-    expect(d.tab()).toBe('sitzungen');
+    expect(s.router.url).toBe('/committees/g-1');
+    expect(d.tab()).toBe('meetings');
   });
 
   it('opens an unknown tab of the URL as the meetings', async () => {
-    const s = await start('/gremien/g-1?tab=uebersicht');
+    const s = await start('/committees/g-1?tab=uebersicht');
     restore = s.restore;
-    expect(s.detail().tab()).toBe('sitzungen');
+    expect(s.detail().tab()).toBe('meetings');
   });
 
   it('starts afresh for another gremium', async () => {
-    const s = await start('/gremien/g-1?tab=mitglieder');
+    const s = await start('/committees/g-1?tab=members');
     restore = s.restore;
     const d = s.detail();
-    expect([...d.visited()]).toEqual(['mitglieder']);
-    await s.router.navigateByUrl('/gremien/g-2');
+    expect([...d.visited()]).toEqual(['members']);
+    await s.router.navigateByUrl('/committees/g-2');
     await s.settle();
-    expect([...d.visited()]).toEqual(['sitzungen']);
+    expect([...d.visited()]).toEqual(['meetings']);
     expect(d.roleLabel()).toBe('');
     expect(d.facts()).toEqual(['1 Mitglied']);
     expect(screen.getByRole('button', { name: 'Zur laufenden Sitzung' })).toBeTruthy();
   });
 
   it('plans a meeting with session.manage and opens the administration with admin.gremien', async () => {
-    const s = await start('/gremien/g-1', { plan: true, admin: true });
+    const s = await start('/committees/g-1', { plan: true, admin: true });
     restore = s.restore;
     const d = s.detail();
     screen.getByRole('button', { name: /Sitzung planen/ }).click();
@@ -205,11 +205,11 @@ describe('GremiumDetailComponent', () => {
 
     screen.getByRole('button', { name: 'Gremium verwalten' }).click();
     await s.settle();
-    expect(s.router.url).toBe('/admin/gremien/g-1/members');
+    expect(s.router.url).toBe('/admin/committees/g-1/members');
   });
 
   it('runs every entry of the ⋮ menu', async () => {
-    const s = await start('/gremien/g-1');
+    const s = await start('/committees/g-1');
     restore = s.restore;
     const d = s.detail();
     const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;
@@ -218,21 +218,21 @@ describe('GremiumDetailComponent', () => {
 
     d.onMenu({ id: 'votes', label: '' }, abo);
     await s.settle();
-    expect(s.router.url).toBe('/voting?gremium=g-1');
+    expect(s.router.url).toBe('/voting?committee=g-1');
 
-    await s.router.navigateByUrl('/gremien/g-1');
+    await s.router.navigateByUrl('/committees/g-1');
     await s.settle();
     s.detail().onMenu({ id: 'admin', label: '' }, abo);
     await s.settle();
-    expect(s.router.url).toBe('/admin/gremien/g-1/members');
+    expect(s.router.url).toBe('/admin/committees/g-1/members');
 
-    await s.router.navigateByUrl('/gremien/g-1');
+    await s.router.navigateByUrl('/committees/g-1');
     await s.settle();
     s.detail().onMenu({ id: 'next', label: '' }, abo);
     await s.settle();
     expect(s.router.url).toBe('/meetings/m-9');
 
-    await s.router.navigateByUrl('/gremien/g-1');
+    await s.router.navigateByUrl('/committees/g-1');
     await s.settle();
     s.detail().onMenu({ id: 'meetings', label: '' }, abo);
     await s.settle();
@@ -240,7 +240,7 @@ describe('GremiumDetailComponent', () => {
   });
 
   it('moves the actions into the ⋮ menu on a phone', async () => {
-    const s = await start('/gremien/g-1', { media: [MEDIA.phone], plan: true, admin: true });
+    const s = await start('/committees/g-1', { media: [MEDIA.phone], plan: true, admin: true });
     restore = s.restore;
     const d = s.detail();
     expect(screen.queryByRole('button', { name: 'Sitzungen abonnieren' })).toBeNull();
@@ -250,7 +250,7 @@ describe('GremiumDetailComponent', () => {
   });
 
   it('keeps "Nächste Sitzung" as the one action on a phone without planning', async () => {
-    const s = await start('/gremien/g-2', { media: [MEDIA.phone] });
+    const s = await start('/committees/g-2', { media: [MEDIA.phone] });
     restore = s.restore;
     const d = s.detail();
     expect(d.showNext()).toBe(true);
@@ -258,23 +258,23 @@ describe('GremiumDetailComponent', () => {
   });
 
   it('says when the gremium is not there, or the list failed', async () => {
-    const s = await start('/gremien/g-x');
+    const s = await start('/committees/g-x');
     restore = s.restore;
     expect(screen.getByText('Gremium nicht gefunden')).toBeTruthy();
     s.detail().openNext();
     s.detail().openAdmin();
     await s.settle();
-    expect(s.router.url).toBe('/admin/gremien/g-x/members');
+    expect(s.router.url).toBe('/admin/committees/g-x/members');
   });
 
   it('shows the list error in the sheet', async () => {
-    const s = await start('/gremien/g-1', { overview: jest.fn(() => throwError(() => new Error('x'))) });
+    const s = await start('/committees/g-1', { overview: jest.fn(() => throwError(() => new Error('x'))) });
     restore = s.restore;
     expect(screen.getAllByText('Die Gremien konnten nicht geladen werden.').length).toBeGreaterThan(0);
   });
 
   it('shows a skeleton while the list loads', async () => {
-    const s = await start('/gremien/g-1', { overview: jest.fn(() => NEVER) });
+    const s = await start('/committees/g-1', { overview: jest.fn(() => NEVER) });
     restore = s.restore;
     expect(s.harness.routeNativeElement?.querySelector('.gd--busy')).toBeTruthy();
   });
@@ -291,7 +291,7 @@ describe('GremiumDetailComponent', () => {
     });
 
     it('shows the open cards of the board of the Gremium, in board order', async () => {
-      const s = await start('/gremien/g-1?tab=todos', { boards, board: gremiumBoard });
+      const s = await start('/committees/g-1?tab=todos', { boards, board: gremiumBoard });
       restore = s.restore;
       const d = s.detail();
       expect(s.todos.boards).toHaveBeenCalledWith('g-1');
@@ -308,10 +308,10 @@ describe('GremiumDetailComponent', () => {
     });
 
     it('has no tab To-Dos when the person reads no board of the Gremium', async () => {
-      const s = await start('/gremien/g-1?tab=todos', { boards: [] });
+      const s = await start('/committees/g-1?tab=todos', { boards: [] });
       restore = s.restore;
       const d = s.detail();
-      expect(d.tab()).toBe('sitzungen');
+      expect(d.tab()).toBe('meetings');
       expect(d.tabs().map((t) => t.id)).not.toContain('todos');
       expect(d.menu()[0].items.map((i) => i.id)).toEqual(['meetings', 'votes']);
     });
@@ -320,7 +320,7 @@ describe('GremiumDetailComponent', () => {
       TestBed.overrideProvider(TodosApiService, {
         useValue: { boards: jest.fn(() => throwError(() => new Error('x'))), board: jest.fn(), linked: jest.fn() },
       });
-      const s = await start('/gremien/g-1?tab=todos');
+      const s = await start('/committees/g-1?tab=todos');
       restore = s.restore;
       expect(s.detail().tabs().map((t) => t.id)).not.toContain('todos');
     });
@@ -333,13 +333,13 @@ describe('GremiumDetailComponent', () => {
           linked: jest.fn(() => of([])),
         },
       });
-      const s = await start('/gremien/g-1?tab=todos');
+      const s = await start('/committees/g-1?tab=todos');
       restore = s.restore;
       expect(screen.getByText('Keine offenen To-Dos')).toBeTruthy();
     });
 
     it('says so when the board has no open card', async () => {
-      const s = await start('/gremien/g-1?tab=todos', { boards, board: board({ id: 'b-7', cards: [] }) });
+      const s = await start('/committees/g-1?tab=todos', { boards, board: board({ id: 'b-7', cards: [] }) });
       restore = s.restore;
       expect(screen.getByText('Keine offenen To-Dos')).toBeTruthy();
     });

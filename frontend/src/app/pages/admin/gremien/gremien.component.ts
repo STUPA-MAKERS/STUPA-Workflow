@@ -56,7 +56,7 @@ interface Setting {
 }
 
 /**
- * Gremien administration (`/admin/gremien`).
+ * Gremien administration (`/admin/committees`).
  *
  * One row per gremium: name, slug, "n Mitglieder · n Rollen", the link to the members,
  * edit, delete and the toggle. An open row shows the settings (gaps N38) and the role
@@ -245,7 +245,7 @@ export class AdminGremienComponent {
 
   protected onRowMenu(item: RowMenuItem, g: Gremium): void {
     if (item.id === 'edit') this.openEdit(g);
-    if (item.id === 'members') void this.router.navigate(['/admin/gremien', g.id, 'members']);
+    if (item.id === 'members') void this.router.navigate(['/admin/committees', g.id, 'members']);
     if (item.id === 'delete') this.askDelete(g);
   }
 

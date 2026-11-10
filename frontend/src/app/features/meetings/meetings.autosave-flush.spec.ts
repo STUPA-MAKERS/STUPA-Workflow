@@ -119,7 +119,7 @@ async function loaded() {
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   http.match((r) => r.url.endsWith('/gremium')).forEach((req) => req.flush([]));
-  http.match((r) => r.url.endsWith('/gremien')).forEach((req) => req.flush([]));
+  http.match((r) => r.url.endsWith('/committees')).forEach((req) => req.flush([]));
   http.expectOne('/api/meetings/m-1').flush(MEETING);
   http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
   http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -191,9 +191,9 @@ describe('MeetingsComponent — autosave flush on TOP switch', () => {
       cmp.handOver(cmp.meeting()!, 'now');
       const save = http.expectOne('/api/meetings/m-1/agenda/t-1');
       expect(save.request.body).toEqual({ body: 'Letzter Satz' });
-      http.expectNone('/api/meetings/m-1/protokollant-handover');
+      http.expectNone('/api/meetings/m-1/minute-taker-handover');
       save.flush([AGENDA_ITEM({ body: 'Letzter Satz' })]);
-      const handover = http.expectOne('/api/meetings/m-1/protokollant-handover');
+      const handover = http.expectOne('/api/meetings/m-1/minute-taker-handover');
       expect(handover.request.body).toEqual({ principalId: 'pr-2', mode: 'now' });
       handover.flush({ ...MEETING, protokollantId: 'pr-2' });
       jest.advanceTimersByTime(5000);
@@ -207,7 +207,7 @@ describe('MeetingsComponent — autosave flush on TOP switch', () => {
     const { cmp, http } = await loaded();
     cmp.askHandover('nobody');
     cmp.handOver(cmp.meeting()!, 'now');
-    http.expectNone('/api/meetings/m-1/protokollant-handover');
+    http.expectNone('/api/meetings/m-1/minute-taker-handover');
     http.verify();
   });
 
@@ -222,7 +222,7 @@ describe('MeetingsComponent — autosave flush on TOP switch', () => {
       .expectOne('/api/meetings/m-1/agenda/t-1')
       .flush(null, { status: 403, statusText: 'Forbidden' });
     expect(cmp.saveState()).toBe('error');
-    http.expectOne('/api/meetings/m-1/protokollant-handover').flush(MEETING);
+    http.expectOne('/api/meetings/m-1/minute-taker-handover').flush(MEETING);
     http.verify();
   });
 

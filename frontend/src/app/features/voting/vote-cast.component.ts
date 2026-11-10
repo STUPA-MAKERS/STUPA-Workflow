@@ -219,7 +219,7 @@ export class VoteCastComponent implements OnDestroy {
     const allowed = gremiumId
       ? this.auth.canInGremium(gremiumId, 'session.manage')
       : this.auth.canInAnyGremium('session.manage');
-    return allowed ? ['/voting/beamer', meetingId] : null;
+    return allowed ? ['/voting/projector', meetingId] : null;
   });
 
   /**

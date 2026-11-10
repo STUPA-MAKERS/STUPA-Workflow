@@ -201,7 +201,7 @@ export class MeetingsComponent {
 
   /**
    * "Beamer-Ansicht": the screen for the projector, in a new tab, so the session page
-   * stays open (`/voting/beamer/:id`, no chrome).
+   * stays open (`/voting/projector/:id`, no chrome).
    */
   openBeamer(m: Meeting): void {
     const url = this.router.serializeUrl(beamerUrl(this.router, m.id));

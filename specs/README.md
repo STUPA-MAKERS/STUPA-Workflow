@@ -23,7 +23,7 @@ specs/
       public/          public-pages
     non-functional/
       accessibility/  conformance, documents, interaction, language, perception, settings, statement
-      compatibility/  deploy, pwa
+      compatibility/  deploy, links, pwa
       performance/    loading
       privacy/        personal-data
       security/       access, files, integrity, network
@@ -381,6 +381,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/statement/000497](requirements/non-functional/accessibility/statement/000497_barrier-report.md) | A user can report a barrier as a ticket | approved |
 | [NF/compatibility/deploy/000394](requirements/non-functional/compatibility/deploy/000394_migrate-first.md) | A deploy runs the migration first | approved |
 | [NF/compatibility/deploy/000435](requirements/non-functional/compatibility/deploy/000435_caddy-edge.md) | Caddy is the edge proxy | approved |
+| [NF/compatibility/links/000592](requirements/non-functional/compatibility/links/000592_old-german-urls.md) | An old German URL redirects to its English URL | approved |
 | [NF/compatibility/pwa/000220](requirements/non-functional/compatibility/pwa/000220_zoom.md) | Zoom is blocked only in the installed app | approved |
 | [NF/compatibility/pwa/000221](requirements/non-functional/compatibility/pwa/000221_android-nav-bar.md) | The Android navigation bar has the manifest colour | approved |
 | [NF/compatibility/pwa/000222](requirements/non-functional/compatibility/pwa/000222_update-offline.md) | The app shows update and offline bars | approved |
@@ -551,6 +552,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/api/000042](style/shared/api/000042_problem-json.md) | Every error is problem+json | approved |
 | [S/shared/api/000468](style/shared/api/000468_specific-conflict-code.md) | A conflict names a specific code | approved |
 | [S/shared/api/000475](style/shared/api/000475_oauth-error-shape.md) | The OAuth token endpoint uses the RFC 6749 error shape | approved |
+| [S/shared/api/000591](style/shared/api/000591_english-urls.md) | Every URL is in English | approved |
 | [S/shared/functional/000081](style/shared/functional/000081_body-shape.md) | A function body has one shape | approved |
 | [S/shared/functional/000082](style/shared/functional/000082_readability-limit.md) | Readability limits the single expression | approved |
 | [S/shared/functional/000083](style/shared/functional/000083_bind-once.md) | A local is bound once | approved |

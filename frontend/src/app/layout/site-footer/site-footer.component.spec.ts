@@ -106,6 +106,6 @@ describe('SiteFooterComponent', () => {
   /** Spec 000496: the statement link shows on every page, also without legal links. */
   it('always links to the accessibility statement', async () => {
     await setup(branding({ copyright: { de: '© AStA' } }));
-    expect(screen.getByRole('link', { name: 'Barrierefreiheit' })).toHaveAttribute('href', '/barrierefreiheit');
+    expect(screen.getByRole('link', { name: 'Barrierefreiheit' })).toHaveAttribute('href', '/accessibility');
   });
 });

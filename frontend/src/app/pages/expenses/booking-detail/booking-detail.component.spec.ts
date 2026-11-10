@@ -166,7 +166,7 @@ describe('BookingDetailComponent', () => {
     expect(screen.getByRole('img', { name: /Ausgegeben 4\.200,00/ })).toBeInTheDocument();
     expect(screen.getByText('VS-200-220')).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Im Budget ansehen' });
-    expect(link.getAttribute('href')).toBe('/budget?budget=top&ks=mb&fy=fy');
+    expect(link.getAttribute('href')).toBe('/budget?budget=top&costCentre=mb&fy=fy');
     expect(view.container.querySelector('.fd--split')).not.toBeNull();
   });
 

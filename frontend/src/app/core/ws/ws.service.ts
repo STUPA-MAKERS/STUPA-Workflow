@@ -38,7 +38,7 @@ export class WsService {
 
   /** Open `/api/ws/meetings/{id}`, or `…/beamer` for read-only access. */
   connectMeeting(meetingId: string, beamer = false): MeetingChannel {
-    const suffix = beamer ? '/beamer' : '';
+    const suffix = beamer ? '/projector' : '';
     return this.open(`/api/ws/meetings/${meetingId}${suffix}`);
   }
 

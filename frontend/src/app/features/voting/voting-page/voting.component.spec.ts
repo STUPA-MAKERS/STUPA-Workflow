@@ -438,7 +438,7 @@ describe('VotingComponent', () => {
   describe('filters', () => {
     /** A gremium that the person is not in shows its id until a row names it. */
     it('reads the filters from the URL and sends them', async () => {
-      const { listVotes, cmp } = await start('/voting?status=ended&gremium=g2&q=Haushalt');
+      const { listVotes, cmp } = await start('/voting?status=ended&committee=g2&q=Haushalt');
       expect(listVotes).toHaveBeenCalledWith({
         status: ['closed'],
         gremiumId: 'g2',
@@ -487,14 +487,14 @@ describe('VotingComponent', () => {
       cmp.setStatus('');
       expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { status: null } }));
       cmp.setGremium('g2');
-      expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { gremium: 'g2' } }));
+      expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { committee: 'g2' } }));
       cmp.setGremium('');
-      expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { gremium: null } }));
+      expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { committee: null } }));
       cmp.search.set('xy');
       cmp.reset();
       expect(navigate).toHaveBeenLastCalledWith(
         [],
-        expect.objectContaining({ queryParams: { q: null, status: null, gremium: null, kind: null } }),
+        expect.objectContaining({ queryParams: { q: null, status: null, committee: null, kind: null } }),
       );
       expect(cmp.search.text()).toBe('');
     });
@@ -883,7 +883,7 @@ describe('VotingComponent', () => {
     it('keeps a filtered list when a connect replays a vote that the filter hides', async () => {
       jest.useFakeTimers({ doNotFake: ['Date'] });
       try {
-        for (const url of ['/voting?status=ended', '/voting?gremium=g2', '/voting?q=Mensa']) {
+        for (const url of ['/voting?status=ended', '/voting?committee=g2', '/voting?q=Mensa']) {
           TestBed.resetTestingModule();
           const { sessions, harness, router } = await start(url, {
             live: [{ id: 'm1', status: 'live' }],
@@ -1109,7 +1109,7 @@ describe('VotingComponent', () => {
     const navigate = jest.spyOn(router, 'navigate');
     cmp.reset();
     expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({
-      queryParams: { q: null, status: null, gremium: null, kind: null },
+      queryParams: { q: null, status: null, committee: null, kind: null },
     }));
   });
 

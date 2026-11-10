@@ -112,7 +112,7 @@ def _client(principal: Principal | None = None) -> TestClient:
 
 
 def test_overview_answers_camel_case(calls: _Calls) -> None:
-    resp = _client(Principal(sub="u1")).get("/api/gremien/overview")
+    resp = _client(Principal(sub="u1")).get("/api/committees/overview")
     assert resp.status_code == 200
     body = resp.json()[0]
     assert body["isMember"] is True
@@ -122,8 +122,8 @@ def test_overview_answers_camel_case(calls: _Calls) -> None:
 
 
 def test_routes_need_a_login(calls: _Calls) -> None:
-    assert _client().get("/api/gremien/overview").status_code == 401
-    assert _client().get(f"/api/gremien/{GID}/members").status_code == 401
+    assert _client().get("/api/committees/overview").status_code == 401
+    assert _client().get(f"/api/committees/{GID}/members").status_code == 401
     assert calls.seen == []
 
 
@@ -133,7 +133,7 @@ def test_routes_need_a_login(calls: _Calls) -> None:
 )
 def test_hidden_gremium_is_404(calls: _Calls, path: str) -> None:
     calls.hidden.add(GID)
-    resp = _client(Principal(sub="u1")).get(f"/api/gremien/{GID}/{path}")
+    resp = _client(Principal(sub="u1")).get(f"/api/committees/{GID}/{path}")
     assert resp.status_code == 404
     assert resp.json()["code"] == "gremium_not_found"
     assert calls.seen == []
@@ -141,13 +141,13 @@ def test_hidden_gremium_is_404(calls: _Calls, path: str) -> None:
 
 def test_members_passes_former(calls: _Calls) -> None:
     client = _client(Principal(sub="u1"))
-    assert client.get(f"/api/gremien/{GID}/members").status_code == 200
-    assert client.get(f"/api/gremien/{GID}/members?former=true").status_code == 200
+    assert client.get(f"/api/committees/{GID}/members").status_code == 200
+    assert client.get(f"/api/committees/{GID}/members?former=true").status_code == 200
     assert [c[2]["former"] for c in calls.seen] == [False, True]
 
 
 def test_meetings(calls: _Calls) -> None:
-    resp = _client(Principal(sub="u1")).get(f"/api/gremien/{GID}/meetings")
+    resp = _client(Principal(sub="u1")).get(f"/api/committees/{GID}/meetings")
     assert resp.status_code == 200
     assert resp.json() == []
     assert calls.seen[0][1] == (GID,)
@@ -155,7 +155,7 @@ def test_meetings(calls: _Calls) -> None:
 
 def test_attendance_passes_the_range(calls: _Calls) -> None:
     resp = _client(Principal(sub="u1")).get(
-        f"/api/gremien/{GID}/attendance?from=2026-01&to=2026-06"
+        f"/api/committees/{GID}/attendance?from=2026-01&to=2026-06"
     )
     assert resp.status_code == 200
     assert resp.json()["fromMonth"] == "2026-05"
@@ -164,25 +164,25 @@ def test_attendance_passes_the_range(calls: _Calls) -> None:
 
 @pytest.mark.parametrize("query", ["from=2026-13", "to=26-01", "from=2026-1"])
 def test_attendance_rejects_a_bad_month(calls: _Calls, query: str) -> None:
-    resp = _client(Principal(sub="u1")).get(f"/api/gremien/{GID}/attendance?{query}")
+    resp = _client(Principal(sub="u1")).get(f"/api/committees/{GID}/attendance?{query}")
     assert resp.status_code == 422
     assert calls.seen == []
 
 
 def test_member_attendance(calls: _Calls) -> None:
     client = _client(Principal(sub="u1"))
-    resp = client.get(f"/api/gremien/{GID}/attendance/{PID}?month=2026-10")
+    resp = client.get(f"/api/committees/{GID}/attendance/{PID}?month=2026-10")
     assert resp.status_code == 200
     assert resp.json()["principalId"] == str(PID)
     assert calls.seen[0][1] == (GID, PID, "2026-10")
-    assert client.get(f"/api/gremien/{GID}/attendance/{PID}").status_code == 422
-    assert client.get(f"/api/gremien/{GID}/attendance/{PID}?month=2026-00").status_code == 422
+    assert client.get(f"/api/committees/{GID}/attendance/{PID}").status_code == 422
+    assert client.get(f"/api/committees/{GID}/attendance/{PID}?month=2026-00").status_code == 422
 
 
 def test_decisions_passes_the_filters(calls: _Calls) -> None:
     client = _client(Principal(sub="u1"))
     resp = client.get(
-        f"/api/gremien/{GID}/decisions?cursor=abc&q=Etat&result=passed&kind=motion&since=2026-01-01"
+        f"/api/committees/{GID}/decisions?cursor=abc&q=Etat&result=passed&kind=motion&since=2026-01-01"
     )
     assert resp.status_code == 200
     assert resp.json() == {"items": [], "nextCursor": None}
@@ -208,7 +208,7 @@ def test_decisions_passes_the_filters(calls: _Calls) -> None:
     ],
 )
 def test_decisions_rejects_bad_filters(calls: _Calls, query: str) -> None:
-    resp = _client(Principal(sub="u1")).get(f"/api/gremien/{GID}/decisions?{query}")
+    resp = _client(Principal(sub="u1")).get(f"/api/committees/{GID}/decisions?{query}")
     assert resp.status_code == 422
     assert calls.seen == []
 

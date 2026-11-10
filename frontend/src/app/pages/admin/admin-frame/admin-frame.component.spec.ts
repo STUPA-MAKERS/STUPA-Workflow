@@ -61,7 +61,7 @@ async function setup(perms: string[], url = '/admin/users', wide = true, phone =
             { path: 'flow', component: StubPageComponent, data: { adminNav: false, adminPane: true } },
             { path: 'plain', component: StubPageComponent, data: { adminNav: false } },
             { path: 'cost-centres', component: StubPageComponent },
-            { path: 'gremien/g1/members', component: StubPageComponent, data: { parent: ['admin', 'admin/gremien'] } },
+            { path: 'committees/g1/members', component: StubPageComponent, data: { parent: ['admin', 'admin/committees'] } },
             { path: 'users', component: StubPageComponent, data: { parent: ['admin'] } },
             {
               path: 'forms/:id',
@@ -111,9 +111,9 @@ describe('AdminFrameComponent swipe back on a phone', () => {
   }
 
   it('leads an admin page back to its nearest breadcrumb', async () => {
-    const view = await setup(ALL, '/admin/gremien/g1/members', false);
+    const view = await setup(ALL, '/admin/committees/g1/members', false);
     const router = await swipe(view);
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin/gremien');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin/committees');
   });
 
   it('leads an admin page without a parent to the home page', async () => {

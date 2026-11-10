@@ -232,7 +232,7 @@ export class BrandingEditorComponent {
   }
 
   /**
-   * The text map of the accessibility statement (`/barrierefreiheit`, spec 000495). The
+   * The text map of the accessibility statement (`/accessibility`, spec 000495). The
    * server fills a config without it with its built-in draft.
    */
   protected statementMap(d: Branding): I18nMap {

@@ -666,7 +666,7 @@ export class BudgetDashboardComponent {
    * Follow the URL after the first restore, so a link into this page works while the
    * reader is already on it.
    *
-   * The global search sends a cost centre here as `/budget?ks=…`, and the router keeps
+   * The global search sends a cost centre here as `/budget?costCentre=…`, and the router keeps
    * this component alive for a query-string-only change. `restoreOrDefault` cannot do
    * this job: it is latched, because its OTHER job is to pick a default exactly once
    * while the tree and the fiscal years trickle in.
@@ -692,7 +692,7 @@ export class BudgetDashboardComponent {
    * One resolver for both entry points, so a deep link cannot mean one thing on arrival
    * and another when it is followed later.
    *
-   * A search hit is `?ks=…` alone, so the root comes from the cost centre itself when the URL does
+   * A search hit is `?costCentre=…` alone, so the root comes from the cost centre itself when the URL does
    * not name one. A URL that names a root whose years have not landed yet waits rather than settle
    * for the first ready root, because the choice is latched.
    */
@@ -706,7 +706,7 @@ export class BudgetDashboardComponent {
     const selectable = (id: string | null): boolean =>
       !!id && !!this.nodeById().get(id) && (this.fiscalYearsByBudget()[id]?.length ?? 0) > 0;
 
-    const ks = qp.get('ks');
+    const ks = qp.get('costCentre');
     const qpBudget = qp.get('budget');
     const derived = ks && this.nodeById().get(ks) ? this.rootOf(ks) : null;
     const wanted = selectable(qpBudget) ? qpBudget : selectable(derived) ? derived : null;
@@ -758,7 +758,7 @@ export class BudgetDashboardComponent {
       relativeTo: this.route,
       queryParams: {
         budget: this.selectedBudgetId() || null,
-        ks: this.selectedKsId() || null,
+        costCentre: this.selectedKsId() || null,
         fy: this.selectedFyId() || null,
       },
       queryParamsHandling: 'merge',

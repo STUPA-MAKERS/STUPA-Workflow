@@ -515,7 +515,7 @@ class LinkResolver:
         ).all()
         return {
             gid: Resolved(
-                accessible=True, title=name, url=f"/gremien/{gid}", detail=TodoLinkDetail()
+                accessible=True, title=name, url=f"/committees/{gid}", detail=TodoLinkDetail()
             )
             for gid, name in rows
         }
@@ -592,7 +592,7 @@ class LinkResolver:
             bid: Resolved(
                 accessible=True,
                 title=name,
-                url=f"/budget?ks={bid}" if reads else None,
+                url=f"/budget?costCentre={bid}" if reads else None,
                 detail=TodoLinkDetail(cost_centre=path_key),
             )
             for bid, name, path_key in rows

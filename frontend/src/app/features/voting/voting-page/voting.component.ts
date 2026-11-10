@@ -439,7 +439,7 @@ export class VotingComponent implements OnDestroy {
   }
 
   setGremium(value: string): void {
-    this.navigate({ gremium: value || null });
+    this.navigate({ committee: value || null });
   }
 
   setKind(value: string): void {
@@ -448,7 +448,7 @@ export class VotingComponent implements OnDestroy {
 
   reset(): void {
     this.search.sync('');
-    this.navigate({ q: null, status: null, gremium: null, kind: null });
+    this.navigate({ q: null, status: null, committee: null, kind: null });
   }
 
   /** The new poll exists: the list follows and the detail shows it. */
@@ -464,7 +464,7 @@ export class VotingComponent implements OnDestroy {
     const status = pm.get('status') ?? '';
     const known = status !== '' && status in STATUS_QUERY && (status !== 'draft' || this.canManage());
     this.statusFilter.set(known ? (status as VoteStatusFilter) : '');
-    this.gremiumId.set(pm.get('gremium') ?? '');
+    this.gremiumId.set(pm.get('committee') ?? '');
     const kind = pm.get('kind') ?? '';
     this.kindFilter.set((KINDS as readonly string[]).includes(kind) ? (kind as VoteKind) : '');
   }

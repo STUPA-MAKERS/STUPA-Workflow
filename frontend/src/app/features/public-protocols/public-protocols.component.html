@@ -81,7 +81,7 @@
               <div class="pp__titles">
                 <span class="pp__meta">{{ p.gremium.name }} · {{ when(p) }}</span>
                 <h3 class="pp__cardTitle">
-                  <a [routerLink]="['/protokolle', p.id]">
+                  <a [routerLink]="['/protocols', p.id]">
                     <app-highlight [text]="p.title" [query]="appliedQuery()" />
                   </a>
                 </h3>
@@ -124,7 +124,7 @@
                 </a>
               }
               <span class="pp__pdfMeta">{{ pdfMeta(p) }}</span>
-              <a class="pp__view" [routerLink]="['/protokolle', p.id]">
+              <a class="pp__view" [routerLink]="['/protocols', p.id]">
                 {{ 'publicProtocols.card.view' | t }}
                 <app-icon name="right" [size]="15" />
               </a>

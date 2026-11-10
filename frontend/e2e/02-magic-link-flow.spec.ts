@@ -14,13 +14,13 @@ import {
  * against the real stack:
  *
  *  1. Create the application over the API. Request a magic link. Read the token from
- *     mailpit, a real SMTP sink. Open /status. The application is editable in the
+ *     mailpit, a real SMTP sink. Open /my-applications/<id>. The application is editable in the
  *     initial status `entwurf`.
  *  2. The admin (seeded session) moves the application to `pruefung` with a flow
  *     transition (edit_allowed=false).
  *  3. The applicant loads the page again. The application is read-only and locked.
  *
- * The test opens the magic link over `/status?t=…&app=…`, with the token pulled from
+ * The test opens the magic link over `/my-applications/<id>#t=…`, with the token pulled from
  * mailpit.
  * The magic-link request is unauthenticated, so it needs no CSRF token. The page shows the list
  * beside the detail. The detail is the article of the open application, so the checks look there
@@ -43,7 +43,7 @@ test('@gating Magic-Link bearbeiten → Flow-Transition → read-only', async ({
 
   const applicant = await browser.newContext();
   const ap = await applicant.newPage();
-  await ap.goto(`/status?t=${token}&app=${appId}`);
+  await ap.goto(`/my-applications/${appId}#t=${token}`);
   await expect(ap.getByRole('heading', { level: 1, name: 'Magic-Link Antrag' })).toBeVisible();
   await expect(ap.getByRole('heading', { name: 'Verlauf' })).toBeVisible();
   await expect(ap.getByRole('button', { name: /Angaben bearbeiten/ })).toBeEnabled();
@@ -56,7 +56,7 @@ test('@gating Magic-Link bearbeiten → Flow-Transition → read-only', async ({
   await detail.getByRole('button', { name: 'Zur Prüfung' }).click();
   await expect(detail.locator('.ad__line').getByText('In Prüfung')).toBeVisible();
 
-  await ap.goto(`/status?app=${appId}`);
+  await ap.goto(`/my-applications/${appId}`);
   await expect(ap.getByText('Im aktuellen Status gesperrt')).toBeVisible();
   await expect(ap.getByRole('button', { name: /Angaben bearbeiten/ })).toBeDisabled();
 

@@ -59,7 +59,7 @@ async def test_gremium_delete_deletes_meetings_and_keeps_votes_without_a_meeting
         await session.commit()
 
     with TestClient(api) as client:
-        resp = client.delete(f"/api/admin/gremien/{s.gremium_id}")
+        resp = client.delete(f"/api/admin/committees/{s.gremium_id}")
     assert resp.status_code == 204, resp.text
 
     async with maker() as session:
@@ -103,7 +103,7 @@ async def test_gremium_delete_with_an_open_vote_is_refused(
         await _standalone_vote(maker, s.gremium_id, "open")
 
     with TestClient(api) as client:
-        resp = client.delete(f"/api/admin/gremien/{s.gremium_id}")
+        resp = client.delete(f"/api/admin/committees/{s.gremium_id}")
     assert resp.status_code == 409, resp.text
     assert resp.headers["content-type"] == "application/problem+json"
     assert resp.json()["code"] == "open_vote"

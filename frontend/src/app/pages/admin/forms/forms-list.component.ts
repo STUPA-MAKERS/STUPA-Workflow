@@ -114,7 +114,7 @@ export class FormsListComponent {
   protected readonly form = signal<NewForm>(emptyForm());
 
   /**
-   * The dropdown source is the authenticated /gremien, not admin/gremien, so a form manager with
+   * The dropdown source is the authenticated /committees, not admin/committees, so a form manager with
    * form.configure fills the Gremium column without the admin.gremien permission.
    */
   constructor() {

@@ -137,7 +137,7 @@ describe('AdminGremienComponent', () => {
     const { fixture } = await setup();
     const nav = jest.spyOn(fixture.debugElement.injector.get(Router), 'navigate').mockResolvedValue(true);
     await pick('AStA', 'Mitglieder');
-    expect(nav).toHaveBeenCalledWith(['/admin/gremien', 'g-2', 'members']);
+    expect(nav).toHaveBeenCalledWith(['/admin/committees', 'g-2', 'members']);
   });
 
   it('tags a gremium that publishes its protocols and names the setting', async () => {

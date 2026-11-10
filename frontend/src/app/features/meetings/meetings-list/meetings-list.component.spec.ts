@@ -131,7 +131,7 @@ function load(
   view: View,
   pages: { upcoming?: Page; past?: Page; gremien?: { id: string; name: string }[] } = {},
 ): { past: TestRequest; upcoming: TestRequest } {
-  view.http.expectOne('/api/meetings/gremien').flush(pages.gremien ?? []);
+  view.http.expectOne('/api/meetings/committees').flush(pages.gremien ?? []);
   view.timeline.loadList();
   const upcoming = timelineReq(view.http, 'upcoming');
   const past = timelineReq(view.http, 'past');
@@ -243,7 +243,7 @@ describe('MeetingsListComponent', () => {
 
   it('shows the placeholder rows while the list loads', async () => {
     const view = await setup();
-    view.http.expectOne('/api/meetings/gremien').flush([]);
+    view.http.expectOne('/api/meetings/committees').flush([]);
     view.timeline.loadList();
     view.fixture.detectChanges();
     expect(screen.getByRole('status')).toHaveTextContent('Sitzungen werden geladen');

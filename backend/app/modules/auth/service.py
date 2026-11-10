@@ -122,7 +122,7 @@ async def request_magic_link(
         )
     )
     await db.flush()
-    link = f"{settings.public_base_url.rstrip('/')}/antrag/{app.id}#t={token}"
+    link = f"{settings.public_base_url.rstrip('/')}/my-applications/{app.id}#t={token}"
     result = deliver(email, link)
     if inspect.isawaitable(result):
         await result
