@@ -142,7 +142,7 @@
   outline: none;
 }
 .agd__noteInput::placeholder {
-  color: var(--color-text-subtle);
+  color: var(--field-text, var(--color-text-subtle));
   opacity: 1;
 }
 

@@ -72,7 +72,7 @@
   font-size: var(--fs-small);
 }
 .ccs__placeholder {
-  color: var(--color-text-subtle);
+  color: var(--field-text, var(--color-text-subtle));
 }
 .ccs__swatch {
   display: inline-block;
@@ -152,6 +152,7 @@
   background: var(--field-bg, var(--color-surface-1));
   color: var(--field-text, var(--color-text-muted));
   box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .ccs__search:focus-within {
   box-shadow: var(--field-focus, inset 0 0 0 2px var(--color-focus-ring));
@@ -159,6 +160,7 @@
 .ccs__search--sheet {
   margin: 0 0 var(--space-3);
   background: var(--field-bg, var(--color-surface-3));
+  @include f.ring;
 }
 .ccs__input {
   flex: 1 1 auto;
@@ -169,12 +171,12 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--color-text);
+  color: var(--field-text, var(--color-text));
   font: inherit;
   font-size: var(--fs-md);
 }
 .ccs__input::placeholder {
-  color: var(--color-text-subtle);
+  color: var(--field-text, var(--color-text-subtle));
 }
 .ccs__input::-webkit-search-cancel-button {
   display: none;

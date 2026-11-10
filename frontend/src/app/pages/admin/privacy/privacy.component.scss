@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use '../../../shared/ui/surface-card' as sc;
+@use 'field' as f;
 
 :host {
   display: block;
@@ -102,6 +103,7 @@
   font: inherit;
   font-size: var(--fs-md);
   box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .pv__textarea:focus-visible {
   outline: var(--field-focus-outline, none);

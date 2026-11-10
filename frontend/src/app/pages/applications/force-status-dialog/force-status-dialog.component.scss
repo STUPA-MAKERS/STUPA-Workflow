@@ -1,3 +1,4 @@
+@use 'field' as f;
 .fsd__lead {
   margin: 0 0 var(--space-3);
   color: var(--color-text-muted);
@@ -27,6 +28,7 @@
     font: inherit;
     line-height: 1.4;
     box-shadow: var(--field-edge, none);
+    @include f.ring;
   }
 
   textarea:focus-visible {

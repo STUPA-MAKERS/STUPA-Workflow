@@ -96,6 +96,7 @@
   font-size: var(--fs-h1);
   font-weight: var(--fw-semibold);
   box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .ts__titleInput:focus-visible {
   outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
@@ -357,5 +358,5 @@
   @include f.highlight-surface;
 }
 .ts__raw::placeholder {
-  color: var(--color-text-muted);
+  color: var(--field-text, var(--color-text-muted));
 }

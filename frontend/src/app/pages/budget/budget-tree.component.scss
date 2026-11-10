@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'field' as f;
 
 :host {
   display: block;
@@ -291,6 +292,7 @@
   border-radius: var(--radius-field);
   background: var(--field-bg, var(--color-surface-sunken));
   box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .bt__numField:focus-within {
   box-shadow: var(--field-focus, inset 0 0 0 2px var(--color-focus-ring));

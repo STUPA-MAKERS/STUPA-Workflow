@@ -1,4 +1,5 @@
 @use '../../../shared/ui/surface-card' as sc;
+@use 'field' as f;
 :host {
   display: block;
 }
@@ -142,6 +143,7 @@
   border-radius: var(--radius-field);
   background: var(--field-bg, var(--color-surface-sunken));
   box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .br__area:focus-within {
   box-shadow: var(--field-focus, inset 0 0 0 2px var(--color-focus-ring));
@@ -165,7 +167,7 @@
   outline: none;
 }
 .br__areaInput::placeholder {
-  color: var(--field-label, var(--color-text-subtle));
+  color: var(--field-text, var(--field-label, var(--color-text-subtle)));
 }
 .br__areaInput--line {
   min-height: 1.75rem;
