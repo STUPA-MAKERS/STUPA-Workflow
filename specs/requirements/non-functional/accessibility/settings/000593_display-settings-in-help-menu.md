@@ -15,8 +15,8 @@ scope:
 
 The help menu must show a group "Darstellung" between "Barrierefreiheit" and "Problem
 melden". The group must have one switch for each of these settings: "Dunkles Design"
-(000218), "Mehr Kontrast" (000595), "Weniger Bewegung" (000219) and "Weniger Transparenz"
-(000596). The group must show with and without a login, in the popover, in the phone sheet
+(000218), "Mehr Kontrast" (000595), "Weniger Bewegung" (000219), "Weniger Transparenz"
+(000596) and "Eingabefelder hervorheben" (000597). The group must show with and without a login, in the popover, in the phone sheet
 of the public header and in the "Mehr" sheet.
 
 Reason: A person who needs one of these settings must find it in one place on every page,

@@ -13,7 +13,7 @@ scope:
 
 # A display setting overrides the system setting
 
-Each switch of 000593 must show the state that is in effect. Without a choice of the person,
+Each switch of 000593 that has a system setting must show the state that is in effect. Without a choice of the person,
 that is the state of the system setting (`prefers-color-scheme`, `prefers-contrast`,
 `prefers-reduced-motion`, `prefers-reduced-transparency`). When the person sets a switch, the
 choice must override the system setting in this browser on this device, and it must stay after
