@@ -10,7 +10,7 @@ implementation:
   - backend/app/modules/admin/schemas.py
   - backend/app/modules/webhooks/service.py
   - backend/migrations/versions/08dfb2c28b9a_drop_webhook_events.py
-  - frontend/src/app/pages/admin/config/webhooks.component.html
+  - frontend/src/app/pages/admin/webhooks/webhooks.component.html
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin

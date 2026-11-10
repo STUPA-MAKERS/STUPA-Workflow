@@ -17,9 +17,9 @@ implementation:
   - frontend/src/app/pages/invoices/invoice-detail/invoice-detail.component.html
   - frontend/src/app/pages/budget/budget-dashboard.component.html
   - frontend/src/app/pages/admin/cd-variants/cd-variants.component.html
-  - frontend/src/app/pages/admin/config/webhooks.component.html
-  - frontend/src/app/pages/admin/flow-editor/transition-detail.component.html
-  - frontend/src/app/pages/admin/flow-editor/transition-lists.component.html
+  - frontend/src/app/pages/admin/webhooks/webhooks.component.html
+  - frontend/src/app/pages/admin/flow/transition-detail.component.html
+  - frontend/src/app/pages/admin/flow/transition-lists.component.html
   - frontend/src/app/pages/admin/forms/form-editor.component.html
   - frontend/src/app/pages/admin/version-history/version-history.component.html
   - frontend/src/app/pages/dashboard/dashboard.component.html

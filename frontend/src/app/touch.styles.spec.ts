@@ -131,7 +131,7 @@ describe('touch styles', () => {
         return /:active\b/.test(text) && !text.includes('@include press.press-scale');
       })
       .map((file) => relative(SRC, file));
-    expect(own).toEqual(['app/pages/admin/flow-editor/flow-editor.component.scss', 'app/pages/dashboard/dashboard.component.scss']);
+    expect(own).toEqual(['app/pages/admin/flow/flow-editor.component.scss', 'app/pages/dashboard/dashboard.component.scss']);
   });
 
   it('gives the app cards and the page header actions the press and the chrome text', () => {
