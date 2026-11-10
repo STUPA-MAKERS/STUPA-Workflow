@@ -2,7 +2,7 @@
 id: "000607"
 title: An agenda row shows no drag handle
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
