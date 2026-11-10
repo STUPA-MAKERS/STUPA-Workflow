@@ -479,7 +479,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000597](requirements/non-functional/usability/controls/000597_one-ghost-row-in-sections.md) | A section in a detail and a small tile show one ghost row | approved |
 | [NF/usability/controls/000603](requirements/non-functional/usability/controls/000603_one-centre-line-in-controls.md) | Text, icons and counts of a control share one centre line | approved |
 | [NF/usability/controls/000604](requirements/non-functional/usability/controls/000604_count-plate-in-button.md) | A count in a button is the count plate of the kit button | approved |
-| [NF/usability/controls/000609](requirements/non-functional/usability/controls/000609_one-ghost-row-holds-message.md) | One ghost row holds the message and shows no bars | draft |
+| [NF/usability/controls/000613](requirements/non-functional/usability/controls/000613_one-ghost-row-holds-message.md) | One ghost row holds the message and shows no bars | draft |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll edge fades, or cuts at a line | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |

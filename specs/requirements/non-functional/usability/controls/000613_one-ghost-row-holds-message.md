@@ -1,5 +1,5 @@
 ---
-id: "000609"
+id: "000613"
 title: One ghost row holds the message and shows no bars
 kind: non-functional
 status: draft
