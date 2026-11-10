@@ -5,7 +5,12 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "backend/tests/unit/scripts/test_check_ratchets.py:test_commit_calls_are_counted"
+implementation:
+  - scripts/check_ratchets.py
+  - scripts/ratchet-baseline/service-commits.json
+  - .github/workflows/ci.yml
 scope:
   - backend/app
   - scripts/

@@ -5,7 +5,12 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "backend/tests/unit/scripts/test_check_ratchets.py:test_session_classes_are_counted"
+implementation:
+  - scripts/check_ratchets.py
+  - scripts/ratchet-baseline/session-fakes.json
+  - .github/workflows/ci.yml
 scope:
   - backend/tests
   - scripts/

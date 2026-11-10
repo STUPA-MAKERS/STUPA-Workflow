@@ -114,6 +114,14 @@ python3 scripts/check_functional.py --write                     # backend, mcp, 
 - **100 % branch** for critical modules: `auth`, `voting`, `flow`, `budget`, `webhooks`, `audit`,
   `backup` (`scripts/coverage_critical.py`, list in `[tool.coverage_critical]` of
   `backend/pyproject.toml`).
+- **Unit and integration tests count together** for both backend gates: `be-unit` and
+  `be-integration` each write a coverage data file, and the `coverage-gate` job combines them.
+- **A new test of a database query is an integration test on Postgres**
+  (`backend/tests/integration`), not a fake session that returns the rows the test wrote down.
+- **Two ratchets only go down** (`scripts/check_ratchets.py`, CI job `functional`): the `commit()`
+  calls outside router files, because a service function does not commit, and the classes with
+  `Session` in their name in `backend/tests/unit`. After you lower a count:
+  `python3 scripts/check_ratchets.py --write`.
 - Local (BE): `ruff check .` + `basedpyright` (0 errors) + `pytest`. Local (FE): `npm run lint`,
   `npm run typecheck`, `npm test`. CI order: `Lint → Typecheck → BE-Unit → BE-Integration →
   Contract (Schemathesis) → FE-Unit → E2E (Playwright) → Coverage-Gate → Image-Build + Smoke`.
