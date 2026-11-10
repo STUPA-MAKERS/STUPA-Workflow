@@ -188,6 +188,13 @@ describe('TodoLinkedListComponent actions (specs 000547, 000548)', () => {
     expect(document.querySelector('app-todo-link-card-dialog')).not.toBeNull();
   });
 
+  /** Spec 000582: the section with actions and no row shows the empty state. */
+  it('shows the empty state below the actions when nothing is linked', async () => {
+    await withActions(true);
+    expect(screen.getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();
+    expect(screen.getByText('Keine To-Dos verknüpft')).toBeInTheDocument();
+  });
+
   it('hides the actions from a person who writes no board', async () => {
     await withActions(false);
     expect(screen.queryByRole('button', { name: 'To-Do anlegen' })).toBeNull();

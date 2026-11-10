@@ -237,6 +237,12 @@ describe('TodoCardDetailComponent', () => {
     expect(document.querySelector('app-filter-select.cd__addLabel')).not.toBeNull();
   });
 
+  /** Spec 000582: a card with write access and no link shows the empty state below "Verknüpft". */
+  it('shows the empty state in the links section of a card without links', async () => {
+    await setup({ card: detail({ links: [] }) });
+    expect(screen.getByText('Nichts verknüpft')).toBeInTheDocument();
+  });
+
   /**
    * Beside the list the pane is a sheet, and the bar bleeds into its padding. The link sits in the
    * bar, so the menu does not repeat it.
