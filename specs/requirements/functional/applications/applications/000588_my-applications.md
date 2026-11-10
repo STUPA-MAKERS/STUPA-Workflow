@@ -13,11 +13,14 @@ scope:
 
 # Meine Anträge lists the Anträge of the address
 
-After the e-mail login, the page `/meine-antraege` must list every Antrag of the address,
-newest first. A row must show the title, the number, the state and the date of the Antrag, and
-must open the Antrag at `/antrag/<id>`. The page must have a logout.
+After the e-mail login, the page `/my-applications` must list every Antrag of the address,
+newest first, in the same list and detail layout as the Anträge page of a logged-in person. A row
+must show the title, the state and the date. A row must open the detail
+`/my-applications/<id>` beside the list. The page must have a logout. An invalid, used or
+expired link must open `/login` with a hint.
 
-Reason: The applicant needs one place that shows all Anträge of the address.
+Reason: The applicant needs one place that shows all Anträge of the address, and it must look
+like the rest of the platform.
 
 Test: `frontend/src/app/features/apply/my-applications.component.spec.ts`: the page lists the
-Anträge of the session and links each row.
+Anträge of the session, links each row, and sends an invalid link to `/login`.

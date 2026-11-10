@@ -15,8 +15,7 @@ scope:
 # The e-mail login confirms the open guest Anträge of the address
 
 The first redeem of a login link must confirm the e-mail of every guest Antrag of the address
-that waits for the confirmation. Each confirmed Antrag must then start its flow, as the redeem of
-its own link does.
+that waits for the confirmation. Each confirmed Antrag must then start its flow.
 
 Reason: The login link proves that the person reads the mailbox, and that is what the
 confirmation checks.
