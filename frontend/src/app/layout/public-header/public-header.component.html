@@ -19,7 +19,7 @@
     [attr.aria-pressed]="theme.resolved() === 'dark'"
     (click)="theme.toggle()"
   >
-    <app-icon [name]="theme.resolved() === 'dark' ? 'sun' : 'moon'" [size]="19" />
+    <app-icon [name]="theme.resolved() === 'dark' ? 'sun' : 'moon'" [size]="20" />
   </button>
 
   @if (auth.applicantSession()) {

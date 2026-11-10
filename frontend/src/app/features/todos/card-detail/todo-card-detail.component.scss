@@ -42,19 +42,6 @@
 .cd__head {
   flex: none;
 }
-// The same plate as `.ad__commentsN` of the application detail.
-.cd__activityN {
-  display: inline-grid;
-  place-items: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-3);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-medium);
-}
 .cd__boardLink {
   display: inline-flex;
   align-items: center;

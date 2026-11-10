@@ -215,7 +215,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     detectChanges();
     expect(cmp.commentsLoading()).toBe(true);
-    expect(document.querySelector('.ad__commentsN')).toBeNull();
+    expect(document.querySelector('.btn__count')).toBeNull();
     openComments(detectChanges);
     expect(screen.queryByText('Noch keine Nachrichten.')).not.toBeInTheDocument();
     expect(document.querySelectorAll('app-chat .sk__msg').length).toBeGreaterThan(0);
@@ -223,7 +223,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     detectChanges();
     expect(cmp.commentsLoading()).toBe(false);
     expect(screen.getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
-    expect(document.querySelector('.ad__commentsN')).toHaveTextContent('1');
+    expect(document.querySelector('.btn__count')).toHaveTextContent('1');
   });
 
   it('ends the loading state of the comments when their read fails', async () => {
@@ -284,13 +284,13 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
     detectChanges();
-    expect(document.querySelector('.ad__commentsN')).toHaveTextContent('1');
+    expect(document.querySelector('.btn__count')).toHaveTextContent('1');
     (cmp as unknown as { refresh(): void }).refresh();
     http.expectOne(url('')).flush(appWire());
     detectChanges();
     expect(http.match(url('/comments'))).toHaveLength(1);
     expect(cmp.commentsLoading()).toBe(false);
-    expect(document.querySelector('.ad__commentsN')).toHaveTextContent('1');
+    expect(document.querySelector('.btn__count')).toHaveTextContent('1');
   });
 
   /** A later "#comments" opens the closed sheet again; another fragment does not. */
