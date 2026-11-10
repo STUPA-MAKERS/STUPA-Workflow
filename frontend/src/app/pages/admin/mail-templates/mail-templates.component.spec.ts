@@ -133,6 +133,15 @@ describe('MailTemplatesComponent', () => {
     expect(c.draft()).toBeNull();
   });
 
+  it('"Verwerfen" is a no-op without a selected template', async () => {
+    const api = { ...setupApi(), listMailTemplates: jest.fn(() => of([])) };
+    const { view } = await setup(api);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = view.fixture.componentInstance as any;
+    c.discard();
+    expect(c.draft()).toBeNull();
+  });
+
   it('does not auto-select when the list is empty', async () => {
     const api = { ...setupApi(), listMailTemplates: jest.fn(() => of([])) };
     const { view } = await setup(api);

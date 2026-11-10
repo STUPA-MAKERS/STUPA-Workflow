@@ -58,6 +58,13 @@ const save = () =>
     .closest('button') as HTMLButtonElement;
 
 describe('GremiumDialogComponent', () => {
+  it('reads no counts of the question for a new Gremium', async () => {
+    const { fixture, api } = await setup(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (fixture.componentInstance as any).loadPreview();
+    expect(api.getGremiumPublicPreview).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   /** The slug of a stored gremium never changes, so the dialog shows the stored one. */

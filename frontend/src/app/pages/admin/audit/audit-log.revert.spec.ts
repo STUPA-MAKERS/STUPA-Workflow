@@ -40,6 +40,8 @@ type Cmp = AuditLogComponent & {
   toggle(id: number): void;
   isRevertable(e: AuditEntry): boolean;
   diffOf(e: AuditEntry): ConfigRevisionDiff | null | undefined;
+  diffState(e: AuditEntry): string;
+  retryDiff(e: AuditEntry): void;
   askRevert(e: AuditEntry): void;
   doRevert(): void;
   confirmRevert(): AuditEntry | null;
@@ -211,6 +213,19 @@ describe('AuditLogComponent — config diff + revert', () => {
     c.toggle(7);
     expect(api.getConfigRevisionDiff).toHaveBeenCalledTimes(2);
     expect(c.diffOf(c.entries()[0])).toEqual(DIFF);
+  });
+
+  /** § 000632 */
+  it('a failed diff shows the error state, and the retry reads it again', async () => {
+    const { c, api } = await setup();
+    (api.getConfigRevisionDiff as jest.Mock).mockReturnValueOnce(throwError(() => new Error('x')));
+    const e = c.entries()[0];
+    c.toggle(7);
+    expect(c.diffState(e)).toBe('error');
+    c.retryDiff(e);
+    expect(api.getConfigRevisionDiff).toHaveBeenCalledTimes(2);
+    expect(c.diffState(e)).toBe('ok');
+    expect(c.diffState({ ...e, data: {} })).toBe('loading');
   });
 
   it('loads a diff only once and has none for an entry without a revision', async () => {

@@ -191,16 +191,15 @@ export class BrandingEditorComponent {
   }
 
   /** A copy of the branding as the server has it, for "Verwerfen". The editor changes the draft in place. */
-  private saved: Branding | null = null;
+  private saved = 'null';
 
   private keepSaved(branding: Branding): void {
-    this.saved = JSON.parse(JSON.stringify(branding)) as Branding;
+    this.saved = JSON.stringify(branding);
   }
 
   /** "Verwerfen": every field goes back to the stored value (§ 000635). */
   protected discard(): void {
-    if (!this.saved) return;
-    this.draft.set(JSON.parse(JSON.stringify(this.saved)) as Branding);
+    this.draft.set(JSON.parse(this.saved) as Branding);
     this.markSaved(this.editRev());
     this.brand.previewAccent(undefined);
   }

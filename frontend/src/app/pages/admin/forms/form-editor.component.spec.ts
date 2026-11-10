@@ -1072,6 +1072,21 @@ describe('FormEditorComponent — layout of the redesign', () => {
     expect(c.groupIndex()).toBe(0);
   });
 
+  /** § 000635 */
+  it('the phone header menu holds "Verwerfen" while the form has changes', async () => {
+    const { c, api } = await setup(draft(TWO_GROUPS, { de: 'Hallo', en: '' }));
+    const getFormDraft = api['getFormDraft'] as jest.Mock;
+    c.setDescription('de', 'Neu');
+    expect(c.headerMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['toggleActive', 'preview', 'discard']);
+    const reads = getFormDraft.mock.calls.length;
+    c.onHeaderMenu({ id: 'discard', label: '' });
+    expect(getFormDraft.mock.calls.length).toBe(reads + 1);
+    expect(c.description()).toEqual({ de: 'Hallo', en: '' });
+    c.typeId.set('');
+    c.discard();
+    expect(getFormDraft.mock.calls.length).toBe(reads + 1);
+  });
+
   it('the phone header menu holds activate/deactivate and the preview', async () => {
     const { c, setFormActive } = await setup(draft(TWO_GROUPS));
     expect(c.headerMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['toggleActive', 'preview']);

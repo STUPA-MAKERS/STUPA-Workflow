@@ -324,6 +324,13 @@ describe('UserRevokeComponent', () => {
     expect(screen.getByText('Gremien')).toBeInTheDocument();
   });
 
+  it('the retry reads nothing without a person', async () => {
+    const api = makeApi();
+    const { inst } = await setup(api, null);
+    inst.retry();
+    expect(api.previewPrincipalRevoke).not.toHaveBeenCalled();
+  });
+
   it('age() counts days and months', async () => {
     const { inst } = await setup();
     const now = Date.parse('2026-10-09T12:00:00Z');

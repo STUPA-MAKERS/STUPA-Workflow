@@ -3080,6 +3080,12 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       expect(c.headerMenu()[0].items[0].checked).toBe(true);
       c.onHeaderMenu({ id: 'other', label: 'x' });
       expect(c.showVersions()).toBe(true);
+      const before = c.json();
+      buildValid(c);
+      expect(c.headerMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['versions', 'discard']);
+      c.onHeaderMenu({ id: 'discard', label: 'Verwerfen' });
+      expect(c.json()).toBe(before);
+      expect(c.headerMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['versions']);
     });
 
     it('lists the incoming and outgoing transitions of a selected state in the inspector', async () => {
