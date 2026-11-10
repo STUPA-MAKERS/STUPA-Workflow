@@ -194,8 +194,7 @@ export class MyApplicationsComponent implements MyApplicationsPage {
   /** The token must not stay in the history or reach a Referer. */
   private stripToken(): void {
     if (typeof history === 'undefined') return;
-    const url = new URL(this.location.href);
-    url.hash = '';
-    history.replaceState(history.state, '', url.toString());
+    const { pathname, search } = this.location;
+    history.replaceState(history.state, '', `${pathname}${search}`);
   }
 }

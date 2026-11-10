@@ -47,7 +47,11 @@ async function setup(o: Opts = {}) {
   const verify = o.verify ?? jest.fn(() => of(undefined));
   const list = jest.fn(o.list ?? (() => of(LIST)));
   const auth = { markApplicantSession: jest.fn() };
-  const location = createLocationMock({ href: 'http://localhost/my-applications#t=tok' });
+  const location = createLocationMock({
+    href: 'http://localhost/my-applications#t=tok',
+    pathname: '/my-applications',
+    hash: '#t=tok',
+  });
   const api: Partial<ApiClient> = {
     applicationTypes: (() =>
       o.typesFail ? throwError(() => new Error('x')) : of([
@@ -112,7 +116,7 @@ describe('MyApplicationsComponent', () => {
     const { verify, list } = await setup({ fragment: 't=tok' });
     expect(verify).toHaveBeenCalledWith('tok');
     await waitFor(() => expect(list).toHaveBeenCalled());
-    expect(replace.mock.calls.at(-1)?.[2]).toBe('http://localhost/my-applications');
+    expect(replace.mock.calls.at(-1)?.[2]).toBe('/my-applications');
   });
 
   it('sends an invalid link to the login page with a hint', async () => {
