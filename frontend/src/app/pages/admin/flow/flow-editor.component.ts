@@ -91,6 +91,7 @@ import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
 import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /** How far one press of a scroll tongue pans the canvas, in screen px. */
 const PAN_STEP = 240;
@@ -132,6 +133,7 @@ const MIN_FIT_SCALE = 0.75;
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState, FlowEditorOptionsService],
   imports: [
+    LoadStateComponent,
     ContentLangSwitchComponent,
     SkeletonComponent,
     EmptyStateComponent,
@@ -201,6 +203,10 @@ export class FlowEditorComponent {
   protected readonly loaded = signal(false);
   /** The first read of the flow has not answered yet: a placeholder covers the canvas. */
   protected readonly loading = signal(true);
+  /** The first read of the flow failed. */
+  protected readonly loadFailed = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.loadFailed);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly history = new FlowHistory();
   protected readonly canUndo = this.history.canUndo;
@@ -287,24 +293,7 @@ export class FlowEditorComponent {
    */
   constructor() {
     inject(DestroyRef).onDestroy(() => this.stopHold());
-    this.api
-      .getGlobalFlow()
-      .pipe(takeUntilDestroyed())
-      .subscribe({
-        next: (graph) => {
-          if (graph && graph.states?.length) {
-            this.applyingHistory = true;
-            this.graph.set(autoLayout(normalizeFlowGraph(graph)));
-          }
-          this.savedJson.set(this.json());
-          this.loaded.set(true);
-          this.loading.set(false);
-        },
-        error: () => {
-          this.loading.set(false);
-          this.toast.error(this.i18n.translate('admin.flow.loadFailed'));
-        },
-      });
+    this.loadFlow();
 
     observeElementSize(
       () => this.canvasWrap()?.nativeElement,
@@ -1036,5 +1025,29 @@ export class FlowEditorComponent {
       },
       error: () => this.toast.error(this.i18n.translate('admin.flow.loadFailed')),
     });
+  }
+
+  /** Read the flow; also the retry of the load error (§ 000576). */
+  protected loadFlow(): void {
+    this.loading.set(true);
+    this.loadFailed.set(false);
+    this.api
+      .getGlobalFlow()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (graph) => {
+          if (graph && graph.states?.length) {
+            this.applyingHistory = true;
+            this.graph.set(autoLayout(normalizeFlowGraph(graph)));
+          }
+          this.savedJson.set(this.json());
+          this.loaded.set(true);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loading.set(false);
+          this.loadFailed.set(true);
+        },
+      });
   }
 }

@@ -1,4 +1,4 @@
-import { toastWith } from '../../../../testing/load-error';
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { NEVER, Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -498,12 +498,13 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().states.map((s: { key: string }) => s.key)).toEqual(['a', 'b']);
   });
 
-  it('toasts when the global flow fails to load', async () => {
-    const { toast } = await setup({
-      getGlobalFlow: jest.fn(() => throwError(() => new Error('boom'))),
-    });
-    expect(toast.error).toHaveBeenCalled();
+  it('shows the load error toast with a retry when the global flow fails to load', async () => {
+    const getGlobalFlow = jest.fn(() => throwError(() => new Error('boom')));
+    await setup({ getGlobalFlow });
+    expect(loadErrorToast()).toBeTruthy();
     expect(document.querySelector('.fe__canvasSkel')).toBeNull();
+    retryLoadError();
+    expect(getGlobalFlow).toHaveBeenCalledTimes(2);
   });
 
   it('swallows errors from option/role/webhook/budget loads', async () => {

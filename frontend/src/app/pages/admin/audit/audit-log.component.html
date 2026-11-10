@@ -58,78 +58,88 @@
   </div>
   </app-sticky-bar>
 
-  @if (loadError()) {
-    <app-load-error [message]="'admin.audit.error' | t" (retry)="retry()" />
-  }
-
-  @if (entries().length) {
-    <ul class="rowgroup al__list">
-      @for (e of entries(); track e.id) {
-        <li class="al__item">
-          <app-expand-row
-            [title]="actionLabel(e.action)"
-            [sub]="(e.at | ldate: 'medium') + ' · ' + actorLabel(e) + (targetText(e) ? ' · ' + targetText(e) : '')"
-            [open]="isOpen(e.id)"
-            (openChange)="toggle(e.id)"
-          >
-          @if (isOpen(e.id)) {
-            <div class="al__details" [id]="'al-detail-' + e.id">
-              <dl class="al__meta">
-                <dt>{{ 'admin.audit.detail.action' | t }}</dt>
-                <dd>{{ actionLabel(e.action) }}</dd>
-                @if (e.targetType || e.targetId) {
-                  <dt>{{ 'admin.audit.detail.target' | t }}</dt>
-                  <dd class="al__wrap">
-                    @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span>{{ e.targetType ? ' · ' : '' }}{{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono">{{ e.targetType || e.targetLabel ? ' · ' : '' }}{{ e.targetId }}</span>}@if (revisionId(e); as rev) {<span> · </span><span class="mono">rev {{ rev }}</span>}
-                  </dd>
-                }
-                <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
-                <dd class="al__wrap">{{ actorDisplay(e) }}</dd>
-                @for (row of dataRows(e); track row.key) {
-                  <dt [class.mono]="!row.known">{{ row.label }}</dt>
-                  <dd class="al__wrap" [class.mono]="!row.known">{{ row.value }}</dd>
-                }
-              </dl>
-              @if (revisionId(e)) {
-                <div class="al__diff">
-                  @if (diffOf(e); as d) {
-                    <app-config-diff [diff]="d.diff" compact />
-                  } @else {
-                    <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.audit.error' | t" (retry)="retry()">
+    <ng-template #loading>
+      <app-skeleton variant="rows" [count]="6" [label]="'admin.audit.loading' | t" />
+    </ng-template>
+    <ng-template #content>
+      @if (entries().length) {
+        <ul class="rowgroup al__list">
+          @for (e of entries(); track e.id) {
+            <li class="al__item">
+              <app-expand-row
+                [title]="actionLabel(e.action)"
+                [sub]="(e.at | ldate: 'medium') + ' · ' + actorLabel(e) + (targetText(e) ? ' · ' + targetText(e) : '')"
+                [open]="isOpen(e.id)"
+                (openChange)="toggle(e.id)"
+              >
+              @if (isOpen(e.id)) {
+                <div class="al__details" [id]="'al-detail-' + e.id">
+                  <dl class="al__meta">
+                    <dt>{{ 'admin.audit.detail.action' | t }}</dt>
+                    <dd>{{ actionLabel(e.action) }}</dd>
+                    @if (e.targetType || e.targetId) {
+                      <dt>{{ 'admin.audit.detail.target' | t }}</dt>
+                      <dd class="al__wrap">
+                        @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span>{{ e.targetType ? ' · ' : '' }}{{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono">{{ e.targetType || e.targetLabel ? ' · ' : '' }}{{ e.targetId }}</span>}@if (revisionId(e); as rev) {<span> · </span><span class="mono">rev {{ rev }}</span>}
+                      </dd>
+                    }
+                    <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
+                    <dd class="al__wrap">{{ actorDisplay(e) }}</dd>
+                    @for (row of dataRows(e); track row.key) {
+                      <dt [class.mono]="!row.known">{{ row.label }}</dt>
+                      <dd class="al__wrap" [class.mono]="!row.known">{{ row.value }}</dd>
+                    }
+                  </dl>
+                  @if (revisionId(e)) {
+                    <div class="al__diff">
+                      <app-load-state
+                        [state]="diffState(e)"
+                        [errorText]="'admin.config.history.diffFailed' | t"
+                        (retry)="retryDiff(e)"
+                      >
+                        <ng-template #loading>
+                          <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+                        </ng-template>
+                        <ng-template #content>
+                          @if (diffOf(e); as d) {
+                            <app-config-diff [diff]="d.diff" compact />
+                          }
+                        </ng-template>
+                      </app-load-state>
+                    </div>
+                  }
+                  @if (targetLink(e) || isRevertable(e)) {
+                    <div class="al__actions">
+                      @if (targetLink(e); as link) {
+                        <a class="al__open" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
+                      }
+                      @if (isRevertable(e)) {
+                        <app-button variant="danger" size="sm" [disabled]="reverting()" (click)="askRevert(e)">
+                          {{ 'admin.audit.revert.action' | t }}
+                        </app-button>
+                      }
+                    </div>
                   }
                 </div>
               }
-              @if (targetLink(e) || isRevertable(e)) {
-                <div class="al__actions">
-                  @if (targetLink(e); as link) {
-                    <a class="al__open" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
-                  }
-                  @if (isRevertable(e)) {
-                    <app-button variant="danger" size="sm" [disabled]="reverting()" (click)="askRevert(e)">
-                      {{ 'admin.audit.revert.action' | t }}
-                    </app-button>
-                  }
-                </div>
-              }
-            </div>
+              </app-expand-row>
+            </li>
           }
-          </app-expand-row>
-        </li>
+        </ul>
+      } @else {
+        <app-empty-state shape="table" [heading]="'admin.audit.empty' | t">
+          @if (activeFilterCount()) {
+            <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</app-button>
+          }
+        </app-empty-state>
       }
-    </ul>
-  } @else if (!loading() && !loadError()) {
-    <app-empty-state shape="table" [heading]="'admin.audit.empty' | t">
-      @if (activeFilterCount()) {
-        <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</app-button>
-      }
-    </app-empty-state>
-  }
 
-  @if (loading() && !entries().length) {
-    <app-skeleton variant="rows" [count]="6" [label]="'admin.audit.loading' | t" />
-  } @else if (hasMore()) {
-    <app-load-more [label]="'admin.audit.loadMore' | t" [loading]="loading()" (more)="loadMore()" />
-  }
+      @if (hasMore()) {
+        <app-load-more [label]="'admin.audit.loadMore' | t" [loading]="loadingMore()" (more)="loadMore()" />
+      }
+    </ng-template>
+  </app-load-state>
 </section>
 
 <app-confirm-dialog
