@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use 'field' as f;
 
 :host {
   display: flex;
@@ -102,6 +103,7 @@
 }
 .af__item--on {
   background: var(--color-selected);
+  @include f.highlight-chosen;
 }
 @media (hover: hover) {
   .af__item--on:hover {

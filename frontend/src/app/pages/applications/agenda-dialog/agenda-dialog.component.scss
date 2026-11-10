@@ -55,6 +55,7 @@
 .agd__row--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 .agd__radio {
   flex: none;

@@ -10,6 +10,7 @@ tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:highlightedButtons"
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:highlightedChips"
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:highlightedChosenRow"
+  - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:highlightedCurrentRow"
   - "frontend/src/app/shared/highlighted-fields.styles.spec.ts:highlightedFields"
 implementation:
   - frontend/vendor/ui-kit/src/styles/display-settings.scss
@@ -21,6 +22,7 @@ implementation:
   - frontend/vendor/ui-kit/src/lib/filter-select/filter-select.component.scss
   - frontend/vendor/ui-kit/src/lib/row-menu/row-menu.component.scss
   - frontend/vendor/ui-kit/src/lib/data-table/data-table.component.scss
+  - frontend/vendor/ui-kit/src/lib/list-item/list-item.component.scss
   - frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.component.scss
 scope:
   - frontend/src/app/
@@ -38,8 +40,9 @@ outlined and text buttons, pill buttons such as a picker, and floating action bu
 on yellow with a black 2 px edge and no yellow outside the edge. A destructive button must be
 dark red on yellow with a dark red edge. A pressed toggle button must be yellow on black. The
 chosen option of a segmented control must be black on yellow with the same edge. A filter chip must be black on yellow with the same edge, and an active filter
-chip yellow on black. In a menu or a list of options, only the chosen row must be black on
-yellow with the same edge; the other rows stay as they are. A check box that a component draws itself reads the
+chip yellow on black. In a menu, a list of options and every other list, the chosen or current
+row (for example the open item of a list page) must be black on yellow with the same edge; the
+other rows stay as they are. A selected table row is black on yellow without the edge. A check box that a component draws itself reads the
 same yellow box and black mark. An icon button
 without a surface stays as it is. The focused element
 must have a double ring: 3 px black next to it and 3 px yellow outside the black. The error

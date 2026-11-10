@@ -1,3 +1,4 @@
+@use 'field' as f;
 :host {
   display: block;
 }
@@ -138,6 +139,7 @@
 }
 .gv__item--now {
   background: var(--color-selected);
+  @include f.highlight-chosen;
 }
 .gv__badge {
   --tb-size: 28px;

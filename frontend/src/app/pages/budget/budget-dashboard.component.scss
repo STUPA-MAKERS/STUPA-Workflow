@@ -2,6 +2,7 @@
 @use 'scroll-fade' as fade;
 @use 'dot-parts' as dots;
 @use 'swatch';
+@use 'field' as f;
 
 :host {
   display: flex;
@@ -144,6 +145,7 @@
 .tn--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 @media (hover: hover) {
   .tn--on:hover {
