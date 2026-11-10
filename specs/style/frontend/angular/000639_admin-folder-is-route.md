@@ -5,7 +5,11 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "frontend/src/app/pages/admin/admin-frame/admin-pages.spec.ts:ADMIN_PAGES"
+implementation:
+  - frontend/src/app/app.routes.ts
+  - frontend/src/app/pages/admin
 scope:
   - frontend/src/app/pages/admin
 ---
@@ -17,8 +21,7 @@ The component of an admin route must be in the folder `pages/admin/<segment>`, w
 component of another admin page or of another feature has no folder of its own. A folder
 that holds parts for more than one page must have a name that says what the parts are.
 
-Reason: Webhooks are in `config`, the route `committees` is in `gremien`, and the route
-`flow` is in `flow-editor`, so the folder cannot be found from the URL.
+Reason: A folder with the name of the route can be found from the URL.
 
 Test: `frontend/src/app/pages/admin/admin-frame/admin-pages.spec.ts`: for each child route
 of `/admin` with a component below `pages/admin`, the import path starts with the folder of

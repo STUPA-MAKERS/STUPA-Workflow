@@ -26,22 +26,6 @@
   min-height: 3.5rem;
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
 }
-.tr__langMain {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: var(--space-3);
-  min-width: 0;
-}
-.tr__langName {
-  font-weight: var(--fw-semibold);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.tr__langCode {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
 .tr__langActions {
   display: flex;
   align-items: center;
@@ -111,15 +95,6 @@
   padding-top: var(--space-2);
 }
 
-.tr__sentinel {
-  height: 1px;
-}
-.tr__more {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-2) 0;
-}
-
 .tr__form {
   display: flex;
   flex-direction: column;
@@ -133,8 +108,5 @@
     grid-template-areas:
       'ref reset'
       'edit edit';
-  }
-  .tr__langCode {
-    display: none;
   }
 }

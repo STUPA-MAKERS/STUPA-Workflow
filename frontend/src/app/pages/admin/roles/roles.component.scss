@@ -12,50 +12,8 @@
   padding: 0;
   list-style: none;
 }
-
-.ar__head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  min-height: 3.5rem;
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
-}
-
-.ar__toggle {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  min-height: 2.5rem;
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--color-text);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-@media (hover: hover) {
-  .ar__toggle:hover .ar__name {
-    text-decoration: underline;
-  }
-}
-.ar__toggle:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-.ar__chev {
-  flex: none;
-  color: var(--color-text-muted);
-}
 .ar__name {
   font-weight: var(--fw-semibold);
-}
-
-.ar__head app-status-text {
-  font-size: var(--fs-sm);
 }
 
 .ar__key {
@@ -66,20 +24,6 @@
   white-space: nowrap;
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
-}
-
-.ar__count {
-  flex: none;
-  min-width: 4.5rem;
-  text-align: end;
-  font-size: var(--fs-sm);
-}
-
-.ar__del {
-  display: flex;
-  flex: none;
-  justify-content: center;
-  width: 2.5rem;
 }
 
 .ar__body {
@@ -110,12 +54,6 @@
   overflow-wrap: break-word;
 }
 
-.ar__foot {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-
 .ar__form {
   display: flex;
   flex-direction: column;
@@ -129,10 +67,6 @@
 }
 
 @container (max-width: 40rem) {
-  .ar__head {
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-3);
-  }
   .ar__key {
     display: none;
   }

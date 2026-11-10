@@ -71,49 +71,8 @@
   padding: 0;
   list-style: none;
 }
-
-.al__row {
-  display: grid;
-  grid-template-columns: 10.5rem minmax(10rem, 1.3fr) minmax(6rem, 0.8fr) minmax(8rem, 1fr) 1rem;
-  align-items: center;
-  gap: var(--space-4);
-  width: 100%;
-  min-height: 2.75rem;
-  padding: var(--space-2) var(--space-4);
-  border: 0;
-  border-radius: inherit;
-  background: none;
-  color: var(--color-text);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-@media (hover: hover) {
-  .al__row:hover {
-    background: var(--color-surface-3);
-  }
-}
-.al__row:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-.al__time {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
 .al__action {
   font-weight: var(--fw-semibold);
-}
-.al__actor,
-.al__target {
-  font-size: var(--fs-sm);
-}
-.al__actor {
-  color: var(--color-text-muted);
-}
-.al__chev {
-  color: var(--color-text-muted);
 }
 
 .al__details {
@@ -152,39 +111,9 @@
   color: var(--color-accent-text);
 }
 
-.al__sentinel {
-  height: 1px;
-}
-.al__more {
-  display: flex;
-  justify-content: center;
-}
-
 @container (max-width: 44rem) {
-  .al__row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 1rem;
-    grid-template-areas:
-      'action action chev'
-      'time actor chev'
-      'target target chev';
-    gap: 2px var(--space-3);
-    padding-block: var(--space-3);
-  }
   .al__action {
     grid-area: action;
-  }
-  .al__time {
-    grid-area: time;
-  }
-  .al__actor {
-    grid-area: actor;
-  }
-  .al__target {
-    grid-area: target;
-    color: var(--color-text-muted);
-  }
-  .al__chev {
-    grid-area: chev;
   }
   .al__verify {
     display: grid;

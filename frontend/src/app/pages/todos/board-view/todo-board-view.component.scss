@@ -11,12 +11,8 @@
   min-width: 0;
   min-height: 0;
 }
-:host(.bv-host--natural) .bv__scroll,
-:host(.bv-host--natural) .bv__pager {
+:host(.bv-host--natural) .bv__scroll {
   flex: 0 0 auto;
-}
-:host(.bv-host--natural) .bv__page {
-  overflow-y: visible;
 }
 
 .bv {
@@ -280,35 +276,6 @@
     display: block;
     top: calc(-1 * var(--ld-pane-top, 0px));
   }
-}
-// The pager of `todo-board-skeleton` in the geometry of the tab pager.
-.bv__pager {
-  display: grid;
-  flex: 1 1 0;
-  grid-auto-columns: 100%;
-  grid-auto-flow: column;
-  min-height: 0;
-  margin-inline: calc(-1 * var(--bv-gutter));
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-}
-.bv__pager::-webkit-scrollbar {
-  display: none;
-}
-.bv__page {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  padding: var(--space-3) var(--bv-gutter) 0;
-  padding-bottom: calc(56px + 2 * var(--space-4));
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
 }
 .bv__phoneCards {
   display: flex;

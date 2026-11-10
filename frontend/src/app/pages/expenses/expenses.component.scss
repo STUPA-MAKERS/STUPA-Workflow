@@ -29,12 +29,8 @@
 .exp__chip {
   max-width: 100%;
 }
-.exp__chip app-icon,
-.exp__chip .exp__swatch {
+.exp__chip app-icon {
   pointer-events: none;
-}
-.exp__swatch {
-  @include swatch.mark(9px);
 }
 
 .exp__rowCheck {

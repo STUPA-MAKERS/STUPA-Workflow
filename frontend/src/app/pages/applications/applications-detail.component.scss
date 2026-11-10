@@ -235,11 +235,6 @@
   color: inherit;
   overflow-wrap: anywhere;
 }
-.ad__links {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
 
 .ad--edit {
   --ad-edit-bar: 60px;
