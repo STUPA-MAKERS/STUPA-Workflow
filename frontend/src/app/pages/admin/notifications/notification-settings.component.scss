@@ -1,4 +1,6 @@
 @use '../../../shared/ui/surface-card' as sc;
+@use '../widths' as w;
+
 :host {
   display: block;
 }
@@ -6,64 +8,18 @@
 .ns {
   container-type: inline-size;
 }
-
-.ns__card {
-  @include sc.card($gap: var(--space-4), $direction: row);
-  align-items: flex-start;
-}
-.ns__icon {
-  flex: none;
-  margin-top: 2px;
-  color: var(--color-text-muted);
-}
-.ns__body {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-}
-.ns__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-.ns__text {
-  min-width: 0;
-}
-.ns__head app-switch {
-  flex: none;
-}
 .ns__fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
 }
 
-@container (max-width: 34rem) {
-  .ns__card {
-    gap: var(--space-3);
-    padding: var(--space-4);
-  }
-  .ns__head {
-    flex-direction: column;
-  }
+@include w.fields {
   .ns__fields {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-.ns__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow: hidden;
-  border-radius: var(--radius-field);
-}
 .ns__row {
-  min-height: 56px;
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-2);
   justify-content: center;
 }

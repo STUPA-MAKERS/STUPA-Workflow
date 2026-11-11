@@ -37,7 +37,7 @@ import { Subscription } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import { type AdminPrincipal, isActiveMembership } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
-import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {
@@ -64,7 +64,7 @@ const SEARCH_LIMIT = 8;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LoadErrorComponent,
+    LoadStateComponent,
     SectionComponent,
     NoteComponent,
     EmptyStateComponent,
@@ -96,6 +96,7 @@ export class SubstitutePoolComponent {
 
   protected readonly loading = signal(true);
   protected readonly failed = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.failed);
   protected readonly entries = signal<DelegationSubstitute[]>([]);
   private readonly loadedMembers = signal<PoolMember[]>([]);
   protected readonly memberList = computed(() => this.members() ?? this.loadedMembers());
@@ -245,13 +246,13 @@ export class SubstitutePoolComponent {
         },
         error: (err: { status?: number }) => {
           this.adding.set(false);
+          if (err.status !== 409 && err.status !== 422) {
+            this.toast.error(this.i18n.translate('admin.substitutes.failed'));
+            return;
+          }
           this.addError.set(
             this.i18n.translate(
-              err.status === 409
-                ? 'admin.substitutes.duplicate'
-                : err.status === 422
-                  ? 'admin.substitutes.invalid'
-                  : 'admin.substitutes.failed',
+              err.status === 409 ? 'admin.substitutes.duplicate' : 'admin.substitutes.invalid',
             ),
           );
         },

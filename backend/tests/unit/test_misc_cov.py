@@ -556,7 +556,7 @@ def test_admin_delete_gremium_204(
     application, cfg, *_ = admin_app
     client = TestClient(application)
     gid = uuid4()
-    assert client.delete(f"/api/admin/gremien/{gid}").status_code == 204
+    assert client.delete(f"/api/admin/committees/{gid}").status_code == 204
     assert str(cfg.deleted_gremium) == str(gid)
 
 
@@ -601,15 +601,15 @@ def test_admin_gremium_role_crud(
     client = TestClient(application)
     gid, rid = uuid4(), uuid4()
     created = client.post(
-        f"/api/admin/gremien/{gid}/roles",
+        f"/api/admin/committees/{gid}/roles",
         json={"key": "kasse", "name": {"de": "Kasse"}, "permissions": ["vote.cast"]},
     )
     assert created.status_code == 201
     patched = client.patch(
-        f"/api/admin/gremium-roles/{rid}", json={"name": {"de": "Neu"}}
+        f"/api/admin/committee-roles/{rid}", json={"name": {"de": "Neu"}}
     )
     assert patched.status_code == 200
-    deleted = client.delete(f"/api/admin/gremium-roles/{rid}")
+    deleted = client.delete(f"/api/admin/committee-roles/{rid}")
     assert deleted.status_code == 204
     assert {"create_role", "update_role", "delete_role"} <= set(groles.events)
 
@@ -681,10 +681,10 @@ class _FakeSessionmaker:
 async def _run_deliver_magic_link(
     monkeypatch: pytest.MonkeyPatch, *, lang_row: object | None
 ) -> dict[str, Any]:
-    """Run the applications-router magic-link background task against fakes.
+    """Run the applications-router login-link background task against fakes.
 
-    The fake auth service calls the injected deliver once to cover the inner closure, and
-    the fake NotificationService keeps the real mailer out.
+    The fake `email_login.issue_confirm_link` gives the link, and the fake
+    NotificationService keeps the real mailer out.
     """
     import app.modules.applications.router as ar
 
@@ -694,38 +694,34 @@ async def _run_deliver_magic_link(
 
     seen: dict[str, Any] = {}
 
-    async def _request_magic_link(db, settings, *, email, application_id, deliver):
+    async def _issue_confirm_link(db, settings, *, email):
         seen["email"] = email
-        seen["application_id"] = application_id
-        await deliver(email, "https://link/x")
+        return "https://link/x"
 
     class _NS:
         def __init__(self, *a: object, **k: object) -> None:
             pass
 
-        async def send_magic_link(self, *, email: str, link: str, lang: str) -> None:
+        async def send_email_login(self, *, email: str, link: str, lang: str) -> None:
             seen["delivered"] = (email, link, lang)
 
-    monkeypatch.setattr(ar.auth_service, "request_magic_link", _request_magic_link)
+    monkeypatch.setattr(ar.email_login, "issue_confirm_link", _issue_confirm_link)
     monkeypatch.setattr(ar, "NotificationService", _NS)
 
-    aid = uuid4()
-    await _deliver_magic_link(_settings(), "user@example.org", aid, pool=None)
-    seen["expected_application_id"] = aid
+    await _deliver_magic_link(_settings(), "user@example.org", uuid4(), pool=None)
     seen["committed"] = fake_db.committed
     return seen
 
 
-async def test_deliver_magic_link_invokes_request_magic_link(
+async def test_deliver_magic_link_sends_the_login_link(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`_deliver_magic_link` opens its own session, calls the auth service and commits.
+    """`_deliver_magic_link` opens its own session, sends the e-mail login link and commits.
 
     Without an application row the mail keeps the default language.
     """
     seen = await _run_deliver_magic_link(monkeypatch, lang_row=None)
     assert seen["email"] == "user@example.org"
-    assert seen["application_id"] == seen["expected_application_id"]
     assert seen["delivered"] == ("user@example.org", "https://link/x", "de")
     assert seen["committed"] is True
 

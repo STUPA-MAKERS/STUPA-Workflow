@@ -11,7 +11,7 @@ The tests cover six areas.
    `square_logo_bytes`, and the resolver that never hands the square slot to
    the render service.
 5. `can_view_gremium`: member, `gremium.view_all`, admin, a scoped token.
-6. The routes `GET /api/gremien/{id}/logo` and
+6. The routes `GET /api/committees/{id}/logo` and
    `GET /api/admin/cd-variant-logos/{id}/square`: headers, ETag and 304, and the
    404 for a caller who may not see the Gremium.
 """
@@ -526,7 +526,7 @@ def _assert_inline_headers(headers: Any) -> None:
 
 def test_gremium_logo_streams_the_bytes_inline(app: FastAPI, client: TestClient) -> None:
     _as(app, "member")
-    response = client.get(f"/api/gremien/{GREMIUM_ID}/logo")
+    response = client.get(f"/api/committees/{GREMIUM_ID}/logo")
     assert response.status_code == 200
     assert response.content == IMG
     assert response.headers["content-type"] == "image/webp"
@@ -539,7 +539,7 @@ def test_gremium_logo_answers_304_for_a_matching_etag(
     app: FastAPI, client: TestClient, fake: _FakeSquare, header: str
 ) -> None:
     _as(app, "member")
-    response = client.get(f"/api/gremien/{GREMIUM_ID}/logo", headers={"If-None-Match": header})
+    response = client.get(f"/api/committees/{GREMIUM_ID}/logo", headers={"If-None-Match": header})
     assert response.status_code == 304 and response.content == b""
     _assert_inline_headers(response.headers)
     assert fake.reads == 0
@@ -550,7 +550,7 @@ def test_gremium_logo_sends_the_bytes_for_a_stale_etag(
 ) -> None:
     _as(app, "member")
     response = client.get(
-        f"/api/gremien/{GREMIUM_ID}/logo", headers={"If-None-Match": '"stale"'}
+        f"/api/committees/{GREMIUM_ID}/logo", headers={"If-None-Match": '"stale"'}
     )
     assert response.status_code == 200 and fake.reads == 1
 
@@ -560,7 +560,7 @@ def test_gremium_logo_404_for_a_caller_who_may_not_see_it(
 ) -> None:
     """Not 403: the answer must not tell that the Gremium exists."""
     _as(app, "stranger")
-    response = client.get(f"/api/gremien/{GREMIUM_ID}/logo")
+    response = client.get(f"/api/committees/{GREMIUM_ID}/logo")
     assert response.status_code == 404
     assert response.headers["content-type"].startswith("application/problem+json")
     assert fake.reads == 0
@@ -568,13 +568,13 @@ def test_gremium_logo_404_for_a_caller_who_may_not_see_it(
 
 def test_gremium_logo_404_without_a_logo(app: FastAPI, client: TestClient) -> None:
     _as(app, "member")
-    response = client.get(f"/api/gremien/{uuid.uuid4()}/logo")
+    response = client.get(f"/api/committees/{uuid.uuid4()}/logo")
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
 
 
 def test_gremium_logo_requires_a_login(client: TestClient) -> None:
-    assert client.get(f"/api/gremien/{GREMIUM_ID}/logo").status_code == 401
+    assert client.get(f"/api/committees/{GREMIUM_ID}/logo").status_code == 401
 
 
 def test_admin_square_logo_streams_inline(app: FastAPI, client: TestClient) -> None:

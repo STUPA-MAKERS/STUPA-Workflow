@@ -320,7 +320,10 @@ describe('AgendaPaneComponent', () => {
 
   /** A row in rename is no drag source. */
   it('renames inline: enter saves, escape cancels, blur saves', async () => {
-    const { on, fixture } = await setup({ renamingTopId: 't-1', renameDraft: 'Begrüßung neu' });
+    const { on, fixture } = await setup({ renameDraft: 'Begrüßung neu' });
+    await userEvent.click(within(await openMenu(0)).getByRole('menuitem', { name: 'TOP umbenennen' }));
+    fixture.componentRef.setInput('renamingTopId', 't-1');
+    fixture.detectChanges();
     const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
     expect(input).toHaveValue('Begrüßung neu');
     expect(input).toHaveFocus();
@@ -335,9 +338,10 @@ describe('AgendaPaneComponent', () => {
   });
 
   /** A drop at the same place moves nothing. */
-  it('reorders by drag and drop with the lift and the drop box of the board (frame 7)', async () => {
+  it('reorders by drag and drop on the whole row, without a drag handle (frame 7)', async () => {
     const { on, fixture } = await setup();
     expect(draggable(fixture)).toEqual([true, true, true]);
+    expect(fixture.nativeElement.querySelector('.ap__grip')).toBeNull();
     const row = fixture.debugElement.queryAll(By.directive(CdkDrag))[0].injector.get(CdkDrag);
     expect(row.previewClass).toBe('ap__preview');
     expect(row.dragStartDelay).toEqual({ touch: 400, mouse: 0 });
@@ -345,6 +349,12 @@ describe('AgendaPaneComponent', () => {
     expect(on.move).toHaveBeenCalledWith({ from: 2, to: 0 });
     drop(fixture, 1, 1);
     expect(on.move).toHaveBeenCalledTimes(1);
+  });
+
+  /** A rename from the heading of the TOP opens the field there, not in the agenda as well. */
+  it('shows no rename field for a rename that started elsewhere', async () => {
+    await setup({ renamingTopId: 't-1', renameDraft: 'Begrüßung neu' });
+    expect(screen.queryByRole('textbox', { name: 'TOP umbenennen' })).not.toBeInTheDocument();
   });
 
   it('lifts no row and drops nothing while the agenda saves', async () => {

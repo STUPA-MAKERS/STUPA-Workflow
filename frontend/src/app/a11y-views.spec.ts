@@ -26,10 +26,10 @@ import { VoteCastComponent } from './features/voting/vote-cast.component';
 import { BeamerComponent } from './features/voting/beamer.component';
 import { AdminHomeComponent } from './pages/admin/admin-home.component';
 import { UsersComponent } from './pages/admin/users/users.component';
-import { FlowEditorComponent } from './pages/admin/flow-editor/flow-editor.component';
+import { FlowEditorComponent } from './pages/admin/flow/flow-editor.component';
 import { BrandingEditorComponent } from './pages/admin/branding/branding-editor.component';
-import { AdminGremienComponent } from './pages/admin/gremien/gremien.component';
-import { GremiumMembersComponent } from './pages/admin/gremien/gremium-members.component';
+import { AdminGremienComponent } from './pages/admin/committees/gremien.component';
+import { GremiumMembersComponent } from './pages/admin/committees/gremium-members.component';
 import { DelegationsComponent } from './pages/admin/delegations/delegations.component';
 import { MOCK_GREMIUM_STUPA_ID } from './pages/admin/admin.mock';
 import { AdminApiService } from './pages/admin/admin-api.service';
@@ -467,7 +467,7 @@ describe('Kern-Views a11y (axe)', () => {
       expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
 
-    it('/admin/gremien (open row with settings and role matrix) has no violations', async () => {
+    it('/admin/committees (open row with settings and role matrix) has no violations', async () => {
       const { container, fixture } = await render(GremienHost, {
         providers: [provideRouter([]), ...adminHttp, { provide: USE_MOCK_API, useValue: true }, adminAuth],
       });
@@ -476,7 +476,7 @@ describe('Kern-Views a11y (axe)', () => {
       expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
 
-    it('/admin/gremien/:id/members (with the substitute pool) has no violations', async () => {
+    it('/admin/committees/:id/members (with the substitute pool) has no violations', async () => {
       const { container, fixture } = await render(MembersHost, {
         providers: [
           provideRouter([]),

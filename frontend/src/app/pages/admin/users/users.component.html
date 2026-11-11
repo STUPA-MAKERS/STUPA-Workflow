@@ -22,8 +22,8 @@
         [clearable]="true"
         [placeholder]="'admin.users.searchPlaceholder' | t"
         [label]="'admin.users.search' | t"
-        [busy]="search.pending() && !loading()"
-        [results]="loading() ? null : principals().length"
+        [busy]="search.pending() && loadState() !== 'loading'"
+        [results]="loadState() === 'loading' ? null : principals().length"
         [value]="search.text()"
         (valueChange)="search.set($event)"
         (commit)="search.flush()"
@@ -51,73 +51,78 @@
     </div>
   </app-sticky-bar>
 
-  @if (loading()) {
-    <app-skeleton variant="rows" [count]="5" [label]="'admin.users.loading' | t" />
-  } @else if (principals().length) {
-    <ul class="rowgroup au__list" [attr.aria-label]="'admin.users.title' | t">
-      @for (p of principals(); track p.id) {
-        <li>
-          <app-expand-row
-            [class.au__off]="p.active === false || !!p.mergedIntoId"
-            [attr.title]="userTitle(p)"
-            [title]="userLabel(p)"
-            [sub]="(p.email ?? '') + (roleText(p) ? ' · ' + roleText(p) : '')"
-            [open]="openIds().has(p.id)"
-            (openChange)="toggleOpen(p.id)"
-          >
-            <app-avatar lead size="sm" [name]="userLabel(p)" [principalId]="p.id" [decorative]="true" />
-            @if (!p.mergedIntoId && p.active === false) {
-              <app-status-text status kind="muted">{{ 'common.inactive' | t }}</app-status-text>
-            }
-            @if (p.mergedIntoId) {
-              <app-status-text status kind="muted">{{
-                'admin.users.merge.mergedInto' | t: { name: p.mergedIntoName || ('admin.users.merge.unnamed' | t) }
-              }}</app-status-text>
-            }
-            @if (!p.mergedIntoId) {
-              <app-row-menu
-                trail
-                [sections]="menuFor(p)"
-                [label]="('admin.users.moreActions' | t) + ': ' + userLabel(p)"
-                (selected)="onMenu($event, p)"
-              />
-            }
-            @if (openIds().has(p.id)) {
-              <dl class="kv au__kv">
-                <div>
-                  <dt>{{ 'admin.users.col.roles' | t }}</dt>
-                  <dd>{{ roleText(p) || ('admin.users.noRoles' | t) }}</dd>
-                </div>
-                <div>
-                  <dt>{{ 'admin.users.col.lastLogin' | t }}</dt>
-                  @if (isStale(p)) {
-                    <dd>
-                      <span class="au__stale">{{ p.lastLogin | ldate: 'medium' }}</span>
-                      <span class="au__staleHint">{{ 'admin.users.staleLogin' | t }}</span>
-                    </dd>
-                  } @else {
-                    <dd>{{ p.lastLogin ? (p.lastLogin | ldate: 'medium') : ('admin.users.never' | t) }}</dd>
-                  }
-                </div>
-                <div class="kv__wide">
-                  <dt>{{ 'admin.users.col.groups' | t }}</dt>
-                  <dd class="au__tags">
-                    @for (g of p.oidcGroups; track g) {
-                      <code class="code-tag">{{ g }}</code>
-                    } @empty {
-                      {{ 'admin.users.noGroups' | t }}
+  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.users.loadFailed' | t" (retry)="retryLoad()">
+    <ng-template #loading>
+      <app-skeleton variant="rows" [count]="5" [label]="'admin.users.loading' | t" />
+    </ng-template>
+    <ng-template #content>
+      @if (principals().length) {
+      <ul class="rowgroup au__list" [attr.aria-label]="'admin.users.title' | t">
+        @for (p of principals(); track p.id) {
+          <li>
+            <app-expand-row
+              [class.au__off]="p.active === false || !!p.mergedIntoId"
+              [attr.title]="userTitle(p)"
+              [title]="userLabel(p)"
+              [sub]="(p.email ?? '') + (roleText(p) ? ' · ' + roleText(p) : '')"
+              [open]="openIds().has(p.id)"
+              (openChange)="toggleOpen(p.id)"
+            >
+              <app-avatar lead size="sm" [name]="userLabel(p)" [principalId]="p.id" [decorative]="true" />
+              @if (!p.mergedIntoId && p.active === false) {
+                <app-status-text status kind="muted">{{ 'common.inactive' | t }}</app-status-text>
+              }
+              @if (p.mergedIntoId) {
+                <app-status-text status kind="muted">{{
+                  'admin.users.merge.mergedInto' | t: { name: p.mergedIntoName || ('admin.users.merge.unnamed' | t) }
+                }}</app-status-text>
+              }
+              @if (!p.mergedIntoId) {
+                <app-row-menu
+                  trail
+                  [sections]="menuFor(p)"
+                  [label]="('admin.users.moreActions' | t) + ': ' + userLabel(p)"
+                  (selected)="onMenu($event, p)"
+                />
+              }
+              @if (openIds().has(p.id)) {
+                <dl class="kv au__kv">
+                  <div>
+                    <dt>{{ 'admin.users.col.roles' | t }}</dt>
+                    <dd>{{ roleText(p) || ('admin.users.noRoles' | t) }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ 'admin.users.col.lastLogin' | t }}</dt>
+                    @if (isStale(p)) {
+                      <dd>
+                        <span class="au__stale">{{ p.lastLogin | ldate: 'medium' }}</span>
+                        <span class="au__staleHint">{{ 'admin.users.staleLogin' | t }}</span>
+                      </dd>
+                    } @else {
+                      <dd>{{ p.lastLogin ? (p.lastLogin | ldate: 'medium') : ('admin.users.never' | t) }}</dd>
                     }
-                  </dd>
-                </div>
-              </dl>
-            }
-          </app-expand-row>
-        </li>
+                  </div>
+                  <div class="kv__wide">
+                    <dt>{{ 'admin.users.col.groups' | t }}</dt>
+                    <dd class="au__tags">
+                      @for (g of p.oidcGroups; track g) {
+                        <code class="code-tag">{{ g }}</code>
+                      } @empty {
+                        {{ 'admin.users.noGroups' | t }}
+                      }
+                    </dd>
+                  </div>
+                </dl>
+              }
+            </app-expand-row>
+          </li>
+        }
+      </ul>
+    } @else {
+      <app-empty-state shape="person" [heading]="'admin.users.noResults' | t" />
       }
-    </ul>
-  } @else {
-    <app-empty-state shape="person" [heading]="'admin.users.noResults' | t" />
-  }
+    </ng-template>
+  </app-load-state>
 </section>
 
 <app-user-merge [source]="mergeSource()" (closed)="mergeSource.set(null)" (merged)="onMerged()" />

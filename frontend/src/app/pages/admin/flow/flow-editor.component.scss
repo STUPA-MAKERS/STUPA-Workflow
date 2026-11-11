@@ -1,0 +1,569 @@
+@use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
+@use 'press';
+@use 'display' as d;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+:host(.fe-pane) {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.fe {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fe--wide {
+  min-height: 0;
+}
+
+.fe__headTools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fe__validity {
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+}
+
+.fe__work {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@include bp.wide {
+  .fe__work {
+    flex: 1 1 0;
+    grid-template-columns: minmax(0, 1fr) 23.75rem;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+}
+
+.fe__sheet {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+
+.fe__toolbar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.fe__zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+.fe__zoomValue {
+  min-width: 3.25rem;
+  font-size: var(--fs-small);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.fe__crumbs {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4) 0;
+}
+.fe__crumbSep {
+  color: var(--color-text-muted);
+}
+.fe__crumb {
+  padding: 0.15rem 0.45rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--color-accent-text);
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .fe__crumb:hover {
+    background: var(--color-surface-2);
+  }
+}
+.fe__crumb--current {
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+  cursor: default;
+}
+@media (hover: hover) {
+  .fe__crumb--current:hover {
+    background: none;
+  }
+}
+
+.fe__alert {
+  flex: none;
+  margin: var(--space-3) var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+}
+.fe__alert ul {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.fe__canvas-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  height: 34rem;
+  min-height: 0;
+  overflow: hidden;
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+@include bp.wide {
+  .fe__canvas-wrap {
+    height: auto;
+  }
+}
+
+// The SVG keeps its box while the flow loads, so the canvas measures its real size.
+.fe__canvas--loading {
+  visibility: hidden;
+}
+.fe__canvasSkel {
+  position: absolute;
+  inset: var(--space-4);
+}
+// touch-action: none stops pen and touch panning from fighting the pan and connect logic.
+.fe__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.fe__canvas:active {
+  cursor: grabbing;
+}
+
+// The scroll tongues of the ui-kit data table.
+.fe__tongue {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  border: var(--border-width) solid var(--color-border);
+  box-shadow: var(--shadow-elevated);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-base, 200ms) var(--ease-standard, ease),
+    background var(--motion-fast, 120ms) var(--ease-standard, ease),
+    color var(--motion-fast, 120ms) var(--ease-standard, ease),
+    border-color var(--motion-fast, 120ms) var(--ease-standard, ease),
+    scale var(--motion-xs) var(--ease-standard);
+  @include press.press;
+}
+.fe__tongue--on {
+  opacity: 1;
+  pointer-events: auto;
+}
+// The size stays on hover, because a repeat-click target that grows moves its own edge away
+// mid-click.
+.fe__tongue--held {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+@media (hover: hover) {
+  .fe__tongue:hover {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    border-color: var(--color-accent);
+  }
+}
+.fe__tongue:focus-visible {
+  outline: 2px solid var(--color-focus-ring, var(--color-primary));
+  outline-offset: 2px;
+}
+.fe__tongue svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+.fe__tongue[data-side='left'],
+.fe__tongue[data-side='right'] {
+  top: 50%;
+  width: 18px;
+  height: 54px;
+  translate: 0 -50%;
+}
+.fe__tongue[data-side='up'],
+.fe__tongue[data-side='down'] {
+  left: 50%;
+  width: 54px;
+  height: 18px;
+  translate: -50% 0;
+}
+.fe__tongue[data-side='left'] {
+  left: 0;
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+}
+.fe__tongue[data-side='right'] {
+  right: 0;
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+}
+.fe__tongue[data-side='right'] svg {
+  rotate: 180deg;
+}
+.fe__tongue[data-side='up'] {
+  top: 0;
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+}
+.fe__tongue[data-side='up'] svg {
+  rotate: 90deg;
+}
+.fe__tongue[data-side='down'] {
+  bottom: 0;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+.fe__tongue[data-side='down'] svg {
+  rotate: -90deg;
+}
+@include d.host-on(motion) {
+  .fe__tongue {
+    transition: none;
+  }
+}
+
+.fe__legend {
+  position: absolute;
+  left: var(--space-5);
+  right: var(--space-5);
+  bottom: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.fe__legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fe__legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.fe__legendDash {
+  width: 22px;
+  border-top: 2px dashed var(--color-text-subtle);
+}
+
+.fe__node-g {
+  cursor: pointer;
+}
+
+.fe__node-g,
+.fe__edge-g {
+  transition: opacity var(--motion-fast, 120ms) var(--ease-standard, ease);
+}
+.fe__node-g.fe__dim {
+  opacity: 0.35;
+}
+.fe__edge-g.fe__dim {
+  opacity: 0.12;
+}
+@include d.host-on(motion) {
+  .fe__node-g,
+  .fe__edge-g {
+    transition: none;
+  }
+}
+
+.fe__node {
+  fill: var(--color-surface-2);
+  stroke: var(--color-text-subtle);
+  stroke-width: 2;
+  cursor: pointer;
+}
+.fe__node--sel {
+  stroke: var(--color-accent);
+}
+.fe__node--multi {
+  stroke: var(--color-accent);
+  stroke-dasharray: 5 3;
+}
+.fe__node-halo {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-opacity: 0.3;
+  stroke-width: 4;
+  pointer-events: none;
+}
+
+.fe__node-initial-dot {
+  fill: var(--color-accent);
+  pointer-events: none;
+}
+
+.fe__node-text {
+  fill: var(--color-text);
+  font-size: 13.5px;
+  font-weight: var(--fw-semibold);
+  pointer-events: none;
+  user-select: none;
+}
+
+.fe__node-tag {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.fe__node-kind {
+  fill: var(--color-accent-text);
+  font-size: 11.5px;
+  font-weight: var(--fw-semibold);
+  pointer-events: none;
+  user-select: none;
+}
+
+.fe__connector {
+  fill: var(--color-surface-3);
+  stroke: var(--color-text-subtle);
+  stroke-width: 2;
+  cursor: crosshair;
+}
+@media (hover: hover) {
+  .fe__connector:hover {
+    stroke: var(--color-accent);
+  }
+}
+.fe__connector--branch {
+  stroke: var(--color-warning);
+}
+.fe__connector--guard {
+  stroke: var(--color-info, var(--color-accent));
+}
+.fe__dot-label {
+  fill: var(--color-text-muted);
+  font-size: 10.5px;
+  paint-order: stroke;
+  stroke: var(--color-surface-1);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+}
+
+.fe__edge {
+  stroke: var(--edge-color, var(--color-text-subtle));
+  stroke-width: 1.6;
+  fill: none;
+  pointer-events: none;
+}
+
+.fe__edge-hit {
+  stroke: transparent;
+  stroke-width: 14;
+  fill: none;
+  cursor: pointer;
+}
+
+.fe__edge-g--sel .fe__edge {
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}
+
+.fe__edge--auto {
+  stroke-dasharray: 6 5;
+}
+
+.fe__edge--temp {
+  stroke: var(--color-accent);
+  stroke-dasharray: 4 4;
+}
+
+.fe__arrow-head {
+  fill: context-stroke;
+}
+
+.fe__edge-label {
+  fill: var(--color-text-muted);
+  font-size: 11.5px;
+  font-weight: var(--fw-medium);
+  paint-order: stroke;
+  stroke: var(--color-surface-1);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.fe__edge-g--sel .fe__edge-label {
+  fill: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+}
+.fe__bolt {
+  fill: var(--color-warning);
+}
+
+.fe__groupbox {
+  fill: var(--color-surface-2);
+  stroke: var(--color-text-subtle);
+  stroke-width: 2;
+  stroke-dasharray: 8 5;
+  cursor: pointer;
+}
+.fe__groupbox-g--multi .fe__groupbox {
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}
+.fe__groupbox-name {
+  fill: var(--color-text);
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  pointer-events: none;
+}
+.fe__groupbox-count {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  pointer-events: none;
+}
+.fe__groupbox-dot {
+  fill: var(--color-surface-3);
+  stroke: var(--color-text-subtle);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.fe__proxy {
+  fill: var(--color-surface-1);
+  stroke: var(--color-border);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  cursor: pointer;
+}
+.fe__proxy--group {
+  stroke-dasharray: 8 5;
+  stroke-width: 2;
+}
+@media (hover: hover) {
+  .fe__proxy-g:hover .fe__proxy {
+    stroke: var(--color-accent);
+  }
+}
+.fe__proxy-text {
+  fill: var(--color-text-muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.fe__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+@include bp.wide {
+  .fe__panel {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    @include fade.fade-y(var(--space-5));
+  }
+}
+
+.fe__back {
+  align-self: flex-start;
+  margin-left: calc(-1 * var(--space-2));
+}
+
+.fe__versions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.fe__hidden {
+  display: none;
+}
+
+.fe__json {
+  margin-top: auto;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.fe__json summary {
+  cursor: pointer;
+}
+.fe__json pre {
+  max-height: 18rem;
+  margin: var(--space-2) 0 0;
+  overflow: auto;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: var(--fs-xs);
+}
+
+@include bp.phone {
+  .fe__canvas-wrap {
+    height: 26rem;
+  }
+  .fe__toolbar {
+    padding-inline: var(--space-2);
+  }
+  .fe__zoom {
+    margin-left: 0;
+  }
+  .fe__legend {
+    left: var(--space-3);
+    right: var(--space-3);
+  }
+  .fe__panel {
+    padding: var(--space-4);
+  }
+}

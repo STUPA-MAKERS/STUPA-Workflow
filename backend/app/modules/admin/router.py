@@ -292,7 +292,7 @@ async def get_config_schemas() -> dict[str, dict[str, Any]]:
 
 
 @router.get(
-    "/gremien",
+    "/committees",
     response_model=list[GremiumAdminOut],
     dependencies=[_GREMIEN],
     responses=_errors(401, 403),
@@ -303,7 +303,7 @@ async def list_gremien(service: ServiceDep) -> list[GremiumAdminOut]:
 
 
 @router.post(
-    "/gremien",
+    "/committees",
     response_model=GremiumOut,
     status_code=201,
     responses=_errors(400, 401, 403, 409, 422),
@@ -316,7 +316,7 @@ async def create_gremium(
 
 
 @router.patch(
-    "/gremien/{gremium_id}",
+    "/committees/{gremium_id}",
     response_model=GremiumOut,
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
@@ -344,7 +344,7 @@ async def update_gremium(
 
 
 @router.get(
-    "/gremien/{gremium_id}/public-preview",
+    "/committees/{gremium_id}/public-preview",
     response_model=GremiumPublicPreview,
     responses=_errors(401, 403, 404),
 )
@@ -359,7 +359,7 @@ async def gremium_public_preview(
 
 
 @router.delete(
-    "/gremien/{gremium_id}",
+    "/committees/{gremium_id}",
     status_code=204,
     responses=_errors(401, 403, 404, 409),
 )
@@ -369,7 +369,7 @@ async def delete_gremium(gremium_id: UUID, service: ServiceDep, principal: Gremi
 
 
 @router.get(
-    "/gremien/{gremium_id}/mail-recipients",
+    "/committees/{gremium_id}/mail-recipients",
     response_model=GremiumMailRecipients,
     responses=_errors(401, 403, 404),
 )
@@ -381,7 +381,7 @@ async def get_gremium_mail_recipients(
 
 
 @router.put(
-    "/gremien/{gremium_id}/mail-recipients",
+    "/committees/{gremium_id}/mail-recipients",
     response_model=GremiumMailRecipients,
     responses=_errors(400, 401, 403, 404, 422),
 )
@@ -400,7 +400,7 @@ async def set_gremium_mail_recipients(
 
 
 @router.get(
-    "/gremien/{gremium_id}/roles",
+    "/committees/{gremium_id}/roles",
     response_model=list[GremiumRoleOut],
     dependencies=[_GREMIEN_OR_GREMIUM_ROLES],
     responses=_errors(401, 403),
@@ -413,7 +413,7 @@ async def list_gremium_roles(
 
 
 @router.post(
-    "/gremien/{gremium_id}/roles",
+    "/committees/{gremium_id}/roles",
     response_model=GremiumRoleOut,
     status_code=201,
     responses=_errors(400, 401, 403, 409, 422),
@@ -429,7 +429,7 @@ async def create_gremium_role(
 
 
 @router.patch(
-    "/gremium-roles/{role_id}",
+    "/committee-roles/{role_id}",
     response_model=GremiumRoleOut,
     responses=_errors(400, 401, 403, 404, 422),
 )
@@ -443,7 +443,7 @@ async def update_gremium_role(
     return await service.update_role(role_id, payload, principal.sub)
 
 
-@router.delete("/gremium-roles/{role_id}", status_code=204, responses=_errors(401, 403, 404, 409))
+@router.delete("/committee-roles/{role_id}", status_code=204, responses=_errors(401, 403, 404, 409))
 async def delete_gremium_role(
     role_id: UUID, service: GremiumRoleServiceDep, principal: GremiumRolesAdmin
 ) -> None:
@@ -452,7 +452,7 @@ async def delete_gremium_role(
 
 
 @router.get(
-    "/gremien/{gremium_id}/memberships",
+    "/committees/{gremium_id}/memberships",
     response_model=list[GremiumMembershipOut],
     dependencies=[_MEMBERSHIP_READERS],
     responses=_errors(401, 403),
@@ -465,7 +465,7 @@ async def list_gremium_memberships(
 
 
 @authed_router.get(
-    "/gremien",
+    "/committees",
     response_model=list[GremiumOut],
     responses=_errors(401),
 )
@@ -691,7 +691,7 @@ async def list_cd_variant_options(service: CdVariantServiceDep) -> list[CdVarian
 
 
 @authed_router.get(
-    "/gremien/{gremium_id}/logo",
+    "/committees/{gremium_id}/logo",
     responses=_errors(401, 404, 503),
     response_class=Response,
 )
@@ -1046,7 +1046,7 @@ async def delete_group_mapping(
 
 
 @router.get(
-    "/gremium-membership-mappings",
+    "/committee-membership-mappings",
     response_model=list[GremiumMembershipMappingOut],
     dependencies=[_GROUP_MAPPINGS],
     responses=_errors(401, 403),
@@ -1059,7 +1059,7 @@ async def list_gremium_membership_mappings(
 
 
 @router.post(
-    "/gremium-membership-mappings",
+    "/committee-membership-mappings",
     response_model=GremiumMembershipMappingOut,
     status_code=201,
     responses=_errors(400, 401, 403, 404, 409, 422),
@@ -1077,7 +1077,7 @@ async def create_gremium_membership_mapping(
 
 
 @router.patch(
-    "/gremium-membership-mappings/{mapping_id}",
+    "/committee-membership-mappings/{mapping_id}",
     response_model=GremiumMembershipMappingOut,
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
@@ -1092,7 +1092,7 @@ async def update_gremium_membership_mapping(
 
 
 @router.delete(
-    "/gremium-membership-mappings/{mapping_id}",
+    "/committee-membership-mappings/{mapping_id}",
     status_code=204,
     responses=_errors(401, 403, 404),
 )
@@ -1104,7 +1104,7 @@ async def delete_gremium_membership_mapping(
 
 
 @router.get(
-    "/gremium-role-mappings",
+    "/committee-role-mappings",
     response_model=list[GremiumRoleMappingOut],
     dependencies=[_GROUP_MAPPINGS],
     responses=_errors(401, 403),
@@ -1117,7 +1117,7 @@ async def list_gremium_role_mappings(
 
 
 @router.post(
-    "/gremium-role-mappings",
+    "/committee-role-mappings",
     response_model=GremiumRoleMappingOut,
     status_code=201,
     responses=_errors(400, 401, 403, 404, 409, 422),
@@ -1136,7 +1136,7 @@ async def create_gremium_role_mapping(
 
 
 @router.patch(
-    "/gremium-role-mappings/{mapping_id}",
+    "/committee-role-mappings/{mapping_id}",
     response_model=GremiumRoleMappingOut,
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
@@ -1151,7 +1151,7 @@ async def update_gremium_role_mapping(
 
 
 @router.delete(
-    "/gremium-role-mappings/{mapping_id}",
+    "/committee-role-mappings/{mapping_id}",
     status_code=204,
     responses=_errors(401, 403, 404),
 )

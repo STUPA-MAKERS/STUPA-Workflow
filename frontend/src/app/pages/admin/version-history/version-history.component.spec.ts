@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -58,7 +59,7 @@ async function setup(over: Record<string, unknown> = {}) {
     inputs: { entityType: 'form', entityId: 't1' },
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   return { ...view, c: view.fixture.componentInstance as unknown as Cmp, api, toast };

@@ -1,6 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 @use '../../../shared/ui/dialog-form' as df;
+@use 'field' as f;
 
 @include df.host;
 
@@ -64,6 +65,7 @@
 .pd__row--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 @media (hover: hover) {
   .pd__row--on:hover {

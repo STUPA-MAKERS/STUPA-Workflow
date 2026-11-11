@@ -1,3 +1,5 @@
+@use '../widths' as w;
+
 :host {
   display: block;
 }
@@ -10,9 +12,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-}
-.cdv__variant {
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
 }
 @media (hover: hover) {
   .cdv__head.hitrow:hover {
@@ -55,9 +54,6 @@
   flex-wrap: wrap;
   align-items: baseline;
   column-gap: var(--space-2);
-}
-.cdv__name {
-  font-weight: var(--fw-semibold);
 }
 .cdv__key {
   font-size: var(--fs-sm);
@@ -240,7 +236,7 @@
   --dialog-footer-gap: var(--space-2);
 }
 
-@container (max-width: 34rem) {
+@include w.fields {
   .cdv__head {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);

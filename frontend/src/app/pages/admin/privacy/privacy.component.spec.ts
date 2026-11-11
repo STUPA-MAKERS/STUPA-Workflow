@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { of, throwError } from 'rxjs';
 import { provideRouter, Router } from '@angular/router';
 import { render, screen, waitFor } from '@testing-library/angular';
@@ -80,7 +81,7 @@ async function setup(api = makeApi(), url = '/') {
     providers: [
       provideRouter([{ path: '**', children: [] }]),
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   if (url !== '/') {
@@ -430,6 +431,23 @@ describe('PrivacyComponent', () => {
     expect(api.putPrivacySettings).toHaveBeenCalledWith({ defaultRetentionMonths: 36 });
     expect(cmp.retentionMonths()).toBe(36);
     expect(toast.success).toHaveBeenCalled();
+  });
+
+  /** § 000635 */
+  it('"Verwerfen" sets the retention back and hides with "Speichern"', async () => {
+    const { fixture, api } = await setup();
+    const field = screen.getByDisplayValue('24');
+    await userEvent.clear(field);
+    await userEvent.type(field, '36');
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(screen.getByDisplayValue('24')).toBeInTheDocument();
+    expect(api.putPrivacySettings).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('shows "Speichern" only while the retention has a change', async () => {

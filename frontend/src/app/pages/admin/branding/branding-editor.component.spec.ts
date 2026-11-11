@@ -1,3 +1,4 @@
+import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute } from '@angular/router';
@@ -32,7 +33,7 @@ async function setup(section: BrandingSection = 'texts') {
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: true },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       route(section),
     ],
   });
@@ -77,7 +78,7 @@ async function setupWithStub(
   const view = await render(BrandingEditorComponent, {
     providers: [
       { provide: AdminApiService, useValue: fullApi },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       route(section),
     ],
   });
@@ -88,6 +89,18 @@ async function setupWithStub(
 
 describe('BrandingEditorComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('shows the load error toast with a retry when the branding fails to load', async () => {
+    let calls = 0;
+    const getSiteConfig = jest.fn(() =>
+      ++calls === 1 ? throwError(() => new Error('x')) : of({ ...STUB_CFG, branding: emptyBranding() }),
+    );
+    await setupWithStub({ getSiteConfig });
+    expect(loadErrorToast()).toBe('Das Branding konnte nicht geladen werden.');
+    expect(screen.queryByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeNull();
+    retryLoadError();
+    expect(await screen.findByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeInTheDocument();
+  });
 
   it('shows the texts on the page "Texte" and nothing of the branding', async () => {
     const { container } = await setup('texts');
@@ -142,6 +155,22 @@ describe('BrandingEditorComponent', () => {
       CATALOG.en = en;
       CATALOG.de = de;
     }
+  });
+
+  /** § 000635 */
+  it('"Verwerfen" sets the fields back and hides with "Speichern"', async () => {
+    const { api, fixture } = await setupWithStub({});
+    const field = (): HTMLInputElement => screen.getByRole('textbox', { name: 'Kurzname (PWA)' });
+    const before = field().value;
+    await userEvent.type(field(), 'AP');
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(field().value).toBe(before);
+    expect(api.saveSiteConfig).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('saves at once, without a version line or a version list', async () => {
@@ -493,7 +522,7 @@ describe('BrandingEditorComponent', () => {
       expect(saved.freetexts.submittedExternal).toEqual({});
     });
 
-    /** Spec 000495: the statement of `/barrierefreiheit` is an admin text. */
+    /** Spec 000495: the statement of `/accessibility` is an admin text. */
     it('edits the accessibility statement per language', async () => {
       const { fixture, api } = await setupWithStub({}, 'texts');
       await fixture.whenStable();

@@ -91,6 +91,6 @@ def test_api_rejects_a_bad_global_role_key(client: TestClient) -> None:
 
 
 def test_api_rejects_a_bad_gremium_role_key(client: TestClient) -> None:
-    r = client.post(f"/api/admin/gremien/{uuid4()}/roles", json={"key": "Schrift Führung"})
+    r = client.post(f"/api/admin/committees/{uuid4()}/roles", json={"key": "Schrift Führung"})
     assert r.status_code == 422
     assert r.headers["content-type"].startswith("application/problem+json")

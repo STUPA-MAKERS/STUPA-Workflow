@@ -91,6 +91,21 @@ describe('LoginSettingsComponent', () => {
     expect(api.putLoginSettings).not.toHaveBeenCalled();
   });
 
+  /** § 000635 */
+  it('"Verwerfen" sets the fields back and hides with "Speichern"', async () => {
+    const { c, fixture } = await setup();
+    const before = pwaField().value;
+    c.patch({ pwa: '200' });
+    fixture.detectChanges();
+    expect(saveButton()).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(pwaField().value).toBe(before);
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('turns the save off again when the draft returns to the stored values', async () => {
     const { c } = await setup();
     c.patch({ pwa: '200' });

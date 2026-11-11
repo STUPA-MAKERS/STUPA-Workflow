@@ -158,11 +158,10 @@ omit = ["tests/*"]
 
 [tool.coverage.report]
 show_missing = true
-# Total gate: backend, unit tests only, lines and branches. The unit suite
-# now reaches 98.7 %. Fakes without a database cover all services, routers and workers.
-# The gate sits at 97 %, just below the current value. Real regressions then break the
-# build, and small swings do not turn it red by mistake. The goal is to hold or raise the
-# 97 %.
+# Total gate: backend, lines and branches. The unit tests and the integration tests
+# count together: each CI job writes its own data file, and the `coverage-gate` job
+# combines them and applies this value. The gate sits at 97 %, so real regressions
+# break the build and small swings do not turn it red by mistake.
 fail_under = 97
 exclude_lines = [
     "pragma: no cover",
@@ -176,7 +175,7 @@ exclude_lines = [
 # the coverage `source` (= `app`), as coverage.xml lists them, for example
 # `modules/auth/oidc.py`. The gate turns on as soon as the path exists. The negative probe
 # is tests/test_coverage_gate.py.
-# The pure unit run reaches 100 % branch coverage in each of these modules, and the
+# The unit tests and the integration tests count together for this gate too, and the
 # `coverage-gate` job in .github/workflows/ci.yml blocks on it. The backup module and
 # its worker (`worker/backup.py`) are on the list too.
 [tool.coverage_critical]

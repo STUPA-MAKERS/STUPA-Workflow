@@ -1,5 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'frosted' as *;
+@use 'field' as f;
+@use 'display' as d;
 
 :host {
   display: flex;
@@ -89,15 +91,18 @@
   padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius-field);
-  background: var(--color-surface-3);
-  color: var(--color-text);
+  background: var(--field-bg, var(--color-surface-3));
+  color: var(--field-text, var(--color-text));
   font: inherit;
   font-size: var(--fs-h1);
   font-weight: var(--fw-semibold);
+  box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .ts__titleInput:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
   outline-offset: 1px;
+  box-shadow: var(--field-focus, var(--field-edge, none));
 }
 .ts__bar {
   display: flex;
@@ -177,6 +182,24 @@
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-5) 28px;
+}
+/* Highlighted fields (000598): the whole rounded pane of the TOP is the field, black on
+   yellow with the black edge, and the editor inside it draws no surface of its own. */
+.ts {
+  @include f.highlight-surface;
+}
+@include d.host-on(fields) {
+  .ts__editor ::ng-deep .mde__host {
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+  }
+  .ts__raw,
+  .ts__raw:focus-within {
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+  }
 }
 .ts__editor ::ng-deep .mde__host {
   min-height: 100%;
@@ -352,5 +375,5 @@
   outline: none;
 }
 .ts__raw::placeholder {
-  color: var(--color-text-muted);
+  color: var(--field-text, var(--color-text-muted));
 }

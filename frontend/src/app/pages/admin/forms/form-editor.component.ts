@@ -37,6 +37,7 @@ import {
   ToastService,
   FabComponent,
   PageHeaderComponent,
+  scrollBehavior,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -236,7 +237,12 @@ export class FormEditorComponent {
       label: this.i18n.translate(this.preview() ? 'admin.forms.modeEdit' : 'admin.forms.modeView'),
       icon: this.preview() ? 'edit' : 'eye',
     };
-    return [{ items: [...(this.hasVersion() ? [toggle] : []), preview] }];
+    const discard: RowMenuItem = {
+      id: 'discard',
+      label: this.i18n.translate('action.discard'),
+      icon: 'undo',
+    };
+    return [{ items: [...(this.hasVersion() ? [toggle] : []), preview, ...(this.dirty() ? [discard] : [])] }];
   });
 
   /** Original type state. A save patches the type only after a change. */
@@ -346,6 +352,12 @@ export class FormEditorComponent {
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  /** "Verwerfen": read the stored form and type again (§ 000635). */
+  protected discard(): void {
+    const id = this.typeId();
+    if (id) this.load(id);
   }
 
   /** Reload the editor state after a version restore (sidebar). */
@@ -569,7 +581,7 @@ export class FormEditorComponent {
       const card = this.host.nativeElement.querySelector<HTMLElement>(
         `[data-q="${pos.gi}:${pos.qi}"]`,
       );
-      card?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+      card?.scrollIntoView?.({ block: 'nearest', behavior: scrollBehavior() });
     });
   }
 
@@ -611,6 +623,8 @@ export class FormEditorComponent {
         return this.toggleActive();
       case 'preview':
         return this.preview.set(!this.preview());
+      case 'discard':
+        return this.discard();
       default:
         return;
     }

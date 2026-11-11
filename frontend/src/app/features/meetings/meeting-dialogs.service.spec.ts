@@ -44,7 +44,7 @@ function setup() {
   const svc = TestBed.inject(MeetingDialogsService);
   const session = TestBed.inject(MeetingSessionService);
   const timeline = TestBed.inject(MeetingsTimelineService);
-  http.match('/api/meetings/gremien').forEach((r) => r.flush([]));
+  http.match('/api/meetings/committees').forEach((r) => r.flush([]));
   const toasts = () => TestBed.inject(ToastService).toasts().map((t) => t.message);
   return { http, svc, session, timeline, navigate, toasts };
 }
@@ -130,22 +130,22 @@ describe('MeetingDialogsService', () => {
     expect(svc.handoverTarget()).toBe(member);
     svc.handOver(M(), 'p-2', 'now');
     expect(svc.handoverSaving()).toBe(true);
-    const now = http.expectOne('/api/meetings/m-1/protokollant-handover');
+    const now = http.expectOne('/api/meetings/m-1/minute-taker-handover');
     expect(now.request.body).toEqual({ principalId: 'p-2', mode: 'now' });
     now.flush(WIRE);
     expect(toasts()).toContain('Protokollführung übergeben.');
     expect(svc.handoverTarget()).toBeNull();
     expect(svc.handoverSaving()).toBe(false);
     svc.handOver(M(), 'p-2', 'next_item');
-    http.expectOne('/api/meetings/m-1/protokollant-handover').flush(WIRE);
+    http.expectOne('/api/meetings/m-1/minute-taker-handover').flush(WIRE);
     expect(toasts()).toContain('Übergabe mit dem nächsten TOP geplant.');
     svc.cancelHandover(M());
-    const cancel = http.expectOne('/api/meetings/m-1/protokollant-handover');
+    const cancel = http.expectOne('/api/meetings/m-1/minute-taker-handover');
     expect(cancel.request.method).toBe('DELETE');
     cancel.flush(WIRE);
     expect(toasts()).toContain('Geplante Übergabe verworfen.');
     svc.cancelHandover(M());
-    http.expectOne('/api/meetings/m-1/protokollant-handover').flush(null, { status: 500, statusText: 'x' });
+    http.expectOne('/api/meetings/m-1/minute-taker-handover').flush(null, { status: 500, statusText: 'x' });
     expect(toasts()).toContain('Aktion fehlgeschlagen.');
   });
 
@@ -156,14 +156,14 @@ describe('MeetingDialogsService', () => {
     for (const [status, code] of [[422, 'protokollant_needs_protocol_write'], [409, 'no_next_item'], [409, 'already_protokollant']] as const) {
       svc.askHandover(member);
       svc.handOver(M(), 'p-2', 'next_item');
-      http.expectOne('/api/meetings/m-1/protokollant-handover').flush({ code }, { status, statusText: 'x' });
+      http.expectOne('/api/meetings/m-1/minute-taker-handover').flush({ code }, { status, statusText: 'x' });
       expect(svc.handoverRefusal()).toBe(code);
       expect(svc.handoverTarget()).toBe(member);
       expect(svc.handoverSaving()).toBe(false);
     }
     expect(toasts()).toEqual([]);
     svc.handOver(M(), 'p-2', 'now');
-    http.expectOne('/api/meetings/m-1/protokollant-handover').flush({ code: 'meeting_not_live', detail: 'nicht live' }, { status: 409, statusText: 'x' });
+    http.expectOne('/api/meetings/m-1/minute-taker-handover').flush({ code: 'meeting_not_live', detail: 'nicht live' }, { status: 409, statusText: 'x' });
     expect(toasts()).toContain('Aktion fehlgeschlagen.: nicht live');
     expect(svc.handoverRefusal()).toBeNull();
     svc.closeHandover();

@@ -3,62 +3,62 @@
     <app-breadcrumbs crumbs />
   </app-page-header>
 
-  @if (loadError()) {
-    <app-note kind="error" icon="alert" role="alert">{{ 'admin.forms.overviewError' | t }}</app-note>
-  } @else {
-    @if (loading() || types().length) {
-      <app-data-table
-        surface="rowgroup"
-        [loading]="loading()"
-        [loadingText]="'admin.forms.overviewLoading' | t"
-        [columns]="columns()"
-        [rows]="types()"
-        [rowKey]="rowId"
-        [clickable]="true"
-        (rowClick)="open($any($event))"
-      >
-        <ng-template appCell="name" let-t>
-          <a
-            class="fl__name ell"
-            [routerLink]="['/admin/forms', $any(t).id]"
-            [title]="name($any(t))"
-            (click)="$event.stopPropagation()"
-            (keydown.enter)="$event.stopPropagation()"
-            >{{ name($any(t)) }}</a
-          >
-        </ng-template>
-        <ng-template appCell="gremium" let-t>
-          <span class="fl__muted">{{ gremiumName($any(t).gremiumId) }}</span>
-        </ng-template>
-        <ng-template appCell="budget" let-t>
-          <span [class.fl__muted]="!$any(t).hasBudget">{{ ($any(t).hasBudget ? 'admin.forms.withBudget' : 'admin.forms.withoutBudget') | t }}</span>
-        </ng-template>
-        <ng-template appCell="status" let-t>
-          @if ($any(t).activeFormVersionId) {
-            <app-status-text kind="accent">{{ 'admin.forms.status.active' | t }}</app-status-text>
-          } @else {
-            <app-status-text kind="warn">{{ 'admin.forms.status.draft' | t }}</app-status-text>
-          }
-        </ng-template>
-        <ng-template appCell="version" let-t>
-          <span class="fl__version mono">{{ versionLabel($any(t)) }}</span>
-        </ng-template>
-        <ng-template appCell="actions" let-t>
-          @if (canDelete()) {
-            <span class="fl__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
-              <app-row-menu
-                [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
-                [sections]="rowMenu()"
-                (selected)="askDelete($any(t))"
-              />
-            </span>
-          }
-        </ng-template>
-      </app-data-table>
-    } @else {
-      <app-empty-state shape="table" [heading]="'admin.forms.overviewEmpty' | t" />
-    }
-  }
+  <app-load-state [state]="loadError() ? 'error' : 'ok'" [keepContent]="true" [errorText]="'admin.forms.overviewError' | t" (retry)="retryLoad()">
+    <ng-template #content>
+      @if (loading() || types().length) {
+        <app-data-table
+          surface="rowgroup"
+          [loading]="loading()"
+          [loadingText]="'admin.forms.overviewLoading' | t"
+          [columns]="columns()"
+          [rows]="types()"
+          [rowKey]="rowId"
+          [clickable]="true"
+          (rowClick)="open($any($event))"
+        >
+          <ng-template appCell="name" let-t>
+            <a
+              class="fl__name ell"
+              [routerLink]="['/admin/forms', $any(t).id]"
+              [title]="name($any(t))"
+              (click)="$event.stopPropagation()"
+              (keydown.enter)="$event.stopPropagation()"
+              >{{ name($any(t)) }}</a
+            >
+          </ng-template>
+          <ng-template appCell="gremium" let-t>
+            <span class="fl__muted">{{ gremiumName($any(t).gremiumId) }}</span>
+          </ng-template>
+          <ng-template appCell="budget" let-t>
+            <span [class.fl__muted]="!$any(t).hasBudget">{{ ($any(t).hasBudget ? 'admin.forms.withBudget' : 'admin.forms.withoutBudget') | t }}</span>
+          </ng-template>
+          <ng-template appCell="status" let-t>
+            @if ($any(t).activeFormVersionId) {
+              <app-status-text kind="accent">{{ 'admin.forms.status.active' | t }}</app-status-text>
+            } @else {
+              <app-status-text kind="warn">{{ 'admin.forms.status.draft' | t }}</app-status-text>
+            }
+          </ng-template>
+          <ng-template appCell="version" let-t>
+            <span class="fl__version mono">{{ versionLabel($any(t)) }}</span>
+          </ng-template>
+          <ng-template appCell="actions" let-t>
+            @if (canDelete()) {
+              <span class="fl__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+                <app-row-menu
+                  [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
+                  [sections]="rowMenu()"
+                  (selected)="askDelete($any(t))"
+                />
+              </span>
+            }
+          </ng-template>
+        </app-data-table>
+      } @else {
+        <app-empty-state shape="table" [heading]="'admin.forms.overviewEmpty' | t" />
+      }
+    </ng-template>
+  </app-load-state>
 
   @if (canCreate()) {
     <app-fab [label]="'fab.form' | t" (activate)="openCreate()" />

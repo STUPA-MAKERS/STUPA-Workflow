@@ -92,13 +92,13 @@ describe('PageIndexService', () => {
   it('withholds the gremium-gated pages from a user in no gremium', () => {
     const paths = setup({}).visible().map((e) => e.path);
     expect(paths).not.toContain('/meetings');
-    expect(paths).not.toContain('/voting/beamer');
+    expect(paths).not.toContain('/voting/projector');
   });
 
   it('offers a gremium-gated page for the gremium permission in any gremium', () => {
     const svc = setup({ canInAnyGremium: (p: string) => p === 'session.manage' });
     const paths = svc.visible().map((e) => e.path);
-    expect(paths).toContain('/voting/beamer');
+    expect(paths).toContain('/voting/projector');
     expect(paths).toContain('/meetings');
   });
 

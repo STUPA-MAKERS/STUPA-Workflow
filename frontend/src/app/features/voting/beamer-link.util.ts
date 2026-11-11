@@ -8,7 +8,7 @@ export const BEAMER_FROM_PARAM = 'from';
  * reads `?from=` (see `beamerOrigin`) for its exit control and for Escape.
  */
 export function beamerUrl(router: Router, meetingId: string): UrlTree {
-  return router.createUrlTree(['/voting/beamer', meetingId], {
+  return router.createUrlTree(['/voting/projector', meetingId], {
     queryParams: { [BEAMER_FROM_PARAM]: router.url },
   });
 }
@@ -21,6 +21,6 @@ export function beamerUrl(router: Router, meetingId: string): UrlTree {
 export function beamerOrigin(from: string | null): string | null {
   if (!from || !from.startsWith('/')) return null;
   if (from.startsWith('//') || from.startsWith('/\\')) return null;
-  if (from.startsWith('/voting/beamer')) return null;
+  if (from.startsWith('/voting/projector')) return null;
   return from;
 }

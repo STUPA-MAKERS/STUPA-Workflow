@@ -33,9 +33,9 @@ export class PublicProtocolsService {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
 
-  /** GET /public/gremien — the gremien that publish their protocols. */
+  /** GET /public/committees — the gremien that publish their protocols. */
   gremien(): Observable<PublicGremium[]> {
-    return this.http.get<PublicGremium[]>(`${this.base}/public/gremien`, {
+    return this.http.get<PublicGremium[]>(`${this.base}/public/committees`, {
       context: skipLoading(),
     });
   }

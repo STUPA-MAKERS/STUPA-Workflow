@@ -1,4 +1,5 @@
 @use 'frosted' as *;
+@use 'display' as d;
 
 .sb__svg {
   width: min(480px, 100%);
@@ -53,4 +54,23 @@
 }
 .sb__center--empty {
   cursor: default;
+}
+
+/* Very high contrast (spec 000605): the segments alternate white and yellow with a black
+   edge; the name of a segment shows on hover and in the list for a screen reader. */
+@include d.host-on(veryHigh) {
+  .sb__seg {
+    fill: #ffffff;
+    fill-opacity: 1;
+    stroke: #000000;
+    stroke-width: 2px;
+  }
+  .sb__seg:nth-child(even of .sb__seg) {
+    fill: #ffff00;
+  }
+  .sb__seg--dim {
+    opacity: 1;
+    fill: #000000;
+    stroke: #ffffff;
+  }
 }

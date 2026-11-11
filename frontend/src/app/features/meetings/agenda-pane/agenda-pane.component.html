@@ -31,7 +31,7 @@
         [class.ap__row--done]="done"
         [class.ap__row--drag]="canChangeAgenda()"
       >
-        @if (renamingTopId() === item.id) {
+        @if (renaming(item)) {
           <div class="ap__rename">
             <app-top-badge [number]="i + 1" decorative />
             <input
@@ -54,12 +54,7 @@
             [selected]="item.id === selectedId()"
             (activate)="pick.emit(item.id)"
           >
-            <span lead class="ap__lead">
-              @if (canChangeAgenda()) {
-                <span class="ap__grip" aria-hidden="true" [title]="'meetings.agenda.dragHandle' | t">
-                  <app-icon name="grip" [size]="16" />
-                </span>
-              }
+            <span lead>
               <app-top-badge [number]="i + 1" [state]="done ? 'done' : isNow(item) ? 'now' : 'todo'" decorative />
             </span>
             @if (isNow(item) || done) {

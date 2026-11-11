@@ -1,3 +1,4 @@
+@use 'field' as f;
 :host {
   display: contents;
 }
@@ -30,6 +31,7 @@
 .ms__row--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 .ms__row--transfer {
   margin-inline: calc(-1 * var(--space-4));

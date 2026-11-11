@@ -17,12 +17,18 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
+  DisplaySettingsService,
   IconComponent,
   MEDIA,
   SideSheetComponent,
+  SwitchComponent,
+  ThemeService,
   mediaQuery,
   showInTopLayer,
+  type DisplayChoice,
+  type IconName,
 } from '@stupa-makers/ui-kit';
 import { HelpService } from '../help.service';
 
@@ -35,6 +41,22 @@ import { HelpService } from '../help.service';
  */
 export type HelpMenuVariant = 'rail' | 'header' | 'sheet';
 
+/** A switch of the group "Darstellung": `dark` is the theme, the rest are display settings. */
+export type DisplayKey = 'dark' | DisplayChoice;
+
+/** The switches of the group "Darstellung", in their order (app spec 000593). */
+const DISPLAY_ROWS: readonly {
+  readonly key: DisplayKey;
+  readonly icon: IconName;
+  readonly label: TranslationKey;
+}[] = [
+  { key: 'dark', icon: 'moon', label: 'help.display.dark' },
+  { key: 'contrast', icon: 'half', label: 'help.display.contrast' },
+  { key: 'motion', icon: 'play', label: 'help.display.motion' },
+  { key: 'transparency', icon: 'square', label: 'help.display.transparency' },
+  { key: 'veryHigh', icon: 'palette', label: 'help.display.veryHigh' },
+];
+
 /** Space between the trigger and the popover, and the least distance to the viewport edge. */
 const GAP = 8;
 
@@ -43,7 +65,17 @@ let nextId = 0;
 /**
  * The help menu: "Handbuch im Wiki" (the configured `help.wikiUrl`, a real link in a new
  * tab), "Barrierefreiheit" (the accessibility statement, on every page with and without a
- * login, spec 000496) and "Problem melden", which opens the report dialog.
+ * login, spec 000496), the group "Darstellung" and "Problem melden", which opens the report
+ * dialog.
+ *
+ * "Darstellung" (specs 000593, 000594) has one switch per display setting: the dark theme,
+ * more contrast, less motion, less transparency and, last, very high contrast, which also
+ * highlights the fields (spec 000598). A switch shows the
+ * state in effect, which is the system setting until the person sets it. The choice holds
+ * in this browser only. "Systemeinstellungen verwenden" removes every choice, the theme
+ * included, and shows only while a choice exists. Very high contrast turns every other
+ * setting on: their switches show on and are disabled (spec 000606). The menu stays open on a switch, so the
+ * person sees the change and can set the next one.
  *
  * A signed-in person always gets "Problem melden". A visitor gets it only while the
  * admin allows tickets without an account (`tickets.publicEnabled`).
@@ -56,7 +88,7 @@ let nextId = 0;
   selector: 'app-help-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, RouterLink, TranslatePipe, IconComponent, SideSheetComponent],
+  imports: [NgTemplateOutlet, RouterLink, TranslatePipe, IconComponent, SideSheetComponent, SwitchComponent],
   templateUrl: './help-menu.component.html',
   styleUrl: './help-menu.component.scss',
 })
@@ -64,6 +96,8 @@ export class HelpMenuComponent {
   private readonly auth = inject(AuthService);
   private readonly help = inject(HelpService);
   readonly branding = inject(BrandingService);
+  private readonly theme = inject(ThemeService);
+  private readonly display = inject(DisplaySettingsService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly variant = input<HelpMenuVariant>('rail');
@@ -91,6 +125,26 @@ export class HelpMenuComponent {
 
   /** The link without the scheme, as the second line: it wraps, it is never cut. */
   readonly wikiLabel = computed(() => this.branding.wikiUrl().replace(/^https?:\/\//, ''));
+
+  /**
+   * The rows of the group "Darstellung", each with the state in effect. While very high
+   * contrast is on, every other row is on and disabled (spec 000606).
+   */
+  readonly displayRows = computed(() => {
+    const effective = this.display.effective();
+    const dark = this.theme.resolved() === 'dark';
+    const locked = effective.veryHigh;
+    return DISPLAY_ROWS.map((row) => ({
+      ...row,
+      on: row.key === 'dark' ? dark : effective[row.key],
+      locked: locked && row.key !== 'veryHigh',
+    }));
+  });
+
+  /** A switch of the group overrides the system, so "Systemeinstellungen verwenden" shows. */
+  readonly hasDisplayChoice = computed(
+    () => this.display.hasChoice() || this.theme.preference() !== 'system',
+  );
 
   protected readonly panelId = `help-menu-${nextId++}`;
   private readonly trigger = viewChild<ElementRef<HTMLButtonElement>>('trigger');
@@ -139,6 +193,18 @@ export class HelpMenuComponent {
     if (!this.open()) return;
     this.open.set(false);
     if (restoreFocus) this.trigger()?.nativeElement.focus();
+  }
+
+  /** Set one switch of the group "Darstellung" for this browser. */
+  setDisplay(key: DisplayKey, on: boolean): void {
+    if (key === 'dark') this.theme.setPreference(on ? 'dark' : 'light');
+    else this.display.set(key, on);
+  }
+
+  /** Every switch of the group follows the system again. */
+  resetDisplay(): void {
+    this.theme.setPreference('system');
+    this.display.reset();
   }
 
   /** The handbook link was followed (it opens in a new tab). */

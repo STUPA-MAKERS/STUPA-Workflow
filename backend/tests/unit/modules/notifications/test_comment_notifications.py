@@ -110,7 +110,7 @@ async def test_principal_comment_links_a_guest_to_the_applicant_page() -> None:
     assert svc is not None
     base = SETTINGS.public_base_url.rstrip("/")
     text = svc.enqueued[0].text
-    assert f"Antrag öffnen: {base}/antrag/{app_id}" in text
+    assert f"Antrag öffnen: {base}/my-applications/{app_id}" in text
     assert "#comment" not in text
 
 

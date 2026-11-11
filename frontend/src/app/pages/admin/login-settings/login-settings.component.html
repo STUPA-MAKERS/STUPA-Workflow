@@ -1,6 +1,9 @@
 <section class="ls admin-page">
   <app-page-header [flush]="true" [title]="'admin.loginSettings.title' | t">
     <app-breadcrumbs crumbs />
+    @if (form.state() === 'ok' && dirty()) {
+      <app-button actions variant="text" [disabled]="form.saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
+    }
   </app-page-header>
 
   <app-load-state

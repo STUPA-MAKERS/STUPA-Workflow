@@ -9,7 +9,7 @@ export const GREMIEN_NOW = new InjectionToken<() => Date>('GREMIEN_NOW', {
 });
 
 /**
- * The list of the gremien that the caller sees (`GET /gremien/overview`), shared by the
+ * The list of the gremien that the caller sees (`GET /committees/overview`), shared by the
  * list pane and the open gremium. `GremienComponent` provides it, so the detail reads the
  * row of its gremium (role, counts, quorum, next meeting) without a second request.
  */

@@ -1186,7 +1186,7 @@ async def test_notify_erasure_rejected_links_the_application(
         reason=None,
     )
     base = SETTINGS.public_base_url.rstrip("/")
-    assert f"Antrag öffnen: {base}/antrag/{app_id}" in queue.messages[0].text
+    assert f"Antrag öffnen: {base}/my-applications/{app_id}" in queue.messages[0].text
 
 
 async def test_notify_erasure_rejected_no_reason(

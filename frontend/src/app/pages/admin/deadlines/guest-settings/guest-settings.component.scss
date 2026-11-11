@@ -1,3 +1,5 @@
+@use '../../widths' as w;
+
 :host {
   display: block;
 }
@@ -13,7 +15,7 @@
   gap: var(--space-4);
   align-items: start;
 }
-@container (max-width: 40rem) {
+@include w.columns {
   .gs__grid {
     grid-template-columns: minmax(0, 1fr);
   }

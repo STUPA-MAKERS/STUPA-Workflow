@@ -246,12 +246,12 @@ describe('mockApiInterceptor', () => {
       expect(form.sections.length).toBeGreaterThan(0);
     });
 
-    it('GET /gremien/{id}/meeting-defaults → a quorum for the StuPa, public join elsewhere', async () => {
-      expect(await get('/api/gremien/g0000000-0000-0000-0000-000000000001/meeting-defaults')).toEqual({
+    it('GET /committees/{id}/meeting-defaults → a quorum for the StuPa, public join elsewhere', async () => {
+      expect(await get('/api/committees/g0000000-0000-0000-0000-000000000001/meeting-defaults')).toEqual({
         publicJoinAllowed: false,
         quorumPercent: 50,
       });
-      expect(await get('/api/gremien/g-other/meeting-defaults')).toEqual({
+      expect(await get('/api/committees/g-other/meeting-defaults')).toEqual({
         publicJoinAllowed: true,
         quorumPercent: null,
       });
@@ -933,13 +933,13 @@ describe('mockApiInterceptor', () => {
       expect(filtered.items.length).toBe(1);
     });
 
-    it('GET /meetings/gremien → the filter Gremien', async () => {
-      const gs = await get<{ name: string }[]>('/api/meetings/gremien');
+    it('GET /meetings/committees → the filter Gremien', async () => {
+      const gs = await get<{ name: string }[]>('/api/meetings/committees');
       expect(gs.map((g) => g.name)).toEqual(['Studierendenparlament', 'Haushaltsausschuss']);
     });
 
-    it('GET /gremien/{id}/meeting-members → members, one without protocol.write', async () => {
-      const ms = await get<{ canKeepProtocol: boolean }[]>('/api/gremien/g1/meeting-members');
+    it('GET /committees/{id}/meeting-members → members, one without protocol.write', async () => {
+      const ms = await get<{ canKeepProtocol: boolean }[]>('/api/committees/g1/meeting-members');
       expect(ms.length).toBe(9);
       expect(ms.filter((m) => !m.canKeepProtocol).length).toBe(4);
     });
@@ -1441,6 +1441,13 @@ describe('mockApiInterceptor', () => {
       expect(m.status).toBe('planned');
     });
 
+    it('GET /applicant/applications and POST /auth/email-login(/verify) → the e-mail session', async () => {
+      const res = await get<{ items: unknown[] }>('/api/applicant/applications');
+      expect(res.items.length).toBe(3);
+      await expect(firstValueFrom(http.post('/api/auth/email-login', { email: 'a@b.de' }))).resolves.toBeNull();
+      await expect(firstValueFrom(http.post('/api/auth/email-login/verify', { token: 't' }))).resolves.toBeNull();
+    });
+
     it('POST /auth/magic-link/verify → scope edit', async () => {
       const res = await firstValueFrom(
         http.post<{ scope: string }>('/api/auth/magic-link/verify', { token: 't' }),
@@ -1682,7 +1689,7 @@ describe('mockApiInterceptor', () => {
         keeperPeriods: { principalId: string; toAt: string | null; toPosition: number | null }[];
       };
       const handover = (principalId: string, mode: string) =>
-        firstValueFrom(http.post<M>(`/api/meetings/${LIVE}/protokollant-handover`, { principalId, mode }));
+        firstValueFrom(http.post<M>(`/api/meetings/${LIVE}/minute-taker-handover`, { principalId, mode }));
 
       /**
        * Other tests change the shared mock meeting, so each test starts from the demo keeper on TOP
@@ -1716,11 +1723,11 @@ describe('mockApiInterceptor', () => {
         const planned = await handover('p-4', 'next_item');
         expect(planned.plannedHandover).toMatchObject({ principalId: 'p-4', fromPosition: 2 });
         const discarded = await firstValueFrom(
-          http.delete<M>(`/api/meetings/${LIVE}/protokollant-handover`),
+          http.delete<M>(`/api/meetings/${LIVE}/minute-taker-handover`),
         );
         expect(discarded.plannedHandover).toBeNull();
         await expect(
-          firstValueFrom(http.delete(`/api/meetings/${LIVE}/protokollant-handover`)),
+          firstValueFrom(http.delete(`/api/meetings/${LIVE}/minute-taker-handover`)),
         ).rejects.toMatchObject({ status: 404 });
         await handover('p-4', 'next_item');
         const moved = await firstValueFrom(
@@ -1825,7 +1832,7 @@ describe('mockApiInterceptor', () => {
   it('serves the public protocols from the lazy mock', async () => {
     setup(true);
     const http = TestBed.inject(HttpClient);
-    expect(await firstValueFrom(http.get<unknown[]>('/api/public/gremien'))).toHaveLength(1);
+    expect(await firstValueFrom(http.get<unknown[]>('/api/public/committees'))).toHaveLength(1);
     const page = await firstValueFrom(
       http.get<{ total: number; items: { tops: object[] }[] }>('/api/public/protocols?limit=3'),
     );

@@ -1,3 +1,6 @@
+@use 'display' as d;
+@use 'field' as f;
+
 .altcha {
   display: flex;
   flex-direction: column;
@@ -78,8 +81,33 @@
     transform: rotate(360deg);
   }
 }
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .altcha__spinner {
     animation-duration: 1.8s;
+  }
+}
+
+/* Highlighted fields (000598): the "Ich bin kein Roboter" control is a check box field,
+   black on yellow with the black edge. Its box has the black edge and a black mark, as
+   every check box. */
+.altcha__btn {
+  @include f.highlight-surface;
+}
+@include d.host-on(fields) {
+  .altcha__btn {
+    --color-danger: var(--field-danger);
+  }
+  .altcha__box,
+  .altcha[data-state='solved'] .altcha__box {
+    background: var(--field-bg);
+    box-shadow: inset 0 0 0 2px var(--field-text);
+    color: var(--field-text);
+  }
+}
+@media (hover: hover) {
+  @include d.host-on(fields) {
+    .altcha__btn:hover:not(:disabled) {
+      background: var(--field-bg-hover);
+    }
   }
 }

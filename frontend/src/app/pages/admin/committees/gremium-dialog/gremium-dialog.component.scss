@@ -1,0 +1,171 @@
+@use '../../../../shared/ui/dialog-form' as df;
+@use 'field' as f;
+@use '../../widths' as w;
+
+@include df.host;
+
+.gd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  container-type: inline-size;
+}
+
+.gd__cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-6);
+  align-items: start;
+}
+.gd__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.gd__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.gd__hint {
+  margin: 0;
+  padding-inline: var(--space-1);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.gd__slug {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.gd__switch {
+  display: block;
+}
+.gd__switch ::ng-deep .sw {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.gd__switch ::ng-deep .sw__label {
+  font-weight: var(--fw-semibold);
+}
+
+.gd__nested {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-inline-start: var(--space-1);
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--color-border);
+}
+
+.gd__mail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+  @include f.highlight-surface;
+}
+.gd__mail:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+.gd__mailLabel {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.gd__mailInput {
+  min-height: 4.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  resize: vertical;
+}
+.gd__mailInput:focus {
+  outline: none;
+}
+.gd__mailInput::placeholder {
+  color: var(--field-text, var(--color-text-muted));
+}
+
+@include w.fields {
+  .gd__cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gd__public {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: var(--border-width) solid var(--color-border);
+}
+.gd__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-3);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.gd__box--row {
+  flex-direction: row;
+  align-items: flex-start;
+}
+.gd__box--row app-icon {
+  flex: none;
+  margin-top: 2px;
+}
+.gd__boxLabel {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.gd__implies {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gd__implies li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.gd__impliesIcon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--color-accent-text);
+}
+.gd__link {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.gd__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.gd--confirm {
+  gap: var(--space-4);
+}
+.gd__text {
+  margin: 0;
+  color: var(--color-text);
+}

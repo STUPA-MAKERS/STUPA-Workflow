@@ -34,7 +34,7 @@ description: Global search behind the command palette. One GET /api/search?q= fa
 - **One source cannot empty the palette.** A source that raises is logged and named in `failed`; the others still answer.
 - **Cap per kind.** Each source asks for `PER_KIND + 1` rows. More than `PER_KIND` sets `truncated`, and the client says that the list is not complete.
 - **A hit is flat and resolved on the server.** Titles and subtitles are final text in `lang` (German fallback). A nameless record reads "Ohne Titel" / "Untitled", never its id ([[no-uuids-in-ui]]).
-- **`HIT_URL` names the record.** Every template holds `{id}`: a path segment where the record has a page, a query filter where it does not (`/invoices?id=`, `/budget?ks=`, `/admin/users?q=<sub>`). A new kind needs an entry; `test_every_kind_has_a_url_that_names_the_record` checks it.
+- **`HIT_URL` names the record.** Every template holds `{id}`: a path segment where the record has a page, a query filter where it does not (`/invoices?id=`, `/budget?costCentre=`, `/admin/users?q=<sub>`). A new kind needs an entry; `test_every_kind_has_a_url_that_names_the_record` checks it.
 - `q` is always a bound parameter. `escape_like` makes a typed `%` or `_` a literal.
 
 **Related:** be-applications, be-livevote, be-budget, be-admin, frontend

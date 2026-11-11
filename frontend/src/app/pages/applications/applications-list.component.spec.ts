@@ -460,7 +460,7 @@ describe('ApplicationsListComponent', () => {
       const { http, router, cmp } = await start();
       await router.navigateByUrl(
         '/applications?state=s1&state=s2&type=t1&budget=b2&q=%20fest%20&amountMin=100&amountMax=500' +
-          '&createdFrom=2026-01-01&createdTo=2026-12-31&archived=all&gremium=g1&mine=true&sort=amount&order=asc',
+          '&createdFrom=2026-01-01&createdTo=2026-12-31&archived=all&committee=g1&mine=true&sort=amount&order=asc',
       );
       const req = http.expectOne(LIST);
       const p = req.request.params;

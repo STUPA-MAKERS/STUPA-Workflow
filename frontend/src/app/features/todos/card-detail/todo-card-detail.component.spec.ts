@@ -230,6 +230,19 @@ describe('TodoCardDetailComponent', () => {
     expect(closed).toHaveBeenCalled();
   });
 
+  /** Spec 000581: both add buttons carry the class of the dashed chip box. */
+  it('draws the add buttons of the assignees and the labels as dashed chips', async () => {
+    await setup();
+    expect(document.querySelector('app-filter-select.cd__addPerson')).not.toBeNull();
+    expect(document.querySelector('app-filter-select.cd__addLabel')).not.toBeNull();
+  });
+
+  /** Spec 000582: a card with write access and no link shows the empty state below "Verknüpft". */
+  it('shows the empty state in the links section of a card without links', async () => {
+    await setup({ card: detail({ links: [] }) });
+    expect(screen.getByText('Nichts verknüpft')).toBeInTheDocument();
+  });
+
   /**
    * Beside the list the pane is a sheet, and the bar bleeds into its padding. The link sits in the
    * bar, so the menu does not repeat it.
@@ -1416,7 +1429,7 @@ describe('TodoCardDetailComponent', () => {
       cmp.transferOpen.set(false);
       detect();
       const open = screen.getByRole('button', { name: 'Aktivität, 1' });
-      expect(open.querySelector('.cd__activityN')?.textContent).toBe('1');
+      expect(open.querySelector('.btn__count')?.textContent).toBe('1');
       fireEvent.click(open);
       detect();
       expect(cmp.activityOpen()).toBe(true);

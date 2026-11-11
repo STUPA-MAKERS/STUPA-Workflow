@@ -23,6 +23,14 @@ class MagicLinkRequest(FrozenModel, frozen=True):
     altcha: AltchaSolutionStr | None = None
 
 
+class EmailLoginRequest(FrozenModel, frozen=True):
+    """Body of `POST /auth/email-login`. The response is always 202 to block enumeration."""
+
+    email: EmailStr
+    #: ALTCHA proof-of-work solution; `require_altcha` runs the cryptographic check.
+    altcha: AltchaSolutionStr | None = None
+
+
 class MagicLinkVerifyRequest(FrozenModel, frozen=True):
     """Body of the magic-link verify: the token from the URL fragment."""
 

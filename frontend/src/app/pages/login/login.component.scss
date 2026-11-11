@@ -1,0 +1,113 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: flex;
+  flex: 1 0 auto;
+  justify-content: center;
+}
+.lg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: min(40rem, 100%);
+  padding-block: var(--space-4) var(--space-6);
+}
+.lg__heading {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+}
+.lg__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.lg__icon {
+  margin-bottom: var(--space-1);
+  color: var(--color-accent-text);
+}
+.lg__icon--warn {
+  color: var(--color-warning);
+}
+.lg__title {
+  margin: -6px 0 0;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+}
+.lg__sub {
+  margin: 0;
+  font-size: var(--fs-h2);
+  line-height: var(--lh-h2);
+  font-weight: var(--fw-semibold);
+}
+.lg__text {
+  margin: 0;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+.lg__meta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.lg__form {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: var(--space-3);
+  margin: 0;
+}
+.lg__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+.lg__actions--end {
+  align-self: stretch;
+  justify-content: flex-end;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.lg__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .lg__link:hover {
+    text-decoration: underline;
+  }
+}
+.lg__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@include bp.phone {
+  .lg__actions--pair {
+    align-self: stretch;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .lg__actions--pair > *,
+  .lg__actions--pair ::ng-deep .btn {
+    align-self: stretch;
+    width: 100%;
+    justify-content: center;
+  }
+  .lg__card {
+    padding: var(--space-5);
+    border-radius: var(--radius-xl);
+  }
+}

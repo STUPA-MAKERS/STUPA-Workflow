@@ -36,12 +36,6 @@
 .inv__count--wait {
   visibility: hidden;
 }
-.inv__selText {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-weight: var(--fw-semibold);
-  font-size: var(--fs-md);
-}
 
 .inv__scroll {
   @include lp.scroll(--inv-fade);

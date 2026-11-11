@@ -2,14 +2,13 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
-  IconComponent,
   InputComponent,
-  NoteComponent,
   SwitchComponent,
   FabComponent,
   ToastService,
   PageHeaderComponent,
   SectionComponent,
+  ButtonComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -32,14 +31,13 @@ import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ButtonComponent,
     SectionComponent,
     LoadStateComponent,
     FormsModule,
     TranslatePipe,
     FabComponent,
-    IconComponent,
     InputComponent,
-    NoteComponent,
     SwitchComponent,
     PageHeaderComponent,
     BreadcrumbsComponent,
@@ -57,6 +55,8 @@ export class NotificationSettingsComponent {
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly dirty = signal(false);
+  /** The settings as the server has them, for "Verwerfen". */
+  private readonly saved = signal<NotificationSettings | null>(null);
   /** The read: loading, then the form, or the error note of a failed read. */
   protected readonly loadState = computed<LoadState>(() =>
     this.loading() ? 'loading' : this.settings() ? 'ok' : 'error',
@@ -88,6 +88,8 @@ export class NotificationSettingsComponent {
     this.api.getNotificationSettings().subscribe({
       next: (s) => {
         this.settings.set(s);
+        this.saved.set(s);
+        this.dirty.set(false);
         this.loading.set(false);
       },
       error: () => {
@@ -95,6 +97,12 @@ export class NotificationSettingsComponent {
         this.loading.set(false);
       },
     });
+  }
+
+  /** "Verwerfen": back to the stored values (§ 000635). */
+  discard(): void {
+    this.settings.set(this.saved());
+    this.dirty.set(false);
   }
 
   patch(change: Partial<NotificationSettings>): void {
@@ -113,16 +121,16 @@ export class NotificationSettingsComponent {
     const s = this.settings();
     if (!s || !this.valid()) return;
     this.saving.set(true);
-    this.error.set(null);
     this.api.putNotificationSettings(s).subscribe({
       next: (saved) => {
         this.settings.set(saved);
+        this.saved.set(saved);
         this.dirty.set(false);
         this.saving.set(false);
         this.toast.success(this.i18n.translate('admin.notifications.saved'));
       },
       error: () => {
-        this.error.set('admin.notifications.saveError');
+        this.toast.error(this.i18n.translate('admin.notifications.saveError'));
         this.saving.set(false);
       },
     });

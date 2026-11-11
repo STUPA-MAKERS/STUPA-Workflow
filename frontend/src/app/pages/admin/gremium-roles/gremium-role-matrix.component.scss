@@ -1,3 +1,6 @@
+@use 'field' as f;
+@use '../widths' as w;
+
 :host {
   display: block;
   min-width: 0;
@@ -122,15 +125,16 @@
   margin: 0;
   border: 0;
   border-radius: 5px;
-  background: transparent;
-  box-shadow: inset 0 0 0 2px var(--color-border-strong);
+  background: var(--check-bg, transparent);
+  box-shadow: inset 0 0 0 2px var(--check-edge, var(--color-border-strong));
   cursor: inherit;
+  @include f.ring;
 }
 .rm__box:checked {
-  background: var(--color-accent)
+  background: var(--check-on, var(--color-accent))
     url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%230b1d12" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>')
     center / 13px 13px no-repeat;
-  box-shadow: none;
+  box-shadow: var(--check-checked-edge, none);
 }
 .rm__box:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -149,7 +153,7 @@
 
 // The matrix is about 49rem wide at a 960px viewport and about 54rem at 1440px, so 51rem puts the
 // first in the chip layout. The header rule is more specific than `.rm__row`, so it stays hidden.
-@container (max-width: 51rem) {
+@include w.wide {
   .rm__row.rm__row--head {
     display: none;
   }

@@ -1,6 +1,8 @@
 @use 'breakpoints' as bp;
 @use 'frosted' as *;
 @use 'option-menu' as om;
+@use 'field' as f;
+@use 'display' as d;
 
 :host {
   display: block;
@@ -83,6 +85,7 @@
   font-weight: var(--fw-semibold);
   white-space: nowrap;
   cursor: pointer;
+  @include f.highlight-surface;
 }
 .hm__head.is-open {
   background: var(--color-surface-2);
@@ -205,6 +208,79 @@
   }
 }
 
+// The group "Darstellung": a caption, a row per switch with its icon, and the reset.
+.hm__group {
+  margin: 0;
+  padding: 8px var(--space-4) 4px;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+}
+.hm__toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+  padding: 6px var(--space-4);
+}
+.hm__toggle > app-icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.hm__switch {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hm__groupHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 4px var(--space-4) 0;
+}
+/* In the head the caption takes the inline and block room of the row, so its text and the
+   reset share one centre line. */
+.hm__groupHead > .hm__group {
+  padding: 0;
+}
+/* "Systemeinstellungen verwenden": a circle arrow across from the group name. The name
+   is in the label and the tooltip. */
+.hm__reset {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-accent-text);
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .hm__reset:hover {
+    background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  }
+}
+.hm__reset:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 0;
+}
+.hm__display {
+  display: flex;
+  flex-direction: column;
+}
+.hm--sheet .hm__group,
+.hm--sheet .hm__toggle {
+  padding-inline: var(--space-2);
+}
+.hm--sheet .hm__groupHead {
+  padding-inline: var(--space-2);
+}
+
 /* The phone sheet of the public header sits in the top layer, so no glass or scroll box
    of the header clips it. In the sheet the entries need no rule below them. */
 .hm__layer {
@@ -212,4 +288,20 @@
 }
 .hm--inSheet {
   border-bottom: 0;
+}
+
+// Very high contrast (spec 000605): the popover has the white edge of every surface, and the
+// open trigger in the rail is black on the yellow pill.
+@include d.host-on(veryHigh) {
+  .hm--popover {
+    outline: var(--vh-edge);
+    outline-offset: -2px;
+  }
+  .hm__rail.is-open {
+    color: var(--vh-hi);
+  }
+  .hm__rail.is-open .hm__ind {
+    background: var(--vh-hi);
+    color: var(--vh-bg);
+  }
 }

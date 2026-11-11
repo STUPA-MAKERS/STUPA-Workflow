@@ -1,4 +1,5 @@
 @use 'field' as f;
+@use 'display' as d;
 @use 'option-menu' as om;
 @use 'scroll-fade' as fade;
 
@@ -72,7 +73,7 @@
   font-size: var(--fs-small);
 }
 .ccs__placeholder {
-  color: var(--color-text-subtle);
+  color: var(--field-text, var(--color-text-subtle));
 }
 .ccs__swatch {
   display: inline-block;
@@ -149,15 +150,18 @@
   padding: 0 var(--space-4);
   height: 2.75rem;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-1);
-  color: var(--color-text-muted);
+  background: var(--field-bg, var(--color-surface-1));
+  color: var(--field-text, var(--color-text-muted));
+  box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .ccs__search:focus-within {
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+  box-shadow: var(--field-focus, inset 0 0 0 2px var(--color-focus-ring));
 }
 .ccs__search--sheet {
   margin: 0 0 var(--space-3);
-  background: var(--color-surface-3);
+  background: var(--field-bg, var(--color-surface-3));
+  @include f.ring;
 }
 .ccs__input {
   flex: 1 1 auto;
@@ -168,12 +172,12 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--color-text);
+  color: var(--field-text, var(--color-text));
   font: inherit;
   font-size: var(--fs-md);
 }
 .ccs__input::placeholder {
-  color: var(--color-text-subtle);
+  color: var(--field-text, var(--color-text-subtle));
 }
 .ccs__input::-webkit-search-cancel-button {
   display: none;
@@ -191,6 +195,13 @@
   overscroll-behavior: contain;
   padding: 0 var(--space-2) var(--space-2);
   @include fade.fade-y(var(--space-5));
+}
+// The black ring of a highlighted chosen row reaches 1px past the row (000598), so the
+// scrolling list leaves it room at the top, or the list cuts it off.
+@include d.host-on(fields) {
+  .ccs__list {
+    padding-top: 2px;
+  }
 }
 // A limit of its own, because a flex item in a box with only a `max-height` does not shrink.
 .ccs__menu .ccs__list {
@@ -226,6 +237,7 @@
 .ccs__opt[aria-selected='true'] {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 .ccs__opt[aria-selected='true'] .ccs__optName {
   font-weight: var(--fw-semibold);

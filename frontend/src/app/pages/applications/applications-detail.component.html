@@ -111,15 +111,13 @@
                 ? ('applications.comments.title' | t)
                 : ('applications.comments.open' | t: { n: comments().length })
             "
+            [count]="commentsLoading() ? null : comments().length"
             data-testid="ad-comments-open"
             (click)="commentsOpen.set(true)"
           >
             <app-icon name="chat" />
             @if (!phone()) {
               {{ 'applications.comments.title' | t }}
-            }
-            @if (!commentsLoading()) {
-              <span class="ad__commentsN num" aria-hidden="true">{{ comments().length }}</span>
             }
           </app-button>
           @if (!phone()) {
@@ -390,7 +388,7 @@
     @if (historyEntries().length) {
       <app-history [entries]="historyEntries()" />
     } @else {
-      <app-empty-state rows="3" [heading]="'applications.history.empty' | t" />
+      <app-empty-state rows="1" [heading]="'applications.history.empty' | t" />
     }
   </app-section>
 </ng-template>

@@ -146,11 +146,11 @@ class GremiumOut(FrozenCamelModel, frozen=True):
 
 
 class GremiumAdminOut(GremiumOut, frozen=True):
-    """A gremium in the admin list (``GET /admin/gremien``), with its counts.
+    """A gremium in the admin list (``GET /admin/committees``), with its counts.
 
     ``memberCount`` is the number of persons with a membership in the gremium.
     ``roleCount`` is the number of gremium roles, the forced roles included. The
-    public master-data list (``GET /gremien``) does not have these fields.
+    public master-data list (``GET /committees``) does not have these fields.
     """
 
     member_count: int = Field(default=0, serialization_alias="memberCount")

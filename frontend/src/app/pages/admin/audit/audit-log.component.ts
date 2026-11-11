@@ -23,7 +23,6 @@ import {
   FilterSelectComponent,
   type FilterSelectOption,
   IconComponent,
-  InfiniteScrollDirective,
   RangeChipComponent,
   type RangeValue,
   SkeletonComponent,
@@ -38,7 +37,8 @@ import type {
   ConfigRevisionDiff,
 } from '../admin.models';
 import { expandSet } from '@shared/expand-set';
-import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import type { LoadState } from '@shared/forms/settings-form';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 
 const PAGE_SIZE = 50;
 
@@ -158,7 +158,7 @@ const TARGET_ROUTES: Record<string, (id: string) => readonly string[]> = {
   application: (id) => ['/applications', id],
   vote: (id) => ['/voting', id],
   meeting: (id) => ['/meetings', id],
-  gremium: () => ['/admin/gremien'],
+  gremium: () => ['/admin/committees'],
   application_type: () => ['/admin/forms'],
   role: () => ['/admin/roles'],
   role_assignment: () => ['/admin/users'],
@@ -236,11 +236,10 @@ type VerifyState =
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     ExpandRowComponent,
     LoadMoreComponent,
     _Sb,
-    InfiniteScrollDirective,
-    LoadErrorComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,
@@ -270,6 +269,12 @@ export class AuditLogComponent {
   protected readonly hasMore = signal(false);
   protected readonly loading = signal(false);
   protected readonly loadError = signal(false);
+  /** The first page loads: skeleton rows. A later page loads inside the list. */
+  protected readonly loadState = computed<LoadState>(() =>
+    this.loading() && !this.entries().length ? 'loading' : this.loadError() ? 'error' : 'ok',
+  );
+  /** A further page loads, for "Mehr laden". */
+  protected readonly loadingMore = computed(() => this.loading() && this.entries().length > 0);
   /** Ids of the expanded entries. Their detail area is visible. */
   protected readonly open = expandSet<number>();
 
@@ -282,6 +287,8 @@ export class AuditLogComponent {
   protected readonly diffs = signal<ReadonlyMap<string, ConfigRevisionDiff | null>>(
     new Map(),
   );
+  /** The revisions whose diff failed to load. */
+  private readonly diffFailed = signal<ReadonlySet<string>>(new Set());
   /** The entry whose revert the user confirms now. */
   protected readonly confirmRevert = signal<AuditEntry | null>(null);
   protected readonly reverting = signal(false);
@@ -453,9 +460,25 @@ export class AuditLogComponent {
     this.diffs.update((m) => new Map(m).set(rid, null));
     this.api.getConfigRevisionDiff(rid).subscribe({
       next: (d) => this.diffs.update((m) => new Map(m).set(rid, d)),
-      error: () =>
-        this.diffs.update((m) => new Map([...m].filter(([key]) => key !== rid))),
+      error: () => {
+        this.diffs.update((m) => new Map([...m].filter(([key]) => key !== rid)));
+        this.diffFailed.update((failed) => new Set(failed).add(rid));
+      },
     });
+  }
+
+  /** The load state of the diff of an open entry. */
+  protected diffState(e: AuditEntry): LoadState {
+    const rid = this.revisionId(e);
+    if (this.diffOf(e)) return 'ok';
+    return rid && this.diffFailed().has(rid) ? 'error' : 'loading';
+  }
+
+  /** The retry of a diff that failed to load. */
+  protected retryDiff(e: AuditEntry): void {
+    const rid = this.revisionId(e);
+    this.diffFailed.update((failed) => new Set([...failed].filter((id) => id !== rid)));
+    this.loadDiff(e);
   }
 
   protected askRevert(e: AuditEntry): void {

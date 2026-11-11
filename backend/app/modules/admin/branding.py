@@ -215,7 +215,7 @@ class SiteFreetexts(FrozenStrictCamelModel, frozen=True):
     #: back to the built-in text of the frontend.
     submitted_internal: I18nMap = Field(default_factory=dict, alias="submittedInternal")
     submitted_external: I18nMap = Field(default_factory=dict, alias="submittedExternal")
-    #: The accessibility statement of ``/barrierefreiheit``, Markdown, per language
+    #: The accessibility statement of ``/accessibility``, Markdown, per language
     #: (spec 000495). A config without it reads as the built-in draft.
     accessibility_statement: I18nMap = Field(
         default_factory=default_statement, alias="accessibilityStatement"

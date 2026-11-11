@@ -22,7 +22,7 @@ const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group']
  * data is empty, as in mock mode, a fallback list applies. Labels follow the active
  * locale.
  *
- * With mock mode off, the service calls the real sources: gremien through `/gremien`
+ * With mock mode off, the service calls the real sources: gremien through `/committees`
  * (authenticated), application types through `/application-types`, roles through
  * `/admin/roles`.
  */
@@ -32,7 +32,7 @@ export class AdminOptionsService {
   private readonly i18n = inject(I18nService);
 
   /**
-   * Gremien as options (id → display name), from `/gremien` (authenticated, no admin
+   * Gremien as options (id → display name), from `/committees` (authenticated, no admin
    * right). Usable in "create meeting" and budget, where the actor does not
    * necessarily have `admin.config`.
    */

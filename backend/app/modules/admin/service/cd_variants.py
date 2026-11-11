@@ -16,7 +16,7 @@ download path therefore forces an attachment disposition and never answers with
 The square slot is the exception. Its upload accepts PNG, JPEG and WebP only and
 checks the pixel size (`cd_logos.check_square_logo`). A variant holds at most one
 square logo, so a new upload replaces the old row and its object. Two routes serve
-it inline: the admin thumbnail and `GET /gremien/{id}/logo`. Both go through
+it inline: the admin thumbnail and `GET /committees/{id}/logo`. Both go through
 `SquareLogoRef`, which only a square row with a raster type can produce.
 """
 

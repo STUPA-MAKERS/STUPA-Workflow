@@ -218,6 +218,13 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         {"link": "Anmelde-Link"},
     ),
     MailTemplateSpec(
+        _svc.EMAIL_LOGIN_TEMPLATE_KEY,
+        "magic_link",
+        _svc._BUILTIN_EMAIL_LOGIN_SUBJECT,
+        _svc._BUILTIN_EMAIL_LOGIN_BODY,
+        {"link": "Login-Link zu allen Anträgen der Adresse"},
+    ),
+    MailTemplateSpec(
         captured.APPLICATION_CAPTURED_KEY,
         captured.APPLICATION_CAPTURED_KEY,
         captured.APPLICATION_CAPTURED_SUBJECT,

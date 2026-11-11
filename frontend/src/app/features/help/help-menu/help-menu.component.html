@@ -13,10 +13,40 @@
     </span>
     <app-icon class="hm__ext" name="ext" [size]="16" />
   </a>
-  <a class="hm__item" routerLink="/barrierefreiheit" (click)="onStatement()">
+  <a class="hm__item" routerLink="/accessibility" (click)="onStatement()">
     <app-icon name="eye" [size]="19" />
     <span class="hm__text">{{ 'a11yStatement.link' | t }}</span>
   </a>
+  <div class="hm__sep" role="separator"></div>
+  <div class="hm__display" role="group" [attr.aria-labelledby]="panelId + '-display'">
+    <div class="hm__groupHead">
+      <p class="hm__group" [id]="panelId + '-display'">{{ 'help.display' | t }}</p>
+      @if (hasDisplayChoice()) {
+        <button
+          type="button"
+          class="hm__reset"
+          [attr.aria-label]="'help.display.reset' | t"
+          [title]="'help.display.reset' | t"
+          (click)="resetDisplay()"
+        >
+          <app-icon name="reset" [size]="18" />
+        </button>
+      }
+    </div>
+    @for (row of displayRows(); track row.key) {
+      <div class="hm__toggle">
+        <app-icon [name]="row.icon" [size]="19" />
+        <app-switch
+          class="hm__switch"
+          [id]="panelId + '-' + row.key"
+          [checked]="row.on"
+          [disabled]="row.locked"
+          (checkedChange)="setDisplay(row.key, $event)"
+          >{{ row.label | t }}</app-switch
+        >
+      </div>
+    }
+  </div>
   @if (canReport()) {
     <div class="hm__sep" role="separator"></div>
     <button type="button" class="hm__item" (click)="report()">

@@ -100,6 +100,11 @@ export class MeetingWindowSettingsComponent {
     this.form.patch(change);
   }
 
+  /** Back to the stored values, for "Verwerfen" of the page. */
+  discard(): void {
+    this.form.reset();
+  }
+
   /** Send the section. The "Speichern" button of the deadlines page and the form submit call it. */
   save(): void {
     this.form.save();

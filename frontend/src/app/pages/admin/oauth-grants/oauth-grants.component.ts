@@ -21,7 +21,7 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
-import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /**
  * The most scope tags per row. A token usually carries every scope, and all of them would
@@ -54,7 +54,7 @@ const PAGE_SIZE = 25;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LoadErrorComponent,
+    LoadStateComponent,
     ConfirmDialogComponent,
     TranslatePipe,
     LocalizedDatePipe,
@@ -81,6 +81,7 @@ export class AdminOAuthGrantsComponent {
   readonly offset = signal(0);
   readonly loading = signal(true);
   readonly loadError = signal(false);
+  readonly loadState = loadStateOf(this.loading, this.loadError);
 
   /** Owner filter. An empty string means "every principal". */
   readonly principalId = signal<Uuid | ''>('');

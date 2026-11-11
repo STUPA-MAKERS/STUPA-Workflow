@@ -1,3 +1,4 @@
+import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -38,7 +39,7 @@ async function setup(api: MailApiMock = setupApi()) {
     providers: [
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
   return { api, toast, view };
@@ -59,6 +60,23 @@ describe('MailTemplatesComponent', () => {
     fixture.detectChanges();
     expect(screen.getByDisplayValue('Anmeldung')).toBeInTheDocument();
     expect(screen.getByText(/name/)).toBeInTheDocument();
+  });
+
+  /** § 000635 */
+  it('"Verwerfen" sets the open template back and hides with "Speichern"', async () => {
+    const { api, view } = await setup();
+    await screen.findByRole('button', { name: /Anmelde-Link/ });
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    await userEvent.type(screen.getByDisplayValue('Anmeldung'), ' neu');
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    view.fixture.detectChanges();
+    await view.fixture.whenStable();
+    expect(screen.getByDisplayValue('Anmeldung')).toBeInTheDocument();
+    expect(api.upsertMailTemplate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('shows "Speichern" only after an edit, saves it and renders a preview', async () => {
@@ -82,8 +100,8 @@ describe('MailTemplatesComponent', () => {
       ...setupApi(),
       listMailTemplates: jest.fn(() => throwError(() => new Error('boom'))),
     };
-    const { toast } = await setup(api);
-    expect(toast.error).toHaveBeenCalledWith('Vorlagen konnten nicht geladen werden.');
+    await setup(api);
+    expect(loadErrorToast()).toBe('Vorlagen konnten nicht geladen werden.');
     expect(document.querySelector('app-skeleton')).toBeNull();
   });
 
@@ -112,6 +130,15 @@ describe('MailTemplatesComponent', () => {
     const c = view.fixture.componentInstance as any;
     expect(c.draft()).toBeNull();
     c.patch('subjectI18n', 'x');
+    expect(c.draft()).toBeNull();
+  });
+
+  it('"Verwerfen" is a no-op without a selected template', async () => {
+    const api = { ...setupApi(), listMailTemplates: jest.fn(() => of([])) };
+    const { view } = await setup(api);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = view.fixture.componentInstance as any;
+    c.discard();
     expect(c.draft()).toBeNull();
   });
 

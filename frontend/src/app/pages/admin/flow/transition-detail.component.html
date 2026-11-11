@@ -1,0 +1,170 @@
+<hr class="ins__rule" />
+
+<section class="td__block" aria-labelledby="td-guard">
+  <h3 class="cap ins__cap" id="td-guard">{{ 'admin.flow.guard' | t }}</h3>
+  <app-guard-editor
+    [guard]="transition().guard ?? null"
+    [roleOptions]="roleOptions()"
+    [gremiumOptions]="gremiumOptions()"
+    [automatic]="!!transition().automatic"
+    (guardChange)="guardChange.emit($event)"
+  />
+</section>
+
+<section class="td__block" aria-labelledby="td-actions">
+  <h3 class="cap ins__cap" id="td-actions">{{ 'admin.flow.actions' | t }}</h3>
+
+  @if ((transition().actions ?? []).length) {
+    <ol class="rowgroup rowgroup--bg3 td__actions">
+      @for (act of transition().actions ?? []; track $index; let ai = $index) {
+        <li class="td__action">
+          <div class="td__actionHead">
+            <strong class="td__actionTitle">{{ actionLabel(act.type) }}</strong>
+            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.remove' | t) + ': ' + actionLabel(act.type)" [title]="'admin.common.remove' | t" (click)="actionRemove.emit(ai)">
+              <app-icon name="trash" />
+            </app-button>
+          </div>
+          @switch (act.type) {
+            @case ('webhook') {
+              <app-select
+                [label]="'admin.flow.actWebhook' | t"
+                [placeholder]="'admin.flow.actWebhookPh' | t"
+                [options]="webhookOptions()"
+                [ngModel]="actionParam(act, 'webhookId')"
+                (ngModelChange)="actionParamChange.emit({ ai, key: 'webhookId', value: $event })"
+              />
+            }
+            @case ('addToNextSession') {
+              <app-select
+                [label]="'admin.flow.cfgGremium' | t"
+                [placeholder]="'admin.flow.actSessionGremiumPh' | t"
+                [options]="gremiumOptions()"
+                [ngModel]="actionParam(act, 'gremiumId')"
+                (ngModelChange)="actionParamChange.emit({ ai, key: 'gremiumId', value: $event })"
+              />
+            }
+            @case ('assignBudgetFromApplicantGremium') {
+              <app-cost-centre-select
+                [label]="'admin.flow.actSubtree' | t"
+                [allLabel]="'admin.flow.actSubtreeAll' | t"
+                [unknownLabel]="'admin.flow.ccUnknown' | t"
+                [emptyLabel]="'admin.flow.ccEmpty' | t"
+                [nodes]="budgetTree()"
+                [value]="actionParam(act, 'parentId')"
+                (picked)="actionParamChange.emit({ ai, key: 'parentId', value: $event })"
+              />
+            }
+            @case ('assignBudgetFromMap') {
+              <app-input
+                class="ins__mono"
+                [label]="'admin.flow.actBudgetField' | t"
+                [placeholder]="'admin.flow.actBudgetFieldPh' | t"
+                [ngModel]="actionParam(act, 'field')"
+                (ngModelChange)="actionParamChange.emit({ ai, key: 'field', value: $event })"
+              />
+              <span class="td__sub">{{ 'admin.flow.actMapRows' | t }}</span>
+              @for (row of mapRows(act); track $index; let mi = $index) {
+                <div class="td__mapRow">
+                  <app-input
+                    class="td__mapValue"
+                    [label]="'admin.flow.actMapValue' | t"
+                    [ngModel]="row.value"
+                    (ngModelChange)="setMapValue(ai, act, mi, $event)"
+                  />
+                  <app-cost-centre-select
+                    class="td__mapBudget"
+                    [label]="'admin.flow.actMapBudget' | t"
+                    [placeholder]="'admin.flow.ccPick' | t"
+                    [unknownLabel]="'admin.flow.ccUnknown' | t"
+                    [emptyLabel]="'admin.flow.ccEmpty' | t"
+                    [nodes]="budgetTree()"
+                    [value]="row.budgetId"
+                    (picked)="setMapBudget(ai, act, mi, $event)"
+                  />
+                  <app-button
+                    class="td__mapRemove"
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'admin.flow.actMapRemove' | t"
+                    [title]="'admin.flow.actMapRemove' | t"
+                    (click)="removeMapRow(ai, act, mi)"
+                  >
+                    <app-icon name="trash" />
+                  </app-button>
+                </div>
+              } @empty {
+                <p class="ins__hint">{{ 'admin.flow.actMapEmpty' | t }}</p>
+              }
+              <app-button class="td__inlineAdd" variant="text" size="sm" [disabled]="hasBlankMapRow(act)" (click)="addMapRow(ai, act)">
+                <app-icon name="plus" /> {{ 'admin.flow.actMapAdd' | t }}
+              </app-button>
+            }
+            @case ('assignBudget') {
+              <app-input
+                class="ins__mono"
+                [label]="'admin.flow.actBudget' | t"
+                [placeholder]="'admin.flow.actBudgetPh' | t"
+                [ngModel]="actionParam(act, 'budgetId')"
+                (ngModelChange)="actionParamChange.emit({ ai, key: 'budgetId', value: $event })"
+              />
+            }
+            @case ('assignBudgetFromField') {
+              <app-input
+                class="ins__mono"
+                [label]="'admin.flow.actBudgetField' | t"
+                [placeholder]="'admin.flow.actBudgetFieldPh' | t"
+                [ngModel]="actionParam(act, 'field')"
+                (ngModelChange)="actionParamChange.emit({ ai, key: 'field', value: $event })"
+              />
+            }
+            @case ('notify') {
+              <span class="td__sub">{{ 'admin.flow.actRecipients' | t }}</span>
+              @for (r of recipientsOf(act); track $index; let ri = $index) {
+                <div class="td__recipient" [class.td__recipient--ref]="recipientNeedsRef(r.kind)">
+                  <app-select
+                    [ariaLabel]="'admin.flow.actRecipients' | t"
+                    [options]="recipientKindOptions()"
+                    [ngModel]="r.kind"
+                    (ngModelChange)="recipientKindChange.emit({ ai, ri, kind: $event })"
+                  />
+                  @if (recipientNeedsRef(r.kind)) {
+                    @if (r.kind === 'gremium') {
+                      <app-select [ariaLabel]="'admin.flow.recipientKind.gremium' | t" [options]="gremiumOptions()" [placeholder]="'admin.flow.cfgGremiumPh' | t" [ngModel]="r.ref ?? ''" (ngModelChange)="recipientRefChange.emit({ ai, ri, ref: $event })" />
+                    } @else if (r.kind === 'role') {
+                      <app-select [ariaLabel]="'admin.flow.recipientKind.role' | t" [options]="roleOptions()" [placeholder]="'admin.flow.cfgRolePh' | t" [ngModel]="r.ref ?? ''" (ngModelChange)="recipientRefChange.emit({ ai, ri, ref: $event })" />
+                    } @else {
+                      <app-input type="email" [ariaLabel]="'admin.flow.recipientKind.email' | t" [placeholder]="'admin.flow.actEmailPh' | t" [ngModel]="r.ref ?? ''" (ngModelChange)="recipientRefChange.emit({ ai, ri, ref: $event })" />
+                    }
+                  }
+                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="recipientRemove.emit({ ai, ri })">
+                    <app-icon name="x" />
+                  </app-button>
+                </div>
+              }
+              <app-button class="td__inlineAdd" variant="text" size="sm" (click)="recipientAdd.emit(ai)">
+                <app-icon name="plus" /> {{ 'admin.flow.addRecipient' | t }}
+              </app-button>
+            }
+          }
+        </li>
+      }
+    </ol>
+  } @else {
+    <app-empty-state rows="1" [heading]="'admin.flow.actionsEmpty' | t" />
+  }
+
+  <div class="td__add">
+    <app-select
+      class="td__addSelect"
+      [label]="'admin.flow.addAction' | t"
+      [placeholder]="'admin.flow.addActionPh' | t"
+      [options]="actionOptions()"
+      [ngModel]="pendingAction()"
+      (ngModelChange)="pendingAction.set($event)"
+    />
+    <app-button variant="tonal" size="sm" [disabled]="!pendingAction()" (click)="addPending()">
+      {{ 'admin.common.add' | t }}
+    </app-button>
+  </div>
+</section>

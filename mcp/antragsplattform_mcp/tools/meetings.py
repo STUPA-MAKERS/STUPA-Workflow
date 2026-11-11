@@ -192,7 +192,7 @@ async def protokollant_handover(
     with `keeperPeriods` and `plannedHandover`.
     """
     return await api().post(
-        f"/meetings/{meeting_id}/protokollant-handover",
+        f"/meetings/{meeting_id}/minute-taker-handover",
         json={"principalId": principal_id, "mode": mode},
     )
 
@@ -204,7 +204,7 @@ async def cancel_protokollant_handover(meeting_id: str) -> dict:
     Same callers as `protokollant_handover`. 404 `no_planned_handover` without a
     plan. Goes into the audit log. Returns the meeting.
     """
-    return await api().delete(f"/meetings/{meeting_id}/protokollant-handover")
+    return await api().delete(f"/meetings/{meeting_id}/minute-taker-handover")
 
 
 @group.tool

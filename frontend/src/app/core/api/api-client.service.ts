@@ -61,6 +61,8 @@ import type {
   HandoverMode,
   LogoutOut,
   MagicLinkVerifyResult,
+  EmailLoginRequest,
+  ApplicantApplications,
   Meeting,
   MeetingCreateBody,
   MeetingMember,
@@ -179,6 +181,27 @@ export class ApiClient {
     return this.http.post<MagicLinkVerifyResult>(`${this.base}/auth/magic-link/verify`, {
       token,
     });
+  }
+
+  /**
+   * POST /auth/email-login — ask for a login link for an address without an account. The
+   * server answers 202 for every address, so the answer tells nothing about it.
+   */
+  requestEmailLogin(body: EmailLoginRequest): Observable<void> {
+    return this.http.post<void>(`${this.base}/auth/email-login`, body);
+  }
+
+  /**
+   * POST /auth/email-login/verify — exchange the token of a login link for an HttpOnly
+   * applicant session of the address. The response carries no session token.
+   */
+  verifyEmailLogin(token: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/auth/email-login/verify`, { token });
+  }
+
+  /** GET /applicant/applications — the Anträge of the address of the e-mail session. */
+  applicantApplications(): Observable<ApplicantApplications> {
+    return this.http.get<ApplicantApplications>(`${this.base}/applicant/applications`);
   }
 
   /**
@@ -670,9 +693,9 @@ export class ApiClient {
     return this.http.post<MeetingOutWire>(`${this.base}/meetings`, body).pipe(map(mapMeeting));
   }
 
-  /** GET /gremien/{id}/meeting-members — protokollant candidates (P(session.manage)). */
+  /** GET /committees/{id}/meeting-members — protokollant candidates (P(session.manage)). */
   listMeetingMembers(gremiumId: Uuid): Observable<MeetingMember[]> {
-    return this.http.get<MeetingMember[]>(`${this.base}/gremien/${gremiumId}/meeting-members`, {
+    return this.http.get<MeetingMember[]>(`${this.base}/committees/${gremiumId}/meeting-members`, {
       context: skipLoading(),
     });
   }
@@ -738,7 +761,7 @@ export class ApiClient {
   }
 
   /**
-   * GET /meetings/gremien — gremien for the meeting-overview filter.
+   * GET /meetings/committees — gremien for the meeting-overview filter.
    *
    * The list holds every Gremium with at least ONE meeting the user may read.
    * It is not the list of member Gremien. The response is already camelCase
@@ -749,7 +772,7 @@ export class ApiClient {
    * overlay at the same time.
    */
   listMeetingFilterGremien(): Observable<{ id: Uuid; name: string }[]> {
-    return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/gremien`, {
+    return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/committees`, {
       context: skipLoading(),
     });
   }
@@ -772,22 +795,22 @@ export class ApiClient {
   }
 
   /**
-   * POST /meetings/{id}/protokollant-handover — hand the minutes of a live meeting
+   * POST /meetings/{id}/minute-taker-handover — hand the minutes of a live meeting
    * over. `now` at once, `next_item` with the next agenda item.
    */
   handOverProtokollant(id: Uuid, principalId: Uuid, mode: HandoverMode): Observable<Meeting> {
     return this.http
-      .post<MeetingOutWire>(`${this.base}/meetings/${id}/protokollant-handover`, {
+      .post<MeetingOutWire>(`${this.base}/meetings/${id}/minute-taker-handover`, {
         principalId,
         mode,
       })
       .pipe(map(mapMeeting));
   }
 
-  /** DELETE /meetings/{id}/protokollant-handover — discard the planned handover. */
+  /** DELETE /meetings/{id}/minute-taker-handover — discard the planned handover. */
   cancelProtokollantHandover(id: Uuid): Observable<Meeting> {
     return this.http
-      .delete<MeetingOutWire>(`${this.base}/meetings/${id}/protokollant-handover`)
+      .delete<MeetingOutWire>(`${this.base}/meetings/${id}/minute-taker-handover`)
       .pipe(map(mapMeeting));
   }
 
@@ -1027,9 +1050,9 @@ export class ApiClient {
     );
   }
 
-  /** GET /gremien/{id}/meeting-defaults — the defaults of a new meeting (`session.manage`). */
+  /** GET /committees/{id}/meeting-defaults — the defaults of a new meeting (`session.manage`). */
   meetingDefaults(gremiumId: Uuid): Observable<MeetingDefaults> {
-    return this.http.get<MeetingDefaults>(`${this.base}/gremien/${gremiumId}/meeting-defaults`, {
+    return this.http.get<MeetingDefaults>(`${this.base}/committees/${gremiumId}/meeting-defaults`, {
       context: skipLoading(),
     });
   }

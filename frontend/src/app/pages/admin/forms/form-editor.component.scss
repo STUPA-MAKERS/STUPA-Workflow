@@ -171,6 +171,7 @@
 }
 .fe__row--on {
   background: var(--color-selected);
+  @include f.highlight-chosen;
 }
 @media (hover: hover) {
   .fe__row--on:hover {
@@ -574,6 +575,7 @@
   background: var(--color-surface-sunken);
   color: inherit;
   font: inherit;
+  @include f.highlight-surface;
 }
 
 .fe__pv-select {

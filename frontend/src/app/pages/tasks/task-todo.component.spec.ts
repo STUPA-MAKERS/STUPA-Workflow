@@ -2,11 +2,12 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import { Router, TitleStrategy, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { of } from 'rxjs';
 import { TodosApiService } from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { PageTitleService } from '../../layout/page-title.service';
 import { MEMBERS, detail } from '../../../testing/todo-fixtures';
 import { provideFakeTodoLive } from '../../../testing/todo-live';
 import { TaskTodoComponent } from './task-todo.component';
@@ -15,7 +16,7 @@ import { TasksComponent } from './tasks.component';
 @Component({ standalone: true, template: '' })
 class ListStub {}
 
-async function start(withPage: boolean, split = true) {
+async function start(withPage: boolean, split = true, titles = false) {
   const page = { loadTodos: jest.fn(), split: () => split };
   TestBed.configureTestingModule({
     providers: [
@@ -29,6 +30,7 @@ async function start(withPage: boolean, split = true) {
       provideFakeTodoLive(),
       { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
       ...(withPage ? [{ provide: TasksComponent, useValue: page }] : []),
+      ...(titles ? [{ provide: TitleStrategy, useExisting: PageTitleService }] : []),
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -39,6 +41,13 @@ async function start(withPage: boolean, split = true) {
 
 describe('TaskTodoComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('names the card in the document title', async () => {
+    const { harness } = await start(true, true, true);
+    harness.detectChanges();
+    TestBed.tick();
+    expect(TestBed.inject(PageTitleService).page()).toBe('Raum buchen');
+  });
 
   it('shows the card of the route in pane mode and refreshes the group on a change', async () => {
     const { cmp, page, harness } = await start(true);

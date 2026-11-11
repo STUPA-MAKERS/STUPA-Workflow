@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { render, screen, waitFor, within } from '@testing-library/angular';
@@ -52,7 +53,7 @@ async function setup(
   const view = await render(FormEditorComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       {
         provide: ActivatedRoute,
         useValue: { paramMap: of(convertToParamMap(id === null ? {} : { id })) },
@@ -136,6 +137,22 @@ describe('FormEditorComponent', () => {
    * With nothing changed the page shows no "Speichern", but the save itself still works. A
    * markerless single group serializes back to exactly the original flat fields.
    */
+  /** § 000635 */
+  it('"Verwerfen" reads the stored form again and hides with "Speichern"', async () => {
+    const { c, fixture, createFormVersion } = await setup(
+      draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }], { de: 'Hallo', en: '' }),
+    );
+    c.setDescription('de', 'Neu');
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    fixture.detectChanges();
+    expect(c.description()).toEqual({ de: 'Hallo', en: '' });
+    expect(createFormVersion).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('saves a normalized form version with the description', async () => {
     const { c, createFormVersion } = await setup(
       draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }], { de: 'Hallo', en: '' }),
@@ -1053,6 +1070,21 @@ describe('FormEditorComponent — layout of the redesign', () => {
     expect(c.groups()).toHaveLength(1);
     expect(c.selected()).toEqual({ gi: 0, qi: 0 });
     expect(c.groupIndex()).toBe(0);
+  });
+
+  /** § 000635 */
+  it('the phone header menu holds "Verwerfen" while the form has changes', async () => {
+    const { c, api } = await setup(draft(TWO_GROUPS, { de: 'Hallo', en: '' }));
+    const getFormDraft = api['getFormDraft'] as jest.Mock;
+    c.setDescription('de', 'Neu');
+    expect(c.headerMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['toggleActive', 'preview', 'discard']);
+    const reads = getFormDraft.mock.calls.length;
+    c.onHeaderMenu({ id: 'discard', label: '' });
+    expect(getFormDraft.mock.calls.length).toBe(reads + 1);
+    expect(c.description()).toEqual({ de: 'Hallo', en: '' });
+    c.typeId.set('');
+    c.discard();
+    expect(getFormDraft.mock.calls.length).toBe(reads + 1);
   });
 
   it('the phone header menu holds activate/deactivate and the preview', async () => {

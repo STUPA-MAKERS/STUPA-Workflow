@@ -29,6 +29,7 @@ from app.modules.applications.models import (
 from app.modules.audit.models import AuditEntry, AuditVerification
 from app.modules.auth.models import (
     AuthSession,
+    EmailLoginLink,
     GroupMapping,
     Principal,
     Role,
@@ -96,6 +97,7 @@ __all__ = [
     "AuditEntry",
     "AuditVerification",
     "AuthSession",
+    "EmailLoginLink",
     "Base",
     "Budget",
     "BudgetAllocation",

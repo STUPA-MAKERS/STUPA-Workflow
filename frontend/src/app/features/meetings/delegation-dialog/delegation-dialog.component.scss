@@ -1,3 +1,4 @@
+@use 'field' as f;
 .dd {
   display: flex;
   flex-direction: column;
@@ -68,6 +69,7 @@
 .dd__row--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 @media (hover: hover) {
   .dd__row--on:hover:not(.dd__row--off) {
@@ -110,12 +112,6 @@
 }
 .dd__row--on .dd__sub {
   color: inherit;
-}
-.dd__empty {
-  margin: 0;
-  padding: var(--space-3) 14px;
-  font-size: var(--fs-small);
-  color: var(--color-text-muted);
 }
 
 .dd__voting {

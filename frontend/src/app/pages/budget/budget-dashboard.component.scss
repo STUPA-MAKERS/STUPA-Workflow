@@ -2,6 +2,8 @@
 @use 'scroll-fade' as fade;
 @use 'dot-parts' as dots;
 @use 'swatch';
+@use 'display' as d;
+@use 'field' as f;
 
 :host {
   display: flex;
@@ -144,6 +146,7 @@
 .tn--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 @media (hover: hover) {
   .tn--on:hover {
@@ -510,4 +513,12 @@
 }
 .bd__skFig {
   width: 5.5em;
+}
+
+/* Very high contrast (spec 000605): a colour swatch of a cost centre is white. */
+@include d.host-on(veryHigh) {
+  .tn__swatch,
+  .bd__keySwatch {
+    background: #ffffff !important;
+  }
 }

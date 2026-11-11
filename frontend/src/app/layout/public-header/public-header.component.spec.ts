@@ -49,10 +49,20 @@ describe('PublicHeaderComponent', () => {
     expect(logo.getAttribute('src')).toBe('assets/logos/stupa-wordmark-dark.svg');
   });
 
-  it('starts the sign-in', async () => {
-    const { location } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
-    expect(location.assign).toHaveBeenCalledWith('/api/auth/login');
+  it('links the sign-in to the login page', async () => {
+    await setup();
+    expect(screen.getByRole('link', { name: 'Anmelden' })).toHaveAttribute('href', '/login');
+  });
+
+  it('shows Abmelden in place of Anmelden for an e-mail session (F/applications/applications/000588)', async () => {
+    const { auth, http, fixture, location } = await setup();
+    auth.markApplicantSession();
+    fixture.detectChanges();
+    expect(screen.queryByRole('link', { name: 'Anmelden' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Abmelden' }));
+    http.expectOne('/api/auth/logout').flush({ logout_url: null });
+    expect(location.assign).toHaveBeenCalledWith('/');
+    expect(auth.applicantSession()).toBe(false);
   });
 
   it('hides the sign-in for a principal who is signed in', async () => {
@@ -60,7 +70,7 @@ describe('PublicHeaderComponent', () => {
     auth.ensureLoaded().subscribe();
     http.expectOne('/api/auth/me').flush({ sub: '1', roles: [], permissions: [], groups: [] });
     fixture.detectChanges();
-    expect(screen.queryByRole('button', { name: 'Anmelden' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Anmelden' })).not.toBeInTheDocument();
   });
 
   it('toggles the appearance and says which state it is in', async () => {

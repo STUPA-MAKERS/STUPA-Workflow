@@ -71,11 +71,11 @@
             class="cd__activityBtn"
             variant="text"
             [ariaLabel]="'todos.card.activityOpen' | t: { n: card.comments.length }"
+            [count]="card.comments.length"
             data-testid="cd-activity-open"
             (click)="activityOpen.set(true)"
           >
             <app-icon name="chat" />
-            <span class="cd__activityN num" aria-hidden="true">{{ card.comments.length }}</span>
           </app-button>
         }
         @if (menuSections().length) {
@@ -247,6 +247,7 @@
         }
         @if (canWrite()) {
           <app-filter-select
+            class="cd__addPerson"
             icon="plus"
             [chevron]="false"
             [iconOnly]="true"
@@ -493,6 +494,8 @@
             </li>
           }
         </ul>
+      } @else {
+        <app-empty-state shape="row" rows="1" data-testid="cd-links-empty" [heading]="'todos.card.noLinks' | t" />
       }
     </app-section>
 

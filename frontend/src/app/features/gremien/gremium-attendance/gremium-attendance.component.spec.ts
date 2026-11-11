@@ -56,7 +56,7 @@ describe('GremiumAttendanceComponent', () => {
 
     const table = screen.getByRole('table');
     const heads = within(table).getAllByRole('columnheader').map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
-    expect(heads).toEqual(['Mitglied', 'Sep2 Sitzungen', 'Okt0 Sitzungen', 'Gesamt 2 Sitzungen']);
+    expect(heads).toEqual(['Mitglied', 'Sep2 Sitzungen', 'Okt', 'Gesamt 2 Sitzungen']);
 
     const names = within(table)
       .getAllByRole('rowheader')
@@ -67,10 +67,10 @@ describe('GremiumAttendanceComponent', () => {
       name: 'Finn Schulze, September 2026: 1 von 2 Sitzungen anwesend, 1 entschuldigt, 1 Stimme übertragen',
     });
     expect(cell).toHaveTextContent('1/2');
-    expect(cell.querySelector('.gat__ex:not(.gat__ex--dv)')?.textContent).toBe('1');
+    expect(cell.querySelector('.gat__ex:not(.gat__ex--dv)')?.textContent).toBe('1E');
     expect(cell.querySelector('.gat__ex--dv')?.textContent).toBe('1V');
     expect(screen.getByRole('button', { name: /^Anna Berg, September 2026/ }).classList.contains('gat__cell--full')).toBe(true);
-    expect(screen.getByRole('img', { name: 'Finn Schulze, Oktober 2026: keine Sitzung' })).toHaveTextContent('—');
+    expect(screen.getByRole('img', { name: 'Finn Schulze, Oktober 2026: keine Sitzung' })).toHaveTextContent('–');
     expect(screen.getByRole('img', { name: 'Kai Meier, September 2026: nicht Mitglied' })).toBeTruthy();
 
     const rows = within(table).getAllByRole('row');
@@ -259,5 +259,49 @@ describe('GremiumAttendanceComponent', () => {
     screen.getByRole('button', { name: 'Kai Meier, 0 von 0 anwesend' }).click();
     view.fixture.detectChanges();
     expect(view.api.memberAttendance).not.toHaveBeenCalled();
+  });
+
+  describe('emptyMonth (§F/meetings/meetings/000610)', () => {
+    it('shows a month without a meeting as a narrow column with a dash in every row', async () => {
+      const view = await setup();
+      restore = view.restore;
+      const table = screen.getByRole('table');
+      const head = within(table).getByRole('columnheader', { name: /Okt/ });
+      expect(head.classList.contains('gat__th--empty')).toBe(true);
+      expect(head.querySelector('.gat__meetings')).toBeNull();
+      expect(table.querySelectorAll('col.gat__colMonth--empty')).toHaveLength(1);
+      const dashes = within(table).getAllByRole('img', { name: /Oktober 2026: keine Sitzung$/ });
+      expect(dashes.map((d) => d.textContent)).toEqual(['–', '–', '–']);
+      expect(dashes.every((d) => d.classList.contains('gat__dash'))).toBe(true);
+      expect(table.querySelector('tfoot .gat__td--empty')).toHaveTextContent('—');
+    });
+  });
+
+  describe('cellBadges (§F/meetings/meetings/000611)', () => {
+    it('puts "nE" and "nV" inside the cell and in the legend, and mutes a cell without a presence', async () => {
+      const data = attendance();
+      const none = attendance({
+        rows: [
+          data.rows[0],
+          {
+            ...data.rows[0],
+            principalId: 'p-0',
+            displayName: 'Nora Null',
+            cells: data.rows[0].cells.map((c) => ({ ...c, present: 0, excused: 2, delegated: 0 })),
+          },
+        ],
+      });
+      const view = await setup({ api: gremienApiMock({ attendance: jest.fn(() => of(none)) }) });
+      restore = view.restore;
+      const cell = screen.getByRole('button', { name: /^Finn Schulze, September 2026/ });
+      expect([...cell.querySelectorAll('.gat__ex')].map((b) => b.textContent)).toEqual(['1E', '1V']);
+      expect(cell.classList.contains('gat__cell--zero')).toBe(false);
+      const zero = screen.getByRole('button', { name: /^Nora Null, September 2026/ });
+      expect(zero).toHaveTextContent('0/2');
+      expect(zero.querySelector('.gat__ex')?.textContent).toBe('2E');
+      expect(zero.classList.contains('gat__cell--zero')).toBe(true);
+      const legend = screen.getByRole('list', { name: 'Legende' });
+      expect([...legend.querySelectorAll('.gat__ex')].map((b) => b.textContent)).toEqual(['1E', '1V']);
+    });
   });
 });

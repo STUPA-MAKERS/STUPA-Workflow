@@ -16,4 +16,4 @@ scope:
 # A public protocol has no names and no internal TOPs
 
 A public protocol must show counts, never attendee names. It must show only public TOPs. The
-URL must be `/protokolle/<uuid>`.
+URL must be `/protocols/<uuid>`.

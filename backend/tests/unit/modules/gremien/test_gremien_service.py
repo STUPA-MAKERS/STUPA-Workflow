@@ -56,7 +56,7 @@ def test_month_helpers() -> None:
         (2026, 1),
         (2026, 2),
     ]
-    assert svc.logo_url(G1) == f"/api/gremien/{G1}/logo"
+    assert svc.logo_url(G1) == f"/api/committees/{G1}/logo"
 
 
 def test_month_range_defaults_to_six_months() -> None:
@@ -161,7 +161,7 @@ async def test_overview_member_rows() -> None:
     )
     assert first.member_count == 3 and first.live and first.next_meeting is not None
     assert first.next_meeting.id == live.id
-    assert first.logo_url == f"/api/gremien/{G1}/logo"
+    assert first.logo_url == f"/api/committees/{G1}/logo"
     assert first.protocols_public and not first.allow_vote_delegation
     assert second.role_name == {} and second.member_count == 0 and not second.live
     assert second.next_meeting is not None and second.next_meeting.id == only_undated.id

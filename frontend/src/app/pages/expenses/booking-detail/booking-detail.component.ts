@@ -182,7 +182,7 @@ export class BookingDetailComponent {
   protected readonly budgetLink = computed(() => {
     const e = this.expense();
     const top = findTopBudgetNode(this.tree(), e.budgetId);
-    return { budget: top?.id ?? null, ks: e.budgetId, fy: e.fiscalYearId };
+    return { budget: top?.id ?? null, costCentre: e.budgetId, fy: e.fiscalYearId };
   });
 
   protected readonly path = computed(() => {

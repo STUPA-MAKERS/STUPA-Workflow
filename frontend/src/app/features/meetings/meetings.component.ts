@@ -163,11 +163,6 @@ export class MeetingsComponent {
   readonly selectedTop = this.agendaSvc.selectedTop;
   readonly selectedIndex = this.agendaSvc.selectedIndex;
 
-  /** The present members, for the voters line of the vote dialog. */
-  readonly presentMembers = computed(
-    () => this.attendance().filter((a) => a.status === 'present').length,
-  );
-
   /** The 1-based agenda number of the item that gets the vote. */
   readonly voteTopNumber = computed(() => {
     const it = this.dialogs.voteItem();
@@ -201,7 +196,7 @@ export class MeetingsComponent {
 
   /**
    * "Beamer-Ansicht": the screen for the projector, in a new tab, so the session page
-   * stays open (`/voting/beamer/:id`, no chrome).
+   * stays open (`/voting/projector/:id`, no chrome).
    */
   openBeamer(m: Meeting): void {
     const url = this.router.serializeUrl(beamerUrl(this.router, m.id));

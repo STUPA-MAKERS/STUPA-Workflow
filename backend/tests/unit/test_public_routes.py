@@ -25,7 +25,7 @@ Groups of ``PUBLIC_ROUTES`` and why each one is public:
 
 - FastAPI docs: the OpenAPI schema and the Swagger and ReDoc pages of the framework.
 - Health: the container healthcheck and the smoke test call it without a session.
-- Login: the OIDC login, the callback, the logout, the magic-link request (ALTCHA)
+- Login: the OIDC login, the callback, the logout, the magic-link and e-mail-login request (ALTCHA)
   and its verify run before a session exists.
 - OAuth: ``authorize`` starts the PKCE grant, ``token`` authenticates the client by
   the code verifier or the refresh token, and the discovery documents (RFC 8414,
@@ -106,6 +106,8 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("POST", "/api/auth/logout"),
         ("POST", "/api/auth/magic-link"),
         ("POST", "/api/auth/magic-link/verify"),
+        ("POST", "/api/auth/email-login"),
+        ("POST", "/api/auth/email-login/verify"),
         ("GET", "/api/oauth/authorize"),
         ("POST", "/api/oauth/token"),
         ("GET", "/api/.well-known/oauth-authorization-server"),
@@ -120,7 +122,7 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("DELETE", "/api/public/meetings/{code}/me"),
         ("POST", "/api/public/meetings/{code}/votes/{vote_id}/ballot"),
         ("WS", "/api/public/meetings/{code}/ws"),
-        ("GET", "/api/public/gremien"),
+        ("GET", "/api/public/committees"),
         ("GET", "/api/public/protocols"),
         ("GET", "/api/public/protocols/semesters"),
         ("GET", "/api/public/protocols/{protocol_id}"),

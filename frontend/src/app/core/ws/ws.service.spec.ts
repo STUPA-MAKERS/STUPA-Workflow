@@ -68,7 +68,7 @@ describe('WsService', () => {
 
   it('opens the read-only beamer stream', () => {
     svc.connectMeeting('m-1', true);
-    expect(MockWebSocket.instances[0].url).toContain('/api/ws/meetings/m-1/beamer');
+    expect(MockWebSocket.instances[0].url).toContain('/api/ws/meetings/m-1/projector');
   });
 
   it('opens the guest channel of a public meeting', () => {

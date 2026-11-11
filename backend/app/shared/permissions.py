@@ -47,7 +47,7 @@ Keys that need a note:
   (create, edit), because a form and a flow hang on the type.
 - `admin.roles`, `admin.users`, `admin.group_mappings`, `admin.gremium_roles`,
   `admin.cd_variants`, `admin.delegations`, `admin.deadlines`: one key per admin page
-  (/admin/roles, /admin/users, /admin/group-mappings, /admin/gremien/:id/roles,
+  (/admin/roles, /admin/users, /admin/group-mappings, /admin/committees/:id/roles,
   /admin/cd-variants with the logo upload and download, /admin/delegations with the
   substitute pool, /admin/deadlines with the meeting window and guest confirmation).
 - `admin.translations`: the UI texts of every key in every locale and the extra UI

@@ -1,0 +1,63 @@
+@use 'breakpoints' as bp;
+@use '../../../shared/ui/surface-card' as sc;
+@use '../widths' as w;
+
+:host {
+  display: block;
+}
+
+.grem {
+  container-type: inline-size;
+}
+
+.grem__noteLink {
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+  white-space: nowrap;
+}
+
+.grem__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.grem__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.grem__body {
+  @include sc.raised-fields;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.grem__grid {
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+}
+.grem__copy {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  user-select: text;
+}
+
+@include w.columns {
+  .grem__grid {
+    --kv-cols: 2;
+  }
+}
+
+@include w.fields {
+  .grem__grid {
+    --kv-cols: 1;
+  }
+  .grem__body {
+    padding: 0 var(--space-3) var(--space-3);
+  }
+}
+
+@include bp.phone {
+}

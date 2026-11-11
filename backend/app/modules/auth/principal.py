@@ -61,10 +61,27 @@ class Principal:
 
 @dataclass(frozen=True, slots=True)
 class Applicant:
-    """Magic-link applicant, bound to exactly one `application_id`.
+    """Magic-link applicant: bound to one `application_id` or to one `email`.
+
+    The link of one Antrag binds the session to its `application_id`. The e-mail
+    login binds it to an address: `app.deps` then reads the Antrag ids of that
+    address at each request into `application_ids`, so an anonymized Antrag drops
+    out and a new one joins.
 
     The applicant has no scope: each action checks the current state of the
     application, and the edit service answers 409 in a locked state.
     """
 
-    application_id: str
+    application_id: str | None = None
+    email: str | None = None
+    application_ids: frozenset[str] = frozenset()
+
+    def covers(self, application_id: object) -> bool:
+        """Tell whether the session reaches the application ``application_id``."""
+        wanted = str(application_id)
+        return wanted == self.application_id or wanted in self.application_ids
+
+    @property
+    def identity(self) -> str:
+        """Return a stable key of the session binding, for the rate limits."""
+        return self.application_id if self.application_id is not None else f"email:{self.email}"

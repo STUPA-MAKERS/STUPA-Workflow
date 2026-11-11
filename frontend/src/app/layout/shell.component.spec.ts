@@ -33,9 +33,9 @@ const ROUTES: Routes = [
   { path: 'dashboard', component: StubPage },
   { path: 'account/notifications', component: StubPage },
   { path: 'expenses', component: StubPage },
-  { path: 'protokolle', component: StubPage, data: { footer: true } },
+  { path: 'protocols', component: StubPage, data: { footer: true } },
   { path: 'tasks', component: StubPage },
-  { path: 'beamer', component: StubPage, data: { chrome: false } },
+  { path: 'projector', component: StubPage, data: { chrome: false } },
   { path: 'start', component: StubPage, data: { fab: true } },
   {
     path: 'budget',
@@ -134,7 +134,7 @@ describe('ShellComponent', () => {
     /** With nobody signed in there is no search palette either. */
     it('frames a signed-out visitor with the public bar and the footer, and only the home link as navigation', async () => {
       const { container } = await setup(null);
-      expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Anmelden' })).toHaveAttribute('href', '/login');
       expect(container.querySelector('app-nav-rail, app-bottom-bar')).toBeNull();
       expect(within(mainNav() as HTMLElement).getAllByRole('link')).toHaveLength(1);
       expect(container.querySelector('app-site-footer')).not.toBeNull();
@@ -165,7 +165,7 @@ describe('ShellComponent', () => {
     /** Back on a normal page the frame returns. */
     it('shows a route with `chrome: false` (the beamer) without rail, bars or footer', async () => {
       const { router, fixture, container } = await setup(MEMBER);
-      await router.navigateByUrl('/beamer');
+      await router.navigateByUrl('/projector');
       fixture.detectChanges();
       expect(mainNav()).not.toBeInTheDocument();
       expect(container.querySelector('app-site-footer')).toBeNull();
@@ -349,7 +349,7 @@ describe('ShellComponent', () => {
 
     it('shows the same footer at the end of a signed-in page with route data `footer` (a public page)', async () => {
       const { router, fixture } = await setup(MEMBER, { branding });
-      await router.navigateByUrl('/protokolle');
+      await router.navigateByUrl('/protocols');
       fixture.detectChanges();
       const footer = screen.getByRole('contentinfo');
       expect(within(footer).getByRole('link', { name: 'Impressum' })).toBeInTheDocument();
@@ -368,14 +368,14 @@ describe('ShellComponent', () => {
       await router.navigateByUrl('/budget/wide');
       fixture.detectChanges();
       expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
-      await router.navigateByUrl('/protokolle');
+      await router.navigateByUrl('/protocols');
       fixture.detectChanges();
       expect(screen.getByRole('contentinfo')).toBeInTheDocument();
     });
 
     it('leaves the footer out while the page fills the viewport', async () => {
       const view = await setup(MEMBER, { branding });
-      await view.router.navigateByUrl('/protokolle');
+      await view.router.navigateByUrl('/protocols');
       view.fixture.detectChanges();
       const frame = view.fixture.debugElement.injector.get(PageFrame);
       frame.fill.set(true);

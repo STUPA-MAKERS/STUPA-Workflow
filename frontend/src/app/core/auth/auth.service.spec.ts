@@ -64,6 +64,17 @@ describe('AuthService', () => {
     expect(auth.roles()).toEqual(['member']);
   });
 
+  /** F/applications/applications/000588: the header shows "Abmelden" for an e-mail session. */
+  it('marks an applicant session until the logout', () => {
+    expect(auth.applicantSession()).toBe(false);
+    auth.markApplicantSession();
+    expect(auth.applicantSession()).toBe(true);
+    auth.logout();
+    http.expectOne('/api/auth/logout').flush({ logout_url: null });
+    expect(auth.applicantSession()).toBe(false);
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
   it('falls back to email then placeholder for the display name', () => {
     auth.ensureLoaded().subscribe();
     http.expectOne('/api/auth/me').flush({ ...PRINCIPAL, display_name: null });
@@ -111,7 +122,7 @@ describe('AuthService', () => {
     expect(loginReturnTo('/api/auth/me')).toBeNull();
     expect(loginReturnTo('https://evil.example/x')).toBeNull();
     expect(loginReturnTo('//evil.example/x')).toBeNull();
-    expect(loginReturnTo('/antrag/a1#t=secret')).toBe('/antrag/a1');
+    expect(loginReturnTo('/my-applications/a1#t=secret')).toBe('/my-applications/a1');
     expect(loginReturnTo('/status?t=secret&app=a1')).toBe('/status?app=a1');
     expect(loginReturnTo('/applications/a1#comments')).toBe('/applications/a1#comments');
     expect(loginReturnTo('/applications/a1#comment-0d4c-11')).toBe('/applications/a1#comment-0d4c-11');

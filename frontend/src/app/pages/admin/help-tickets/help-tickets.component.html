@@ -23,7 +23,7 @@
           </span>
         </app-section>
         <app-section class="ht__sec" [level]="2" [heading]="'admin.helpTickets.reports' | t">
-          <div class="ht__rows">
+          <div class="rowgroup rowgroup--settings">
             @for (key of skelSwitches; track key) {
               <div class="ht__row ht__row--split">
                 <span class="ht__label">{{ key | t }}</span>
@@ -50,7 +50,7 @@
         </app-section>
 
         <app-section class="ht__sec" [level]="2" [heading]="'admin.helpTickets.reports' | t">
-          <div class="ht__rows">
+          <div class="rowgroup rowgroup--settings">
             <app-switch
               class="ht__row"
               [checked]="draft().publicEnabled"
@@ -84,57 +84,59 @@
 
   @if (canBlock()) {
     <app-section id="ht-blocked" class="ht__sec" tabindex="-1" [level]="2" [heading]="'admin.helpTickets.blocked' | t">
-      @if (blocked(); as list) {
-        @if (blockedError()) {
-          <app-note kind="error" icon="alert" role="alert">{{ 'admin.helpTickets.error.blocked' | t }}</app-note>
-        } @else if (list.length) {
-          <ul class="ht__rows ht__blocks">
-            @for (b of list; track b.id) {
-              <li class="ht__row ht__row--split">
-                <span class="ht__block">
-                  <span class="ht__label">{{ senderName(b) }}</span>
-                  <span class="ht__meta">
-                    <span class="ht__parts">
-                      <span class="ht__part">{{ 'admin.helpTickets.blockedOn' | t: { date: (b.blockedAt | ldate: 'mediumDate') } }}</span>
-                      @if (b.sourceTicket; as src) {
-                        <span class="ht__part"><a class="mono ht__link" [routerLink]="['/tickets', src.id]">{{ src.number }}</a></span>
-                      }
-                      @if (b.hitCount > 0) {
-                        <span class="ht__part">{{ hits(b) }}</span>
-                      }
+      <app-load-state [state]="blockedState()" [errorText]="'admin.helpTickets.error.blocked' | t" (retry)="loadBlocked()">
+        <ng-template #content>
+          @let list = blocked() ?? [];
+          @if (list.length) {
+            <ul class="rowgroup rowgroup--records ht__blocks">
+              @for (b of list; track b.id) {
+                <li class="ht__row ht__row--split">
+                  <span class="ht__block">
+                    <span class="ht__name rowgroup__title">{{ senderName(b) }}</span>
+                    <span class="ht__meta">
+                      <span class="ht__parts">
+                        <span class="ht__part">{{ 'admin.helpTickets.blockedOn' | t: { date: (b.blockedAt | ldate: 'mediumDate') } }}</span>
+                        @if (b.sourceTicket; as src) {
+                          <span class="ht__part"><a class="mono ht__link" [routerLink]="['/tickets', src.id]">{{ src.number }}</a></span>
+                        }
+                        @if (b.hitCount > 0) {
+                          <span class="ht__part">{{ hits(b) }}</span>
+                        }
+                      </span>
                     </span>
                   </span>
-                </span>
-                <app-button
-                  variant="tonal"
-                  size="sm"
-                  [loading]="unblocking() === b.id"
-                  [disabled]="unblocking() !== null"
-                  [ariaLabel]="'admin.helpTickets.unblockNamed' | t: { name: senderName(b) }"
-                  (click)="unblock(b)"
-                >
-                  {{ 'admin.helpTickets.unblock' | t }}
-                </app-button>
-              </li>
-            }
+                  <app-button
+                    variant="tonal"
+                    size="sm"
+                    [loading]="unblocking() === b.id"
+                    [disabled]="unblocking() !== null"
+                    [ariaLabel]="'admin.helpTickets.unblockNamed' | t: { name: senderName(b) }"
+                    (click)="unblock(b)"
+                  >
+                    {{ 'admin.helpTickets.unblock' | t }}
+                  </app-button>
+                </li>
+              }
+            </ul>
+          } @else {
+            <app-empty-state rows="3" [heading]="'admin.helpTickets.blockedEmpty' | t" />
+          }
+        </ng-template>
+        <ng-template #loading>
+          <ul class="rowgroup rowgroup--records ht__skelBlocks skel-in" aria-hidden="true">
+            <li class="ht__row ht__row--split">
+              <span class="ht__block">
+                <span class="ht__name rowgroup__title"><span class="skel-text ht__skelName"></span></span>
+                <span class="ht__meta"><span class="skel-text skel-text--muted ht__skelMeta"></span></span>
+              </span>
+              <span class="skel-box ht__skelButton ht__skelButton--sm"></span>
+            </li>
           </ul>
-        } @else {
-          <app-empty-state rows="3" [heading]="'admin.helpTickets.blockedEmpty' | t" />
-        }
-      } @else {
-        <ul class="ht__rows ht__skelBlocks skel-in" aria-hidden="true">
-          <li class="ht__row ht__row--split">
-            <span class="ht__block">
-              <span class="ht__label"><span class="skel-text ht__skelName"></span></span>
-              <span class="ht__meta"><span class="skel-text skel-text--muted ht__skelMeta"></span></span>
-            </span>
-            <span class="skel-box ht__skelButton ht__skelButton--sm"></span>
-          </li>
-        </ul>
-        @if (!form.loading()) {
-          <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
-        }
-      }
+          @if (!form.loading()) {
+            <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
+          }
+        </ng-template>
+      </app-load-state>
     </app-section>
   }
 

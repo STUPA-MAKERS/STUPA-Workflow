@@ -2,12 +2,10 @@
 id: "000249"
 title: Flow states classify the amount of an Antrag
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/budget/tree/view.py
-  - backend/app/modules/budget/tree/applications.py
+updated: 2026-11-10
+replaced_by: F/applications/flow/000572
 scope:
   - backend/app/modules/budget
   - backend/app/modules/flow
@@ -15,6 +13,6 @@ scope:
 
 # Flow states classify the amount of an Antrag
 
-A cost centre must list flow states as accepted (bound) or denied (excluded). An Antrag in any
-other state must count as requested. A booking for an Antrag must lower its bound amount by the
-booked amount, down to 0.
+A cost centre lists flow states as accepted (bound) or denied (excluded). An Antrag in any
+other state counts as requested. 000572 holds the rule for the state flags, and 000629 holds
+the rule for bookings.

@@ -11,16 +11,15 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { catchError, forkJoin, of } from 'rxjs';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
 import { LOCATION } from '@core/browser/location.token';
-import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
@@ -60,18 +59,26 @@ import {
   IconComponent,
   MEDIA,
   mediaQuery,
+  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
   SectionComponent,
+  SheetBarComponent,
+  SheetBarTitleDirective,
   SideSheetComponent,
   SkeletonComponent,
   StatusTextComponent,
+  type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { AmountComponent } from '@shared/ui/amount/amount.component';
+import { formatMoney } from '@shared/format-money';
+import { MY_APPLICATIONS_PAGE } from './my-applications-page';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
-import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { pageItemTitle } from '../../layout/page-title.service';
 
@@ -79,7 +86,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
 /**
  * Status page of the applicant (the same page on the desktop).
- * Routes `/status` and `/antrag/:id` (the magic link `#t=<token>`).
+ * Routes `/status` and `/my-applications/:id` (the magic link `#t=<token>`).
  *
  * The page verifies the token, strips it from the URL and loads the application with
  * the session cookie. It shows:
@@ -118,6 +125,13 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
+    AmountComponent,
+    NoteComponent,
+    SheetBarComponent,
+    SheetBarTitleDirective,
+    TabPageDirective,
+    TabPagerComponent,
     SectionComponent,
     SkeletonComponent,
     FabComponent,
@@ -126,7 +140,6 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     ReactiveFormsModule,
     RouterLink,
     FormlyForm,
-    LocalizedDatePipe,
     AnswerViewComponent,
     HistoryComponent,
     RowMenuComponent,
@@ -150,17 +163,37 @@ export class StatusTimelineComponent {
   private readonly api = inject(ApiClient);
   private readonly apiBase = inject(API_BASE_URL);
   private readonly location = inject(LOCATION);
-  private readonly branding = inject(BrandingService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly injector = inject(Injector);
 
   private readonly editTitle = viewChild<ElementRef<HTMLElement>>('editTitle');
-  private readonly editRow = viewChild<ElementRef<HTMLButtonElement>>('editRow');
+  private readonly editRow = viewChild('editRow', { read: ElementRef<HTMLElement> });
   private readonly pageTitle = viewChild<ElementRef<HTMLElement>>('pageTitle');
 
   protected readonly phone = mediaQuery(MEDIA.phone);
+  /** The list of `/my-applications`, when the detail runs in it. */
+  private readonly page = inject(MY_APPLICATIONS_PAGE, { optional: true });
+  private readonly router = inject(Router);
+  /** The list sits beside the detail: two columns, no tabs, as in the detail of "Anträge". */
+  readonly split = computed(() => this.page?.split() ?? false);
+  /** The title is the page heading on its own; in `/my-applications` the list owns the h1. */
+  readonly headingLevel = this.page ? null : 1;
+  /** The tab of the narrow layout. */
+  readonly tab = signal<'app' | 'history' | 'files'>('app');
+  /** The tabs of the narrow layout, by their labels alone, as in the detail of "Anträge". */
+  readonly tabs = computed<TabItem[]>(() => [
+    { id: 'app', label: this.i18n.translate('applications.detail.tab.app') },
+    { id: 'history', label: this.i18n.translate('applications.detail.tab.history') },
+    { id: 'files', label: this.i18n.translate('applications.detail.tab.files') },
+  ]);
+  /** The names of the application types, for "Status · Typ · Betrag". */
+  private readonly typeNames = signal<ReadonlyMap<string, string>>(new Map());
+  readonly typeName = computed(() => {
+    const app = this.application();
+    return app ? (this.typeNames().get(app.typeId) ?? null) : null;
+  });
 
   readonly phase = signal<Phase>('loading');
   readonly application = signal<Application | null>(null);
@@ -168,13 +201,11 @@ export class StatusTimelineComponent {
   readonly timeline = signal<TimelineEntry[]>([]);
   readonly versions = signal<ApplicationVersion[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
-  readonly attachmentCount = signal<number | null>(null);
   /** Transitions the applicant can fire (actorIsApplicant gate). Empty ⇒ no actions. */
   readonly actions = signal<Transition[]>([]);
   /** Id of the currently firing transition (button spinner / lock). */
   readonly firing = signal<string | null>(null);
 
-  readonly filesOpen = signal(false);
   readonly commentsOpen = signal(false);
   private readonly filesPanel = viewChild(AttachmentsPanelComponent);
   /** Files dropped on the page, until the sheet "Anhänge" has its panel. */
@@ -227,20 +258,15 @@ export class StatusTimelineComponent {
   readonly canUploadAttachments = computed(() => this.editScope());
   /** A file dropped anywhere on the page becomes an attachment; an open sheet takes its own. */
   readonly takesDrop = computed(
-    () => this.canUploadAttachments() && !this.filesOpen() && !this.commentsOpen(),
+    () => this.canUploadAttachments() && !this.commentsOpen(),
   );
 
+  /** A drop goes to the attachments: in the narrow layout their tab opens first. */
   onFilesDropped(files: File[]): void {
     this.droppedFiles.set(files);
-    this.filesOpen.set(true);
+    if (!this.split()) this.tab.set('files');
   }
 
-  /** Days a magic link works; `null`: no end. */
-  protected readonly linkTtlDays = this.branding.linkTtlDays;
-  /** The config loaded, so `linkTtlDays` is the real setting. */
-  protected readonly linkTtlLoaded = this.branding.loaded;
-
-  readonly ref = computed(() => shortRef(this.application()?.id));
   readonly title = computed(() =>
     applicationTitle(this.application()?.data, this.i18n.translate('applications.list.untitled')),
   );
@@ -260,19 +286,6 @@ export class StatusTimelineComponent {
       ],
     },
   ]);
-
-  /** "3 Dateien" / "1 Datei"; empty until the count is in. */
-  readonly filesSub = computed(() => {
-    const n = this.attachmentCount();
-    if (n === null) return '';
-    return this.i18n.translate(n === 1 ? 'status.files.one' : 'status.files.other', { count: n });
-  });
-  readonly commentsSub = computed(() => {
-    const n = this.comments().length;
-    return this.i18n.translate(n === 1 ? 'status.comments.one' : 'status.comments.other', {
-      count: n,
-    });
-  });
 
   /** The labels of the form fields, for the changed fields of a version. */
   private readonly labels = computed(() => {
@@ -337,11 +350,15 @@ export class StatusTimelineComponent {
   });
 
   /**
-   * The magic-link target is /antrag/{id}#t={token}: the token is in the fragment, so it does not
+   * The magic-link target is /my-applications/{id}#t={token}: the token is in the fragment, so it does not
    * leak through Referer or logs. The query form (?t=&app=) stays as a fallback.
    */
   constructor() {
     pageItemTitle(() => (this.application() ? this.title() : null));
+    this.api.applicationTypes({ quiet: true }).subscribe({
+      next: (types) => this.typeNames.set(new Map(types.map((t) => [t.id, t.name]))),
+      error: () => this.typeNames.set(new Map()),
+    });
     effect(() => {
       const panel = this.filesPanel();
       const files = this.droppedFiles();
@@ -372,8 +389,13 @@ export class StatusTimelineComponent {
         const appId = res.application_id ?? fallbackAppId ?? '';
         this.stripTokenFromUrl(appId);
         this.load(appId);
+        this.page?.reload();
       },
       error: (err: { status?: number }) => {
+        if (this.page) {
+          void this.router.navigate(['/login'], { queryParams: { link: 'invalid' }, replaceUrl: true });
+          return;
+        }
         this.phase.set(err.status === 410 ? 'expired' : 'error');
       },
     });
@@ -436,20 +458,15 @@ export class StatusTimelineComponent {
         this.comments.set(comments);
         this.actions.set(actions);
         this.versions.set(versions);
-        this.loadCount(application.id);
         this.loadForm(application);
       },
       error: (err: { status?: number }) => {
+        if (this.page && err.status === 401) {
+          void this.router.navigate(['/login'], { replaceUrl: true });
+          return;
+        }
         this.phase.set(err.status === 410 ? 'expired' : 'error');
       },
-    });
-  }
-
-  /** The number of attachments for the row; the panel in the sheet loads its own list. */
-  private loadCount(appId: Uuid): void {
-    this.api.listAttachments(appId).subscribe({
-      next: (list) => this.attachmentCount.set(list.length),
-      error: () => this.attachmentCount.set(null),
     });
   }
 
@@ -525,6 +542,24 @@ export class StatusTimelineComponent {
     });
   }
 
+  /** A tab of the narrow layout was chosen. */
+  selectTab(id: string | null): void {
+    if (id === 'app' || id === 'history' || id === 'files') this.tab.set(id);
+  }
+
+  /** The requested amount in its currency. */
+  amount(app: Application): string {
+    if (app.amount === null) return '';
+    return formatMoney(app.amount, this.i18n.formatLocale(), { currency: app.currency }) || app.amount;
+  }
+
+  /** The approved amount when it deviates from the requested one, else `''`. */
+  approvedAmount(app: Application): string {
+    if (app.approvedAmount === null || app.approvedAmount === undefined || app.amount === null) return '';
+    if (Number(app.approvedAmount) === Number(app.amount)) return '';
+    return formatMoney(app.approvedAmount, this.i18n.formatLocale(), { currency: app.currency });
+  }
+
   onMenu(item: RowMenuItem): void {
     if (item.id === 'erase') this.confirmErase.set(true);
   }
@@ -566,9 +601,18 @@ export class StatusTimelineComponent {
     this.focusAfterRender(() => (locked ? this.pageTitle() : this.editRow()));
   }
 
-  /** Focus an element once the view drew it (the edit mode swaps the whole article). */
+  /**
+   * Focus an element once the view drew it (the edit mode swaps the whole article). The
+   * edit button is a component, so the focus goes to the native button inside it.
+   */
   private focusAfterRender(target: () => ElementRef<HTMLElement> | undefined): void {
-    afterNextRender(() => target()?.nativeElement.focus(), { injector: this.injector });
+    afterNextRender(
+      () => {
+        const el = target()?.nativeElement;
+        (el?.querySelector('button') ?? el)?.focus();
+      },
+      { injector: this.injector },
+    );
   }
 
   save(): void {

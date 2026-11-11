@@ -17,7 +17,6 @@ import {
   DialogComponent,
   EmptyStateComponent,
   InputComponent,
-  NoteComponent,
   RowMenuComponent,
   type RowMenuSection,
   StatusTextComponent,
@@ -27,6 +26,7 @@ import {
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 
 /** Edit state of the create dialog: title in DE and EN, Gremium, and budget flag. */
 interface NewForm {
@@ -54,6 +54,7 @@ function emptyForm(): NewForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -66,7 +67,6 @@ function emptyForm(): NewForm {
     DataTableComponent,
     CellDirective,
     InputComponent,
-    NoteComponent,
     PageHeaderComponent,
     BreadcrumbsComponent,
     StatusTextComponent,
@@ -114,7 +114,7 @@ export class FormsListComponent {
   protected readonly form = signal<NewForm>(emptyForm());
 
   /**
-   * The dropdown source is the authenticated /gremien, not admin/gremien, so a form manager with
+   * The dropdown source is the authenticated /committees, not admin/committees, so a form manager with
    * form.configure fills the Gremium column without the admin.gremien permission.
    */
   constructor() {
@@ -125,8 +125,14 @@ export class FormsListComponent {
     });
   }
 
+  /** The retry of the load error. */
+  protected retryLoad(): void {
+    this.reload();
+  }
+
   private reload(): void {
     this.loading.set(true);
+    this.loadError.set(false);
     this.api.listApplicationTypesFull().subscribe({
       next: (t) => {
         this.types.set(t);

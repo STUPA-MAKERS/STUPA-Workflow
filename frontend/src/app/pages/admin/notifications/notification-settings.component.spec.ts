@@ -1,3 +1,4 @@
+import { errorToasts } from '../../../../testing/load-error';
 import { of, throwError } from 'rxjs';
 import { render, screen, fireEvent } from '@testing-library/angular';
 import type { NotificationSettings } from '../admin.models';
@@ -49,6 +50,24 @@ describe('NotificationSettingsComponent', () => {
     });
   });
 
+  /** § 000635 */
+  it('"Verwerfen" sets the fields back and hides with "Speichern"', async () => {
+    const { fixture } = await setup();
+    const field = screen.getByLabelText<HTMLInputElement>(/Erinnern nach/);
+    const before = field.value;
+    fireEvent.input(field, { target: { value: '3' } });
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(screen.getByLabelText<HTMLInputElement>(/Erinnern nach/).value).toBe(before);
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('shows "Speichern" only while something changed', async () => {
     const { fixture } = await setup();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
@@ -90,7 +109,9 @@ describe('NotificationSettingsComponent', () => {
     c.save();
     expect(putNotificationSettings).toHaveBeenCalled();
     expect(c.saving()).toBe(false);
-    expect(c.error()).toBe('admin.notifications.saveError');
+    expect(c.error()).toBeNull();
+    expect(errorToasts()).toHaveLength(1);
+    expect(view.container.querySelector('app-note')).toBeNull();
   });
 
   it('patch is a no-op when settings are not loaded', async () => {

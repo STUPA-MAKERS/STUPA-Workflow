@@ -118,7 +118,7 @@ Month = tuple[int, int]
 
 def logo_url(gremium_id: UUID) -> str:
     """Return the API path of the square logo of a gremium."""
-    return f"/api/gremien/{gremium_id}/logo"
+    return f"/api/committees/{gremium_id}/logo"
 
 
 def month_key(month: Month) -> str:

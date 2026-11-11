@@ -210,23 +210,23 @@ export class AdminApiService {
         })),
       );
     }
-    return this.http.get<Gremium[]>(`${this.base}/admin/gremien`, {
+    return this.http.get<Gremium[]>(`${this.base}/admin/committees`, {
       context: opts.quiet ? skipLoading() : undefined,
     });
   }
 
   /**
-   * Gremien master data as a dropdown source — GET `/gremien`. Any logged-in principal
+   * Gremien master data as a dropdown source — GET `/committees`. Any logged-in principal
    * can call it. No admin right is necessary. Unlike {@link listGremien}
-   * (`/admin/gremien`, P `admin.gremien`), it also works for "create meeting" and for
+   * (`/admin/committees`, P `admin.gremien`), it also works for "create meeting" and for
    * budget, where the actor only holds a gremium role or `budget.*`.
    */
   listGremienOptions(): Observable<Gremium[]> {
     if (this.mock) return of(structuredCopy(this.store.gremien));
-    return this.http.get<Gremium[]>(`${this.base}/gremien`);
+    return this.http.get<Gremium[]>(`${this.base}/committees`);
   }
 
-  /** POST /admin/gremien — create a gremium (P `admin.gremien`). */
+  /** POST /admin/committees — create a gremium (P `admin.gremien`). */
   createGremium(body: GremiumCreateBody): Observable<Gremium> {
     if (this.mock) {
       const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, allowVoteDelegation: false, ...body };
@@ -241,17 +241,17 @@ export class AdminApiService {
       ];
       return of(structuredCopy(created));
     }
-    return this.http.post<Gremium>(`${this.base}/admin/gremien`, body);
+    return this.http.post<Gremium>(`${this.base}/admin/committees`, body);
   }
 
-  /** PATCH /admin/gremien/{id} — edit a gremium (P `admin.gremien`). */
+  /** PATCH /admin/committees/{id} — edit a gremium (P `admin.gremien`). */
   updateGremium(id: Uuid, body: GremiumUpdateBody): Observable<Gremium> {
     if (this.mock) {
       const row = this.store.gremien.find((g) => g.id === id);
       if (row) Object.assign(row, body);
       return of(structuredCopy(row ?? this.store.gremien[0]));
     }
-    return this.http.patch<Gremium>(`${this.base}/admin/gremien/${id}`, body);
+    return this.http.patch<Gremium>(`${this.base}/admin/committees/${id}`, body);
   }
 
   deleteGremium(id: Uuid): Observable<void> {
@@ -259,26 +259,26 @@ export class AdminApiService {
       this.store.gremien = this.store.gremien.filter((g) => g.id !== id);
       return of(void 0);
     }
-    return this.http.delete<void>(`${this.base}/admin/gremien/${id}`);
+    return this.http.delete<void>(`${this.base}/admin/committees/${id}`);
   }
 
-  /** GET /admin/gremien/{id}/public-preview — what the switch to "public" publishes. */
+  /** GET /admin/committees/{id}/public-preview — what the switch to "public" publishes. */
   getGremiumPublicPreview(id: Uuid): Observable<GremiumPublicPreview> {
     if (this.mock) return of({ finalCount: 6, missingCount: 5 });
-    return this.http.get<GremiumPublicPreview>(`${this.base}/admin/gremien/${id}/public-preview`, {
+    return this.http.get<GremiumPublicPreview>(`${this.base}/admin/committees/${id}/public-preview`, {
       context: skipLoading(),
     });
   }
 
-  /** GET /admin/gremien/{id}/mail-recipients — extra protocol recipients. */
+  /** GET /admin/committees/{id}/mail-recipients — extra protocol recipients. */
   getGremiumMailRecipients(id: Uuid): Observable<{ recipients: string[] }> {
     if (this.mock) return of({ recipients: [...(this.store.mailRecipients[id] ?? [])] });
     return this.http.get<{ recipients: string[] }>(
-      `${this.base}/admin/gremien/${id}/mail-recipients`,
+      `${this.base}/admin/committees/${id}/mail-recipients`,
     );
   }
 
-  /** PUT /admin/gremien/{id}/mail-recipients — replace extra recipients (idempotent). */
+  /** PUT /admin/committees/{id}/mail-recipients — replace extra recipients (idempotent). */
   setGremiumMailRecipients(
     id: Uuid,
     recipients: readonly string[],
@@ -288,7 +288,7 @@ export class AdminApiService {
       return of({ recipients: [...recipients] });
     }
     return this.http.put<{ recipients: string[] }>(
-      `${this.base}/admin/gremien/${id}/mail-recipients`,
+      `${this.base}/admin/committees/${id}/mail-recipients`,
       { recipients },
     );
   }
@@ -401,13 +401,13 @@ export class AdminApiService {
   listMembershipMappings(): Observable<GremiumMembershipMapping[]> {
     if (this.mock) return of(structuredCopy(this.store.membershipMappings));
     return this.http.get<GremiumMembershipMapping[]>(
-      `${this.base}/admin/gremium-membership-mappings`,
+      `${this.base}/admin/committee-membership-mappings`,
     );
   }
   createMembershipMapping(body: GremiumMembershipMappingBody): Observable<GremiumMembershipMapping> {
     if (this.mock) return mockInsert(this.store.membershipMappings, 'gmm', body);
     return this.http.post<GremiumMembershipMapping>(
-      `${this.base}/admin/gremium-membership-mappings`,
+      `${this.base}/admin/committee-membership-mappings`,
       body,
     );
   }
@@ -417,13 +417,13 @@ export class AdminApiService {
   ): Observable<GremiumMembershipMapping> {
     if (this.mock) return mockPatch(this.store.membershipMappings, id, body);
     return this.http.patch<GremiumMembershipMapping>(
-      `${this.base}/admin/gremium-membership-mappings/${id}`,
+      `${this.base}/admin/committee-membership-mappings/${id}`,
       body,
     );
   }
   deleteMembershipMapping(id: Uuid): Observable<void> {
     if (this.mock) return mockRemove(this.store.membershipMappings, id);
-    return this.http.delete<void>(`${this.base}/admin/gremium-membership-mappings/${id}`);
+    return this.http.delete<void>(`${this.base}/admin/committee-membership-mappings/${id}`);
   }
 
   /**
@@ -432,7 +432,7 @@ export class AdminApiService {
    */
   listRoleMappings(): Observable<GremiumRoleMapping[]> {
     if (this.mock) return of(structuredCopy(this.store.roleMappings));
-    return this.http.get<GremiumRoleMapping[]>(`${this.base}/admin/gremium-role-mappings`);
+    return this.http.get<GremiumRoleMapping[]>(`${this.base}/admin/committee-role-mappings`);
   }
   createRoleMapping(body: GremiumRoleMappingBody): Observable<GremiumRoleMapping> {
     if (this.mock) {
@@ -441,7 +441,7 @@ export class AdminApiService {
         gremiumId: this.mockRoleGremium(body.gremiumRoleId),
       });
     }
-    return this.http.post<GremiumRoleMapping>(`${this.base}/admin/gremium-role-mappings`, body);
+    return this.http.post<GremiumRoleMapping>(`${this.base}/admin/committee-role-mappings`, body);
   }
   updateRoleMapping(
     id: Uuid,
@@ -454,13 +454,13 @@ export class AdminApiService {
       return mockPatch(this.store.roleMappings, id, patch);
     }
     return this.http.patch<GremiumRoleMapping>(
-      `${this.base}/admin/gremium-role-mappings/${id}`,
+      `${this.base}/admin/committee-role-mappings/${id}`,
       body,
     );
   }
   deleteRoleMapping(id: Uuid): Observable<void> {
     if (this.mock) return mockRemove(this.store.roleMappings, id);
-    return this.http.delete<void>(`${this.base}/admin/gremium-role-mappings/${id}`);
+    return this.http.delete<void>(`${this.base}/admin/committee-role-mappings/${id}`);
   }
 
   /** The gremium of a gremium role in the mock store (empty for an unknown role). */
@@ -974,7 +974,7 @@ export class AdminApiService {
   /** `quiet` = the caller shows its own loading state (no overlay). */
   listGremiumRoles(gremiumId: Uuid, opts: { quiet?: boolean } = {}): Observable<GremiumRole[]> {
     if (this.mock) return of(structuredCopy(this.store.gremiumRoles.filter((r) => r.gremiumId === gremiumId)));
-    return this.http.get<GremiumRole[]>(`${this.base}/admin/gremien/${gremiumId}/roles`, {
+    return this.http.get<GremiumRole[]>(`${this.base}/admin/committees/${gremiumId}/roles`, {
       context: opts.quiet ? skipLoading() : undefined,
     });
   }
@@ -988,7 +988,7 @@ export class AdminApiService {
       this.store.gremiumRoles = [...this.store.gremiumRoles, row];
       return of(structuredCopy(row));
     }
-    return this.http.post<GremiumRole>(`${this.base}/admin/gremien/${gremiumId}/roles`, body);
+    return this.http.post<GremiumRole>(`${this.base}/admin/committees/${gremiumId}/roles`, body);
   }
 
   updateGremiumRole(
@@ -1000,7 +1000,7 @@ export class AdminApiService {
       if (row) Object.assign(row, body);
       return of(structuredCopy(row ?? { id, gremiumId: '', key: '', name: body.name ?? {} }));
     }
-    return this.http.patch<GremiumRole>(`${this.base}/admin/gremium-roles/${id}`, body);
+    return this.http.patch<GremiumRole>(`${this.base}/admin/committee-roles/${id}`, body);
   }
 
   /** Set a gremium role's granular permissions. */
@@ -1013,7 +1013,7 @@ export class AdminApiService {
       this.store.gremiumRoles = (this.store.gremiumRoles ?? []).filter((r) => r.id !== id);
       return of(void 0);
     }
-    return this.http.delete<void>(`${this.base}/admin/gremium-roles/${id}`);
+    return this.http.delete<void>(`${this.base}/admin/committee-roles/${id}`);
   }
 
   /** Memberships of one gremium (read-only). The OIDC group sync writes them. */
@@ -1028,7 +1028,7 @@ export class AdminApiService {
         })),
       );
     }
-    return this.http.get<GremiumMembership[]>(`${this.base}/admin/gremien/${gremiumId}/memberships`);
+    return this.http.get<GremiumMembership[]>(`${this.base}/admin/committees/${gremiumId}/memberships`);
   }
 
   /**
@@ -1502,7 +1502,7 @@ export class AdminApiService {
   downloadAuskunft(email: string): Observable<Blob> {
     if (this.mock) return of(new Blob([], { type: 'application/octet-stream' }));
     const params = new HttpParams().set('email', email);
-    return this.http.get(`${this.base}/admin/privacy/auskunft`, {
+    return this.http.get(`${this.base}/admin/privacy/export`, {
       params,
       responseType: 'blob',
     });

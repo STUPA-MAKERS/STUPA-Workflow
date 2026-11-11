@@ -1,4 +1,5 @@
 @use 'swatch';
+@use 'display' as d;
 
 :host {
   display: block;
@@ -144,7 +145,7 @@
   width: 60%;
 }
 
-@media (prefers-reduced-motion: reduce) {
+@include d.host-on(motion) {
   .pie__slice {
     transition: none;
   }
@@ -158,5 +159,25 @@
   }
   .pie__chart {
     align-self: center;
+  }
+}
+
+/* Very high contrast (spec 000605): the slices alternate white and yellow with a black
+   edge, and each legend entry takes the colour of its slice. */
+@include d.host-on(veryHigh) {
+  .pie__slice {
+    fill: #ffffff !important;
+    stroke: #000000;
+    stroke-width: 2px;
+  }
+  .pie__slice:nth-child(even of .pie__slice) {
+    fill: #ffff00 !important;
+  }
+  .pie__swatch {
+    background: #ffffff !important;
+    box-shadow: 0 0 0 1px #000000;
+  }
+  li:nth-child(even) .pie__swatch {
+    background: #ffff00 !important;
   }
 }

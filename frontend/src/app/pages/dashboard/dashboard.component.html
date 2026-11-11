@@ -153,7 +153,7 @@
 
     @if (noMeetings()) {
       <app-empty-state shape="date"
-        rows="3"
+        rows="1"
         [heading]="'dashboard.today.none' | t"
         [body]="(auth.gremien().length ? 'dashboard.today.noneBody' : 'dashboard.today.noGremiumBody') | t"
       />
@@ -199,7 +199,6 @@
     <div
       class="dash__panel"
       role="tabpanel"
-      appScrollFade="y"
       [id]="tabBar.panelId(tab())"
       [attr.aria-labelledby]="tabBar.tabId(tab())"
     >
@@ -219,10 +218,10 @@
     <div class="dash__emptyGrid" [class.dash__emptyGrid--two]="newUser() && applyTypes().length">
       @switch (t) {
         @case ('mine') {
-          <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="3" [heading]="'dashboard.empty.mine' | t" [body]="'dashboard.empty.mineBody' | t" />
+          <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="1" [heading]="'dashboard.empty.mine' | t" [body]="'dashboard.empty.mineBody' | t" />
         }
         @default {
-          <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="3" [heading]="'dashboard.empty.tasks' | t" [body]="'dashboard.empty.tasksBody' | t" />
+          <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="1" [heading]="'dashboard.empty.tasks' | t" [body]="'dashboard.empty.tasksBody' | t" />
         }
       }
       @if (newUser() && applyTypes().length) {
@@ -257,6 +256,7 @@
   } @else {
     <app-data-table
       surface="rowgroup"
+      [stickyHead]="true"
       [columns]="workColumns()"
       [rows]="rowsOf(t)"
       [loading]="loadingOf(t)"

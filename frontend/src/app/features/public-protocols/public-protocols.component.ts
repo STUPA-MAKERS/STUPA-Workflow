@@ -53,7 +53,7 @@ interface SemesterGroup {
 }
 
 /**
- * "Öffentliche Protokolle" (`/protokolle`, no login): the final protocols of the gremien
+ * "Öffentliche Protokolle" (`/protocols`, no login): the final protocols of the gremien
  * that publish them, in their public version, newest first and grouped by semester.
  *
  * The search (meeting title and the text of the public agenda items), the Gremium chip
@@ -97,7 +97,7 @@ export class PublicProtocolsComponent {
     },
   });
   protected readonly gremiumFilter = signal<readonly string[]>(
-    this.route.snapshot.queryParamMap.getAll('gremium'),
+    this.route.snapshot.queryParamMap.getAll('committee'),
   );
   protected readonly semesterFilter = signal('');
 

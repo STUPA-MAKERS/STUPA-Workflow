@@ -4,6 +4,8 @@
 - `SecurityHeadersMiddleware`: base hardening headers. The app serves JSON only, so
   the CSP is a strict `default-src 'none'`. The edge nginx gives the SPA its own
   CSP. The TLS-terminating proxy sets HSTS.
+- `LegacyPathMiddleware`: an old German API path answers like its English path (spec
+  000592), because installed MCP servers and scripts still call the old paths.
 - `CsrfMiddleware`: double-submit token for cookie-authenticated write requests.
   A request with a principal access token (`Bearer apat_…`) stays exempt, because
   a cross-site page cannot set `Authorization` without a CORS preflight and the
@@ -18,13 +20,16 @@ The app registers no CORSMiddleware on purpose. Cross-origin access stays off.
 from __future__ import annotations
 
 import hmac
+import re
 import secrets
 import uuid
 from collections.abc import Awaitable, Callable
+from typing import Final
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.modules.auth import oauth
 from app.modules.auth.sessions import SESSION_COOKIE_MAX_AGE, principal_sid
@@ -53,6 +58,62 @@ _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 PUBLIC_MEETING_PREFIX = "/api/public/meetings/"
 
 Dispatch = Callable[[Request], Awaitable[Response]]
+
+#: The old German API paths and their English paths (spec 000592), as patterns over a whole
+#: path. A pattern ends at a segment boundary, so `/api/gremien` does not match
+#: `/api/gremienx`. The longer prefix comes first, so `/api/admin/gremien` does not match as
+#: `/api/gremien`.
+LEGACY_API_PATHS: Final[tuple[tuple[re.Pattern[str], str], ...]] = tuple(
+    (re.compile(old + r"(?=/|$)"), new)
+    for old, new in (
+        (r"^/api/admin/privacy/auskunft", "/api/admin/privacy/export"),
+        (r"^/api/admin/gremien", "/api/admin/committees"),
+        (r"^/api/admin/gremium-roles", "/api/admin/committee-roles"),
+        (r"^/api/admin/gremium-membership-mappings", "/api/admin/committee-membership-mappings"),
+        (r"^/api/admin/gremium-role-mappings", "/api/admin/committee-role-mappings"),
+        (r"^/api/meetings/gremien", "/api/meetings/committees"),
+        (r"^/api/public/gremien", "/api/public/committees"),
+        (r"^/api/gremien", "/api/committees"),
+        (r"^(/api/meetings/[^/]+)/protokollant-handover", r"\1/minute-taker-handover"),
+        (r"^(/api/ws/meetings/[^/]+)/beamer", r"\1/projector"),
+    )
+)
+
+
+def english_api_path(path: str) -> str:
+    """Return the English path for an old German API path, else the path itself."""
+    return next(
+        (
+            pattern.sub(new, path, count=1)
+            for pattern, new in LEGACY_API_PATHS
+            if pattern.match(path)
+        ),
+        path,
+    )
+
+
+class LegacyPathMiddleware:
+    """Route an old German API path to its English route before any other middleware.
+
+    The middleware rewrites the path of the scope, so the CSRF check, the rate limits and
+    the route all see the English path. The response is the same as for the English path.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        """Wrap the next ASGI app."""
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Rewrite an old path of an HTTP or WebSocket scope, then call the next app."""
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+        path: str = scope["path"]
+        new_path = english_api_path(path)
+        if new_path == path:
+            await self.app(scope, receive, send)
+            return
+        await self.app({**scope, "path": new_path, "raw_path": new_path.encode()}, receive, send)
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):

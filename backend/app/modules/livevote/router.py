@@ -241,7 +241,7 @@ async def create_meeting(
 
 
 @router.get(
-    "/gremien/{gremium_id}/meeting-members",
+    "/committees/{gremium_id}/meeting-members",
     response_model=list[MeetingMemberOut],
     responses=_errors(401, 403),
 )
@@ -264,7 +264,7 @@ async def list_meeting_members(
 
 
 @router.get(
-    "/gremien/{gremium_id}/meeting-defaults",
+    "/committees/{gremium_id}/meeting-defaults",
     response_model=MeetingDefaultsOut,
     responses=_errors(401, 403),
 )
@@ -336,7 +336,7 @@ async def list_meetings_timeline(
 
 
 @router.get(
-    "/meetings/gremien",
+    "/meetings/committees",
     response_model=list[MeetingGremiumOut],
     responses=_errors(401, 403),
 )
@@ -434,7 +434,7 @@ async def patch_meeting(
 
 
 @router.post(
-    "/meetings/{meeting_id}/protokollant-handover",
+    "/meetings/{meeting_id}/minute-taker-handover",
     response_model=MeetingOut,
     responses=_errors(401, 403, 404, 409, 422),
 )
@@ -459,7 +459,7 @@ async def hand_over_protokollant(
 
 
 @router.delete(
-    "/meetings/{meeting_id}/protokollant-handover",
+    "/meetings/{meeting_id}/minute-taker-handover",
     response_model=MeetingOut,
     responses=_errors(401, 403, 404, 409),
 )
@@ -1276,7 +1276,7 @@ async def meeting_socket(
     await _serve(websocket, meeting_id, principal, meetings, voting, broker, locker, beamer=False)
 
 
-@router.websocket("/ws/meetings/{meeting_id}/beamer")
+@router.websocket("/ws/meetings/{meeting_id}/projector")
 async def beamer_socket(
     websocket: WebSocket,
     meeting_id: UUID,

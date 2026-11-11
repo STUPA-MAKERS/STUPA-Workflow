@@ -348,7 +348,7 @@ def test_beamer_requires_manage_permission() -> None:
     meeting = _meeting()
     app, _, _ = _build(meeting=meeting, principal=_voter(groups=set()))
     client = TestClient(app)
-    with client.websocket_connect(_url(meeting) + "/beamer") as ws:
+    with client.websocket_connect(_url(meeting) + "/projector") as ws:
         assert _recv(ws) == {"type": "error", "code": "not_eligible"}
 
 
@@ -357,7 +357,7 @@ def test_beamer_refuses_a_member_without_session_manage() -> None:
     meeting = _meeting()
     app, _, _ = _build(meeting=meeting, principal=_voter())
     client = TestClient(app)
-    with client.websocket_connect(_url(meeting) + "/beamer") as ws:
+    with client.websocket_connect(_url(meeting) + "/projector") as ws:
         assert _recv(ws) == {"type": "error", "code": "not_eligible"}
 
 
@@ -367,7 +367,7 @@ def test_beamer_refuses_session_manage_of_another_gremium() -> None:
     other = Principal(sub="chair", groups={f"manage:{uuid4()}"})
     app, _, _ = _build(meeting=meeting, principal=other)
     client = TestClient(app)
-    with client.websocket_connect(_url(meeting) + "/beamer") as ws:
+    with client.websocket_connect(_url(meeting) + "/projector") as ws:
         assert _recv(ws) == {"type": "error", "code": "not_eligible"}
 
 
@@ -375,7 +375,7 @@ def test_beamer_receives_state_but_cannot_cast() -> None:
     meeting = _meeting()
     app, voting, _ = _build(meeting=meeting, principal=_beamer())
     client = TestClient(app)
-    with client.websocket_connect(_url(meeting) + "/beamer") as ws:
+    with client.websocket_connect(_url(meeting) + "/projector") as ws:
         assert _recv(ws)["type"] == "meeting_state"
         ws.send_json({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
         assert _recv(ws) == {"type": "error", "code": "read_only"}
@@ -481,7 +481,7 @@ def test_handshake_foreign_origin_is_rejected() -> None:
     assert exc.value.code == 4403
 
 
-@pytest.mark.parametrize("suffix", ["", "/beamer"])
+@pytest.mark.parametrize("suffix", ["", "/projector"])
 def test_real_flow_dispatcher_override_reaches_the_socket(suffix: str) -> None:
     """Regression: the `get_action_dispatcher` override of `app.main` works on a socket.
 

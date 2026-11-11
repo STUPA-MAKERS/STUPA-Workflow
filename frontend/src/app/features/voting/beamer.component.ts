@@ -29,7 +29,7 @@ import { BEAMER_FROM_PARAM, beamerOrigin } from './beamer-link.util';
 export const BEAMER_IDLE_MS = 2500;
 
 /**
- * The beamer page (`/voting/beamer/:id`, route data `chrome: false`): the screen for the
+ * The beamer page (`/voting/projector/:id`, route data `chrome: false`): the screen for the
  * projector of a meeting. It shows the agenda item that the room handles, the open vote
  * with its turnout, and the result after the close (`MeetingBeamerComponent`).
  *

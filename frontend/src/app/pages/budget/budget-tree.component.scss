@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'field' as f;
 
 :host {
   display: block;
@@ -289,20 +290,22 @@
   gap: 2px;
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-field);
-  background: var(--color-surface-sunken);
+  background: var(--field-bg, var(--color-surface-sunken));
+  box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .bt__numField:focus-within {
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+  box-shadow: var(--field-focus, inset 0 0 0 2px var(--color-focus-ring));
 }
 .bt__numLabel {
   font-size: var(--fs-xs);
-  color: var(--color-text-muted);
+  color: var(--field-label, var(--color-text-muted));
 }
 .bt__numInput {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--color-text);
+  color: var(--field-text, var(--color-text));
   font: inherit;
   font-size: var(--fs-md);
 }

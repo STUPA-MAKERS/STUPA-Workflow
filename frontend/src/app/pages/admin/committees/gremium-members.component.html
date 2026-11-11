@@ -1,0 +1,64 @@
+<section class="gmm admin-page">
+  <app-page-header
+    [flush]="true"
+    [title]="('admin.gremien.membersOf' | t) + ': ' + (gremium()?.name ?? '…')"
+  >
+    <app-breadcrumbs crumbs />
+  </app-page-header>
+
+  @if (canManageMappings()) {
+    <app-note>
+      <a class="gmm__noteLink" routerLink="/admin/group-mappings">{{
+        'admin.users.manageGroupMappings' | t
+      }}</a>
+    </app-note>
+  }
+
+  <app-section
+    class="gmm__section"
+    [level]="2"
+    [heading]="'admin.gremien.members' | t"
+  >
+
+    <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.gremien.membersLoadFailed' | t" (retry)="loadMembers()">
+      <ng-template #loading>
+        <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
+      </ng-template>
+      <ng-template #content>
+        @if (!visible().length) {
+        <app-empty-state shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
+      } @else {
+        <ul class="rowgroup rowgroup--records gmm__list" [attr.aria-label]="'admin.gremien.members' | t">
+          @for (m of visible(); track m.id) {
+            <li class="gmm__row">
+              <app-avatar size="sm" [name]="m.name" [principalId]="m.id" [decorative]="true" />
+              <span class="gmm__name rowgroup__title ell" [title]="m.name">{{ m.name }}</span>
+              <span class="gmm__mail mono">{{ m.email ?? '—' }}</span>
+              <span class="gmm__role">{{ m.role | capitalize }}</span>
+            </li>
+          }
+        </ul>
+        @if (members().length > preview) {
+          <app-button
+            class="gmm__more"
+            variant="text"
+            size="sm"
+            [ariaExpanded]="showAll()"
+            (click)="showAll.set(!showAll())"
+          >
+            {{
+              showAll()
+                ? ('admin.gremien.showLess' | t)
+                : ('admin.gremien.showAll' | t: { count: members().length })
+            }}
+          </app-button>
+        }
+        }
+      </ng-template>
+    </app-load-state>
+  </app-section>
+
+  @if (canPool()) {
+    <app-substitute-pool [gremiumId]="gremiumId" [members]="poolMembers()" />
+  }
+</section>

@@ -1,0 +1,68 @@
+<section class="lg">
+  @if (phase() === 'sent') {
+    <article class="lg__card" aria-labelledby="lg-sent-title">
+      <app-icon class="lg__icon lg__icon--warn" name="mail" [size]="32" [strokeWidth]="1.6" />
+      <app-status-text kind="warn">{{ 'login.sent.badge' | t }}</app-status-text>
+      <h1 class="lg__title" id="lg-sent-title">{{ 'login.sent.heading' | t }}</h1>
+      <p class="lg__text">{{ 'login.sent.body' | t: { email: email().trim() } }}</p>
+      <p class="lg__meta">
+        {{ 'login.sent.hint' | t }}
+        <button type="button" class="lg__link" (click)="again()">{{ 'login.sent.again' | t }}</button>
+      </p>
+      <div class="lg__actions lg__actions--pair">
+        <a appButton="outlined" routerLink="/">{{ 'apply.confirm.home' | t }}</a>
+      </div>
+    </article>
+  } @else {
+    <h1 class="lg__heading">{{ 'login.heading' | t }}</h1>
+    @if (linkInvalid) {
+      <app-note kind="warn" icon="clock" role="status">{{ 'login.linkInvalid' | t }}</app-note>
+    }
+
+    <article class="lg__card" aria-labelledby="lg-sso-title">
+      <app-icon class="lg__icon" name="user" [size]="28" />
+      <h2 class="lg__sub" id="lg-sso-title">{{ 'login.sso.title' | t: { account: ('login.accountName' | t) } }}</h2>
+      <p class="lg__text">{{ 'login.sso.desc' | t: { account: ('login.accountName' | t) } }}</p>
+      <div class="lg__actions">
+        <app-button variant="fill" (click)="ssoLogin()">
+          {{ 'login.sso.submit' | t }}
+          <app-icon name="arrow" />
+        </app-button>
+      </div>
+    </article>
+
+    <article class="lg__card" aria-labelledby="lg-mail-title">
+      <app-icon class="lg__icon" name="mail" [size]="28" />
+      <h2 class="lg__sub" id="lg-mail-title">{{ 'login.mail.title' | t }}</h2>
+      <p class="lg__text">{{ 'login.mail.desc' | t: { account: ('login.accountName' | t) } }}</p>
+      <form class="lg__form" (submit)="$event.preventDefault(); send()">
+        <app-input
+          name="email"
+          type="email"
+          [id]="'lg-email'"
+          [label]="'login.mail.label' | t"
+          [required]="true"
+          [ngModel]="email()"
+          (ngModelChange)="email.set($event)"
+        />
+        @if (altchaRequired()) {
+          <app-altcha (solved)="onAltchaSolved($event)" (unavailable)="onAltchaUnavailable()" />
+        }
+        @if (phase() === 'error') {
+          <app-note kind="error" icon="alert" role="alert">{{ 'login.mail.error' | t }}</app-note>
+        }
+        <div class="lg__actions">
+          <app-button
+            variant="fill"
+            [loading]="phase() === 'sending'"
+            [disabled]="!canSend()"
+            (click)="send()"
+          >
+            {{ 'login.mail.submit' | t }}
+          </app-button>
+        </div>
+        <button type="submit" hidden></button>
+      </form>
+    </article>
+  }
+</section>

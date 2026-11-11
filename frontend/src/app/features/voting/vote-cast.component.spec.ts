@@ -154,7 +154,7 @@ async function setup(opts: {
     providers: [
       provideRouter([
         { path: 'voting', children: [] },
-        { path: 'voting/beamer/:id', children: [] },
+        { path: 'voting/projector/:id', children: [] },
         { path: 'applications/:id', children: [] },
         { path: 'meetings/:id', children: [] },
       ]),
@@ -414,7 +414,7 @@ describe('VoteCastComponent', () => {
       const navigate = jest.spyOn(router, 'navigate');
       expect(auth.canInGremium).toHaveBeenCalledWith('g1', 'session.manage');
       await userEvent.click(screen.getByRole('button', { name: 'Beamer-Ansicht' }));
-      expect(navigate).toHaveBeenCalledWith(['/voting/beamer', 'm1'], { queryParams: { from: '/' } });
+      expect(navigate).toHaveBeenCalledWith(['/voting/projector', 'm1'], { queryParams: { from: '/' } });
     });
 
     it('falls back to any gremium when the meeting is not readable', async () => {

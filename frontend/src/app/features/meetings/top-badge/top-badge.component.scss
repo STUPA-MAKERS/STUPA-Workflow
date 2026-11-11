@@ -23,3 +23,16 @@
   box-sizing: border-box;
   border: 1.5px solid var(--color-accent);
 }
+// Highlighted fields (app spec 000598): in a chosen row, which is black on yellow, the badge
+// is a black ring with a black number or tick; the current item is filled black with a yellow
+// number.
+:host-context(:root[data-fields='highlight'] .li--on) {
+  box-sizing: border-box;
+  border: 2px solid var(--field-text);
+  background: transparent;
+  color: var(--field-text);
+}
+:host-context(:root[data-fields='highlight'] .li--on).tb--now {
+  background: var(--field-text);
+  color: var(--field-bg);
+}

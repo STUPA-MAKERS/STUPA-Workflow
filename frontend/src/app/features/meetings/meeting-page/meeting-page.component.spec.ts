@@ -5,6 +5,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import type { ComponentFixture } from '@angular/core/testing';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type {
@@ -92,6 +93,15 @@ afterEach(() => {
 });
 
 /** Render the page; `media` lists the width queries that match (none: narrow). */
+/** Start the rename of the first TOP from its row menu, as the page does after the click. */
+async function startAgendaRename(fixture: ComponentFixture<MeetingPageComponent>): Promise<void> {
+  const rows = screen.getAllByRole('listitem');
+  await userEvent.click(within(rows[0]).getByRole('button', { name: /Aktionen für/ }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'TOP umbenennen' }));
+  fixture.componentRef.setInput('renamingTopId', 't-1');
+  fixture.detectChanges();
+}
+
 async function setup(over: Partial<Inputs> = {}, media: string[] = []) {
   restoreMedia = matchMediaQueries(...media);
   const on = Object.fromEntries(OUTPUTS.map((name) => [name, jest.fn()])) as Record<
@@ -546,14 +556,16 @@ describe('MeetingPageComponent', () => {
 
     /** Text selected in the rename field fires a native `select` that bubbles. */
     it('passes on no native event that bubbles out of the agenda as a value', async () => {
-      const { on } = await setup({ renamingTopId: 't-1', renameDraft: 'Neu' }, [MEDIA.wide]);
+      const { on, fixture } = await setup({ renameDraft: 'Neu' }, [MEDIA.wide]);
+      await startAgendaRename(fixture);
       const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
       input.dispatchEvent(new Event('select', { bubbles: true }));
       expect(on.selectTop).not.toHaveBeenCalled();
     });
 
     it('passes the inline rename on', async () => {
-      const { on } = await setup({ renamingTopId: 't-1', renameDraft: 'Neu' }, [MEDIA.wide]);
+      const { on, fixture } = await setup({ renameDraft: 'Neu' }, [MEDIA.wide]);
+      await startAgendaRename(fixture);
       const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
       await userEvent.type(input, '{Enter}');
       expect(on.renameTop).toHaveBeenCalledWith(AGENDA[0]);

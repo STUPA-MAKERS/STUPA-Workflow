@@ -1,5 +1,6 @@
 @use '../../../shared/ui/dialog-form' as df;
 @use 'breakpoints' as bp;
+@use 'field' as f;
 
 @include df.host;
 
@@ -62,6 +63,7 @@
 .rowgroup.rowgroup--bg3 > .hd__mode--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+  @include f.highlight-chosen;
 }
 .hd__mode--on .hd__small {
   color: inherit;

@@ -10,11 +10,11 @@ implementation:
   - backend/app/shared/config_schemas.py
   - backend/app/modules/admin/service/flow.py
   - backend/migrations/versions/e4a91c27b6d3_state_outcome_flags.py
-  - frontend/src/app/pages/admin/flow-editor/state-inspector.component.html
-  - frontend/src/app/pages/admin/flow-editor/flow-graph-ops.util.ts
+  - frontend/src/app/pages/admin/flow/state-inspector.component.html
+  - frontend/src/app/pages/admin/flow/flow-graph-ops.util.ts
 scope:
   - backend/app/modules/flow
-  - frontend/src/app/pages/admin/flow-editor
+  - frontend/src/app/pages/admin/flow
 ---
 
 # A flow state can mark an Antrag as approved or denied

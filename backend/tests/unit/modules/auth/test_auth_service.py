@@ -59,7 +59,7 @@ async def test_request_magic_link_unlimited_by_default() -> None:
     )
     assert len(db.added) == 1
     link = sent[0][1]
-    assert "/antrag/aid-1#t=" in link
+    assert "/my-applications/aid-1#t=" in link
     assert db.added[0].expires_at is None
 
 
@@ -96,7 +96,7 @@ async def test_request_magic_link_awaits_async_deliver() -> None:
         sent.append((email, link))
 
     await service.request_magic_link(db, settings, email="x@y.de", deliver=deliver)
-    assert len(sent) == 1 and "/antrag/aid-1#t=" in sent[0][1]
+    assert len(sent) == 1 and "/my-applications/aid-1#t=" in sent[0][1]
 
 
 def _link(token: str, settings: Settings, **kw: object) -> MagicLink:
@@ -210,6 +210,7 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
     UPDATE that expires the older links, `FlowService._load_app` and the latest status
     event of the task mail.
     """
+    from app.modules.auth import email_login
     from app.modules.flow.service import FlowService
 
     settings = _settings()
@@ -219,6 +220,11 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
         return None
 
     monkeypatch.setattr(FlowService, "auto_advance", _advance)
+
+    async def _assign(_db: object, _ids: object) -> None:
+        return None
+
+    monkeypatch.setattr(email_login, "assign_to_accounts", _assign)
     row = _link("tok", settings)
     app = _app(state_id="s1")
     app.email_confirmed_at = NOW

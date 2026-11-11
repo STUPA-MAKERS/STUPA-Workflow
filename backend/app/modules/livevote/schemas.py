@@ -221,7 +221,7 @@ HandoverMode = Literal["now", "next_item"]
 
 
 class ProtokollantHandoverBody(FrozenCamelModel, frozen=True):
-    """``POST /meetings/{id}/protokollant-handover`` — hand the minutes over.
+    """``POST /meetings/{id}/minute-taker-handover`` — hand the minutes over.
 
     ``now`` hands over at once. ``next_item`` plans the handover for the next
     forward move of the current agenda item.
@@ -702,7 +702,7 @@ class JoinTargetOut(FrozenCamelModel, frozen=True):
 
 
 class MeetingDefaultsOut(FrozenCamelModel, frozen=True):
-    """``GET /gremien/{id}/meeting-defaults`` — what a new meeting of the gremium allows."""
+    """``GET /committees/{id}/meeting-defaults`` — what a new meeting of the gremium allows."""
 
     #: Public participation only without a quorum.
     public_join_allowed: bool = Field(alias="publicJoinAllowed")

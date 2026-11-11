@@ -55,6 +55,16 @@ import type {
  * The `ApiClient` maps them like a real backend response. This keeps the mock
  * true to the contract and exercises the mapper layer.
  */
+/** The Anträge of the mock e-mail session (`/my-applications`). */
+const MOCK_APPLICANT_APPLICATIONS = {
+  email: 'lena.berger@example.org',
+  items: [
+    { id: '7c2e91d4-0000-4000-8000-000000000003', title: 'Zuschuss Erstsemesterfahrt 2027', state: { id: '00000000-0000-4000-8000-0000000000a1', key: 'eingereicht', label: { de: 'Eingereicht', en: 'Submitted' }, color: '#2563eb', editAllowed: true }, typeId: '11111111-1111-1111-1111-111111111111', amount: '480.00', approvedAmount: null, currency: 'EUR', createdAt: '2026-11-04T09:12:00Z' },
+    { id: '4f8a03b6-0000-4000-8000-000000000002', title: 'Technik für das Sommerfest', state: { id: '00000000-0000-4000-8000-0000000000a2', key: 'bewilligt', label: { de: 'Bewilligt', en: 'Approved' }, color: '#16a34a', editAllowed: false }, typeId: '11111111-1111-1111-1111-111111111111', amount: '1250.00', approvedAmount: '1000.00', currency: 'EUR', createdAt: '2026-06-18T15:40:00Z' },
+    { id: 'b915e2c0-0000-4000-8000-000000000001', title: 'Neue Bänke im Innenhof', state: { id: '00000000-0000-4000-8000-0000000000a3', key: 'abgelehnt', label: { de: 'Abgelehnt', en: 'Rejected' }, color: '#dc2626', editAllowed: false }, typeId: '22222222-2222-2222-2222-222222222222', amount: null, approvedAmount: null, currency: null, createdAt: '2026-03-02T11:05:00Z' },
+  ],
+} as const;
+
 const MOCK_PRINCIPAL: Principal = {
   sub: '00000000-0000-0000-0000-000000000001',
   display_name: 'Demo Mitglied',
@@ -1451,7 +1461,7 @@ function mockProblem(status: number, code: string, url: string): Observable<neve
 }
 
 /**
- * POST /meetings/{id}/protokollant-handover of the live mock meeting: `now`
+ * POST /meetings/{id}/minute-taker-handover of the live mock meeting: `now`
  * ends the running period and starts one for the new keeper; `next_item` plans it.
  */
 function mockHandover(body: { readonly principalId?: string; readonly mode?: string } | null, url: string): Observable<HttpEvent<unknown>> | MeetingOutWire {
@@ -1634,7 +1644,7 @@ const PUBLIC_MEETING_PATH =
   /\/public\/meetings\/|\/meetings\/join\/[^/]+$|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
 
 /** The public protocol routes (`mock-public-protocols.ts`). */
-const PUBLIC_PROTOCOLS_PATH = /\/public\/(gremien|protocols)(\/|$)/;
+const PUBLIC_PROTOCOLS_PATH = /\/public\/(committees|protocols)(\/|$)/;
 
 function path(url: string): string {
   return url.split('?')[0];
@@ -1815,6 +1825,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith(`/application-types/${MOCK_TYPES.items[0].id}/form`)) {
       return from(import('./mock-applications')).pipe(mergeMap((m) => ok(m.demoForm())));
     }
+    if (p.endsWith('/applicant/applications')) {
+      return ok(MOCK_APPLICANT_APPLICATIONS);
+    }
     if (p.endsWith('/altcha/challenge')) {
       return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
     }
@@ -1840,18 +1853,18 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       };
       return ok(page);
     }
-    if (p.endsWith('/meetings/gremien')) {
+    if (p.endsWith('/meetings/committees')) {
       return ok([
         { id: 'g0000000-0000-0000-0000-000000000001', name: 'Studierendenparlament' },
         { id: 'g0000000-0000-0000-0000-000000000002', name: 'Haushaltsausschuss' },
       ]);
     }
-    const defaults = /\/gremien\/([^/]+)\/meeting-defaults$/.exec(p);
+    const defaults = /\/committees\/([^/]+)\/meeting-defaults$/.exec(p);
     if (defaults) {
       const quorum = defaults[1] === 'g0000000-0000-0000-0000-000000000001' ? 50 : null;
       return ok({ publicJoinAllowed: quorum === null, quorumPercent: quorum });
     }
-    if (/\/gremien\/[^/]+\/meeting-members$/.test(p)) {
+    if (/\/committees\/[^/]+\/meeting-members$/.test(p)) {
       return ok(
         MOCK_ATTENDANCE.map((a) => ({
           principalId: a.principalId,
@@ -1978,7 +1991,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       const name = file instanceof File ? file.name : 'rechnung.pdf';
       return from(import('./mock-bookings')).pipe(mergeMap((m) => ok(m.mockParseInvoice(name))));
     }
-    if (/\/meetings\/[^/]+\/protokollant-handover$/.test(p)) {
+    if (/\/meetings\/[^/]+\/minute-taker-handover$/.test(p)) {
       const out = mockHandover(req.body as { principalId?: string; mode?: string } | null, req.url);
       return 'id' in out ? ok(out) : out;
     }
@@ -2065,6 +2078,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         ];
       }
       return ok([...MOCK_AGENDA]);
+    }
+    if (p.endsWith('/auth/email-login') || p.endsWith('/auth/email-login/verify')) {
+      return ok(null);
     }
     if (p.endsWith('/auth/magic-link/verify')) {
       const res: MagicLinkVerifyResult = { application_id: MOCK_APP_ID, scope: 'edit' };
@@ -2224,7 +2240,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'DELETE') {
     if (/\/apply\/attachments\/[^/]+$/.test(p)) return ok(null, 204);
-    if (/\/meetings\/[^/]+\/protokollant-handover$/.test(p)) {
+    if (/\/meetings\/[^/]+\/minute-taker-handover$/.test(p)) {
       if (!MOCK_MEETING.plannedHandover) return mockProblem(404, 'no_planned_handover', req.url);
       MOCK_MEETING = { ...MOCK_MEETING, plannedHandover: null };
       return ok(MOCK_MEETING);

@@ -245,7 +245,7 @@ describe('SubstitutePoolComponent', () => {
         .mockReturnValueOnce(throwError(() => ({ status: 422 })))
         .mockReturnValueOnce(throwError(() => ({ status: 500 }))),
     });
-    await setup({ delegations });
+    const { toast } = await setup({ delegations });
     await userEvent.click(screen.getByRole('button', { name: /Stellvertretung hinzufügen/ }));
     const dialog = screen.getByRole('dialog');
     await userEvent.type(within(dialog).getByRole('searchbox'), 'kim');
@@ -260,7 +260,8 @@ describe('SubstitutePoolComponent', () => {
       'Eine Person kann sich nicht selbst vertreten.',
     );
     await userEvent.click(add);
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Aktion fehlgeschlagen.');
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
   });
 
   /** The stream lives on after a failure. One character sends no request and says nothing yet. */

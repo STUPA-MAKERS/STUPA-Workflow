@@ -52,7 +52,7 @@ describe('PublicProtocolsComponent', () => {
     expect(within(card).getByText('Studierendenparlament · Di, 29.09.2026')).toBeInTheDocument();
     expect(
       within(card).getByRole('link', { name: '34. Sitzung des Studierendenparlaments' }),
-    ).toHaveAttribute('href', '/protokolle/p-1');
+    ).toHaveAttribute('href', '/protocols/p-1');
     expect(within(card).getByText('Nicht-öffentlicher TOP')).toBeInTheDocument();
     expect(within(card).getByText('Angenommen')).toBeInTheDocument();
     expect(within(card).getByText('Abgelehnt')).toBeInTheDocument();
@@ -130,13 +130,13 @@ describe('PublicProtocolsComponent', () => {
   });
 
   it('takes the gremium from the link of a detail page', async () => {
-    const { api } = await setup(makeApi(), { gremium: 'g-1' });
+    const { api } = await setup(makeApi(), { committee: 'g-1' });
     expect(api.list).toHaveBeenCalledWith(expect.objectContaining({ gremium: ['g-1'] }));
     expect(screen.getByRole('button', { name: 'Gremium: Studierendenparlament' })).toBeInTheDocument();
   });
 
   it('counts a gremium of an old link that publishes no more', async () => {
-    await setup(makeApi(), { gremium: 'g-x' });
+    await setup(makeApi(), { committee: 'g-x' });
     expect(screen.getByRole('button', { name: 'Gremium: 1 Gremien' })).toBeInTheDocument();
   });
 

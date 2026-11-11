@@ -114,6 +114,14 @@ python3 scripts/check_functional.py --write                     # backend, mcp, 
 - **100 % branch** for critical modules: `auth`, `voting`, `flow`, `budget`, `webhooks`, `audit`,
   `backup` (`scripts/coverage_critical.py`, list in `[tool.coverage_critical]` of
   `backend/pyproject.toml`).
+- **Unit and integration tests count together** for both backend gates: `be-unit` and
+  `be-integration` each write a coverage data file, and the `coverage-gate` job combines them.
+- **A new test of a database query is an integration test on Postgres**
+  (`backend/tests/integration`), not a fake session that returns the rows the test wrote down.
+- **Two ratchets only go down** (`scripts/check_ratchets.py`, CI job `functional`): the `commit()`
+  calls outside router files, because a service function does not commit, and the classes with
+  `Session` in their name in `backend/tests/unit`. After you lower a count:
+  `python3 scripts/check_ratchets.py --write`.
 - Local (BE): `ruff check .` + `basedpyright` (0 errors) + `pytest`. Local (FE): `npm run lint`,
   `npm run typecheck`, `npm test`. CI order: `Lint → Typecheck → BE-Unit → BE-Integration →
   Contract (Schemathesis) → FE-Unit → E2E (Playwright) → Coverage-Gate → Image-Build + Smoke`.
@@ -130,6 +138,10 @@ python3 scripts/check_functional.py --write                     # backend, mcp, 
   A hash id (12 chars) always fits; mind the length only for a hand-written id.
 - The `0001` baseline creates the whole schema via `Base.metadata.create_all` (single-source). Pure
   data/constraint migrations get their own revision. Details: `backend/migrations/README.md`.
+- **CI runs the migrations on the schema of the newest release tag** (job `be-migrations`), then
+  `python -m app.shared.schema_drift --strict` compares the database with `Base.metadata`. A model
+  change without a migration fails there. An accepted difference is an entry with its cause in
+  `EXCEPTIONS` (`backend/app/shared/schema_drift.py`).
 - **A migration that adds a table MUST be idempotent.** The baseline builds from
   `Base.metadata`, so the moment the model is registered in `app/models.py` the table already
   exists at `0001` on a fresh database. A plain `op.create_table` then fails the FIRST

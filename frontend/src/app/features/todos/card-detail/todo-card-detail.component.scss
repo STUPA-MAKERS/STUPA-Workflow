@@ -3,6 +3,7 @@
 @use 'press';
 @use 'scroll-fade' as fade;
 @use '../todo-labels' as lbl;
+@use 'field' as f;
 
 @include lbl.colors;
 
@@ -41,19 +42,6 @@
 .cd__head {
   flex: none;
 }
-// The same plate as `.ad__commentsN` of the application detail.
-.cd__activityN {
-  display: inline-grid;
-  place-items: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-3);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-medium);
-}
 .cd__boardLink {
   display: inline-flex;
   align-items: center;
@@ -84,9 +72,11 @@
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-field);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
+  background: var(--field-bg, var(--color-surface-sunken));
+  color: var(--field-text, var(--color-text));
   font: inherit;
+  box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .cd__titleInput {
   font-size: var(--fs-lg);
@@ -94,7 +84,8 @@
 }
 .cd__titleInput:focus-visible,
 .cd__itemInput:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
+  box-shadow: var(--field-focus, var(--field-edge, none));
 }
 .cd__seg {
   display: inline-block;
@@ -217,14 +208,21 @@
 .cd__dot {
   @include lbl.dot;
 }
-// "+ Label" has the box and the type of a label chip, with a dashed border.
-.cd__addLabel ::ng-deep .fs__chip {
+// "+ Label" and the "+" beside the assignees have the box and the type of a chip of the card,
+// with a dashed border (spec 000581).
+.cd__addLabel ::ng-deep .fs__chip,
+.cd__addPerson ::ng-deep .fs__chip {
   gap: 5px;
   height: 30px;
   padding: 1px 10px;
   border-style: dashed;
   font-size: 0.8125rem;
   font-weight: var(--fw-regular);
+}
+// The "+" beside the assignees shows only the icon: a square of the chip height.
+.cd__addPerson ::ng-deep .fs__chip {
+  width: 30px;
+  padding: 0;
 }
 .cd__muted {
   color: var(--color-text-muted);
@@ -362,6 +360,7 @@ button.cd__linkOpen {
   display: block;
   border-radius: var(--radius-field);
   background: var(--color-surface-sunken);
+  @include f.highlight-surface;
 }
 .cd__area:focus-within {
   outline: 2px solid var(--color-focus-ring);
@@ -507,6 +506,10 @@ button.cd__linkOpen {
   gap: var(--space-6);
   padding-top: var(--space-4);
 }
+// On a phone the panel ends on the bottom bar. The last row keeps room above the bar (000580).
+:host(.cd--phone) .cd__panel {
+  padding-bottom: var(--space-6);
+}
 :host(.cd--phone) .cd__head {
   border-bottom: 0;
   padding-bottom: 0;
@@ -621,13 +624,16 @@ button.cd__evText:focus-visible {
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-field);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
+  background: var(--field-bg, var(--color-surface-sunken));
+  color: var(--field-text, var(--color-text));
   font: inherit;
   font-size: 0.84375rem;
+  box-shadow: var(--field-edge, none);
+  @include f.ring;
 }
 .cd__evInput:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
+  box-shadow: var(--field-focus, var(--field-edge, none));
 }
 .cd__evNeg {
   color: var(--color-danger);

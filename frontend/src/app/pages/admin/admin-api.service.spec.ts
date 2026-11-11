@@ -143,7 +143,7 @@ describe('AdminApiService — real mode (contract)', () => {
   it('GETs the public preview of a gremium', () => {
     let got: unknown;
     s.getGremiumPublicPreview('g-1').subscribe((p) => (got = p));
-    const req = http.expectOne('/api/admin/gremien/g-1/public-preview');
+    const req = http.expectOne('/api/admin/committees/g-1/public-preview');
     expect(req.request.method).toBe('GET');
     req.flush({ finalCount: 3, missingCount: 1 });
     expect(got).toEqual({ finalCount: 3, missingCount: 1 });
@@ -164,7 +164,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/application-types/t2/form-versions').request.method).toBe('POST');
 
     s.listGremien().subscribe();
-    http.expectOne('/api/admin/gremien').flush([]);
+    http.expectOne('/api/admin/committees').flush([]);
     s.listRoles().subscribe();
     http.expectOne('/api/admin/roles').flush([]);
 
@@ -205,27 +205,27 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/oauth-grants/grant-9').request.method).toBe('DELETE');
   });
 
-  it('GETs gremium options from the public /gremien path', () => {
+  it('GETs gremium options from the public /committees path', () => {
     s.listGremienOptions().subscribe();
-    http.expectOne('/api/gremien').flush([]);
+    http.expectOne('/api/committees').flush([]);
   });
 
   it('PATCHes/DELETEs a gremium and gets/sets mail recipients', () => {
     s.updateGremium('g-9', { name: 'X' }).subscribe();
-    expect(http.expectOne('/api/admin/gremien/g-9').request.method).toBe('PATCH');
+    expect(http.expectOne('/api/admin/committees/g-9').request.method).toBe('PATCH');
 
     s.deleteGremium('g-9').subscribe();
-    expect(http.expectOne('/api/admin/gremien/g-9').request.method).toBe('DELETE');
+    expect(http.expectOne('/api/admin/committees/g-9').request.method).toBe('DELETE');
 
     s.createGremium({ name: 'X', slug: 'x', cdVariantId: 'cd-stupa', defaultLang: 'de' }).subscribe();
-    expect(http.expectOne('/api/admin/gremien').request.method).toBe('POST');
+    expect(http.expectOne('/api/admin/committees').request.method).toBe('POST');
 
     s.getGremiumMailRecipients('g-9').subscribe();
-    expect(http.expectOne('/api/admin/gremien/g-9/mail-recipients').request.method).toBe('GET');
+    expect(http.expectOne('/api/admin/committees/g-9/mail-recipients').request.method).toBe('GET');
 
     let recv: string[] | undefined;
     s.setGremiumMailRecipients('g-9', ['a@b.org']).subscribe((r) => (recv = r.recipients));
-    const put = http.expectOne('/api/admin/gremien/g-9/mail-recipients');
+    const put = http.expectOne('/api/admin/committees/g-9/mail-recipients');
     expect(put.request.method).toBe('PUT');
     expect(put.request.body).toEqual({ recipients: ['a@b.org'] });
     put.flush({ recipients: ['a@b.org'] });
@@ -506,55 +506,55 @@ describe('AdminApiService — real mode (contract)', () => {
   /** The helper delegates to updateGremiumRole. */
   it('wires gremium-role CRUD + permission helper', () => {
     s.listGremiumRoles('g1').subscribe();
-    http.expectOne('/api/admin/gremien/g1/roles').flush([]);
+    http.expectOne('/api/admin/committees/g1/roles').flush([]);
 
     s.createGremiumRole('g1', { key: 'k', name: { de: 'N' } }).subscribe();
-    expect(http.expectOne('/api/admin/gremien/g1/roles').request.method).toBe('POST');
+    expect(http.expectOne('/api/admin/committees/g1/roles').request.method).toBe('POST');
 
     s.updateGremiumRole('gr-9', { name: { de: 'N2' } }).subscribe();
-    expect(http.expectOne('/api/admin/gremium-roles/gr-9').request.method).toBe('PATCH');
+    expect(http.expectOne('/api/admin/committee-roles/gr-9').request.method).toBe('PATCH');
 
     s.saveGremiumRolePermissions('gr-9', ['vote.cast']).subscribe();
-    const pr = http.expectOne('/api/admin/gremium-roles/gr-9');
+    const pr = http.expectOne('/api/admin/committee-roles/gr-9');
     expect(pr.request.body).toEqual({ permissions: ['vote.cast'] });
     pr.flush({ id: 'gr-9', gremiumId: 'g1', key: 'k', name: {} });
 
     s.deleteGremiumRole('gr-9').subscribe();
-    expect(http.expectOne('/api/admin/gremium-roles/gr-9').request.method).toBe('DELETE');
+    expect(http.expectOne('/api/admin/committee-roles/gr-9').request.method).toBe('DELETE');
   });
 
   it('wires the gremium membership and the membership/role mapping endpoints', () => {
     s.listGremiumMemberships('g1').subscribe();
-    http.expectOne('/api/admin/gremien/g1/memberships').flush([]);
+    http.expectOne('/api/admin/committees/g1/memberships').flush([]);
 
     s.listGremiumRoles('g1', { quiet: true }).subscribe();
-    http.expectOne('/api/admin/gremien/g1/roles').flush([]);
+    http.expectOne('/api/admin/committees/g1/roles').flush([]);
 
     s.listMembershipMappings().subscribe();
-    http.expectOne('/api/admin/gremium-membership-mappings').flush([]);
+    http.expectOne('/api/admin/committee-membership-mappings').flush([]);
     s.createMembershipMapping({ oidcGroup: 'stupa', gremiumId: 'g1' }).subscribe();
-    const mPost = http.expectOne('/api/admin/gremium-membership-mappings');
+    const mPost = http.expectOne('/api/admin/committee-membership-mappings');
     expect(mPost.request.method).toBe('POST');
     expect(mPost.request.body).toEqual({ oidcGroup: 'stupa', gremiumId: 'g1' });
     s.updateMembershipMapping('gmm-9', { gremiumId: 'g2' }).subscribe();
-    const mPatch = http.expectOne('/api/admin/gremium-membership-mappings/gmm-9');
+    const mPatch = http.expectOne('/api/admin/committee-membership-mappings/gmm-9');
     expect(mPatch.request.method).toBe('PATCH');
     expect(mPatch.request.body).toEqual({ gremiumId: 'g2' });
     s.deleteMembershipMapping('gmm-9').subscribe();
-    expect(http.expectOne('/api/admin/gremium-membership-mappings/gmm-9').request.method).toBe('DELETE');
+    expect(http.expectOne('/api/admin/committee-membership-mappings/gmm-9').request.method).toBe('DELETE');
 
     s.listRoleMappings().subscribe();
-    http.expectOne('/api/admin/gremium-role-mappings').flush([]);
+    http.expectOne('/api/admin/committee-role-mappings').flush([]);
     s.createRoleMapping({ oidcGroup: 'stupa', gremiumRoleId: 'gr1' }).subscribe();
-    const rPost = http.expectOne('/api/admin/gremium-role-mappings');
+    const rPost = http.expectOne('/api/admin/committee-role-mappings');
     expect(rPost.request.method).toBe('POST');
     expect(rPost.request.body).toEqual({ oidcGroup: 'stupa', gremiumRoleId: 'gr1' });
     s.updateRoleMapping('grm-9', { gremiumRoleId: 'gr2' }).subscribe();
-    const rPatch = http.expectOne('/api/admin/gremium-role-mappings/grm-9');
+    const rPatch = http.expectOne('/api/admin/committee-role-mappings/grm-9');
     expect(rPatch.request.method).toBe('PATCH');
     expect(rPatch.request.body).toEqual({ gremiumRoleId: 'gr2' });
     s.deleteRoleMapping('grm-9').subscribe();
-    expect(http.expectOne('/api/admin/gremium-role-mappings/grm-9').request.method).toBe('DELETE');
+    expect(http.expectOne('/api/admin/committee-role-mappings/grm-9').request.method).toBe('DELETE');
   });
 
   /** `before: 0` is a valid cursor (not null), so the request must carry it. */
@@ -689,7 +689,7 @@ describe('AdminApiService — real mode (contract)', () => {
     put.flush({ defaultRetentionMonths: 36 });
 
     s.downloadAuskunft('a@b.org').subscribe();
-    const dl = http.expectOne((r) => r.url === '/api/admin/privacy/auskunft');
+    const dl = http.expectOne((r) => r.url === '/api/admin/privacy/export');
     expect(dl.request.params.get('email')).toBe('a@b.org');
     expect(dl.request.responseType).toBe('blob');
     dl.flush(new Blob([]));

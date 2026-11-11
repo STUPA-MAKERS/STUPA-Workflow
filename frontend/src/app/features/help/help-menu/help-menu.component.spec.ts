@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
-import { MEDIA } from '@stupa-makers/ui-kit';
+import { DisplaySettingsService, MEDIA, ThemeService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { HelpService } from '../help.service';
 import { HelpMenuComponent, type HelpMenuVariant } from './help-menu.component';
@@ -18,7 +18,7 @@ async function setup(opts: { variant?: HelpMenuVariant; signedIn?: boolean; publ
     inputs: { variant: opts.variant ?? 'rail' },
     on: { navigated },
     providers: [
-      provideRouter([{ path: 'barrierefreiheit', children: [] }]),
+      provideRouter([{ path: 'accessibility', children: [] }]),
       { provide: AuthService, useValue: { isAuthenticated: signal(opts.signedIn ?? true) } },
       {
         provide: BrandingService,
@@ -129,7 +129,7 @@ describe('HelpMenuComponent', () => {
     trigger().click();
     fixture.detectChanges();
     const link = screen.getByRole('link', { name: 'Barrierefreiheit' });
-    expect(link).toHaveAttribute('href', '/barrierefreiheit');
+    expect(link).toHaveAttribute('href', '/accessibility');
     link.click();
     fixture.detectChanges();
     expect(navigated).toHaveBeenCalled();
@@ -219,5 +219,80 @@ describe('HelpMenuComponent', () => {
     } finally {
       restore();
     }
+  });
+
+  /** §000593 the group "Darstellung" with its five switches, with and without a login. */
+  it('shows the display switches in the order of the spec, also for a visitor', async () => {
+    await setup({ variant: 'sheet', signedIn: false });
+    const group = screen.getByRole('group', { name: 'Darstellung' });
+    const names = Array.from(group.querySelectorAll('[role="switch"]')).map((s) =>
+      document.getElementById(s.getAttribute('aria-labelledby')!)!.textContent!.trim(),
+    );
+    expect(names).toEqual([
+      'Dunkles Design',
+      'Mehr Kontrast',
+      'Weniger Bewegung',
+      'Weniger Transparenz',
+      'Sehr hoher Kontrast',
+    ]);
+  });
+
+  /** §000606 very high contrast turns the other switches on and disables them. */
+  it('locks the other switches on while very high contrast is on', async () => {
+    const { fixture } = await setup({ variant: 'sheet' });
+    const display = fixture.debugElement.injector.get(DisplaySettingsService);
+    display.reset();
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('switch', { name: 'Sehr hoher Kontrast' }));
+    fixture.detectChanges();
+    for (const name of [
+      'Dunkles Design',
+      'Mehr Kontrast',
+      'Weniger Bewegung',
+      'Weniger Transparenz',
+    ]) {
+      const toggle = screen.getByRole('switch', { name });
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+      expect(toggle).toBeDisabled();
+    }
+    expect(screen.getByRole('switch', { name: 'Sehr hoher Kontrast' })).toBeEnabled();
+    expect(document.documentElement.getAttribute('data-fields')).toBe('highlight');
+    display.reset();
+  });
+
+  /** §000594 a switch shows the state in effect and overrides the system; the reset clears all. */
+  it('sets a display setting and the theme, and resets both to the system', async () => {
+    const { fixture } = await setup({ variant: 'sheet' });
+    const display = fixture.debugElement.injector.get(DisplaySettingsService);
+    const theme = fixture.debugElement.injector.get(ThemeService);
+    display.reset();
+    theme.setPreference('system');
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Systemeinstellungen verwenden' })).toBeNull();
+
+    const transparency = screen.getByRole('switch', { name: 'Weniger Transparenz' });
+    expect(transparency).toHaveAttribute('aria-checked', 'false');
+    await userEvent.click(transparency);
+    expect(display.effective().transparency).toBe(true);
+    expect(document.documentElement.getAttribute('data-transparency')).toBe('reduce');
+    expect(transparency).toHaveAttribute('aria-checked', 'true');
+
+    await userEvent.click(screen.getByRole('switch', { name: 'Dunkles Design' }));
+    expect(theme.preference()).toBe('dark');
+    expect(screen.getByRole('switch', { name: 'Dunkles Design' })).toHaveAttribute('aria-checked', 'true');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Systemeinstellungen verwenden' }));
+    expect(display.hasChoice()).toBe(false);
+    expect(theme.preference()).toBe('system');
+    expect(screen.queryByRole('button', { name: 'Systemeinstellungen verwenden' })).toBeNull();
+  });
+
+  it('offers the reset while only the theme is set', async () => {
+    const { fixture } = await setup({ variant: 'sheet' });
+    fixture.debugElement.injector.get(DisplaySettingsService).reset();
+    fixture.debugElement.injector.get(ThemeService).setPreference('light');
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Systemeinstellungen verwenden' })).toBeInTheDocument();
+    fixture.debugElement.injector.get(ThemeService).setPreference('system');
   });
 });

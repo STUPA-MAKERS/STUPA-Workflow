@@ -23,7 +23,7 @@
     </a>
 
     @if (protocolTotal() > 0) {
-      <a routerLink="/protokolle" class="home__choice">
+      <a routerLink="/protocols" class="home__choice">
         <app-icon class="home__icon" name="archive" [size]="24" />
         <span class="home__choice-title">{{ 'home.choice.protocols.title' | t }}</span>
         <span class="home__choice-desc">{{ 'home.choice.protocols.desc' | t }}</span>
@@ -33,14 +33,14 @@
       </a>
     }
 
-    <button type="button" class="home__choice" (click)="login()">
+    <a routerLink="/login" class="home__choice">
       <app-icon class="home__icon" name="user" [size]="24" />
       <span class="home__choice-title">{{ 'home.choice.login.title' | t }}</span>
-      <span class="home__choice-desc">{{ 'home.choice.login.desc' | t }}</span>
+      <span class="home__choice-desc">{{ 'home.choice.login.desc' | t: { account: ('login.accountName' | t) } }}</span>
       <span class="home__go" aria-hidden="true">
         {{ 'home.choice.go' | t }} <app-icon name="arrow" [size]="15" />
       </span>
-    </button>
+    </a>
   </div>
 
   @if (protocolTotal() > 0) {
@@ -49,7 +49,7 @@
       <ul class="home__latestList">
         @for (p of latest(); track p.id) {
           <li>
-            <a class="home__latestItem" [routerLink]="['/protokolle', p.id]">
+            <a class="home__latestItem" [routerLink]="['/protocols', p.id]">
               <app-date-block [date]="dateOf(p)" />
               <span class="home__latestText">
                 <span class="home__latestName">{{ p.title }}</span>
@@ -62,7 +62,7 @@
           </li>
         }
       </ul>
-      <a class="home__latestAll" routerLink="/protokolle">
+      <a class="home__latestAll" routerLink="/protocols">
         {{
           (protocolTotal() === 1 ? 'home.latest.allOne' : 'home.latest.all')
             | t: { n: protocolTotal() }

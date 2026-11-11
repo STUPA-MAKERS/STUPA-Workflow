@@ -74,6 +74,22 @@ _BUILTIN_MAGIC_LINK_BODY = {
     "ignore this email.\n",
 }
 
+#: Template key of the login link of the e-mail login (all Anträge of an address).
+EMAIL_LOGIN_TEMPLATE_KEY = "email_login"
+_BUILTIN_EMAIL_LOGIN_SUBJECT = {
+    "de": "Ihr Login-Link zu Ihren Anträgen",
+    "en": "Your login link to your applications",
+}
+_BUILTIN_EMAIL_LOGIN_BODY = {
+    "de": "Hallo,\n\nüber diesen Link sehen und bearbeiten Sie alle Anträge, die Sie mit "
+    "dieser Adresse gestellt haben:\n{{ link }}\n\nDer Link funktioniert einmal "
+    "und läuft bald ab. Danach fordern Sie auf der Anmeldeseite einen neuen an. Wenn "
+    "Sie das nicht angefordert haben, ignorieren Sie diese Mail.\n",
+    "en": "Hello,\n\nuse this link to see and edit every application that you filed "
+    "with this address:\n{{ link }}\n\nThe link works once and ends soon. After "
+    "that, request a new one on the login page. If you did not request it, ignore "
+    "this email.\n",
+}
 #: Template of a ``notify`` action without ``templateKey``. When it is absent, the
 #: variable-free builtin applies, which is safe under StrictUndefined.
 DEFAULT_NOTIFY_TEMPLATE_KEY = "status_update"
@@ -649,6 +665,52 @@ class NotificationService:
             idempotency_key=compute_idempotency_key("magic_link", email, link),
         )
         await self._enqueue(msg)
+
+    async def send_email_login(self, *, email: str, link: str, lang: str | None = None) -> None:
+        """Render and enqueue the login link of the e-mail login in `lang`."""
+        await self._send_builtin_or_template(
+            key=EMAIL_LOGIN_TEMPLATE_KEY,
+            subject_i18n=_BUILTIN_EMAIL_LOGIN_SUBJECT,
+            body_i18n=_BUILTIN_EMAIL_LOGIN_BODY,
+            email=email,
+            context={"link": link},
+            lang=lang,
+            idempotency=(EMAIL_LOGIN_TEMPLATE_KEY, email, link),
+        )
+
+    async def _send_builtin_or_template(
+        self,
+        *,
+        key: str,
+        subject_i18n: dict[str, str],
+        body_i18n: dict[str, str],
+        email: str,
+        context: dict[str, Any],
+        lang: str | None,
+        idempotency: tuple[str, ...],
+    ) -> None:
+        """Render a mail from its DB template or its builtin and enqueue it to `email`."""
+        tpl = await self._get_template_by_key(key)
+        rendered = (
+            self._render(tpl, context=context, lang=lang)
+            if tpl is not None
+            else render_mail(
+                subject_i18n=subject_i18n,
+                body_i18n=body_i18n,
+                context=context,
+                lang=lang or self.settings.mail_default_lang,
+                default_lang=self.settings.mail_default_lang,
+            )
+        )
+        await self._enqueue(
+            MailMessage(
+                to=(email,),
+                subject=rendered.subject,
+                text=rendered.text,
+                html=self._layout_html(rendered, "magic_link"),
+                idempotency_key=compute_idempotency_key(*idempotency),
+            )
+        )
 
     async def _get_template_by_key(self, key: str) -> MailTemplate | None:
         return (

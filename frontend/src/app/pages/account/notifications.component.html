@@ -13,7 +13,7 @@
   @if (loading()) {
     <app-skeleton variant="rows" [count]="6" [label]="'common.loading' | t" />
   } @else if (rows().length > 0) {
-    <ul class="rowgroup nt__list" [attr.aria-label]="'account.notifications.title' | t">
+    <ul class="rowgroup rowgroup--settings nt__list" [attr.aria-label]="'account.notifications.title' | t">
       @for (p of rows(); track p.kind) {
         <li class="nt__row">
           <app-switch [checked]="p.enabled" (checkedChange)="toggle(p.kind, $event)">

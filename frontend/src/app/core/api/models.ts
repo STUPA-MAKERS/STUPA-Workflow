@@ -1090,6 +1090,30 @@ export interface MagicLinkVerifyResult {
   readonly scope: 'edit';
 }
 
+/** Body of POST /api/auth/email-login: the address and the ALTCHA solution. */
+export interface EmailLoginRequest {
+  readonly email: string;
+  readonly altcha: string | null;
+}
+
+/** One Antrag of the address of an e-mail session (GET /api/applicant/applications). */
+export interface ApplicantApplicationItem {
+  readonly id: Uuid;
+  readonly title: string | null;
+  readonly state: StateOutWire | null;
+  readonly typeId: Uuid;
+  readonly amount: string | null;
+  readonly approvedAmount: string | null;
+  readonly currency: string | null;
+  readonly createdAt: IsoDateTime;
+}
+
+/** The Anträge of the e-mail session, newest first, and the address of the session. */
+export interface ApplicantApplications {
+  readonly email: string | null;
+  readonly items: readonly ApplicantApplicationItem[];
+}
+
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
 /** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
@@ -1999,7 +2023,7 @@ export interface GuestMe {
   readonly view: GuestView | null;
 }
 
-/** `GET /gremien/{id}/meeting-defaults`: what a new meeting of the gremium allows. */
+/** `GET /committees/{id}/meeting-defaults`: what a new meeting of the gremium allows. */
 export interface MeetingDefaults {
   readonly publicJoinAllowed: boolean;
   readonly quorumPercent: number | null;

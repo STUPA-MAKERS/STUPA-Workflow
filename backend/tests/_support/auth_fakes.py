@@ -7,7 +7,7 @@ database.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import Any
 
 
@@ -22,6 +22,9 @@ class FakeResult:
 
     def scalars(self) -> FakeResult:
         return self
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self._items)
 
     def all(self) -> list[Any]:
         return list(self._items)

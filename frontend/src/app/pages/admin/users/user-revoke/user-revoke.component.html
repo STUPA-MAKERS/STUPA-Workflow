@@ -8,154 +8,155 @@
 >
   @let p = preview();
   <div class="ur">
-    @if (loading()) {
-      <app-skeleton variant="rows" [count]="4" [label]="'admin.users.revoke.loading' | t" />
-    } @else if (failed() || !p) {
-      <app-note kind="error" icon="alert" role="alert">
-        <span>{{ 'admin.users.revoke.loadFailed' | t }}</span>
-      </app-note>
-    } @else {
-      <div class="ur__who">
-        <app-avatar size="sm" [name]="name(p.principal)" [principalId]="p.principal.id" [decorative]="true" />
-        <span class="ur__whoText">
-          <span class="ur__name">
-            {{ name(p.principal) }}
-            @if (!p.principal.active) {
-              <span class="ur__tag">{{ 'admin.users.inactive' | t }}</span>
-            }
-          </span>
-          @if (p.principal.email) {
-            <span class="ur__mail mono">{{ p.principal.email }}</span>
+    <app-load-state [state]="loadState()" [errorText]="'admin.users.revoke.loadFailed' | t" (retry)="retry()">
+      <ng-template #loading>
+        <app-skeleton variant="rows" [count]="4" [label]="'admin.users.revoke.loading' | t" />
+      </ng-template>
+      <ng-template #content>
+        @if (p) {
+          <div class="ur__who">
+            <app-avatar size="sm" [name]="name(p.principal)" [principalId]="p.principal.id" [decorative]="true" />
+            <span class="ur__whoText">
+              <span class="ur__name">
+                {{ name(p.principal) }}
+                @if (!p.principal.active) {
+                  <span class="ur__tag">{{ 'admin.users.inactive' | t }}</span>
+                }
+              </span>
+              @if (p.principal.email) {
+                <span class="ur__mail mono">{{ p.principal.email }}</span>
+              }
+              <span class="ur__muted">
+                @if (p.principal.lastLogin) {
+                  {{
+                    'admin.users.revoke.lastLogin'
+                      | t: { date: (p.principal.lastLogin | ldate: 'mediumDate'), age: age(p.principal.lastLogin) }
+                  }}
+                } @else {
+                  {{ 'admin.users.revoke.lastLoginNever' | t }}
+                }
+              </span>
+            </span>
+          </div>
+
+          @if (p.isSelf) {
+            <app-note kind="warn" icon="lock">
+              <span>{{ 'admin.users.revoke.selfNote' | t }}</span>
+            </app-note>
           }
-          <span class="ur__muted">
-            @if (p.principal.lastLogin) {
-              {{
-                'admin.users.revoke.lastLogin'
-                  | t: { date: (p.principal.lastLogin | ldate: 'mediumDate'), age: age(p.principal.lastLogin) }
-              }}
-            } @else {
-              {{ 'admin.users.revoke.lastLoginNever' | t }}
-            }
-          </span>
-        </span>
-      </div>
 
-      @if (p.isSelf) {
-        <app-note kind="warn" icon="lock">
-          <span>{{ 'admin.users.revoke.selfNote' | t }}</span>
-        </app-note>
-      }
+          @if (empty()) {
+            <app-empty-state rows="3" [heading]="'admin.users.revoke.nothing' | t" />
+          }
 
-      @if (empty()) {
-        <app-empty-state rows="3" [heading]="'admin.users.revoke.nothing' | t" />
-      }
+          @if (p.gremien.length) {
+            <app-section class="ur__sec" [heading]="'admin.users.revoke.gremien' | t">
+              <app-button sectionAction variant="text" size="sm" [disabled]="p.isSelf" (click)="toggleAll()">{{
+                (allSelected() ? 'admin.users.revoke.deselectAll' : 'admin.users.revoke.selectAll') | t
+              }}</app-button>
+              <ul class="ur__items">
+                @for (g of p.gremien; track g.gremiumId) {
+                  @let e = gEntry(g);
+                  <li class="ur__item" [class.ur__item--on]="isOn(e)">
+                    <div class="ur__body">
+                      <app-checkbox
+                        class="ur__title"
+                        [name]="'ur-' + e"
+                        [ngModel]="isOn(e)"
+                        [disabled]="p.isSelf"
+                        (ngModelChange)="toggle(e, $event)"
+                        >{{ g.name }}</app-checkbox
+                      >
+                      <ul class="ur__lines">
+                        @for (line of gremiumLines(g); track $index) {
+                          <li class="ur__line" [class.ur__line--kept]="line.kept">
+                            <app-icon class="ur__lineIcon" name="right" [size]="14" />
+                            <span class="ur__lineText">
+                              <span>{{ line.text }}</span>
+                              @if (line.detail) {
+                                <span class="ur__muted">{{ line.detail }}</span>
+                              }
+                            </span>
+                          </li>
+                        }
+                        @for (hint of sharedHints(e); track $index) {
+                          <li class="ur__line ur__line--hint">
+                            <app-icon class="ur__lineIcon" name="link" [size]="14" />
+                            <span class="ur__lineText">{{ hint }}</span>
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  </li>
+                }
+              </ul>
+            </app-section>
+          }
 
-      @if (p.gremien.length) {
-        <app-section class="ur__sec" [heading]="'admin.users.revoke.gremien' | t">
-          <app-button sectionAction variant="text" size="sm" [disabled]="p.isSelf" (click)="toggleAll()">{{
-            (allSelected() ? 'admin.users.revoke.deselectAll' : 'admin.users.revoke.selectAll') | t
-          }}</app-button>
-          <ul class="ur__items">
-            @for (g of p.gremien; track g.gremiumId) {
-              @let e = gEntry(g);
-              <li class="ur__item" [class.ur__item--on]="isOn(e)">
-                <div class="ur__body">
-                  <app-checkbox
-                    class="ur__title"
-                    [name]="'ur-' + e"
-                    [ngModel]="isOn(e)"
-                    [disabled]="p.isSelf"
-                    (ngModelChange)="toggle(e, $event)"
-                    >{{ g.name }}</app-checkbox
-                  >
-                  <ul class="ur__lines">
-                    @for (line of gremiumLines(g); track $index) {
-                      <li class="ur__line" [class.ur__line--kept]="line.kept">
-                        <app-icon class="ur__lineIcon" name="right" [size]="14" />
-                        <span class="ur__lineText">
-                          <span>{{ line.text }}</span>
-                          @if (line.detail) {
-                            <span class="ur__muted">{{ line.detail }}</span>
-                          }
-                        </span>
-                      </li>
-                    }
-                    @for (hint of sharedHints(e); track $index) {
-                      <li class="ur__line ur__line--hint">
-                        <app-icon class="ur__lineIcon" name="link" [size]="14" />
-                        <span class="ur__lineText">{{ hint }}</span>
-                      </li>
-                    }
-                  </ul>
-                </div>
-              </li>
-            }
-          </ul>
-        </app-section>
-      }
+          @if (p.globalRoles.length) {
+            <app-section class="ur__sec" [heading]="'admin.users.revoke.roles' | t">
+              <ul class="ur__items">
+                @for (r of p.globalRoles; track r.roleId) {
+                  @let e = rEntry(r);
+                  <li class="ur__item" [class.ur__item--on]="isOn(e)">
+                    <div class="ur__body">
+                      <app-checkbox
+                        class="ur__title"
+                        [name]="'ur-' + e"
+                        [ngModel]="isOn(e)"
+                        [disabled]="p.isSelf"
+                        (ngModelChange)="toggle(e, $event)"
+                        >{{ label(r.roleLabel, r.roleKey) }}</app-checkbox
+                      >
+                      <ul class="ur__lines">
+                        @for (line of roleLines(r); track $index) {
+                          <li class="ur__line">
+                            <app-icon class="ur__lineIcon" name="right" [size]="14" />
+                            <span class="ur__lineText">
+                              <span>{{ line.text }}</span>
+                              @if (line.detail) {
+                                <span class="ur__muted">{{ line.detail }}</span>
+                              }
+                            </span>
+                          </li>
+                        }
+                        @for (hint of sharedHints(e); track $index) {
+                          <li class="ur__line ur__line--hint">
+                            <app-icon class="ur__lineIcon" name="link" [size]="14" />
+                            <span class="ur__lineText">{{ hint }}</span>
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  </li>
+                }
+              </ul>
+            </app-section>
+          }
 
-      @if (p.globalRoles.length) {
-        <app-section class="ur__sec" [heading]="'admin.users.revoke.roles' | t">
-          <ul class="ur__items">
-            @for (r of p.globalRoles; track r.roleId) {
-              @let e = rEntry(r);
-              <li class="ur__item" [class.ur__item--on]="isOn(e)">
-                <div class="ur__body">
-                  <app-checkbox
-                    class="ur__title"
-                    [name]="'ur-' + e"
-                    [ngModel]="isOn(e)"
-                    [disabled]="p.isSelf"
-                    (ngModelChange)="toggle(e, $event)"
-                    >{{ label(r.roleLabel, r.roleKey) }}</app-checkbox
-                  >
-                  <ul class="ur__lines">
-                    @for (line of roleLines(r); track $index) {
-                      <li class="ur__line">
-                        <app-icon class="ur__lineIcon" name="right" [size]="14" />
-                        <span class="ur__lineText">
-                          <span>{{ line.text }}</span>
-                          @if (line.detail) {
-                            <span class="ur__muted">{{ line.detail }}</span>
-                          }
-                        </span>
-                      </li>
-                    }
-                    @for (hint of sharedHints(e); track $index) {
-                      <li class="ur__line ur__line--hint">
-                        <app-icon class="ur__lineIcon" name="link" [size]="14" />
-                        <span class="ur__lineText">{{ hint }}</span>
-                      </li>
-                    }
-                  </ul>
-                </div>
-              </li>
-            }
-          </ul>
-        </app-section>
-      }
+          @if (!empty()) {
+            <app-note icon="info">
+              <span
+                >{{ 'admin.users.revoke.note' | t: { name: name(p.principal) } }}
+                {{
+                  (deactivate() ? 'admin.users.revoke.noteDeactivated' : 'admin.users.revoke.noteLogin')
+                    | t: { name: name(p.principal) }
+                }}</span
+              >
+            </app-note>
+          }
 
-      @if (!empty()) {
-        <app-note icon="info">
-          <span
-            >{{ 'admin.users.revoke.note' | t: { name: name(p.principal) } }}
-            {{
-              (deactivate() ? 'admin.users.revoke.noteDeactivated' : 'admin.users.revoke.noteLogin')
-                | t: { name: name(p.principal) }
-            }}</span
-          >
-        </app-note>
-      }
-
-      @if (p.principal.active && !p.isSelf) {
-        <app-switch
-          class="ur__switch"
-          [checked]="deactivate()"
-          (checkedChange)="deactivate.set($event)"
-          >{{ 'admin.users.revoke.deactivate' | t }}</app-switch
-        >
-      }
-    }
+          @if (p.principal.active && !p.isSelf) {
+            <app-switch
+              class="ur__switch"
+              [checked]="deactivate()"
+              (checkedChange)="deactivate.set($event)"
+              >{{ 'admin.users.revoke.deactivate' | t }}</app-switch
+            >
+          }
+        }
+      </ng-template>
+    </app-load-state>
   </div>
 
   <div dialog-footer class="ur__foot">

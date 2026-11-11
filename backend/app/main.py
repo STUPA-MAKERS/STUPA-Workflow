@@ -25,6 +25,7 @@ from app.logging_config import configure_logging
 from app.middleware import (
     CsrfMiddleware,
     DefaultWriteRateLimitMiddleware,
+    LegacyPathMiddleware,
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
@@ -214,10 +215,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the FastAPI app with its middleware, handlers and routers.
 
     CORS stays unregistered on purpose: no cross-origin access. The last middleware added
-    becomes the outermost one. SecurityHeaders is outermost, so its headers also reach the
-    CSRF and 429 responses; then come the trace id, CSRF, and innermost the default write
-    rate limit. All of them are BaseHTTPMiddleware, so a WebSocket scope passes through
-    untouched.
+    becomes the outermost one. LegacyPath is outermost, so every other middleware and the
+    route see the English path of an old German API path (spec 000592). SecurityHeaders
+    comes next, so its headers also reach the CSRF and 429 responses; then come the trace
+    id, CSRF, and innermost the default write rate limit. All but LegacyPath are
+    BaseHTTPMiddleware, so a WebSocket scope passes through them untouched.
 
     OAuth discovery (RFC 8414/9728) sits at the root, per well-known convention. The public
     share pages ``/s/<token>`` sit at the root and NOT under /api, because Matrix, WhatsApp
@@ -238,6 +240,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(CsrfMiddleware, settings=config)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(LegacyPathMiddleware)
 
     register_exception_handlers(app)
 

@@ -316,7 +316,7 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
     assert f"Protokoll öffnen: {SETTINGS_BASE}/meetings/{MID}" in mail.sent[0].text
     assert f'href="{SETTINGS_BASE}/meetings/{MID}"' in (mail.sent[0].html or "")
-    assert "/protokolle/" not in mail.sent[0].text
+    assert "/protocols/" not in mail.sent[0].text
 
 
 async def test_protocol_mail_links_the_public_version_when_public() -> None:
@@ -337,7 +337,7 @@ async def test_protocol_mail_links_the_public_version_when_public() -> None:
 
     assert len(mail.sent) == 1
     text = mail.sent[0].text
-    assert f"Öffentliche Fassung: {SETTINGS_BASE}/protokolle/{PID}" in text
+    assert f"Öffentliche Fassung: {SETTINGS_BASE}/protocols/{PID}" in text
     assert f"Protokoll öffnen: {SETTINGS_BASE}/meetings/{MID}" in text
 
 
@@ -353,7 +353,7 @@ async def test_protocol_mail_hides_a_withheld_public_version() -> None:
     )
     await _service(session, mail_queue=mail)._send(proto, None)
 
-    assert "/protokolle/" not in mail.sent[0].text
+    assert "/protocols/" not in mail.sent[0].text
 
 
 async def test_the_design_never_decides_the_document_shape() -> None:

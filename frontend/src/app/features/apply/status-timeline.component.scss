@@ -1,7 +1,11 @@
 @use 'breakpoints' as bp;
+@use 'dot-parts' as dots;
 
 :host {
-  display: block;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .sp {
@@ -10,129 +14,6 @@
   gap: var(--space-5);
   max-width: 72rem;
   margin-inline: auto;
-}
-.sp__head {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.sp__headTop {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.sp__ref {
-  flex: 1 1 auto;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.sp__menu {
-  flex: none;
-}
-.sp__title {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-.sp__state {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 var(--space-2);
-  margin: 0;
-  color: var(--color-text-muted);
-}
-.sp__state app-status-text {
-  flex: none;
-}
-.sp__sep {
-  color: var(--color-text-subtle);
-}
-.sp__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-}
-
-.sp__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(20rem, 1fr);
-  align-items: start;
-  gap: var(--space-6);
-}
-.sp__main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  min-width: 0;
-}
-.sp__sec {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-  --section-gap: var(--space-2);
-}
-.sp__link {
-  margin: calc(-1 * var(--space-3)) 0 0;
-  padding: 0 var(--space-1);
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-
-.sp__rows {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.sp__row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  width: 100%;
-  min-height: 4rem;
-  padding: 10px var(--space-4);
-  border: 0;
-  border-radius: inherit;
-  background: none;
-  color: var(--color-text);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-@media (hover: hover) {
-  .sp__row:hover:not(:disabled) {
-    background: var(--color-surface-3);
-  }
-}
-.sp__row:disabled {
-  cursor: default;
-}
-.sp__row:disabled .sp__rowIcon,
-.sp__row:disabled .sp__rowTitle {
-  color: var(--color-text-subtle);
-}
-.sp__rowIcon {
-  flex: none;
-  color: var(--color-text-muted);
-}
-.sp__rowText {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-.sp__rowTitle {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-medium);
-}
-.sp__rowSub {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.sp__rowChev {
-  flex: none;
-  color: var(--color-text-muted);
 }
 
 .sp--edit {
@@ -164,7 +45,6 @@
 }
 // Programmatic focus targets only. The bar text clips its overflow, so a ring shows as a stray
 // line.
-.sp__title:focus,
 .sp__editText strong:focus {
   outline: none;
 }
@@ -218,22 +98,6 @@
 }
 
 @include bp.below-wide {
-  .sp__grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .sp__main {
-    display: contents;
-  }
-  .sp__rows,
-  .sp__link {
-    order: 1;
-  }
-  .sp__history {
-    order: 2;
-  }
-  .sp__answers {
-    order: 3;
-  }
   .sp {
     max-width: 46rem;
   }
@@ -241,14 +105,6 @@
 
 @include bp.phone {
   .sp {
-    gap: var(--space-4);
-  }
-  .sp__title {
-    font-size: var(--fs-h1);
-    line-height: var(--lh-h1);
-  }
-  .sp__grid,
-  .sp__main {
     gap: var(--space-4);
   }
   .sp__editBar {
@@ -259,4 +115,78 @@
   .sp__endCard {
     padding: var(--space-5);
   }
+}
+
+// The view of one Antrag takes the look of the detail of "Anträge"
+// (`applications-detail.component.scss`): the same sheet head, the same line of
+// "Status · Typ · Betrag", two columns beside the list and tabs without it.
+.ad {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.ad--split {
+  position: relative;
+  padding: 0 var(--space-6) var(--space-6);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.ad__line {
+  --ad-sep: 24px;
+}
+.ad__seps {
+  overflow-x: clip;
+}
+.ad__parts {
+  @include dots.list(var(--ad-sep));
+}
+.ad__part {
+  @include dots.part(var(--ad-sep));
+}
+.ad__transitions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.ad__note {
+  margin-top: var(--space-2);
+}
+.ad__cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  align-items: flex-start;
+}
+.ad__col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ad__col:first-child {
+  flex: 1.4 1 0;
+  min-width: min(100%, 22.5rem);
+}
+.ad__col:last-child {
+  flex: 1 1 0;
+  min-width: min(100%, 22rem);
+}
+.ad__tabs {
+  --tab-pager-page-top: var(--space-5);
+  margin-top: calc(-1 * var(--space-5));
+}
+.ad__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.ad__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  --section-gap: var(--space-2);
 }

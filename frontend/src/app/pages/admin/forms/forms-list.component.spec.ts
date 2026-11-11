@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
@@ -44,7 +45,7 @@ async function setup(opts: { api?: Api; perms?: string[] } = {}) {
         provide: AuthService,
         useValue: fakeAuth(opts.perms ?? ['admin.types', 'admin.types_delete']),
       },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       provideRouter([{ path: 'admin/forms/:id', children: [] }]),
     ],
   });

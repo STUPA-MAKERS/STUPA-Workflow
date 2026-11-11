@@ -30,18 +30,6 @@
   max-width: 100%;
 }
 
-.vod__voters {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-3);
-  font-size: var(--fs-small);
-  color: var(--color-text-muted);
-}
-
 .vod__stepper {
   display: flex;
   align-items: center;

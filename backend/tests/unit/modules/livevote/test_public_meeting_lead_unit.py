@@ -473,10 +473,10 @@ def test_guest_name_drops_hidden_characters() -> None:
 
 def test_meeting_defaults_route(setup: Any) -> None:
     client, meetings, *_ = setup
-    resp = client.get(f"/api/gremien/{uuid4()}/meeting-defaults")
+    resp = client.get(f"/api/committees/{uuid4()}/meeting-defaults")
     assert resp.json() == {"publicJoinAllowed": True, "quorumPercent": None}
     meetings._can_manage = False
-    assert client.get(f"/api/gremien/{uuid4()}/meeting-defaults").status_code == 403
+    assert client.get(f"/api/committees/{uuid4()}/meeting-defaults").status_code == 403
 
 
 async def test_public_join_needs_a_gremium_without_quorum() -> None:

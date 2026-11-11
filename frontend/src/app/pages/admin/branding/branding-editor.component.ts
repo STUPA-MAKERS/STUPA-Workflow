@@ -13,7 +13,12 @@ import { I18nService, baseLocale } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CATALOG, type TranslationKey } from '@core/i18n/translations';
 import { langFieldLabel, setI18n } from '@shared/forms/i18n-text';
-import { DEFAULT_ACCENT, accentContrastIssues, accentPalette, normalizeHex } from '@core/theme/accent';
+import {
+  DEFAULT_ACCENT,
+  accentContrastIssues,
+  accentPalette,
+  normalizeHex,
+} from '@core/theme/accent';
 import {
   ThemeService,
   FabComponent,
@@ -45,7 +50,10 @@ import {
   type LogoSlot,
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
-import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
+import {
+  type ContentLang,
+  ContentLangSwitchComponent,
+} from '@shared/ui/content-lang-switch/content-lang-switch.component';
 
 /** The language of the texts in the editor. */
 type TextLang = ContentLang;
@@ -74,11 +82,14 @@ export type BrandingSection = 'branding' | 'texts';
  * A link may carry `http:`, `https:` or `mailto:` only; another scheme blocks the save.
  * It works against `/api/admin/site-config`.
  */
+import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+
 @Component({
   selector: 'app-branding-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LoadStateComponent,
     SectionComponent,
     FilePickerComponent,
     FabComponent,
@@ -115,6 +126,11 @@ export class BrandingEditorComponent {
 
   /** The edited copy of the active branding. */
   protected readonly draft = signal<Branding | null>(null);
+  /** The read of the branding runs. */
+  protected readonly loading = signal(true);
+  /** The read of the branding failed. */
+  protected readonly loadFailed = signal(false);
+  protected readonly loadState = loadStateOf(this.loading, this.loadFailed);
   /** The count of local edits. `patch()` increments it. */
   private readonly editRev = signal(0);
   /** The edit count that the server has. A save, a load or an activate sets it. */
@@ -135,7 +151,9 @@ export class BrandingEditorComponent {
   /** The built-in accent: the placeholder of the colour field. */
   protected readonly defaultAccent = DEFAULT_ACCENT;
   /** The accent of the edited copy, or the built-in one. */
-  protected readonly accent = computed(() => normalizeHex(this.draft()?.accentColor) ?? DEFAULT_ACCENT);
+  protected readonly accent = computed(
+    () => normalizeHex(this.draft()?.accentColor) ?? DEFAULT_ACCENT,
+  );
   /** The edited copy carries an own accent. */
   protected readonly customAccent = computed(() => this.accent() !== DEFAULT_ACCENT);
   /**
@@ -154,12 +172,36 @@ export class BrandingEditorComponent {
 
   /** Load the active branding. */
   protected loadConfig(): void {
-    this.api.getSiteConfig().subscribe((cfg) => {
-      this.draft.set(cfg.branding);
-      this.markSaved(this.editRev());
-      this.brand.applyBranding(cfg.branding);
-      this.brand.previewAccent(undefined);
+    this.loading.set(true);
+    this.loadFailed.set(false);
+    this.api.getSiteConfig().subscribe({
+      next: (cfg) => {
+        this.draft.set(cfg.branding);
+        this.keepSaved(cfg.branding);
+        this.markSaved(this.editRev());
+        this.brand.applyBranding(cfg.branding);
+        this.brand.previewAccent(undefined);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.loadFailed.set(true);
+        this.loading.set(false);
+      },
     });
+  }
+
+  /** A copy of the branding as the server has it, for "Verwerfen". The editor changes the draft in place. */
+  private saved = 'null';
+
+  private keepSaved(branding: Branding): void {
+    this.saved = JSON.stringify(branding);
+  }
+
+  /** "Verwerfen": every field goes back to the stored value (§ 000635). */
+  protected discard(): void {
+    this.draft.set(JSON.parse(this.saved) as Branding);
+    this.markSaved(this.editRev());
+    this.brand.previewAccent(undefined);
   }
 
   /** Record that the server has the draft up to the edit count `rev`. */
@@ -232,7 +274,7 @@ export class BrandingEditorComponent {
   }
 
   /**
-   * The text map of the accessibility statement (`/barrierefreiheit`, spec 000495). The
+   * The text map of the accessibility statement (`/accessibility`, spec 000495). The
    * server fills a config without it with its built-in draft.
    */
   protected statementMap(d: Branding): I18nMap {
@@ -306,7 +348,12 @@ export class BrandingEditorComponent {
       this.patch((d) => {
         d.logos = {
           ...d.logos,
-          [slot]: { url: String(reader.result), filename: file.name, mime: file.type, size: file.size },
+          [slot]: {
+            url: String(reader.result),
+            filename: file.name,
+            mime: file.type,
+            size: file.size,
+          },
         };
       });
     };
@@ -377,7 +424,8 @@ export class BrandingEditorComponent {
     this.api.saveSiteConfig(d).subscribe({
       next: (cfg) => {
         this.saving.set(false);
-          this.markSaved(rev);
+        this.keepSaved(d);
+        this.markSaved(rev);
         this.brand.applyBranding(cfg.branding);
         this.brand.previewAccent(undefined);
         this.toast.success(this.i18n.translate('admin.common.saved'));

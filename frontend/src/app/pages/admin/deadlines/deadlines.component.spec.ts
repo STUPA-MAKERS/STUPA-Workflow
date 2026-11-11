@@ -1,3 +1,4 @@
+import { toastWith } from '../../../../testing/load-error';
 import { of } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -20,7 +21,7 @@ async function setup(api = makeApi()) {
   const view = await render(AdminDeadlinesComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: toast },
+      { provide: ToastService, useFactory: () => toastWith(toast) },
       { provide: AuthService, useValue: { can: () => true } },
     ],
   });
@@ -35,6 +36,24 @@ describe('AdminDeadlinesComponent', () => {
   it('shows the title and no floating button while nothing changed', async () => {
     await setup();
     expect(screen.getByRole('heading', { name: 'Fristen & Fenster' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
+  /** § 000635 */
+  it('"Verwerfen" sets the fields back and hides with "Speichern"', async () => {
+    const { api, fixture } = await setup();
+    const hours = screen.getByLabelText<HTMLInputElement>('Unbestätigte Anträge verwerfen nach');
+    const before = hours.value;
+    await userEvent.clear(hours);
+    await userEvent.type(hours, '48');
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(hours.value).toBe(before);
+    expect(api.putGuestSettings).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 

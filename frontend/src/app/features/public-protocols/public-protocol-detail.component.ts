@@ -23,7 +23,7 @@ import { pageItemTitle } from '../../layout/page-title.service';
 import { langAttr } from '@shared/forms/i18n-text';
 
 /**
- * One public protocol (`/protokolle/:id`, no login): the public version of a final
+ * One public protocol (`/protocols/:id`, no login): the public version of a final
  * protocol. The head names the gremium, the meeting and the dates; the agenda shows the
  * full text of each public item as rendered Markdown with its decisions. A vote callout
  * in the text shows as the same decision box as a decision outside it. A non-public
