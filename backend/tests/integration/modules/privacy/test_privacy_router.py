@@ -32,7 +32,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-import app.modules.applications.router as applications_router
+import app.modules.privacy.request_router as erasure_request_router
 import app.modules.privacy.router as privacy_router
 from app.db import get_session
 from app.deps import Principal, get_current_principal
@@ -105,7 +105,7 @@ def app(
         "notify_erasure_rejected",
     ):
         monkeypatch.setattr(privacy_router, name, _noop)
-    monkeypatch.setattr(applications_router, "notify_erasure_requested", _noop)
+    monkeypatch.setattr(erasure_request_router, "notify_erasure_requested", _noop)
 
     application = create_app(settings)
     application.dependency_overrides[get_settings] = lambda: settings
