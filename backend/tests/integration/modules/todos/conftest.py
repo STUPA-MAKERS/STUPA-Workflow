@@ -18,9 +18,9 @@ from sqlalchemy import Engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import get_current_principal
-from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.todos.boards import ensure_gremium_board
 from app.modules.todos.models import TodoBoard
 from app.modules.todos.router import get_todo_mail_sender

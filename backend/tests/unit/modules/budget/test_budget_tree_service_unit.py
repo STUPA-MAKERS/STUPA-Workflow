@@ -13,7 +13,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import (
@@ -31,6 +30,7 @@ from app.modules.budget.tree_schemas import (
     FiscalYearUpdate,
     MoveFiscalYearRequest,
 )
+from app.modules.gremien.models import Gremium
 from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests._support.auth_fakes import fake_session, result

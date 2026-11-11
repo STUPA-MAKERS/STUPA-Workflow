@@ -8,10 +8,10 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, or_, select
 
-from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.policy import expand, gremium_ids_with
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.keepers import keeper_summaries
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingGremiumOut, MeetingOut, MeetingPage

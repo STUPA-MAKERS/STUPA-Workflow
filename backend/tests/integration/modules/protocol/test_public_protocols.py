@@ -23,12 +23,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormVersion
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.models import (
     Meeting,
     MeetingAgendaItem,

@@ -24,12 +24,7 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import (
-    ApplicationType,
-    Gremium,
-    GremiumMembership,
-    GremiumRole,
-)
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.access import require_app_read
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
@@ -38,6 +33,7 @@ from app.modules.auth.principal import Principal
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.models import Meeting
 from app.modules.voting.models import Vote
 from app.shared.config_schemas import FormFieldDef

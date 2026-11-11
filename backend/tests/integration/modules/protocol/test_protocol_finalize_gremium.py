@@ -17,9 +17,9 @@ from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin.gremium_roles import GremiumRoleService
-from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.service import MeetingService
 from app.modules.protocol.models import Protocol

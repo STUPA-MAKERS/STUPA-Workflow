@@ -14,7 +14,7 @@ description: Outbound event webhooks — SSRF-guarded, HMAC-SHA256-signed HTTP P
 - `queue.py` — `WebhookQueue` Protocol + `ArqWebhookQueue`. `WEBHOOK_TASK_NAME="deliver_webhook"`, job id `webhook:<delivery_id>` (coalesces duplicate enqueues)
 - `action_dispatcher.py` — `WebhookActionDispatcher`: flow-engine `webhook` action handler → `dispatch_to_webhook`. Event `application.transition`. `flow.dispatch.build_worker_dispatcher` builds it for the API and the worker, so a vote close and an automatic transition also deliver.
 - `worker/webhook.py` (sibling, not in module dir) — arq task `deliver_webhook`. Maps `retry`→`arq.Retry`, no-redirect httpx client
-- Models live in `app/modules/admin/models.py`. Schemas live in `app/modules/admin/schemas.py`. The CRUD router lives in `app/modules/admin/router.py`
+- Models live in `app/modules/webhooks/models.py`. Schemas live in `app/modules/admin/schemas.py`. The CRUD router lives in `app/modules/admin/router.py`
 
 **Domain / data model:**
 - `Webhook` (table `webhook`): `name`, `url`, `events` (Text[] whitelist), `secret` (LargeBinary, server-generated `secrets.token_bytes(32)`, never returned/logged), `active`.

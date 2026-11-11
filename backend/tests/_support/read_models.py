@@ -26,12 +26,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.deps import get_current_applicant, get_current_principal
-from app.modules.admin.models import (
-    ApplicationType,
-    Gremium,
-    GremiumMembership,
-    GremiumRole,
-)
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
@@ -42,6 +37,7 @@ from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.shared.config_schemas import FormFieldDef
 from tests._support.guest_apps import build_api, guest_settings
 

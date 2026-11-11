@@ -19,8 +19,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.gremien.models import GremiumMembership, GremiumRole
 from app.modules.livevote.agenda_service import agenda_order
 from app.modules.livevote.models import MeetingAgendaItem, ProtocolKeeperPeriod
 from app.modules.livevote.schemas import KeeperPeriodOut

@@ -13,7 +13,7 @@ import pytest
 import respx
 from arq import Retry
 
-from app.modules.admin.models import Webhook, WebhookDelivery
+from app.modules.webhooks.models import Webhook, WebhookDelivery
 from app.settings import load_settings
 from tests._support.webhooks_fakes import FakeSession
 from worker.webhook import _sessionmaker, deliver_webhook, on_startup

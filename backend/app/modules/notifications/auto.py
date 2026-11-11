@@ -103,9 +103,9 @@ async def meeting_delegation_mail_info(
     instead: the access revoke takes the rights of a delegate, and the delegator
     then loses the representation.
     """
-    from app.modules.admin.models import Gremium
     from app.modules.auth.models import Principal
     from app.modules.delegations.models import MeetingDelegation
+    from app.modules.gremien.models import Gremium
     from app.modules.livevote.models import Meeting
 
     delegator = Principal.__table__.alias("delegator")
@@ -187,7 +187,7 @@ class AutoMailer:
     async def _meeting_created(
         self, settings: Settings, meeting_id: uuid.UUID, pool: object
     ) -> None:
-        from app.modules.admin.models import Gremium
+        from app.modules.gremien.models import Gremium
         from app.modules.livevote.models import Meeting
         from app.modules.notifications.recipients import RecipientResolver
 

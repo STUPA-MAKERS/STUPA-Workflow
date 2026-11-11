@@ -21,7 +21,7 @@ description: Meeting-bound vote and representation delegations (MeetingDelegatio
 **Domain / data model:**
 - `MeetingDelegation` (`meeting_delegation`): `meeting_id`, `gremium_id` (denormalized = `meeting.gremium_id`, avoids a join in the hot vote-cast path), `delegator_principal_id`, `delegate_principal_id`, `delegate_voting` (bool, transfers the vote), `via_pool` (bool, legitimated through the pool → no lead deadline), `created_by` (actor `sub`), `created_at`. Constraints: unique `(meeting_id, delegator)`. A partial unique `(meeting_id, delegate)` WHERE `delegate_voting` allows at most one received vote transfer per meeting.
 - `DelegationSubstitute` (`delegation_substitute`): `gremium_id`, `member_principal_id` (NULL = Gremium-wide substitute for *any* member), `substitute_principal_id`, `created_by`. Unique `(gremium, member, substitute)` + partial unique `(gremium, substitute)` WHERE `member IS NULL`.
-- Config gates live on **`Gremium`** (`admin/models.py`): `allow_vote_delegation`, `delegation_lead_minutes`, `delegation_allow_external`. `local_timezone` lives on **`Settings`**. No server setting switches the vote transfer.
+- Config gates live on **`Gremium`** (`gremien/models.py`): `allow_vote_delegation`, `delegation_lead_minutes`, `delegation_allow_external`. `local_timezone` lives on **`Settings`**. No server setting switches the vote transfer.
 - Audit actions (`audit/actions.py`): `DELEGATION_GRANT`, `DELEGATION_REVOKE`, `DELEGATION_USE`, `DELEGATION_SUBSTITUTE_ADD`, `DELEGATION_SUBSTITUTE_REMOVE`.
 
 **API surface:** (prefix `/api/delegations`)

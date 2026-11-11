@@ -17,7 +17,7 @@ from sqlalchemy import ColumnElement, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.membership_sync import sync_principal_memberships
-from app.modules.admin.models import ApplicationType
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import (
     Applicant,
     Application,

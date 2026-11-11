@@ -31,12 +31,7 @@ import pytest
 from sqlalchemy import Engine, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import (
-    ApplicationType,
-    Gremium,
-    GremiumMembership,
-    GremiumRole,
-)
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.access import resolve_app_read
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
@@ -53,6 +48,7 @@ from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.voting.schemas import VoteCreate

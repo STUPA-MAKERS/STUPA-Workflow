@@ -10,7 +10,7 @@ import httpx
 import pytest
 import respx
 
-from app.modules.admin.models import Webhook, WebhookDelivery
+from app.modules.webhooks.models import Webhook, WebhookDelivery
 from app.modules.webhooks.queue import WebhookQueue
 from app.modules.webhooks.service import WebhookService
 from app.settings import load_settings

@@ -101,9 +101,9 @@ async def notify_application_captured(
     account. The idempotency key holds only the application, so a retry or a second
     call for the same application coalesces into one mail.
     """
-    from app.modules.admin.models import Gremium
     from app.modules.applications.models import Applicant, Application
     from app.modules.auth import email_login
+    from app.modules.gremien.models import Gremium
 
     try:
         async with get_sessionmaker()() as session:

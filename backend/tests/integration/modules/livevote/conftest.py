@@ -24,10 +24,10 @@ import app.main as main_mod
 from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
-from app.modules.admin.models import Gremium
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.router import get_broker_rest

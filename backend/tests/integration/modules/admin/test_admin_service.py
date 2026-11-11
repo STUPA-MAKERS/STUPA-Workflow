@@ -19,14 +19,7 @@ from sqlalchemy import Engine, create_engine, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin.branding import Branding
-from app.modules.admin.models import (
-    ApplicationType,
-    Gremium,
-    GremiumMembership,
-    GremiumRole,
-    SiteConfigVersion,
-    Webhook,
-)
+from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
     ApplicationTypeUpdate,
@@ -41,9 +34,12 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
+from app.modules.application_types.models import ApplicationType
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal, Role, RoleAssignment
 from app.modules.flow.models import FlowVersion, State
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.webhooks.models import Webhook
 from app.shared.errors import ConflictError, NotFoundError
 
 pytestmark = pytest.mark.integration

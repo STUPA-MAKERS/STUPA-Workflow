@@ -10,7 +10,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.admin.models import ApplicationType
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import (
     Applicant,
     Application,

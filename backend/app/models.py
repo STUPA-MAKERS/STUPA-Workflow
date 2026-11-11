@@ -7,13 +7,8 @@ metadata is the single source for Alembic and for the tests.
 from __future__ import annotations
 
 from app.db import Base
-from app.modules.admin.models import (
-    ApplicationType,
-    Gremium,
-    SiteConfigVersion,
-    Webhook,
-    WebhookDelivery,
-)
+from app.modules.admin.models import SiteConfigVersion
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import (
     Applicant,
     Application,
@@ -52,6 +47,7 @@ from app.modules.delegations.models import (
 from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.models import (
     Meeting,
     MeetingAgendaItem,
@@ -84,6 +80,7 @@ from app.modules.todos.models import (
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
+from app.modules.webhooks.models import Webhook, WebhookDelivery
 
 __all__ = [
     "Applicant",

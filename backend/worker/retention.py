@@ -20,7 +20,7 @@ from sqlalchemy import CursorResult, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
-from app.modules.admin.models import ApplicationType
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Applicant, Application, MagicLink
 from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction

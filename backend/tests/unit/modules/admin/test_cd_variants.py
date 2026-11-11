@@ -32,7 +32,7 @@ from app.modules.admin.cd_logos import (
     sniff_cd_logo,
 )
 from app.modules.admin.cd_resolver import cd_variant_key_for_gremium, resolve_cd_variant_by_key
-from app.modules.admin.models import CdVariant, CdVariantLogo, Gremium
+from app.modules.admin.models import CdVariant, CdVariantLogo
 from app.modules.admin.schemas import (
     CdVariantCreate,
     CdVariantLogoReorder,
@@ -46,6 +46,7 @@ from app.modules.admin.service.cd_variants import CD_LOGO_PREFIX, CdVariantServi
 from app.modules.files import scanner as scanner_mod
 from app.modules.files.scanner import ScanVerdict
 from app.modules.files.storage import StorageError
+from app.modules.gremien.models import Gremium
 from app.settings import Settings, load_settings
 from app.shared.errors import (
     ConflictError,
