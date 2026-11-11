@@ -147,9 +147,13 @@
   text-align: start;
   cursor: pointer;
 }
-.cal__hit--active,
-.cal__hit:hover {
+.cal__hit--active {
   background: var(--color-surface-4);
+}
+@media (hover: hover) {
+  .cal__hit:hover {
+    background: var(--color-surface-4);
+  }
 }
 .cal__hit:focus-visible {
   outline: 2px solid var(--color-focus-ring);

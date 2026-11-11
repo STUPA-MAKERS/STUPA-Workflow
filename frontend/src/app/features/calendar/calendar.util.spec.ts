@@ -89,6 +89,11 @@ describe('calendar.util', () => {
       expect(kindKey('meeting')).toBe('calendar.kind.meeting');
       expect(entryIcon('event')).toBe(entryIcon('appointment'));
       expect(entryIcon('meeting')).toBe('users');
+      expect([filterKind('external'), kindKey('external'), entryIcon('external')]).toEqual([
+        'external',
+        'calendar.kind.external',
+        'globe',
+      ]);
     });
 
     /** § 000713: an entry without a Gremium shows only when no Gremium is picked. */
@@ -112,6 +117,7 @@ describe('calendar.util', () => {
       expect(entryLink(entry('c', { kind: 'card' }))).toEqual({ commands: ['/todos'], queryParams: { card: 'c' } });
       expect(entryLink(entry('e', { kind: 'event' }))).toEqual({ commands: ['/todos'], queryParams: { card: 'e' } });
       expect(entryLink(entry('a'))).toBeNull();
+      expect(entryLink(entry('x', { kind: 'external' }))).toBeNull();
     });
   });
 

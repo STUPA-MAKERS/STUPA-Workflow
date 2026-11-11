@@ -1,7 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { type AppointmentInput, CalendarApiService } from './calendar.service';
+import {
+  type AppointmentInput,
+  CalendarApiService,
+  type ExternalCalendarInput,
+  ExternalCalendarsApiService,
+} from './calendar.service';
 
 const BODY: AppointmentInput = {
   title: 'Klausur',
@@ -72,5 +77,33 @@ describe('CalendarApiService', () => {
     expect(answer.request.body).toEqual({ answer: 'tentative' });
     api.remove('a-1').subscribe();
     expect(http.expectOne('/api/calendar/appointments/a-1').request.method).toBe('DELETE');
+  });
+
+  it('reads an entry of an external calendar', () => {
+    api.externalEntry('x-1').subscribe();
+    expect(http.expectOne('/api/calendar/external/x-1').request.method).toBe('GET');
+  });
+
+  /** § 000729: the routes of the admin page. */
+  it('lists, creates, changes, fetches and deletes an external calendar', () => {
+    const admin = TestBed.inject(ExternalCalendarsApiService);
+    const body: ExternalCalendarInput = {
+      name: 'Hochschule',
+      url: 'https://example.org/a.ics',
+      gremiumId: null,
+      intervalMinutes: 60,
+    };
+    admin.list().subscribe();
+    expect(http.expectOne('/api/admin/calendars').request.method).toBe('GET');
+    admin.create(body).subscribe();
+    const create = http.expectOne('/api/admin/calendars');
+    expect([create.request.method, create.request.body]).toEqual(['POST', body]);
+    admin.update('c-1', body).subscribe();
+    const update = http.expectOne('/api/admin/calendars/c-1');
+    expect([update.request.method, update.request.body]).toEqual(['PUT', body]);
+    admin.fetchNow('c-1').subscribe();
+    expect(http.expectOne('/api/admin/calendars/c-1/fetch').request.method).toBe('POST');
+    admin.remove('c-1').subscribe();
+    expect(http.expectOne('/api/admin/calendars/c-1').request.method).toBe('DELETE');
   });
 });

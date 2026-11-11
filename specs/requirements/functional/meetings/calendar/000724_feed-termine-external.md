@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - backend/app/modules/calendar/ics.py
+  - backend/app/modules/calendar/service.py
 scope:
   - backend/app/modules/calendar
 ---

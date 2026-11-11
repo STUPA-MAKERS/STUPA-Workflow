@@ -5,8 +5,8 @@ import { dayMonth, isoDay, shortTime, weekdayDate } from '@shared/date-format';
 import type { CalendarDay } from './calendar-grid.util';
 
 /** The kinds of the filter "Art". An Event counts to the Termine (§ 000737). */
-export type FilterKind = 'meeting' | 'card' | 'appointment';
-export const FILTER_KINDS: readonly FilterKind[] = ['meeting', 'card', 'appointment'];
+export type FilterKind = 'meeting' | 'card' | 'appointment' | 'external';
+export const FILTER_KINDS: readonly FilterKind[] = ['meeting', 'card', 'appointment', 'external'];
 
 /** The two views of the desktop Kalender. */
 export type CalendarView = 'week' | 'month';
@@ -42,6 +42,7 @@ const ICONS: Readonly<Record<EntryKind, IconName>> = {
   card: 'circleok',
   event: 'cal',
   appointment: 'cal',
+  external: 'globe',
 };
 
 /** The icon of the kind of an entry. */
@@ -49,7 +50,7 @@ export function entryIcon(kind: EntryKind): IconName {
   return ICONS[kind];
 }
 
-/** The text key of the kind of an entry ("Sitzung", "Karte", "Termin"). */
+/** The text key of the kind of an entry ("Sitzung", "Karte", "Termin", "Extern"). */
 export function kindKey(kind: EntryKind): TranslationKey {
   return `calendar.kind.${filterKind(kind)}`;
 }
@@ -248,7 +249,7 @@ export function mergeEntries(
   );
 }
 
-/** The route that an entry opens, or null for a Termin (it opens in a dialog). */
+/** The route that an entry opens, or null for a Termin and an external entry (a dialog). */
 export function entryLink(
   e: CalendarEntry,
 ): { readonly commands: readonly string[]; readonly queryParams?: Readonly<Record<string, string>> } | null {
@@ -259,6 +260,7 @@ export function entryLink(
     case 'event':
       return { commands: ['/todos'], queryParams: { card: e.id } };
     case 'appointment':
+    case 'external':
       return null;
   }
 }

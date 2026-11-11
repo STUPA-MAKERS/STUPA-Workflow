@@ -1,9 +1,11 @@
 /**
- * API of the Kalender (`/api/calendar`): the entries of the page, the search, and the
- * Termine with their invitations and answers.
+ * API of the Kalender (`/api/calendar`): the entries of the page, the search, the
+ * Termine with their invitations and answers, and the entries of the external calendars.
+ * `ExternalCalendarsApiService` is the API of the admin page (`/api/admin/calendars`).
  *
  * The server reads each kind of entry under the rule of its own module, and a Termin
- * that the caller does not read answers 404. The client only binds the data.
+ * or an external entry that the caller does not read answers 404. The client only binds
+ * the data.
  */
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
@@ -14,7 +16,7 @@ import { skipLoading } from '@stupa-makers/ui-kit';
 import { httpParams } from './http-params';
 
 /** The kinds of entries on the wire. The page counts an Event to the Termine. */
-export type EntryKind = 'meeting' | 'card' | 'event' | 'appointment';
+export type EntryKind = 'meeting' | 'card' | 'event' | 'appointment' | 'external';
 
 /** The answers of an invited person, in the order of the answer control. */
 export type AnswerKey = 'accept' | 'tentative' | 'decline';
@@ -30,7 +32,10 @@ export interface CalendarEntry {
   readonly startTime: string | null;
   readonly endTime: string | null;
   readonly place: string | null;
-  /** The Gremium of a meeting, the board of a card, the first invited Gremium of a Termin. */
+  /**
+   * The Gremium of a meeting, the board of a card, the first invited Gremium of a Termin,
+   * the name of an external calendar.
+   */
   readonly source: string | null;
   readonly gremiumIds: readonly Uuid[];
   /** A card assigned to the caller, a Termin that the caller created or is invited to. */
@@ -88,6 +93,46 @@ export interface AppointmentInput {
   readonly principalIds: readonly Uuid[];
 }
 
+/** An entry of an external calendar with the name of its calendar. Read-only. */
+export interface ExternalEntry {
+  readonly id: Uuid;
+  readonly title: string;
+  readonly startsOn: string;
+  readonly endsOn: string;
+  readonly startTime: string | null;
+  readonly endTime: string | null;
+  readonly place: string | null;
+  readonly description: string | null;
+  readonly calendar: string;
+}
+
+/** The fetch intervals of an external calendar in minutes. */
+export const FETCH_INTERVALS = [15, 60, 360, 1440] as const;
+export type FetchInterval = (typeof FETCH_INTERVALS)[number];
+
+/** An external calendar with the state of its newest fetch, for the admin page. */
+export interface ExternalCalendar {
+  readonly id: Uuid;
+  readonly name: string;
+  readonly url: string;
+  /** Null: the calendar is for all persons. */
+  readonly gremiumId: Uuid | null;
+  readonly gremiumName: string | null;
+  readonly intervalMinutes: FetchInterval;
+  readonly lastAttemptAt: string | null;
+  readonly lastSuccessAt: string | null;
+  /** The cause code of the newest failed fetch, null after a success. */
+  readonly lastError: string | null;
+  readonly entryCount: number;
+}
+
+export interface ExternalCalendarInput {
+  readonly name: string;
+  readonly url: string;
+  readonly gremiumId: Uuid | null;
+  readonly intervalMinutes: FetchInterval;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CalendarApiService {
   private readonly http = inject(HttpClient);
@@ -140,4 +185,36 @@ export class CalendarApiService {
   answer(id: Uuid, answer: AnswerKey): Observable<Appointment> {
     return this.http.put<Appointment>(`${this.base}/appointments/${id}/answer`, { answer });
   }
+  externalEntry(id: Uuid): Observable<ExternalEntry> {
+    return this.http.get<ExternalEntry>(`${this.base}/external/${id}`);
+  }
 }
+
+/** The external calendars of the admin page. Every route needs `admin.calendars`. */
+@Injectable({ providedIn: 'root' })
+export class ExternalCalendarsApiService {
+  private readonly http = inject(HttpClient);
+  private readonly base = `${inject(API_BASE_URL)}/admin/calendars`;
+
+  list(): Observable<readonly ExternalCalendar[]> {
+    return this.http.get<readonly ExternalCalendar[]>(this.base);
+  }
+
+  create(body: ExternalCalendarInput): Observable<ExternalCalendar> {
+    return this.http.post<ExternalCalendar>(this.base, body);
+  }
+
+  update(id: Uuid, body: ExternalCalendarInput): Observable<ExternalCalendar> {
+    return this.http.put<ExternalCalendar>(`${this.base}/${id}`, body);
+  }
+
+  remove(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${id}`);
+  }
+
+  /** Make the calendar due at once. The worker fetches it within a minute. */
+  fetchNow(id: Uuid): Observable<ExternalCalendar> {
+    return this.http.post<ExternalCalendar>(`${this.base}/${id}/fetch`, null);
+  }
+}
+

@@ -216,6 +216,36 @@ describe('CalendarComponent (desktop)', () => {
     expect(view.router.url).toBe('/calendar');
   });
 
+  /** § 000714: an external entry opens read-only, with the name of its calendar. */
+  it('opens an external entry in a read-only dialog', async () => {
+    const view = await setup();
+    const extern = calendarEntry('x-1', { kind: 'external', title: 'Senatssitzung', source: 'Senatstermine' });
+    load(view, [...MONTH, extern]);
+    await userEvent.click(within(panel()).getByRole('button', { name: /Senatssitzung/ }));
+    view.http.expectOne('/api/calendar/external/x-1').flush({
+      id: 'x-1',
+      title: 'Senatssitzung',
+      startsOn: '2026-11-11',
+      endsOn: '2026-11-11',
+      startTime: '14:00:00',
+      endTime: '17:00:00',
+      place: 'Raum 113',
+      description: 'Öffentlicher Teil',
+      calendar: 'Senatstermine',
+    });
+    view.fixture.detectChanges();
+    const dialog = await screen.findByRole('dialog', { name: 'Senatssitzung' });
+    expect(within(dialog).getByText('Mi, 11.11.2026 · 14:00 – 17:00')).toBeInTheDocument();
+    expect(within(dialog).getByText('Raum 113')).toBeInTheDocument();
+    expect(within(dialog).getByText('Senatstermine')).toBeInTheDocument();
+    expect(within(dialog).getByText('Öffentlicher Teil')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(within(dialog).queryByRole('radio')).toBeNull();
+    view.cmp.openEntry(extern);
+    view.http.expectOne('/api/calendar/external/x-1').flush(null, { status: 404, statusText: 'Not Found' });
+    expect(errorToasts()).toEqual(['Der Eintrag ließ sich nicht laden.']);
+  });
+
   it('reports a Termin that cannot be read', async () => {
     const view = await setup();
     load(view);
@@ -315,7 +345,7 @@ describe('CalendarComponent (desktop)', () => {
   it('filters by kind in the browser and asks the server for "Nur meine"', async () => {
     const view = await setup();
     load(view);
-    expect(view.cmp.kindOptions().map((o) => o.label)).toEqual(['Sitzung', 'Karte', 'Termin']);
+    expect(view.cmp.kindOptions().map((o) => o.label)).toEqual(['Sitzung', 'Karte', 'Termin', 'Extern']);
     expect(view.cmp.mineOptions().map((o) => o.label)).toEqual(['Alle Einträge', 'Nur meine']);
     view.cmp.kinds.set(['card']);
     view.fixture.detectChanges();

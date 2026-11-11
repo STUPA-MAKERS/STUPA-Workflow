@@ -4,7 +4,15 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { isoDay } from '@shared/date-format';
 import { USE_MOCK_API } from './api.config';
-import type { Appointment, AppointmentInput, CalendarEntry, CalendarPerson } from './calendar.service';
+import type {
+  Appointment,
+  AppointmentInput,
+  CalendarEntry,
+  CalendarPerson,
+  ExternalCalendar,
+  ExternalCalendarInput,
+  ExternalEntry,
+} from './calendar.service';
 import { mockApiInterceptor } from './mock-api.interceptor';
 import { mockCalendar, resetMockCalendar } from './mock-calendar';
 
@@ -37,9 +45,9 @@ describe('mockCalendar (demo data)', () => {
     expect(entries({})).toEqual([]);
     const all = entries({ from: '2000-01-01', to: '2999-01-01' });
     const mine = entries({ from: '2000-01-01', to: '2999-01-01', mine: 'true' });
-    expect(new Set(all.map((e) => e.kind))).toEqual(new Set(['meeting', 'card', 'event', 'appointment']));
+    expect(new Set(all.map((e) => e.kind))).toEqual(new Set(['meeting', 'card', 'event', 'appointment', 'external']));
     expect(mine.length).toBeLessThan(all.length);
-    expect(mine.every((e) => e.kind === 'meeting' || e.mine)).toBe(true);
+    expect(mine.every((e) => e.kind === 'meeting' || e.kind === 'external' || e.mine)).toBe(true);
   });
 
   it('searches the titles and the people from two characters on', () => {
@@ -49,7 +57,7 @@ describe('mockCalendar (demo data)', () => {
       }).items;
     expect(search('s')).toEqual([]);
     expect(search()).toEqual([]);
-    expect(search('SITZUNG').map((e) => e.kind)).toEqual(['meeting', 'meeting']);
+    expect(search('SITZUNG').map((e) => e.kind)).toEqual(['meeting', 'external', 'meeting']);
     const people = (q?: string) =>
       mockCalendar('GET', '/api/calendar/people', q === undefined ? NONE : params({ q }), null)!.body as CalendarPerson[];
     expect(people('j')).toEqual([]);
@@ -94,6 +102,51 @@ describe('mockCalendar (demo data)', () => {
     expect(after.answers).toEqual(before.answers);
   });
 
+  it('reads an external entry with the name of its calendar', () => {
+    const all = entries({ from: '2000-01-01', to: '2999-01-01' });
+    const senat = all.find((e) => e.kind === 'external' && e.title === 'Senatssitzung')!;
+    expect([senat.source, senat.gremiumIds.length]).toEqual(['Senatstermine', 1]);
+    const detail = mockCalendar('GET', `/api/calendar/external/${senat.id}`, NONE, null)!.body as ExternalEntry;
+    expect([detail.calendar, detail.place]).toEqual(['Senatstermine', 'Gebäude 3, Raum 113']);
+    expect(mockCalendar('GET', '/api/calendar/external/none', NONE, null)).toBeNull();
+    expect(all.find((e) => e.title === 'Vorlesungsfreie Zeit')?.gremiumIds).toEqual([]);
+  });
+
+  it('lists, creates, changes, fetches and deletes an external calendar', () => {
+    const base = '/api/admin/calendars';
+    const list = () => mockCalendar('GET', base, NONE, null)!.body as ExternalCalendar[];
+    expect(list().map((c) => c.lastError)).toEqual([null, null, 'timeout']);
+    const body: ExternalCalendarInput = {
+      name: ' Neu ',
+      url: 'https://example.org/a.ics',
+      gremiumId: 'g0000000-0000-0000-0000-000000000001',
+      intervalMinutes: 360,
+    };
+    const made = mockCalendar('POST', base, NONE, body)!;
+    const fresh = made.body as ExternalCalendar;
+    expect(made.status).toBe(201);
+    expect([fresh.name, fresh.gremiumName, fresh.lastAttemptAt, fresh.entryCount]).toEqual([
+      'Neu',
+      'Studierendenparlament',
+      null,
+      0,
+    ]);
+    const failed = list()[2];
+    const fetched = mockCalendar('POST', `${base}/${failed.id}/fetch`, NONE, null)!.body as ExternalCalendar;
+    expect([fetched.lastError, fetched.entryCount]).toEqual([null, 17]);
+    const changed = mockCalendar('PUT', `${base}/${failed.id}`, NONE, { ...body, gremiumId: null })!
+      .body as ExternalCalendar;
+    expect([changed.gremiumName, changed.entryCount, changed.intervalMinutes]).toEqual([null, 17, 360]);
+    expect(mockCalendar('DELETE', `${base}/${failed.id}`, NONE, null)!.status).toBe(204);
+    expect(list().map((c) => c.name)).toEqual(['Hochschulkalender', 'Senatstermine', 'Neu']);
+    expect(mockCalendar('DELETE', base, NONE, null)).toBeNull();
+    expect(mockCalendar('GET', `${base}/none`, NONE, null)).toBeNull();
+    expect(mockCalendar('GET', `${base}/${fresh.id}`, NONE, null)).toBeNull();
+    expect(mockCalendar('GET', `${base}/${fresh.id}/fetch`, NONE, null)).toBeNull();
+    resetMockCalendar();
+    expect(list().length).toBe(3);
+  });
+
   it('does not know other paths and methods', () => {
     const path = '/api/calendar/appointments/a0000000-0000-0000-0000-000000000001';
     expect(mockCalendar('GET', '/api/calendar/other', NONE, null)).toBeNull();
@@ -132,5 +185,7 @@ describe('mockApiInterceptor (Kalender)', () => {
     );
     expect(page.items.length).toBe(3);
     await expect(firstValueFrom(http.get('/api/calendar/appointments/none'))).rejects.toMatchObject({ status: 404 });
+    const calendars = await firstValueFrom(http.get<ExternalCalendar[]>('/api/admin/calendars'));
+    expect(calendars.length).toBe(3);
   });
 });

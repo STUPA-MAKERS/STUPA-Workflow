@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - backend/app/modules/calendar/entries.py
+  - frontend/src/app/features/calendar/calendar.util.ts
 scope:
   - backend/app/modules/calendar
   - frontend/src/app/features

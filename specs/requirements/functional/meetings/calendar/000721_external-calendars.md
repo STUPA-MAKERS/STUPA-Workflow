@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - backend/app/modules/calendar/models.py
+  - backend/app/modules/calendar/external.py
+  - frontend/src/app/pages/admin/calendars/calendars.component.ts
 scope:
   - backend/app/modules/calendar
   - frontend/src/app/pages/admin

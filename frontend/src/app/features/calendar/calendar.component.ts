@@ -24,6 +24,7 @@ import {
   CalendarApiService,
   type CalendarEntry,
   type CalendarGremium,
+  type ExternalEntry,
 } from '@core/api/calendar.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -56,6 +57,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../meetings/calendar-subscribe/calendar-subscribe.component';
 import { AppointmentDetailComponent } from './appointment-detail/appointment-detail.component';
+import { ExternalEntryComponent } from './external-entry/external-entry.component';
 import { AppointmentDialogComponent } from './appointment-dialog/appointment-dialog.component';
 import {
   CALENDAR_NOW,
@@ -127,6 +129,7 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
     CalendarSubscribeComponent,
     CalendarWeekComponent,
     EmptyStateComponent,
+    ExternalEntryComponent,
     FabComponent,
     FilterSelectComponent,
     IconComponent,
@@ -257,6 +260,9 @@ export class CalendarComponent implements OnDestroy {
   /** The Termin of the detail dialog. */
   readonly detail = signal<Appointment | null>(null);
   readonly detailOpen = signal(false);
+  /** The external entry of the read-only dialog. */
+  readonly external = signal<ExternalEntry | null>(null);
+  readonly externalOpen = signal(false);
   /** The Termin of the form dialog, or null for a new one. */
   readonly editing = signal<Appointment | null>(null);
   readonly formOpen = signal(false);
@@ -415,10 +421,11 @@ export class CalendarComponent implements OnDestroy {
     this.selectDay(e.startsOn);
   }
 
-  /** A meeting and a card open their own page, a Termin opens in the dialog. */
+  /** A meeting and a card open their own page, a Termin and an external entry a dialog. */
   openEntry(e: CalendarEntry): void {
     const link = entryLink(e);
     if (link) void this.router.navigate([...link.commands], { queryParams: link.queryParams });
+    else if (e.kind === 'external') this.openExternal(e.id);
     else this.openAppointment(e.id);
   }
 
@@ -509,6 +516,16 @@ export class CalendarComponent implements OnDestroy {
     this.hits.set([]);
     this.activeHit.set(0);
     this.searched.set(false);
+  }
+
+  private openExternal(id: string): void {
+    this.api.externalEntry(id).subscribe({
+      next: (entry) => {
+        this.external.set(entry);
+        this.externalOpen.set(true);
+      },
+      error: () => this.toast.error(this.i18n.translate('calendar.external.loadFailed')),
+    });
   }
 
   private openAppointment(id: string): void {

@@ -108,6 +108,7 @@ const MOCK_PRINCIPAL: Principal = {
     'form.configure',
     'flow.configure',
     'webhook.manage',
+    'admin.calendars',
     'admin.users',
     'admin.users.merge',
     'admin.users.revoke_groups',
@@ -1639,8 +1640,9 @@ export function mockMediaImage(body: unknown): MediaImage {
 const MOCK_ACCOUNT_PATH =
   /(^|\/)api\/(notifications\/preferences|oauth\/grants(\/[^/]+)?|oauth\/consent(-request)?|mcp\/(config|package))$/;
 
-/** The routes of the Kalender page (`mock-calendar.ts`). */
-const MOCK_CALENDAR_PATH = /(^|\/)api\/calendar\/(entries|search|people|appointments(\/[^/]+(\/answer)?)?)$/;
+/** The routes of the Kalender page and of the admin page `Kalender` (`mock-calendar.ts`). */
+const MOCK_CALENDAR_PATH =
+  /(^|\/)api\/(calendar\/(entries|search|people|external\/[^/]+|appointments(\/[^/]+(\/answer)?)?)|admin\/calendars(\/[^/]+(\/fetch)?)?)$/;
 
 /** The routes of the public meeting: the guest side and the lead side. */
 const PUBLIC_MEETING_PATH =

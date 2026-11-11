@@ -57,3 +57,13 @@ description: Backend calendar module. It serves the entries of the Kalender page
 - The feed holds every readable Termin (`service.feed_appointments`). An invited owner is the `ATTENDEE` with the answer as `PARTSTAT`.
 
 **Related:** be-livevote, be-admin, be-auth, be-todos, be-notifications, be-privacy
+
+## External calendars (specs 000721-000724, 000729)
+
+- Tables `calendar_external` (`ExternalCalendar`: name, url, `gremium_id` or NULL for all, `interval_minutes` of `FETCH_INTERVALS`, `due_at`, `last_attempt_at`, `last_success_at`, `last_error`) and `calendar_external_entry` (`ExternalEntry`, deleted with its calendar).
+- `external.py` `ExternalCalendarService`: the admin writes, `due`/`refresh` of the worker and the reads (`between`, `matching`, `readable`, `entry`). An entry of a calendar for all is readable by each signed-in person; an entry of a Gremium calendar follows `MeetingRules.meeting_read_scope`.
+- The API never fetches, because a request must not wait on a foreign host. A create, a new address and `POST /admin/calendars/{id}/fetch` set `due_at` to now; `worker/calendars.py` `fetch_external_calendars` (cron, each minute) fetches at most `BATCH` due calendars, each in its own transaction with a row lock.
+- `external_fetch.py` `HttpFeedFetcher`: https only, the SSRF guard (`app/shared/ssrf.py`) on every hop, at most 3 redirects, 10 s, 2 MB. A failure is a code (`blocked`, `timeout`, `unreachable`, `status`, `size`, `redirect`, `format`) in `last_error`, and the entries of the last good fetch stay.
+- `external_feed.py` `parse_feed`: only title, start, end, place and description, as plain text (`plain`), never an organiser or an attendee. Times are local Berlin values. A series is expanded 12 months back and 24 ahead (`MAX_SERIES`, `MAX_ENTRIES`).
+- Routes: `GET /api/calendar/external/{entry_id}`; `/api/admin/calendars` GET/POST, `/{id}` PUT/DELETE, `/{id}/fetch` POST, all behind `admin.calendars`. `entries.py` adds the kind `external` to the span and the search, and the personal feed holds the readable entries (`service.feed_external`, `ics.ExternalEvent`).
+

@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - backend/app/modules/calendar/external_fetch.py
+  - backend/app/modules/calendar/external_feed.py
+  - backend/worker/calendars.py
 scope:
   - backend/app/modules/calendar
   - backend/worker

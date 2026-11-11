@@ -34,6 +34,7 @@ export const ADMIN_AREA_PERMISSIONS = [
   'admin.notifications',
   'privacy.manage',
   'webhook.manage',
+  'admin.calendars',
   'ticket.manage',
   'audit.read',
   'backup.manage',

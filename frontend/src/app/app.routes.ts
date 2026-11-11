@@ -525,6 +525,15 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'calendars',
+            data: { title: 'admin.calendars.title', permission: 'admin.calendars', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/calendars/calendars.component').then(
+                (m) => m.AdminCalendarsComponent,
+              ),
+          },
+          {
             path: 'webhooks',
             data: { title: 'admin.webhook.title', permission: 'webhook.manage', parent: ['admin'] },
             canActivate: [authGuard],

@@ -58,6 +58,7 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'oauth-grants', title: 'admin.nav.oauthGrants', desc: 'admin.nav.oauthGrantsDesc', icon: 'handshake', group: 'people', permissions: ['admin.users'] },
   { link: 'committees', title: 'admin.nav.gremien', desc: 'admin.nav.gremienDesc', icon: 'landmark', group: 'gremien', permissions: ['admin.gremien'] },
   { link: 'delegations', title: 'admin.nav.delegations', desc: 'admin.nav.delegationsDesc', icon: 'repeat', group: 'gremien', permissions: ['admin.delegations'] },
+  { link: 'calendars', title: 'admin.nav.calendars', desc: 'admin.nav.calendarsDesc', icon: 'cal', group: 'gremien', permissions: ['admin.calendars'] },
   { link: 'forms', title: 'admin.nav.forms', desc: 'admin.nav.formsDesc', icon: 'form', group: 'applications', permissions: ['form.configure'] },
   { link: 'flow', title: 'admin.nav.flow', desc: 'admin.nav.flowDesc', icon: 'flow', group: 'applications', permissions: ['flow.configure', 'admin.types'] },
   { link: 'deadlines', title: 'admin.nav.deadlines', desc: 'admin.nav.deadlinesDesc', icon: 'clock', group: 'applications', permissions: ['admin.deadlines'] },

@@ -340,6 +340,7 @@
   (answered)="onAnswered($event)"
   (removed)="onRemoved($event)"
 />
+<app-external-entry [open]="externalOpen()" [entry]="external()" (closed)="externalOpen.set(false)" />
 <app-appointment-dialog
   [open]="formOpen()"
   [appointment]="editing()"

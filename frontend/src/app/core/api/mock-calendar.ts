@@ -1,7 +1,7 @@
 /**
  * Demo data of the Kalender for the mock API (dev builds only): meetings, due cards, an
- * Event and Termine around today, the search, the person search and the Termine with
- * their answers. The interceptor loads this module on first use, so it stays out of the
+ * Event, Termine and external entries around today, the search, the person search, the
+ * Termine with their answers, and the external calendars of the admin page. The interceptor loads this module on first use, so it stays out of the
  * initial bundle.
  */
 import { signal } from '@angular/core';
@@ -13,6 +13,9 @@ import type {
   CalendarEntry,
   CalendarGremium,
   CalendarPerson,
+  ExternalCalendar,
+  ExternalCalendarInput,
+  ExternalEntry,
 } from './calendar.service';
 
 /** The answer of a mock route: the status and the body. */
@@ -158,8 +161,154 @@ function fixed(): readonly CalendarEntry[] {
   ];
 }
 
+/** The time `minutes` before now as an ISO instant. */
+function ago(minutes: number): string {
+  return new Date(Date.now() - minutes * 60_000).toISOString();
+}
+
+function initialCalendars(): readonly ExternalCalendar[] {
+  return [
+    {
+      id: 'c0000000-0000-0000-0000-000000000001',
+      name: 'Hochschulkalender',
+      url: 'https://www.reutlingen-university.de/termine/semester.ics',
+      gremiumId: null,
+      gremiumName: null,
+      intervalMinutes: 1440,
+      lastAttemptAt: ago(55),
+      lastSuccessAt: ago(55),
+      lastError: null,
+      entryCount: 42,
+    },
+    {
+      id: 'c0000000-0000-0000-0000-000000000002',
+      name: 'Senatstermine',
+      url: 'https://cloud.example.org/remote.php/dav/public-calendars/k3Qz/?export',
+      gremiumId: STUPA.id,
+      gremiumName: STUPA.name,
+      intervalMinutes: 60,
+      lastAttemptAt: ago(12),
+      lastSuccessAt: ago(12),
+      lastError: null,
+      entryCount: 9,
+    },
+    {
+      id: 'c0000000-0000-0000-0000-000000000003',
+      name: 'Raumbelegung AStA-Büro',
+      url: 'https://raum.example.org/asta/belegung.ics',
+      gremiumId: HHA.id,
+      gremiumName: HHA.name,
+      intervalMinutes: 15,
+      lastAttemptAt: ago(4),
+      lastSuccessAt: ago(60 * 53),
+      lastError: 'timeout',
+      entryCount: 17,
+    },
+  ];
+}
+
+const calendars = signal(initialCalendars());
+
+/** The external entries of the demo: the dialog reads the description from here. */
+function externalEntries(): readonly ExternalEntry[] {
+  const entry = (
+    n: number,
+    title: string,
+    from: number,
+    to: number,
+    times: readonly [string, string] | null,
+    calendar: string,
+    place: string | null,
+    description: string | null,
+  ): ExternalEntry => ({
+    id: `x0000000-0000-0000-0000-00000000000${n}`,
+    title,
+    startsOn: day(from),
+    endsOn: day(to),
+    startTime: times ? `${times[0]}:00` : null,
+    endTime: times ? `${times[1]}:00` : null,
+    place,
+    description,
+    calendar,
+  });
+  return [
+    entry(1, 'Senatssitzung', 5, 5, ['14:00', '17:00'], 'Senatstermine', 'Gebäude 3, Raum 113', 'Öffentlicher Teil ab 14:00 Uhr.\n\nTagesordnung im Intranet.'),
+    entry(2, 'Vorlesungsfreie Zeit', 20, 24, null, 'Hochschulkalender', null, null),
+    entry(3, 'Rückmeldefrist', -3, -3, null, 'Hochschulkalender', null, 'Frist für die Rückmeldung zum Sommersemester.'),
+  ];
+}
+
+function externalEntryOf(e: ExternalEntry): CalendarEntry {
+  return {
+    kind: 'external',
+    id: e.id,
+    title: e.title,
+    startsOn: e.startsOn,
+    endsOn: e.endsOn,
+    startTime: e.startTime,
+    endTime: e.endTime,
+    place: e.place,
+    source: e.calendar,
+    gremiumIds: e.calendar === 'Senatstermine' ? [STUPA.id] : [],
+    mine: false,
+    myAnswer: null,
+  };
+}
+
+function calendarFrom(id: string, body: ExternalCalendarInput, before: ExternalCalendar | null): ExternalCalendar {
+  return {
+    id,
+    name: body.name.trim(),
+    url: body.url,
+    gremiumId: body.gremiumId,
+    gremiumName: GREMIEN.find((g) => g.id === body.gremiumId)?.name ?? null,
+    intervalMinutes: body.intervalMinutes,
+    lastAttemptAt: before?.lastAttemptAt ?? null,
+    lastSuccessAt: before?.lastSuccessAt ?? null,
+    lastError: before?.lastError ?? null,
+    entryCount: before?.entryCount ?? 0,
+  };
+}
+
+/** Answer a route of the admin page `Kalender`, or null for an unknown path. */
+function mockExternalCalendars(method: string, tail: string, body: unknown): MockCalendarReply | null {
+  if (tail === '') {
+    if (method === 'GET') return { status: 200, body: calendars() };
+    if (method !== 'POST') return null;
+    created.update((n) => n + 1);
+    const fresh = calendarFrom(
+      `c0000000-0000-0000-0000-0000000001${String(created()).padStart(2, '0')}`,
+      body as ExternalCalendarInput,
+      null,
+    );
+    calendars.update((list) => [...list, fresh]);
+    return { status: 201, body: fresh };
+  }
+  const match = /^\/([^/]+)(\/fetch)?$/.exec(tail);
+  const current = match ? calendars().find((c) => c.id === match[1]) : undefined;
+  if (!match || !current) return null;
+  if (match[2]) {
+    if (method !== 'POST') return null;
+    const next = { ...current, lastAttemptAt: ago(0), lastSuccessAt: ago(0), lastError: null };
+    calendars.update((list) => list.map((c) => (c.id === next.id ? next : c)));
+    return { status: 200, body: next };
+  }
+  switch (method) {
+    case 'PUT': {
+      const next = calendarFrom(current.id, body as ExternalCalendarInput, current);
+      calendars.update((list) => list.map((c) => (c.id === next.id ? next : c)));
+      return { status: 200, body: next };
+    }
+    case 'DELETE':
+      calendars.update((list) => list.filter((c) => c.id !== current.id));
+      return { status: 204, body: null };
+    default:
+      return null;
+  }
+}
+
 function all(): readonly CalendarEntry[] {
-  return [...fixed(), ...appointments().map(entryOf)].sort(
+  return [...fixed(), ...appointments().map(entryOf), ...externalEntries().map(externalEntryOf)].sort(
     (a, b) => a.startsOn.localeCompare(b.startsOn) || (a.startTime ?? '').localeCompare(b.startTime ?? ''),
   );
 }
@@ -210,12 +359,18 @@ export function mockCalendar(
   params: { get(name: string): string | null },
   body: unknown,
 ): MockCalendarReply | null {
+  const admin = path.split('/admin/calendars')[1];
+  if (admin !== undefined) return mockExternalCalendars(method, admin, body);
   const tail = path.split('/calendar/')[1] ?? '';
+  if (method === 'GET' && tail.startsWith('external/')) {
+    const found = externalEntries().find((e) => e.id === tail.slice('external/'.length));
+    return found ? { status: 200, body: found } : null;
+  }
   if (method === 'GET' && tail === 'entries') {
     const from = params.get('from') ?? '';
     const to = params.get('to') ?? '';
     const mine = params.get('mine') === 'true';
-    const items = all().filter((e) => e.startsOn <= to && e.endsOn >= from && (!mine || e.kind === 'meeting' || e.mine));
+    const items = all().filter((e) => e.startsOn <= to && e.endsOn >= from && (!mine || e.kind === 'meeting' || e.kind === 'external' || e.mine));
     return { status: 200, body: { items } };
   }
   if (method === 'GET' && tail === 'search') {
@@ -261,5 +416,6 @@ export function mockCalendar(
 /** Put the demo data back, for a test. */
 export function resetMockCalendar(): void {
   appointments.set(initialAppointments());
+  calendars.set(initialCalendars());
   created.set(0);
 }
