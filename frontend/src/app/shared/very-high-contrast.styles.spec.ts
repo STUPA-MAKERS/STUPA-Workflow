@@ -42,8 +42,32 @@ describe('surfaceEdges (§000605)', () => {
     expect(RULES).toMatch(/\.cal__panel \.cal__card \{[^}]*border: var\(--vh-edge\);/);
   });
 
-  it('draws the white edge around a card of a board', () => {
-    expect(RULES).toMatch(/\n {2}app-todo-card-tile \{\s*outline: var\(--vh-edge\);\s*outline-offset: -2px;/);
+  it('draws the white edge around a card and a column of a board', () => {
+    expect(RULES).toMatch(
+      /\n {2}app-todo-card-tile,\s*\.bv__col \{\s*outline: var\(--vh-edge\);\s*outline-offset: -2px;/,
+    );
+  });
+
+  it('keeps the top edge of the work list of the start page above its sticky header', () => {
+    const rule = /\.dash--wide \.dash__panel:has\(\.dt--boxed\)::before \{([^}]*)\}/.exec(RULES)?.[1] ?? '';
+    expect(rule).toMatch(/position: sticky;\s*top: 0;/);
+    expect(rule).toMatch(/border: var\(--vh-edge\);\s*border-bottom: 0;/);
+    expect(rule).toMatch(/pointer-events: none;/);
+  });
+});
+
+describe('boardPicker (§000617)', () => {
+  it('draws the picker as a menu: white edge, yellow rows, the open board filled', () => {
+    expect(RULES).toMatch(/\.bp__pop \{\s*outline: var\(--vh-edge\);\s*outline-offset: -2px;/);
+    expect(RULES).toMatch(/\n {2}\.bp__row \{\s*@include vh\.text;/);
+    expect(RULES).toMatch(/\.bp__row\[aria-current='true'\] \{\s*@include vh\.fill;/);
+    expect(RULES).toMatch(/\.bp__cap \{\s*color: var\(--vh-fg\) !important;/);
+  });
+
+  it('marks the row under the pointer with a yellow edge, not with a fill', () => {
+    expect(RULES).toMatch(
+      /@media \(hover: hover\) \{\s*\.bp__row:hover \{\s*outline: 2px solid var\(--vh-hi\) !important;/,
+    );
   });
 });
 

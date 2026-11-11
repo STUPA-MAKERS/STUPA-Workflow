@@ -34,10 +34,57 @@
     border-radius: var(--radius-lg);
   }
 
-  // A card of a board is a surface, so it has the white edge too.
-  app-todo-card-tile {
+  // A card of a board is a surface, so it has the white edge too. A column of a board is a
+  // surface that holds the cards, so it has the edge as well.
+  app-todo-card-tile,
+  .bv__col {
     outline: var(--vh-edge);
     outline-offset: -2px;
+  }
+
+  // The work list of the start page scrolls inside its panel, and the column header sticks
+  // to the top of the panel. The edge of the table scrolls away with the rows, so the panel
+  // draws the top edge and the two round corners as a layer that stays above the header.
+  .dash--wide .dash__panel:has(.dt--boxed)::before {
+    content: '';
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: block;
+    box-sizing: border-box;
+    height: var(--radius-lg);
+    margin-bottom: calc(-1 * var(--radius-lg));
+    border: var(--vh-edge);
+    border-bottom: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    pointer-events: none;
+  }
+
+  // The board picker is a menu (000617): black with the white edge of a surface, yellow
+  // rows and white headings. The open board is a yellow fill, and the row under the pointer
+  // or with the focus has a yellow edge.
+  .bp__pop {
+    outline: var(--vh-edge);
+    outline-offset: -2px;
+  }
+  .bp__row {
+    @include vh.text;
+  }
+  .bp__cap {
+    color: var(--vh-fg) !important;
+  }
+  .bp__row[aria-current='true'] {
+    @include vh.fill;
+  }
+  .bp__row:focus-visible {
+    outline: 2px solid var(--vh-hi) !important;
+    outline-offset: -2px !important;
+  }
+  @media (hover: hover) {
+    .bp__row:hover {
+      outline: 2px solid var(--vh-hi) !important;
+      outline-offset: -2px !important;
+    }
   }
 
   // The band with the state of the protocol sits in the pane of the TOP, whose ink is
