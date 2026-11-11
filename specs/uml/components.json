@@ -58,6 +58,11 @@
     {
       "count": 3,
       "from": "admin",
+      "to": "calendar"
+    },
+    {
+      "count": 3,
+      "from": "admin",
       "to": "config_revision"
     },
     {
@@ -406,27 +411,32 @@
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 10,
       "from": "calendar",
       "to": "auth"
     },
     {
-      "count": 2,
+      "count": 6,
       "from": "calendar",
       "to": "gremien"
     },
     {
-      "count": 1,
+      "count": 5,
       "from": "calendar",
       "to": "meetings"
     },
     {
-      "count": 3,
+      "count": 6,
+      "from": "calendar",
+      "to": "notifications"
+    },
+    {
+      "count": 11,
       "from": "calendar",
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 5,
       "from": "calendar",
       "to": "todos"
     },
@@ -824,6 +834,11 @@
       "count": 1,
       "from": "privacy",
       "to": "auth"
+    },
+    {
+      "count": 1,
+      "from": "privacy",
+      "to": "calendar"
     },
     {
       "count": 3,
