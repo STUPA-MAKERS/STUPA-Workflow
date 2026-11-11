@@ -169,9 +169,9 @@ MODEL_MODULES = {
     "application_type": "app.modules.application_types.models",
     "webhook": "app.modules.webhooks.models",
     "webhook_delivery": "app.modules.webhooks.models",
-    "cd_variant": "app.modules.admin.models",
-    "cd_variant_logo": "app.modules.admin.models",
-    "site_config_version": "app.modules.admin.models",
+    "cd_variant": "app.modules.site_config.models",
+    "cd_variant_logo": "app.modules.site_config.models",
+    "site_config_version": "app.modules.site_config.models",
 }
 
 
@@ -184,5 +184,6 @@ def test_model_in_module_of_its_subject() -> None:
     }
     assert {table: modules[table] for table in MODEL_MODULES} == MODEL_MODULES
     assert {
-        table for table, module in modules.items() if module == "app.modules.admin.models"
+        table for table, module in modules.items() if module == "app.modules.site_config.models"
     } == {"cd_variant", "cd_variant_logo", "site_config_version"}
+    assert not [module for module in modules.values() if module.startswith("app.modules.admin.")]

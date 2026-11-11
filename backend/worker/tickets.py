@@ -23,11 +23,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
-from app.modules.admin.site_config_service import active_branding
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.files.service import FilesService
 from app.modules.files.storage import ObjectStorage, build_object_storage
+from app.modules.site_config.reads import active_branding
 from app.modules.tickets.models import Ticket
 from app.modules.tickets.service import TicketService
 from app.settings import load_settings

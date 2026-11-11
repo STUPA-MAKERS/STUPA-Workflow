@@ -24,15 +24,6 @@ from typing import Any
 import pytest
 from sqlalchemy import CheckConstraint, Table
 
-from app.modules.admin.cd_logos import (
-    ALLOWED_CD_LOGO_MIME,
-    MAX_CD_LOGO_BYTES,
-    VENDORED_LOGO_NAMES,
-    asset_file_name,
-    sniff_cd_logo,
-)
-from app.modules.admin.cd_resolver import cd_variant_key_for_gremium, resolve_cd_variant_by_key
-from app.modules.admin.models import CdVariant, CdVariantLogo
 from app.modules.admin.schemas import (
     CdVariantCreate,
     CdVariantLogoReorder,
@@ -47,6 +38,15 @@ from app.modules.files import scanner as scanner_mod
 from app.modules.files.scanner import ScanVerdict
 from app.modules.files.storage import StorageError
 from app.modules.gremien.models import Gremium
+from app.modules.protocol.cd_resolver import cd_variant_key_for_gremium, resolve_cd_variant_by_key
+from app.modules.site_config.cd_logos import (
+    ALLOWED_CD_LOGO_MIME,
+    MAX_CD_LOGO_BYTES,
+    VENDORED_LOGO_NAMES,
+    asset_file_name,
+    sniff_cd_logo,
+)
+from app.modules.site_config.models import CdVariant, CdVariantLogo
 from app.settings import Settings, load_settings
 from app.shared.errors import (
     ConflictError,

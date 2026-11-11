@@ -7,7 +7,6 @@ metadata is the single source for Alembic and for the tests.
 from __future__ import annotations
 
 from app.db import Base
-from app.modules.admin.models import SiteConfigVersion
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import (
     Applicant,
@@ -65,6 +64,7 @@ from app.modules.notifications.models import (
 )
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
+from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.models import (
     TodoAssignee,

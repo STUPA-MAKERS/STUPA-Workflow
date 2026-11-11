@@ -21,13 +21,6 @@ from typing import Any, Literal
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.branding import (
-    Branding,
-    HelpSettings,
-    PublicBranding,
-    TicketSettings,
-)
-from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.schemas import (
     AttachmentLimitsOut,
     HelpTicketsSettings,
@@ -44,6 +37,14 @@ from app.modules.config_revision.service import (
     ConfigRevisionService,
 )
 from app.modules.files.scanner import scan_or_raise
+from app.modules.site_config.branding import (
+    Branding,
+    HelpSettings,
+    PublicBranding,
+    TicketSettings,
+)
+from app.modules.site_config.models import SiteConfigVersion
+from app.modules.site_config.reads import branding_of
 from app.settings import Settings, get_settings
 
 #: Fallback app names for the case where the config leaves them empty. They match the
@@ -153,22 +154,6 @@ _MANIFEST_BASE: dict[str, Any] = {
 }
 
 
-def _branding(row: SiteConfigVersion | None) -> Branding:
-    return Branding.model_validate(row.branding) if row is not None else Branding()
-
-
-async def active_branding(session: AsyncSession) -> Branding:
-    """Return the active branding, or the defaults without an active version.
-
-    Other modules read their settings from here: the ticket report reads
-    ``tickets.publicEnabled``, the retention cron ``tickets.retentionMonths``.
-    """
-    row = (
-        await session.scalars(select(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)))
-    ).first()
-    return _branding(row)
-
-
 class SiteConfigService:
     """Site-config operations bound to an ``AsyncSession``.
 
@@ -211,7 +196,7 @@ class SiteConfigService:
     async def get(self) -> SiteConfigOut:
         """Return the active branding and its version (0 without one)."""
         active = await self._active()
-        return SiteConfigOut(version=active.version if active else 0, branding=_branding(active))
+        return SiteConfigOut(version=active.version if active else 0, branding=branding_of(active))
 
     async def save(self, branding: Branding, actor: str) -> SiteConfigOut:
         """Save the branding as the new active version.
@@ -246,7 +231,7 @@ class SiteConfigService:
         await self._scan_logos(branding)
         latest = await self._latest()
         base = latest.version if latest is not None else 0
-        payload = _with_help_tickets_of(branding, _branding(await self._active()))
+        payload = _with_help_tickets_of(branding, branding_of(await self._active()))
         row = SiteConfigVersion(version=base + 1, active=True, branding=payload, created_by=actor)
         await self.session.execute(
             update(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)).values(active=False)
@@ -275,7 +260,7 @@ class SiteConfigService:
         active = await self._active()
         guest = await load_guest_settings(self.session)
         settings = get_settings()
-        branding = _branding(active)
+        branding = branding_of(active)
         return PublicSiteConfigOut(
             version=active.version if active else 0,
             branding=PublicBranding.model_validate(branding.model_dump(by_alias=True)),
@@ -292,7 +277,7 @@ class SiteConfigService:
 
     async def help_tickets(self) -> HelpTicketsSettings:
         """Return the help and ticket settings of the active branding."""
-        return _help_tickets_of(_branding(await self._active()))
+        return _help_tickets_of(branding_of(await self._active()))
 
     async def put_help_tickets(
         self, payload: HelpTicketsSettings, actor: str
@@ -311,7 +296,7 @@ class SiteConfigService:
         )
         active = await self._active()
         latest = await self._latest()
-        branding = _branding(active).model_copy(
+        branding = branding_of(active).model_copy(
             update={"help": help_settings, "tickets": ticket_settings}
         )
         snapshot = branding.model_dump(by_alias=True)
@@ -340,7 +325,7 @@ class SiteConfigService:
         back to the default. ``theme_color`` and ``background_color`` follow
         ``scheme``. All other fields are static.
         """
-        branding = _branding(await self._active())
+        branding = branding_of(await self._active())
         return {
             "name": branding.app_name.strip() or DEFAULT_APP_NAME,
             "short_name": branding.app_short_name.strip() or DEFAULT_APP_SHORT_NAME,

@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/admin/cd_logos.py
+  - backend/app/modules/site_config/cd_logos.py
   - backend/app/modules/admin/router.py
 scope:
   - backend/app/modules/admin

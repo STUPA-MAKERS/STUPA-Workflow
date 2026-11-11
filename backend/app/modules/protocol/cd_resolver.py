@@ -21,10 +21,10 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from app.modules.admin.cd_logos import RENDER_SLOTS, asset_file_name
-from app.modules.admin.models import CdVariant, CdVariantLogo
 from app.modules.files.storage import StorageError
 from app.modules.gremien.models import Gremium
+from app.modules.site_config.cd_logos import RENDER_SLOTS, asset_file_name
+from app.modules.site_config.models import CdVariant, CdVariantLogo
 from app.shared.errors import ServiceUnavailableError
 
 if TYPE_CHECKING:

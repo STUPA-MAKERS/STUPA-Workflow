@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from app.modules.admin.branding import (
+from app.modules.site_config.branding import (
     MAX_FREETEXT_CHARS,
     MAX_LOGO_BYTES,
     Branding,

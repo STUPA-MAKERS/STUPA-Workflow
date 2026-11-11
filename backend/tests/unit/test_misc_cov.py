@@ -50,7 +50,6 @@ from app.middleware import (
     CsrfMiddleware,
     DefaultWriteRateLimitMiddleware,
 )
-from app.modules.admin.branding import Branding, PublicBranding
 from app.modules.admin.router import (
     get_config_service,
     get_gremium_role_service,
@@ -73,6 +72,7 @@ from app.modules.applications.router import (
 )
 from app.modules.applications.schemas import ApplicationListItem, StateOut
 from app.modules.gremien.role_schemas import GremiumRoleOut
+from app.modules.site_config.branding import Branding, PublicBranding
 from app.settings import Settings, get_settings, load_settings
 from app.shared import search as search_mod
 from app.shared.errors import ForbiddenError, UnauthorizedError

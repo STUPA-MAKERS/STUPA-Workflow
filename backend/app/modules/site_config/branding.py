@@ -27,7 +27,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from app.modules.admin.statement import default_statement
+from app.modules.site_config.statement import default_statement
 from app.shared.i18n import I18nMap
 from app.shared.schemas import FrozenStrictCamelModel
 

@@ -125,7 +125,9 @@ python3 scripts/check_functional.py --write                     # backend, mcp, 
 - **Module layers** (`[tool.importlinter]` in `backend/pyproject.toml`, `lint-imports` in the CI
   job `be-lint`): a module in `backend/app/modules` imports only from its own layer and from
   lower layers, and an import inside a function counts. `app/shared`, `db.py`, `settings.py` and
-  `logging_config.py` import no module. A new module needs a layer in the contract. The old
+  `logging_config.py` import no module. A new module needs a layer in the contract. The module
+  `site_config` (lowest layer) holds what every module reads of the site configuration and of
+  the design variants; `admin` writes them. The old
   imports that break a rule are the `ignore_imports` lists: do not add an entry, and when you
   remove an import, remove its entry, because `lint-imports` fails for an entry that matches no
   import. Local: `cd backend && lint-imports`.

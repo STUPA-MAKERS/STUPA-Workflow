@@ -656,13 +656,13 @@ class AuditService:
         binds it. A site-config version has no name column, so its version number is
         the label: it tells two drafts apart and reads the same in both UI locales.
         """
-        from app.modules.admin.models import CdVariant, SiteConfigVersion
         from app.modules.application_types.models import ApplicationType
         from app.modules.applications.models import Application
         from app.modules.auth.identity import refs_by_id
         from app.modules.auth.models import Role
         from app.modules.files.models import Attachment
         from app.modules.gremien.models import Gremium
+        from app.modules.site_config.models import CdVariant, SiteConfigVersion
         from app.modules.voting.models import Vote
         from app.modules.webhooks.models import Webhook
 

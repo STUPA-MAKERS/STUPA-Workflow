@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.modules.admin.branding import Branding, BrandingAsset
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.files import scanner as scanner_mod
 from app.modules.files.scanner import ScanVerdict
+from app.modules.site_config.branding import Branding, BrandingAsset
 from app.settings import Settings, load_settings
 from app.shared.errors import ServiceUnavailableError, UnsupportedMediaTypeError
 

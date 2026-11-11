@@ -7,10 +7,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import SiteConfigVersion
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.avatars.cache import AvatarCache
 from app.modules.avatars.gravatar import AvatarImage, GravatarFetcher, gravatar_hash
+from app.modules.site_config.models import SiteConfigVersion
 from app.settings import Settings
 
 

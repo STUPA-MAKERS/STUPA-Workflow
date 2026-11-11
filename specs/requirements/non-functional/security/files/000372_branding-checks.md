@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/admin/branding.py
+  - backend/app/modules/site_config/branding.py
 scope:
   - backend/app/modules/admin
   - frontend/src/app/pages/admin

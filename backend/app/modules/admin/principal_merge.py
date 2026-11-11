@@ -76,7 +76,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, aliased
 
 from app.db import Base
-from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.schemas import (
     MergeArea,
     MergeAreaOut,
@@ -123,6 +122,7 @@ from app.modules.livevote.models import (
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
 from app.modules.protocol.models import Protocol
+from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.merge import fold_personal_board, rewrite_mentions
 from app.modules.todos.models import (
