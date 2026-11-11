@@ -2,7 +2,7 @@
 id: "000647"
 title: Accessibility has its own menu
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 tests:
