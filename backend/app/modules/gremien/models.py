@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -139,4 +140,44 @@ class GremiumRoleMapping(UUIDPkMixin, Base):
             "gremium_role_id", "oidc_group", name="uq_gremium_role_mapping_role_group"
         ),
         Index("ix_gremium_role_mapping_oidc_group", "oidc_group"),
+    )
+
+
+class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
+    """Pool entry that lets a substitute represent a member.
+
+    The substitute acts without the lead-time deadline. A NULL
+    `member_principal_id` lets the substitute represent every member.
+
+    A partial unique index deduplicates the gremium-wide entries, because `UniqueConstraint` treats
+    NULL values as distinct.
+    """
+
+    __tablename__ = "delegation_substitute"
+
+    gremium_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("gremium.id", ondelete="CASCADE"))
+    #: NULL marks a gremium-wide substitute that represents every member.
+    member_principal_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("principal.id", ondelete="CASCADE"), nullable=True
+    )
+    substitute_principal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("principal.id", ondelete="CASCADE")
+    )
+    created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "gremium_id",
+            "member_principal_id",
+            "substitute_principal_id",
+            name="uq_delegation_substitute",
+        ),
+        Index(
+            "uq_delegation_substitute_gremiumwide",
+            "gremium_id",
+            "substitute_principal_id",
+            unique=True,
+            postgresql_where=text("member_principal_id IS NULL"),
+        ),
+        Index("ix_delegation_substitute_gremium", "gremium_id"),
     )

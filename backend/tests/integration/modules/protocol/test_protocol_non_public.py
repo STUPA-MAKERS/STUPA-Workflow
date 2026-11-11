@@ -30,10 +30,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.modules.auth.models import Principal
 from app.modules.files.storage import ObjectStorage
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.mail import MailMessage
 from app.modules.pdf.typst_client import TypstClient
-from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService
 
 pytestmark = pytest.mark.integration

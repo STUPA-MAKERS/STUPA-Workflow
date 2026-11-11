@@ -890,7 +890,7 @@ def test_request_erasure_202(
     TestClient runs the background task synchronously, so the notification fires within the
     call.
     """
-    import app.modules.applications.router as ar
+    import app.modules.privacy.request_router as ar
     from app.db import get_session
     from app.deps import get_current_applicant
 

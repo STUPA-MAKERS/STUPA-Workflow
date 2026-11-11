@@ -20,9 +20,9 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.gremien.gremium_roles import GremiumRoleService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting
 from app.modules.livevote.service import MeetingService
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.models import Meeting
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.service import ProtocolService
 from app.shared.errors import ForbiddenError
 

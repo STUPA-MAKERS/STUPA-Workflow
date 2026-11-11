@@ -32,7 +32,7 @@ from app.modules.audit.schemas import (
 )
 from app.modules.audit_log.service import AuditLogService, data_uuid_strings
 from app.modules.config_revision.revert import RevertService
-from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
+from app.modules.meetings.publisher import MeetingPublisher, get_meeting_publisher
 from app.shared.errors import ProblemDetail
 from app.shared.paging import DEFAULT_LIMIT, MAX_LIMIT
 

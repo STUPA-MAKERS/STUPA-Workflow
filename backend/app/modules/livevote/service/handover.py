@@ -38,12 +38,12 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.gremien.gremium_roles import gremium_member_ids
-from app.modules.livevote.agenda_service import agenda_order
-from app.modules.livevote.keepers import KEEPER_PERMISSION, keeper_principal_ids
-from app.modules.livevote.models import Meeting, MeetingAgendaItem, ProtocolKeeperPeriod
 from app.modules.livevote.schemas import HandoverMode, MeetingOut
 from app.modules.livevote.service.permissions import PermissionOps
 from app.modules.livevote.service.votes import VoteReadOps
+from app.modules.meetings.agenda_service import agenda_order
+from app.modules.meetings.keepers import KEEPER_PERMISSION, keeper_principal_ids
+from app.modules.meetings.models import Meeting, MeetingAgendaItem, ProtocolKeeperPeriod
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 
 #: The audit mode of a planned period that a move of the agenda item started.

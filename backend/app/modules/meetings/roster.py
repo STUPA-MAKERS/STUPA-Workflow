@@ -24,7 +24,7 @@ from sqlalchemy import ColumnElement, or_, select
 
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.gremien.models import GremiumMembership
-from app.modules.livevote.models import Meeting, MeetingAttendance
+from app.modules.meetings.models import Meeting, MeetingAttendance
 
 
 def planned_start_utc(meeting: Meeting, tz_name: str) -> datetime | None:

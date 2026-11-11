@@ -32,7 +32,6 @@ from app.modules.livevote.connection import (
 from app.modules.livevote.events import ErrorEvent, GuestStatusEvent
 from app.modules.livevote.guest_connection import GuestConnection
 from app.modules.livevote.guests import GuestService, token_hash
-from app.modules.livevote.models import MeetingGuest
 from app.modules.livevote.public_schemas import (
     GuestBallotBody,
     GuestJoinBody,
@@ -42,6 +41,7 @@ from app.modules.livevote.public_schemas import (
 from app.modules.livevote.router import get_broker_rest, get_broker_ws
 from app.modules.livevote.schemas import GuestNameBody
 from app.modules.livevote.service import BrokerPublisher
+from app.modules.meetings.models import MeetingGuest
 from app.modules.voting.schemas import BallotAccepted
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings

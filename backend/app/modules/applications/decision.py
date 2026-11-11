@@ -442,7 +442,7 @@ async def decision_source(
     the Gremium of the application.
     """
     from app.modules.gremien.models import Gremium
-    from app.modules.livevote.models import Meeting
+    from app.modules.meetings.models import Meeting
     from app.modules.voting.models import Vote
 
     vote = await session.get(Vote, row.vote_id) if row.vote_id is not None else None
@@ -485,8 +485,8 @@ async def _agenda_position(
     session: AsyncSession, meeting_id: UUID, agenda_item_id: UUID
 ) -> int | None:
     """Return the 1-based number of an agenda item in its meeting, or None."""
-    from app.modules.livevote.agenda_service import agenda_order
-    from app.modules.livevote.models import MeetingAgendaItem
+    from app.modules.meetings.agenda_service import agenda_order
+    from app.modules.meetings.models import MeetingAgendaItem
 
     number = func.row_number().over(order_by=list(agenda_order())).label("n")
     ranked = (

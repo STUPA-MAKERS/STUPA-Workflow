@@ -27,7 +27,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.modules.auth.principal import Principal
-from app.modules.delegations.models import DelegationSubstitute
 from app.modules.delegations.schemas import (
     DelegationCreate,
     DelegationOut,
@@ -43,6 +42,7 @@ from app.modules.delegations.service import (
     meeting_start_utc,
     voting_delegation_check,
 )
+from app.modules.gremien.models import DelegationSubstitute
 from app.settings import load_settings
 from app.shared.errors import (
     ConflictError,

@@ -14,9 +14,9 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
+from app.modules.meetings.models import Meeting
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import TallyOut, VoteClosed, VoteOut
 from app.shared.config_schemas import VoteConfig
@@ -615,7 +615,7 @@ async def test_pool_substitute_sees_committee_timeline(
     The fake `execute(...).scalars().all()` returns the pool Gremium.
     """
     from app.modules.auth.principal import Principal
-    from app.modules.livevote.service import permissions as livevote_permissions_mod
+    from app.modules.meetings import rules as livevote_permissions_mod
     from tests._support.auth_fakes import fake_session, result
 
     member_g = uuid4()
@@ -656,7 +656,7 @@ async def test_assert_can_read_denies_non_member(monkeypatch: pytest.MonkeyPatch
     `_get` returns the meeting. The pool query and the delegated query stay empty.
     """
     from app.modules.auth.principal import Principal
-    from app.modules.livevote.service import permissions as mod
+    from app.modules.meetings import rules as mod
     from app.shared.errors import ForbiddenError
     from tests._support.auth_fakes import fake_session, result
 
@@ -678,7 +678,7 @@ async def test_assert_can_read_allows_member(monkeypatch: pytest.MonkeyPatch) ->
     The fake session answers `_get` and the pool query.
     """
     from app.modules.auth.principal import Principal
-    from app.modules.livevote.service import permissions as mod
+    from app.modules.meetings import rules as mod
     from tests._support.auth_fakes import fake_session, result
 
     meeting = Meeting(gremium_id=uuid4(), title="GV")
@@ -721,7 +721,7 @@ async def test_view_all_is_live_participant_without_membership(
     `meeting.view_all` short-circuits before any query.
     """
     from app.modules.auth.principal import Principal
-    from app.modules.livevote.service import permissions as mod
+    from app.modules.meetings import rules as mod
     from tests._support.auth_fakes import fake_session
 
     async def _none(_s, _sub, now=None):
@@ -746,7 +746,7 @@ async def test_view_all_can_read_foreign_meeting(
     query runs.
     """
     from app.modules.auth.principal import Principal
-    from app.modules.livevote.service import permissions as mod
+    from app.modules.meetings import rules as mod
     from tests._support.auth_fakes import fake_session, result
 
     meeting = Meeting(gremium_id=uuid4(), title="GV")

@@ -21,8 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.modules.admin.service import ConfigService
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.models import Meeting
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.models import Meeting
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.shared.errors import ForbiddenError
 from tests.integration.modules.livevote.conftest import CONFIG, audit_actions, seed

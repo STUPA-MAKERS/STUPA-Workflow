@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/livevote/keepers.py
+  - backend/app/modules/meetings/keepers.py
   - backend/app/modules/livevote/service/handover.py
   - frontend/src/app/features/meetings/handover-dialog/handover-dialog.component.ts
 scope:

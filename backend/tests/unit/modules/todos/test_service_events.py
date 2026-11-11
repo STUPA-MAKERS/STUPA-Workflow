@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from app.modules.auth.principal import Principal
-from app.modules.livevote.models import MeetingAgendaItem
+from app.modules.meetings.models import MeetingAgendaItem
 from app.modules.todos import events as todo_events
 from app.modules.todos.links import Resolved
 from app.modules.todos.models import (

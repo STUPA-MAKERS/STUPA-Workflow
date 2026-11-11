@@ -813,10 +813,10 @@ class _MeetingSvc:
 
 @pytest.fixture
 def meeting_svc(monkeypatch: pytest.MonkeyPatch) -> type[_MeetingSvc]:
-    import app.modules.livevote.service as livevote_service
+    import app.modules.meetings.rules as livevote_service
 
     _MeetingSvc.error = None
-    monkeypatch.setattr(livevote_service, "MeetingService", _MeetingSvc)
+    monkeypatch.setattr(livevote_service, "MeetingRules", _MeetingSvc)
     return _MeetingSvc
 
 
@@ -883,7 +883,7 @@ async def test_check_agenda_meeting_accepts_a_fitting_meeting(
 async def test_add_to_agenda_in_tx(
     monkeypatch: pytest.MonkeyPatch, error: Exception | None
 ) -> None:
-    import app.modules.livevote.agenda_service as agenda_mod
+    import app.modules.meetings.agenda_service as agenda_mod
     from app.shared.errors import ValidationProblem
 
     added: list[tuple[object, object, bool, str]] = []

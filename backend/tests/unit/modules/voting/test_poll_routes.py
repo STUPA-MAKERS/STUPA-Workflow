@@ -97,7 +97,7 @@ def mails(monkeypatch: pytest.MonkeyPatch) -> list[UUID]:
 
 @pytest.fixture
 def routes(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, _Service]:
-    from app.modules.livevote.publisher import get_meeting_publisher
+    from app.modules.meetings.publisher import get_meeting_publisher
 
     _Polls.calls = []
     _Polls.created = _poll_out()

@@ -22,13 +22,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.livevote.models import (
+from app.modules.meetings.models import (
     DEFAULT_CONFIRM_LEAD_MINUTES,
     DEFAULT_OPEN_LEAD_MINUTES,
     Meeting,
     MeetingSettings,
 )
-from app.modules.livevote.roster import planned_start_utc
+from app.modules.meetings.roster import planned_start_utc
 from app.shared.errors import ConflictError, ValidationProblem
 
 AUDIT_TARGET_TYPE = "meeting_settings"

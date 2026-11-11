@@ -21,9 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.applications.service import ApplicationsService
-from app.modules.livevote.models import Meeting, MeetingGuest
 from app.modules.livevote.service import MeetingService
-from app.modules.protocol.models import Protocol, ProtocolVoteRef
+from app.modules.meetings.models import Meeting, MeetingGuest
+from app.modules.meetings.protocol_models import Protocol, ProtocolVoteRef
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.service import VotingService, guest_voter_sub
 from tests.integration.modules.livevote.conftest import CONFIG, admin, audit_actions, seed

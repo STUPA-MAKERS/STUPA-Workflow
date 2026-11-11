@@ -524,7 +524,7 @@ class _Pub:
 
 @pytest.fixture
 def routes(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, _Pub]:
-    from app.modules.livevote.publisher import get_meeting_publisher
+    from app.modules.meetings.publisher import get_meeting_publisher
 
     _FakeElections.calls = []
     monkeypatch.setattr(voting_router, "ElectionService", _FakeElections)

@@ -22,8 +22,8 @@ from app.modules.auth.rbac import vote_group_key
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.livevote.connection import LiveVoteConnection
 from app.modules.livevote.locks import InMemoryLocker
-from app.modules.livevote.models import Meeting
 from app.modules.livevote.service import MeetingService
+from app.modules.meetings.models import Meeting
 from app.modules.voting.models import VotedMarker
 from app.modules.voting.service import VotingService
 from tests.integration.modules.livevote.conftest import seed

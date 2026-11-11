@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from sqlalchemy.dialects import postgresql
 
-from app.modules.livevote.roster import (
+from app.modules.meetings.roster import (
     meeting_roster_filter,
     planned_start_utc,
     roster_filter,

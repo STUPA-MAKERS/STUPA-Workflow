@@ -264,7 +264,7 @@ async def test_cast_blocked_when_voting_right_delegated_403() -> None:
 @pytest.fixture
 def marks(monkeypatch: pytest.MonkeyPatch) -> mock.AsyncMock:
     """Stub the attendance mark of a meeting ballot and record its calls."""
-    from app.modules.livevote.attendance_service import AttendanceService
+    from app.modules.meetings.attendance_service import AttendanceService
 
     stub = mock.AsyncMock()
     monkeypatch.setattr(AttendanceService, "mark_present_on_cast", stub)
@@ -1277,7 +1277,7 @@ async def test_assert_can_read_meeting_vote_goes_through_the_meeting_guard() -> 
     svc = VotingService(fake_session())
     admin = Principal(sub="a", roles=["admin"])
     meeting_id = uuid4()
-    with mock.patch("app.modules.livevote.service.MeetingService", _Meetings):
+    with mock.patch("app.modules.meetings.rules.MeetingRules", _Meetings):
         await svc.assert_can_read(_vote(meeting_id=meeting_id), admin)  # pyright: ignore[reportArgumentType]
     assert seen == [meeting_id]
 
@@ -1327,7 +1327,7 @@ async def test_assert_can_read_meeting_delegates_to_meeting_service(
         async def assert_can_read(self, meeting_id: Any, _principal: Principal) -> None:
             seen["meeting_id"] = meeting_id
 
-    monkeypatch.setattr("app.modules.livevote.service.MeetingService", _FakeMeeting)
+    monkeypatch.setattr("app.modules.meetings.rules.MeetingRules", _FakeMeeting)
     vote = _vote(meeting_id=uuid4())
     await VotingService(fake_session()).assert_can_read(vote, _voter())  # pyright: ignore[reportArgumentType]
     assert seen["meeting_id"] == vote.meeting_id

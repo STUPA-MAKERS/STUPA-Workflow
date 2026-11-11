@@ -24,12 +24,11 @@ from app.deps import get_current_principal
 from app.main import create_app
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.delegations.models import DelegationSubstitute
-from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.gremien.models import DelegationSubstitute, Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.broker import InMemoryBroker
-from app.modules.livevote.models import Meeting
-from app.modules.livevote.publisher import NullPublisher, get_meeting_publisher
 from app.modules.livevote.router import get_broker_rest
+from app.modules.meetings.models import Meeting
+from app.modules.meetings.publisher import NullPublisher, get_meeting_publisher
 from app.settings import get_settings, load_settings
 
 ADMIN_SUB = "admin-p7"

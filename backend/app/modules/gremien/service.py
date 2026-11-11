@@ -79,9 +79,9 @@ from app.modules.gremien.schemas import (
     MemberMeetingOut,
     NextMeetingOut,
 )
-from app.modules.livevote.agenda_service import title_of
-from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.agenda_service import title_of
+from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.site_config.cd_logos import ALLOWED_SQUARE_LOGO_MIME
 from app.modules.site_config.models import CdVariantLogo
 from app.modules.voting.election import election_config, is_election

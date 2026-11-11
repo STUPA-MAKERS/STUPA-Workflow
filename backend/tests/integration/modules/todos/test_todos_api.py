@@ -296,7 +296,7 @@ async def test_a_card_becomes_an_agenda_item(
     """
     from datetime import date
 
-    from app.modules.livevote.models import Meeting
+    from app.modules.meetings.models import Meeting
 
     gid, bid = await add_gremium(maker)
     admin, _ = await add_person(maker, "Admin")

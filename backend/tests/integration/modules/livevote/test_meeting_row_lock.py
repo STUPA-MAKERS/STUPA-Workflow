@@ -23,10 +23,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.livevote.agenda_service import AgendaService
-from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingPatch
 from app.modules.livevote.service import MeetingService
+from app.modules.meetings.agenda_service import AgendaService
+from app.modules.meetings.models import Meeting
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService

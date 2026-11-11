@@ -15,10 +15,10 @@ from app.deps import get_current_principal
 from app.main import create_app
 from app.modules.auth.principal import Principal
 from app.modules.livevote import router as router_mod
-from app.modules.livevote.agenda_service import AgendaService
-from app.modules.livevote.models import MeetingAgendaItem
 from app.modules.livevote.router import get_agenda_service, get_meeting_service
 from app.modules.livevote.schemas import AgendaAddBody, MeetingOut
+from app.modules.meetings.agenda_service import AgendaService
+from app.modules.meetings.models import MeetingAgendaItem
 from app.modules.todos.live import BoardPings
 from app.shared.errors import ConflictError
 from tests.unit.modules.todos.fakes import ScriptedSession

@@ -17,7 +17,7 @@ from app.modules.applications.models import Application
 from app.modules.auth.people import DELETED_PERSON, PersonRef
 from app.modules.auth.principal import Principal
 from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.models import Meeting
 from app.modules.tickets import service as svc_mod
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from app.modules.tickets.schemas import NoteCreate, TicketCreate, TicketPatch

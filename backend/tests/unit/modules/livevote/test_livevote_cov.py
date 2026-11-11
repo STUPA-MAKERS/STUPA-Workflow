@@ -29,8 +29,6 @@ from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import NullActionDispatcher
 from app.modules.gremien import gremium_roles as gremium_roles_mod
 from app.modules.livevote import router as router_mod
-from app.modules.livevote.agenda_service import AgendaService, title_of
-from app.modules.livevote.attendance_service import AttendanceService
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.livevote.connection import (
     WS_FORBIDDEN,
@@ -38,7 +36,6 @@ from app.modules.livevote.connection import (
     WS_UNAUTHENTICATED,
 )
 from app.modules.livevote.locks import InMemoryLocker
-from app.modules.livevote.models import Meeting
 from app.modules.livevote.router import (
     _authorize,
     _serve,
@@ -55,13 +52,16 @@ from app.modules.livevote.router import (
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
 from app.modules.livevote.service import handover as handover_mod
 from app.modules.livevote.service import lifecycle as lifecycle_mod
-from app.modules.livevote.service import permissions as permissions_mod
 from app.modules.livevote.service.paging import (
     _decode_cursor,
     _decode_offset,
     _encode_cursor,
     _encode_offset,
 )
+from app.modules.meetings import rules as permissions_mod
+from app.modules.meetings.agenda_service import AgendaService, title_of
+from app.modules.meetings.attendance_service import AttendanceService
+from app.modules.meetings.models import Meeting
 from app.shared.errors import (
     BadRequestError,
     ConflictError,
@@ -177,8 +177,8 @@ def audit_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     The real ``record`` runs two statements (the chain lock and the previous hash).
     They would consume the FIFO results of ``_QueueSession``.
     """
-    import app.modules.livevote.agenda_service as agenda_mod
-    import app.modules.livevote.attendance_service as attendance_mod
+    import app.modules.meetings.agenda_service as agenda_mod
+    import app.modules.meetings.attendance_service as attendance_mod
     import app.modules.voting.service as voting_service_mod
 
     calls: list[dict[str, Any]] = []
@@ -2443,7 +2443,7 @@ class _FakeAttendanceService:
         self.calls: list[str] = []
 
     async def members(self, gremium_id: UUID) -> list[Any]:
-        from app.modules.livevote.schemas import MeetingMemberOut
+        from app.modules.meetings.schemas import MeetingMemberOut
 
         return [MeetingMemberOut(principalId=uuid4(), displayName="A", email="a@x")]
 

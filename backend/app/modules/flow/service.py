@@ -87,7 +87,7 @@ from app.shared.errors import (
 from app.shared.guards import eval_guard, guard_requires_applicant
 
 if TYPE_CHECKING:
-    from app.modules.livevote.publisher import MeetingPublisher
+    from app.modules.meetings.publisher import MeetingPublisher
 
 logger = logging.getLogger("app.flow")
 
@@ -943,8 +943,8 @@ class FlowService:
                 target is not a vote state, or the meeting is unknown, not readable,
                 not `planned` or of another Gremium (422).
         """
-        from app.modules.livevote.models import Meeting
-        from app.modules.livevote.service import MeetingService
+        from app.modules.meetings.models import Meeting
+        from app.modules.meetings.rules import MeetingRules
 
         action = _agenda_action(transition.actions)
         gremium_id = (
@@ -958,7 +958,7 @@ class FlowService:
         if to_state is None or to_state.kind != "vote":
             raise _meeting_problem("The target state of this transition is no vote state.")
         try:
-            await MeetingService(self.session).assert_can_read(meeting_id, principal)
+            await MeetingRules(self.session).assert_can_read(meeting_id, principal)
         except (NotFoundError, ForbiddenError) as exc:
             raise _meeting_problem("The meeting is unknown or not visible.") from exc
         meeting = await self.session.get(Meeting, meeting_id)
@@ -971,7 +971,7 @@ class FlowService:
         self, application_id: UUID, meeting_id: UUID, *, non_public: bool, actor: str
     ) -> None:
         """Add the agenda item in the open transaction. Roll back on a refusal."""
-        from app.modules.livevote.agenda_service import AgendaService
+        from app.modules.meetings.agenda_service import AgendaService
 
         try:
             await AgendaService(self.session).add_in_tx(

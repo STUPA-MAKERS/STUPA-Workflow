@@ -209,7 +209,7 @@ async def _committee_can_read(
         if await BudgetTreeService(db).can_view_node(budget_id, gremien):
             return True
 
-    from app.modules.livevote.models import Meeting
+    from app.modules.meetings.models import Meeting
     from app.modules.voting.models import Vote
 
     voted = await db.scalar(
@@ -238,7 +238,7 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
     """
     from app.modules.budget.tree_models import Budget
     from app.modules.budget.tree_rules import _SEP
-    from app.modules.livevote.models import Meeting
+    from app.modules.meetings.models import Meeting
     from app.modules.voting.models import Vote
 
     row = (

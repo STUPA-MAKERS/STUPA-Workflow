@@ -44,9 +44,9 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.delegations.models import MeetingDelegation
-from app.modules.delegations.pool import members_for_substitute
 from app.modules.gremien.models import GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting, MeetingAttendance
+from app.modules.gremien.pool import members_for_substitute
+from app.modules.meetings.models import Meeting, MeetingAttendance
 
 #: Advisory-lock base key. It serializes the delegation writes per meeting, so a
 #: concurrent insert cannot race the read-then-insert check of the no-chains rule
