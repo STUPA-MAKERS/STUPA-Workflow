@@ -559,7 +559,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/backend/python/000644](style/backend/python/000644_shared-imports-no-module.md) | The shared code imports no module | approved |
 | [S/backend/python/000645](style/backend/python/000645_model-in-subject-module.md) | A model is in the module of its subject | approved |
 | [S/backend/python/000646](style/backend/python/000646_import-exception-ratchet.md) | A CI ratchet lowers the accepted import violations | approved |
-| [S/backend/python/000648](style/backend/python/000648_notifications-mail-engine-only.md) | The module notifications holds the mail engine only | draft |
+| [S/backend/python/000648](style/backend/python/000648_notifications-mail-engine-only.md) | The module notifications holds the mail engine only | approved |
 | [S/frontend/angular/000073](style/frontend/angular/000073_i18n-parity.md) | Every UI text is in both catalogs | approved |
 | [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | approved |
 | [S/frontend/angular/000075](style/frontend/angular/000075_narrow-with-as.md) | A template narrows a signal with as | approved |

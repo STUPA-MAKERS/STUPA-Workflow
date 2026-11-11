@@ -2,7 +2,7 @@
 id: "000648"
 title: The module notifications holds the mail engine only
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null
