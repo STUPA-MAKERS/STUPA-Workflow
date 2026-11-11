@@ -14,8 +14,8 @@ from typing import Any, cast
 
 import pytest
 
-from app.modules.applications import guest_settings
-from app.modules.auth import email_login, sessions, tokens
+from app.modules.applications import email_login, guest_settings
+from app.modules.auth import sessions, tokens
 from app.modules.auth.models import EmailLoginLink
 from app.settings import Settings, load_settings
 from app.shared.errors import GoneError

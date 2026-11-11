@@ -32,10 +32,10 @@ from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
 from app.modules.application_types.models import ApplicationType
+from app.modules.applications import magic_link
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
-from app.modules.auth import service as auth_service
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.mail_actions import NotificationActionDispatcher
@@ -174,7 +174,7 @@ async def _magic_token(
         links.append(link)
 
     async with maker() as session:
-        await auth_service.request_magic_link(
+        await magic_link.request_magic_link(
             session, settings, email="gast@example.org", application_id=app_id,
             deliver=_deliver,
         )
@@ -190,7 +190,7 @@ async def _verify(
     recorder: _Recorder,
 ) -> None:
     async with maker() as session:
-        await auth_service.verify_magic_link(
+        await magic_link.verify_magic_link(
             session, settings, token=token, dispatcher=recorder
         )
         await session.commit()

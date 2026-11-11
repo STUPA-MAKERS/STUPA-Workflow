@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/audit/router.py
+  - backend/app/modules/audit_log/router.py
 scope:
   - backend/app/modules/audit
 ---

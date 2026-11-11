@@ -7,6 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/audit/service.py
+  - backend/app/modules/audit_log/service.py
   - backend/app/modules/audit/schemas.py
 scope:
   - backend/app/modules/audit

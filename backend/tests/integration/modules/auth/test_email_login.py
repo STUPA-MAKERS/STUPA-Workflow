@@ -24,11 +24,11 @@ import pytest
 from sqlalchemy import Engine, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.applications import email_login
 from app.modules.applications.models import Application
 from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
-from app.modules.auth import email_login
 from app.modules.auth.models import ApplicantSession, EmailLoginLink
 from app.modules.auth.models import Principal as PrincipalRow
 from app.settings import Settings

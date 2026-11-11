@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
-  - backend/app/modules/auth/service.py
+  - backend/app/modules/applications/magic_link.py
   - backend/app/modules/applications/guest_settings.py
 scope:
   - backend/app/modules/auth

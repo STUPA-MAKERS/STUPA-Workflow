@@ -110,44 +110,87 @@ def _cookie(sid: str = "as1") -> str:
 async def test_get_current_applicant_bearer() -> None:
     req = _request(headers={"Authorization": f"Bearer {_cookie()}"})
     db = fake_session(result(_applicant_row(application_id="a1")))
-    applicant = await get_current_applicant(req, db, _settings())
+    applicant = await get_current_applicant(req, db, _settings(), _unused_resolver)
     assert applicant is not None
     assert applicant.application_id == "a1"
+
+
+async def _unused_resolver(_db: object, _email: str) -> Applicant:
+    raise AssertionError("no e-mail session in this test")
+
+
+async def test_get_current_applicant_email_session_uses_the_given_resolver() -> None:
+    """The lookup that the app wires in resolves an e-mail session (§S/backend/python/000649)."""
+    seen: list[str] = []
+
+    async def _resolve(_db: object, email: str) -> Applicant:
+        seen.append(email)
+        return Applicant(email=email, application_ids=frozenset({"a7"}))
+
+    row = _applicant_row()
+    row.application_id = None
+    row.email = "x@y.de"
+    req = _request(headers={"Authorization": f"Bearer {_cookie()}"})
+    applicant = await get_current_applicant(req, fake_session(result(row)), _settings(), _resolve)
+    assert seen == ["x@y.de"]
+    assert applicant is not None
+    assert applicant.covers("a7")
+
+
+def test_email_session_resolver_is_unset_without_the_app() -> None:
+    """The bare dependency fails loudly, so a missing wiring never opens a session."""
+    with pytest.raises(RuntimeError):
+        deps.get_email_session_resolver()
+
+
+def test_create_app_wires_the_email_session_resolver() -> None:
+    """`create_app` overrides the dependency with the lookup of `applications`."""
+    from app.main import create_app
+    from app.modules.applications.email_login import resolve_session
+
+    override = create_app().dependency_overrides[deps.get_email_session_resolver]
+    assert override() is resolve_session
 
 
 async def test_get_current_applicant_query_param_not_accepted() -> None:
     """Reject the ``?t=`` query parameter, because a token in the query string leaks."""
     req = _request(query=f"t={_cookie()}")
-    assert await get_current_applicant(req, fake_session(), _settings()) is None
+    assert await get_current_applicant(req, fake_session(), _settings(), _unused_resolver) is None
 
 
 async def test_get_current_applicant_cookie() -> None:
     req = _request(cookies={_settings().applicant_cookie_name: _cookie()})
     db = fake_session(result(_applicant_row(application_id="a3")))
-    applicant = await get_current_applicant(req, db, _settings())
+    applicant = await get_current_applicant(req, db, _settings(), _unused_resolver)
     assert applicant is not None
     assert applicant.application_id == "a3"
 
 
 async def test_get_current_applicant_no_token() -> None:
-    assert await get_current_applicant(_request(), fake_session(), _settings()) is None
+    applicant = await get_current_applicant(
+        _request(), fake_session(), _settings(), _unused_resolver
+    )
+    assert applicant is None
 
 
 async def test_get_current_applicant_invalid_token() -> None:
     req = _request(headers={"Authorization": "Bearer garbage"})
-    assert await get_current_applicant(req, fake_session(), _settings()) is None
+    assert await get_current_applicant(req, fake_session(), _settings(), _unused_resolver) is None
 
 
 async def test_get_current_applicant_forged_secret_no_row() -> None:
     """Resolve a correctly signed sid without a database row to None."""
     req = _request(headers={"Authorization": f"Bearer {_cookie('forged')}"})
-    assert await get_current_applicant(req, fake_session(result()), _settings()) is None
+    applicant = await get_current_applicant(
+        req, fake_session(result()), _settings(), _unused_resolver
+    )
+    assert applicant is None
 
 
 async def test_get_current_applicant_revoked() -> None:
     req = _request(headers={"Authorization": f"Bearer {_cookie()}"})
     db = fake_session(result(_applicant_row(revoked=True)))
-    assert await get_current_applicant(req, db, _settings()) is None
+    assert await get_current_applicant(req, db, _settings(), _unused_resolver) is None
 
 
 async def test_get_current_principal_no_cookie() -> None:

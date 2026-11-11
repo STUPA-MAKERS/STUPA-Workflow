@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
-  - backend/app/modules/auth/email_login.py
-  - backend/app/modules/auth/service.py
+  - backend/app/modules/applications/email_login.py
+  - backend/app/modules/applications/magic_link.py
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py

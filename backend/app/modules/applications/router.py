@@ -28,6 +28,7 @@ from app.deps import (
     require_applicant,
     require_principal,
 )
+from app.modules.applications import email_login
 from app.modules.applications.access import (
     ARCHIVE_PERMISSION,
     DELETE_PERMISSION,
@@ -63,7 +64,6 @@ from app.modules.applications.schemas import (
 from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.auth import email_login
 from app.modules.auth.people import PersonRef
 from app.modules.files.service import FilesService
 from app.modules.flow.dispatch import ActionDispatcher

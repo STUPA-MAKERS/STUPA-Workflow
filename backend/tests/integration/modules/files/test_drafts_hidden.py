@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.deps import DbSession, SettingsDep, get_current_principal
 from app.modules.applications.models import Application, Comment
 from app.modules.applications.service import ApplicationsService
-from app.modules.audit.service import AuditService
+from app.modules.audit_log.service import AuditLogService
 from app.modules.auth.principal import Principal
 from app.modules.files.drafts import hash_draft_token
 from app.modules.files.models import Attachment
@@ -157,7 +157,7 @@ async def test_service_paths_ignore_a_draft(
         context = await build_base_context(session, app, manual=True)
         assert context.has_attachment is False
 
-        audit = AuditService(session)
+        audit = AuditLogService(session)
         labels = await audit.resolve_target_labels([("attachment", str(draft_id))])
         assert labels == {}
         assert await audit.resolve_data_ids([{"attachmentId": str(draft_id)}]) == {}
@@ -196,7 +196,8 @@ async def test_a_bound_attachment_is_still_visible(
         app = await session.get(Application, app_id)
         assert app is not None
         assert (await build_base_context(session, app, manual=True)).has_attachment
-        labels = await AuditService(session).resolve_target_labels([("attachment", str(bound.id))])
+        target = ("attachment", str(bound.id))
+        labels = await AuditLogService(session).resolve_target_labels([target])
         assert labels == {("attachment", str(bound.id)): "beleg.pdf"}
 
 

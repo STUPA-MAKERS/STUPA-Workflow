@@ -450,7 +450,7 @@ class _Rows:
 
 @pytest.mark.parametrize("guest", [False, True])
 async def test_mail_links(monkeypatch: pytest.MonkeyPatch, guest: bool) -> None:
-    from app.modules.auth import email_login
+    from app.modules.applications import email_login
     from app.settings import load_settings
 
     app = _Row(

@@ -30,7 +30,7 @@ from app.modules.audit.schemas import (
     AuditVerificationOut,
     ChainVerificationOut,
 )
-from app.modules.audit.service import AuditService, data_uuid_strings
+from app.modules.audit_log.service import AuditLogService, data_uuid_strings
 from app.modules.config_revision.revert import RevertService
 from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
 from app.shared.errors import ProblemDetail
@@ -42,12 +42,12 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _AUTH_ERRORS: dict[int | str, dict[str, Any]] = {401: _PROBLEM, 403: _PROBLEM}
 
 
-def get_audit_service(session: DbSession) -> AuditService:
+def get_audit_service(session: DbSession) -> AuditLogService:
     """Build the audit service."""
-    return AuditService(session)
+    return AuditLogService(session)
 
 
-ServiceDep = Annotated[AuditService, Depends(get_audit_service)]
+ServiceDep = Annotated[AuditLogService, Depends(get_audit_service)]
 
 
 @router.get(

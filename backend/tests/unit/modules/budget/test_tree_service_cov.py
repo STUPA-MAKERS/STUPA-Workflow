@@ -2167,7 +2167,7 @@ async def test_update_transfer_audit_entry_is_not_revertable() -> None:
 
     A one-sided revert would desync the pair, so the log must not offer it.
     """
-    from app.modules.audit.service import AuditService
+    from app.modules.audit_log.service import AuditLogService
 
     tid, out, income = _transfer_pair()
     entries: list[Any] = []
@@ -2191,7 +2191,7 @@ async def test_update_transfer_audit_entry_is_not_revertable() -> None:
     assert audit[0].target_type == "budget_transfer"
     assert "before" not in audit[0].data
     assert audit[0].data["prior"]["amount"] == "100.00"
-    flags = await AuditService(sess).revertable_flags([audit[0]])
+    flags = await AuditLogService(sess).revertable_flags([audit[0]])
     assert flags[audit[0].id] is False
 
 

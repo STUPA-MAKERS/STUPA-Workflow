@@ -21,6 +21,7 @@ from fastapi import APIRouter, FastAPI
 from starlette.requests import HTTPConnection
 
 from app.db import dispose_engine, get_sessionmaker
+from app.deps import EmailSessionResolver, get_email_session_resolver
 from app.logging_config import configure_logging
 from app.middleware import (
     CsrfMiddleware,
@@ -29,14 +30,17 @@ from app.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.modules.account.router import router as account_router
 from app.modules.admin.router import authed_router as gremien_authed_router
 from app.modules.admin.router import public_router as site_config_public_router
 from app.modules.admin.router import router as admin_router
 from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
+from app.modules.applications.email_login import resolve_session as resolve_email_session
 from app.modules.applications.links_router import router as application_links_router
+from app.modules.applications.login_router import router as applicant_login_router
 from app.modules.applications.router import router as applications_router
-from app.modules.audit.router import router as audit_router
+from app.modules.audit_log.router import router as audit_router
 from app.modules.auth.mcp_router import router as mcp_router
 from app.modules.auth.oauth_admin_router import router as oauth_admin_router
 from app.modules.auth.oauth_router import router as oauth_router
@@ -93,6 +97,8 @@ def health() -> dict[str, str]:
 
 
 api_router.include_router(auth_router)
+api_router.include_router(account_router)
+api_router.include_router(applicant_login_router)
 api_router.include_router(oauth_router)
 api_router.include_router(oauth_admin_router)
 api_router.include_router(mcp_router)
@@ -211,6 +217,11 @@ def _flow_action_dispatcher(conn: HTTPConnection) -> ActionDispatcher:
     return build_worker_dispatcher(pool, get_sessionmaker())
 
 
+def _email_session_resolver() -> EmailSessionResolver:
+    """Give `app.deps` the e-mail session lookup of `applications` (§S/backend/python/000649)."""
+    return resolve_email_session
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the FastAPI app with its middleware, handlers and routers.
 
@@ -244,7 +255,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
 
-    app.dependency_overrides.update({get_action_dispatcher: _flow_action_dispatcher})
+    app.dependency_overrides.update(
+        {
+            get_action_dispatcher: _flow_action_dispatcher,
+            get_email_session_resolver: _email_session_resolver,
+        }
+    )
 
     app.include_router(api_router)
     app.include_router(oauth_well_known_router)
