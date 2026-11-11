@@ -118,6 +118,14 @@ describe('rowsAndFills (§000619, §000621)', () => {
   });
 });
 
+describe('copyBoxes (§000739)', () => {
+  it('fills the address of a calendar subscription and the boxes of the MCP setup', () => {
+    const fill = selectorsOf('  .cs__url,', 'fill');
+    expect(fill).toContain('.gr__cmd');
+    expect(fill).toContain('.gr__config');
+  });
+});
+
 describe('permissionChips (§000615, §000620)', () => {
   it('fills a granted permission and gives the others the edge', () => {
     expect(selectorsOf('  .rm__chip--on {', 'fill')).toContain('.rm__chip--on');

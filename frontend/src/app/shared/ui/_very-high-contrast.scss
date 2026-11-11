@@ -169,4 +169,13 @@
   .tn--on :is(.tn__main, .tn__name, .tn__amt) {
     color: var(--vh-bg) !important;
   }
+
+  // A box with a text to copy (000739): the address of a calendar subscription, and the
+  // command and the configuration of the MCP setup. On the black page the box has no shade,
+  // so it is a yellow fill with black text.
+  .cs__url,
+  .gr__cmd,
+  .gr__config {
+    @include vh.fill;
+  }
 }
