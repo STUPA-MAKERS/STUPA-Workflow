@@ -277,7 +277,7 @@ async def test_check_agenda_meeting_uses_the_vote_gremium(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Check the meeting against the vote Gremium; without one the agenda is refused."""
-    import app.modules.livevote.service as livevote_service
+    import app.modules.meetings.rules as livevote_service
     from app.shared.errors import ValidationProblem
 
     class _Meetings:
@@ -285,7 +285,7 @@ async def test_check_agenda_meeting_uses_the_vote_gremium(
 
         async def assert_can_read(self, *_a: object) -> None: ...
 
-    monkeypatch.setattr(livevote_service, "MeetingService", _Meetings)
+    monkeypatch.setattr(livevote_service, "MeetingRules", _Meetings)
     gid = uuid4()
     app = _app(uuid4())
     gvote = _state(config=BUDGET)

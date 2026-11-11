@@ -10,9 +10,9 @@ from typing import Any
 
 import pytest
 
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol import service as protocol_service_mod
 from app.modules.protocol.markdown import sanitize_user_markdown
-from app.modules.protocol.models import Protocol
 from app.modules.protocol.public import PublicProtocolService, PublicSnapshot, PublicTop
 from app.modules.protocol.service import ProtocolService
 from app.settings import get_settings

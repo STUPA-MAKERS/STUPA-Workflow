@@ -20,9 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.livevote.broker import InMemoryBroker
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
-from app.modules.livevote.publisher import get_meeting_publisher
 from app.modules.livevote.service import BrokerPublisher
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.publisher import get_meeting_publisher
 from app.modules.voting.models import Vote
 from tests.integration.modules.livevote.conftest import ADMIN_SUB, audit_actions, seed
 from tests.integration.modules.voting.vote_support import seed_vote_flow

@@ -5,10 +5,9 @@ pair has exactly one outgoing delegation. The gremium of the row is the gremium
 of the meeting. `delegate_voting` also transfers the voting right. The transfer
 is exclusive and never a duplicate. The delegator cannot vote in that meeting.
 
-`DelegationSubstitute` holds the substitute pool of one gremium. A member may
-delegate to a pool member without the lead-time deadline. A pool member does not
-have to be a gremium member. A NULL `member_principal_id` marks a substitute for
-every member.
+The substitute pool of a gremium (`DelegationSubstitute`) is in `gremien.models`,
+because the pool belongs to a gremium and gives its read scope
+(§S/backend/python/000652).
 """
 
 from __future__ import annotations
@@ -68,44 +67,4 @@ class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
         ),
         Index("ix_meeting_delegation_meeting", "meeting_id"),
         Index("ix_meeting_delegation_delegate", "delegate_principal_id"),
-    )
-
-
-class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
-    """Pool entry that lets a substitute represent a member.
-
-    The substitute acts without the lead-time deadline. A NULL
-    `member_principal_id` lets the substitute represent every member.
-
-    A partial unique index deduplicates the gremium-wide entries, because `UniqueConstraint` treats
-    NULL values as distinct.
-    """
-
-    __tablename__ = "delegation_substitute"
-
-    gremium_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("gremium.id", ondelete="CASCADE"))
-    #: NULL marks a gremium-wide substitute that represents every member.
-    member_principal_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("principal.id", ondelete="CASCADE"), nullable=True
-    )
-    substitute_principal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("principal.id", ondelete="CASCADE")
-    )
-    created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    __table_args__ = (
-        UniqueConstraint(
-            "gremium_id",
-            "member_principal_id",
-            "substitute_principal_id",
-            name="uq_delegation_substitute",
-        ),
-        Index(
-            "uq_delegation_substitute_gremiumwide",
-            "gremium_id",
-            "substitute_principal_id",
-            unique=True,
-            postgresql_where=text("member_principal_id IS NULL"),
-        ),
-        Index("ix_delegation_substitute_gremium", "gremium_id"),
     )

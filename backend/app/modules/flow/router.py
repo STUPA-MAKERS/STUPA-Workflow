@@ -34,7 +34,7 @@ from app.modules.flow.schemas import (
     TransitionResult,
 )
 from app.modules.flow.service import FlowService
-from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
+from app.modules.meetings.publisher import MeetingPublisher, get_meeting_publisher
 from app.shared.errors import ProblemDetail
 
 router = APIRouter(tags=["flow"])

@@ -15,7 +15,7 @@ RBAC is fail-closed and gremium-scoped. ``vote.eligible_group`` holds the UUID o
 gremium that votes. A ``cast`` needs the gremium permission ``vote.cast`` there: only an
 active gremium role with ``vote.cast`` writes the namespaced group key
 ``vote:<gremium_id>``. No global permission grants a vote right. The quorum denominator
-(``MeetingService.vote_eligible_count``) reads the same roster, and ``create`` stores it
+(``MeetingRules.vote_eligible_count``) reads the same roster, and ``create`` stores it
 as ``eligible_count``, so the counted set and the admitted set stay equal. A vote with a
 free group key (an old row) admits nobody: the call gets 403.
 
@@ -53,7 +53,7 @@ from app.modules.delegations.pool_seat import (
 from app.modules.delegations.service import voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService, StagedFire
-from app.modules.protocol.models import ProtocolVoteRef
+from app.modules.meetings.protocol_models import ProtocolVoteRef
 from app.modules.voting import election as election_mod
 from app.modules.voting import poll as poll_mod
 from app.modules.voting import tally as tally_mod
@@ -324,7 +324,7 @@ class VotingService:
             ConflictError: The meeting is not ``live`` (``meeting_not_started`` or
                 ``meeting_closed``).
         """
-        from app.modules.livevote.models import Meeting, MeetingAgendaItem
+        from app.modules.meetings.models import Meeting, MeetingAgendaItem
 
         status = await self.session.scalar(
             select(Meeting.status).where(Meeting.id == meeting_id).with_for_update()
@@ -649,7 +649,7 @@ class VotingService:
         """Count the present meeting members, or 0 without a meeting."""
         if vote.meeting_id is None:
             return 0
-        from app.modules.livevote.models import MeetingAttendance
+        from app.modules.meetings.models import MeetingAttendance
 
         return (
             await self.session.scalar(
@@ -666,7 +666,7 @@ class VotingService:
         """Count the admitted guests of the meeting of the vote, or 0 without one."""
         if vote.meeting_id is None:
             return 0
-        from app.modules.livevote.models import MeetingGuest
+        from app.modules.meetings.models import MeetingGuest
 
         return (
             await self.session.scalar(
@@ -691,7 +691,7 @@ class VotingService:
         """
         if not config.guests_vote:
             return await self._admitted_guest_count(vote)
-        from app.modules.livevote.models import MeetingGuest
+        from app.modules.meetings.models import MeetingGuest
 
         admitted = {
             guest_voter_sub(gid)
@@ -941,9 +941,9 @@ class VotingService:
                 errors=[{"field": "eligibleGroup", "msg": "not the gremium of the application"}],
             )
         self._check_proposal(application, payload.proposal)
-        from app.modules.livevote.service import MeetingService
+        from app.modules.meetings.rules import MeetingRules
 
-        eligible = await MeetingService(self.session).vote_eligible_count(gremium_id)
+        eligible = await MeetingRules(self.session).vote_eligible_count(gremium_id)
         internal = VoteCreateInternal(
             config=config,
             eligibleGroup=gremium_id,
@@ -1307,7 +1307,7 @@ class VotingService:
                 data={"eligibleGroup": vote.eligible_group},
             )
         if vote.meeting_id is not None and not as_delegation:
-            from app.modules.livevote.attendance_service import AttendanceService
+            from app.modules.meetings.attendance_service import AttendanceService
 
             await release_pool_seat_of(self.session, vote.meeting_id, principal.sub)
             await AttendanceService(self.session).mark_present_on_cast(
@@ -1438,7 +1438,7 @@ class VotingService:
         Only the namespaced key ``vote:<gremium_id>`` decides. `resolve_principal`
         writes it for an active membership whose gremium role carries ``vote.cast``,
         and for nothing else, so the key proves the right. A matching OIDC group claim
-        cannot satisfy it. `MeetingService.vote_eligible_count` builds the quorum
+        cannot satisfy it. `MeetingRules.vote_eligible_count` builds the quorum
         denominator from exactly that roster, so both sides use the same rule.
 
         A free group key (not a UUID) is an old row. No global permission grants a
@@ -1525,7 +1525,7 @@ class VotingService:
         """Guard read access to a vote (broken object level authorization).
 
         A meeting-bound vote follows the meeting visibility rules of
-        ``MeetingService.assert_can_read``: member, participant, or delegation
+        ``MeetingRules.assert_can_read``: member, participant, or delegation
         recipient. A vote without a meeting (application vote) is readable with
         ``application.read`` or ``application.read_all`` (the admin role holds both),
         for an eligible voter of the vote, and for a holder of the gremium permission
@@ -1544,9 +1544,9 @@ class VotingService:
             ForbiddenError: The principal cannot view this vote.
         """
         if vote.meeting_id is not None:
-            from app.modules.livevote.service import MeetingService
+            from app.modules.meetings.rules import MeetingRules
 
-            await MeetingService(self.session).assert_can_read(vote.meeting_id, principal)
+            await MeetingRules(self.session).assert_can_read(vote.meeting_id, principal)
             return
         if poll_mod.is_poll(vote):
             from app.modules.auth.policy import admin_bypass
@@ -1623,7 +1623,7 @@ class VotingService:
         the admin role then grants access.
         """
         if meeting_id is not None:
-            from app.modules.livevote.models import Meeting
+            from app.modules.meetings.models import Meeting
 
             gid = await self.session.scalar(
                 select(Meeting.gremium_id).where(Meeting.id == meeting_id)
@@ -1643,7 +1643,7 @@ class VotingService:
         The meeting payload publishes ``canManageVotes``, and the client renders the
         open, close and delete buttons from it. This gate must therefore admit exactly
         the people that flag names, or the UI offers an action that the API refuses.
-        ``MeetingService.can_manage_votes`` is the single source of that rule: the
+        ``MeetingRules.can_manage_votes`` is the single source of that rule: the
         session manager, the protokollant, or the gremium rule
         (``manages_votes_in_gremium``).
 
@@ -1653,13 +1653,13 @@ class VotingService:
         ``/meetings/{id}/votes``, so the close and the cancel add no right that the
         delete does not already carry.
         """
-        from app.modules.livevote.models import Meeting
-        from app.modules.livevote.service import MeetingService
+        from app.modules.meetings.models import Meeting
+        from app.modules.meetings.rules import MeetingRules
 
         meeting = await self.session.get(Meeting, meeting_id)
         if meeting is None:
             return False
-        return await MeetingService(self.session).can_manage_votes(meeting, principal)
+        return await MeetingRules(self.session).can_manage_votes(meeting, principal)
 
     async def can_manage_group(
         self, eligible_group: str, meeting_id: UUID | None, principal: Principal
@@ -1742,7 +1742,7 @@ class VotingService:
 
         The manage right (``assert_can_manage_vote``) comes first. A vote that a
         meeting holds then needs the protokollant of that meeting
-        (``MeetingService.assert_can_run_votes``): the open and the close follow the
+        (``MeetingRules.assert_can_run_votes``): the open and the close follow the
         minutes. A vote without a meeting keeps the manage right only.
 
         Raises:
@@ -1754,9 +1754,9 @@ class VotingService:
         meeting_id = await self.meeting_id_of(vote_id)
         if meeting_id is None:
             return
-        from app.modules.livevote.service import MeetingService
+        from app.modules.meetings.rules import MeetingRules
 
-        await MeetingService(self.session).assert_can_run_votes(meeting_id, principal)
+        await MeetingRules(self.session).assert_can_run_votes(meeting_id, principal)
 
     async def assert_can_manage_vote(self, vote_id: UUID, principal: Principal) -> None:
         """Load the vote and run ``assert_can_manage`` on it.

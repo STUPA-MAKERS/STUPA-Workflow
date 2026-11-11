@@ -31,7 +31,7 @@ from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.flow.models import State
 from app.modules.gremien.membership_sync import sync_principal_memberships
-from app.modules.livevote.models import Meeting, MeetingAttendance
+from app.modules.meetings.models import Meeting, MeetingAttendance
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names
 from app.modules.tickets.models import Ticket, TicketNote

@@ -31,7 +31,7 @@ from app.modules.applications.models import Application, ApplicationDecision
 from app.modules.applications.service.service_base import _title_of
 from app.modules.budget.tree_models import BudgetExpense
 from app.modules.flow.models import State
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.todos.grouping import grouped
 from app.modules.todos.models import (
     LINK_COLUMNS,

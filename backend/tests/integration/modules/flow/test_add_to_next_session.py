@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
 from app.modules.flow.service import FlowService
-from app.modules.livevote.models import MeetingAgendaItem
+from app.modules.meetings.models import MeetingAgendaItem
 from app.settings import get_settings
 from tests.integration.modules.flow.agenda_support import (
     admin,

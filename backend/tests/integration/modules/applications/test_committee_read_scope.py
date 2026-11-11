@@ -35,11 +35,10 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget
-from app.modules.delegations.models import DelegationSubstitute
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
-from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.gremien.models import DelegationSubstitute, Gremium, GremiumMembership, GremiumRole
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import ForbiddenError
 

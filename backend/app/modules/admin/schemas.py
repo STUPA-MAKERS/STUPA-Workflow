@@ -20,7 +20,7 @@ from app.modules.applications.models import (
 )
 from app.modules.auth.models import MAX_SESSION_DAYS
 from app.modules.gremien.role_schemas import ROLE_KEY_PATTERN
-from app.modules.livevote.models import MAX_LEAD_MINUTES
+from app.modules.meetings.models import MAX_LEAD_MINUTES
 from app.modules.site_config.branding import (
     DEFAULT_WIKI_URL,
     Branding,

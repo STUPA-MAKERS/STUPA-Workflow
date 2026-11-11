@@ -114,7 +114,7 @@ async def _in_substitute_pool(db: DbSession, sub: str) -> bool:
     to show the meeting timeline to pool substitutes that have no own
     membership.
     """
-    from app.modules.delegations.pool import substitute_gremien_for_sub
+    from app.modules.gremien.pool import substitute_gremien_for_sub
 
     return bool(await substitute_gremien_for_sub(db, sub))
 

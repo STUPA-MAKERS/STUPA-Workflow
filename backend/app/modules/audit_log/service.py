@@ -317,7 +317,7 @@ class AuditLogService(AuditService):
         from app.modules.budget.tree_models import Budget, FiscalYear
         from app.modules.files.models import Attachment
         from app.modules.gremien.models import Gremium
-        from app.modules.livevote.models import Meeting
+        from app.modules.meetings.models import Meeting
         from app.modules.voting.models import Vote
         from app.modules.webhooks.models import Webhook
 

@@ -37,8 +37,8 @@ from app.modules.budget.tree_rules import _SEP, pick_fiscal_year
 from app.modules.flow.context import committee_ids_for_sub
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.vote_gremium import fill_snapshot, in_budget_vote_state
-from app.modules.livevote.agenda_service import AgendaService
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.agenda_service import AgendaService
+from app.modules.meetings.models import Meeting
 from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError
 

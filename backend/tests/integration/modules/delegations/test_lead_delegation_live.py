@@ -32,7 +32,7 @@ from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.schemas import DelegationCreate
 from app.modules.delegations.service import DelegationService
-from app.modules.livevote.models import Meeting, MeetingAttendance
+from app.modules.meetings.models import Meeting, MeetingAttendance
 from app.modules.voting.models import Vote, VotedMarker
 from app.settings import load_settings
 from app.shared.config_schemas import VoteConfig

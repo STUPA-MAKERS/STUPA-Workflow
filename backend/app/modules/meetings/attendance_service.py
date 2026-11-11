@@ -1,7 +1,7 @@
 """Attendance service for a meeting.
 
 The roster of a meeting holds the members of the Gremium, plus each principal
-with an attendance record for the meeting (see `app.modules.livevote.roster`). A
+with an attendance record for the meeting (see `app.modules.meetings.roster`). A
 closed meeting thus keeps its attendance, also when the OIDC sync removed a
 membership later. A change of the attendance needs a membership. Each pair of meeting and member
 has exactly one record. The unique constraint drives the upsert.
@@ -42,15 +42,15 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.pool_seat import release_pool_seat
 from app.modules.gremien.models import GremiumMembership
-from app.modules.livevote.keepers import (
+from app.modules.meetings.keepers import (
     KEEPER_PERMISSION,
     VOTE_PERMISSION,
     keeper_principal_ids,
     member_permissions,
 )
-from app.modules.livevote.models import Meeting, MeetingAttendance
-from app.modules.livevote.roster import meeting_roster_filter
-from app.modules.livevote.schemas import (
+from app.modules.meetings.models import Meeting, MeetingAttendance
+from app.modules.meetings.roster import meeting_roster_filter
+from app.modules.meetings.schemas import (
     AttendanceOut,
     AttendanceStatus,
     MeetingMemberOut,

@@ -29,9 +29,9 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.broker import InMemoryBroker
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.router import get_broker_rest
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.voting.models import Vote
 from app.settings import get_settings, load_settings
 from app.shared.config_schemas import VoteConfig

@@ -27,13 +27,14 @@ import pytest
 
 from app.modules.auth.principal import Principal
 from app.modules.delegations import service as delegations_service
-from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.schemas import DelegationCreate, SubstituteCreate
 from app.modules.delegations.service import (
     DelegationService,
     meeting_start_utc,
     voting_delegation_check,
 )
+from app.modules.gremien.models import DelegationSubstitute
 from app.settings import load_settings
 from app.shared.errors import (
     ConflictError,

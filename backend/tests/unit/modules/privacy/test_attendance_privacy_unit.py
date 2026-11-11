@@ -18,7 +18,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.dml import Update
 
 from app.modules.auth.models import Principal
-from app.modules.livevote.models import Meeting, MeetingAttendance
+from app.modules.meetings.models import Meeting, MeetingAttendance
 from app.modules.privacy.service import (
     AuskunftService,
     PrincipalService,

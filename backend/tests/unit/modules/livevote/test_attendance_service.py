@@ -13,8 +13,8 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.modules.livevote import attendance_service as attendance_mod
-from app.modules.livevote.attendance_service import AttendanceService
+from app.modules.meetings import attendance_service as attendance_mod
+from app.modules.meetings.attendance_service import AttendanceService
 from app.shared.errors import ConflictError
 from tests._support.flow_fakes import FakeSession, fake_session, result
 

@@ -13,8 +13,8 @@ from uuid import uuid4
 import pytest
 from arq import Retry
 
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.pdf.typst_client import TypstError
-from app.modules.protocol.models import Protocol
 from app.settings import load_settings
 from tests._support.pdf_fakes import FakeSessionmaker, FakeTypst
 from tests._support.protocol_fakes import FakeSession, FakeStorage, result

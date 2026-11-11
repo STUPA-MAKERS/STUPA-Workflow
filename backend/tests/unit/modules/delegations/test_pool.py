@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from sqlalchemy.dialects import postgresql
 
-from app.modules.delegations import pool
+from app.modules.gremien import pool
 from tests._support.flow_fakes import fake_session, result
 
 GREMIUM_ID = uuid4()

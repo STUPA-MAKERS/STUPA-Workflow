@@ -49,12 +49,13 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.agenda_service import agenda_order, title_of
-from app.modules.livevote.keepers import agenda_positions, keeper_periods, principal_names
-from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
-from app.modules.livevote.roster import meeting_roster_filter, roster_filter
 from app.modules.livevote.service import MeetingService
 from app.modules.media.service import MediaService
+from app.modules.meetings.agenda_service import agenda_order, title_of
+from app.modules.meetings.keepers import agenda_positions, keeper_periods, principal_names
+from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.meetings.protocol_models import Protocol, ProtocolVoteRef
+from app.modules.meetings.roster import meeting_roster_filter, roster_filter
 from app.modules.notifications.layout import (
     append_link_text,
     reason_text,
@@ -95,7 +96,6 @@ from app.modules.protocol.markdown import (
     replace_vote_blocks,
     votes_in_body,
 )
-from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.protocol.public import (
     PublicAttendance,
     PublicDecision,
@@ -1002,7 +1002,7 @@ class ProtocolService:
 
         The members are the roster of the meeting: the members of the Gremium,
         plus each principal with an attendance record (see
-        `app.modules.livevote.roster`). Without a meeting the members of the
+        `app.modules.meetings.roster`). Without a meeting the members of the
         Gremium count. The threshold is `gremium.quorum_percent` when
         that value is set. If not, the threshold is more than half of the members.
 

@@ -20,8 +20,6 @@ from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
-from app.modules.livevote.agenda_service import AgendaService
-from app.modules.livevote.attendance_service import AttendanceService
 from app.modules.livevote.broker import InMemoryBroker, MeetingBroker
 from app.modules.livevote.connection import (
     WS_FORBIDDEN,
@@ -38,10 +36,7 @@ from app.modules.livevote.schemas import (
     AgendaAddBody,
     AgendaBodyBody,
     AgendaDoneBody,
-    AgendaItemOut,
     AgendaReorderBody,
-    AssignableApplicationOut,
-    AttendanceOut,
     AttendanceSelfBody,
     AttendanceSetBody,
     GuestNameBody,
@@ -51,7 +46,6 @@ from app.modules.livevote.schemas import (
     MeetingDefaultsOut,
     MeetingGremiumOut,
     MeetingGuestOut,
-    MeetingMemberOut,
     MeetingOut,
     MeetingPage,
     MeetingPatch,
@@ -70,6 +64,14 @@ from app.modules.livevote.vote_repeat import (
     assert_reopenable,
     reopen_application,
     repeat_source,
+)
+from app.modules.meetings.agenda_service import AgendaService
+from app.modules.meetings.attendance_service import AttendanceService
+from app.modules.meetings.schemas import (
+    AgendaItemOut,
+    AssignableApplicationOut,
+    AttendanceOut,
+    MeetingMemberOut,
 )
 from app.modules.todos.live import publish_pings, todo_broker
 from app.modules.todos.service import TodoService

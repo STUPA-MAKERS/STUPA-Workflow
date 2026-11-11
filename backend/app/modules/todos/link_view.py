@@ -35,7 +35,7 @@ from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
 from app.modules.forms.models import FormField
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.todos.links import GRANT_KINDS, LinkResolver
 from app.modules.todos.models import TodoBoard, TodoCard, TodoCheckItem, TodoColumn
 from app.modules.todos.schemas import TodoLinkDetail, TodoLinkView, TodoViewFact, TodoViewRow

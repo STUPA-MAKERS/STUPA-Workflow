@@ -28,7 +28,7 @@ from sqlalchemy import cast as sql_cast
 from app.modules.auth.policy import admin_bypass, held_gremium_ids
 from app.modules.auth.rbac import VOTE_GROUP_PREFIX
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.voting.models import Vote, VotedMarker
 from app.modules.voting.schemas import MyBallot, VoteKind, VoteListItem, VoteStatus
 from app.shared.config_schemas import VoteConfig
@@ -63,9 +63,9 @@ async def read_scope(session: AsyncSession, principal: Principal) -> ColumnEleme
     ``vote.cast``. The manager holds ``vote.manage`` or ``session.manage``,
     scope-capped.
     """
-    from app.modules.livevote.service import MeetingService
+    from app.modules.meetings.rules import MeetingRules
 
-    visible, delegated = await MeetingService(session).meeting_read_scope(principal)
+    visible, delegated = await MeetingRules(session).meeting_read_scope(principal)
     meeting_ok: ColumnElement[bool] = (
         Vote.meeting_id.is_not(None)
         if visible is None
@@ -260,7 +260,7 @@ async def _agenda_positions(session: AsyncSession, votes: list[Vote]) -> dict[UU
     The number follows `agenda_order` (position, then creation time, then id), as the
     agenda list and the meeting payload count it.
     """
-    from app.modules.livevote.agenda_service import agenda_order
+    from app.modules.meetings.agenda_service import agenda_order
 
     meeting_ids = {v.meeting_id for v in votes if v.agenda_item_id and v.meeting_id}
     if not meeting_ids:

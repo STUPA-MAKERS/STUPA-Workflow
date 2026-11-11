@@ -922,7 +922,7 @@ async def test_auto_mailer_meeting_created_sends(
     The scalars feed the gremium name, the gremium members, the preference filter (no
     opt-out) and the template lookup (no database template).
     """
-    from app.modules.livevote.models import Meeting
+    from app.modules.meetings.models import Meeting
 
     gid = uuid.uuid4()
     mid = uuid.uuid4()
@@ -964,7 +964,7 @@ async def test_auto_mailer_meeting_created_meeting_missing(
 async def test_auto_mailer_meeting_created_no_date_no_time(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.modules.livevote.models import Meeting
+    from app.modules.meetings.models import Meeting
 
     gid = uuid.uuid4()
     mid = uuid.uuid4()

@@ -107,7 +107,7 @@ async def gremium_reader_ids(session: AsyncSession, sub: str) -> set[UUID]:
     the cost centers and the meetings of the Gremium like a member. The pool gives no
     gremium permission (`vote.cast`, `todo.write`, ...): those stay with the roles.
     """
-    from app.modules.delegations.pool import substitute_gremien_for_sub
+    from app.modules.gremien.pool import substitute_gremien_for_sub
 
     return await gremium_member_ids(session, sub) | await substitute_gremien_for_sub(
         session, sub

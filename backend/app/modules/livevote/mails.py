@@ -44,7 +44,7 @@ class MeetingMailer:
         self, settings: Settings, meeting_id: uuid.UUID, pool: object
     ) -> None:
         from app.modules.gremien.models import Gremium
-        from app.modules.livevote.models import Meeting
+        from app.modules.meetings.models import Meeting
         from app.modules.notifications.recipients import RecipientResolver
 
         queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]

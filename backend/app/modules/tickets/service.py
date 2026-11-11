@@ -53,7 +53,7 @@ from app.modules.auth.principal import Principal
 from app.modules.files.drafts import bind_drafts, check_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.models import Meeting
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import (
     CLOSED_STATUSES,

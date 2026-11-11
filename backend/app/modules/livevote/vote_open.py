@@ -17,10 +17,10 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.principal import Principal
-from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.schemas import MeetingOut
 from app.modules.livevote.service import MeetingService
 from app.modules.livevote.vote_repeat import reopen_application
+from app.modules.meetings.agenda_service import AgendaService
 from app.modules.voting.models import Vote
 from app.shared.errors import ConflictError, NotFoundError
 
