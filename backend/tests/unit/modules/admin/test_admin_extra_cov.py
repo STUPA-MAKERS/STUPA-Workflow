@@ -451,6 +451,14 @@ async def test_manifest_dark_scheme_takes_the_dark_bar_colours() -> None:
     assert man["theme_color"] == man["background_color"] == "#262a27"
 
 
+async def test_manifest_contrast_scheme_takes_black_bars() -> None:
+    """The bars of "Hoher Kontrast" are black like its page (spec 000221)."""
+    active = _scv(1, active=True, branding=Branding().model_dump(by_alias=True))
+    db = fake_session(result(active))
+    man = await SiteConfigService(db).manifest("contrast")
+    assert man["theme_color"] == man["background_color"] == "#000000"
+
+
 async def test_manifest_falls_back_to_defaults_when_blank() -> None:
     """An empty or whitespace name falls back to the default."""
     branding = Branding(appName="   ", appShortName="")

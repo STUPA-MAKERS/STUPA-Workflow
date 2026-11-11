@@ -58,8 +58,16 @@ DEFAULT_APP_SHORT_NAME = "STUPA"
 #: two bars meet without a seam in every version; the splash screen shows the same colour.
 #: The status bar follows the ``theme-color`` meta tag of the page (frontend ThemeService),
 #: so it keeps the page background. The manifest has no per-scheme variant, so the
-#: frontend links ``?scheme=dark`` while the dark theme is in effect.
-MANIFEST_COLORS: dict[str, str] = {"light": "#e6e9e5", "dark": "#262a27"}
+#: frontend links ``?scheme=dark`` while the dark theme is in effect, and
+#: ``?scheme=contrast`` while "Hoher Kontrast" is on, because its bottom bar is black.
+MANIFEST_COLORS: dict[str, str] = {
+    "light": "#e6e9e5",
+    "dark": "#262a27",
+    "contrast": "#000000",
+}
+
+#: The colour schemes that the manifest route serves.
+ManifestScheme = Literal["light", "dark", "contrast"]
 
 #: The icon of a manifest shortcut: the app icon at 96 px, the size that Android asks for.
 _SHORTCUT_ICON: dict[str, Any] = {
@@ -325,7 +333,7 @@ class SiteConfigService:
         await self.session.commit()
         return _help_tickets_of(branding)
 
-    async def manifest(self, scheme: Literal["light", "dark"] = "light") -> dict[str, Any]:
+    async def manifest(self, scheme: ManifestScheme = "light") -> dict[str, Any]:
         """Build the PWA manifest from the active branding config.
 
         ``name`` and ``short_name`` come from the config. An empty value falls
