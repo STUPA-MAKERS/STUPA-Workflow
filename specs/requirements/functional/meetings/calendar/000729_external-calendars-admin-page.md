@@ -23,7 +23,9 @@ of the Gremium) and the URL. The body of a row must show the state, the time of 
 the time of the newest success, the number of entries and the reason of a failure.
 
 The button `Kalender abonnieren` and a press on a row must open a dialog with the fields `Name`,
-`ICS-Adresse`, the choice `Alle | Ein Gremium` and, for `Ein Gremium`, the field `Gremium`. The
+`ICS-Adresse`, the choice `Alle | Ein Gremium`, for `Ein Gremium` the field `Gremium`, and the
+field `Aktualisieren` with the values `Alle 15 Minuten`, `Stündlich`, `Alle 6 Stunden` and
+`Täglich`. The
 dialog must refuse a URL that does not start with `https://`.
 
 The menu of a row must have the actions `Jetzt abrufen`, `Bearbeiten` and `Löschen`. `Löschen`
