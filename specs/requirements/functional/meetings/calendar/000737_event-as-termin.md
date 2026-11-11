@@ -2,7 +2,7 @@
 id: "000737"
 title: The Kalender shows an Event like a Termin
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

@@ -2,7 +2,7 @@
 id: "000735"
 title: A card can link a Termin
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

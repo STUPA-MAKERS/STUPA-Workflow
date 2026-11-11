@@ -2,7 +2,7 @@
 id: "000736"
 title: The start and the end of an Event can have a time
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null
