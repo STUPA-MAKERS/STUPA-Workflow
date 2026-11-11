@@ -1,6 +1,12 @@
 import { applyRawFormat, insertRawTable } from './raw-format';
 
 describe('applyRawFormat', () => {
+  it('puts the blackout marks around the selection and takes them away again (000690)', () => {
+    const on = applyRawFormat({ text: 'Es spricht Lena.', start: 11, end: 15 }, 'blackout');
+    expect(on).toEqual({ text: 'Es spricht %%Lena%%.', start: 13, end: 17 });
+    expect(applyRawFormat(on, 'blackout')).toEqual({ text: 'Es spricht Lena.', start: 11, end: 15 });
+  });
+
   it('puts bold marks around the selection and takes them away again', () => {
     const on = applyRawFormat({ text: 'ein Wort hier', start: 4, end: 8 }, 'bold');
     expect(on).toEqual({ text: 'ein **Wort** hier', start: 6, end: 10 });

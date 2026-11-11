@@ -1,4 +1,4 @@
-import { markdownToSafeHtml } from './markdown.util';
+import { hasOpenBlackout, markdownToSafeHtml } from './markdown.util';
 
 describe('markdownToSafeHtml', () => {
   it('escapes raw HTML before rendering (XSS-safe)', () => {
@@ -288,3 +288,37 @@ describe('markdownToSafeHtml', () => {
     expect(markdownToSafeHtml('```\na')).toBe('<pre><code>a</code></pre>');
   });
 });
+
+describe('blackout marks', () => {
+  const blackout = { mark: 'Wird öffentlich geschwärzt', bar: 'geschwärzt' };
+
+  it('shows a marked name with the outline class and the tooltip (000689)', () => {
+    const html = markdownToSafeHtml('Es spricht %%Lena Hoffmann%%.', { blackout });
+    expect(html).toContain('<span class="md-blackout" title="Wird öffentlich geschwärzt">Lena Hoffmann</span>');
+  });
+
+  it('draws the empty marker as a bar with a text for a screen reader (000687)', () => {
+    const html = markdownToSafeHtml('Es spricht %%%% und %%%%.', { blackout });
+    expect(html.match(/<span class="md-bar" role="img" aria-label="geschwärzt"><\/span>/g)).toHaveLength(2);
+    expect(html).not.toContain('%%');
+  });
+
+  it('keeps an escaped marker and escapes the marked text', () => {
+    expect(markdownToSafeHtml('50 \\%% Rabatt', { blackout })).toContain('50 %% Rabatt');
+    expect(markdownToSafeHtml('%%<b>x</b>%%', { blackout })).toContain('&lt;b&gt;x&lt;/b&gt;');
+  });
+});
+
+describe('hasOpenBlackout (000686)', () => {
+  it.each([
+    ['%%Lena', true],
+    ['%%Lena%% und %%Rest', true],
+    ['%%Lena%%', false],
+    ['%%%%', false],
+    ['50 \\%% Rabatt', false],
+    ['', false],
+  ])('%s gives %s', (text, open) => {
+    expect(hasOpenBlackout(text)).toBe(open);
+  });
+});
+

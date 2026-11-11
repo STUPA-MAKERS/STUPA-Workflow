@@ -419,3 +419,19 @@ def test_poll_footer_comes_from_the_number_of_answers() -> None:
         (vote,) = conv(f"> [!abstimmung] **Q**\n> Umfrage · Einzelwahl\n> A: 1\n> {stored}")
         poll = cast("dict[str, object]", vote["poll"])
         assert poll["footer"] == footer
+
+
+def test_blackout_bar_and_internal_mark() -> None:
+    """§000687 and §000689: `%%%%` is a black bar, `%%Name%%` is plain text."""
+    (block,) = conv("Es spricht %%%% und %%Lena Hoffmann%%.")
+    inline = block["c"]
+    assert {"t": "bar"} in inline  # pyright: ignore[reportOperatorIssue]
+    assert {"t": "text", "v": "Lena Hoffmann"} in inline  # pyright: ignore[reportOperatorIssue]
+    assert "%%" not in texts(block)
+
+
+def test_blackout_keeps_shortcodes_beside_a_mark() -> None:
+    (block,) = conv("%%%% um {{time 18:00}}")
+    inline = block["c"]
+    assert inline[0] == {"t": "bar"}  # pyright: ignore[reportIndexIssue]
+    assert {"t": "time", "v": "18:00"} in inline  # pyright: ignore[reportOperatorIssue]

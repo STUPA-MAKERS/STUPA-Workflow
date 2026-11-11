@@ -110,6 +110,7 @@ from app.modules.voting.models import Vote
 from app.modules.voting.schemas import ElectionResultOut, PollResultOut, VoteOut
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
+from app.shared.blackout import black_out, has_open_marker
 from app.shared.config_schemas import ElectionConfig, PollConfig, PollOption
 from app.shared.errors import (
     BadRequestError,
@@ -588,6 +589,7 @@ class ProtocolService:
         Raises:
             ConflictError: The meeting is not closed (`meeting_not_closed`), or the
                 protocol is not a draft (`protocol_not_draft`).
+            ValidationProblem: A text has an open blackout marker (`blackout_unclosed`).
         """
         protocol = await self._get(protocol_id, for_update=True)
         meeting = await self._meeting(protocol.meeting_id)
@@ -601,6 +603,7 @@ class ProtocolService:
                 f"the protocol is {protocol.status} — it is finalized only once",
                 code="protocol_not_draft",
             )
+        await self._check_blackout(protocol)
         protocol.status = "rendering"
         old_withheld = bool(protocol.public_withheld)
         if public_withheld is not None and public_withheld != old_withheld:
@@ -690,19 +693,20 @@ class ProtocolService:
 
         The method renders two PDFs when the meeting has a non-public item or the
         gremium publishes its protocols: the full internal PDF and the redacted public
-        PDF. With a non-public item only the public variant is mailed, so a non-public
-        item never reaches the list. A gremium that publishes its protocols always gets
-        the public variant, for the public page.
+        PDF. With a non-public item or a blackout mark (000691) only the public variant
+        is mailed, so neither a non-public item nor a marked name reaches the list. A
+        gremium that publishes its protocols always gets the public variant, for the
+        public page.
         """
         protocol = await self._get(protocol_id)
         if protocol.status == "final":
             return await self._to_out(protocol)
 
-        has_non_public = await self._has_non_public(protocol.meeting_id)
+        mail_public = await self._mails_public(protocol)
         gremium = await self.session.get(Gremium, protocol.gremium_id)
         uploads, mail_pdf = (
-            await self._render_both(protocol, has_non_public=has_non_public)
-            if has_non_public or bool(getattr(gremium, "protocols_public", False))
+            await self._render_both(protocol, mail_public=mail_public)
+            if mail_public or bool(getattr(gremium, "protocols_public", False))
             else await self._render_internal(protocol)
         )
         protocol.status = "final"
@@ -714,13 +718,13 @@ class ProtocolService:
         return await self._to_out(protocol)
 
     async def _render_both(
-        self, protocol: Protocol, *, has_non_public: bool
+        self, protocol: Protocol, *, mail_public: bool
     ) -> tuple[tuple[tuple[str, bytes], ...], bytes | None]:
         """Render the internal and the public PDF and store the public snapshot.
 
         Returns:
             The uploads, and the PDF for the mail: the public one when a non-public
-            item exists, else the internal one.
+            item or a blackout mark exists, else the internal one.
         """
         internal_md = await self._build_document(protocol, public=False)
         internal_pdf = await self._render_pdf(protocol, internal_md, public=False)
@@ -732,7 +736,7 @@ class ProtocolService:
             *_upload(protocol_storage_key(protocol.id), internal_pdf),
             *_upload(protocol_public_storage_key(protocol.id), public_pdf),
         )
-        return uploads, (public_pdf if has_non_public else internal_pdf)
+        return uploads, (public_pdf if mail_public else internal_pdf)
 
     async def _render_internal(
         self, protocol: Protocol
@@ -908,6 +912,9 @@ class ProtocolService:
             tops=snapshot.tops if snapshot is not None else None,
         )
         header = await self._header_meta(meeting, public=public)
+        free_text = (
+            black_out(protocol.markdown) if public and protocol.markdown else protocol.markdown
+        )
         if snapshot is not None:
             snapshot.attendance = PublicAttendance(
                 present=header.present_count,
@@ -916,7 +923,7 @@ class ProtocolService:
                 guests=header.guest_count,
             )
             if not assembled:
-                snapshot.markdown = protocol.markdown
+                snapshot.markdown = free_text
         date, start_time = self._start_of(meeting)
         return build_protocol_document(
             ProtocolDoc(
@@ -940,7 +947,7 @@ class ProtocolService:
                 absent=header.absent,
                 datalines=header.datalines,
                 quorate=await self._quorate(gremium, meeting, header.present_count),
-                markdown=assembled or protocol.markdown,
+                markdown=assembled or free_text,
             )
         )
 
@@ -1102,6 +1109,57 @@ class ProtocolService:
             select(PrincipalRow.display_name).where(PrincipalRow.id == meeting.protokollant_id)
         )
 
+    async def _texts(self, protocol: Protocol) -> list[tuple[int | None, str]]:
+        """Return the Markdown texts: the TOP bodies with their numbers, then the free text."""
+        bodies = (
+            await self.session.execute(
+                select(MeetingAgendaItem.body)
+                .where(MeetingAgendaItem.meeting_id == protocol.meeting_id)
+                .order_by(*agenda_order())
+            )
+        ).scalars().all()
+        tops = [(number, body) for number, body in enumerate(bodies, start=1) if body]
+        return [*tops, *([(None, protocol.markdown)] if protocol.markdown else [])]
+
+    async def _mails_public(self, protocol: Protocol) -> bool:
+        """Return True if only the public PDF may go to the mailing list.
+
+        That is the case with a non-public agenda item, or with a `%%` in a TOP body
+        or in the free text: a blackout mark (000691). The `%%` test is wider than a
+        mark on purpose, because the public PDF is the safe choice. One count query
+        serves both rules.
+        """
+        found = await self.session.scalar(
+            select(func.count())
+            .select_from(MeetingAgendaItem)
+            .where(
+                MeetingAgendaItem.meeting_id == protocol.meeting_id,
+                or_(
+                    MeetingAgendaItem.non_public.is_(True),
+                    MeetingAgendaItem.body.contains("%%", autoescape=True),
+                ),
+            )
+        )
+        return bool(found) or "%%" in (protocol.markdown or "")
+
+    async def _check_blackout(self, protocol: Protocol) -> None:
+        """Refuse a protocol with an open blackout marker (000686).
+
+        Raises:
+            ValidationProblem: A `%%` has no closing pair (`blackout_unclosed`). The
+                detail names the TOP, or the free text.
+        """
+        open_at = [n for n, text in await self._texts(protocol) if has_open_marker(text)]
+        if not open_at:
+            return
+        number = open_at[0]
+        where = "the free text" if number is None else f"TOP {number}"
+        raise ValidationProblem(
+            f"{where} has a blackout marker %% without its closing %%",
+            code="blackout_unclosed",
+            errors=[{"field": "text" if number is None else f"top.{number}", "msg": where}],
+        )
+
     async def _has_non_public(self, meeting_id: UUID) -> bool:
         """Return True if the meeting has a non-public agenda item.
 
@@ -1221,7 +1279,8 @@ class ProtocolService:
         A vote whose snippet is already in the body gets no second box, and a repeated
         vote gets its mark line, in the body or below its own box.
         """
-        raw = item.body.strip() if item.body and item.body.strip() else ""
+        stripped = item.body.strip() if item.body and item.body.strip() else ""
+        raw = black_out(stripped) if public else stripped
         votes = (
             await self.session.execute(
                 select(Vote)

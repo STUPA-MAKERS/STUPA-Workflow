@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import { Router } from '@angular/router';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { routeInternalLink } from './internal-link';
 import { defaultImageSrc, markdownToSafeHtml } from './markdown.util';
 
@@ -31,6 +32,7 @@ import { defaultImageSrc, markdownToSafeHtml } from './markdown.util';
 export class MarkdownViewComponent {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly router = inject(Router, { optional: true });
+  private readonly i18n = inject(I18nService);
   readonly src = input('');
   /** The number of levels that a heading moves down (3: `#` renders as h4). */
   readonly headingOffset = input(3);
@@ -41,6 +43,10 @@ export class MarkdownViewComponent {
       markdownToSafeHtml(this.src(), {
         headingOffset: this.headingOffset(),
         imageSrc: this.imageSrc(),
+        blackout: {
+          mark: this.i18n.translate('markdown.blackout.mark'),
+          bar: this.i18n.translate('markdown.blackout.bar'),
+        },
       }),
     ),
   );
