@@ -1,0 +1,38 @@
+{
+  "column": "status",
+  "edges": [
+    {
+      "from": "planned",
+      "path": "backend/app/modules/livevote/service/lifecycle.py",
+      "to": "live",
+      "trigger": "Sitzung starten"
+    },
+    {
+      "from": "live",
+      "path": "backend/app/modules/livevote/service/lifecycle.py",
+      "to": "closed",
+      "trigger": "Sitzung schließen"
+    }
+  ],
+  "elements": [
+    {
+      "id": "planned",
+      "initial": true,
+      "name": "planned",
+      "path": "backend/app/modules/livevote/service/lifecycle.py"
+    },
+    {
+      "id": "live",
+      "name": "live",
+      "path": "backend/app/modules/livevote/service/lifecycle.py"
+    },
+    {
+      "id": "closed",
+      "name": "closed",
+      "path": "backend/app/modules/livevote/service/lifecycle.py"
+    }
+  ],
+  "table": "meeting",
+  "title": "Meeting",
+  "view": "state"
+}

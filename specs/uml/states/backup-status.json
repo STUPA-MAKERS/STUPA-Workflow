@@ -1,0 +1,55 @@
+{
+  "column": "status",
+  "edges": [
+    {
+      "from": "pending",
+      "path": "backend/worker/backup.py",
+      "to": "running",
+      "trigger": "Worker starts the archive"
+    },
+    {
+      "from": "running",
+      "path": "backend/worker/backup.py",
+      "to": "done",
+      "trigger": "Archive is stored"
+    },
+    {
+      "from": "running",
+      "path": "backend/worker/backup.py",
+      "to": "failed",
+      "trigger": "Archive fails"
+    },
+    {
+      "from": "pending",
+      "path": "backend/app/modules/backup/router.py",
+      "to": "done",
+      "trigger": "Import of an uploaded archive"
+    }
+  ],
+  "elements": [
+    {
+      "id": "pending",
+      "initial": true,
+      "name": "pending",
+      "path": "backend/app/modules/backup/service.py"
+    },
+    {
+      "id": "running",
+      "name": "running",
+      "path": "backend/app/modules/backup/service.py"
+    },
+    {
+      "id": "done",
+      "name": "done",
+      "path": "backend/app/modules/backup/service.py"
+    },
+    {
+      "id": "failed",
+      "name": "failed",
+      "path": "backend/app/modules/backup/service.py"
+    }
+  ],
+  "table": "backup",
+  "title": "Backup",
+  "view": "state"
+}

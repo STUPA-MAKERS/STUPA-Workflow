@@ -1,0 +1,78 @@
+{
+  "column": "status",
+  "edges": [
+    {
+      "from": "pending",
+      "path": "backend/app/modules/livevote/guests.py",
+      "to": "admitted",
+      "trigger": "Lead admits the guest"
+    },
+    {
+      "from": "pending",
+      "path": "backend/app/modules/livevote/guests.py",
+      "to": "rejected",
+      "trigger": "Lead rejects the guest"
+    },
+    {
+      "from": "admitted",
+      "path": "backend/app/modules/livevote/guests.py",
+      "to": "removed",
+      "trigger": "Lead removes the guest, or guests are switched off"
+    },
+    {
+      "from": "pending",
+      "path": "backend/app/modules/livevote/guests.py",
+      "to": "left",
+      "trigger": "Guest withdraws or joins another meeting"
+    },
+    {
+      "from": "admitted",
+      "path": "backend/app/modules/livevote/guests.py",
+      "to": "left",
+      "trigger": "Guest leaves or joins another meeting"
+    },
+    {
+      "from": "rejected",
+      "path": "backend/app/modules/livevote/guests.py",
+      "to": "pending",
+      "trigger": "Guest asks again"
+    },
+    {
+      "from": "left",
+      "path": "backend/app/modules/livevote/guests.py",
+      "to": "pending",
+      "trigger": "Guest asks again"
+    }
+  ],
+  "elements": [
+    {
+      "id": "pending",
+      "initial": true,
+      "name": "pending",
+      "path": "backend/app/modules/livevote/guests.py"
+    },
+    {
+      "id": "admitted",
+      "name": "admitted",
+      "path": "backend/app/modules/livevote/guests.py"
+    },
+    {
+      "id": "rejected",
+      "name": "rejected",
+      "path": "backend/app/modules/livevote/guests.py"
+    },
+    {
+      "id": "removed",
+      "name": "removed",
+      "path": "backend/app/modules/livevote/guests.py"
+    },
+    {
+      "id": "left",
+      "name": "left",
+      "path": "backend/app/modules/livevote/guests.py"
+    }
+  ],
+  "table": "meeting_guest",
+  "title": "Meeting guest",
+  "view": "state"
+}

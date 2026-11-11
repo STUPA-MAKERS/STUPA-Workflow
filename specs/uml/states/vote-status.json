@@ -1,0 +1,55 @@
+{
+  "column": "status",
+  "edges": [
+    {
+      "from": "draft",
+      "path": "backend/app/modules/voting/service.py",
+      "to": "open",
+      "trigger": "Abstimmung öffnen"
+    },
+    {
+      "from": "open",
+      "path": "backend/app/modules/voting/service.py",
+      "to": "closed",
+      "trigger": "Abstimmung schließen, or the deadline passes"
+    },
+    {
+      "from": "draft",
+      "path": "backend/app/modules/voting/service.py",
+      "to": "cancelled",
+      "trigger": "Antrag leaves the vote state, or the meeting closes"
+    },
+    {
+      "from": "open",
+      "path": "backend/app/modules/voting/service.py",
+      "to": "cancelled",
+      "trigger": "Abstimmung abbrechen"
+    }
+  ],
+  "elements": [
+    {
+      "id": "draft",
+      "initial": true,
+      "name": "draft",
+      "path": "backend/app/modules/voting/service.py"
+    },
+    {
+      "id": "open",
+      "name": "open",
+      "path": "backend/app/modules/voting/service.py"
+    },
+    {
+      "id": "closed",
+      "name": "closed",
+      "path": "backend/app/modules/voting/service.py"
+    },
+    {
+      "id": "cancelled",
+      "name": "cancelled",
+      "path": "backend/app/modules/voting/service.py"
+    }
+  ],
+  "table": "vote",
+  "title": "Vote",
+  "view": "state"
+}

@@ -5,7 +5,11 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/scripts/test_build_uml.py:test_deployment_view_has_each_service"
+implementation:
+  - scripts/build_uml.py
+  - specs/uml/deployment.json
 scope:
   - specs/
   - scripts/

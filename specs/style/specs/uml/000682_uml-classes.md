@@ -5,7 +5,12 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/scripts/test_build_uml.py:test_class_view_has_each_table_and_foreign_key"
+  - "backend/tests/unit/scripts/test_build_uml.py:test_check_values_reads_an_in_list"
+implementation:
+  - scripts/build_uml.py
+  - specs/uml/classes.json
 scope:
   - specs/
   - scripts/
