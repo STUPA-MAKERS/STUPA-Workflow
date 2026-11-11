@@ -2,7 +2,7 @@
 id: "000732"
 title: The public calendar shows the meetings of Gremien with public protocols
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

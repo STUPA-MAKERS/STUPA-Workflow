@@ -2,7 +2,7 @@
 id: "000730"
 title: A Termin can be public
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

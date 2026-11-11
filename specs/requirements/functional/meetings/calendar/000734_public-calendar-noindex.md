@@ -2,7 +2,7 @@
 id: "000734"
 title: The public calendar is not indexed
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

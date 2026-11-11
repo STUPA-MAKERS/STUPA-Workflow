@@ -2,7 +2,7 @@
 id: "000733"
 title: The public calendar has an ICS feed without a token
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

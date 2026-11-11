@@ -2,7 +2,7 @@
 id: "000731"
 title: The public calendar page shows the public entries
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null
