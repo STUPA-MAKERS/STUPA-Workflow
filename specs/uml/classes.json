@@ -946,6 +946,13 @@
       "to": "Application"
     },
     {
+      "column": "appointment_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Appointment"
+    },
+    {
       "column": "budget_id",
       "from": "TodoLink",
       "multiplicity": "*",
@@ -5961,6 +5968,12 @@
         },
         {
           "name": "vote_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "appointment_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"

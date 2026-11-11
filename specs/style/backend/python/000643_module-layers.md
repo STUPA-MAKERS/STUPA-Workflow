@@ -18,9 +18,9 @@ scope:
 
 The backend modules are in five layers, from the top to the bottom:
 
-1. `admin`, `search`, `privacy`, `backup`, `config_revision`, `calendar`, `audit_log`,
-   `account`, `attachments`, `gremien_overview`
-2. `protocol`, `livevote`, `todos`, `tickets`
+1. `admin`, `search`, `privacy`, `backup`, `config_revision`, `audit_log`, `account`,
+   `attachments`, `gremien_overview`
+2. `protocol`, `livevote`, `todos`, `tickets`, `calendar`
 3. `voting`, `budget`, `applications`, `flow`, `meetings`, `delegations`
 4. `forms`, `application_types`, `notifications`, `webhooks`, `files`, `media`, `translations`,
    `avatars`

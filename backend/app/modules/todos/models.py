@@ -15,9 +15,9 @@ a move writes one row only (``lexorank.py``). ``version`` guards the content edi
 (title, description, due date) against a lost update.
 
 ``todo_link`` points a card at exactly one target: an application, a meeting, an
-agenda item, a vote, a gremium, an invoice, a booking (``budget_expense``), a cost
-centre (``budget``), a ticket or another card. ``todo_event`` is the timeline of a card;
-there is no audit entry for to-dos.
+agenda item, a vote, a Termin (``calendar_appointment``), a gremium, an invoice, a
+booking (``budget_expense``), a cost centre (``budget``), a ticket or another card.
+``todo_event`` is the timeline of a card; there is no audit entry for to-dos.
 
 ``due_reminded_on`` is the due date that the ``todo_due`` reminder went out for. A
 changed due date gets a new reminder.
@@ -77,6 +77,7 @@ LINK_KINDS: tuple[str, ...] = (
     "meeting",
     "agenda_item",
     "vote",
+    "appointment",
     "gremium",
     "invoice",
     "expense",
@@ -90,6 +91,7 @@ LINK_COLUMNS: dict[str, str] = {
     "meeting": "meeting_id",
     "agenda_item": "agenda_item_id",
     "vote": "vote_id",
+    "appointment": "appointment_id",
     "gremium": "gremium_id",
     "invoice": "invoice_id",
     "expense": "expense_id",
@@ -364,6 +366,9 @@ class TodoLink(UUIDPkMixin, Base):
     )
     vote_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("vote.id", ondelete="CASCADE"), nullable=True
+    )
+    appointment_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("calendar_appointment.id", ondelete="CASCADE"), nullable=True
     )
     gremium_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True

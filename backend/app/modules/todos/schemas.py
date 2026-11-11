@@ -24,6 +24,7 @@ TodoLinkKind = Literal[
     "meeting",
     "agenda_item",
     "vote",
+    "appointment",
     "gremium",
     "invoice",
     "expense",
@@ -37,6 +38,7 @@ TodoLinkedKind = Literal[
     "meeting",
     "agenda_item",
     "vote",
+    "appointment",
     "gremium",
     "invoice",
     "expense",
@@ -111,6 +113,10 @@ class TodoLinkDetail(FrozenCamelModel, frozen=True):
     booking_kind: BookingKind | None = Field(default=None, serialization_alias="bookingKind")
     vote_status: VoteStatus | None = Field(default=None, serialization_alias="voteStatus")
     vote_result: VoteResult | None = Field(default=None, serialization_alias="voteResult")
+    end_date: str | None = Field(default=None, serialization_alias="endDate")
+    start_time: str | None = Field(default=None, serialization_alias="startTime")
+    end_time: str | None = Field(default=None, serialization_alias="endTime")
+    place: str | None = None
 
 
 class TodoLinkOut(FrozenCamelModel, frozen=True):

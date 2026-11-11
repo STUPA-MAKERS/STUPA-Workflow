@@ -1076,6 +1076,11 @@
       "to": "budget"
     },
     {
+      "count": 4,
+      "from": "todos",
+      "to": "calendar"
+    },
+    {
       "count": 7,
       "from": "todos",
       "to": "files"
@@ -1261,7 +1266,7 @@
     },
     {
       "id": "calendar",
-      "layer": 1,
+      "layer": 2,
       "name": "calendar",
       "path": "backend/app/modules/calendar"
     },

@@ -114,8 +114,8 @@ type = "layers"
 containers = ["app.modules"]
 exhaustive = true
 layers = [
-    "admin : search : privacy : backup : config_revision : calendar : audit_log : account : gremien_overview : attachments",
-    "protocol : livevote : todos : tickets",
+    "admin : search : privacy : backup : config_revision : audit_log : account : gremien_overview : attachments",
+    "protocol : livevote : todos : tickets : calendar",
     "voting : budget : applications : flow : meetings : delegations",
     "forms : application_types : notifications : webhooks : files : media : translations : avatars",
     "gremien : site_config : audit : auth : antiabuse : pdf",
