@@ -33,7 +33,6 @@ from sqlalchemy import Engine, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin import principal_merge as merge_mod
-from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.applications.models import (
     Application,
@@ -80,6 +79,7 @@ from app.modules.livevote.models import (
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
 from app.modules.protocol.models import Protocol
+from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.models import (
     TodoAssignee,

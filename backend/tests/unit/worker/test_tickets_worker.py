@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from app.modules.admin.branding import Branding, TicketSettings
+from app.modules.site_config.branding import Branding, TicketSettings
 from app.modules.tickets.models import Ticket
 from app.settings import load_settings
 from tests.unit.modules.tickets.fakes import ScriptedSession

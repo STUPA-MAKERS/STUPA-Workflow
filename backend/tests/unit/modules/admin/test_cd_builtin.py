@@ -27,10 +27,10 @@ from app.modules.admin.cd_builtin import (
     builtin_logo_bytes,
 )
 from app.modules.admin.cd_builtin.convert import BuiltinConversion, convert_builtin_cd_logos
-from app.modules.admin.cd_logos import VENDORED_LOGO_NAMES, sniff_cd_logo
 from app.modules.admin.service.cd_variants import CD_LOGO_PREFIX
 from app.modules.audit.models import AuditEntry
 from app.modules.files.storage import StorageError
+from app.modules.site_config.cd_logos import VENDORED_LOGO_NAMES, sniff_cd_logo
 from app.shared.errors import ServiceUnavailableError
 from tests._support.files_fakes import FailingStorage, FakeStorage
 from tests.unit.modules.admin.test_cd_variants import (

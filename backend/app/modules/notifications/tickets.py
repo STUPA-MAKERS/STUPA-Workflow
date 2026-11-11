@@ -34,12 +34,12 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
-from app.modules.admin.site_config_service import active_branding
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.files.service import FilesService
 from app.modules.notifications.links import ticket_link
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
+from app.modules.site_config.reads import active_branding
 from app.modules.tickets.models import Ticket, TicketNote
 from app.modules.tickets.service import TicketService, format_number, ticket_managers
 from app.settings import Settings

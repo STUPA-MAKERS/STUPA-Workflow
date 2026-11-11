@@ -46,8 +46,6 @@ from app.deps import (
     require_any_permission,
     require_principal,
 )
-from app.modules.admin.branding import Branding
-from app.modules.admin.cd_logos import LogoSlot
 from app.modules.admin.oidc_mappings import OidcMappingService
 from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.admin.principal_revoke import PrincipalRevokeService
@@ -120,6 +118,8 @@ from app.modules.gremien.role_schemas import (
 )
 from app.modules.livevote.open_window import MeetingSettingsService
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
+from app.modules.site_config.branding import Branding
+from app.modules.site_config.cd_logos import LogoSlot
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail

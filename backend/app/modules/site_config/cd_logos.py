@@ -34,8 +34,8 @@ import re
 import uuid
 from typing import Final, Literal
 
-from app.modules.admin.branding import sniff_raster_image
-from app.modules.admin.image_size import raster_dimensions
+from app.modules.site_config.branding import sniff_raster_image
+from app.modules.site_config.image_size import raster_dimensions
 from app.shared.errors import (
     PayloadTooLargeError,
     UnsupportedMediaTypeError,

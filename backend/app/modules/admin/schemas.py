@@ -14,13 +14,6 @@ from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
 
-from app.modules.admin.branding import (
-    DEFAULT_WIKI_URL,
-    Branding,
-    PublicBranding,
-    check_http_url,
-)
-from app.modules.admin.cd_logos import LogoSlot, RenderSlot, VendoredLogoName
 from app.modules.applications.models import (
     DEFAULT_CONFIRM_TTL_HOURS,
     MAX_CONFIRM_TTL_HOURS,
@@ -28,6 +21,13 @@ from app.modules.applications.models import (
 from app.modules.auth.models import MAX_SESSION_DAYS
 from app.modules.gremien.role_schemas import ROLE_KEY_PATTERN
 from app.modules.livevote.models import MAX_LEAD_MINUTES
+from app.modules.site_config.branding import (
+    DEFAULT_WIKI_URL,
+    Branding,
+    PublicBranding,
+    check_http_url,
+)
+from app.modules.site_config.cd_logos import LogoSlot, RenderSlot, VendoredLogoName
 from app.shared.config_schemas import ComparisonOffers, FlowGraph
 from app.shared.i18n import I18nMap, Lang
 from app.shared.permissions import PERMISSION_CATALOGUE

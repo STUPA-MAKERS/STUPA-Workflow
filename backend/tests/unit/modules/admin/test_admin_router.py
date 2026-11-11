@@ -19,7 +19,6 @@ from fastapi.testclient import TestClient
 
 from app.deps import Principal, get_current_principal
 from app.main import create_app
-from app.modules.admin.branding import Branding, PublicBranding
 from app.modules.admin.router import (
     get_config_service,
     get_gremium_role_service,
@@ -44,6 +43,7 @@ from app.modules.admin.schemas import (
     WebhookOut,
 )
 from app.modules.gremien.role_schemas import GremiumMembershipOut, GremiumRoleOut
+from app.modules.site_config.branding import Branding, PublicBranding
 from app.shared.errors import ConflictError, NotFoundError
 
 _ALL_PERMS = {

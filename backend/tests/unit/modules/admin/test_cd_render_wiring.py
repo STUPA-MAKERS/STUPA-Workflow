@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.modules.admin.cd_resolver import ResolvedCdVariant, cd_render_config
+from app.modules.protocol.cd_resolver import ResolvedCdVariant, cd_render_config
 
 
 def _resolved(**over: Any) -> ResolvedCdVariant:

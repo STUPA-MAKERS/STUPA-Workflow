@@ -30,20 +30,20 @@ from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
 from app.modules.admin import router as admin_router
-from app.modules.admin.cd_logos import (
-    MAX_CD_LOGO_BYTES,
-    SQUARE_LOGO_MAX_PX,
-    SQUARE_LOGO_MIN_PX,
-    check_square_logo,
-)
-from app.modules.admin.cd_resolver import resolve_cd_variant_by_key
-from app.modules.admin.image_size import raster_dimensions
-from app.modules.admin.models import CdVariantLogo
 from app.modules.admin.router import get_cd_variant_service
 from app.modules.admin.service.cd_variants import SquareLogoRef
 from app.modules.auth import policy
 from app.modules.auth.policy import GREMIUM_VIEW_ALL, can_view_gremium
 from app.modules.gremien import gremium_roles
+from app.modules.protocol.cd_resolver import resolve_cd_variant_by_key
+from app.modules.site_config.cd_logos import (
+    MAX_CD_LOGO_BYTES,
+    SQUARE_LOGO_MAX_PX,
+    SQUARE_LOGO_MIN_PX,
+    check_square_logo,
+)
+from app.modules.site_config.image_size import raster_dimensions
+from app.modules.site_config.models import CdVariantLogo
 from app.shared.errors import (
     NotFoundError,
     PayloadTooLargeError,

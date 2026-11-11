@@ -42,11 +42,6 @@ from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.cd_resolver import (
-    cd_render_config,
-    cd_variant_key_for_gremium,
-    resolve_cd_variant_by_key,
-)
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -76,6 +71,11 @@ from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient, TypstError
+from app.modules.protocol.cd_resolver import (
+    cd_render_config,
+    cd_variant_key_for_gremium,
+    resolve_cd_variant_by_key,
+)
 from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.markdown import (
     ElectionLine,

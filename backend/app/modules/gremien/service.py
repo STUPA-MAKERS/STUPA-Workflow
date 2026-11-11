@@ -54,8 +54,6 @@ from sqlalchemy import cast as sql_cast
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.cd_logos import ALLOWED_SQUARE_LOGO_MIME
-from app.modules.admin.models import CdVariantLogo
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.policy import GREMIUM_VIEW_ALL
@@ -84,6 +82,8 @@ from app.modules.gremien.schemas import (
 from app.modules.livevote.agenda_service import title_of
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.protocol.models import Protocol
+from app.modules.site_config.cd_logos import ALLOWED_SQUARE_LOGO_MIME
+from app.modules.site_config.models import CdVariantLogo
 from app.modules.voting.election import election_config, is_election
 from app.modules.voting.listing import read_scope
 from app.modules.voting.models import SecretBallot, Vote

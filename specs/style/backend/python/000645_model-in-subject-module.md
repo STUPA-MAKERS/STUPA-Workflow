@@ -11,7 +11,8 @@ implementation:
   - backend/app/modules/gremien/models.py
   - backend/app/modules/application_types/models.py
   - backend/app/modules/webhooks/models.py
-  - backend/app/modules/admin/models.py
+  - backend/app/modules/site_config/models.py
+  - backend/app/modules/site_config/reads.py
 scope:
   - backend/app/modules
 ---

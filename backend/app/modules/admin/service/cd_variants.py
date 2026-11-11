@@ -29,15 +29,6 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 
-from app.modules.admin.cd_logos import (
-    ALLOWED_CD_LOGO_MIME,
-    ALLOWED_SQUARE_LOGO_MIME,
-    MAX_CD_LOGO_BYTES,
-    LogoSlot,
-    check_square_logo,
-    sniff_cd_logo,
-)
-from app.modules.admin.models import CdVariant, CdVariantLogo
 from app.modules.admin.schemas import (
     CdVariantCreate,
     CdVariantLogoOut,
@@ -52,6 +43,15 @@ from app.modules.audit.actions import AuditAction
 from app.modules.files.scanner import scan_or_raise
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.gremien.models import Gremium
+from app.modules.site_config.cd_logos import (
+    ALLOWED_CD_LOGO_MIME,
+    ALLOWED_SQUARE_LOGO_MIME,
+    MAX_CD_LOGO_BYTES,
+    LogoSlot,
+    check_square_logo,
+    sniff_cd_logo,
+)
+from app.modules.site_config.models import CdVariant, CdVariantLogo
 from app.settings import Settings, get_settings
 from app.shared.errors import (
     ConflictError,

@@ -25,7 +25,6 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
 
 from app.deps import DbSession, Principal, SettingsDep, get_current_principal, require_principal
-from app.modules.admin.site_config_service import active_branding
 from app.modules.auth.people import PersonRef
 from app.modules.files.service import FilesService
 from app.modules.notifications.mentions import notify_ticket_mentions
@@ -35,6 +34,7 @@ from app.modules.notifications.tickets import (
     notify_ticket_note,
     notify_ticket_received,
 )
+from app.modules.site_config.reads import active_branding
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.schemas import (
     NoteBody,

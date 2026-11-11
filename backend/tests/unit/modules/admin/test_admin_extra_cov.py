@@ -19,13 +19,10 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.admin.branding import Branding
-from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.site_config_service import (
     DEFAULT_APP_NAME,
     DEFAULT_APP_SHORT_NAME,
     SiteConfigService,
-    _branding,
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.gremien import gremium_roles as gr
@@ -42,6 +39,9 @@ from app.modules.gremien.gremium_roles import (
 )
 from app.modules.gremien.models import GremiumMembership, GremiumRole
 from app.modules.gremien.role_schemas import GremiumRoleCreate, GremiumRoleUpdate
+from app.modules.site_config.branding import Branding
+from app.modules.site_config.models import SiteConfigVersion
+from app.modules.site_config.reads import branding_of
 from app.shared.errors import ConflictError, NotFoundError
 from tests._support.auth_fakes import fake_session, result
 
@@ -332,9 +332,9 @@ def _scv(version: int, *, active: bool, branding=None) -> SiteConfigVersion:
 
 
 def test_branding_helper_none_and_row() -> None:
-    assert isinstance(_branding(None), Branding)
+    assert isinstance(branding_of(None), Branding)
     row = _scv(1, active=True, branding=Branding(appName="X").model_dump(by_alias=True))
-    assert _branding(row).app_name == "X"
+    assert branding_of(row).app_name == "X"
 
 
 async def test_get_no_versions() -> None:
@@ -492,7 +492,7 @@ def test_module_constants_consistency() -> None:
 
 
 def test_public_branding_hides_the_help_and_ticket_settings() -> None:
-    from app.modules.admin.branding import HelpSettings, PublicBranding
+    from app.modules.site_config.branding import HelpSettings, PublicBranding
 
     with pytest.raises(ValueError, match="https://"):
         HelpSettings(wikiUrl="javascript:alert(1)")
@@ -520,7 +520,7 @@ async def test_public_names_the_wiki_and_the_public_switch() -> None:
 
 
 async def test_active_branding_reads_the_active_row_or_the_defaults() -> None:
-    from app.modules.admin.site_config_service import active_branding
+    from app.modules.site_config.reads import active_branding
 
     active = _scv(1, active=True, branding=Branding(appName="A").model_dump(by_alias=True))
     assert (await active_branding(fake_session(result(active)))).app_name == "A"

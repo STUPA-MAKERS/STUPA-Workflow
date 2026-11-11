@@ -11,8 +11,8 @@ tests:
 implementation:
   - frontend/src/app/features/accessibility/accessibility-statement.component.ts
   - frontend/src/app/pages/admin/branding/branding-editor.component.ts
-  - backend/app/modules/admin/statement.py
-  - backend/app/modules/admin/branding.py
+  - backend/app/modules/site_config/statement.py
+  - backend/app/modules/site_config/branding.py
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

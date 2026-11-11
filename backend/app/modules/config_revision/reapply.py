@@ -65,8 +65,8 @@ async def reapply_snapshot(
                 UUID(entity_id), payload, actor, action=action, extra_data=extra_data
             )
         case entities.ENTITY_SITE_CONFIG:
-            from app.modules.admin.branding import Branding
             from app.modules.admin.site_config_service import SiteConfigService
+            from app.modules.site_config.branding import Branding
 
             branding = Branding.model_validate(snapshot)
             await SiteConfigService(session).restore_branding(
