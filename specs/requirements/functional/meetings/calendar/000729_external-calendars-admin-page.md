@@ -2,7 +2,7 @@
 id: "000729"
 title: The admin page Kalender lists and edits the external calendars
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null
