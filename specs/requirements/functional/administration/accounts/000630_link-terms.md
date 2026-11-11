@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
   - backend/app/modules/applications/models.py
-  - backend/app/modules/auth/email_login.py
+  - backend/app/modules/applications/email_login.py
 scope:
   - backend/app/modules/auth
   - backend/app/modules/applications

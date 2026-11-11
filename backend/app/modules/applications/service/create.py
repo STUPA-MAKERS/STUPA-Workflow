@@ -91,7 +91,7 @@ class CreateOps(ApplicationsServiceBase):
 
         A public submission starts unconfirmed and rests in the flow: no automatic
         transition and no mail. The magic-link verify starts the flow
-        (``auth.service.verify_magic_link``).
+        (``applications.magic_link.verify_magic_link``).
 
         ``email_confirmed`` tells whether the applicant email is already confirmed.
         The router sets it to False for a logged-in person who enters an email

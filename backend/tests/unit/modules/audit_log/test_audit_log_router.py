@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 from app.deps import get_current_principal
 from app.main import create_app
 from app.modules.audit.models import AuditEntry, AuditVerification
-from app.modules.audit.router import get_audit_service
 from app.modules.audit.service import ChainVerification
+from app.modules.audit_log.router import get_audit_service
 from app.modules.auth.principal import Principal
 from app.shared.errors import ConflictError, RateLimitedError
 

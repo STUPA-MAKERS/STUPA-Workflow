@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 
-from app.modules.audit.service import data_uuid_strings
+from app.modules.audit_log.service import data_uuid_strings
 
 _U1 = str(uuid.uuid4())
 _U2 = str(uuid.uuid4())

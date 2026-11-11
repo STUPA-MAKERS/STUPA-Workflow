@@ -5,7 +5,16 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/modules/auth/test_no_upward_import.py:test_import_contract_has_no_exception_for_auth_or_audit"
+implementation:
+  - backend/app/modules/applications/login_router.py
+  - backend/app/modules/applications/magic_link.py
+  - backend/app/modules/applications/email_login.py
+  - backend/app/modules/audit_log
+  - backend/app/modules/account
+  - backend/app/deps.py
+  - backend/pyproject.toml
 scope:
   - backend/app/modules
   - backend/pyproject.toml

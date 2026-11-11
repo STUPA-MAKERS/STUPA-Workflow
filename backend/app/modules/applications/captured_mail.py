@@ -7,7 +7,7 @@ gets one mail with a link:
   (``/applications/{id}``). The login is the usual one.
 - A guest applicant gets the login link of the e-mail login
   (``/my-applications#t=…``), as after a guest submission. The link comes from
-  ``auth.email_login.issue_confirm_link``, so the token rules are the same.
+  ``applications.email_login.issue_confirm_link``, so the token rules are the same.
 
 The mail is not opt-outable: its kind is not in ``NOTIFICATION_KINDS``, like the magic
 link. It is the only notice that an application in the name of the person exists.
@@ -60,8 +60,8 @@ async def notify_application_captured(
     account. The idempotency key holds only the application, so a retry or a second
     call for the same application coalesces into one mail.
     """
+    from app.modules.applications import email_login
     from app.modules.applications.models import Applicant, Application
-    from app.modules.auth import email_login
     from app.modules.gremien.models import Gremium
 
     try:

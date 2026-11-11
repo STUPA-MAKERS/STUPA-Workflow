@@ -20,9 +20,9 @@ from sqlalchemy.pool import NullPool
 
 from app.db import get_session
 from app.modules.application_types.models import ApplicationType
+from app.modules.applications import magic_link
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
-from app.modules.auth import service as auth_service
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
@@ -147,7 +147,7 @@ async def issue_magic_token(
         links.append(link)
 
     async with maker() as session:
-        await auth_service.request_magic_link(
+        await magic_link.request_magic_link(
             session, settings, email=email, application_id=app_id, deliver=_deliver
         )
         await session.commit()
@@ -160,7 +160,7 @@ async def issue_magic_token(
 async def redeem(maker: async_sessionmaker[AsyncSession], settings: Settings, token: str) -> str:
     """Redeem a token and return the application id of the new applicant session."""
     async with maker() as session:
-        app_id, _ = await auth_service.verify_magic_link(session, settings, token=token)
+        app_id, _ = await magic_link.verify_magic_link(session, settings, token=token)
         await session.commit()
     return app_id
 

@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
 from app.modules.audit.service import AuditService
+from app.modules.audit_log.service import AuditLogService
 
 pytestmark = pytest.mark.integration
 
@@ -145,7 +146,7 @@ async def test_resolve_data_ids_resolves_embedded_uuids(session: AsyncSession) -
     await session.flush()
     unknown = str(_uuid.uuid4())
 
-    resolved = await AuditService(session).resolve_data_ids(
+    resolved = await AuditLogService(session).resolve_data_ids(
         [
             {"gremiumId": str(g.id), "note": "kein-uuid"},
             {"members": [{"delegateId": unknown}]},

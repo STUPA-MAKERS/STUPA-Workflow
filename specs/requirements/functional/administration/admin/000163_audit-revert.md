@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/config_revision/revert.py
-  - backend/app/modules/audit/router.py
+  - backend/app/modules/audit_log/router.py
   - frontend/src/app/pages/admin/audit/audit-log.component.ts
 scope:
   - backend/app/modules/config_revision

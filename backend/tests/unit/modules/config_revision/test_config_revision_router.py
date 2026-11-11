@@ -165,7 +165,7 @@ def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatc
             seen.append(principal)
             return RevertResult(entity_type="flow", entity_id="global", reverted_audit_id=entry_id)
 
-    monkeypatch.setattr("app.modules.audit.router.RevertService", _FakeRevert)
+    monkeypatch.setattr("app.modules.audit_log.router.RevertService", _FakeRevert)
     app = create_app()
     app.dependency_overrides[get_current_principal] = lambda: _principal(
         "audit.revert", "flow.configure"

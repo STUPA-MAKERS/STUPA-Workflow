@@ -23,6 +23,8 @@ from fastapi.testclient import TestClient
 from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
+from app.modules.account import router as account_mod
+from app.modules.applications import login_router as login_mod
 from app.modules.auth import mcp_router as mcp_router_mod
 from app.modules.auth import oauth, oauth_service, rbac, service, sessions
 from app.modules.auth import oauth_router as oauth_router_mod
@@ -1129,14 +1131,14 @@ async def test_me_gremien_helpers_with_rows(monkeypatch: pytest.MonkeyPatch) -> 
 
     gremium_row = SimpleNamespace(id=gid, name="StuPa", slug="stupa")
     db = fake_session(result(gremium_row))
-    out = await router_mod._gremien_for(db, "u1")
+    out = await account_mod._gremien_for(db, "u1")
     assert len(out) == 1
     assert out[0].name == "StuPa"
 
-    out2 = await router_mod._session_manage_gremien(fake_session(), Principal(sub="u1"))
+    out2 = await account_mod._session_manage_gremien(fake_session(), Principal(sub="u1"))
     assert out2 == [gid]
     capped = Principal(sub="u1", scope_permissions=frozenset({"application.read"}))
-    assert await router_mod._session_manage_gremien(fake_session(), capped) == []
+    assert await account_mod._session_manage_gremien(fake_session(), capped) == []
 
 
 async def test_me_gremium_permissions_scope_capped(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1154,10 +1156,10 @@ async def test_me_gremium_permissions_scope_capped(monkeypatch: pytest.MonkeyPat
         ]
 
     monkeypatch.setattr(gr, "active_gremium_roles", _roles)
-    full = await router_mod._gremium_permissions(fake_session(), Principal(sub="u1"))
+    full = await account_mod._gremium_permissions(fake_session(), Principal(sub="u1"))
     assert full == {"g1": ["session.manage", "vote.cast"], "g2": []}
     capped = Principal(sub="u1", scope_permissions=oauth.scope_permissions(["read"]))
-    assert await router_mod._gremium_permissions(fake_session(), capped) == {
+    assert await account_mod._gremium_permissions(fake_session(), capped) == {
         "g1": [],
         "g2": [],
     }
@@ -1170,7 +1172,7 @@ async def test_me_gremien_for_empty(monkeypatch: pytest.MonkeyPatch) -> None:
         return set()
 
     monkeypatch.setattr(gr, "gremium_member_ids", _empty)
-    assert await router_mod._gremien_for(fake_session(), "u1") == []
+    assert await account_mod._gremien_for(fake_session(), "u1") == []
 
 
 async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1187,7 +1189,7 @@ async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) 
         return set()
 
     monkeypatch.setattr(gr, "gremium_member_ids", _none)
-    assert await router_mod._has_scoped_budget_view(fake_session(), "u1") is False
+    assert await account_mod._has_scoped_budget_view(fake_session(), "u1") is False
 
     async def _some(db: object, sub: str, *a: object) -> set[str]:
         return {gid}
@@ -1195,17 +1197,17 @@ async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(gr, "gremium_member_ids", _some)
     db = fake_session()
     db.scalar_results.append("budget-id")
-    assert await router_mod._has_scoped_budget_view(db, "u1") is True
+    assert await account_mod._has_scoped_budget_view(db, "u1") is True
 
     db2 = fake_session()
-    assert await router_mod._has_scoped_budget_view(db2, "u1") is False
+    assert await account_mod._has_scoped_budget_view(db2, "u1") is False
 
 
 async def test_in_substitute_pool_branches() -> None:
     """The flag is true when the pool helper finds at least one gremium."""
     hit_db = fake_session(result("gremium-id"))
-    assert await router_mod._in_substitute_pool(hit_db, "u1") is True
-    assert await router_mod._in_substitute_pool(fake_session(result()), "u1") is False
+    assert await account_mod._in_substitute_pool(hit_db, "u1") is True
+    assert await account_mod._in_substitute_pool(fake_session(result()), "u1") is False
 
 
 def test_me_endpoint_aggregates(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1224,10 +1226,10 @@ def test_me_endpoint_aggregates(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _pool(db: object, sub: str) -> bool:
         return True
 
-    monkeypatch.setattr(router_mod, "_gremien_for", _gremien)
-    monkeypatch.setattr(router_mod, "_session_manage_gremien", _manage)
-    monkeypatch.setattr(router_mod, "_has_scoped_budget_view", _budget)
-    monkeypatch.setattr(router_mod, "_in_substitute_pool", _pool)
+    monkeypatch.setattr(account_mod, "_gremien_for", _gremien)
+    monkeypatch.setattr(account_mod, "_session_manage_gremien", _manage)
+    monkeypatch.setattr(account_mod, "_has_scoped_budget_view", _budget)
+    monkeypatch.setattr(account_mod, "_in_substitute_pool", _pool)
 
     app = create_app(ENABLED)
 
@@ -1281,12 +1283,12 @@ async def test_deliver_magic_link_inner_deliver_sends(
     ) -> None:
         await deliver("r@x.de", "https://link")  # type: ignore[operator]
 
-    monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
-    monkeypatch.setattr(router_mod, "mail_queue_from_pool", lambda pool: None)
-    monkeypatch.setattr(router_mod, "NotificationService", _FakeNotificationService)
-    monkeypatch.setattr(router_mod.service, "request_magic_link", _req)
+    monkeypatch.setattr(login_mod, "get_sessionmaker", lambda: _ACM)
+    monkeypatch.setattr(login_mod, "mail_queue_from_pool", lambda pool: None)
+    monkeypatch.setattr(login_mod, "NotificationService", _FakeNotificationService)
+    monkeypatch.setattr(login_mod.magic_link, "request_magic_link", _req)
 
-    await router_mod._deliver_magic_link(ENABLED, "x@y.de", None, None)
+    await login_mod._deliver_magic_link(ENABLED, "x@y.de", None, None)
     assert sent == [("r@x.de", "https://link")]
     assert db.committed == 1
 

@@ -13,12 +13,13 @@ from typing import Any
 import pytest
 from sqlalchemy.sql.dml import Update
 
+from app.modules.applications import magic_link
 from app.modules.applications.models import (
     Application,
     GuestApplicationSettings,
     MagicLink,
 )
-from app.modules.auth import service, tokens
+from app.modules.auth import tokens
 from app.settings import Settings, load_settings
 from tests._support.auth_fakes import FakeResult, FakeSession, result
 
@@ -66,10 +67,12 @@ async def test_request_writes_an_edit_link_with_the_configured_lifetime(
     `link_ttl_days` sets the expiry. The request reads no state and expires no other
     link: only the lookup runs.
     """
-    monkeypatch.setattr(service, "_now", lambda: NOW)
+    monkeypatch.setattr(magic_link, "_now", lambda: NOW)
     cfg = GuestApplicationSettings(id=1, confirm_ttl_hours=12, link_ttl_days=30)
     db = _session([result(_app())], gets=[cfg])
-    await service.request_magic_link(db, _settings(), email="x@y.de", deliver=lambda _e, _l: None)
+    await magic_link.request_magic_link(
+        db, _settings(), email="x@y.de", deliver=lambda _e, _l: None
+    )
     link = db.added[0]
     assert isinstance(link, MagicLink)
     assert link.expires_at == NOW + timedelta(days=30)
@@ -79,7 +82,9 @@ async def test_request_writes_an_edit_link_with_the_configured_lifetime(
 async def test_request_writes_an_unlimited_link_when_the_ttl_is_null() -> None:
     cfg = GuestApplicationSettings(id=1, confirm_ttl_hours=12, link_ttl_days=None)
     db = _session([result(_app())], gets=[cfg])
-    await service.request_magic_link(db, _settings(), email="x@y.de", deliver=lambda _e, _l: None)
+    await magic_link.request_magic_link(
+        db, _settings(), email="x@y.de", deliver=lambda _e, _l: None
+    )
     assert db.added[0].expires_at is None
 
 
@@ -96,10 +101,10 @@ def _link(settings: Settings, *, expires_at: datetime | None) -> MagicLink:
 
 async def test_verify_accepts_a_link_without_expiry(monkeypatch: pytest.MonkeyPatch) -> None:
     """`expires_at` NULL is valid and does not raise a TypeError (500)."""
-    monkeypatch.setattr(service, "_now", lambda: NOW)
+    monkeypatch.setattr(magic_link, "_now", lambda: NOW)
     settings = _settings()
     db = _session([result(_link(settings, expires_at=None))])
-    app_id, token = await service.verify_magic_link(db, settings, token="tok")
+    app_id, token = await magic_link.verify_magic_link(db, settings, token="tok")
     assert app_id == "aid-1"
     assert token
 
@@ -108,10 +113,10 @@ async def test_verify_expires_the_older_links_of_the_application(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The redeem sets `expires_at = now` on the older, still valid links."""
-    monkeypatch.setattr(service, "_now", lambda: NOW)
+    monkeypatch.setattr(magic_link, "_now", lambda: NOW)
     settings = _settings()
     db = _session([result(_link(settings, expires_at=None))])
-    await service.verify_magic_link(db, settings, token="tok")
+    await magic_link.verify_magic_link(db, settings, token="tok")
     updates = [s for s in db.statements if isinstance(s, Update)]
     expire = [u for u in updates if getattr(u.table, "name", None) == "magic_link"]
     assert len(expire) == 1

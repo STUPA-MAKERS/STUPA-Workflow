@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
+from app.modules.applications import login_router as login_mod
 from app.modules.auth import oidc
 from app.modules.auth import router as router_mod
 from app.modules.auth.models import AuthSession
@@ -375,7 +376,7 @@ def test_magic_link_always_202(
     ) -> None:
         scheduled.append((email, application_id))
 
-    monkeypatch.setattr(router_mod, "_deliver_magic_link", _capture)
+    monkeypatch.setattr(login_mod, "_deliver_magic_link", _capture)
     resp = enabled_client.post("/api/auth/magic-link", json={"email": "x@y.de"})
     assert resp.status_code == 202
     assert resp.json() == {"status": "accepted"}
@@ -409,7 +410,7 @@ def test_magic_link_well_formed_altcha_202(
     async def _noop(settings: object, email: str, application_id: object, pool: object) -> None:
         return None
 
-    monkeypatch.setattr(router_mod, "_deliver_magic_link", _noop)
+    monkeypatch.setattr(login_mod, "_deliver_magic_link", _noop)
     solution = solve_challenge(create_challenge("altcha-test-secret-0123", max_number=50))
     resp = enabled_client.post(
         "/api/auth/magic-link", json={"email": "x@y.de", "altcha": solution}
@@ -434,9 +435,9 @@ async def test_deliver_magic_link_opens_session_and_commits(
     async def _req(session: object, settings: object, *, email: str, **k: object) -> None:
         called.append(email)
 
-    monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
-    monkeypatch.setattr(router_mod.service, "request_magic_link", _req)
-    await router_mod._deliver_magic_link(ENABLED, "x@y.de", None, None)
+    monkeypatch.setattr(login_mod, "get_sessionmaker", lambda: _ACM)
+    monkeypatch.setattr(login_mod.magic_link, "request_magic_link", _req)
+    await login_mod._deliver_magic_link(ENABLED, "x@y.de", None, None)
     assert called == ["x@y.de"]
     assert db.committed == 1
 
@@ -473,12 +474,12 @@ async def _deliver_and_capture_lang(
     ) -> None:
         await deliver("r@x.de", "https://link")  # type: ignore[operator]
 
-    monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
-    monkeypatch.setattr(router_mod, "mail_queue_from_pool", lambda pool: None)
-    monkeypatch.setattr(router_mod, "NotificationService", _FakeNotificationService)
-    monkeypatch.setattr(router_mod.service, "request_magic_link", _req)
+    monkeypatch.setattr(login_mod, "get_sessionmaker", lambda: _ACM)
+    monkeypatch.setattr(login_mod, "mail_queue_from_pool", lambda pool: None)
+    monkeypatch.setattr(login_mod, "NotificationService", _FakeNotificationService)
+    monkeypatch.setattr(login_mod.magic_link, "request_magic_link", _req)
 
-    await router_mod._deliver_magic_link(ENABLED, "x@y.de", None, None)
+    await login_mod._deliver_magic_link(ENABLED, "x@y.de", None, None)
     return langs
 
 
@@ -515,7 +516,7 @@ def test_magic_link_verify_ok(
     async def _verify(*a: object, **k: object) -> tuple[str, str]:
         return app_uuid, "applicant-token"
 
-    monkeypatch.setattr(router_mod.service, "verify_magic_link", _verify)
+    monkeypatch.setattr(login_mod.magic_link, "verify_magic_link", _verify)
     resp = enabled_client.post("/api/auth/magic-link/verify", json={"token": "tok"})
     assert resp.status_code == 200
     body = resp.json()
@@ -530,7 +531,7 @@ def test_magic_link_verify_gone(
     async def _verify(*a: object, **k: object) -> tuple[str, str]:
         raise GoneError("expired")
 
-    monkeypatch.setattr(router_mod.service, "verify_magic_link", _verify)
+    monkeypatch.setattr(login_mod.magic_link, "verify_magic_link", _verify)
     resp = enabled_client.post("/api/auth/magic-link/verify", json={"token": "tok"})
     assert resp.status_code == 410
 
@@ -728,7 +729,7 @@ def test_email_login_request_is_202_and_runs_in_the_background(
     async def _capture(settings: object, email: str, pool: object) -> None:
         scheduled.append(email)
 
-    monkeypatch.setattr(router_mod, "_deliver_email_login", _capture)
+    monkeypatch.setattr(login_mod, "_deliver_email_login", _capture)
     resp = enabled_client.post("/api/auth/email-login", json={"email": "x@y.de"})
     assert resp.status_code == 202
     assert resp.json() == {"status": "accepted"}
@@ -769,13 +770,13 @@ async def test_deliver_email_login_sends_in_the_newest_language(
     async def _request(_db: object, _settings: object, *, email: str, send_link: object) -> None:
         await send_link(email, "https://link")  # type: ignore[operator]
 
-    monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
-    monkeypatch.setattr(router_mod, "mail_queue_from_pool", lambda pool: None)
-    monkeypatch.setattr(router_mod, "NotificationService", _Notifications)
-    monkeypatch.setattr(router_mod.service, "resolve_application", _resolve)
-    monkeypatch.setattr(router_mod, "resolve_application_lang", _lang)
-    monkeypatch.setattr(router_mod.email_login, "request_email_login", _request)
-    await router_mod._deliver_email_login(ENABLED, "x@y.de", None)
+    monkeypatch.setattr(login_mod, "get_sessionmaker", lambda: _ACM)
+    monkeypatch.setattr(login_mod, "mail_queue_from_pool", lambda pool: None)
+    monkeypatch.setattr(login_mod, "NotificationService", _Notifications)
+    monkeypatch.setattr(login_mod.magic_link, "resolve_application", _resolve)
+    monkeypatch.setattr(login_mod, "resolve_application_lang", _lang)
+    monkeypatch.setattr(login_mod.email_login, "request_email_login", _request)
+    await login_mod._deliver_email_login(ENABLED, "x@y.de", None)
     assert sent == [("x@y.de", "https://link", "en")]
     assert lang_for == [getattr(newest, "id", None)]
     assert db.committed == 1
@@ -787,7 +788,7 @@ def test_email_login_verify_sets_the_cookie(
     async def _verify(*a: object, **k: object) -> str:
         return "email-session"
 
-    monkeypatch.setattr(router_mod.email_login, "verify_email_login", _verify)
+    monkeypatch.setattr(login_mod.email_login, "verify_email_login", _verify)
     resp = enabled_client.post("/api/auth/email-login/verify", json={"token": "tok"})
     assert resp.status_code == 204
     assert ENABLED.applicant_cookie_name in resp.headers.get("set-cookie", "")
@@ -799,6 +800,6 @@ def test_email_login_verify_gone(
     async def _verify(*a: object, **k: object) -> str:
         raise GoneError("expired")
 
-    monkeypatch.setattr(router_mod.email_login, "verify_email_login", _verify)
+    monkeypatch.setattr(login_mod.email_login, "verify_email_login", _verify)
     resp = enabled_client.post("/api/auth/email-login/verify", json={"token": "tok"})
     assert resp.status_code == 410
