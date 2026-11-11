@@ -2,7 +2,7 @@
 id: "000671"
 title: A view shows an action in one place
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

@@ -2,7 +2,7 @@
 id: "000668"
 title: The fiscal year is chosen with a chip
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

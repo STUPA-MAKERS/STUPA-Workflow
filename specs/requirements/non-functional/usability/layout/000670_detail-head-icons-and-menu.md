@@ -2,7 +2,7 @@
 id: "000670"
 title: A detail head has icon buttons and a menu
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

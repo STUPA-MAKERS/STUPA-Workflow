@@ -2,7 +2,7 @@
 id: "000669"
 title: The actions of a "Verknüpft" section are icon buttons
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

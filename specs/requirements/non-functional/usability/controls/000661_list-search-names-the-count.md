@@ -2,7 +2,7 @@
 id: "000661"
 title: The search field of a list names the count
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

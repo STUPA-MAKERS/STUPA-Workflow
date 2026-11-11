@@ -2,7 +2,7 @@
 id: "000662"
 title: A list shows no "X von Y" counter
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

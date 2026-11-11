@@ -2,7 +2,7 @@
 id: "000660"
 title: The navigation rail shows the active item
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

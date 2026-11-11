@@ -2,7 +2,7 @@
 id: "000667"
 title: A list filters the status with a chip
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

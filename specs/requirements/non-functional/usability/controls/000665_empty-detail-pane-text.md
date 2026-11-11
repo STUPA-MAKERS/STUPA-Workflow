@@ -2,7 +2,7 @@
 id: "000665"
 title: The empty detail pane says "Kein … geöffnet"
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

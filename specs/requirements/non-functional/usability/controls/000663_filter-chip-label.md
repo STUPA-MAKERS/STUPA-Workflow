@@ -2,7 +2,7 @@
 id: "000663"
 title: A filter chip shows its name, then name and value
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

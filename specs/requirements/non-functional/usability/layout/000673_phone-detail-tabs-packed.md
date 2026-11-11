@@ -2,7 +2,7 @@
 id: "000673"
 title: The tabs of a phone detail are packed at the start
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

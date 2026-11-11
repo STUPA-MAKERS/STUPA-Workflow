@@ -2,7 +2,7 @@
 id: "000664"
 title: A list page opens no item by itself
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

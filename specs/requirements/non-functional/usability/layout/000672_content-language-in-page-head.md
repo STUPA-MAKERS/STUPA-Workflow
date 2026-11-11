@@ -2,7 +2,7 @@
 id: "000672"
 title: The language of a content editor stands in the page head
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:

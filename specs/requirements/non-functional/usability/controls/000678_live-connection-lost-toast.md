@@ -2,7 +2,7 @@
 id: "000678"
 title: A lost live connection shows as a toast
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:
