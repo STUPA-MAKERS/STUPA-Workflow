@@ -5,7 +5,9 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+implementation:
+  - backend/pyproject.toml
+  - .github/workflows/ci.yml
 scope:
   - backend/app/modules
   - backend/pyproject.toml

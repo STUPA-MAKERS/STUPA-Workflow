@@ -67,9 +67,25 @@ def test_measure_reads_a_folder(tmp_path: Path) -> None:
     assert ratchets.measure("service-commits", tmp_path) == {"backend/app/service.py": 1}
 
 
+def test_import_exceptions_are_counted_per_contract(tmp_path: Path) -> None:
+    """§S/backend/python/000646: each entry of `ignore_imports` counts for its contract."""
+    pyproject = (
+        "[[tool.importlinter.contracts]]\n"
+        'id = "layers"\n'
+        'ignore_imports = ["app.a -> app.b", "app.a -> app.c"]\n'
+        "[[tool.importlinter.contracts]]\n"
+        'id = "clean"\n'
+    )
+    assert ratchets.count_import_exceptions(pyproject) == {"layers": 2, "clean": 0}
+    assert ratchets.count_import_exceptions("") == {}
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "pyproject.toml").write_text(pyproject)
+    assert ratchets.measure("import-exceptions", tmp_path) == {"layers": 2}
+
+
 def test_repository_equals_its_baselines() -> None:
     assert [
         line
-        for name in ratchets.RATCHETS
+        for name in ratchets.NAMES
         for line in ratchets.compare(name, ratchets.measure(name), ratchets._read(name))
     ] == []

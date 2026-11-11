@@ -5,7 +5,13 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "backend/tests/unit/scripts/test_check_ratchets.py:test_import_exceptions_are_counted_per_contract"
+implementation:
+  - backend/pyproject.toml
+  - scripts/check_ratchets.py
+  - scripts/ratchet-baseline/import-exceptions.json
+  - .github/workflows/ci.yml
 scope:
   - backend/pyproject.toml
   - scripts/
