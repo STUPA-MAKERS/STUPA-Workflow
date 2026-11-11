@@ -844,9 +844,12 @@ describe('CalendarComponent (public)', () => {
     expect(screen.queryByRole('button', { name: 'Termin anlegen' })).toBeNull();
   });
 
-  it('shows an empty Gremium filter when the Gremien cannot be read', async () => {
+  it('shows no Gremium filter when the Gremien cannot be read', async () => {
     const view = await setup({ public: true });
     view.http.expectOne('/api/public/calendar/committees').flush(null, { status: 500, statusText: 'Error' });
-    expect(view.cmp.gremien()).toEqual([]);
+    view.http.expectOne((r) => r.url === '/api/public/calendar/entries').flush({ items: ITEMS });
+    view.fixture.detectChanges();
+    expect(cards()).toEqual(['Vollversammlung']);
+    expect(screen.queryByRole('button', { name: /Alle Gremien/ })).toBeNull();
   });
 });
