@@ -2,7 +2,7 @@
 id: "000643"
 title: A backend module imports only from its layer and from lower layers
 kind: style
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:
@@ -18,7 +18,8 @@ scope:
 
 The backend modules are in five layers, from the top to the bottom:
 
-1. `admin`, `search`, `privacy`, `backup`, `config_revision`, `calendar`
+1. `admin`, `search`, `privacy`, `backup`, `config_revision`, `calendar`, `audit_log`,
+   `account`
 2. `protocol`, `livevote`, `todos`, `tickets`, `delegations`
 3. `voting`, `budget`, `applications`, `flow`
 4. `forms`, `application_types`, `notifications`, `webhooks`, `files`, `media`, `translations`,
