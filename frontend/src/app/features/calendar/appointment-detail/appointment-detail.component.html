@@ -54,7 +54,7 @@
           </div>
         </div>
       }
-      @if (a.answers.length) {
+      @if (a.answers.length || a.unanswered.length) {
         <div class="apv__block">
           <span class="apv__cap">{{ 'calendar.detail.answers' | t }}</span>
           <div class="rowgroup apv__people" role="list">
@@ -65,19 +65,28 @@
                 <app-status-text [kind]="answerKind(row.answer)">{{ answerKey(row.answer) | t }}</app-status-text>
               </div>
             }
+            @for (p of a.unanswered; track p.id) {
+              <div class="apv__person" role="listitem">
+                <app-avatar size="sm" [name]="p.name" [decorative]="true" />
+                <span class="apv__name">{{ p.name }}</span>
+                <app-status-text kind="neutral">{{ 'calendar.answer.open' | t }}</app-status-text>
+              </div>
+            }
           </div>
         </div>
       }
       <app-todo-linked-list kind="appointment" headingId="apv-todos" [targetId]="a.id" />
     </div>
-    @if (a.canEdit) {
-      <app-button dialog-footer variant="text" (click)="confirming.set(true)">
-        <app-icon name="trash" />{{ 'action.delete' | t }}
-      </app-button>
-      <app-button dialog-footer variant="tonal" (click)="edit.emit(a)">
-        <app-icon name="edit" />{{ 'action.edit' | t }}
-      </app-button>
-    }
+  }
+  @if (a?.canEdit) {
+    <app-button dialog-footer variant="text" (click)="confirming.set(true)">
+      <app-icon name="trash" />{{ 'action.delete' | t }}
+    </app-button>
+  }
+  @if (a?.canEdit) {
+    <app-button dialog-footer variant="tonal" (click)="a && edit.emit(a)">
+      <app-icon name="edit" />{{ 'action.edit' | t }}
+    </app-button>
   }
 </app-dialog>
 

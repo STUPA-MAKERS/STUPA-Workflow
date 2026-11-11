@@ -100,8 +100,9 @@ class AnswerOut(FrozenCamelModel, frozen=True):
 class AppointmentOut(FrozenCamelModel, frozen=True):
     """A Termin as its reader sees it.
 
-    ``answers`` is empty for a reader who is neither the creator nor invited, because
-    only the creator and the invited persons see who comes. ``invited`` tells if the
+    ``answers`` and ``unanswered`` are empty for a reader who is neither the creator nor
+    invited, because only the creator and the invited persons see who comes.
+    ``unanswered`` names each invited person without an answer. ``invited`` tells if the
     caller can answer, ``canEdit`` if the caller can change and delete the Termin.
     """
 
@@ -119,6 +120,7 @@ class AppointmentOut(FrozenCamelModel, frozen=True):
     gremien: tuple[GremiumRefOut, ...] = ()
     persons: tuple[PersonOut, ...] = ()
     answers: tuple[AnswerOut, ...] = ()
+    unanswered: tuple[PersonOut, ...] = ()
     my_answer: AnswerKey | None = Field(default=None, serialization_alias="myAnswer")
     invited: bool = False
     can_edit: bool = Field(default=False, serialization_alias="canEdit")

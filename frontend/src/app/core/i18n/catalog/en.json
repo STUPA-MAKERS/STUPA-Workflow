@@ -3616,6 +3616,7 @@
   "calendar.detail.answers": "Answers",
   "calendar.answer.accept": "Accept",
   "calendar.answer.tentative": "Tentative",
+  "calendar.answer.open": "Open",
   "calendar.answer.decline": "Decline",
   "calendar.remove.title": "Delete the appointment?",
   "calendar.remove.body": "“{title}” is deleted for good. The invited persons get a cancellation by e-mail.",

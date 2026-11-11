@@ -67,6 +67,7 @@ function appointment(
     gremien: [],
     persons: [],
     answers: [],
+    unanswered: [],
     myAnswer: null,
     invited: false,
     canEdit: true,
@@ -85,6 +86,7 @@ function initialAppointments(): readonly Appointment[] {
         { principalId: PEOPLE[1].id, name: PEOPLE[1].name, answer: 'accept' },
         { principalId: PEOPLE[2].id, name: PEOPLE[2].name, answer: 'tentative' },
       ],
+      unanswered: [PEOPLE[3]],
       invited: true,
       canEdit: false,
     }),
@@ -346,6 +348,7 @@ function fromInput(id: string, body: AppointmentInput, before: Appointment | nul
     gremien: GREMIEN.filter((g) => body.gremiumIds.includes(g.id)),
     persons: PEOPLE.filter((p) => body.principalIds.includes(p.id)),
     answers: moved ? [] : (before?.answers ?? []),
+    unanswered: before?.unanswered ?? [],
     myAnswer: moved ? null : (before?.myAnswer ?? null),
     invited: before?.invited ?? false,
     canEdit: true,
@@ -361,6 +364,7 @@ function answered(a: Appointment, answer: AnswerKey): Appointment {
       ...a.answers.filter((row) => row.principalId !== ME.id),
       { principalId: ME.id, name: ME.name, answer },
     ],
+    unanswered: a.unanswered.filter((p) => p.id !== ME.id),
   };
 }
 

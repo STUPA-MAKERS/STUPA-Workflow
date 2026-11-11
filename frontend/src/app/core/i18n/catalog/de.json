@@ -3616,6 +3616,7 @@
   "calendar.detail.answers": "Antworten",
   "calendar.answer.accept": "Zusage",
   "calendar.answer.tentative": "Vorbehalt",
+  "calendar.answer.open": "Offen",
   "calendar.answer.decline": "Absage",
   "calendar.remove.title": "Termin löschen?",
   "calendar.remove.body": "„{title}“ wird endgültig gelöscht. Die eingeladenen Personen bekommen eine Absage per E-Mail.",

@@ -48,15 +48,17 @@ describe('AppointmentDetailComponent', () => {
     expect(within(dialog).getByText('Dana Meier')).toBeInTheDocument();
     expect(within(dialog).getByText('Offene Buchungen')).toBeInTheDocument();
     expect(within(dialog).getByText('Haushaltsausschuss')).toBeInTheDocument();
-    const [row] = within(dialog).getAllByRole('listitem');
+    const [row, open] = within(dialog).getAllByRole('listitem');
     expect(row).toHaveTextContent('Jonas Weber');
     expect(row).toHaveTextContent('Zusage');
+    expect(open).toHaveTextContent('Mira Kaya');
+    expect(open).toHaveTextContent('Offen');
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
 
   it('leaves out what a Termin does not have', async () => {
     await setup(
-      appointment({ place: null, description: null, creator: null, gremien: [], persons: [], answers: [], invited: false, canEdit: false }),
+      appointment({ place: null, description: null, creator: null, gremien: [], persons: [], answers: [], unanswered: [], invited: false, canEdit: false }),
     );
     const dialog = screen.getByRole('dialog', { name: 'Jour fixe' });
     expect(within(dialog).queryByText('Ort')).toBeNull();

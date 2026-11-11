@@ -329,8 +329,10 @@ class AppointmentService:
         row = item.row
         shows = rules.sees_answers(viewer, row.creator_id, item.targets)
         answers = item.answers if shows else ()
+        answered = frozenset(a.principal_id for a in answers)
+        unanswered = (await self.people(item.targets)) - answered if shows else frozenset[UUID]()
         names = await self._names(
-            {*item.targets.principal_ids, *(a.principal_id for a in answers)}
+            {*item.targets.principal_ids, *answered, *unanswered}
             | ({row.creator_id} if row.creator_id is not None else set())
         )
         gremien = await self._gremium_names(item.targets.gremium_ids)
@@ -376,6 +378,12 @@ class AppointmentService:
                         for a in answers
                     ),
                     key=lambda a: a.name.casefold(),
+                )
+            ),
+            unanswered=tuple(
+                sorted(
+                    (PersonOut(id=pid, name=names[pid]) for pid in unanswered if pid in names),
+                    key=lambda p: p.name.casefold(),
                 )
             ),
             my_answer=my_answer(viewer, item),

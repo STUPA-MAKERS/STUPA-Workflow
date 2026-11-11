@@ -36,6 +36,7 @@ export function appointment(over: Partial<Appointment> = {}): Appointment {
     gremien: [{ id: 'g-1', name: 'Haushaltsausschuss' }],
     persons: [{ id: 'p-2', name: 'Jonas Weber' }],
     answers: [{ principalId: 'p-2', name: 'Jonas Weber', answer: 'accept' }],
+    unanswered: [{ id: 'p-3', name: 'Mira Kaya' }],
     myAnswer: null,
     invited: true,
     canEdit: true,

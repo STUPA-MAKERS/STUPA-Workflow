@@ -162,7 +162,11 @@ async def test_visibility_and_for_all(
         assert _ok(client.put(url, json={**TERMIN, "forAll": True}))["forAll"] is True
         api.login(dora)
         seen = _ok(client.get(url))
-        assert seen["forAll"] is True and seen["invited"] is False and seen["answers"] == []
+        assert (
+            seen["forAll"] is True
+            and seen["invited"] is False
+            and seen["answers"] == [] == seen["unanswered"]
+        )
         _ok(client.put(f"{url}/answer", json={"answer": "accept"}), 403)
         assert [e["title"] for e in _entries(client)] == ["Klausurtagung"]
         assert _entries(client, mine=True) == []
@@ -187,6 +191,8 @@ async def test_answers(api: CalendarApi, maker: async_sessionmaker[AsyncSession]
             _ok(client.put(f"{url}/answer", json={"answer": "tentative"}))["myAnswer"]
             == "tentative"
         )
+        open_ = _ok(client.get(url))
+        assert [p["name"] for p in open_["unanswered"]] == ["Cleo"]
         api.login(cleo)
         _ok(client.put(f"{url}/answer", json={"answer": "decline"}))
         api.login(anna)
@@ -195,6 +201,7 @@ async def test_answers(api: CalendarApi, maker: async_sessionmaker[AsyncSession]
             ("Bert", "tentative"),
             ("Cleo", "decline"),
         ]
+        assert seen["unanswered"] == []
         assert _entries(client)[0]["myAnswer"] is None
         kept = _ok(client.put(url, json={**TIMED, "title": "Neu", "principalIds": [str(bert_id)]}))
         assert [a["name"] for a in kept["answers"]] == ["Bert"]
@@ -202,6 +209,7 @@ async def test_answers(api: CalendarApi, maker: async_sessionmaker[AsyncSession]
             client.put(url, json={**TIMED, "startTime": "15:00:00", "principalIds": [str(bert_id)]})
         )
         assert moved["answers"] == []
+        assert [p["name"] for p in moved["unanswered"]] == ["Bert"]
         past = _create(
             client, startsOn="2020-01-01", endsOn="2020-01-01", principalIds=[str(bert_id)]
         )

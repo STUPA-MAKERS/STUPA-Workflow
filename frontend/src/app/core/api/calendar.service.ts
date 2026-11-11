@@ -76,6 +76,8 @@ export interface Appointment {
   readonly gremien: readonly CalendarGremium[];
   readonly persons: readonly CalendarPerson[];
   readonly answers: readonly AppointmentAnswer[];
+  /** The invited persons without an answer; empty for a reader who is not invited. */
+  readonly unanswered: readonly CalendarPerson[];
   readonly myAnswer: AnswerKey | null;
   readonly invited: boolean;
   readonly canEdit: boolean;
