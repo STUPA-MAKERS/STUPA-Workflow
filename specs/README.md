@@ -501,6 +501,18 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000613](requirements/non-functional/usability/controls/000613_one-ghost-row-holds-message.md) | One ghost row holds the message and shows no bars | approved |
 | [NF/usability/controls/000631](requirements/non-functional/usability/controls/000631_settings-row.md) | A settings row is a row of a row group, 56 px high | approved |
 | [NF/usability/controls/000633](requirements/non-functional/usability/controls/000633_note-is-data-state.md) | A note shows a state of the data, not a failed request | approved |
+| [NF/usability/controls/000661](requirements/non-functional/usability/controls/000661_list-search-names-the-count.md) | The search field of a list names the count | draft |
+| [NF/usability/controls/000662](requirements/non-functional/usability/controls/000662_no-shown-of-total-counter.md) | A list shows no "X von Y" counter | draft |
+| [NF/usability/controls/000663](requirements/non-functional/usability/controls/000663_filter-chip-label.md) | A filter chip shows its name, then name and value | draft |
+| [NF/usability/controls/000665](requirements/non-functional/usability/controls/000665_empty-detail-pane-text.md) | The empty detail pane says "Kein … geöffnet" | draft |
+| [NF/usability/controls/000666](requirements/non-functional/usability/controls/000666_create-wording.md) | A create form has the name of its button | draft |
+| [NF/usability/controls/000667](requirements/non-functional/usability/controls/000667_status-filter-is-a-chip.md) | A list filters the status with a chip | draft |
+| [NF/usability/controls/000668](requirements/non-functional/usability/controls/000668_fiscal-year-chip.md) | The fiscal year is chosen with a chip | draft |
+| [NF/usability/controls/000669](requirements/non-functional/usability/controls/000669_linked-section-icon-actions.md) | The actions of a "Verknüpft" section are icon buttons | draft |
+| [NF/usability/controls/000671](requirements/non-functional/usability/controls/000671_one-place-per-action.md) | A view shows an action in one place | draft |
+| [NF/usability/controls/000675](requirements/non-functional/usability/controls/000675_phone-row-end.md) | A phone list row ends with a menu or with nothing | draft |
+| [NF/usability/controls/000676](requirements/non-functional/usability/controls/000676_tickets-word-in-admin.md) | Verwaltung says "Tickets" | draft |
+| [NF/usability/controls/000678](requirements/non-functional/usability/controls/000678_live-connection-lost-toast.md) | A lost live connection shows as a toast | draft |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll edge fades, or cuts at a line | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
@@ -537,6 +549,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/000624](requirements/non-functional/usability/layout/000624_start-work-list-sticky-head.md) | The work list on Start keeps its column header and cuts at the window edge | approved |
 | [NF/usability/layout/000634](requirements/non-functional/usability/layout/000634_admin-record-row.md) | A record row in Verwaltung has one anatomy | approved |
 | [NF/usability/layout/000635](requirements/non-functional/usability/layout/000635_discard-with-save.md) | A page with Speichern offers Verwerfen in its header | approved |
+| [NF/usability/layout/000660](requirements/non-functional/usability/layout/000660_nav-rail-shows-active-item.md) | The navigation rail shows the active item | draft |
+| [NF/usability/layout/000664](requirements/non-functional/usability/layout/000664_list-opens-no-item-by-itself.md) | A list page opens no item by itself | draft |
+| [NF/usability/layout/000670](requirements/non-functional/usability/layout/000670_detail-head-icons-and-menu.md) | A detail head has icon buttons and a menu | draft |
+| [NF/usability/layout/000672](requirements/non-functional/usability/layout/000672_content-language-in-page-head.md) | The language of a content editor stands in the page head | draft |
+| [NF/usability/layout/000673](requirements/non-functional/usability/layout/000673_phone-detail-tabs-packed.md) | The tabs of a phone detail are packed at the start | draft |
+| [NF/usability/layout/000674](requirements/non-functional/usability/layout/000674_phone-vote-detail-bar.md) | The phone vote detail uses the bar of the other details | draft |
+| [NF/usability/layout/000677](requirements/non-functional/usability/layout/000677_public-page-title-size.md) | A public page has a title of 28 px | draft |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
 | [S/backend/database/000070](style/backend/database/000070_idempotent-tables.md) | A migration that adds a table is idempotent | approved |
