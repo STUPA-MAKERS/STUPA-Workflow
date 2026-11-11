@@ -78,7 +78,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python3 scripts/check_functional.py
-      # Service commits and fake sessions can only go down (specs 000640, 000642).
+      # Service commits, fake sessions and import exceptions can only go down
+      # (specs 000640, 000642, 000646).
       - run: python3 scripts/check_ratchets.py
 
   be-lint:
@@ -96,6 +97,10 @@ jobs:
       - run: pip install -e '.[dev]'
       - name: Ruff lint
         run: ruff check .
+      # The layers of the modules and the shared code (specs 000643, 000644). An entry of
+      # `ignore_imports` that matches no import fails too (000646).
+      - name: Import contracts
+        run: lint-imports
       # `ruff format --check` runs locally through pre-commit (.pre-commit-config.yaml).
       # CI runs the lint only, because the code base is not fully formatted yet.
 

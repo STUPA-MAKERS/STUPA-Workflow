@@ -102,7 +102,8 @@ So a wrapper that looks for `AGENTS.md` or `.agents/skills` resolves to the same
 
 ## Quick command reference
 
-- Backend (`backend/`): `ruff check .` · `basedpyright` · `pytest` · `pytest -m integration`
+- Backend (`backend/`): `ruff check .` · `lint-imports` · `basedpyright` · `pytest` ·
+  `pytest -m integration`
 - Frontend (`frontend/`): `npm run lint` · `npm run typecheck` · `npm test` · `npm run build`
 - Migrations (`backend/`): `alembic revision -m "..."` (hash id) · `alembic heads` (must be 1) ·
   `alembic upgrade head`

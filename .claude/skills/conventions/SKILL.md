@@ -118,10 +118,17 @@ python3 scripts/check_functional.py --write                     # backend, mcp, 
   `be-integration` each write a coverage data file, and the `coverage-gate` job combines them.
 - **A new test of a database query is an integration test on Postgres**
   (`backend/tests/integration`), not a fake session that returns the rows the test wrote down.
-- **Two ratchets only go down** (`scripts/check_ratchets.py`, CI job `functional`): the `commit()`
-  calls outside router files, because a service function does not commit, and the classes with
-  `Session` in their name in `backend/tests/unit`. After you lower a count:
-  `python3 scripts/check_ratchets.py --write`.
+- **Three ratchets only go down** (`scripts/check_ratchets.py`, CI job `functional`): the
+  `commit()` calls outside router files, because a service function does not commit, the classes
+  with `Session` in their name in `backend/tests/unit`, and the entries of `ignore_imports` in
+  the import contracts. After you lower a count: `python3 scripts/check_ratchets.py --write`.
+- **Module layers** (`[tool.importlinter]` in `backend/pyproject.toml`, `lint-imports` in the CI
+  job `be-lint`): a module in `backend/app/modules` imports only from its own layer and from
+  lower layers, and an import inside a function counts. `app/shared`, `db.py`, `settings.py` and
+  `logging_config.py` import no module. A new module needs a layer in the contract. The old
+  imports that break a rule are the `ignore_imports` lists: do not add an entry, and when you
+  remove an import, remove its entry, because `lint-imports` fails for an entry that matches no
+  import. Local: `cd backend && lint-imports`.
 - Local (BE): `ruff check .` + `basedpyright` (0 errors) + `pytest`. Local (FE): `npm run lint`,
   `npm run typecheck`, `npm test`. CI order: `Lint → Typecheck → BE-Unit → BE-Integration →
   Contract (Schemathesis) → FE-Unit → E2E (Playwright) → Coverage-Gate → Image-Build + Smoke`.
