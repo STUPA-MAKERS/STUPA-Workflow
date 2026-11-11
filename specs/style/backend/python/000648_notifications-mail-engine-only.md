@@ -5,6 +5,7 @@ kind: style
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-11
+implementation: null
 scope:
   - backend/app/modules
   - backend/pyproject.toml
