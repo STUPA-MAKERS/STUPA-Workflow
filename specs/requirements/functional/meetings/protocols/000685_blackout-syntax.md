@@ -2,10 +2,16 @@
 id: "000685"
 title: Protocol text marks a segment for blackout
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/shared/test_blackout.py:test_black_out_keeps_an_escaped_marker_and_other_text"
+implementation:
+  - backend/app/shared/blackout.py
+  - typst/typst_service/markdown.py
+  - frontend/src/app/shared/markdown/markdown.util.ts
+  - frontend/vendor/ui-kit/markdown-editor/src/blackout.extension.ts
 scope:
   - backend/app/modules/protocol
   - typst/

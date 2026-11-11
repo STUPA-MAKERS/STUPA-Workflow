@@ -2,10 +2,16 @@
 id: "000689"
 title: Internal views show a marked segment as marked
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "typst/tests/test_markdown.py:test_blackout_bar_and_internal_mark"
+implementation:
+  - frontend/src/app/shared/markdown
+  - frontend/src/app/shared/ui/_very-high-contrast.scss
+  - frontend/vendor/ui-kit/markdown-editor/src/blackout.extension.ts
+  - typst/typst_service/markdown.py
 scope:
   - frontend/src/app/shared/markdown
   - frontend/src/app/features/meetings

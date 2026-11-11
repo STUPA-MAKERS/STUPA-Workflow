@@ -173,3 +173,20 @@
   --callout-fg: var(--color-danger);
   --callout-bg: var(--color-danger-subtle);
 }
+
+// A segment that the public protocol blacks out (000689), and its black bar (000687, 000688).
+.mdv .md-blackout {
+  outline: 1.5px dashed var(--color-text-muted);
+  outline-offset: 1px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  padding: 0 2px;
+}
+.mdv .md-bar {
+  display: inline-block;
+  width: 5.5em;
+  height: 1em;
+  vertical-align: -0.12em;
+  border-radius: 2px;
+  background: var(--color-text);
+}

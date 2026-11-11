@@ -2,10 +2,13 @@
 id: "000691"
 title: A marked segment sends the public PDF to the mailing list
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/integration/modules/protocol/test_protocol_blackout.py:test_finalize_with_a_mark_mails_the_public_pdf"
+implementation:
+  - backend/app/modules/protocol/service.py
 scope:
   - backend/app/modules/protocol
   - backend/worker/protocol.py

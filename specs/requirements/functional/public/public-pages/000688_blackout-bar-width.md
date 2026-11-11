@@ -2,10 +2,12 @@
 id: "000688"
 title: A black bar has one fixed width and the text colour
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - typst/template/protocol.typ
+  - frontend/src/app/shared/markdown/markdown-view.component.scss
 scope:
   - typst/
   - frontend/src/app/shared/markdown

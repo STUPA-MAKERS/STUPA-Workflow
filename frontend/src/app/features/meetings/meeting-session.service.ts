@@ -9,6 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -573,6 +574,10 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.finalizing.set(false);
+        if (problemCode(err) === 'blackout_unclosed') {
+          this.toast.error(this.i18n.translate('meetings.toast.blackoutOpen', { where: blackoutWhere(err, this.i18n) }));
+          return;
+        }
         const detail = problemDetail(err);
         this.toast.error(
           detail
@@ -926,4 +931,11 @@ function nowIso(): string {
 /** The end time of a vote: the known one (an own close or a read), else now. */
 function closedAtOf(m: Meeting, voteId: Uuid): string {
   return m.votes.find((v) => v.id === voteId)?.closedAt ?? nowIso();
+}
+
+/** Where the open blackout marker is: "TOP n" from the field `top.n`, or the free text. */
+function blackoutWhere(err: unknown, i18n: I18nService): string {
+  const body = err instanceof HttpErrorResponse ? (err.error as { errors?: readonly { field?: string }[] } | null) : null;
+  const top = /^top\.(\d+)$/.exec(body?.errors?.[0]?.field ?? '')?.[1];
+  return top ? `TOP ${top}` : i18n.translate('meetings.toast.blackoutOpenFree');
 }

@@ -2,10 +2,12 @@
 id: "000690"
 title: The format bar marks a segment for blackout
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - frontend/src/app/features/meetings/top-sheet
+  - frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.component.ts
 scope:
   - frontend/src/app/features/meetings
 ---
@@ -13,9 +15,9 @@ scope:
 # The format bar marks a segment for blackout
 
 The format bar of the protocol editor must have the button "Schwärzen". It must put the marker
-around the selection, or remove it when the selection already has it. The shortcut must be
-Ctrl+Shift+X (Cmd+Shift+X on macOS). The formatted view must show the marked segment as in
-000689.
+around the selection, or remove it when the selection already has it. In the formatted view
+the shortcut must be Ctrl+Shift+X (Cmd+Shift+X on macOS). The formatted view must show the
+marked segment as in 000689.
 
 Reason: A keeper marks a name while the meeting runs, so the mark must take one action.
 

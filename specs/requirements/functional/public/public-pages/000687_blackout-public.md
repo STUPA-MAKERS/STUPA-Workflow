@@ -2,10 +2,18 @@
 id: "000687"
 title: The public variants black out a marked segment
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/integration/modules/protocol/test_protocol_blackout.py:test_public_document_and_snapshot_black_out_the_name"
+  - "backend/tests/integration/modules/livevote/test_public_meeting.py:test_guest_view_blacks_out_marked_names"
+implementation:
+  - backend/app/shared/blackout.py
+  - backend/app/modules/protocol/service.py
+  - backend/app/modules/livevote/guests.py
+  - typst/template/protocol.typ
+  - frontend/src/app/shared/markdown
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/livevote

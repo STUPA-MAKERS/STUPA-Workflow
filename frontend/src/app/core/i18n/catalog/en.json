@@ -4005,5 +4005,11 @@
   "myApps.heading": "My applications",
   "myApps.signedInAs": "Logged in as {email}",
   "myApps.empty": "There are no applications for this address.",
-  "login.linkInvalid": "This link expired or was already used. Request a new one below."
+  "login.linkInvalid": "This link expired or was already used. Request a new one below.",
+  "meetings.editor.blackout": "Black out (Ctrl+Shift+X)",
+  "markdown.blackout.mark": "Blacked out in public",
+  "markdown.blackout.bar": "blacked out",
+  "meetings.editor.blackoutOpen": "A blackout is not closed: the closing %% is missing. The name stays visible in public, and the protocol cannot be finalized.",
+  "meetings.toast.blackoutOpen": "A blackout is not closed ({where}). Add the closing %%.",
+  "meetings.toast.blackoutOpenFree": "in the free text"
 }

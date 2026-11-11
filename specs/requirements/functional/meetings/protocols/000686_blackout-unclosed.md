@@ -2,10 +2,15 @@
 id: "000686"
 title: An open blackout marker stops the finalize
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/integration/modules/protocol/test_protocol_blackout.py:test_start_finalize_refuses_an_open_marker"
+implementation:
+  - backend/app/modules/protocol/service.py
+  - frontend/src/app/shared/markdown/markdown.util.ts
+  - frontend/src/app/features/meetings/top-sheet
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings

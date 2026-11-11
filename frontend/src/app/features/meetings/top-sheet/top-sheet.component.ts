@@ -47,6 +47,7 @@ import { meetingKeeperLine } from '../keepers.util';
 import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
+import { hasOpenBlackout } from '../../../shared/markdown/markdown.util';
 import { applyRawFormat, insertRawTable } from './raw-format';
 import { topApplicationLead } from '../top-application-lead.util';
 
@@ -71,6 +72,7 @@ const TOOLS: readonly FormatTool[] = [
   { format: 'italic', icon: 'italic', label: 'meetings.editor.italic' },
   { format: 'bulletList', icon: 'list', label: 'meetings.editor.list' },
   { format: 'blockquote', icon: 'quote', label: 'meetings.editor.quote' },
+  { format: 'blackout', icon: 'eyeslash', label: 'meetings.editor.blackout' },
 ];
 
 /**
@@ -289,6 +291,9 @@ export class TopSheetComponent {
       throw err;
     }
   };
+
+  /** The text has a `%%` without its closing pair (000686): the public variant would show the name. */
+  protected readonly openBlackout = computed(() => hasOpenBlackout(this.top()?.body ?? ''));
 
   /** The formats at the cursor. The Markdown source shows none as pressed. */
   readonly activeFormats = computed(() =>
