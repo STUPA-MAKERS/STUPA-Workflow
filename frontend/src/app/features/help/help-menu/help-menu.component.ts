@@ -54,7 +54,7 @@ const DISPLAY_ROWS: readonly {
   { key: 'motion', icon: 'play', label: 'help.display.motion' },
   { key: 'transparency', icon: 'square', label: 'help.display.transparency' },
   { key: 'contrast', icon: 'half', label: 'help.display.contrast' },
-  { key: 'veryHigh', icon: 'bulb', label: 'help.display.veryHigh' },
+  { key: 'veryHigh', icon: 'eye', label: 'help.display.veryHigh' },
 ];
 
 /** Space between the trigger and the popover, and the least distance to the viewport edge. */
