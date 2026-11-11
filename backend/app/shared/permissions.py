@@ -81,9 +81,10 @@ Keys that need a note:
 - `admin.calendars`: subscribe, change and delete the external calendars
   (/admin/calendars). The holder gives the server an address to fetch, so the key is
   separate from `calendar.manage`.
-- `calendar.publish`: set the switch "Für alle" of a Termin, which shows the Termin to
-  each signed-in person. It is separate from `calendar.manage`, so no Termin is visible
-  to all by accident.
+- `calendar.publish`: set the switches "Für alle" and "Öffentlich" of a Termin. "Für
+  alle" shows the Termin to each signed-in person, "Öffentlich" also to a person without
+  a sign-in. It is separate from `calendar.manage`, so no Termin is visible to all by
+  accident.
 """
 
 from __future__ import annotations

@@ -45,6 +45,7 @@ class AppointmentIn(FrozenStrictCamelModel, frozen=True):
     place: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=5000)
     for_all: bool = Field(default=False, alias="forAll")
+    public: bool = False
     gremium_ids: tuple[UUID, ...] = Field(default=(), alias="gremiumIds", max_length=_MAX_TARGETS)
     principal_ids: tuple[UUID, ...] = Field(
         default=(), alias="principalIds", max_length=_MAX_TARGETS
@@ -113,6 +114,7 @@ class AppointmentOut(FrozenCamelModel, frozen=True):
     place: str | None = None
     description: str | None = None
     for_all: bool = Field(default=False, serialization_alias="forAll")
+    public: bool = False
     creator: PersonOut | None = None
     gremien: tuple[GremiumRefOut, ...] = ()
     persons: tuple[PersonOut, ...] = ()

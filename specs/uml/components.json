@@ -411,17 +411,22 @@
       "to": "shared"
     },
     {
+      "count": 1,
+      "from": "calendar",
+      "to": "applications"
+    },
+    {
       "count": 10,
       "from": "calendar",
       "to": "auth"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "calendar",
       "to": "gremien"
     },
     {
-      "count": 5,
+      "count": 8,
       "from": "calendar",
       "to": "meetings"
     },
@@ -431,7 +436,12 @@
       "to": "notifications"
     },
     {
-      "count": 11,
+      "count": 1,
+      "from": "calendar",
+      "to": "protocol"
+    },
+    {
+      "count": 16,
       "from": "calendar",
       "to": "shared"
     },

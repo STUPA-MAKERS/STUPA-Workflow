@@ -67,3 +67,10 @@ description: Backend calendar module. It serves the entries of the Kalender page
 - `external_feed.py` `parse_feed`: only title, start, end, place and description, as plain text (`plain`), never an organiser or an attendee. Times are local Berlin values. A series is expanded 12 months back and 24 ahead (`MAX_SERIES`, `MAX_ENTRIES`).
 - Routes: `GET /api/calendar/external/{entry_id}`; `/api/admin/calendars` GET/POST, `/{id}` PUT/DELETE, `/{id}/fetch` POST, all behind `admin.calendars`. `entries.py` adds the kind `external` to the span and the search, and the personal feed holds the readable entries (`service.feed_external`, `ics.ExternalEvent`).
 
+## Public calendar (specs 000730-000734)
+
+- `Appointment.public` (the switch "Öffentlich", migration `a4c8e17d5f02`): only `calendar.publish` sets or changes it, like "Für alle". A public Termin is readable by each signed-in person too (`appointments.readable`).
+- `public.py` `PublicCalendarService`: the reads without a sign-in. Two kinds and no other: a public Termin and a meeting of a Gremium with `protocols_public`. A public Termin gives title, start, end, place and description, never its creator, invitations or answers, so its entry has no Gremium and a filter by Gremium keeps only meetings. A public meeting gives title, day, times, the Gremium name, the titles of the TOPs with `non_public` false, and `protocolId` when the public protocol exists (`protocol.public.visible_clause`).
+- `public_router.py`, all under `/api/public` (the security middleware adds `X-Robots-Tag: noindex`), with the rate limit of the public protocols page: `calendar/committees`, `calendar/entries?from&to&gremium`, `calendar/search?q`, `calendar/appointments/{id}`, `calendar/meetings/{id}`, `calendar.ics`.
+- The feed has no token and no `ORGANIZER`/`ATTENDEE`. `RedisFeedCache` keeps its bytes for `FEED_TTL_SECONDS` (300) and fails open. A new public route needs an entry in `PUBLIC_ROUTES` (`tests/unit/test_public_routes.py`).
+

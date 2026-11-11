@@ -1642,6 +1642,12 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "public",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "sequence",
           "nullable": false,
           "primaryKey": false,

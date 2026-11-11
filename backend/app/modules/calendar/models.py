@@ -70,6 +70,9 @@ class Appointment(UUIDPkMixin, TimestampMixin, Base):
     )
     #: Each signed-in person reads the Termin (the switch "Für alle").
     for_all: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    #: The public calendar shows the Termin without a sign-in (the switch "Öffentlich").
+    #: A public Termin is also readable by each signed-in person.
+    public: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     #: Counts the changes of the time or the place. The ``.ics`` file of a mail carries
     #: it as SEQUENCE, so a calendar app replaces the older copy.
     sequence: Mapped[int] = mapped_column(Integer, server_default=text("0"))
@@ -159,12 +162,8 @@ class ExternalCalendar(UUIDPkMixin, TimestampMixin, Base):
     )
     interval_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    last_attempt_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    last_success_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (

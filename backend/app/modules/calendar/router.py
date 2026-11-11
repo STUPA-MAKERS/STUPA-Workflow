@@ -344,9 +344,7 @@ async def create_external_calendar(
     return created
 
 
-@admin_router.put(
-    "/{calendar_id}", responses={**_ADMIN_ERRORS, 404: _PROBLEM, 422: _PROBLEM}
-)
+@admin_router.put("/{calendar_id}", responses={**_ADMIN_ERRORS, 404: _PROBLEM, 422: _PROBLEM})
 async def change_external_calendar(
     calendar_id: UUID, data: ExternalCalendarIn, _admin: CalendarsAdmin, db: DbSession
 ) -> ExternalCalendarOut:

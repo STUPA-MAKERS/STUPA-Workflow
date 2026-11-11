@@ -139,7 +139,7 @@ def readable(viewer: Viewer) -> ColumnElement[bool]:
         return false()
     if viewer.manages:
         return true()
-    return or_(Appointment.for_all.is_(True), mine(viewer))
+    return or_(Appointment.for_all.is_(True), Appointment.public.is_(True), mine(viewer))
 
 
 def mine(viewer: Viewer) -> ColumnElement[bool]:
@@ -344,6 +344,7 @@ class AppointmentService:
             place=row.place,
             description=row.description,
             for_all=row.for_all,
+            public=row.public,
             creator=(
                 PersonOut(id=row.creator_id, name=names.get(row.creator_id, ""))
                 if row.creator_id is not None
@@ -388,7 +389,10 @@ class AppointmentService:
         row = await self.session.scalar(stmt.with_for_update() if lock else stmt)
         loaded = await self.load([row] if row is not None else [])
         if not loaded or not rules.can_read(
-            viewer, loaded[0].row.creator_id, loaded[0].targets, for_all=loaded[0].row.for_all
+            viewer,
+            loaded[0].row.creator_id,
+            loaded[0].targets,
+            for_all=loaded[0].row.for_all or loaded[0].row.public,
         ):
             raise NotFoundError("Unknown appointment.")
         return loaded[0]
@@ -442,14 +446,14 @@ class AppointmentService:
         """Create a Termin of the caller with its invitations.
 
         Raises:
-            ForbiddenError: A scoped token, the switch "Für alle" without
+            ForbiddenError: A scoped token, the switches "Für alle" and "Öffentlich" without
                 ``calendar.publish``, or a Gremium that the caller must not invite.
             ValidationProblem: An unknown Gremium or person.
         """
         viewer = await self.viewer(principal)
         if viewer.id is None:
             raise ForbiddenError("The Kalender needs a session.")
-        if data.for_all and not viewer.publishes:
+        if (data.for_all or data.public) and not viewer.publishes:
             raise ForbiddenError("You cannot show a Termin to everyone.", code="calendar_publish")
         await self._check_targets(principal, viewer, data, Targets())
         span = span_of(data)
@@ -463,6 +467,7 @@ class AppointmentService:
             description=(data.description or "").strip() or None,
             creator_id=viewer.id,
             for_all=data.for_all,
+            public=data.public,
         )
         self.session.add(row)
         await self.session.flush()
@@ -503,7 +508,7 @@ class AppointmentService:
         row = item.row
         if viewer.id is None or not rules.can_edit(viewer, row.creator_id):
             raise ForbiddenError("Only the creator changes a Termin.")
-        if data.for_all != row.for_all and not viewer.publishes:
+        if (data.for_all, data.public) != (row.for_all, row.public) and not viewer.publishes:
             raise ForbiddenError("You cannot show a Termin to everyone.", code="calendar_publish")
         await self._check_targets(principal, viewer, data, item.targets)
         before = span_of(row)
@@ -522,6 +527,7 @@ class AppointmentService:
                 place=after.place,
                 description=(data.description or "").strip() or None,
                 for_all=data.for_all,
+                public=data.public,
                 sequence=Appointment.sequence + (1 if rules.needs_mail(before, after) else 0),
             )
             .execution_options(synchronize_session=False)

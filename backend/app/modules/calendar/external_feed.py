@@ -214,9 +214,7 @@ def _entry(event: _Event, start: datetime) -> FeedEntry:
 def _nearest(entries: Iterable[FeedEntry], today: date) -> tuple[FeedEntry, ...]:
     """Keep at most `MAX_ENTRIES`, the nearest to today, sorted by day and time."""
     kept = sorted(entries, key=lambda e: abs((e.starts_on - today).days))[:MAX_ENTRIES]
-    return tuple(
-        sorted(kept, key=lambda e: (e.starts_on, e.start_time or time.min, e.title))
-    )
+    return tuple(sorted(kept, key=lambda e: (e.starts_on, e.start_time or time.min, e.title)))
 
 
 def _entries(calendar: Component, today: date) -> tuple[FeedEntry, ...]:
