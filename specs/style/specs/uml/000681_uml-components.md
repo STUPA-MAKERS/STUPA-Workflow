@@ -2,7 +2,7 @@
 id: "000681"
 title: The component view shows the backend modules, their layers and their imports
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

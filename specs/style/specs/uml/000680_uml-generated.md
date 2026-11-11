@@ -2,7 +2,7 @@
 id: "000680"
 title: A script writes the generated UML views, and CI checks that they are current
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

@@ -2,7 +2,7 @@
 id: "000683"
 title: The deployment view shows the services of the compose stack
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

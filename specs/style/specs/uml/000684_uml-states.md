@@ -2,7 +2,7 @@
 id: "000684"
 title: A state view is written by hand and has the states of its check constraint
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

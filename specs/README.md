@@ -690,9 +690,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/specs/structure/000013](style/specs/structure/000013_index.md) | The index lists every rule | approved |
 | [S/specs/structure/000014](style/specs/structure/000014_change-process.md) | A change goes through a pull request | approved |
 | [S/specs/structure/000226](style/specs/structure/000226_spec-first.md) | A change request starts as a spec | approved |
-| [S/specs/uml/000679](style/specs/uml/000679_uml-folder.md) | The UML data of the app is in specs/uml | draft |
-| [S/specs/uml/000680](style/specs/uml/000680_uml-generated.md) | A script writes the generated UML views, and CI checks that they are current | draft |
-| [S/specs/uml/000681](style/specs/uml/000681_uml-components.md) | The component view shows the backend modules, their layers and their imports | draft |
-| [S/specs/uml/000682](style/specs/uml/000682_uml-classes.md) | The class view shows every database model and its relations | draft |
-| [S/specs/uml/000683](style/specs/uml/000683_uml-deployment.md) | The deployment view shows the services of the compose stack | draft |
-| [S/specs/uml/000684](style/specs/uml/000684_uml-states.md) | A state view is written by hand and has the states of its check constraint | draft |
+| [S/specs/uml/000679](style/specs/uml/000679_uml-folder.md) | The UML data of the app is in specs/uml | approved |
+| [S/specs/uml/000680](style/specs/uml/000680_uml-generated.md) | A script writes the generated UML views, and CI checks that they are current | approved |
+| [S/specs/uml/000681](style/specs/uml/000681_uml-components.md) | The component view shows the backend modules, their layers and their imports | approved |
+| [S/specs/uml/000682](style/specs/uml/000682_uml-classes.md) | The class view shows every database model and its relations | approved |
+| [S/specs/uml/000683](style/specs/uml/000683_uml-deployment.md) | The deployment view shows the services of the compose stack | approved |
+| [S/specs/uml/000684](style/specs/uml/000684_uml-states.md) | A state view is written by hand and has the states of its check constraint | approved |

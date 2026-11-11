@@ -2,7 +2,7 @@
 id: "000682"
 title: The class view shows every database model and its relations
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

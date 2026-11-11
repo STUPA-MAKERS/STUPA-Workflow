@@ -2,7 +2,7 @@
 id: "000679"
 title: The UML data of the app is in specs/uml
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null
