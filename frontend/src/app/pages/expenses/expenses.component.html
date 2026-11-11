@@ -35,7 +35,7 @@
 
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
-          [placeholder]="'expenses.search' | t"
+          [placeholder]="searchPlaceholder()"
           [label]="'expenses.searchLabel' | t"
           [results]="loading() || reloading() ? null : total()"
           [value]="q()"

@@ -118,7 +118,7 @@
                             <app-icon name="user" [size]="15" />
                           </span>
                         }
-                        @if (!split()) {
+                        @if (!split() && !phone()) {
                           <app-row-chevron />
                         }
                       </span>

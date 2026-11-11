@@ -110,6 +110,9 @@ describe('BrandingEditorComponent', () => {
     expect(screen.queryByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeNull();
     expect(screen.queryByText('Vorschau', { selector: 'summary *' })).toBeNull();
     expect(container.querySelector('details')).toBeNull();
+    // § 000672: the language picker stands in the page head.
+    expect(container.querySelector('app-page-header app-content-lang-switch')).not.toBeNull();
+    expect(container.querySelectorAll('app-content-lang-switch')).toHaveLength(1);
   });
 
   /** An empty slot shows the built-in logo and offers the file dialog. */
@@ -121,6 +124,7 @@ describe('BrandingEditorComponent', () => {
     expect(screen.queryByRole('textbox', { name: 'Willkommenstext (DE)' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Auswählen: Wortmarke' })).toBeInTheDocument();
     expect(screen.getAllByText('Standard').length).toBeGreaterThanOrEqual(2);
+    expect(document.querySelector('app-content-lang-switch')).toBeNull();
   });
 
   it('shows the built-in logo of an empty slot in the colours of the theme', async () => {

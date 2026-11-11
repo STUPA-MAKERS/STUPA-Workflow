@@ -810,12 +810,12 @@ describe('AuditLogComponent', () => {
    */
   it('filters through the action and actor chips', async () => {
     const { listAuditLog, cmp } = await setup({ actors: [{ sub: 'kc|a', name: 'Alice' }, { sub: 'kc|b', name: null }] });
-    expect(cmp.actionChip()).toBe('Aktion: Alle Aktionen');
-    await userEvent.click(screen.getByRole('button', { name: 'Aktion: Alle Aktionen' }));
+    expect(cmp.actionChip()).toBe('Aktion');
+    await userEvent.click(screen.getByRole('button', { name: 'Aktion' }));
     await userEvent.click(screen.getByRole('option', { name: 'Statuswechsel' }));
     expect(listAuditLog).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'status_change' }));
     expect(cmp.actionChip()).toBe('Aktion: Statuswechsel');
-    await userEvent.click(screen.getByRole('button', { name: 'Akteur: Alle Akteure' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Akteur' }));
     expect(screen.getByRole('option', { name: 'kc|b' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('option', { name: 'Alice' }));
     expect(listAuditLog).toHaveBeenLastCalledWith(expect.objectContaining({ actor: 'kc|a' }));

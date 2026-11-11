@@ -448,8 +448,12 @@ describe('BudgetDashboardComponent', () => {
       expect(view.container.querySelectorAll('#bd-title')).toHaveLength(1);
       expect(view.container.querySelector('.sheet-bar__kicker')).toBeNull();
       const actions = bar.querySelector(':scope > .sheet-bar__actions > .bd__actions') as HTMLElement;
-      expect(within(actions).getByRole('button', { name: /Exportieren/ })).toBeTruthy();
-      expect(within(actions).getByRole('button', { name: 'Buchungen ansehen' })).toBeTruthy();
+      // § 000670: one icon button for the export, "Buchungen ansehen" in the ⋮ menu, no text button.
+      const exportButton = within(actions).getByRole('button', { name: /Exportieren/ });
+      expect(exportButton.textContent?.trim()).toBe('');
+      expect(within(actions).queryByRole('button', { name: 'Buchungen ansehen' })).toBeNull();
+      expect(actions.querySelector('app-row-menu')).not.toBeNull();
+      expect(view.fixture.componentInstance.moreSections()[0].items.map((i) => i.label)).toEqual(['Buchungen ansehen']);
       expect(view.container.querySelector('.bd__sheetBody')?.firstElementChild).toHaveClass('bd__figs');
     });
 
@@ -478,7 +482,7 @@ describe('BudgetDashboardComponent', () => {
     it('opens the bookings page and the dialog with every item of the cost centre', async () => {
       const view = await setup({ apps: [app({ applicationId: 'a-1' })] });
       const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-      screen.getByRole('button', { name: 'Buchungen ansehen' }).click();
+      view.fixture.componentInstance.onAction(view.fixture.componentInstance.moreSections()[0].items[0]);
       expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs' } });
       view.fixture.detectChanges();
       screen.getByRole('button', { name: 'Alle ansehen' }).click();
@@ -542,7 +546,7 @@ describe('BudgetDashboardComponent', () => {
       expect(c.tops().map((n: { id: string }) => n.id)).toEqual(['b-800']);
       expect(c.selectedKsId()).toBe('b-800');
       expect(screen.queryByRole('button', { name: /Exportieren/ })).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Buchungen ansehen' })).toBeNull();
+      expect(document.querySelector('.bd__actions app-row-menu')).toBeNull();
       expect(within(view.container.querySelector('.bd__figs') as HTMLElement).getByText(/^400,00\s€$/)).toBeTruthy();
     });
   });

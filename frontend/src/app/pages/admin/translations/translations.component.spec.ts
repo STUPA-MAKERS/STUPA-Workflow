@@ -127,7 +127,7 @@ describe('AdminTranslationsComponent', () => {
     expect(inst.value('nav.dashboard')).toBe('Tableau de bord');
     expect(inst.reference('nav.tasks')).toBe('To do');
     expect(inst.reference('action.login')).toBe('Sign in');
-    expect(inst.localeText()).toBe('Français (inaktiv)');
+    expect(inst.localeText()).toBe('Sprache: Français (inaktiv)');
     inst.setLocale('de');
     inst.setLocale('fr');
     expect(api.texts).toHaveBeenCalledTimes(3);
@@ -299,9 +299,9 @@ describe('AdminTranslationsComponent', () => {
     inst.setLocale('it');
     expect(inst.reference('nav.dashboard')).toBe('Dashboard');
     expect(inst.value('nav.dashboard')).toBe('');
-    expect(inst.localeText()).toBe('Italiano');
+    expect(inst.localeText()).toBe('Sprache: Italiano');
     inst.locale.set('xx');
-    expect(inst.localeText()).toBe('xx');
+    expect(inst.localeText()).toBe('Sprache: xx');
     inst.locale.set('de');
     inst.edit('nav.dashboard', 'Mein Überblick');
     expect(inst.dirty()).toBe(false);

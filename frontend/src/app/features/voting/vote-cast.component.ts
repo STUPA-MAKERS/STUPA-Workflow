@@ -12,6 +12,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
+import { ServerReachabilityService } from '@core/api/server-reachability.service';
 import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -37,7 +38,6 @@ import { problemDetail } from '@core/api/problem';
 import type { Observable } from 'rxjs';
 import { RailStatusService } from '../../layout/rail-status.service';
 import type { BallotCaster, BallotFailure } from './ballot/ballot.component';
-import { VotePhoneHeaderComponent } from './phone-header/phone-header.component';
 import { VotePanelComponent } from './vote-panel/vote-panel.component';
 import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote-context';
 import { voteChangeText, voteSubject, type SeenVote } from './vote-announce.util';
@@ -77,9 +77,10 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  * - A meeting vote names its meeting and agenda item ("34. Sitzung · TOP 3") and links
  *   the beamer for a person who may run the meeting. A vote without a meeting links its
  *   application, and a draft of it can be deleted.
- * - A phone gets its own layout: back to the list,
- *   "Abstimmung", the meeting line as a link to the meeting ("Antrag öffnen" for a vote
- *   without a meeting), and the button bar of the ballot pinned at the bottom.
+ * - A phone uses the detail bar of the list/detail layout like every other detail
+ *   (§ 000674): the back arrow, the menu and, after a scroll, the title. The meeting line
+ *   stands in the status line below the title. The button bar of the ballot is pinned at
+ *   the bottom.
  * - The route reuses the component from one vote to the next, so the pane loads again
  *   on each change of `:id`.
  * - Under the vote: the to-do cards that link it (`app-todo-linked-list`).
@@ -101,7 +102,6 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
     TodoLinkedListComponent,
     TranslatePipe,
     VotePanelComponent,
-    VotePhoneHeaderComponent,
   ],
   templateUrl: './vote-cast.component.html',
   styleUrl: './vote-cast.component.scss',
@@ -112,6 +112,7 @@ export class VoteCastComponent implements OnDestroy {
   private readonly delegations = inject(DelegationsApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly reachability = inject(ServerReachabilityService);
   private readonly railStatus = inject(RailStatusService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -223,35 +224,6 @@ export class VoteCastComponent implements OnDestroy {
   });
 
   /**
-   * The line below the phone title. A meeting vote names its meeting and agenda item
-   * ("TOP 3 · 34. Sitzung des Studierendenparlaments"); a vote without a meeting reads
-   * "Antrag öffnen". The way back goes to the list, so this line is the way to the
-   * meeting or to the application (`phoneSubtitleLink`).
-   */
-  readonly phoneSubtitle = computed<string | null>(() => {
-    const vote = this.loaded();
-    const { meeting, position } = this.context();
-    if (meeting) {
-      return position === null
-        ? meeting.title
-        : this.i18n.translate('voting.panel.wherePhone', { meeting: meeting.title, n: position });
-    }
-    if (vote && !vote.meetingId && vote.applicationId) {
-      return this.i18n.translate('voting.panel.application');
-    }
-    return null;
-  });
-
-  /** The target of the phone line: the meeting, else the application, of the vote. */
-  readonly phoneSubtitleLink = computed<string[] | null>(() => {
-    const vote = this.loaded();
-    const meeting = this.context().meeting;
-    if (meeting) return ['/meetings', meeting.id];
-    if (vote && !vote.meetingId && vote.applicationId) return ['/applications', vote.applicationId];
-    return null;
-  });
-
-  /**
    * The poll of a Gremium (no meeting) that the person may manage: "Starten" while it is
    * a draft, "Umfrage beenden" while it is open. A meeting poll runs in its meeting.
    */
@@ -300,11 +272,41 @@ export class VoteCastComponent implements OnDestroy {
         : null;
       untracked(() => this.page?.shown.set(shown));
     });
+    effect(() => {
+      const lost = this.connectionLost();
+      untracked(() => this.showConnectionLost(lost));
+    });
+  }
+
+  /**
+   * The live connection is lost and the client tries again (§ 000678). Not while the
+   * server or the network is away: then the bar "Server nicht erreichbar" says so.
+   */
+  readonly connectionLost = computed(
+    () => this.session()?.connection() === 'reconnecting' && !this.reachability.waiting(),
+  );
+  private lostToast: number | null = null;
+
+  /** The toast "Verbindung verloren" stays while the connection is lost and closes itself. */
+  private showConnectionLost(lost: boolean): void {
+    if (lost && this.lostToast === null) {
+      this.lostToast = this.toast.showNotice({
+        message: this.i18n.translate('voting.live.reconnecting'),
+        variant: 'warning',
+        // On a phone the notice is the bar at the top of the frame, like "Server nicht
+        // erreichbar": a card that stays would cover the back arrow of the detail.
+        phonePlacement: 'top',
+      });
+    } else if (!lost && this.lostToast !== null) {
+      this.toast.dismiss(this.lostToast);
+      this.lostToast = null;
+    }
   }
 
   ngOnDestroy(): void {
     this.ownSession?.close();
     this.page?.shown.set(null);
+    this.showConnectionLost(false);
   }
 
   goBeamer(): void {

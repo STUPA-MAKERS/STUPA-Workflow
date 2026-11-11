@@ -2501,7 +2501,7 @@ describe('ExpensesComponent — transfers tab', () => {
     expect(c.kindOptions().map((o: { value: string }) => o.value)).toEqual(['', 'expense', 'income', 'transfer']);
     await openTransfers(ctx);
     expect(c.kindValue()).toBe('transfer');
-    expect(c.kindChipLabel()).toBe('Übertrag');
+    expect(c.kindChipLabel()).toBe('Art: Übertrag');
     expect(c.activeFilterCount()).toBe(1);
     c.setKind('income');
     expect(c.tab()).toBe('bookings');
@@ -2884,7 +2884,7 @@ describe('ExpensesComponent (list/detail)', () => {
     const { cmp, http } = build();
     cmp.setKind('expense');
     expect(flushParams(http).get('kind')).toBe('expense');
-    expect(cmp.kindChipLabel()).toBe('Ausgabe');
+    expect(cmp.kindChipLabel()).toBe('Art: Ausgabe');
     cmp.setKind('nonsense');
     flushParams(http);
     expect(cmp.kindChipLabel()).toBe('Art');
@@ -2962,7 +2962,7 @@ describe('ExpensesComponent (list/detail)', () => {
     const { cmp } = build({ expenses: page([EXPENSE]) });
     expect(cmp.formTitle()).toBe('');
     cmp.openCreate();
-    expect(cmp.formTitle()).toBe('Buchung hinzufügen');
+    expect(cmp.formTitle()).toBe('Buchung anlegen');
     cmp.openEdit(EXPENSE);
     expect(cmp.createOpen()).toBe(false);
     expect(cmp.formTitle()).toBe('Buchung bearbeiten');
@@ -3356,7 +3356,7 @@ describe('ExpensesComponent (list/detail)', () => {
     const { fixture } = await setup({ page: page([EXPENSE]) });
     await userEvent.click(screen.getByRole('button', { name: 'Buchung anlegen' }));
     fixture.detectChanges();
-    const sheet = screen.getByRole('dialog', { name: 'Buchung hinzufügen' });
+    const sheet = screen.getByRole('dialog', { name: 'Buchung anlegen' });
     expect(sheet.classList.contains('ss--bottom')).toBe(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;

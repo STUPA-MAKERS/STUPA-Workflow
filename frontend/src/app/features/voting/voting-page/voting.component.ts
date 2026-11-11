@@ -21,6 +21,7 @@ import { DelegationsApiService } from '@core/api/delegations.service';
 import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { I18nService } from '@core/i18n/i18n.service';
+import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { Meeting, Uuid, Vote, VoteKind, VoteListItem, VoteStatus } from '@core/api/models';
@@ -30,6 +31,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  filterChipText,
   IconComponent,
   ListDetailLayoutComponent,
   ListGroupComponent,
@@ -164,8 +166,8 @@ function whenSource(
  *   that the person can still cast a ballot in (also a new open row of a refresh) when
  *   no vote is open in the detail (also on a phone, from the list), or when the detail
  *   shows an ended vote of the same meeting. A vote that the channel replays on a
- *   connect was open before, so it does not open by itself. On the first load side by
- *   side the page opens the first open vote, as the board shows it.
+ *   connect was open before, so it does not open by itself. On the load the page opens
+ *   no vote by itself (§ 000664): the detail pane says "Keine Abstimmung geöffnet".
  * - One pane at a time (narrow, phone): the list, then the vote with a way back.
  * - Side by side it is a pane page (`styles.scss`): the panes fill the free height and
  *   scroll by themselves.
@@ -243,8 +245,6 @@ export class VotingComponent implements OnDestroy {
   readonly total = signal(0);
   /** Fetch sequence number. The handler drops a late answer of an older request. */
   private fetchSeq = 0;
-  /** The first open vote opens by itself once, on the first load side by side. */
-  private autoOpened = false;
   /**
    * The open votes the list has seen since its last load from the start, or `null` before
    * the first answer. An open vote that a refresh finds and that is not in here is new.
@@ -313,8 +313,10 @@ export class VotingComponent implements OnDestroy {
   ]);
   readonly statusChipLabel = computed(() => {
     const value = this.statusFilter();
-    if (!value) return this.i18n.translate('voting.list.filter.status');
-    return this.statusOptions().find((o) => o.value === value)?.label ?? value;
+    return filterChipText(
+      this.i18n.translate('voting.list.filter.status'),
+      value ? (this.statusOptions().find((o) => o.value === value)?.label ?? value) : null,
+    );
   });
 
   /** The gremien of the person, plus the gremien of the loaded rows. */
@@ -334,10 +336,21 @@ export class VotingComponent implements OnDestroy {
   );
   readonly gremiumChipLabel = computed(() => {
     const id = this.gremiumId();
-    if (!id) return this.i18n.translate('voting.list.filter.gremium');
-    return this.gremiumOptions().find((o) => o.value === id)?.label ?? id;
+    return filterChipText(
+      this.i18n.translate('voting.list.filter.gremium'),
+      id ? (this.gremiumOptions().find((o) => o.value === id)?.label ?? id) : null,
+    );
   });
 
+  /** The search placeholder with the number of votes (§ 000661). */
+  readonly searchPlaceholder = computed(() =>
+    searchPlaceholder(
+      this.i18n,
+      { plain: 'voting.list.search', one: 'voting.list.searchCountOne', many: 'voting.list.searchCount' },
+      this.total(),
+      this.loading(),
+    ),
+  );
   readonly hasMore = computed(() => this.items().length < this.total());
   /** The open votes among the loaded rows. They come first, so the count is exact. */
 
@@ -399,17 +412,6 @@ export class VotingComponent implements OnDestroy {
     });
 
     effect(() => this.page.split.set(this.split()));
-
-    effect(() => {
-      const split = this.split();
-      const loading = this.loading();
-      const first = this.items()[0];
-      untracked(() => {
-        if (this.autoOpened || loading || !split) return;
-        this.autoOpened = true;
-        if (!this.selectedId() && first?.status === 'open') this.openRow(first.id, true);
-      });
-    });
 
     this.followLive();
 

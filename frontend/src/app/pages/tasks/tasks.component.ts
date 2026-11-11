@@ -12,6 +12,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/ro
 import { filter } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
@@ -21,6 +22,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  filterChipText,
   IconComponent,
   ListDetailLayoutComponent,
   ListGroupComponent,
@@ -225,7 +227,11 @@ export class TasksComponent {
     { value: 'todos', label: this.i18n.translate('tasks.show.todos') },
   ]);
   readonly showText = computed(
-    () => `${this.i18n.translate('tasks.show.label')}: ${this.i18n.translate(SHOW_TEXT[this.show()])}`,
+    () =>
+      filterChipText(
+        this.i18n.translate('tasks.show.label'),
+        this.show() === 'all' ? null : this.i18n.translate(SHOW_TEXT[this.show()]),
+      ),
   );
   readonly dueOptions = computed<FilterSelectOption[]>(() => [
     { value: '', label: this.i18n.translate('todos.filter.all') },
@@ -233,7 +239,22 @@ export class TasksComponent {
     { value: 'week', label: this.i18n.translate('todos.filter.week') },
     { value: 'none', label: this.i18n.translate('todos.filter.noDate') },
   ]);
-  readonly dueText = computed(() => this.i18n.translate(DUE_TEXT[this.due()]));
+  readonly dueText = computed(() =>
+    filterChipText(
+      this.i18n.translate('todos.filter.due'),
+      this.due() ? this.i18n.translate(DUE_TEXT[this.due()]) : null,
+    ),
+  );
+
+  /** The search placeholder with the number of tasks (§ 000661). */
+  readonly searchPlaceholder = computed(() =>
+    searchPlaceholder(
+      this.i18n,
+      { plain: 'tasks.search', one: 'tasks.searchCountOne', many: 'tasks.searchCount' },
+      this.tasks().length + this.todos().length,
+      this.loading(),
+    ),
+  );
 
   readonly rows = computed<TaskRow[]>(() => {
     const q = this.query();

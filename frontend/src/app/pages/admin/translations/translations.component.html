@@ -67,7 +67,7 @@
             <app-filter-select
               icon="tag"
               [label]="'admin.translations.area' | t"
-              [text]="area() || ('admin.translations.allAreas' | t)"
+              [text]="areaText()"
               [active]="!!area()"
               [options]="areaOptions()"
               [value]="area()"
@@ -76,7 +76,7 @@
             <app-filter-select
               icon="edit"
               [label]="'admin.translations.changedFilter' | t"
-              [text]="(changedOnly() ? 'admin.translations.changedOnly' : 'admin.translations.allTexts') | t"
+              [text]="changedText()"
               [active]="changedOnly()"
               [options]="changedOptions()"
               [value]="changedOnly() ? 'changed' : ''"

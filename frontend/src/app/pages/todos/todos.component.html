@@ -83,7 +83,7 @@
           class="td__search"
           size="md"
           [clearable]="true"
-          [placeholder]="'todos.search.placeholder' | t: { n: openCount() }"
+          [placeholder]="searchPlaceholder()"
           [label]="'todos.search.label' | t"
           [value]="search.text()"
           (valueChange)="search.set($event)"

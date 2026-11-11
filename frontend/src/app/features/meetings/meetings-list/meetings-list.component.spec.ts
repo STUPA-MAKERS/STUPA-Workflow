@@ -254,7 +254,7 @@ describe('MeetingsListComponent', () => {
     const view = await setup();
     load(view, { gremien: [{ id: 'g-1', name: 'StuPa' }, { id: 'g-2', name: 'Finanzausschuss' }] });
     expect(view.container.querySelector('select')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Gremium: Alle Gremien' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Gremium' }));
     const list = screen.getByRole('listbox', { name: 'Gremium' });
     await userEvent.click(within(list).getByRole('option', { name: 'Finanzausschuss' }));
     view.fixture.detectChanges();
@@ -265,12 +265,12 @@ describe('MeetingsListComponent', () => {
     timelineReq(view.http, 'past').flush({ items: [], nextCursor: null });
   });
 
-  it('reads an unknown Gremium of the filter as "Alle Gremien"', async () => {
+  it('reads an unknown Gremium of the filter as no choice', async () => {
     const view = await setup();
     load(view, { gremien: [{ id: 'g-1', name: 'StuPa' }, { id: 'g-2', name: 'FA' }] });
     view.timeline.gremiumFilter.set('g-gone');
     view.fixture.detectChanges();
-    expect(screen.getByRole('button', { name: 'Gremium: Alle Gremien' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gremium' })).toBeInTheDocument();
   });
 
   it('hides the chip for one Gremium', async () => {
@@ -383,8 +383,10 @@ describe('MeetingsListComponent', () => {
         'Live · seit 18:04 · 8 TOPs',
       );
       expect(liveRow.querySelector('.li')).toHaveClass('li--wrap');
+      // § 000675: a phone list row ends with its last text, not with an arrow.
+      expect(view.container.querySelector('app-row-chevron')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Sitzung' })).toBeNull();
-      expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Sitzungen suchen …');
+      expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Sitzungen durchsuchen');
       const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;
       view.fixture.componentInstance.onPhoneMenu({ id: 'x', label: 'x' }, abo);
       expect(view.router.url).toBe('/');

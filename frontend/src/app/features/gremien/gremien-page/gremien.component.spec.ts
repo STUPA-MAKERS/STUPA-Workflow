@@ -87,14 +87,14 @@ describe('GremienComponent', () => {
     localStorage.clear();
   });
 
-  it('opens the first own gremium by itself when the panes sit side by side', async () => {
+  it('opens no gremium by itself when the panes sit side by side (000664)', async () => {
     const s = await start('/committees', { media: [MEDIA.wide] });
     restore = s.restore;
     expect(s.cmp.split()).toBe(true);
     expect(s.frame.fill()).toBe(true);
-    expect(s.router.url).toBe('/committees/g-1');
-    expect(s.cmp.selectedId()).toBe('g-1');
-    expect(screen.getByText('Detail')).toBeTruthy();
+    expect(s.router.url).toBe('/committees');
+    expect(s.cmp.selectedId()).toBeNull();
+    expect(screen.queryByText('Detail')).toBeNull();
     s.harness.fixture.destroy();
     expect(s.frame.fill()).toBe(false);
   });
@@ -130,11 +130,11 @@ describe('GremienComponent', () => {
     expect(s.cmp.others()[0].next).toEqual({ kind: 'none' });
     expect(screen.getByText('Weitere Gremien')).toBeTruthy();
     expect(screen.getByText('Keine Sitzung geplant')).toBeTruthy();
-    expect(s.cmp.scopeText()).toBe('Anzeigen: Alle Gremien');
+    expect(screen.getByRole('button', { name: 'Gremien' })).toBeInTheDocument();
     expect(s.cmp.searchPlaceholder()).toBe('3 Gremien durchsuchen');
     s.cmp.setScope('mine');
     s.harness.detectChanges();
-    expect(s.cmp.scopeText()).toBe('Anzeigen: Meine Gremien');
+    expect(screen.getByRole('button', { name: 'Gremien: Nur meine' })).toBeInTheDocument();
     expect(s.cmp.others()).toEqual([]);
     expect(s.cmp.searchPlaceholder()).toBe('2 Gremien durchsuchen');
     s.cmp.setScope('anything');
@@ -187,6 +187,8 @@ describe('GremienComponent', () => {
     const s = await start('/committees', { media: [MEDIA.phone] });
     restore = s.restore;
     expect(screen.queryByRole('button', { name: 'Sitzungen abonnieren' })).toBeNull();
+    // § 000675: a phone list row ends with its last text, not with an arrow.
+    expect((s.harness.routeNativeElement as HTMLElement).querySelector('app-row-chevron')).toBeNull();
     expect(s.cmp.phoneMenu().map((sec) => sec.items.map((i) => i.id))).toEqual([['calendar'], ['refresh']]);
     const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;
     s.cmp.onPhoneMenu({ id: 'other', label: 'x' }, abo);

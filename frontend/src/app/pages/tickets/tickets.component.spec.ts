@@ -245,8 +245,8 @@ describe('TicketsComponent', () => {
     harness.detectChanges();
     expect(router.url).toBe('/tickets?status=done&kind=bug&assignee=me');
     expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ kind: ['bug'], assignee: 'me' }));
-    expect(cmp.kindChipLabel()).toBe('Fehler');
-    expect(cmp.assigneeChipLabel()).toBe('Mir');
+    expect(cmp.kindChipLabel()).toBe('Art: Fehler');
+    expect(cmp.assigneeChipLabel()).toBe('Zugewiesen: Mir');
     expect(cmp.statusChipLabel()).toBe('Status: Erledigt');
 
     cmp.setStatus('open');
@@ -267,7 +267,7 @@ describe('TicketsComponent', () => {
   it('lists the people with tickets, and names an unknown one by the chip', async () => {
     const { cmp, go } = await start('/tickets?assignee=p1');
     expect(cmp.assigneeOptions().map((o) => o.label)).toEqual(['Alle', 'Mir', 'Niemandem', 'Mara Keller', 'p3']);
-    expect(cmp.assigneeChipLabel()).toBe('Mara Keller');
+    expect(cmp.assigneeChipLabel()).toBe('Zugewiesen: Mara Keller');
     await go('/tickets?assignee=gone');
     expect(cmp.assigneeChipLabel()).toBe('Zugewiesen');
   });
@@ -431,6 +431,21 @@ describe('TicketsComponent', () => {
     expect(cmp.selectedId()).toBeNull();
     await go('/tickets/t42');
     expect(cmp.selectedId()).toBe('t42');
+  });
+
+  /** § 000675: a phone list row ends with its last text, not with an arrow. */
+  it('ends a phone row without an arrow, and keeps the arrow on a one-pane tablet', async () => {
+    const tablet = await start('/tickets');
+    expect((tablet.harness.routeNativeElement as HTMLElement).querySelector('app-row-chevron')).not.toBeNull();
+    TestBed.resetTestingModule();
+    const restore = matchMediaQueries(MEDIA.phone);
+    try {
+      const phone = await start('/tickets');
+      expect((phone.harness.routeNativeElement as HTMLElement).querySelector('app-list-item')).not.toBeNull();
+      expect((phone.harness.routeNativeElement as HTMLElement).querySelector('app-row-chevron')).toBeNull();
+    } finally {
+      restore();
+    }
   });
 
   /** Leaving the page frees the frame. */

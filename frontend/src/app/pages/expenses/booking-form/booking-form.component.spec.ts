@@ -205,7 +205,7 @@ describe('BookingFormComponent', () => {
     'builds a new booking: kind, cost centre from the list, fiscal year and payment method',
     async () => {
       const { dialogs, http, user, view } = await setup('create');
-      expect(screen.getByRole('heading', { name: 'Buchung hinzufügen' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Buchung anlegen' })).toBeInTheDocument();
       for (const name of ['Zuordnung', 'Beleg', 'Zahlung'])
         expect(screen.getByRole('group', { name })).toBeInTheDocument();
       expect(view.container.querySelector('.ff__subtitle, .mf__subtitle')).toBeNull();

@@ -124,16 +124,6 @@
   @include fade.fade-y(var(--space-5));
 }
 
-.vc__line {
-  margin: 0;
-  font-size: var(--fs-small);
-  line-height: 1.125rem;
-  color: var(--color-text-muted);
-}
-.vc__line--warn {
-  color: var(--color-warning);
-}
-
 .vc__link {
   color: var(--color-accent-text);
   font-weight: var(--fw-semibold);

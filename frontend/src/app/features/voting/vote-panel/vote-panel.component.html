@@ -1,14 +1,7 @@
 @let v = vote();
 @let s = status();
 
-@if (layout() === 'phone') {
-  <h1 class="sheet-title">{{ question() }}</h1>
-  <p class="sheet-line vpn__meta">
-    <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
-    <span class="vpn__sep" aria-hidden="true">·</span>
-    <span class="vpn__rules">{{ rules() }}</span>
-  </p>
-} @else if (layout() === 'strip') {
+@if (layout() === 'strip') {
   <div class="vpn__head">
     <app-status-text class="vpn__cap" [kind]="s.kind">{{ stripCap() }}</app-status-text>
     @if (isOpen()) {
@@ -24,8 +17,15 @@
   <h3 class="vpn__q vpn__q--card">{{ question() }}</h3>
   <p class="vpn__rules vpn__rules--card">{{ rules() }}</p>
 } @else {
+  <!-- `page` and `phone`: the sheet bar hands the title and the actions to the detail bar of
+       the list/detail layout on a phone (§ 000674). The phone view is a page of its own, so
+       its title is the h1. -->
   <app-sheet-bar class="vpn__bar">
-    <h2 appSheetBarTitle class="sheet-title">{{ question() }}</h2>
+    @if (layout() === 'phone') {
+      <h1 appSheetBarTitle class="sheet-title">{{ question() }}</h1>
+    } @else {
+      <h2 appSheetBarTitle class="sheet-title">{{ question() }}</h2>
+    }
     <ng-content select="[vpnActions]" />
   </app-sheet-bar>
   <p class="sheet-line vpn__meta">

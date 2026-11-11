@@ -21,3 +21,7 @@ Neither button must be in the header.
 
 The desktop start page is the exception: "Antrag stellen" stands in the tab line of the work
 list (000650).
+
+A page that creates different items in more than one section is the second exception: each
+create button stands in the head of its section. Examples are Gruppen-Zuordnung and the roles
+of a Gremium in Verwaltung.

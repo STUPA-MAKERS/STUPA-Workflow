@@ -1,9 +1,13 @@
 <section class="mt admin-page">
   <app-page-header [flush]="true" [title]="'admin.mailTemplates.title' | t">
     <app-breadcrumbs crumbs />
-    @if (dirty()) {
-      <app-button actions variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
-    }
+    <!-- § 000672: the language of the template stands at the end of the page head. -->
+    <div actions class="mt__headTools">
+      @if (dirty()) {
+        <app-button variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
+      }
+      <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.mailTemplates.lang' | t" />
+    </div>
   </app-page-header>
 
   <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.mailTemplates.loadFailed' | t" (retry)="load()">
@@ -58,7 +62,6 @@
                 @if (d.source === 'override') {
                   <app-badge variant="accent">{{ 'admin.mailTemplates.customized' | t }}</app-badge>
                 }
-                <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.mailTemplates.lang' | t" />
               </span>
             </header>
 

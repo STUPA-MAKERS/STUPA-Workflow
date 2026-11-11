@@ -120,9 +120,9 @@ describe('HelpTicketsComponent', () => {
     expect(api.getHelpTickets).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { name: 'Hilfe & Tickets' })).toBeInTheDocument();
     expect(wikiField().value).toBe(STORED.wikiUrl);
-    expect(sw('Meldungen ohne Konto erlauben')).toHaveAttribute('aria-checked', 'true');
-    expect(sw('Neue Meldungen per E-Mail')).toHaveAttribute('aria-checked', 'true');
-    expect(sw('Erledigte Meldungen anonymisieren')).toHaveAttribute('aria-checked', 'true');
+    expect(sw('Tickets ohne Konto erlauben')).toHaveAttribute('aria-checked', 'true');
+    expect(sw('Neue Tickets per E-Mail')).toHaveAttribute('aria-checked', 'true');
+    expect(sw('Erledigte Tickets anonymisieren')).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: /nach 12 Monaten/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
@@ -130,8 +130,8 @@ describe('HelpTicketsComponent', () => {
 
   it('saves the switches, the link and the months', async () => {
     const { api, toast, fixture } = await setup();
-    await userEvent.click(sw('Meldungen ohne Konto erlauben'));
-    await userEvent.click(sw('Neue Meldungen per E-Mail'));
+    await userEvent.click(sw('Tickets ohne Konto erlauben'));
+    await userEvent.click(sw('Neue Tickets per E-Mail'));
     await userEvent.clear(wikiField());
     await userEvent.type(wikiField(), '  https://wiki.example.org/neu  ');
     const c = fixture.componentInstance as unknown as { setMonths(v: string): void };
@@ -154,23 +154,23 @@ describe('HelpTicketsComponent', () => {
     const c = fixture.componentInstance as unknown as { setMonths(v: string): void };
     c.setMonths('6');
     fixture.detectChanges();
-    await userEvent.click(sw('Erledigte Meldungen anonymisieren'));
+    await userEvent.click(sw('Erledigte Tickets anonymisieren'));
     fixture.detectChanges();
     expect(screen.queryByRole('button', { name: /nach 6 Monaten/ })).not.toBeInTheDocument();
     await userEvent.click(save());
     expect(api.putHelpTickets).toHaveBeenLastCalledWith(expect.objectContaining({ retentionMonths: null }));
     fixture.detectChanges();
-    await userEvent.click(sw('Erledigte Meldungen anonymisieren'));
+    await userEvent.click(sw('Erledigte Tickets anonymisieren'));
     fixture.detectChanges();
     expect(screen.getByRole('button', { name: /nach 6 Monaten/ })).toBeInTheDocument();
   });
 
   it('turns the anonymization on with 12 months when it was never set', async () => {
     const { fixture } = await setup({ api: makeApi({ ...STORED, retentionMonths: null }) });
-    expect(sw('Erledigte Meldungen anonymisieren')).toHaveAttribute('aria-checked', 'false');
+    expect(sw('Erledigte Tickets anonymisieren')).toHaveAttribute('aria-checked', 'false');
     const c = fixture.componentInstance as unknown as { monthOptions(): unknown[] };
     expect(c.monthOptions()).toHaveLength(8);
-    await userEvent.click(sw('Erledigte Meldungen anonymisieren'));
+    await userEvent.click(sw('Erledigte Tickets anonymisieren'));
     fixture.detectChanges();
     expect(screen.getByRole('button', { name: /nach 12 Monaten/ })).toBeInTheDocument();
   });
@@ -199,10 +199,10 @@ describe('HelpTicketsComponent', () => {
 
   it('puts the stored values back on Verwerfen', async () => {
     const { fixture } = await setup();
-    await userEvent.click(sw('Neue Meldungen per E-Mail'));
+    await userEvent.click(sw('Neue Tickets per E-Mail'));
     await userEvent.click(discard());
     fixture.detectChanges();
-    expect(sw('Neue Meldungen per E-Mail')).toHaveAttribute('aria-checked', 'true');
+    expect(sw('Neue Tickets per E-Mail')).toHaveAttribute('aria-checked', 'true');
     expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
   });
 
@@ -210,10 +210,10 @@ describe('HelpTicketsComponent', () => {
     const api = makeApi();
     api.putHelpTickets.mockReturnValueOnce(throwError(() => new Error('x')));
     const { toast } = await setup({ api });
-    await userEvent.click(sw('Neue Meldungen per E-Mail'));
+    await userEvent.click(sw('Neue Tickets per E-Mail'));
     await userEvent.click(save());
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
-    expect(sw('Neue Meldungen per E-Mail')).toHaveAttribute('aria-checked', 'false');
+    expect(sw('Neue Tickets per E-Mail')).toHaveAttribute('aria-checked', 'false');
     expect(save()).toBeEnabled();
   });
 
@@ -222,7 +222,7 @@ describe('HelpTicketsComponent', () => {
     const pending = new Subject<HelpTicketsSettings>();
     api.putHelpTickets.mockReturnValueOnce(pending);
     const { fixture } = await setup({ api });
-    await userEvent.click(sw('Neue Meldungen per E-Mail'));
+    await userEvent.click(sw('Neue Tickets per E-Mail'));
     const c = fixture.componentInstance as unknown as { save(): void; discard(): void };
     c.save();
     c.save();
@@ -272,8 +272,8 @@ describe('HelpTicketsComponent', () => {
       await setup({ perms: ['admin.site', 'ticket.manage'] });
       expect(screen.getByRole('heading', { name: 'Gesperrte Absender' })).toBeInTheDocument();
       expect(rows()).toEqual([
-        'spam@example.orggesperrt am 14.10.2026T-00423 abgefangene Meldungen Entsperren',
-        'Finn Schulzegesperrt am 10.10.20261 abgefangene Meldung Entsperren',
+        'spam@example.orggesperrt am 14.10.2026T-00423 abgefangene Tickets Entsperren',
+        'Finn Schulzegesperrt am 10.10.20261 abgefangenes Ticket Entsperren',
         'weg@example.orggesperrt am 09.10.2026 Entsperren',
       ]);
       expect(screen.getByRole('link', { name: 'T-0042' })).toHaveAttribute('href', '/tickets/t42');
@@ -289,7 +289,7 @@ describe('HelpTicketsComponent', () => {
       const meta = document.querySelector('.ht__blocks li .ht__meta');
       const parts = [...(meta?.querySelector('.ht__parts')?.children ?? [])];
       expect(parts.map((p) => p.className)).toEqual(['ht__part', 'ht__part', 'ht__part']);
-      expect(parts.map((p) => p.textContent?.trim())).toEqual(['gesperrt am 14.10.2026', 'T-0042', '3 abgefangene Meldungen']);
+      expect(parts.map((p) => p.textContent?.trim())).toEqual(['gesperrt am 14.10.2026', 'T-0042', '3 abgefangene Tickets']);
       expect(meta?.textContent).not.toContain('·');
       const css = readFileSync(join(__dirname, 'help-tickets.component.scss'), 'utf8');
       const rule = (sel: string) => css.match(new RegExp(`\\n${sel.replace(/[.:]/g, '\\$&')} \\{([^}]*)\\}`))?.[1] ?? '';

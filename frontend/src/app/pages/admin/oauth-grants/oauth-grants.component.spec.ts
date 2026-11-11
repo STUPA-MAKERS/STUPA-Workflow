@@ -151,7 +151,7 @@ describe('AdminOAuthGrantsComponent', () => {
     });
     expect(inst.principalChipText()).toBe('Person: Alex Admin');
     inst.setPrincipal('');
-    expect(inst.principalChipText()).toBe('Person: Alle Personen');
+    expect(inst.principalChipText()).toBe('Person');
     expect(api.listOAuthGrants).toHaveBeenLastCalledWith({
       limit: 25,
       offset: 0,
@@ -175,7 +175,7 @@ describe('AdminOAuthGrantsComponent', () => {
 
   it('filters through the person chip, an app menu', async () => {
     const { api } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Person: Alle Personen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Person' }));
     await userEvent.click(screen.getByRole('option', { name: 'Alex Admin' }));
     expect(api.listOAuthGrants).toHaveBeenLastCalledWith(
       expect.objectContaining({ principalId: 'p-1' }),

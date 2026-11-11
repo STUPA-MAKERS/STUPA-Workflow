@@ -259,9 +259,16 @@
 
   @if (manager) {
     <app-section class="td__sec" [heading]="'tickets.todos.title' | t">
-      <app-button sectionAction variant="text" size="sm" (click)="todoOpen.set(true)">
+      <app-button
+        sectionAction
+        variant="text"
+        size="sm"
+        [iconOnly]="true"
+        [ariaLabel]="'tickets.todos.add' | t"
+        data-testid="td-todo-add"
+        (click)="todoOpen.set(true)"
+      >
         <app-icon name="plus" />
-        {{ 'tickets.todos.add' | t }}
       </app-button>
       <app-todo-linked-list
         kind="ticket"

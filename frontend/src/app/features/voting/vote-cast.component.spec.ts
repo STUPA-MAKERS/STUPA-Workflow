@@ -4,6 +4,7 @@ import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
+import { ServerReachabilityService } from '@core/api/server-reachability.service';
 import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import type { Vote } from '@core/api/models';
@@ -86,6 +87,7 @@ async function setup(opts: {
   /** Gremium rights of the caller (`session.manage` gives the beamer). */
   sessionManage?: boolean;
   meetingError?: boolean;
+  serverAway?: boolean;
   /** The list page around the pane: `split` side by side. */
   page?: { split: boolean };
   /** The read answers twice, as a vote read ahead does: the kept vote, then this one. */
@@ -125,7 +127,8 @@ async function setup(opts: {
     canInGremium: jest.fn(() => opts.sessionManage ?? false),
     canInAnyGremium: jest.fn(() => opts.sessionManage ?? false),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = { success: jest.fn(), error: jest.fn(), showNotice: jest.fn(() => 7), dismiss: jest.fn() };
+  const waiting = signal(opts.serverAway ?? false);
   const railStatus = { refresh: jest.fn() };
 
   const id = opts.routeId === undefined ? 'v1' : opts.routeId;
@@ -162,6 +165,7 @@ async function setup(opts: {
       { provide: AuthService, useValue: auth },
       { provide: DelegationsApiService, useValue: { voteStatus } },
       { provide: ToastService, useValue: toast },
+      { provide: ServerReachabilityService, useValue: { waiting } },
       { provide: RailStatusService, useValue: railStatus },
       { provide: LiveVoteService, useValue: live },
       ...(page ? [{ provide: VotingPageService, useValue: page }] : []),
@@ -177,6 +181,7 @@ async function setup(opts: {
     getMeeting,
     voteStatus,
     toast,
+    waiting,
     railStatus,
     auth,
     params,
@@ -442,11 +447,17 @@ describe('VoteCastComponent', () => {
     beforeEach(() => (restore = matchMediaQueries(MEDIA.phone)));
     afterEach(() => restore());
 
-    /** The way back goes to the list; the meeting line goes to the meeting. */
-    it('shows the phone header with the way back to the list', async () => {
+    /**
+     * § 000674: the detail bar of the list/detail layout is the head. The view has no
+     * header of its own, and the meeting line stands in the status line below the title.
+     */
+    it('has no header of its own and names the meeting in the status line', async () => {
       await setup();
-      expect(screen.getByRole('link', { name: 'Zurück' })).toHaveAttribute('href', '/voting');
-      expect(screen.getByRole('link', { name: 'TOP 3 · 34. Sitzung' })).toHaveAttribute(
+      expect(document.querySelector('app-vote-phone-header')).toBeNull();
+      expect(screen.queryByRole('link', { name: 'Zurück' })).toBeNull();
+      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+      expect(document.querySelector('app-sheet-bar')).not.toBeNull();
+      expect(screen.getByRole('link', { name: '34. Sitzung · TOP 3' })).toHaveAttribute(
         'href',
         '/meetings/m1',
       );
@@ -464,12 +475,12 @@ describe('VoteCastComponent', () => {
 
     it('shows no line when the meeting cannot be read', async () => {
       await setup({ meetingError: true });
-      expect(document.querySelector('.ph__sub')).toBeNull();
+      expect(document.querySelector('.vpn__app')).toBeNull();
     });
 
     it('shows no line for a vote without a meeting and without an application', async () => {
       await setup({ vote: vote({ meetingId: null, agendaItemId: null, applicationId: null }) });
-      expect(document.querySelector('.ph__sub')).toBeNull();
+      expect(document.querySelector('.vpn__app')).toBeNull();
     });
 
     it('names only the meeting when the item is unknown', async () => {
@@ -861,11 +872,42 @@ describe('VoteCastComponent', () => {
       expect(document.querySelector('app-vote-bars')).toBeInTheDocument();
     });
 
-    it('shows a lost connection', async () => {
-      const { sessions, fixture } = await setup();
-      sessions[0].connection.set('reconnecting');
-      fixture.detectChanges();
-      expect(screen.getByText('Verbindung verloren — verbinde neu …')).toBeInTheDocument();
+    /** § 000678: a toast that stays while the connection is lost, and no line in the page. */
+    it('shows a lost connection as a toast that stays until the connection is back', async () => {
+      jest.useFakeTimers();
+      try {
+        const { sessions, fixture, toast } = await setup();
+        sessions[0].connection.set('reconnecting');
+        fixture.detectChanges();
+        expect(toast.showNotice).toHaveBeenCalledTimes(1);
+        expect(toast.showNotice).toHaveBeenCalledWith({
+          message: 'Verbindung verloren — verbinde neu …',
+          variant: 'warning',
+          phonePlacement: 'top',
+        });
+        expect(screen.queryByText('Verbindung verloren — verbinde neu …')).toBeNull();
+        jest.advanceTimersByTime(60_000);
+        fixture.detectChanges();
+        expect(toast.dismiss).not.toHaveBeenCalled();
+        sessions[0].connection.set('open');
+        fixture.detectChanges();
+        expect(toast.dismiss).toHaveBeenCalledWith(7);
+        expect(toast.showNotice).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('shows no toast while the server is away, and closes the toast when the view goes', async () => {
+      const away = await setup({ serverAway: true });
+      away.sessions[0].connection.set('reconnecting');
+      away.fixture.detectChanges();
+      expect(away.toast.showNotice).not.toHaveBeenCalled();
+      away.waiting.set(false);
+      away.fixture.detectChanges();
+      expect(away.toast.showNotice).toHaveBeenCalledTimes(1);
+      away.fixture.destroy();
+      expect(away.toast.dismiss).toHaveBeenCalledWith(7);
     });
 
     it('does not follow a closed vote', async () => {

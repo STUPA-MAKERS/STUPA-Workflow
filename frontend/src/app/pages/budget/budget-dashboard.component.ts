@@ -822,6 +822,21 @@ export class BudgetDashboardComponent {
     return [{ items }];
   }
 
+  /** The ⋮ menu of the head on a wide screen (§ 000670): what is no icon button. */
+  moreSections(): RowMenuSection[] {
+    return [
+      {
+        items: [
+          {
+            id: 'bookings',
+            label: this.i18n.translate('budget.usage.viewExpenses'),
+            icon: 'receipt',
+          },
+        ],
+      },
+    ];
+  }
+
   onAction(item: RowMenuItem): void {
     if (item.id === 'export') this.onExport();
     else if (item.id === 'bookings') this.openBookings();

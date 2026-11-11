@@ -636,7 +636,10 @@ describe('TicketDetailComponent', () => {
   /** The shared dialog starts from the ticket: its title and the link to it. */
   it('opens the to-do dialog and reloads after a new card', async () => {
     const { cmp, api, todosApi, harness } = await start('/tickets/t40', { split: true });
-    await userEvent.click(screen.getByRole('button', { name: /To-Do anlegen/ }));
+    // § 000669: the action of the section is an icon button with its text as name.
+    const add = screen.getByRole('button', { name: 'To-Do anlegen' });
+    expect(add.textContent?.trim()).toBe('');
+    await userEvent.click(add);
     harness.detectChanges();
     expect(cmp.todoOpen()).toBe(true);
     await harness.fixture.whenStable();

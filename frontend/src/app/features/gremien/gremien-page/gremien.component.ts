@@ -2,10 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   signal,
-  untracked,
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
@@ -13,6 +11,7 @@ import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
 import type { GremiumOverview } from '@core/api/gremien.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
@@ -73,7 +72,7 @@ export interface GremiumRow {
  *   or the initials, the role and the number of members, and the next meeting ("Läuft",
  *   a date or "keine geplant").
  * - Right: the child route `/committees/:id` with the open gremium (`GremiumDetailComponent`).
- *   Side by side the first own gremium opens by itself.
+ *   The page opens no gremium by itself (§ 000664).
  * - One pane at a time (narrow, phone): the list, then the gremium with a way back.
  *
  * The search filters the loaded list in the browser: the list is short and complete.
@@ -138,10 +137,6 @@ export class GremienComponent {
     { value: 'mine', label: this.i18n.translate('gremien.list.showMine') },
     { value: 'all', label: this.i18n.translate('gremien.list.showAll') },
   ]);
-  readonly scopeText = computed(() => {
-    const label = this.scopeOptions().find((o) => o.value === this.scope())?.label ?? '';
-    return `${this.i18n.translate('gremien.list.show')}: ${label}`;
-  });
 
   /** The rows that match the search, in the order of the server (by name). */
   private readonly matching = computed(() => {
@@ -175,7 +170,12 @@ export class GremienComponent {
   );
 
   readonly searchPlaceholder = computed(() =>
-    this.i18n.translate('gremien.list.search', { n: this.visibleCount() }),
+    searchPlaceholder(
+      this.i18n,
+      { plain: 'gremien.list.searchLabel', one: 'gremien.list.searchOne', many: 'gremien.list.search' },
+      this.visibleCount(),
+      this.store.loading(),
+    ),
   );
 
   /** The ⋮ menu of the phone header: the calendar subscription. */
@@ -194,18 +194,6 @@ export class GremienComponent {
     });
     this.store.load();
 
-    effect(() => {
-      const split = this.split();
-      const loading = this.store.loading();
-      const first = this.mine()[0] ?? this.others()[0];
-      untracked(() => {
-        if (!split || loading || this.selectedId() || !first) return;
-        void this.router.navigate(['/committees', first.item.id], {
-          queryParamsHandling: 'preserve',
-          replaceUrl: true,
-        });
-      });
-    });
   }
 
   /** "Zur Liste": close the gremium, keep the tab. */

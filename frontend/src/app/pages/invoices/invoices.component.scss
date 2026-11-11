@@ -27,16 +27,6 @@
   @include lp.chips;
 }
 
-.inv__count {
-  margin-inline-start: auto;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  white-space: nowrap;
-}
-.inv__count--wait {
-  visibility: hidden;
-}
-
 .inv__scroll {
   @include lp.scroll(--inv-fade);
   padding-bottom: calc(56px + var(--space-6));
@@ -104,10 +94,6 @@
 .inv {
   position: relative;
 }
-.inv__seg {
-  display: block;
-  width: 100%;
-}
 .inv__zone {
   flex: none;
 }
@@ -116,12 +102,6 @@
   .inv__row {
     --li-pad-x: var(--space-3);
     --li-gap: var(--space-2);
-  }
-  .inv__seg ::ng-deep .seg {
-    grid-auto-columns: minmax(max-content, 1fr);
-  }
-  .inv__seg ::ng-deep .seg__opt {
-    padding-inline: var(--space-2);
   }
   .inv__chips {
     @include lp.phone-chips;

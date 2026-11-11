@@ -6,7 +6,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { Meeting, MeetingPage, Uuid } from '@core/api/models';
 import type { SelectOption } from '@stupa-makers/ui-kit';
-import { liveSearch } from '@stupa-makers/ui-kit';
+import { filterChipText, liveSearch } from '@stupa-makers/ui-kit';
 
 /** A change of one meeting, see `MeetingsTimelineService.lastChange`. */
 export type MeetingChange =
@@ -89,11 +89,14 @@ export class MeetingsTimelineService {
   ]);
   /** The Gremium chip shows only when there is more than one Gremium to pick. */
   readonly showGremiumFilter = computed(() => this.filterGremien().length > 1);
-  /** The text of the Gremium chip. An unknown value (a Gremium that left the list) reads as "Alle Gremien". */
+  /**
+   * The text of the Gremium chip (§ 000663): "Gremium" without a choice, "Gremium: Name" with
+   * one. An unknown value (a Gremium that left the list) reads as no choice.
+   */
   readonly gremiumFilterLabel = computed(() => {
-    const options = this.filterGremiumOptions();
     const value = this.gremiumFilter();
-    return options.find((o) => o.value === value)?.label ?? options[0].label;
+    const hit = value ? this.filterGremiumOptions().find((o) => o.value === value) : undefined;
+    return filterChipText(this.i18n.translate('meetings.list.committeeFilter'), hit?.label);
   });
 
   /** Active search query (empty = normal past/upcoming timeline). */

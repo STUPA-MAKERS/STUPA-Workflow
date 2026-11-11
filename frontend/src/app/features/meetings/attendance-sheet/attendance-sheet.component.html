@@ -81,7 +81,7 @@
               <div class="as__ctl" [class.as__ctl--seg]="!!row.options">
                 @if (row.options; as options) {
                   <div
-                    class="as__seg"
+                    class="seg as__seg"
                     role="radiogroup"
                     [attr.aria-label]="'meetings.attendanceSheet.statusOf' | t: { name: row.name }"
                     (focusout)="onFocusOut($event, row)"
@@ -90,7 +90,8 @@
                       <button
                         type="button"
                         role="radio"
-                        class="as__opt"
+                        class="seg__opt as__opt"
+                        [class.seg__opt--on]="o.value === row.value"
                         [class.as__opt--on]="o.value === row.value"
                         [attr.aria-checked]="o.value === row.value"
                         [attr.aria-disabled]="o.blocked || saving() ? 'true' : null"
