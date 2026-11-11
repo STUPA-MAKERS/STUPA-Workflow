@@ -15,7 +15,6 @@ from uuid import uuid4
 import pytest
 
 from app.modules.livevote import open_window as mod
-from app.modules.livevote.models import Meeting, MeetingSettings
 from app.modules.livevote.open_window import (
     MeetingSettingsService,
     OpenWindow,
@@ -23,6 +22,7 @@ from app.modules.livevote.open_window import (
     load_meeting_settings,
     open_window,
 )
+from app.modules.meetings.models import Meeting, MeetingSettings
 from app.shared.errors import ConflictError, ValidationProblem
 
 TZ = "Europe/Berlin"

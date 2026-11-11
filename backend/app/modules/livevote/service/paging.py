@@ -10,7 +10,7 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, DateTime, cast, func
 
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.models import Meeting
 from app.shared.errors import BadRequestError
 
 #: Timeline sort and boundary key: the scheduled moment of the meeting. A missing

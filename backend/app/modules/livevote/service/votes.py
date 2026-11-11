@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from itertools import groupby
 from typing import Any, Literal
 from uuid import UUID
@@ -16,10 +15,10 @@ from app.modules.applications.decision import DecisionIn
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
-from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import MeetingAttendance, MeetingGuest
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.schemas import MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
+from app.modules.meetings.models import MeetingAttendance, MeetingGuest
 from app.modules.voting.election import election_config, election_fields, is_election
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.poll import is_poll, poll_config, poll_fields, result_of
@@ -458,17 +457,3 @@ class VoteReadOps(MeetingServiceBase):
     async def present_member_count(self, meeting_id: UUID) -> int:
         """Return the present members of the meeting (the base of a guest vote)."""
         return (await self._present_by_meeting([meeting_id])).get(meeting_id, 0)
-
-    async def vote_eligible_count(self, gremium_id: UUID) -> int:
-        """Return the roster size for the quorum: active members with a `vote.cast` role."""
-        datetime.now(UTC)
-        rows = (
-            await self.session.execute(
-                select(GremiumMembership.principal_id, GremiumRole.permissions)
-                .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
-                .where(
-                    GremiumMembership.gremium_id == gremium_id,
-                )
-            )
-        ).all()
-        return len({pid for pid, perms in rows if "vote.cast" in (perms or [])})

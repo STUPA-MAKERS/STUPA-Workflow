@@ -22,7 +22,7 @@ from app.modules.applications.models import ApplicationDecision
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear
 from app.modules.flow.models import State
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.todos.service import TodoService
 from app.modules.voting.models import Vote
 from tests.integration.modules.flow.agenda_support import make_application, seed_agenda_flow

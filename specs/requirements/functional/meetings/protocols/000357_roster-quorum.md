@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/livevote/roster.py
+  - backend/app/modules/meetings/roster.py
   - backend/app/modules/protocol/service.py
 scope:
   - backend/app/modules/protocol

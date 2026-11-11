@@ -34,16 +34,16 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.broker import InMemoryBroker
-from app.modules.livevote.models import (
+from app.modules.livevote.router import get_broker_rest, get_broker_ws, get_ws_principal
+from app.modules.livevote.service import BrokerPublisher
+from app.modules.meetings.models import (
     Meeting,
     MeetingAgendaItem,
     MeetingAttendance,
     MeetingGuest,
 )
-from app.modules.livevote.publisher import get_meeting_publisher
-from app.modules.livevote.router import get_broker_rest, get_broker_ws, get_ws_principal
-from app.modules.livevote.service import BrokerPublisher
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.protocol_models import Protocol
+from app.modules.meetings.publisher import get_meeting_publisher
 from app.modules.protocol.service import ProtocolService
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.settings import Settings, get_settings, load_settings

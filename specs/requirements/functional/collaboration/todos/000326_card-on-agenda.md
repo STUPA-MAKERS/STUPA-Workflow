@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/livevote/agenda_service.py
+  - backend/app/modules/meetings/agenda_service.py
   - backend/app/modules/todos/links.py
 scope:
   - backend/app/modules/todos

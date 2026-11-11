@@ -21,7 +21,7 @@ from app.deps import get_current_principal
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from tests.integration.modules.livevote.conftest import ADMIN_SUB, audit_actions, seed
 

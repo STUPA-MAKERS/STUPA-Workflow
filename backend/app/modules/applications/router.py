@@ -2,7 +2,7 @@
 
 The create route is public and ALTCHA-guarded. The other routes accept an
 applicant or a principal. They cover the detail view, the patch that writes a
-new version, the timeline, the versions, the comments and the erasure request.
+new version, the timeline, the versions and the comments.
 Only a principal reads the PII and the internal comments.
 """
 
@@ -43,7 +43,6 @@ from app.modules.applications.access import (
     resolve_app_read,
 )
 from app.modules.applications.captured_mail import notify_application_captured
-from app.modules.applications.erasure_mail import notify_erasure_requested
 from app.modules.applications.mail_data import resolve_application_lang
 from app.modules.applications.mention_mails import notify_comment_mentions
 from app.modules.applications.schemas import (
@@ -72,7 +71,6 @@ from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.notifications.chat_mail import comment_mail_text
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.service import NotificationService
-from app.modules.privacy.service import ErasureRequestService
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_application_payload_limit,
@@ -1015,42 +1013,6 @@ async def delete_comment(
         allow_unconfirmed=access.is_owning_applicant,
         files=FilesService(service.session, storage=storage),
     )
-
-
-@router.post(
-    "/applications/{application_id}/erasure-request",
-    status_code=202,
-    responses=_errors(401, 403, 404),
-)
-async def request_erasure(
-    application_id: UUID,
-    session: DbSession,
-    settings: SettingsDep,
-    background: BackgroundTasks,
-    request: Request,
-    access: Annotated[Access, Depends(require_app_read)],
-) -> Response:
-    """File an erasure request (GDPR Art. 17) into the ``/admin/privacy`` queue.
-
-    The route notifies the privacy officers.
-
-    Every identity that may read the application may request the erasure of the PII: the
-    magic-link applicant, the creator and an authorized principal.
-    """
-    result = await ErasureRequestService(session).create(
-        subject_type="applicant",
-        application_id=access.application_id,
-        requested_by=access.actor,
-    )
-    pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(
-        notify_erasure_requested,
-        queue=mail_queue_from_pool(pool),
-        settings=settings,
-        request_id=result.id,
-        subject_type="applicant",
-    )
-    return Response(status_code=202)
 
 
 @router.get(

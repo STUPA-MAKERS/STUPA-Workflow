@@ -60,7 +60,7 @@ async def meeting_delegation_mail_info(
     from app.modules.auth.models import Principal
     from app.modules.delegations.models import MeetingDelegation
     from app.modules.gremien.models import Gremium
-    from app.modules.livevote.models import Meeting
+    from app.modules.meetings.models import Meeting
 
     delegator = Principal.__table__.alias("delegator")
     try:

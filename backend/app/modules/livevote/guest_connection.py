@@ -37,8 +37,8 @@ from app.modules.livevote.events import (
     VoteTallyEvent,
 )
 from app.modules.livevote.guests import GuestService
-from app.modules.livevote.models import Meeting, MeetingGuest
 from app.modules.livevote.service.pubsub import meeting_channel
+from app.modules.meetings.models import Meeting, MeetingGuest
 from app.modules.voting.models import Vote
 from app.modules.voting.service import VotingService
 

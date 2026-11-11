@@ -45,14 +45,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.agenda_service import agenda_order, title_of
 from app.modules.livevote.events import GuestEventReason
-from app.modules.livevote.models import (
-    Meeting,
-    MeetingAgendaItem,
-    MeetingAttendance,
-    MeetingGuest,
-)
 from app.modules.livevote.public_schemas import (
     GuestAgendaItem,
     GuestMe,
@@ -62,6 +55,13 @@ from app.modules.livevote.public_schemas import (
     PublicMeetingHead,
 )
 from app.modules.livevote.schemas import JoinLinkOut, MeetingGuestOut, QrMatrixOut
+from app.modules.meetings.agenda_service import agenda_order, title_of
+from app.modules.meetings.models import (
+    Meeting,
+    MeetingAgendaItem,
+    MeetingAttendance,
+    MeetingGuest,
+)
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import BallotAccepted
 from app.modules.voting.service import Choice, VotingService, guest_voter_sub

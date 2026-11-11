@@ -49,8 +49,8 @@ from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.agenda_service import AgendaService
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.agenda_service import AgendaService
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.voting.schemas import VoteCreate
 from app.modules.voting.service import VotingService
 from app.shared.config_schemas import FormFieldDef, VoteConfig

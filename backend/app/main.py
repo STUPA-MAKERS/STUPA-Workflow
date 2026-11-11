@@ -64,6 +64,7 @@ from app.modules.livevote.locks import RedisLocker
 from app.modules.livevote.public_router import router as public_meeting_router
 from app.modules.livevote.router import router as livevote_router
 from app.modules.livevote.service import BrokerPublisher
+from app.modules.livevote.vote_open_router import router as vote_open_router
 from app.modules.media.router import public_router as public_media_router
 from app.modules.media.router import router as media_router
 from app.modules.notifications.provider import close_mail_pool, create_mail_pool
@@ -74,6 +75,7 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.notifications.router import (
     templates_router as mail_templates_router,
 )
+from app.modules.privacy.request_router import router as erasure_request_router
 from app.modules.privacy.router import router as privacy_router
 from app.modules.protocol.public_router import router as public_protocol_router
 from app.modules.protocol.router import router as protocol_router
@@ -109,6 +111,7 @@ api_router.include_router(applications_router)
 api_router.include_router(application_links_router)
 api_router.include_router(flow_router)
 api_router.include_router(voting_router)
+api_router.include_router(vote_open_router)
 api_router.include_router(livevote_router)
 api_router.include_router(public_meeting_router)
 api_router.include_router(protocol_router)
@@ -128,6 +131,7 @@ api_router.include_router(config_revision_router)
 api_router.include_router(admin_router)
 api_router.include_router(delegations_router)
 api_router.include_router(privacy_router)
+api_router.include_router(erasure_request_router)
 api_router.include_router(backup_router)
 api_router.include_router(search_router)
 api_router.include_router(tickets_router)

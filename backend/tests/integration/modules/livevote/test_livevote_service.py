@@ -30,12 +30,12 @@ from app.modules.auth.principal import Principal
 from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormVersion
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.locks import RedisLocker
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.schemas import MeetingCreate, MeetingPatch
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
+from app.modules.meetings.agenda_service import AgendaService
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.service import VotingService
 from app.shared.config_schemas import VoteConfig

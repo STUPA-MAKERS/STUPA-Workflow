@@ -41,7 +41,7 @@ from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.models import Meeting
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.models import NotificationPreference
 from app.modules.tickets.mention_mails import send_ticket_mentions

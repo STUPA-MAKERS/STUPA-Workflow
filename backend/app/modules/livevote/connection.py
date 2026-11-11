@@ -70,10 +70,10 @@ from app.modules.livevote.events import (
     VoteTallyEvent,
 )
 from app.modules.livevote.locks import Locker
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.presence import PRESENCE, Viewer
 from app.modules.livevote.schemas import AGENDA_BODY_MAX
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.voting.schemas import VoteOut
 from app.modules.voting.service import VotingService
 from app.shared.errors import AppError, ForbiddenError

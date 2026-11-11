@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.models import Meeting
 from tests.integration.modules.livevote.conftest import audit_actions, seed
 
 pytestmark = pytest.mark.integration

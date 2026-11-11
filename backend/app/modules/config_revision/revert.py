@@ -31,7 +31,7 @@ from app.modules.config_revision.service import (
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 if TYPE_CHECKING:
-    from app.modules.livevote.publisher import MeetingPublisher
+    from app.modules.meetings.publisher import MeetingPublisher
 
 #: Permission per entity that the original config change needed. This is the same gate
 #: as the sidebar restore. A revert is an equally strong mutation, so it must require

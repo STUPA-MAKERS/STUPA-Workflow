@@ -19,7 +19,7 @@ from sqlalchemy import ScalarSelect, Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.delegations.models import DelegationSubstitute
+from app.modules.gremien.models import DelegationSubstitute
 
 
 async def substitutes_for(

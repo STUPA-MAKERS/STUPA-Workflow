@@ -16,8 +16,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.livevote.models import Meeting
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.models import Meeting
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.service import ProtocolService
 from app.shared.errors import ConflictError
 from tests.integration.modules.livevote.conftest import ADMIN_SUB, audit_actions, seed

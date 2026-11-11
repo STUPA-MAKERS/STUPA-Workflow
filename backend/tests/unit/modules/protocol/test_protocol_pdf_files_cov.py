@@ -25,8 +25,8 @@ import pytest
 from app.modules.applications.models import Application
 from app.modules.files import service as files_service
 from app.modules.files.models import Attachment
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.pdf.typst_client import TypstError
-from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import (
     ProtocolService,
     protocol_public_storage_key,

@@ -12,8 +12,6 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.policy import expand, gremium_ids_with
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.keepers import keeper_summaries
-from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingGremiumOut, MeetingOut, MeetingPage
 from app.modules.livevote.service.paging import (
     _decode_cursor,
@@ -24,7 +22,9 @@ from app.modules.livevote.service.paging import (
 )
 from app.modules.livevote.service.permissions import PermissionOps
 from app.modules.livevote.service.votes import VoteReadOps
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.keepers import keeper_summaries
+from app.modules.meetings.models import Meeting
+from app.modules.meetings.protocol_models import Protocol
 from app.shared.search import dialect_of, trigram_rank
 
 #: A tuple of SQL filters that a query applies with `where(*filters)`.

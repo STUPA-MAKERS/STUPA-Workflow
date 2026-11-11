@@ -22,7 +22,7 @@ from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import State, Transition
 from app.modules.flow.service import FlowService
-from app.modules.livevote.models import MeetingAgendaItem
+from app.modules.meetings.models import MeetingAgendaItem
 from app.shared.errors import ConflictError, ValidationProblem
 from tests.integration.modules.flow.agenda_support import (
     admin,

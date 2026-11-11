@@ -22,10 +22,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.modules.auth.models import Principal
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.privacy.service import PrincipalService
 from app.modules.protocol.markdown import build_election_snippet
-from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import election_snippet_of
 from app.modules.voting.erasure import ERASED_CANDIDATE_NAME
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker

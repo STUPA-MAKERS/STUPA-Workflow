@@ -39,15 +39,13 @@ from app.modules.budget.tree_models import (
     FiscalYear,
 )
 from app.modules.config_revision.models import ConfigRevision
-from app.modules.delegations.models import (
-    DelegationSubstitute,
-    MeetingDelegation,
-)
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
-from app.modules.gremien.models import Gremium
-from app.modules.livevote.models import (
+from app.modules.gremien.models import DelegationSubstitute, Gremium
+from app.modules.media.models import MarkdownImage
+from app.modules.meetings.models import (
     Meeting,
     MeetingAgendaItem,
     MeetingAttendance,
@@ -55,7 +53,7 @@ from app.modules.livevote.models import (
     MeetingSettings,
     ProtocolKeeperPeriod,
 )
-from app.modules.media.models import MarkdownImage
+from app.modules.meetings.protocol_models import Protocol, ProtocolVoteRef
 from app.modules.notifications.models import (
     MailTemplate,
     NotificationPreference,
@@ -63,7 +61,6 @@ from app.modules.notifications.models import (
     TaskReminderLog,
 )
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
-from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.models import (

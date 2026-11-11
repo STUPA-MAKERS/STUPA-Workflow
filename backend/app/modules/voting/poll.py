@@ -286,13 +286,13 @@ class PollService:
             )
         if not await self.can_create(gremium_id, principal):
             raise ForbiddenError("not allowed to create a poll in this gremium")
-        from app.modules.livevote.service import MeetingService
+        from app.modules.meetings.rules import MeetingRules
         from app.modules.voting.service import secret_only
 
         _check_end(payload.closes_at, now)
         config = build_config(payload, secret=secret_only(payload.secret, field="secret"))
 
-        eligible = await MeetingService(self.session).vote_eligible_count(gremium_id)
+        eligible = await MeetingRules(self.session).vote_eligible_count(gremium_id)
         internal = VoteCreateInternal(
             config=config,
             eligibleGroup=gremium_id,

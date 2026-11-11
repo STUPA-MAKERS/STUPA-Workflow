@@ -18,10 +18,10 @@ import pytest
 from pydantic import ValidationError
 
 from app.modules.auth.principal import Principal
-from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MEETING_TITLE_MAX, MeetingCreate, MeetingPatch
 from app.modules.livevote.service import MeetingService
 from app.modules.livevote.service import lifecycle as lifecycle_mod
+from app.modules.meetings.models import Meeting
 from app.shared.errors import ConflictError, ForbiddenError
 
 STATUSES = ("planned", "live", "closed")

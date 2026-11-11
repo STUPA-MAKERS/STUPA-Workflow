@@ -43,9 +43,9 @@ from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.flow.models import State
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
-from app.modules.livevote.schemas import AgendaItemOut, AssignableApplicationOut
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.protocol_models import Protocol
+from app.modules.meetings.schemas import AgendaItemOut, AssignableApplicationOut
 from app.shared.errors import ConflictError, NotFoundError
 
 #: The meeting states that accept a change of the agenda.

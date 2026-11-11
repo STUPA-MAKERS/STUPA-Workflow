@@ -5,7 +5,14 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/modules/meetings/test_meeting_core.py:test_import_contract_has_no_exception_for_voting_flow_or_applications"
+implementation:
+  - backend/app/modules/meetings
+  - backend/app/modules/gremien/pool.py
+  - backend/app/modules/livevote/vote_open_router.py
+  - backend/app/modules/privacy/request_router.py
+  - backend/pyproject.toml
 scope:
   - backend/app/modules
   - backend/pyproject.toml

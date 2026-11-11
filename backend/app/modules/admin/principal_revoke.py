@@ -61,17 +61,18 @@ from app.modules.auth.models import GroupMapping, Role, RoleAssignment
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.sessions import end_principal_sessions
 from app.modules.delegations.mails import DelegationMailInfo, meeting_delegation_mail_info
-from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
-from app.modules.delegations.pool import pool_entries_of, pool_principals_stmt
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.membership_sync import sync_principal_memberships
 from app.modules.gremien.models import (
+    DelegationSubstitute,
     Gremium,
     GremiumMembership,
     GremiumMembershipMapping,
     GremiumRole,
     GremiumRoleMapping,
 )
-from app.modules.livevote.models import Meeting
+from app.modules.gremien.pool import pool_entries_of, pool_principals_stmt
+from app.modules.meetings.models import Meeting
 from app.modules.voting.models import Vote, VotedMarker
 from app.settings import Settings
 from app.shared.errors import ConflictError, FieldError, NotFoundError, ValidationProblem

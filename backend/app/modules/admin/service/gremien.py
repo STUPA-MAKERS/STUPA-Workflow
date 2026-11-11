@@ -143,7 +143,7 @@ class GremiumOps(ConfigServiceBase):
         """
         if await self.session.get(Gremium, gremium_id) is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
-        from app.modules.protocol.models import Protocol
+        from app.modules.meetings.protocol_models import Protocol
 
         base = (
             select(func.count())
@@ -352,8 +352,8 @@ class GremiumOps(ConfigServiceBase):
         the delete. Those votes stay; only the votes of the meetings go. The imports
         are local, because livevote and voting import the admin models.
         """
-        from app.modules.livevote.models import Meeting
         from app.modules.livevote.service import MeetingService
+        from app.modules.meetings.models import Meeting
         from app.modules.voting.service import VotingService
 
         meetings = (

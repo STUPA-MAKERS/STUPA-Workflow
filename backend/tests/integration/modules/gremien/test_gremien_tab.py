@@ -29,8 +29,8 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.site_config.models import CdVariant, CdVariantLogo
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.settings import get_settings, load_settings

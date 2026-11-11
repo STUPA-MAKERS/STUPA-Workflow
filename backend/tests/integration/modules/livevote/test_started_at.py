@@ -20,7 +20,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormVersion
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from tests.integration.modules.livevote.conftest import admin, audit_actions, seed
 
 pytestmark = pytest.mark.integration

@@ -1,7 +1,7 @@
 """The `canManageVotes` flag and the vote lifecycle gate must agree.
 
 The meeting payload advertises `canManageVotes`. The client renders the open, close and
-delete buttons from it. `MeetingService.can_manage_votes` computes it for the session
+delete buttons from it. `MeetingRules.can_manage_votes` computes it for the session
 manager, the protokollant, and a gremium role with `vote.manage`. A lifecycle gate that
 admits only `vote.manage` lets the protokollant create, open and delete a vote of the
 meeting, but never close it, so the open vote strands until a `vote.manage` holder steps
@@ -21,8 +21,8 @@ import pytest
 
 from app.modules.auth.principal import Principal
 from app.modules.gremien import gremium_roles as gremium_roles_mod
-from app.modules.livevote.service import MeetingService
-from app.modules.livevote.service import permissions as permissions_mod
+from app.modules.meetings import rules as permissions_mod
+from app.modules.meetings.rules import MeetingRules
 from app.modules.voting.service import VotingService
 from app.shared.errors import ForbiddenError
 from tests._support.flow_fakes import fake_session, result
@@ -62,7 +62,7 @@ async def _advertised(meeting: Any, principal: Principal) -> bool:
     The fake session serves ``_principal_id`` for the protokollant check.
     """
     db = fake_session(result(PID))
-    return await MeetingService(db).can_manage_votes(meeting, principal)
+    return await MeetingRules(db).can_manage_votes(meeting, principal)
 
 
 async def _admitted(meeting: Any, principal: Principal) -> bool:
@@ -169,7 +169,7 @@ async def test_run_vote_needs_the_protokollant_for_a_meeting_vote(
     """Open and close of a meeting vote follow the minutes; a loose vote does not."""
     from uuid import uuid4
 
-    from app.modules.livevote.service import MeetingService
+    from app.modules.meetings.rules import MeetingRules
     from app.modules.voting.service import VotingService
     from app.shared.errors import ForbiddenError
 
@@ -188,7 +188,7 @@ async def test_run_vote_needs_the_protokollant_for_a_meeting_vote(
 
     monkeypatch.setattr(VotingService, "assert_can_manage_vote", _manage)
     monkeypatch.setattr(VotingService, "meeting_id_of", _meeting)
-    monkeypatch.setattr(MeetingService, "assert_can_run_votes", _refuse)
+    monkeypatch.setattr(MeetingRules, "assert_can_run_votes", _refuse)
     svc = VotingService(object())  # type: ignore[arg-type]
     with pytest.raises(ForbiddenError):
         await svc.assert_can_run_vote(uuid4(), object())  # type: ignore[arg-type]

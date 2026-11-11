@@ -309,7 +309,7 @@ class ListingOps(ApplicationsServiceBase):
         ).all()
         budget_scope = (_view_subtrees(root_paths),) if root_paths else ()
 
-        from app.modules.livevote.models import Meeting
+        from app.modules.meetings.models import Meeting
         from app.modules.voting.models import Vote
 
         voted_app_ids = (

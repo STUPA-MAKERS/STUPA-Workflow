@@ -34,7 +34,7 @@ from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.models import Meeting
 from app.modules.voting.models import Vote
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import ForbiddenError

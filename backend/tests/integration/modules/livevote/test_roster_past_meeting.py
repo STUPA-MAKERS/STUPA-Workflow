@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting, MeetingAttendance
+from app.modules.meetings.models import Meeting, MeetingAttendance
 from app.modules.protocol.service import ProtocolService
 from tests.integration.modules.livevote.conftest import seed
 

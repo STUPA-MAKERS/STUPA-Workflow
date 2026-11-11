@@ -95,8 +95,8 @@ async def test_the_agenda_path_locks_the_board_before_the_meeting(
     """
     from datetime import date, timedelta
 
-    from app.modules.livevote.agenda_service import AgendaService
-    from app.modules.livevote.models import Meeting
+    from app.modules.meetings.agenda_service import AgendaService
+    from app.modules.meetings.models import Meeting
 
     gid, bid = await add_gremium(maker)
     admin, admin_id = await add_person(maker, "Admin")
