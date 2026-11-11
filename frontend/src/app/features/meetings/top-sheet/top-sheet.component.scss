@@ -189,6 +189,13 @@
   @include f.highlight-surface;
 }
 @include d.host-on(fields) {
+  /* The pane is one yellow area: no edge around it and no ring while the person writes in
+     it, because the caret shows where the focus is. */
+  .ts,
+  .ts:focus-within {
+    box-shadow: none;
+    outline: none;
+  }
   .ts__editor ::ng-deep .mde__host {
     background: transparent;
     box-shadow: none;
