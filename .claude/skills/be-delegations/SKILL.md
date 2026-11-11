@@ -11,7 +11,7 @@ description: Meeting-bound vote and representation delegations (MeetingDelegatio
 
 **Key files:**
 - `models.py` — `MeetingDelegation` (one outgoing delegation per meeting and delegator). The pool model `DelegationSubstitute` is in `../gremien/models.py`.
-- `../gremien/pool.py` (in `gremien` since spec 000650, because the pool belongs to a Gremium and gives its read scope; `delegations` is in layer 3) — **the only source of the pool**: `substitutes_for(session, gremium, member)` (the personal entries for the member + the gremium-wide entries), `substitute_gremien_for_sub(sub)` (one statement). Never query the pool table directly elsewhere.
+- `../gremien/pool.py` (in `gremien` since spec 000652, because the pool belongs to a Gremium and gives its read scope; `delegations` is in layer 3) — **the only source of the pool**: `substitutes_for(session, gremium, member)` (the personal entries for the member + the gremium-wide entries), `substitute_gremien_for_sub(sub)` (one statement). Never query the pool table directly elsewhere.
 - `pool_seat.py` — pool seats: `pool_seat_for` (read-only lookup), `claim_pool_seat` (on the first represented ballot), `release_pool_seat`/`release_pool_seat_of` (on check-in or own ballot), `pool_seat_clause`, `lock_meeting_delegations` (the advisory lock of all delegation writes).
 - `schemas.py` — camelCase DTOs (`DelegationCreate/Out`, `SubstituteCreate/Out`, `MeetingDelegationContext`, `RecipientOut`, `VoteDelegationStatus`).
 - `service.py` — `DelegationService` (security core: gates, eligibility, chain prevention, deadlines, audit) + module-level `voting_delegation_check` and `meeting_start_utc`.

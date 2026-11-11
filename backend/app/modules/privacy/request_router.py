@@ -2,7 +2,7 @@
 
 `POST /applications/{application_id}/erasure-request` is in `privacy` and not in
 `applications`, because it files the request into the privacy queue, and
-`applications` imports no higher module (§S/backend/python/000650). The URL and the
+`applications` imports no higher module (§S/backend/python/000652). The URL and the
 response are those of the application routes.
 """
 

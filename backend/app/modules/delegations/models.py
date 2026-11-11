@@ -7,7 +7,7 @@ is exclusive and never a duplicate. The delegator cannot vote in that meeting.
 
 The substitute pool of a gremium (`DelegationSubstitute`) is in `gremien.models`,
 because the pool belongs to a gremium and gives its read scope
-(§S/backend/python/000650).
+(§S/backend/python/000652).
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """The route that opens a vote: `POST /votes/{vote_id}/open`.
 
 A meeting vote runs the checks of the meeting before it opens, so the route is in
-`livevote` and not in `voting` (§S/backend/python/000650). The URL and the response
+`livevote` and not in `voting` (§S/backend/python/000652). The URL and the response
 are those of the voting routes.
 """
 
@@ -56,7 +56,7 @@ async def open_vote(
     ahead (422 ``closes_at_too_soon``) and sends ``poll_started``.
 
     The route is in `livevote`, because it runs the checks of a meeting, and `voting`
-    imports no higher module (§S/backend/python/000650).
+    imports no higher module (§S/backend/python/000652).
     """
     await service.assert_can_run_vote(vote_id, principal)
     meeting_id = await service.meeting_id_of(vote_id)

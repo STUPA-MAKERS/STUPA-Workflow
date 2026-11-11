@@ -1,7 +1,7 @@
 """The permission-flag serializer of a meeting.
 
 The RBAC checks and the visibility scope are in `app.modules.meetings.rules`
-(§S/backend/python/000650). This class adds the read model with the flags.
+(§S/backend/python/000652). This class adds the read model with the flags.
 """
 
 from __future__ import annotations

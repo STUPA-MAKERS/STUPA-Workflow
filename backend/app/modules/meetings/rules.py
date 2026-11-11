@@ -8,7 +8,7 @@ included. The `meeting.view_all` permission is global, read-only, and purely add
 
 `MeetingRules` is the class for a caller that needs only the rules (`voting`, `flow`).
 `livevote.service.MeetingService` takes the same methods through `MeetingRuleOps`
-(§S/backend/python/000650).
+(§S/backend/python/000652).
 """
 
 from __future__ import annotations

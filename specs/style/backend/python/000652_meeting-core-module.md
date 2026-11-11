@@ -1,5 +1,5 @@
 ---
-id: "000650"
+id: "000652"
 title: The meeting core is in the module meetings
 kind: style
 status: approved
