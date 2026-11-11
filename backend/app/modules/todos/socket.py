@@ -1,6 +1,6 @@
 """The live channel of the boards: ``WS /api/ws/todos``.
 
-The handshake authenticates like the meeting socket (``app.shared.ws``): the
+The handshake authenticates like the meeting socket (``app.modules.auth.ws``): the
 ``Origin`` header must be on the allowlist, and only the session cookie counts,
 never an OAuth token. Without a session the socket closes with ``4401``; above the
 cap of ``MAX_CONNECTIONS_PER_PRINCIPAL`` open sockets of one account (per process)
@@ -49,13 +49,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import DbSession
 from app.modules.auth.principal import Principal
+from app.modules.auth.ws import WS_FORBIDDEN, WS_UNAUTHENTICATED, resolve_ws_principal
 from app.modules.livevote.broker import PatternBroker, Subscription
 from app.modules.todos.access import BoardAccess
 from app.modules.todos.live import CHANNEL_PATTERN, todo_broker
 from app.modules.todos.models import TodoBoard
 from app.settings import Settings, get_settings
 from app.shared.schemas import FrozenStrictCamelModel
-from app.shared.ws import WS_FORBIDDEN, WS_UNAUTHENTICATED, resolve_ws_principal
 
 logger = logging.getLogger("app.todos.live")
 

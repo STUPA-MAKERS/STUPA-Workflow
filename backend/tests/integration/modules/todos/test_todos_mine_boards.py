@@ -17,8 +17,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.admin.models import GremiumMembership
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import GremiumMembership
 from app.modules.todos.models import TodoAssignee
 from tests.integration.modules.todos.conftest import (
     Api,

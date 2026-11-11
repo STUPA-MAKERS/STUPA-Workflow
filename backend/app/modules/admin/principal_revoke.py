@@ -41,14 +41,6 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, Select, case, delete, exists, func, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.membership_sync import sync_principal_memberships
-from app.modules.admin.models import (
-    Gremium,
-    GremiumMembership,
-    GremiumMembershipMapping,
-    GremiumRole,
-    GremiumRoleMapping,
-)
 from app.modules.admin.schemas import (
     PrincipalRevokeIn,
     RevokeAssignmentOut,
@@ -70,6 +62,14 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.sessions import end_principal_sessions
 from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
 from app.modules.delegations.pool import pool_entries_of, pool_principals_stmt
+from app.modules.gremien.membership_sync import sync_principal_memberships
+from app.modules.gremien.models import (
+    Gremium,
+    GremiumMembership,
+    GremiumMembershipMapping,
+    GremiumRole,
+    GremiumRoleMapping,
+)
 from app.modules.livevote.models import Meeting
 from app.modules.notifications.auto import DelegationMailInfo, meeting_delegation_mail_info
 from app.modules.voting.models import Vote, VotedMarker

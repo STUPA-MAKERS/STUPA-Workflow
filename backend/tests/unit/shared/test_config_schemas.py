@@ -458,12 +458,14 @@ def test_comparison_offers_alias() -> None:
 
 
 def test_export_json_schemas_keys_and_deterministic() -> None:
-    schemas = export_json_schemas()
+    """§S/backend/python/000644: the caller passes the models that a module owns."""
+    schemas = export_json_schemas({"Extra": VoteConfig})
     assert set(schemas) == {
         "FormFieldDef", "FlowGraph", "VoteConfig", "NotificationRule",
-        "WebhookConfig", "ComparisonOffers", "Branding",
+        "WebhookConfig", "ComparisonOffers", "Extra",
     }
-    assert export_json_schemas() == schemas
+    assert export_json_schemas({"Extra": VoteConfig}) == schemas
+    assert set(export_json_schemas()) == set(schemas) - {"Extra"}
     assert "isPromoted" in schemas["FormFieldDef"]["properties"]
 
 

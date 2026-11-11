@@ -27,8 +27,6 @@ from sqlalchemy import inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.gremium_roles import GremiumRoleService
-from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.admin.oidc_mappings import OidcMappingService
 from app.modules.admin.schemas import (
     GremiumMembershipMappingCreate,
@@ -39,6 +37,8 @@ from app.modules.auth import service as auth_service
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oidc import OidcClaims
 from app.modules.auth.rbac import resolve_principal, vote_group_key
+from app.modules.gremien.gremium_roles import GremiumRoleService
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.privacy.service import PrincipalService
 from app.settings import Settings, load_settings
 from app.shared.errors import ConflictError

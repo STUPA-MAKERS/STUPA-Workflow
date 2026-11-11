@@ -551,7 +551,7 @@ async def test_service_delete_finalized_requires_special_permission(
     session = _DeletableSession(existing=meeting)
     svc = MeetingService(session)  # type: ignore[arg-type]
 
-    from app.modules.admin import gremium_roles as gremium_roles_mod
+    from app.modules.gremien import gremium_roles as gremium_roles_mod
 
     async def _manages(_s, _sub, perm, _now=None):
         return {meeting.gremium_id} if perm == "session.manage" else set()

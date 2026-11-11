@@ -31,10 +31,10 @@ from app.modules.applications.schemas import (
     TimelineEventOut,
     VersionOut,
 )
+from app.modules.auth.people import PersonRef
 from app.modules.auth.principal import Applicant, Principal
 from app.modules.files.schemas import MessageAttachmentOut
 from app.shared.paging import Page
-from app.shared.people import PersonRef
 
 _NOW = datetime(2026, 6, 5, tzinfo=UTC)
 

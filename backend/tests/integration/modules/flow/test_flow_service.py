@@ -17,7 +17,7 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
@@ -28,6 +28,7 @@ from app.modules.flow.schemas import TransitionResult
 from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
+from app.modules.gremien.models import Gremium
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import ConflictError
 

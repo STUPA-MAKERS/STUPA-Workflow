@@ -7,7 +7,6 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.modules.admin import gremium_roles
 from app.modules.auth import oauth, policy
 from app.modules.auth.policy import (
     ALL_GREMIEN,
@@ -18,6 +17,7 @@ from app.modules.auth.policy import (
     holds_gremium_permission,
 )
 from app.modules.auth.principal import Principal
+from app.modules.gremien import gremium_roles
 from tests._support.flow_fakes import fake_session
 
 GID = uuid4()

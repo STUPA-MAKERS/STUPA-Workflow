@@ -907,27 +907,26 @@ class ComparisonOffers(FrozenStrictCamelModel, frozen=True):
     as_: Literal["file", "field", "both"] = Field(default="file", alias="as")
 
 
-def _exported_models() -> dict[str, type[BaseModel]]:
-    """Return the config models to export.
+_EXPORTED_MODELS: Mapping[str, type[BaseModel]] = {
+    "FormFieldDef": FormFieldDef,
+    "FlowGraph": FlowGraph,
+    "VoteConfig": VoteConfig,
+    "NotificationRule": NotificationRule,
+    "WebhookConfig": WebhookConfig,
+    "ComparisonOffers": ComparisonOffers,
+}
 
-    The function imports ``Branding`` lazily. This breaks the import cycle between
-    ``shared`` and ``admin``.
+
+def export_json_schemas(
+    extra: Mapping[str, type[BaseModel]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Deterministic JSON-Schema export of all config models (by_alias).
+
+    Args:
+        extra: Config models that a module owns. The shared code imports no module
+            (§S/backend/python/000644), so the caller passes them.
     """
-    from app.modules.admin.branding import Branding
-
     return {
-        "FormFieldDef": FormFieldDef,
-        "FlowGraph": FlowGraph,
-        "VoteConfig": VoteConfig,
-        "NotificationRule": NotificationRule,
-        "WebhookConfig": WebhookConfig,
-        "ComparisonOffers": ComparisonOffers,
-        "Branding": Branding,
-    }
-
-
-def export_json_schemas() -> dict[str, dict[str, Any]]:
-    """Deterministic JSON-Schema export of all config models (by_alias)."""
-    return {
-        name: model.model_json_schema(by_alias=True) for name, model in _exported_models().items()
+        name: model.model_json_schema(by_alias=True)
+        for name, model in {**_EXPORTED_MODELS, **(extra or {})}.items()
     }

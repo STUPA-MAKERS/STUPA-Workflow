@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/webhooks/service.py
-  - backend/app/modules/admin/models.py
+  - backend/app/modules/webhooks/models.py
 scope:
   - backend/app/modules/webhooks
 ---

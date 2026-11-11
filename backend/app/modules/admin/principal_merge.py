@@ -76,13 +76,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, aliased
 
 from app.db import Base
-from app.modules.admin.membership_sync import sync_principal_memberships
-from app.modules.admin.models import (
-    Gremium,
-    GremiumMembership,
-    GremiumRole,
-    SiteConfigVersion,
-)
+from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.schemas import (
     MergeArea,
     MergeAreaOut,
@@ -117,6 +111,8 @@ from app.modules.delegations.models import (
     MeetingDelegation,
 )
 from app.modules.forms.models import FormVersion
+from app.modules.gremien.membership_sync import sync_principal_memberships
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.models import (
     Meeting,
     MeetingAttendance,

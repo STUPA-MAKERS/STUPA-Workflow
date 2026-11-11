@@ -16,15 +16,7 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
-from app.modules.admin import membership_sync, oidc_mappings
-from app.modules.admin.gremium_roles import GremiumRoleService
-from app.modules.admin.models import (
-    Gremium,
-    GremiumMembership,
-    GremiumMembershipMapping,
-    GremiumRole,
-    GremiumRoleMapping,
-)
+from app.modules.admin import oidc_mappings
 from app.modules.admin.oidc_mappings import OidcMappingService
 from app.modules.admin.schemas import (
     GremiumMembershipMappingCreate,
@@ -34,6 +26,15 @@ from app.modules.admin.schemas import (
     GroupMappingCreate,
 )
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.gremien import membership_sync
+from app.modules.gremien.gremium_roles import GremiumRoleService
+from app.modules.gremien.models import (
+    Gremium,
+    GremiumMembership,
+    GremiumMembershipMapping,
+    GremiumRole,
+    GremiumRoleMapping,
+)
 from app.shared.errors import ConflictError, NotFoundError
 from tests._support.auth_fakes import fake_session, result
 

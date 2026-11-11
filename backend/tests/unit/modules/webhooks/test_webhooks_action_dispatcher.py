@@ -5,9 +5,9 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from app.modules.admin.models import Webhook
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.webhooks.action_dispatcher import WebhookActionDispatcher
+from app.modules.webhooks.models import Webhook
 from app.settings import load_settings
 from tests._support.webhooks_fakes import FakeSession, FakeWebhookQueue
 

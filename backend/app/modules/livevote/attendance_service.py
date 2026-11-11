@@ -36,12 +36,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumMembership
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.pool_seat import release_pool_seat
+from app.modules.gremien.models import GremiumMembership
 from app.modules.livevote.keepers import (
     KEEPER_PERMISSION,
     VOTE_PERMISSION,

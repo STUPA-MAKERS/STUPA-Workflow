@@ -16,8 +16,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.admin import gremium_roles as gremium_roles_mod
 from app.modules.auth.principal import Principal
+from app.modules.gremien import gremium_roles as gremium_roles_mod
 from app.modules.voting.service import VotingService, manages_votes_in_gremium
 from app.shared.errors import ForbiddenError
 from tests._support.flow_fakes import fake_session, result

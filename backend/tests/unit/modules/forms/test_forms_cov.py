@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 
-from app.modules.admin.models import ApplicationType
+from app.modules.application_types.models import ApplicationType
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import (

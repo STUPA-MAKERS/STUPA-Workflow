@@ -14,9 +14,10 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.application_types.models import ApplicationType
 from app.modules.application_types.service import ApplicationTypesService
 from app.modules.forms.models import FormVersion
+from app.modules.gremien.models import Gremium
 
 pytestmark = pytest.mark.integration
 

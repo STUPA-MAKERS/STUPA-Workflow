@@ -23,7 +23,7 @@ separate from the global group mappings and from each other.
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import (
@@ -48,7 +48,6 @@ from app.deps import (
 )
 from app.modules.admin.branding import Branding
 from app.modules.admin.cd_logos import LogoSlot
-from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.oidc_mappings import OidcMappingService
 from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.admin.principal_revoke import PrincipalRevokeService
@@ -71,15 +70,11 @@ from app.modules.admin.schemas import (
     GremiumMembershipMappingCreate,
     GremiumMembershipMappingOut,
     GremiumMembershipMappingUpdate,
-    GremiumMembershipOut,
     GremiumOut,
     GremiumPublicPreview,
-    GremiumRoleCreate,
     GremiumRoleMappingCreate,
     GremiumRoleMappingOut,
     GremiumRoleMappingUpdate,
-    GremiumRoleOut,
-    GremiumRoleUpdate,
     GremiumUpdate,
     GroupMappingCreate,
     GroupMappingOut,
@@ -112,10 +107,17 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.service.cd_variants import SquareLogoRef
-from app.modules.admin.site_config_service import SiteConfigService
+from app.modules.admin.site_config_service import ManifestScheme, SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
 from app.modules.auth.login_settings import LoginSettingsService
 from app.modules.auth.policy import can_view_gremium
+from app.modules.gremien.gremium_roles import GremiumRoleService
+from app.modules.gremien.role_schemas import (
+    GremiumMembershipOut,
+    GremiumRoleCreate,
+    GremiumRoleOut,
+    GremiumRoleUpdate,
+)
 from app.modules.livevote.open_window import MeetingSettingsService
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.shared.antiabuse import body_cap
@@ -214,7 +216,7 @@ MergeAdmin = Annotated[Principal, Depends(require_principal("admin.users.merge")
 #: OAuth scope carries it, so it is a web-only action.
 RevokeAdmin = Annotated[Principal, Depends(require_principal("admin.users.revoke_groups"))]
 GroupMappingsAdmin = Annotated[Principal, Depends(require_principal("admin.group_mappings"))]
-GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("admin.gremium_roles"))]
+GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("gremien.gremium_roles"))]
 CdVariantsAdmin = Annotated[Principal, Depends(require_principal("admin.cd_variants"))]
 #: The global flow save accepts EITHER key. ``create_global_flow`` gives the reason.
 FlowVersionAdmin = Annotated[
@@ -229,7 +231,7 @@ _ALL_ADMIN_AREAS = (
     "admin.roles",
     "admin.users",
     "admin.group_mappings",
-    "admin.gremium_roles",
+    "gremien.gremium_roles",
     "admin.cd_variants",
     "admin.delegations",
     "admin.deadlines",
@@ -249,7 +251,7 @@ _ANY_ADMIN_AREA = Depends(require_any_permission(*_ALL_ADMIN_AREAS))
 #: The gremium-members page reads the gremium roles for the role labels. The group
 #: mappings page reads them for its role dropdown.
 _GREMIEN_OR_GREMIUM_ROLES = Depends(
-    require_any_permission("admin.gremien", "admin.gremium_roles", "admin.group_mappings")
+    require_any_permission("admin.gremien", "gremien.gremium_roles", "admin.group_mappings")
 )
 #: The principal search serves the user page, the gremium members, the person picker
 #: of the substitute pool and the person picker of the account erasure.
@@ -288,7 +290,7 @@ _TYPES_OR_FORM = Depends(require_any_permission("admin.types", "form.configure")
 )
 async def get_config_schemas() -> dict[str, dict[str, Any]]:
     """Return the JSON schemas (form/flow/voting/branding/...) for the config editors."""
-    return export_json_schemas()
+    return export_json_schemas({"Branding": Branding})
 
 
 @router.get(
@@ -1452,14 +1454,14 @@ async def get_public_site_config(
 @public_router.get("/manifest.webmanifest", include_in_schema=False)
 async def get_manifest(
     service: SiteServiceDep,
-    scheme: Annotated[Literal["light", "dark"], Query()] = "light",
+    scheme: Annotated[ManifestScheme, Query()] = "light",
 ) -> Response:
     """Serve the PWA manifest from the active branding (application/manifest+json).
 
     The route is auth-free. The edge proxy maps the browser-linked
     ``/manifest.webmanifest`` here, so name and short_name follow the configured app
     name. ``scheme=dark`` gives the dark bar colours; the frontend links it while the
-    dark theme is in effect.
+    dark theme is in effect. ``scheme=contrast`` gives black bars for "Hoher Kontrast".
     """
     import json
 

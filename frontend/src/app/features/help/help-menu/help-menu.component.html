@@ -20,11 +20,12 @@
   <div class="hm__sep" role="separator"></div>
   <div class="hm__display" role="group" [attr.aria-labelledby]="panelId + '-display'">
     <div class="hm__groupHead">
-      <p class="hm__group" [id]="panelId + '-display'">{{ 'help.display' | t }}</p>
+      <p class="hm__group" [class.cap]="variant() === 'sheet'" [id]="panelId + '-display'">{{ 'help.display' | t }}</p>
       @if (hasDisplayChoice()) {
         <button
           type="button"
           class="hm__reset"
+          data-more-keep
           [attr.aria-label]="'help.display.reset' | t"
           [title]="'help.display.reset' | t"
           (click)="resetDisplay()"

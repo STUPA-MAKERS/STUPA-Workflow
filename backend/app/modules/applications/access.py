@@ -186,7 +186,7 @@ async def _committee_can_read(
     Case 1 reuses the canonical ancestor logic of the budget tree instead of a second prefix
     query.
     """
-    from app.modules.admin.gremium_roles import gremium_reader_ids
+    from app.modules.gremien.gremium_roles import gremium_reader_ids
 
     gremien = await gremium_reader_ids(db, principal.sub)
     if not gremien:

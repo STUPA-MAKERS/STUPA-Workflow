@@ -24,7 +24,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, array
 from sqlalchemy.orm import InstrumentedAttribute
 
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import (
     ApplicantApplicationItem,
@@ -39,6 +39,7 @@ from app.modules.applications.service.service_base import (
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import State
+from app.modules.gremien.models import Gremium
 from app.shared.paging import Page
 from app.shared.search import dialect_of, trigram_rank
 
@@ -296,7 +297,7 @@ class ListingOps(ApplicationsServiceBase):
             An empty list when the principal holds no active membership. The caller
             then adds no extra scope.
         """
-        from app.modules.admin.gremium_roles import gremium_reader_ids
+        from app.modules.gremien.gremium_roles import gremium_reader_ids
 
         member_ids = await gremium_reader_ids(self.session, sub)
         if not member_ids:

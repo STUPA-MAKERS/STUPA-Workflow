@@ -88,12 +88,153 @@ dev = [
     "hypothesis==6.170.0",
     "ruff>=0.9",
     "basedpyright>=1.28",
+    # Checks the import contracts of the modules (see `[tool.importlinter]`).
+    "import-linter>=2.3",
     "testcontainers[postgres]>=4.8",
     "psycopg[binary]>=3.2",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app", "worker"]
+
+# The import contracts (§S/backend/python/000643, 000644). `lint-imports` checks them in the CI
+# job `be-lint`. An entry of `ignore_imports` is an import that breaks a contract today
+# (000646). `scripts/check_ratchets.py` holds the count of the entries under a baseline, and
+# `lint-imports` fails for an entry that matches no import. So the lists can only shrink.
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+id = "module-layers"
+ignore_imports = [
+    "app.modules.applications.access -> app.modules.livevote.models",
+    "app.modules.applications.decision -> app.modules.livevote.agenda_service",
+    "app.modules.applications.decision -> app.modules.livevote.models",
+    "app.modules.applications.router -> app.modules.privacy.service",
+    "app.modules.applications.service.listing -> app.modules.livevote.models",
+    "app.modules.audit.router -> app.modules.config_revision.revert",
+    "app.modules.audit.router -> app.modules.livevote.publisher",
+    "app.modules.audit.service -> app.modules.admin.models",
+    "app.modules.audit.service -> app.modules.application_types.models",
+    "app.modules.audit.service -> app.modules.applications.models",
+    "app.modules.audit.service -> app.modules.budget.tree_models",
+    "app.modules.audit.service -> app.modules.config_revision.models",
+    "app.modules.audit.service -> app.modules.files.models",
+    "app.modules.audit.service -> app.modules.livevote.models",
+    "app.modules.audit.service -> app.modules.voting.models",
+    "app.modules.audit.service -> app.modules.webhooks.models",
+    "app.modules.auth.email_login -> app.modules.applications.guest_settings",
+    "app.modules.auth.email_login -> app.modules.applications.models",
+    "app.modules.auth.email_login -> app.modules.flow.dispatch",
+    "app.modules.auth.email_login -> app.modules.flow.service",
+    "app.modules.auth.router -> app.modules.budget.tree_models",
+    "app.modules.auth.router -> app.modules.delegations.pool",
+    "app.modules.auth.router -> app.modules.flow.dispatch",
+    "app.modules.auth.router -> app.modules.flow.router",
+    "app.modules.auth.router -> app.modules.notifications.provider",
+    "app.modules.auth.router -> app.modules.notifications.service",
+    "app.modules.auth.router -> app.modules.tickets.service",
+    "app.modules.auth.service -> app.modules.applications.guest_settings",
+    "app.modules.auth.service -> app.modules.applications.models",
+    "app.modules.auth.service -> app.modules.flow.dispatch",
+    "app.modules.auth.service -> app.modules.flow.service",
+    "app.modules.avatars.service -> app.modules.admin.models",
+    "app.modules.files.router -> app.modules.applications.access",
+    "app.modules.files.router -> app.modules.applications.models",
+    "app.modules.files.router -> app.modules.tickets.access",
+    "app.modules.files.router -> app.modules.tickets.models",
+    "app.modules.files.router -> app.modules.tickets.service",
+    "app.modules.files.router -> app.modules.todos.access",
+    "app.modules.files.router -> app.modules.todos.models",
+    "app.modules.files.service -> app.modules.applications.models",
+    "app.modules.files.service -> app.modules.flow.models",
+    "app.modules.files.service -> app.modules.tickets.models",
+    "app.modules.flow.extras_dispatcher -> app.modules.livevote.agenda_service",
+    "app.modules.flow.extras_dispatcher -> app.modules.livevote.models",
+    "app.modules.flow.router -> app.modules.livevote.publisher",
+    "app.modules.flow.service -> app.modules.livevote.agenda_service",
+    "app.modules.flow.service -> app.modules.livevote.models",
+    "app.modules.flow.service -> app.modules.livevote.publisher",
+    "app.modules.flow.service -> app.modules.livevote.service",
+    "app.modules.forms.service -> app.modules.budget.tree_models",
+    "app.modules.forms.service -> app.modules.config_revision.service",
+    "app.modules.gremien.gremium_roles -> app.modules.delegations.pool",
+    "app.modules.gremien.service -> app.modules.admin.cd_logos",
+    "app.modules.gremien.service -> app.modules.admin.models",
+    "app.modules.gremien.service -> app.modules.applications.models",
+    "app.modules.gremien.service -> app.modules.delegations.models",
+    "app.modules.gremien.service -> app.modules.livevote.agenda_service",
+    "app.modules.gremien.service -> app.modules.livevote.models",
+    "app.modules.gremien.service -> app.modules.protocol.models",
+    "app.modules.gremien.service -> app.modules.voting.election",
+    "app.modules.gremien.service -> app.modules.voting.listing",
+    "app.modules.gremien.service -> app.modules.voting.models",
+    "app.modules.gremien.service -> app.modules.voting.schemas",
+    "app.modules.media.router -> app.modules.protocol.public",
+    "app.modules.notifications.action_dispatcher -> app.modules.applications.decision",
+    "app.modules.notifications.action_dispatcher -> app.modules.applications.models",
+    "app.modules.notifications.action_dispatcher -> app.modules.flow.dispatch",
+    "app.modules.notifications.action_dispatcher -> app.modules.flow.models",
+    "app.modules.notifications.auto -> app.modules.delegations.models",
+    "app.modules.notifications.auto -> app.modules.livevote.models",
+    "app.modules.notifications.captured -> app.modules.applications.models",
+    "app.modules.notifications.comments -> app.modules.applications.models",
+    "app.modules.notifications.comments -> app.modules.applications.service.service_base",
+    "app.modules.notifications.comments -> app.modules.flow.models",
+    "app.modules.notifications.mentions -> app.modules.applications.models",
+    "app.modules.notifications.mentions -> app.modules.tickets.models",
+    "app.modules.notifications.mentions -> app.modules.tickets.service",
+    "app.modules.notifications.polls -> app.modules.voting.models",
+    "app.modules.notifications.privacy -> app.modules.applications.models",
+    "app.modules.notifications.privacy -> app.modules.privacy.models",
+    "app.modules.notifications.recipients -> app.modules.applications.access",
+    "app.modules.notifications.recipients -> app.modules.applications.models",
+    "app.modules.notifications.recipients -> app.modules.budget.decision",
+    "app.modules.notifications.recipients -> app.modules.flow.context",
+    "app.modules.notifications.recipients -> app.modules.flow.models",
+    "app.modules.notifications.recipients -> app.modules.voting.models",
+    "app.modules.notifications.recipients -> app.modules.voting.service",
+    "app.modules.notifications.service -> app.modules.applications.models",
+    "app.modules.notifications.tickets -> app.modules.admin.site_config_service",
+    "app.modules.notifications.tickets -> app.modules.tickets.models",
+    "app.modules.notifications.tickets -> app.modules.tickets.service",
+    "app.modules.notifications.todos -> app.modules.todos.models",
+    "app.modules.notifications.todos -> app.modules.todos.service",
+    "app.modules.protocol.service -> app.modules.admin.cd_resolver",
+    "app.modules.tickets.router -> app.modules.admin.site_config_service",
+    "app.modules.voting.listing -> app.modules.livevote.agenda_service",
+    "app.modules.voting.listing -> app.modules.livevote.models",
+    "app.modules.voting.listing -> app.modules.livevote.service",
+    "app.modules.voting.poll -> app.modules.livevote.service",
+    "app.modules.voting.router -> app.modules.livevote.publisher",
+    "app.modules.voting.router -> app.modules.livevote.vote_open",
+    "app.modules.voting.service -> app.modules.delegations.pool_seat",
+    "app.modules.voting.service -> app.modules.delegations.service",
+    "app.modules.voting.service -> app.modules.livevote.attendance_service",
+    "app.modules.voting.service -> app.modules.livevote.models",
+    "app.modules.voting.service -> app.modules.livevote.service",
+    "app.modules.voting.service -> app.modules.protocol.models",
+    "app.modules.webhooks.action_dispatcher -> app.modules.flow.dispatch",
+]
+name = "A module imports only from its layer and from lower layers"
+type = "layers"
+containers = ["app.modules"]
+exhaustive = true
+layers = [
+    "admin : search : privacy : backup : config_revision : calendar",
+    "protocol : livevote : todos : tickets : delegations",
+    "voting : budget : applications : flow",
+    "forms : application_types : notifications : webhooks : files : media : translations : avatars",
+    "gremien : audit : auth : antiabuse : pdf",
+]
+
+[[tool.importlinter.contracts]]
+id = "shared-imports-no-module"
+name = "The shared code imports no module"
+type = "forbidden"
+source_modules = ["app.shared", "app.db", "app.settings", "app.logging_config"]
+forbidden_modules = ["app.modules"]
+allow_indirect_imports = true
 
 [tool.ruff]
 target-version = "py313"

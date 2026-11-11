@@ -27,6 +27,7 @@ from app.modules.applications.schemas import ActorOut, CommentOut
 from app.modules.applications.service.service_base import ApplicationsServiceBase
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.auth.people import PersonRef, person_refs
 from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
@@ -39,7 +40,6 @@ from app.shared.mentions import (
     stored_mentions,
     unique_mentions,
 )
-from app.shared.people import PersonRef, person_refs
 
 #: The problem code of a comment with files on an anonymized application.
 APPLICATION_ANONYMIZED = "application_anonymized"

@@ -60,6 +60,7 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth import email_login
+from app.modules.auth.people import PersonRef
 from app.modules.files.service import FilesService
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
@@ -88,7 +89,6 @@ from app.shared.errors import (
     ValidationProblem,
 )
 from app.shared.paging import Page, PageParams
-from app.shared.people import PersonRef
 
 router = APIRouter(tags=["applications"])
 

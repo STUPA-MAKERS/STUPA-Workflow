@@ -21,7 +21,7 @@ scope:
 
 # In very high contrast, everything on a yellow fill is black
 
-While "Sehr hoher Kontrast" is on, every text, icon and edge that is on a yellow fill must be
+While "Hoher Kontrast" is on, every text, icon and edge that is on a yellow fill must be
 black. This includes a status box, a count, a key hint such as "Strg+K" and an icon in a chosen
 row or a chosen tile. A destructive label stays dark red (000598).
 

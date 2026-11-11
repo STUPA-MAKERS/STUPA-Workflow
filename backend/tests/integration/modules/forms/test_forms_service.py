@@ -15,12 +15,13 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
+from app.modules.gremien.models import Gremium
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import NotFoundError
 

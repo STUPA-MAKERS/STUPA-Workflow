@@ -36,16 +36,16 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.gremium_roles import GremiumRoleService
-from app.modules.admin.models import (
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import AuditService
+from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.gremien.gremium_roles import GremiumRoleService
+from app.modules.gremien.models import (
     GremiumMembership,
     GremiumMembershipMapping,
     GremiumRole,
     GremiumRoleMapping,
 )
-from app.modules.audit.actions import AuditAction
-from app.modules.audit.service import AuditService
-from app.modules.auth.models import Principal as PrincipalRow
 
 #: The actor of the audit entries that the sync writes.
 SYNC_ACTOR = "oidc-sync"

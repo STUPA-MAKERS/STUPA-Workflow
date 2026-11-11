@@ -12,9 +12,9 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 
-from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.agenda_service import agenda_order, title_of
 from app.modules.livevote.keepers import KeeperSummary
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingGuest

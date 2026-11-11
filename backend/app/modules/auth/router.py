@@ -21,7 +21,6 @@ from sqlalchemy import select
 
 from app.db import get_sessionmaker
 from app.deps import DbSession, Principal, SettingsDep, require_principal
-from app.modules.admin.models import Gremium
 from app.modules.auth import email_login, oidc, service, sessions
 from app.modules.auth.login_settings import load_login_settings, session_days
 from app.modules.auth.models import SESSION_CLIENT_WEB, AuthSession
@@ -37,6 +36,7 @@ from app.modules.auth.schemas import (
 )
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
+from app.modules.gremien.models import Gremium
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.service import (
     NotificationService,
@@ -356,8 +356,8 @@ async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
 
     The frontend uses the flag to show the budget tab.
     """
-    from app.modules.admin.gremium_roles import gremium_reader_ids
     from app.modules.budget.tree_models import Budget
+    from app.modules.gremien.gremium_roles import gremium_reader_ids
 
     member = await gremium_reader_ids(db, sub)
     if not member:
@@ -389,7 +389,7 @@ async def _gremium_permissions(
     the token scope does not let through. A Gremium without a remaining key stays
     in the map with an empty list, because the membership itself still counts.
     """
-    from app.modules.admin.gremium_roles import GREMIUM_PERMISSIONS, active_gremium_roles
+    from app.modules.gremien.gremium_roles import GREMIUM_PERMISSIONS, active_gremium_roles
 
     roles = await active_gremium_roles(db, principal.sub)
     return {
@@ -413,7 +413,7 @@ async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:
     The global `role_assignment` member role is NOT a gremium membership. A magic-link
     applicant gets an empty list.
     """
-    from app.modules.admin.gremium_roles import gremium_member_ids
+    from app.modules.gremien.gremium_roles import gremium_member_ids
 
     ids = await gremium_member_ids(db, sub)
     if not ids:

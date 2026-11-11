@@ -142,7 +142,7 @@ async def gremium_actor_name(session: AsyncSession, gremium_id: UUID | None) -> 
     """
     if gremium_id is None:
         return None
-    from app.modules.admin.models import Gremium
+    from app.modules.gremien.models import Gremium
 
     return await session.scalar(select(Gremium.name).where(Gremium.id == gremium_id))
 

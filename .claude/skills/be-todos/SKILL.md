@@ -75,7 +75,7 @@ done (`completed_at`).
 - Outside the module: `notifications/todos.py` (three mails), `worker/todos.py`
   (`archive_done_todos`, `process_todo_due`), `livevote/agenda_service.add_todo_in_tx`,
   `search/service._todos`, `admin/service/gremien.create_gremium` (board with the
-  gremium), `admin/principal_merge._todos`, `shared/people.permission_holders`.
+  gremium), `admin/principal_merge._todos`, `auth/people.permission_holders`.
 
 **Rights:**
 - gremium board: write with `todo.write` in the gremium, configure with
@@ -252,7 +252,7 @@ read rule stays in force (a tile is per viewer, `primaryLink` is redacted).
   no pings (the poll covers it).
 - `GET /api/todos/cards/{id}/tile` → `TodoCardTile` (the tile of the board read, for this
   viewer). 404 when unreadable or archived.
-- Socket `WS /api/ws/todos`: the session cookie only (`app.shared.ws.resolve_ws_principal`,
+- Socket `WS /api/ws/todos`: the session cookie only (`app.modules.auth.ws.resolve_ws_principal`,
   Origin check; 4401 without a session, 4403 for a foreign origin). Client frame
   `{"type":"subscribe","boardIds":[…]}` replaces the set (at most `MAX_BOARDS` = 100, more
   gives the error `too_many_boards`). Every subscribe resolves the principal again from

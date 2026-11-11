@@ -17,7 +17,7 @@ from typing import Any
 from sqlalchemy import case, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import ApplicationType, GremiumMembership
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.decision import committed_amount
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
@@ -26,6 +26,7 @@ from app.modules.budget.decision import effective_decision_gremium
 from app.modules.budget.tree_models import BudgetAllocation, BudgetExpense
 from app.modules.files.models import Attachment
 from app.modules.forms.models import FormField
+from app.modules.gremien.models import GremiumMembership
 from app.shared.guards import GuardContext
 
 #: Form field type to `compare` value type: number, currency, date, text or bool.

@@ -15,13 +15,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.membership_sync import sync_all_memberships
-from app.modules.admin.models import (
-    Gremium,
-    GremiumMembershipMapping,
-    GremiumRole,
-    GremiumRoleMapping,
-)
 from app.modules.admin.schemas import (
     GremiumMembershipMappingCreate,
     GremiumMembershipMappingOut,
@@ -32,6 +25,13 @@ from app.modules.admin.schemas import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
+from app.modules.gremien.membership_sync import sync_all_memberships
+from app.modules.gremien.models import (
+    Gremium,
+    GremiumMembershipMapping,
+    GremiumRole,
+    GremiumRoleMapping,
+)
 from app.shared.errors import ConflictError, NotFoundError
 
 

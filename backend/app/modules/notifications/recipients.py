@@ -33,7 +33,6 @@ from typing import Any
 from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumMembership
 from app.modules.applications.models import Applicant, Application
 from app.modules.auth.models import (
     GroupMapping,
@@ -46,6 +45,7 @@ from app.modules.auth.principal import Principal as AuthPrincipal
 from app.modules.budget.decision import effective_decision_gremium
 from app.modules.flow.context import build_base_context, with_actor
 from app.modules.flow.models import State, Transition
+from app.modules.gremien.models import GremiumMembership
 from app.shared.guards import GuardContext, GuardError, eval_guard
 
 #: Admin role key; it bypasses every permission check. It must match ``Principal.has``,

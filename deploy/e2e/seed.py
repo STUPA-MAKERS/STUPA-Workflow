@@ -48,7 +48,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete, select
 
 from app.db import get_sessionmaker
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.application_types.models import ApplicationType
+from app.modules.gremien.models import Gremium
 from app.modules.admin.schemas import ApplicationTypeCreate, FlowVersionCreate
 from app.modules.admin.service import ConfigService
 from app.modules.auth.models import GroupMapping, Principal, Role, RoleAssignment

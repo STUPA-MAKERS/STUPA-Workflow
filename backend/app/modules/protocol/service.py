@@ -47,13 +47,13 @@ from app.modules.admin.cd_resolver import (
     cd_variant_key_for_gremium,
     resolve_cd_variant_by_key,
 )
-from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage, StorageError
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.agenda_service import agenda_order, title_of
 from app.modules.livevote.keepers import agenda_positions, keeper_periods, principal_names
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance

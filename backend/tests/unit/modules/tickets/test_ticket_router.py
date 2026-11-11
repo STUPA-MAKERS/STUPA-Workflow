@@ -19,6 +19,7 @@ from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
 from app.modules.admin.branding import Branding, TicketSettings
+from app.modules.auth.people import PersonRef
 from app.modules.auth.principal import Principal
 from app.modules.tickets import router as router_mod
 from app.modules.tickets.router import (
@@ -42,7 +43,6 @@ from app.modules.tickets.service import SwallowedReport
 from app.settings import load_settings
 from app.shared.errors import ValidationProblem
 from app.shared.paging import Page
-from app.shared.people import PersonRef
 
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
 NOTE_ID = uuid.UUID("00000000-0000-0000-0000-0000000000a1")

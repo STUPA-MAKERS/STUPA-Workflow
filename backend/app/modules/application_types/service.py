@@ -12,7 +12,7 @@ from uuid import UUID
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import ApplicationType
+from app.modules.application_types.models import ApplicationType
 from app.modules.application_types.schemas import ApplicationTypeListItem
 from app.shared.i18n import resolve_i18n
 from app.shared.paging import Page

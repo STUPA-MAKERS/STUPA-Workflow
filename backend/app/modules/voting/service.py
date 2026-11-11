@@ -957,7 +957,7 @@ class VotingService:
         return await self._insert(application_id, internal)
 
     async def _gremium_exists(self, gremium_id: UUID) -> bool:
-        from app.modules.admin.models import Gremium
+        from app.modules.gremien.models import Gremium
 
         found = await self.session.scalar(select(Gremium.id).where(Gremium.id == gremium_id))
         return found is not None

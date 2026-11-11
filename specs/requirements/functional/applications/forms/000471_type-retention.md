@@ -6,10 +6,10 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/admin/models.py
+  - backend/app/modules/application_types/models.py
   - backend/worker/retention.py
 scope:
-  - backend/app/modules/admin/models.py
+  - backend/app/modules/application_types/models.py
   - backend/worker/retention.py
 ---
 

@@ -26,10 +26,10 @@ from urllib.parse import quote
 from sqlalchemy import ColumnElement, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import Gremium
 from app.modules.applications.access import READ_ALL_PERMISSION, READ_PERMISSION
 from app.modules.budget.access import has_budget_read
 from app.modules.budget.tree_models import Budget
+from app.modules.gremien.models import Gremium
 from app.modules.search.schemas import SearchHit, SearchKind, SearchResults
 from app.shared.i18n import pick_lang, resolve_i18n
 from app.shared.search import dialect_of, trigram_rank
@@ -271,7 +271,7 @@ class SearchService:
         A global budget permission needs no filter. Anyone else is limited to the nodes of
         the Gremien they read, and a caller who reads no Gremium sees no node at all.
         """
-        from app.modules.admin.gremium_roles import gremium_reader_ids
+        from app.modules.gremien.gremium_roles import gremium_reader_ids
 
         if has_budget_read(principal):
             return ()

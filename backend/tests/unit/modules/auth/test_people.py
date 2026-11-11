@@ -1,10 +1,10 @@
-"""Unit tests of ``app.shared.people``: the wire reference of a person."""
+"""Unit tests of ``app.modules.auth.people``: the wire reference of a person."""
 
 from __future__ import annotations
 
 import uuid
 
-from app.shared.people import DELETED_PERSON, PersonRef, person_of, person_refs
+from app.modules.auth.people import DELETED_PERSON, PersonRef, person_of, person_refs
 from tests.unit.modules.tickets.fakes import ScriptedSession
 
 

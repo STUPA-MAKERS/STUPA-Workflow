@@ -83,8 +83,9 @@ describe('AppAccountMenuComponent', () => {
   });
 
   it('switches to dark and back through the switch', async () => {
-    const { fixture, theme } = await setup();
+    const { fixture, theme } = await setup({ variant: 'popover' });
     theme.setPreference('light');
+    await userEvent.click(screen.getByRole('button', { name: 'Konto: Mia Member' }));
     fixture.detectChanges();
     const sw = screen.getByRole('switch', { name: 'Dunkles Design' });
     expect(sw).toHaveAttribute('aria-checked', 'false');
@@ -94,6 +95,11 @@ describe('AppAccountMenuComponent', () => {
     expect(sw).toHaveAttribute('aria-checked', 'true');
     await userEvent.click(sw);
     expect(theme.preference()).toBe('light');
+  });
+
+  it('shows no dark design switch in the sheet, which has it in the display settings', async () => {
+    await setup();
+    expect(screen.queryByRole('switch', { name: 'Dunkles Design' })).not.toBeInTheDocument();
   });
 
   it('names each language in its own language and switches with a reload', async () => {

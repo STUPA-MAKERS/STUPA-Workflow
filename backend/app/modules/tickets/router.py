@@ -26,6 +26,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Respons
 
 from app.deps import DbSession, Principal, SettingsDep, get_current_principal, require_principal
 from app.modules.admin.site_config_service import active_branding
+from app.modules.auth.people import PersonRef
 from app.modules.files.service import FilesService
 from app.modules.notifications.mentions import notify_ticket_mentions
 from app.modules.notifications.provider import mail_queue_from_pool
@@ -71,7 +72,6 @@ from app.shared.antiabuse import (
 )
 from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
 from app.shared.paging import Page, PageParams
-from app.shared.people import PersonRef
 
 router = APIRouter(tags=["tickets"])
 

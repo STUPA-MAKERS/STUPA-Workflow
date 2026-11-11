@@ -34,6 +34,25 @@
     border-radius: var(--radius-lg);
   }
 
+  // A card of a board is a surface, so it has the white edge too.
+  app-todo-card-tile {
+    outline: var(--vh-edge);
+    outline-offset: -2px;
+  }
+
+  // The band with the state of the protocol sits in the pane of the TOP, whose ink is
+  // black. The band is a black surface, so its ink is white again, it has the edge, and
+  // its PDF links are buttons with the fill.
+  .pb {
+    @include vh.ink(var(--vh-fg));
+    outline: var(--vh-edge);
+    outline-offset: -2px;
+    color: var(--vh-fg);
+  }
+  .pb__pdf {
+    @include vh.fill;
+  }
+
   // A menu (000617): the rows of the help menu and of the account menu.
   .hm__item {
     @include vh.text;

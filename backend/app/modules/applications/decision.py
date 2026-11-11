@@ -441,7 +441,7 @@ async def decision_source(
     meeting title and the 1-based number of its agenda item. A manual decision names
     the Gremium of the application.
     """
-    from app.modules.admin.models import Gremium
+    from app.modules.gremien.models import Gremium
     from app.modules.livevote.models import Meeting
     from app.modules.voting.models import Vote
 

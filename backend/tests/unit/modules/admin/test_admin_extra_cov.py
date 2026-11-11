@@ -19,9 +19,17 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.admin import gremium_roles as gr
 from app.modules.admin.branding import Branding
-from app.modules.admin.gremium_roles import (
+from app.modules.admin.models import SiteConfigVersion
+from app.modules.admin.site_config_service import (
+    DEFAULT_APP_NAME,
+    DEFAULT_APP_SHORT_NAME,
+    SiteConfigService,
+    _branding,
+)
+from app.modules.audit.actions import AuditAction
+from app.modules.gremien import gremium_roles as gr
+from app.modules.gremien.gremium_roles import (
     FORCED_ROLE_KEYS,
     GREMIUM_PERMISSIONS,
     GremiumRoleService,
@@ -32,18 +40,8 @@ from app.modules.admin.gremium_roles import (
     gremium_member_ids,
     gremium_reader_ids,
 )
-from app.modules.admin.models import GremiumMembership, GremiumRole, SiteConfigVersion
-from app.modules.admin.schemas import (
-    GremiumRoleCreate,
-    GremiumRoleUpdate,
-)
-from app.modules.admin.site_config_service import (
-    DEFAULT_APP_NAME,
-    DEFAULT_APP_SHORT_NAME,
-    SiteConfigService,
-    _branding,
-)
-from app.modules.audit.actions import AuditAction
+from app.modules.gremien.models import GremiumMembership, GremiumRole
+from app.modules.gremien.role_schemas import GremiumRoleCreate, GremiumRoleUpdate
 from app.shared.errors import ConflictError, NotFoundError
 from tests._support.auth_fakes import fake_session, result
 
@@ -448,6 +446,14 @@ async def test_manifest_dark_scheme_takes_the_dark_bar_colours() -> None:
     db = fake_session(result(active))
     man = await SiteConfigService(db).manifest("dark")
     assert man["theme_color"] == man["background_color"] == "#262a27"
+
+
+async def test_manifest_contrast_scheme_takes_black_bars() -> None:
+    """The bars of "Hoher Kontrast" are black like its page (spec 000221)."""
+    active = _scv(1, active=True, branding=Branding().model_dump(by_alias=True))
+    db = fake_session(result(active))
+    man = await SiteConfigService(db).manifest("contrast")
+    assert man["theme_color"] == man["background_color"] == "#000000"
 
 
 async def test_manifest_falls_back_to_defaults_when_blank() -> None:

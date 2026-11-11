@@ -13,7 +13,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from app.modules.admin.models import Webhook
+from app.modules.webhooks.models import Webhook
 from app.modules.webhooks.service import WebhookService
 from app.settings import load_settings
 from tests._support.webhooks_fakes import FakeResult, FakeSession, FakeWebhookQueue

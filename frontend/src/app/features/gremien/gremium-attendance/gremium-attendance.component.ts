@@ -106,7 +106,7 @@ export interface RowModel {
  *   the excused meetings and a grey badge "nV" the meetings with a transferred vote
  *   (spec 000611). A hatched cell is a month without a membership. A month without a
  *   meeting is a narrow column with "–" in every row (spec 000610).
- * - With "Sehr hoher Kontrast" a cell is black on yellow and the legend shows no colour
+ * - With "Hoher Kontrast" a cell is black on yellow and the legend shows no colour
  *   steps (spec 000612).
  * - The last column sums the months with a membership, with the quota; the foot gives
  *   "Ø anwesend je Sitzung". The head row and the first column stick while the matrix
