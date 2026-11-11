@@ -339,7 +339,13 @@ async def test_entries_follow_the_module_rules(
         _ok(
             client.put(
                 f"{cards}/{fest['id']}/event",
-                json={"startsOn": "2031-05-30", "endsOn": "2031-06-01", "place": "Hof"},
+                json={
+                    "startsOn": "2031-05-30",
+                    "endsOn": "2031-06-01",
+                    "startTime": "19:00:00",
+                    "endTime": "02:00:00",
+                    "place": "Hof",
+                },
             )
         )
         _create(client, **TIMED, gremiumIds=[str(stupa)])
@@ -353,6 +359,7 @@ async def test_entries_follow_the_module_rules(
         assert seen[0]["source"] == "StuPa" and seen[0]["gremiumIds"] == [str(stupa)]
         assert (seen[1]["startTime"], seen[1]["source"]) == ("18:00:00", "StuPa")
         assert (seen[3]["endsOn"], seen[3]["place"]) == ("2031-06-01", "Hof")
+        assert (seen[3]["startTime"], seen[3]["endTime"]) == ("19:00:00", "02:00:00")
         assert [e["kind"] for e in _entries(client, mine=True)] == ["appointment", "meeting"]
         api.login(bert)
         assert [e["kind"] for e in _entries(client, mine=True)] == [

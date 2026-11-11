@@ -126,6 +126,8 @@ async def readable_events(db: AsyncSession, row: PrincipalRow) -> list[CardEvent
             title=card.title,
             start=cast(date, event.starts_on),
             end=event.ends_on,
+            start_time=event.start_time,
+            end_time=event.end_time,
             stamp=card.created_at,
             place=event.place,
             board_name=board.name,

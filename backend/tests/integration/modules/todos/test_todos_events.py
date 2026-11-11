@@ -181,6 +181,21 @@ async def test_event_data_on_each_board_kind(
             json={"boardId": str(gboard), "title": "X", "event": {"endsOn": "2026-11-20"}},
         )
         assert _code(bad, 422) == "event_dates_invalid"
+        timed = {"startsOn": "2026-11-20", "endsOn": "2026-11-20", "startTime": "20:00:00"}
+        party = _card(client, gboard, "Party", event={**timed, "endTime": "23:30:00"})
+        assert (party["event"]["startTime"], party["event"]["endTime"]) == ("20:00:00", "23:30:00")
+        read = _ok(client.get(f"/api/todos/cards/{party['id']}"))
+        assert read["event"]["startTime"] == "20:00:00"
+        early = client.post(
+            "/api/todos/cards",
+            json={"boardId": str(gboard), "title": "X", "event": {**timed, "endTime": "19:00:00"}},
+        )
+        assert _code(early, 422) == "event_dates_invalid"
+        loose = client.post(
+            "/api/todos/cards",
+            json={"boardId": str(gboard), "title": "X", "event": {"startTime": "19:00:00"}},
+        )
+        assert _code(loose, 422) == "event_time_without_date"
         todo = _card(client, gboard, "Plakate")
         assert todo["event"] is None and todo["eventFacts"] is None
 
@@ -278,8 +293,10 @@ async def test_series_editions_and_follow_up(
         assert [s["name"] for s in listed] == ["Erstiparty"]
         with_series = {**EVENT, "seriesId": str(series.id)}
         old = _card(
-            client, board, "Erstiparty SoSe", event={**with_series, "startsOn": "2026-04-20",
-                                                     "endsOn": None},
+            client,
+            board,
+            "Erstiparty SoSe",
+            event={**with_series, "startsOn": "2026-04-20", "endsOn": None},
         )
         _ok(client.post(f"/api/todos/cards/{old['id']}/checklist", json={"text": "DJ"}), 200)
         new = _card(client, board, "Erstiparty WiSe", event=with_series)

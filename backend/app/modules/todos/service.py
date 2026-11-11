@@ -208,6 +208,8 @@ def _event_brief(
     return TodoEventBrief(
         starts_on=row.starts_on,
         ends_on=row.ends_on,
+        start_time=row.start_time,
+        end_time=row.end_time,
         place=row.place,
         participants=row.participants,
         series_id=row.series_id,
@@ -1803,7 +1805,8 @@ class TodoService:
 
         Raises:
             ValidationProblem: ``event_personal_board`` (a personal board has no Events),
-                ``event_dates_invalid`` (an end without a start or before the start) or
+                ``event_dates_invalid`` (an end without a start or before the start),
+                ``event_time_without_date`` (a time without its date) or
                 ``series_not_found`` (HTTP 422).
         """
         if board.kind == "personal":
@@ -1814,6 +1817,17 @@ class TodoService:
             payload.starts_on is None or payload.ends_on < payload.starts_on
         ):
             raise _invalid("The end is before the start.", "event_dates_invalid", "endsOn")
+        if (payload.start_time is not None and payload.starts_on is None) or (
+            payload.end_time is not None and payload.ends_on is None
+        ):
+            raise _invalid("A time needs its date.", "event_time_without_date", "startTime")
+        if (
+            payload.start_time is not None
+            and payload.end_time is not None
+            and payload.ends_on == payload.starts_on
+            and payload.end_time < payload.start_time
+        ):
+            raise _invalid("The end is before the start.", "event_dates_invalid", "endTime")
         if (
             payload.series_id is not None
             and await self.session.get(TodoEventSeries, payload.series_id) is None
@@ -1844,11 +1858,8 @@ class TodoService:
             await todo_events.check_one_event(self.session, card.id, refs)
             self.session.add(_event_row(card.id, payload))
         else:
-            row.starts_on = payload.starts_on
-            row.ends_on = payload.ends_on
-            row.place = _clean(payload.place)
-            row.participants = payload.participants
-            row.series_id = payload.series_id
+            for name, value in _event_fields(payload).items():
+                setattr(row, name, value)
         card.updated_at = _now()
         self._touch(board, card)
         await self.session.commit()
@@ -2039,6 +2050,8 @@ class TodoService:
                 title=card.title,
                 starts_on=row.starts_on,
                 ends_on=row.ends_on,
+                start_time=row.start_time,
+                end_time=row.end_time,
             )
             for card, row in rows
         ]
@@ -2813,15 +2826,21 @@ def _clean(value: str | None) -> str | None:
     return text or None
 
 
+def _event_fields(payload: EventIn) -> dict[str, object]:
+    """The columns of the event data of a card, from the request."""
+    return {
+        "starts_on": payload.starts_on,
+        "ends_on": payload.ends_on,
+        "start_time": payload.start_time,
+        "end_time": payload.end_time,
+        "place": _clean(payload.place),
+        "participants": payload.participants,
+        "series_id": payload.series_id,
+    }
+
+
 def _event_row(card_id: uuid.UUID, payload: EventIn) -> TodoCardEvent:
-    return TodoCardEvent(
-        card_id=card_id,
-        starts_on=payload.starts_on,
-        ends_on=payload.ends_on,
-        place=_clean(payload.place),
-        participants=payload.participants,
-        series_id=payload.series_id,
-    )
+    return TodoCardEvent(card_id=card_id, **_event_fields(payload))
 
 
 def _link_between(
@@ -2921,6 +2940,8 @@ def _edition_out(
         title=other.title,
         starts_on=row.starts_on,
         ends_on=row.ends_on,
+        start_time=row.start_time,
+        end_time=row.end_time,
         archived=other.archived_at is not None,
         totals=_totals_out(sums[other.id]),
     )

@@ -71,7 +71,10 @@ def card_entry(card: TodoCard, board: TodoBoard, mine: bool) -> EntryOut:
 
 
 def event_entry(card: TodoCard, board: TodoBoard, event: TodoCardEvent, mine: bool) -> EntryOut:
-    """An Event as an entry from its start to its end. An Event without an end takes a day."""
+    """An Event as an entry from its start to its end, with its times.
+
+    An Event without an end takes a day. An end time shows only with a start time.
+    """
     start = cast(date, event.starts_on)
     return EntryOut(
         kind="event",
@@ -79,6 +82,8 @@ def event_entry(card: TodoCard, board: TodoBoard, event: TodoCardEvent, mine: bo
         title=card.title,
         starts_on=start,
         ends_on=max(event.ends_on or start, start),
+        start_time=event.start_time,
+        end_time=event.end_time if event.start_time is not None else None,
         place=event.place,
         source=board.name,
         gremium_ids=_board_gremien(board),

@@ -5604,6 +5604,18 @@
           "type": "DATE"
         },
         {
+          "name": "start_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "end_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
           "name": "place",
           "nullable": true,
           "primaryKey": false,
