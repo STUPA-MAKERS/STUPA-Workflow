@@ -63,7 +63,7 @@ from app.modules.auth.people import PersonRef  # noqa: E402
 from app.modules.auth.principal import Principal  # noqa: E402
 from app.modules.files import mime as backend_mime  # noqa: E402
 from app.modules.files.drafts import DRAFT_ATTACHMENTS_MISSING  # noqa: E402
-from app.modules.files.router import (  # noqa: E402
+from app.modules.attachments.router import (  # noqa: E402
     DRAFT_TOKEN_HEADER,
     get_draft_attachments,
     get_files_service,

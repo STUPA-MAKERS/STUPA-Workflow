@@ -47,6 +47,7 @@ from sqlalchemy.ext.asyncio import (
 from app.db import get_session
 from app.deps import get_current_applicant, get_current_principal
 from app.main import create_app
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
@@ -58,7 +59,6 @@ from app.modules.flow.dispatch import NullActionDispatcher
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.voting.models import Vote
 from app.settings import Settings, get_settings, load_settings
@@ -181,7 +181,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:
         session.add_all([type_a, type_b])
         await session.commit()
         for app_type in (type_a, type_b):
-            await FormsService(session).create_form_version(
+            await FormVersionWriter(session).create_form_version(
                 app_type.id,
                 FormVersionCreate(
                     fields=[

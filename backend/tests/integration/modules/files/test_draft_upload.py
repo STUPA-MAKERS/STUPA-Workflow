@@ -25,11 +25,11 @@ from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import DbSession, SettingsDep
+from app.modules.attachments.router import get_files_service
+from app.modules.attachments.service import AttachmentService
 from app.modules.audit.models import AuditEntry
 from app.modules.files.drafts import DraftAttachments, bind_drafts, check_drafts
 from app.modules.files.models import Attachment, AttachmentDraftToken
-from app.modules.files.router import get_files_service
-from app.modules.files.service import FilesService
 from app.modules.files.storage import ObjectStorage
 from app.settings import Settings
 from app.shared.errors import NotFoundError
@@ -78,9 +78,9 @@ def _client(
 ) -> TestClient:
     api = build_api(migrated[1], settings, monkeypatch)
 
-    def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
+    def _files(session: DbSession, request_settings: SettingsDep) -> AttachmentService:
         object_storage: ObjectStorage = storage  # pyright: ignore[reportAssignmentType]
-        return FilesService(
+        return AttachmentService(
             session, storage=object_storage, queue=None, settings=request_settings
         )
 
@@ -387,7 +387,7 @@ async def test_delete_that_races_with_the_bind_keeps_the_bound_file(
 
         async def _delete() -> None:
             async with maker() as session:
-                files = FilesService(
+                files = AttachmentService(
                     session,
                     storage=storage,  # pyright: ignore[reportArgumentType]
                     queue=None,

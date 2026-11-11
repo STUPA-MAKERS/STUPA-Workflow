@@ -17,8 +17,8 @@ from fastapi.testclient import TestClient
 from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
-from app.modules.gremien import router as gremien_router
-from app.modules.gremien.schemas import (
+from app.modules.gremien_overview import router as gremien_router
+from app.modules.gremien_overview.schemas import (
     AttendanceOut,
     DecisionPageOut,
     GremiumMeetingOut,
@@ -26,7 +26,7 @@ from app.modules.gremien.schemas import (
     GremiumOverviewOut,
     MemberAttendanceOut,
 )
-from app.modules.gremien.service import GremienService
+from app.modules.gremien_overview.service import GremienService
 from app.settings import get_settings, load_settings
 from app.shared.errors import NotFoundError
 from tests._support.auth_fakes import fake_session

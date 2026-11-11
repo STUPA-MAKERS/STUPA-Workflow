@@ -12,11 +12,12 @@ import uuid
 import pytest
 
 from app.modules.applications.models import Application
+from app.modules.attachments.service import AttachmentService
 from app.modules.files import service as files_service
 from app.modules.files.mime import MimeRejected
 from app.modules.files.models import Attachment
 from app.modules.files.scanner import ScanVerdict
-from app.modules.files.service import SCAN_RESULT_CLEAN, FilesService
+from app.modules.files.service import SCAN_RESULT_CLEAN
 from app.modules.flow.models import State
 from app.settings import load_settings
 from app.shared.errors import (
@@ -68,8 +69,8 @@ def _service(
     *,
     storage: object | None = None,
     queue: object | None = None,
-) -> FilesService:
-    return FilesService(session, storage=storage, queue=queue, settings=SETTINGS)  # type: ignore[arg-type]
+) -> AttachmentService:
+    return AttachmentService(session, storage=storage, queue=queue, settings=SETTINGS)  # type: ignore[arg-type]
 
 
 async def test_upload_clean_path_stores_and_enqueues() -> None:

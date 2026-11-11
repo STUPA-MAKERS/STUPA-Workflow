@@ -5,7 +5,19 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/modules/attachments/test_no_import_exception.py:test_import_contract_has_no_entry_in_ignore_imports"
+implementation:
+  - backend/pyproject.toml
+  - backend/app/modules/attachments/router.py
+  - backend/app/modules/attachments/service.py
+  - backend/app/modules/gremien_overview/service.py
+  - backend/app/modules/privacy/request_router.py
+  - backend/app/modules/protocol/public_images_router.py
+  - backend/app/modules/admin/service/forms.py
+  - backend/app/modules/admin/forms_router.py
+  - backend/app/modules/flow/webhook_actions.py
+  - backend/app/modules/budget/form_options.py
 scope:
   - backend/app/modules
   - backend/pyproject.toml

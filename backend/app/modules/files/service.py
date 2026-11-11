@@ -19,10 +19,9 @@ messages in one query, and ``delete_for_messages`` removes them with their messa
 ``remove_objects`` removes those objects after the commit of the caller, so a rollback
 never leaves a row whose object is gone.
 
-``signed_url`` returns the app-relative ``/download`` route that the authorization layer
-gates. It does so only after a clean scan. The route carries no signature and does not
-expire. While the scan runs the method answers 409. After a removal it answers 410. There
-is no direct bucket access.
+The operations that read an application (the list of an application, the download of an
+application file, the edit lock) are in `attachments.service.AttachmentService`, because
+`files` imports no higher module (§S/backend/python/000651).
 
 The service only enqueues the scan. Without the queue (no Redis) the file stays
 quarantined and nothing blocks. Without storage an upload is impossible and gives 503.
@@ -32,16 +31,15 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
-from sqlalchemy import ColumnElement, or_, select
+from sqlalchemy import ColumnElement, Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 from sqlalchemy.orm.exc import StaleDataError
 
-from app.modules.applications.models import Application, Comment
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.files.mime import MimeRejected, validate_upload
@@ -55,8 +53,6 @@ from app.modules.files.schemas import (
     message_attachment_out,
 )
 from app.modules.files.storage import ObjectStorage, StorageError
-from app.modules.flow.models import State
-from app.modules.tickets.models import TicketNote
 from app.settings import Settings, get_settings
 from app.shared.errors import (
     ConflictError,
@@ -182,6 +178,10 @@ class FilesService:
         receipt after the decision. The PATCH lock still protects the form data, and the RBAC
         and applicant check in the router still guard access. The row gets a client-side id,
         because the audit entry needs it before the commit.
+
+        The caller makes sure that the application exists
+        (`attachments.service.AttachmentService.upload`), because `files` imports no
+        higher module (§S/backend/python/000651).
         """
         if len(data) > self.max_bytes:
             raise PayloadTooLargeError(
@@ -189,10 +189,6 @@ class FilesService:
             )
         if not data:
             raise UnsupportedMediaTypeError("Empty file.")
-
-        app = await self.session.get(Application, application_id)
-        if app is None:
-            raise NotFoundError(f"application {application_id} not found")
 
         mime, display_name = self.validate(filename, data)
         storage_key = (
@@ -223,7 +219,7 @@ class FilesService:
         await self.session.commit()
 
         await self._enqueue_scan(attachment.id, actor=by)
-        return _attachment_out(attachment)
+        return attachment_out(attachment)
 
     async def enqueue_scan(self, attachment_id: uuid.UUID, *, actor: str) -> None:
         """Enqueue the scan job of an attachment (best effort, see ``_enqueue_scan``)."""
@@ -241,65 +237,6 @@ class FilesService:
             return
         await self.queue.enqueue(attachment_id)
 
-    async def assert_app_visible(
-        self, application_id: uuid.UUID, *, allow_unconfirmed: bool
-    ) -> None:
-        """Mirror the visibility of the application.
-
-        An unconfirmed guest submission has ``email_confirmed_at IS NULL``. It stays
-        invisible to a principal or a member of the Gremium, exactly as
-        ``list_applications`` and ``list_tasks`` hide it.
-
-        An item route without an owning magic-link applicant passes
-        ``allow_unconfirmed=False``. It then gets 404 instead of 403, so the API is no
-        existence oracle. This mirrors the application detail, timeline, version and
-        comment gates. The owning applicant reads with the default
-        ``allow_unconfirmed=True``.
-
-        Raises:
-            NotFoundError: The application is an unconfirmed guest submission and
-                ``allow_unconfirmed`` is false.
-        """
-        if allow_unconfirmed:
-            return
-        confirmed = await self.session.scalar(
-            select(Application.email_confirmed_at).where(
-                Application.id == application_id
-            )
-        )
-        if confirmed is None:
-            raise NotFoundError(f"application {application_id} not found")
-
-    async def list_for_application(
-        self,
-        application_id: uuid.UUID,
-        *,
-        allow_unconfirmed: bool = True,
-        hidden: Callable[[Attachment], bool] | None = None,
-    ) -> list[AttachmentOut]:
-        """Return all attachments of an application, oldest first.
-
-        The frontend uses this for the panel after a reload.
-
-        A read by a principal or a member of the Gremium passes
-        ``allow_unconfirmed=False``. The method then hides the attachments of an
-        unconfirmed guest submission with a 404. This mirrors the list semantics.
-
-        ``hidden`` removes each attachment for which it returns true. The router
-        uses it for the attachments of the ``isPII`` fields.
-        """
-        await self.assert_app_visible(
-            application_id, allow_unconfirmed=allow_unconfirmed
-        )
-        rows = (
-            await self.session.scalars(
-                select(Attachment)
-                .where(BOUND, Attachment.application_id == application_id)
-                .order_by(Attachment.created_at)
-            )
-        ).all()
-        return [_attachment_out(a) for a in rows if hidden is None or not hidden(a)]
-
     async def get_attachment(self, attachment_id: uuid.UUID) -> Attachment:
         """Load a bound attachment for an application path.
 
@@ -315,7 +252,7 @@ class FilesService:
             raise NotFoundError(f"attachment {attachment_id} not found")
         return attachment
 
-    async def _ready_attachment(self, attachment_id: uuid.UUID) -> Attachment:
+    async def ready_attachment(self, attachment_id: uuid.UUID) -> Attachment:
         """Load the attachment and apply the download gates.
 
         The URL route and the stream route share this method.
@@ -328,7 +265,7 @@ class FilesService:
         return self._ready(await self.get_attachment(attachment_id))
 
     def _ready(self, attachment: Attachment) -> Attachment:
-        """Apply the download gates to a loaded attachment (see ``_ready_attachment``).
+        """Apply the download gates to a loaded attachment (see ``ready_attachment``).
 
         The scan gate is FAIL CLOSED and must never be inverted or weakened. The method refuses
         the download with 409 while ``scanned`` is false, so the API NEVER serves an unscanned
@@ -341,57 +278,6 @@ class FilesService:
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
         return attachment
-
-    async def signed_url(
-        self, attachment_id: uuid.UUID, *, allow_unconfirmed: bool = True
-    ) -> SignedUrlOut:
-        """Return the app-relative download URL after a clean scan.
-
-        Any other state gives 409, 410 or 503.
-
-        The route is no presigned MinIO URL. MinIO runs on the internal Docker network
-        and publishes no port. An S3v4 signature binds the internal host, so the browser
-        cannot reach such a URL. The ``/download`` endpoint streams the bytes from the
-        server through nginx under ``/api/`` instead.
-
-        A read by a principal or a member of the Gremium passes
-        ``allow_unconfirmed=False``. An unconfirmed guest submission then gives 404,
-        which mirrors the list semantics. The visibility gate runs BEFORE the quarantine
-        gates. A hidden application must not shine through as existing over 409, 410
-        or 503.
-        """
-        attachment = await self.get_attachment(attachment_id)
-        await self.assert_app_visible(
-            application_id_of(attachment), allow_unconfirmed=allow_unconfirmed
-        )
-        await self._ready_attachment(attachment_id)
-        return SignedUrlOut(
-            url=f"/api/attachments/{attachment_id}/download",
-            expiresIn=self.settings.attachment_url_ttl_seconds,
-        )
-
-    async def download_stream(
-        self, attachment_id: uuid.UUID, *, allow_unconfirmed: bool = True
-    ) -> tuple[AsyncIterator[bytes], str, str, int]:
-        """Return a chunk iterator over the attachment bytes for the ``/download`` stream.
-
-        The quarantine gates (409, 410, 503) and the visibility gate run unchanged BEFORE
-        the stream starts. The method opens the storage connection eagerly, so a
-        transient error still surfaces as 503 before the response header goes out.
-
-        A read by a principal or a member of the Gremium passes
-        ``allow_unconfirmed=False``. An unconfirmed guest submission then gives 404,
-        which mirrors the list semantics.
-
-        Returns:
-            The iterator, the filename, the MIME type and the size. The caller puts the
-            size into ``Content-Length``.
-        """
-        loaded = await self.get_attachment(attachment_id)
-        await self.assert_app_visible(
-            application_id_of(loaded), allow_unconfirmed=allow_unconfirmed
-        )
-        return await self._open_stream(await self._ready_attachment(attachment_id))
 
     async def owner_of(self, attachment_id: uuid.UUID) -> AttachmentOwner | None:
         """Name the owner of an attachment.
@@ -464,7 +350,7 @@ class FilesService:
     ) -> tuple[AsyncIterator[bytes], str, str, int]:
         """Stream a ticket or message file, with the gates of ``download_stream``."""
         attachment = self._ready(await self._get_owned(attachment_id))
-        return await self._open_stream(attachment)
+        return await self.open_stream(attachment)
 
     async def message_attachments(
         self, owner: MessageOwner, ids: Sequence[uuid.UUID]
@@ -608,7 +494,7 @@ class FilesService:
             )
         return keys
 
-    async def _open_stream(
+    async def open_stream(
         self, attachment: Attachment
     ) -> tuple[AsyncIterator[bytes], str, str, int]:
         """Open the storage stream of a ready attachment.
@@ -633,46 +519,27 @@ class FilesService:
                 .order_by(Attachment.created_at, Attachment.id)
             )
         ).all()
-        return [_attachment_out(a) for a in rows]
+        return [attachment_out(a) for a in rows]
 
-    async def delete_for_ticket(self, ticket_id: uuid.UUID, *, actor: str) -> int:
+    async def delete_for_ticket(
+        self, ticket_id: uuid.UUID, *, notes: Select[uuid.UUID], actor: str
+    ) -> int:
         """Remove the files of a ticket for its anonymization, without a commit.
 
         These are the files of the report and the files of every note of the ticket
-        (also of a deleted note). For each file the method deletes the row, removes the
-        object as best effort and writes an ``attachment_delete`` audit entry. The
-        caller commits.
+        (also of a deleted note). ``notes`` selects the ids of these notes. The module
+        `tickets` builds it, because `files` imports no higher module. For each file the
+        method deletes the row, removes the object as best effort and writes an
+        ``attachment_delete`` audit entry. The caller commits.
 
         Returns:
             The number of removed attachments.
         """
-        notes = select(TicketNote.id).where(TicketNote.ticket_id == ticket_id)
         rows = await self._locked_rows(
             or_(Attachment.ticket_id == ticket_id, Attachment.ticket_note_id.in_(notes))
         )
         await self._remove_rows(rows, actor=actor)
         return len(rows)
-
-    async def assert_editable(self, application_id: uuid.UUID) -> None:
-        """Make sure that the current state of the application allows data edits.
-
-        The router calls this before an applicant or a creator deletes an attachment.
-        A delete is a data change, like a PATCH. An upload is not, so the upload route
-        does not call it. An application without a state passes.
-
-        Raises:
-            ConflictError: The current state has ``edit_allowed = false`` (HTTP 409).
-        """
-        edit_allowed = await self.session.scalar(
-            select(State.edit_allowed)
-            .join(Application, Application.current_state_id == State.id)
-            .where(Application.id == application_id)
-        )
-        if edit_allowed is False:
-            raise ConflictError(
-                "Application is locked for editing in its current state.",
-                code="application_locked",
-            )
 
     async def delete(self, attachment_id: uuid.UUID, *, actor: str) -> None:
         """Delete an attachment: the database row, the storage object and an audit entry.
@@ -702,19 +569,20 @@ class FilesService:
         await self.session.commit()
 
     async def delete_for_application(
-        self, application_id: uuid.UUID, *, actor: str
+        self, application_id: uuid.UUID, *, comments: Select[uuid.UUID], actor: str
     ) -> int:
         """Remove all attachments of an application for DSGVO anonymization.
 
         These are the files of the application (``BOUND``) and the files of all its
-        comments, internal and public. For each file the method deletes the database
-        row, removes the storage object as best effort and writes an audit entry. It
-        does not commit. The calling anonymization routine commits atomically.
+        comments, internal and public. ``comments`` selects the ids of these comments.
+        The module `applications` builds it, because `files` imports no higher module.
+        For each file the method deletes the database row, removes the storage object as
+        best effort and writes an audit entry. It does not commit. The calling
+        anonymization routine commits atomically.
 
         Returns:
             The number of removed attachments.
         """
-        comments = select(Comment.id).where(Comment.application_id == application_id)
         rows = await self._locked_rows(
             or_(
                 BOUND & (Attachment.application_id == application_id),
@@ -861,7 +729,8 @@ def _record_verdict(attachment: Attachment, verdict: ScanVerdict) -> None:
         attachment.storage_key = None
 
 
-def _attachment_out(attachment: Attachment) -> AttachmentOut:
+def attachment_out(attachment: Attachment) -> AttachmentOut:
+    """Build the wire form of an attachment."""
     return AttachmentOut(
         id=attachment.id,
         filename=attachment.filename,

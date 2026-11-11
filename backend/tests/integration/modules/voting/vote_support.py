@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
@@ -25,7 +26,6 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
 from app.modules.voting.models import Vote
@@ -63,7 +63,7 @@ async def seed_vote_flow(
     )
     session.add(app_type)
     await session.commit()
-    await FormsService(session).create_form_version(
+    await FormVersionWriter(session).create_form_version(
         app_type.id,
         FormVersionCreate(
             fields=[FormFieldDef(key="title", type="text", label={"de": "Titel"},

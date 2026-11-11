@@ -12,9 +12,9 @@ magic-link applicant. The id is a random uuid4, so it is unguessable on top of t
 session check. The image of a protocol that an applicant cannot read is therefore
 reachable only with its id.
 
-``GET /api/public/protocols/{protocol_id}/images/{image_id}`` streams an image of a
-public protocol without login. The protocol must be visible, and its public Markdown
-must refer to the image. Everything else gives 404.
+The route of the images of a public protocol is in `protocol.public_images_router`,
+because it reads the protocol, and `media` imports no higher module
+(§S/backend/python/000651).
 
 Every image answer is inline, ``nosniff`` and carries ``default-src 'none'; sandbox``,
 so a browser that opens the URL directly runs nothing. The stored type is one of four
@@ -37,29 +37,23 @@ from fastapi.responses import StreamingResponse
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
 from app.modules.auth.oauth import SCOPES
 from app.modules.auth.principal import Applicant, Principal
-from app.modules.files.router import _read_capped
+from app.modules.files.body import read_capped
 from app.modules.files.storage import ObjectStorage
 from app.modules.media.schemas import MarkdownImageOut
 from app.modules.media.service import ImageStream, MediaService
-from app.modules.protocol.public import PublicProtocolService
 from app.shared.antiabuse import (
     enforce_media_body_cap,
     rate_limit_media_images,
-    rate_limit_public_protocol_images,
 )
-from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail, UnauthorizedError
+from app.shared.errors import ForbiddenError, ProblemDetail, UnauthorizedError
 
 router = APIRouter(tags=["media"])
-public_router = APIRouter(prefix="/public", tags=["public-protocols"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 #: The CSP of an image answer: no active content, also when opened directly.
 IMAGE_CSP = "default-src 'none'; sandbox"
 _PRIVATE_CACHE = "private, max-age=31536000, immutable"
-#: A public protocol can go private again (hold-back, gremium flag), so a shared cache
-#: keeps its images for a short time only.
-_PUBLIC_CACHE = "public, max-age=300"
 
 #: The OAuth scopes whose texts take images: protocol TOPs, to-do cards and their
 #: comments, ticket notes, application comments.
@@ -87,16 +81,11 @@ def get_media_service(session: DbSession, request: Request, settings: SettingsDe
     )
 
 
-def get_public_protocols(session: DbSession) -> PublicProtocolService:
-    """Wire the reads of the public protocols page (visibility only, no storage)."""
-    return PublicProtocolService(session)
-
-
 ServiceDep = Annotated[MediaService, Depends(get_media_service)]
-PublicDep = Annotated[PublicProtocolService, Depends(get_public_protocols)]
 
 
-def _image_response(image: ImageStream, cache_control: str) -> StreamingResponse:
+def image_response(image: ImageStream, cache_control: str) -> StreamingResponse:
+    """Build the inline, sandboxed streaming answer of one image."""
     headers = {
         "Content-Disposition": "inline",
         "Content-Length": str(image.size),
@@ -130,7 +119,7 @@ async def upload_image(
     scope = principal.scope_permissions
     if scope is not None and not (scope & _UPLOAD_PERMISSIONS):
         raise ForbiddenError("The token has no write scope for a text with images.")
-    data = await _read_capped(file, service.max_bytes)
+    data = await read_capped(file, service.max_bytes)
     return await service.upload(data)
 
 
@@ -148,25 +137,4 @@ async def get_image(
     """Stream one image to a principal or a magic-link applicant."""
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
-    return _image_response(await service.open(image_id), _PRIVATE_CACHE)
-
-
-@public_router.get(
-    "/protocols/{protocol_id}/images/{image_id}",
-    response_class=StreamingResponse,
-    dependencies=[Depends(rate_limit_public_protocol_images)],
-    responses=_errors(404, 422, 429, 503),
-)
-async def get_public_protocol_image(
-    protocol_id: UUID,
-    image_id: UUID,
-    service: ServiceDep,
-    protocols: PublicDep,
-) -> StreamingResponse:
-    """Stream an image of a public protocol without login.
-
-    404 unless the protocol is public and its public Markdown refers to the image.
-    """
-    if image_id not in await protocols.public_image_ids(protocol_id):
-        raise NotFoundError("image not found")
-    return _image_response(await service.open(image_id), _PUBLIC_CACHE)
+    return image_response(await service.open(image_id), _PRIVATE_CACHE)

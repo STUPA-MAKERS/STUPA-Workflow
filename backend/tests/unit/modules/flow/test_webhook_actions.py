@@ -6,7 +6,7 @@ import uuid
 from typing import Any
 
 from app.modules.flow.dispatch import DispatchedAction
-from app.modules.webhooks.action_dispatcher import WebhookActionDispatcher
+from app.modules.flow.webhook_actions import WebhookActionDispatcher
 from app.modules.webhooks.models import Webhook
 from app.settings import load_settings
 from tests._support.webhooks_fakes import FakeSession, FakeWebhookQueue

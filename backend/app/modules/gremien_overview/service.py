@@ -61,7 +61,7 @@ from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.access import views_all
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.gremien.schemas import (
+from app.modules.gremien_overview.schemas import (
     AttendanceCellOut,
     AttendanceMonthOut,
     AttendanceOut,

@@ -19,6 +19,7 @@ from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import get_current_principal
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import (
     Application,
@@ -32,7 +33,6 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.principal import Principal
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.settings import Settings
 from app.shared.antiabuse import verify_altcha_unless_authenticated
 from app.shared.config_schemas import FormFieldDef
@@ -118,7 +118,7 @@ async def _form(
     maker: async_sessionmaker[AsyncSession], type_id: uuid.UUID, fields: list[FormFieldDef]
 ) -> None:
     async with maker() as session:
-        await FormsService(session).create_form_version(
+        await FormVersionWriter(session).create_form_version(
             type_id, FormVersionCreate(fields=fields, activate=True), "tester"
         )
 

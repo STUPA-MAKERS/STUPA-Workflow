@@ -26,6 +26,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.deps import get_current_applicant, get_current_principal
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
@@ -36,7 +37,6 @@ from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.shared.config_schemas import FormFieldDef
 from tests._support.guest_apps import build_api, guest_settings
@@ -109,7 +109,7 @@ async def seed_read_world(maker: async_sessionmaker[AsyncSession]) -> ReadSeed:
         )
         session.add_all([budget, app_type])
         await session.commit()
-        await FormsService(session).create_form_version(
+        await FormVersionWriter(session).create_form_version(
             app_type.id, FormVersionCreate(fields=form_fields(), activate=True), "tester"
         )
 

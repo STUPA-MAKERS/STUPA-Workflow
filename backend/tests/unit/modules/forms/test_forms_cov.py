@@ -19,13 +19,15 @@ from typing import Any
 
 import pytest
 
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
+from app.modules.budget.form_options import budget_field_options
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import (
     FormsService,
-    _field_def_to_row_kwargs,
     _row_to_field_def,
+    field_def_to_row_kwargs,
 )
 from app.modules.forms.validation import (
     FieldError,
@@ -189,7 +191,7 @@ def test_row_to_field_def_empty_validation_becomes_none() -> None:
 def test_field_def_to_row_kwargs_validation_none_branch() -> None:
     """Map a field without validation to an empty validation dict."""
     field = FormFieldDef.model_validate({"key": "t", "type": "text", "label": {"de": "T"}})
-    kw = _field_def_to_row_kwargs(field, 3)
+    kw = field_def_to_row_kwargs(field, 3)
     assert kw["validation"] == {}
     assert kw["options"] is None
     assert kw["order"] == 3
@@ -205,7 +207,7 @@ def test_field_def_to_row_kwargs_with_validation_and_options() -> None:
             "options": [{"value": "a", "label": {"de": "A"}}],
         }
     )
-    kw = _field_def_to_row_kwargs(field, 0)
+    kw = field_def_to_row_kwargs(field, 0)
     assert kw["validation"] == {"minLen": 1}
     assert kw["options"] == [{"value": "a", "label": {"de": "A"}}]
 
@@ -289,13 +291,25 @@ def test_get_effective_form_injects_dynamic_options() -> None:
         _form_field_row("ziel_g", "gremium_select"),
         _form_field_row("ziel_b", "budget_select", order=1),
     ]
-    svc = FormsService(_Session(results=[_Result(rows)], gets=[at]))  # type: ignore[arg-type]
+    svc = FormsService(
+        _Session(results=[_Result(rows)], gets=[at]),  # type: ignore[arg-type]
+        budget_field_options,
+    )
     out = _run(svc.get_effective_form(at.id))
     by_key = {f.key: f for s in out.sections for f in s.fields}
     assert by_key["ziel_g"].type == "gremium_select"
     assert by_key["ziel_g"].options == []
     assert by_key["ziel_b"].type == "budget_select"
     assert by_key["ziel_b"].options == []
+
+
+def test_get_effective_form_without_budget_source_raises() -> None:
+    """Refuse a cost-center field when no caller wired the options (§S/backend/python/000651)."""
+    at = _app_type(active_form_version_id=uuid.uuid4())
+    rows = [_form_field_row("ziel_b", "budget_select")]
+    svc = FormsService(_Session(results=[_Result(rows)], gets=[at]))  # type: ignore[arg-type]
+    with pytest.raises(RuntimeError, match="not wired"):
+        _run(svc.get_effective_form(at.id))
 
 
 class _BudgetRowsSession(_Session):
@@ -318,8 +332,7 @@ def test_budget_field_options_carry_the_tree() -> None:
         (child, "Kultur", "VS-1", top, "1", None),
         (orphan, "Sport", "VS-2-3", gone, "3", "#abcdef"),
     ]
-    svc = FormsService(_BudgetRowsSession(rows, gets=[]))  # type: ignore[arg-type]
-    out = _run(svc._budget_field_options())
+    out = _run(budget_field_options(_BudgetRowsSession(rows, gets=[])))  # type: ignore[arg-type]
     assert [o.model_dump(by_alias=True, exclude_none=True) for o in out] == [
         {
             "value": str(top),
@@ -358,7 +371,7 @@ def test_get_effective_form_section_marker_label_preserved() -> None:
 
 
 def test_create_form_version_bad_definition_422() -> None:
-    svc = FormsService(_Session())  # type: ignore[arg-type]
+    svc = FormVersionWriter(_Session())  # type: ignore[arg-type]
     payload = FormVersionCreate(
         fields=[
             FormFieldDef(key="dup", type="text", label={"de": "A"}),
@@ -382,7 +395,7 @@ def test_create_form_version_activate_true() -> None:
     """
     at = _app_type()
     sess = _Session(results=[2], gets=[at, at])
-    svc = FormsService(sess)  # type: ignore[arg-type]
+    svc = FormVersionWriter(sess)  # type: ignore[arg-type]
     payload = FormVersionCreate(
         fields=[FormFieldDef(key="title", type="text", label={"de": "T"})],
         activate=True,
@@ -408,7 +421,7 @@ def test_create_form_version_activate_false_first_version() -> None:
     """
     at = _app_type()
     sess = _Session(results=[None], gets=[at])
-    svc = FormsService(sess)  # type: ignore[arg-type]
+    svc = FormVersionWriter(sess)  # type: ignore[arg-type]
     payload = FormVersionCreate(
         fields=[FormFieldDef(key="title", type="text", label={"de": "T"})],
         activate=False,
@@ -503,13 +516,13 @@ def test_get_form_draft_type_not_found() -> None:
 
 def test_next_version_from_existing_max() -> None:
     sess = _Session(results=[7])
-    svc = FormsService(sess)  # type: ignore[arg-type]
+    svc = FormVersionWriter(sess)  # type: ignore[arg-type]
     assert _run(svc._next_version(uuid.uuid4())) == 8
 
 
 def test_next_version_no_versions_defaults_to_one() -> None:
     sess = _Session(results=[None])
-    svc = FormsService(sess)  # type: ignore[arg-type]
+    svc = FormVersionWriter(sess)  # type: ignore[arg-type]
     assert _run(svc._next_version(uuid.uuid4())) == 1
 
 

@@ -51,8 +51,8 @@ async def reapply_snapshot(
                 FlowVersionCreate(graph=graph), actor, action=action, extra_data=extra_data
             )
         case entities.ENTITY_FORM:
+            from app.modules.admin.service.forms import FormVersionWriter
             from app.modules.forms.schemas import FormVersionCreate
-            from app.modules.forms.service import FormsService
             from app.shared.config_schemas import FormFieldDef
 
             fields = [
@@ -61,7 +61,7 @@ async def reapply_snapshot(
             payload = FormVersionCreate(
                 fields=fields, activate=True, description=snapshot.get("description")
             )
-            await FormsService(session).create_form_version(
+            await FormVersionWriter(session).create_form_version(
                 UUID(entity_id), payload, actor, action=action, extra_data=extra_data
             )
         case entities.ENTITY_SITE_CONFIG:

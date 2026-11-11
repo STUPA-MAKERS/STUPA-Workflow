@@ -76,6 +76,6 @@ description: Admin/config API — gremien, gremium-roles, the OIDC group mapping
 - All datetimes are tz-aware UTC. All error paths return `ProblemDetail` (problem+json): 400 malformed JSON, 422 schema, 404 not-found, 409 conflict.
 - camelCase JSON comes from `_CamelModel` (`populate_by_name=True`). Out models use `serialization_alias`, In models use `alias`. Nullable-clearable fields (`quorumPercent`, `retentionMonths`) tell "absent" from "null" through `payload.model_fields_set`.
 - Webhook persistence lives in this module on purpose (not in `modules/webhooks`) because admin CRUD is the only writer of the config. The delivery worker sits in `webhooks`. See `be-webhooks`.
-- `form-versions`, `notification-rules`/`mail-templates`, and `/admin/audit` are NOT here. They live in the forms, notifications, and audit modules.
+- `notification-rules`/`mail-templates` and `/admin/audit` are NOT here. They live in the notifications and audit modules. The write of a form version is here (`service/forms.py` `FormVersionWriter`, `forms_router.py`), because it records a config revision (spec 000651); the form reads live in `forms`.
 
 **Related:** be-auth, be-flow, be-forms, be-config-revision, be-audit, be-webhooks, be-notifications

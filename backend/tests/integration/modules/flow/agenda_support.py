@@ -14,6 +14,7 @@ from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
@@ -21,7 +22,6 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.auth.principal import Principal
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
 from app.shared.config_schemas import FormFieldDef
@@ -55,7 +55,7 @@ async def seed_agenda_flow(session: AsyncSession) -> AgendaFlow:
     )
     session.add(app_type)
     await session.commit()
-    await FormsService(session).create_form_version(
+    await FormVersionWriter(session).create_form_version(
         app_type.id,
         FormVersionCreate(
             fields=[FormFieldDef(key="title", type="text", label={"de": "Titel"},

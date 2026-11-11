@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 
 from app.deps import Principal, get_current_principal
 from app.main import create_app
-from app.modules.files.router import get_draft_attachments
+from app.modules.attachments.router import get_draft_attachments
 from app.modules.files.schemas import DraftAttachmentOut
 from app.settings import get_settings, load_settings
 from app.shared.altcha import AltchaError

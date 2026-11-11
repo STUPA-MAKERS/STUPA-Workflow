@@ -106,37 +106,13 @@ root_package = "app"
 
 [[tool.importlinter.contracts]]
 id = "module-layers"
-ignore_imports = [
-    "app.modules.files.router -> app.modules.applications.access",
-    "app.modules.files.router -> app.modules.applications.models",
-    "app.modules.files.router -> app.modules.tickets.access",
-    "app.modules.files.router -> app.modules.tickets.models",
-    "app.modules.files.router -> app.modules.tickets.service",
-    "app.modules.files.router -> app.modules.todos.access",
-    "app.modules.files.router -> app.modules.todos.models",
-    "app.modules.files.service -> app.modules.applications.models",
-    "app.modules.files.service -> app.modules.flow.models",
-    "app.modules.files.service -> app.modules.tickets.models",
-    "app.modules.forms.service -> app.modules.budget.tree_models",
-    "app.modules.forms.service -> app.modules.config_revision.service",
-    "app.modules.gremien.service -> app.modules.applications.models",
-    "app.modules.gremien.service -> app.modules.delegations.models",
-    "app.modules.gremien.service -> app.modules.meetings.agenda_service",
-    "app.modules.gremien.service -> app.modules.meetings.models",
-    "app.modules.gremien.service -> app.modules.meetings.protocol_models",
-    "app.modules.gremien.service -> app.modules.voting.election",
-    "app.modules.gremien.service -> app.modules.voting.listing",
-    "app.modules.gremien.service -> app.modules.voting.models",
-    "app.modules.gremien.service -> app.modules.voting.schemas",
-    "app.modules.media.router -> app.modules.protocol.public",
-    "app.modules.webhooks.action_dispatcher -> app.modules.flow.dispatch",
-]
+ignore_imports = []
 name = "A module imports only from its layer and from lower layers"
 type = "layers"
 containers = ["app.modules"]
 exhaustive = true
 layers = [
-    "admin : search : privacy : backup : config_revision : calendar : audit_log : account",
+    "admin : search : privacy : backup : config_revision : calendar : audit_log : account : gremien_overview : attachments",
     "protocol : livevote : todos : tickets",
     "voting : budget : applications : flow : meetings : delegations",
     "forms : application_types : notifications : webhooks : files : media : translations : avatars",
