@@ -124,7 +124,7 @@
                 <span class="grl__none">{{ 'gremien.list.nonePlanned' | t }}</span>
               }
             }
-            @if (!split()) {
+            @if (!split() && !phone()) {
               <app-row-chevron />
             }
           </span>

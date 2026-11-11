@@ -187,6 +187,8 @@ describe('GremienComponent', () => {
     const s = await start('/committees', { media: [MEDIA.phone] });
     restore = s.restore;
     expect(screen.queryByRole('button', { name: 'Sitzungen abonnieren' })).toBeNull();
+    // § 000675: a phone list row ends with its last text, not with an arrow.
+    expect((s.harness.routeNativeElement as HTMLElement).querySelector('app-row-chevron')).toBeNull();
     expect(s.cmp.phoneMenu().map((sec) => sec.items.map((i) => i.id))).toEqual([['calendar'], ['refresh']]);
     const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;
     s.cmp.onPhoneMenu({ id: 'other', label: 'x' }, abo);

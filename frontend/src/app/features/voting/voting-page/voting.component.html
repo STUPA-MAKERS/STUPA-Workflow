@@ -1,7 +1,6 @@
 <div class="vl" [class.vl--split]="split()">
   <app-list-detail
     [detailOpen]="selectedId() !== null"
-    [backButton]="!phone()"
     (back)="closeDetail()"
   >
     <section list class="ld-pane vl__pane" aria-labelledby="vl-title">

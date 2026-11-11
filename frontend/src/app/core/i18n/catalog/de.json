@@ -1333,7 +1333,6 @@
   "vote.tally.quorum": "Quorum",
   "vote.tally.quorumMet": "erreicht",
   "vote.tally.quorumMissed": "nicht erreicht",
-  "voting.cast.back": "Zurück",
   "voting.cast.toOverview": "Zu den Abstimmungen",
   "voting.ballot.own": "Deine Stimme",
   "voting.ballot.proxy": "Als Vertretung für {name}",

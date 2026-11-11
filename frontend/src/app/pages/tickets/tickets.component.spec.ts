@@ -433,6 +433,21 @@ describe('TicketsComponent', () => {
     expect(cmp.selectedId()).toBe('t42');
   });
 
+  /** § 000675: a phone list row ends with its last text, not with an arrow. */
+  it('ends a phone row without an arrow, and keeps the arrow on a one-pane tablet', async () => {
+    const tablet = await start('/tickets');
+    expect((tablet.harness.routeNativeElement as HTMLElement).querySelector('app-row-chevron')).not.toBeNull();
+    TestBed.resetTestingModule();
+    const restore = matchMediaQueries(MEDIA.phone);
+    try {
+      const phone = await start('/tickets');
+      expect((phone.harness.routeNativeElement as HTMLElement).querySelector('app-list-item')).not.toBeNull();
+      expect((phone.harness.routeNativeElement as HTMLElement).querySelector('app-row-chevron')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
   /** Leaving the page frees the frame. */
   it('shows the list beside the detail on a wide screen', async () => {
     const restore = matchMediaQueries(MEDIA.wide);

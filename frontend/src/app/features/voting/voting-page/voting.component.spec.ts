@@ -602,11 +602,12 @@ describe('VotingComponent', () => {
       expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ offset: 0, limit: 30 }));
     });
 
-    it('phone: the vote brings its own way back, the layout drops "Zur Liste"', async () => {
+    /** § 000674: the vote detail has the detail bar of the layout like every other detail. */
+    it('phone: the layout shows its detail bar with "Zur Liste"', async () => {
       const restore = matchMediaQueries(MEDIA.phone);
       try {
         await start('/voting/v1', { pages: [page([item('v1')])] });
-        expect(screen.queryByRole('button', { name: 'Zur Liste' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Zur Liste' })).toBeInTheDocument();
       } finally {
         restore();
       }

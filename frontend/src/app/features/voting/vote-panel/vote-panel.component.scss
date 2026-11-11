@@ -81,8 +81,17 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-:host(.vpn--phone) .sheet-title + .vpn__meta {
+:host(.vpn--phone) .vpn__bar + .vpn__meta {
   margin-top: calc(-1 * var(--space-3));
+}
+// On a phone the status line holds the meeting too (§ 000674), so it breaks into lines
+// and a long meeting title is cut on its own line.
+:host(.vpn--phone) .vpn__meta {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+:host(.vpn--phone) .vpn__where {
+  max-width: 100%;
 }
 
 // The same 18px inline padding as the other boxes of the column, so their content shares one edge.

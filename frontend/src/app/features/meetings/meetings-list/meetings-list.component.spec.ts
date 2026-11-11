@@ -383,6 +383,8 @@ describe('MeetingsListComponent', () => {
         'Live · seit 18:04 · 8 TOPs',
       );
       expect(liveRow.querySelector('.li')).toHaveClass('li--wrap');
+      // § 000675: a phone list row ends with its last text, not with an arrow.
+      expect(view.container.querySelector('app-row-chevron')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Sitzung' })).toBeNull();
       expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Sitzungen durchsuchen');
       const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;

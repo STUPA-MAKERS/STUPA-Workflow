@@ -38,24 +38,7 @@
         [class.vc--phone]="phone()"
         [attr.aria-label]="'voting.cast.heading' | t"
       >
-        @if (phone()) {
-          <app-vote-phone-header
-            [back]="['/voting']"
-            [keepQuery]="true"
-            [subtitle]="phoneSubtitle()"
-            [subtitleLink]="phoneSubtitleLink()"
-          >
-            @if (hasMenu()) {
-              <app-row-menu [sections]="menu()" (selected)="onMenu($event.id)" />
-            }
-          </app-vote-phone-header>
-        }
-
         <div class="vc__body" appScrollFade="y">
-          @if (session()?.connection() === 'reconnecting') {
-            <p class="vc__line vc__line--warn" role="status">{{ 'voting.live.reconnecting' | t }}</p>
-          }
-
           <app-vote-panel
             [vote]="v"
             [context]="context()"
@@ -70,9 +53,9 @@
             (castFailed)="onCastFailed($event)"
             (changed)="onElectionChanged()"
           >
-            @if (!phone() && (beamerLink() || hasMenu())) {
+            @if ((!phone() && beamerLink()) || hasMenu()) {
               <span vpnActions class="vc__actions">
-                @if (beamerLink()) {
+                @if (!phone() && beamerLink()) {
                   <app-button variant="tonal" size="sm" (click)="goBeamer()">
                     <app-icon name="monitor" />
                     {{ 'voting.live.toBeamer' | t }}

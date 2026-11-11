@@ -1333,7 +1333,6 @@
   "vote.tally.quorum": "Quorum",
   "vote.tally.quorumMet": "met",
   "vote.tally.quorumMissed": "not met",
-  "voting.cast.back": "Back",
   "voting.cast.toOverview": "To the votes",
   "voting.ballot.own": "Your vote",
   "voting.ballot.proxy": "As proxy for {name}",
