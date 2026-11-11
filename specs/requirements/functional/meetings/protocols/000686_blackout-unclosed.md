@@ -13,7 +13,7 @@ scope:
 
 # An open blackout marker stops the finalize
 
-If a protocol text has a blackout marker without its end `}}`, the finalize must refuse with
+If a protocol text has a blackout marker without its closing `%%`, the finalize must refuse with
 problem+json code `blackout_unclosed` and must name the TOP. The editor must show the open
 marker as an error.
 
