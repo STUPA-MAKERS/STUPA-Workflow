@@ -627,6 +627,7 @@ def test_admin_manifest_webmanifest(
     assert r.json()["name"] == "Antrag"
     assert r.json()["scheme"] == "light"
     assert client.get("/api/manifest.webmanifest?scheme=dark").json()["scheme"] == "dark"
+    assert client.get("/api/manifest.webmanifest?scheme=contrast").json()["scheme"] == "contrast"
     assert client.get("/api/manifest.webmanifest?scheme=blue").status_code == 422
 
 

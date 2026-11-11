@@ -23,7 +23,7 @@ separate from the global group mappings and from each other.
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import (
@@ -112,7 +112,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.service.cd_variants import SquareLogoRef
-from app.modules.admin.site_config_service import SiteConfigService
+from app.modules.admin.site_config_service import ManifestScheme, SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
 from app.modules.auth.login_settings import LoginSettingsService
 from app.modules.auth.policy import can_view_gremium
@@ -1452,14 +1452,14 @@ async def get_public_site_config(
 @public_router.get("/manifest.webmanifest", include_in_schema=False)
 async def get_manifest(
     service: SiteServiceDep,
-    scheme: Annotated[Literal["light", "dark"], Query()] = "light",
+    scheme: Annotated[ManifestScheme, Query()] = "light",
 ) -> Response:
     """Serve the PWA manifest from the active branding (application/manifest+json).
 
     The route is auth-free. The edge proxy maps the browser-linked
     ``/manifest.webmanifest`` here, so name and short_name follow the configured app
     name. ``scheme=dark`` gives the dark bar colours; the frontend links it while the
-    dark theme is in effect.
+    dark theme is in effect. ``scheme=contrast`` gives black bars for "Hoher Kontrast".
     """
     import json
 
