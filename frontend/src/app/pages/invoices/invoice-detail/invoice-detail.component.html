@@ -39,15 +39,11 @@
         <span class="fd__part"><span class="mono fd__amount">{{ money(i.grossAmount) }}</span></span>
       </span>
     </p>
-    @if (canManage()) {
+    <!-- "Buchung anlegen" stands only in the head of the section "Buchungen" (§ 000671). -->
+    @if (canManage() && i.status === 'open') {
       <div class="fd__actions">
-        @if (i.status === 'open') {
-          <app-button variant="fill" [loading]="markingPaid()" (click)="markPaid.emit()">
-            <span class="fd__btn"><app-icon name="check" />{{ 'invoices.markPaid' | t }}</span>
-          </app-button>
-        }
-        <app-button variant="tonal" (click)="createBooking.emit()">
-          <span class="fd__btn"><app-icon name="plus" />{{ 'invoices.createBooking' | t }}</span>
+        <app-button variant="fill" [loading]="markingPaid()" (click)="markPaid.emit()">
+          <span class="fd__btn"><app-icon name="check" />{{ 'invoices.markPaid' | t }}</span>
         </app-button>
       </div>
     }

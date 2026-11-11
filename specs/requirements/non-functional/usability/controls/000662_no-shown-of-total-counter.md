@@ -5,6 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/src/app/features/voting/voting-page/voting.component.spec.ts:VotingComponent"
+  - "frontend/src/app/pages/invoices/invoices.component.spec.ts:InvoicesComponent"
 implementation:
   - frontend/src/app/pages/invoices
   - frontend/src/app/features/voting

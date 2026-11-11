@@ -5,6 +5,10 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/src/app/pages/tickets/tickets.component.spec.ts:TicketsComponent"
+  - "frontend/src/app/features/meetings/meetings-list/meetings-list.component.spec.ts:MeetingsListComponent"
+  - "frontend/src/app/features/gremien/gremien-page/gremien.component.spec.ts:GremienComponent"
 implementation:
   - frontend/src/app/pages/tickets
   - frontend/src/app/features/meetings

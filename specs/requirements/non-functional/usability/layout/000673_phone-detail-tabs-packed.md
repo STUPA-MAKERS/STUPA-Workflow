@@ -5,6 +5,8 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/src/app/shared/ui-sweep.spec.ts:phoneDetailTabs"
 implementation:
   - frontend/src/app/pages/tickets
   - frontend/vendor/ui-kit/src/lib/tabs

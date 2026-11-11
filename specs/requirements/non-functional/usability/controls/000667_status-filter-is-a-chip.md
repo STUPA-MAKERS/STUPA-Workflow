@@ -5,6 +5,8 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/src/app/pages/invoices/invoices.component.spec.ts:InvoicesComponent"
 implementation:
   - frontend/src/app/pages/invoices
 scope:

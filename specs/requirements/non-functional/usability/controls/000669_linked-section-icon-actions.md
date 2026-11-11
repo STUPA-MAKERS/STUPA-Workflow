@@ -5,6 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/src/app/pages/tickets/ticket-detail.component.spec.ts:TicketDetailComponent"
+  - "frontend/src/app/features/todos/card-detail/todo-card-detail.component.spec.ts:TodoCardDetailComponent"
 implementation:
   - frontend/src/app/features/todos/linked-list
   - frontend/src/app/features/todos/card-detail

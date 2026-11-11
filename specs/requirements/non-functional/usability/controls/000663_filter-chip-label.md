@@ -5,6 +5,10 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/vendor/ui-kit/src/lib/filter-select/filter-select.component.spec.ts:FilterSelectComponent"
+  - "frontend/src/app/pages/tickets/tickets.component.spec.ts:TicketsComponent"
+  - "frontend/src/app/features/meetings/meetings-timeline.service.spec.ts:MeetingsTimelineService"
 implementation:
   - frontend/vendor/ui-kit/src/lib/filter-select
   - frontend/src/app/features/meetings

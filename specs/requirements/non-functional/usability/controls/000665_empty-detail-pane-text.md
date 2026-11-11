@@ -5,6 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/src/app/pages/tickets/tickets-none.component.spec.ts:TicketsNoneComponent"
+  - "frontend/src/app/features/gremien/gremien-none/gremien-none.component.spec.ts:GremienNoneComponent"
 implementation:
   - frontend/src/app/pages/tickets
   - frontend/src/app/pages/account

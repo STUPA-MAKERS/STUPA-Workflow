@@ -5,6 +5,8 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/vendor/ui-kit/shell/src/nav-rail/nav-rail.component.spec.ts:NavRailComponent"
 implementation:
   - frontend/vendor/ui-kit/shell/src/nav-rail
 scope:

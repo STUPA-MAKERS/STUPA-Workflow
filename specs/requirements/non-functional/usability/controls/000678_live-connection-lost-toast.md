@@ -5,6 +5,8 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/src/app/features/voting/vote-cast.component.spec.ts:VoteCastComponent"
 implementation:
   - frontend/src/app/features/voting/vote-cast.component.ts
   - frontend/src/app/features/voting/vote-cast.component.html

@@ -4,9 +4,15 @@
     [title]="(section === 'texts' ? 'admin.texts.title' : 'admin.brand.title') | t"
   >
     <app-breadcrumbs crumbs />
-    @if (draft() && dirty()) {
-      <app-button actions variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
-    }
+    <!-- § 000672: the language of the texts stands at the end of the page head. -->
+    <div actions class="br__headTools">
+      @if (draft() && dirty()) {
+        <app-button variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
+      }
+      @if (section === 'texts' && draft()) {
+        <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.brand.textLang' | t" />
+      }
+    </div>
   </app-page-header>
 
   <app-load-state
@@ -23,10 +29,6 @@
     <ng-template #content>
       @if (draft(); as d) {
         @if (section === 'texts') {
-          <div class="br__meta">
-            <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.brand.textLang' | t" />
-          </div>
-
           @if (linkErrors().length > 0) {
             <app-note kind="error" icon="alert" role="alert">{{ 'admin.brand.badUrl' | t }} ({{ linkErrors().join(', ') }})</app-note>
           }

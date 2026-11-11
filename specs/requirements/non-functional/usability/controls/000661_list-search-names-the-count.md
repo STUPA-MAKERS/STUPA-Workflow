@@ -5,6 +5,8 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/src/app/shared/ui-sweep.spec.ts:searchPlaceholder"
 implementation:
   - frontend/src/app/pages/applications
   - frontend/src/app/pages/tasks
@@ -25,8 +27,10 @@ scope:
 The search field of a list page must show the placeholder "N … durchsuchen", where N is the
 number of items in the list and "…" is the name of the items. For one item the name must be
 in the singular ("1 Ticket durchsuchen"). The pattern is that of Anträge. It applies to
-Anträge, Aufgaben, Buchungen, Rechnungen, Sitzungen, Tickets, Gremien, Abstimmungen and the
-boards.
+Anträge, Aufgaben, Buchungen, Rechnungen, Tickets, Gremien, Abstimmungen and the boards.
+
+The list of Sitzungen loads in both directions and has no total, so its search field must
+show "Sitzungen durchsuchen" without a count.
 
 A search field that searches a part of a page, for example the cost centres of the budget
 tree or the settings of Verwaltung, must show "… durchsuchen" without a count.

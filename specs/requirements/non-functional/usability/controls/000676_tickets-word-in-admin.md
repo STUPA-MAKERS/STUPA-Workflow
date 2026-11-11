@@ -5,6 +5,8 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/src/app/shared/ui-sweep.spec.ts:ticketsInAdmin"
 implementation:
   - frontend/src/app/core/i18n/catalog/de.json
   - frontend/src/app/pages/admin/help-tickets

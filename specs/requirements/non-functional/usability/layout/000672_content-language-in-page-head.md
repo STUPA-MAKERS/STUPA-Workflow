@@ -5,6 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
+tests:
+  - "frontend/src/app/pages/admin/branding/branding-editor.component.spec.ts:BrandingEditorComponent"
+  - "frontend/src/app/pages/admin/mail-templates/mail-templates.component.spec.ts:MailTemplatesComponent"
 implementation:
   - frontend/src/app/pages/admin/roles
   - frontend/src/app/pages/admin/branding
