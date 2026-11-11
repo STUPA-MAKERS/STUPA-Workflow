@@ -194,6 +194,10 @@
         (activeChange)="setTab($event)"
       />
       <ng-container *ngTemplateOutlet="allLinkTpl; context: { $implicit: tab() }" />
+      <a class="dash__btn dash__btn--fill dash__new" routerLink="/apply">
+        <app-icon name="plus" [size]="16" />
+        {{ 'fab.application' | t }}
+      </a>
     </div>
 
     <div
@@ -204,9 +208,6 @@
     >
       <ng-container *ngTemplateOutlet="workTpl; context: { $implicit: tab() }" />
     </div>
-  }
-  @if (wide()) {
-    <app-fab [label]="'fab.application' | t" link="/apply" [contained]="true" />
   }
 </section>
 
@@ -283,10 +284,8 @@
   }
 </ng-template>
 
-@if (!wide()) {
-  <app-fab [label]="'fab.application' | t" link="/apply" />
-}
 @if (phone()) {
+  <app-fab [label]="'fab.application' | t" link="/apply" />
   <app-side-sheet side="bottom" [heading]="'shell.account.region' | t" [(open)]="accountOpen">
     <app-account variant="sheet" (navigated)="closeAccount()" />
   </app-side-sheet>
