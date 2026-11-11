@@ -33,13 +33,21 @@ import {
 import { HelpService } from '../help.service';
 
 /**
- * `rail`: the entry "Hilfe" at the foot of the navigation rail; the menu opens beside it.
- * `header`: the button "Hilfe" of the public header; the menu opens below it, and on a
+ * `rail`: an entry at the foot of the navigation rail; the menu opens beside it.
+ * `header`: a button of the public header; the menu opens below it, and on a
  *   phone as the shared bottom sheet, because a popover under a button near the left edge
  *   does not fit beside it.
- * `sheet`: the entries only, inline in the "Mehr" sheet of the phone bar.
+ * `sheet`: the entries only, inline in the "Mehr" sheet of the phone bar. In "Barrierefreiheit"
+ *   the caption of "Darstellung" says "Barrierefreiheit", so the sheet shows one caption,
+ *   not two stacked ones, and the reset stays on the caption row.
  */
 export type HelpMenuVariant = 'rail' | 'header' | 'sheet';
+
+/**
+ * `help`: "Hilfe" with the handbook and "Problem melden".
+ * `a11y`: "Barrierefreiheit" with the group "Darstellung" and the statement (spec 000647).
+ */
+export type HelpMenuKind = 'help' | 'a11y';
 
 /** A switch of the group "Darstellung": `dark` is the theme, the rest are display settings. */
 export type DisplayKey = 'dark' | DisplayChoice;
@@ -63,22 +71,24 @@ const GAP = 8;
 let nextId = 0;
 
 /**
- * The help menu: "Handbuch im Wiki" (the configured `help.wikiUrl`, a real link in a new
- * tab), "Barrierefreiheit" (the accessibility statement, on every page with and without a
- * login, spec 000496), the group "Darstellung" and "Problem melden", which opens the report
- * dialog.
+ * One of the two menus beside each other: "Hilfe" and "Barrierefreiheit" (spec 000647). They
+ * share the trigger, the popover and the sheets, so they look and behave the same.
  *
- * "Darstellung" (specs 000593, 000594) has one switch per display setting: the dark theme,
- * less motion, less transparency, more contrast and, last, high contrast, which also
- * highlights the fields (spec 000598). A switch shows the
- * state in effect, which is the system setting until the person sets it. The choice holds
- * in this browser only. "Systemeinstellungen verwenden" removes every choice, the theme
- * included, and shows only while a choice exists. Very high contrast turns every other
- * setting on: their switches show on and are disabled (spec 000606). The menu stays open on a switch, so the
- * person sees the change and can set the next one.
+ * "Hilfe" holds "Handbuch im Wiki" (the configured `help.wikiUrl`, a real link in a new tab)
+ * and "Problem melden", which opens the report dialog. A signed-in person always gets
+ * "Problem melden". A visitor gets it only while the admin allows tickets without an account
+ * (`tickets.publicEnabled`).
  *
- * A signed-in person always gets "Problem melden". A visitor gets it only while the
- * admin allows tickets without an account (`tickets.publicEnabled`).
+ * "Barrierefreiheit" has the eye icon. It holds the group "Darstellung" and the link to the
+ * accessibility statement, which no other place links to (spec 000496). "Darstellung"
+ * (specs 000593, 000594) has one switch per display setting: the dark theme, less motion,
+ * less transparency, more contrast and, last, very high contrast, which also highlights the
+ * fields (spec 000598). A switch shows the state in effect, which is the system setting until
+ * the person sets it. The choice holds in this browser only. "Systemeinstellungen verwenden"
+ * removes every choice, the theme included, and shows only while a choice exists. Very high
+ * contrast turns every other setting on: their switches show on and are disabled (spec
+ * 000606). The menu stays open on a switch, so the person sees the change and can set the
+ * next one.
  *
  * Like the account menu, the popover is a disclosure, not an ARIA menu. Escape closes it
  * and gives the focus back to the trigger. A press outside, a focus that leaves it and a
@@ -101,6 +111,11 @@ export class HelpMenuComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly variant = input<HelpMenuVariant>('rail');
+  readonly menu = input<HelpMenuKind>('help');
+
+  /** The name on the trigger, the popover, the sheet and the caption in "Mehr". */
+  readonly title = computed<TranslationKey>(() => (this.menu() === 'a11y' ? 'help.a11y' : 'help.title'));
+  readonly icon = computed<IconName>(() => (this.menu() === 'a11y' ? 'eye' : 'help'));
 
   /** An entry was used: the sheet that holds the inline menu closes. */
   readonly navigated = output<void>();

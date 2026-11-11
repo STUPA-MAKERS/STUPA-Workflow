@@ -7,15 +7,17 @@ import { BrandingService } from '@core/branding/branding.service';
 import { DisplaySettingsService, MEDIA, ThemeService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { HelpService } from '../help.service';
-import { HelpMenuComponent, type HelpMenuVariant } from './help-menu.component';
+import { HelpMenuComponent, type HelpMenuKind, type HelpMenuVariant } from './help-menu.component';
 
 const WIKI = 'https://wiki.example.org/books/stupa';
 
-async function setup(opts: { variant?: HelpMenuVariant; signedIn?: boolean; publicTickets?: boolean } = {}) {
+async function setup(
+  opts: { variant?: HelpMenuVariant; menu?: HelpMenuKind; signedIn?: boolean; publicTickets?: boolean } = {},
+) {
   localStorage.setItem('ap.locale', 'de');
   const navigated = jest.fn();
   const view = await render(HelpMenuComponent, {
-    inputs: { variant: opts.variant ?? 'rail' },
+    inputs: { variant: opts.variant ?? 'rail', menu: opts.menu ?? 'help' },
     on: { navigated },
     providers: [
       provideRouter([{ path: 'accessibility', children: [] }]),
@@ -123,17 +125,38 @@ describe('HelpMenuComponent', () => {
     expect(panel()).toBeNull();
   });
 
+  /** Spec 000647: "Hilfe" holds only the handbook and the report. */
+  it('keeps the display settings and the statement out of the help menu', async () => {
+    await setup({ variant: 'sheet' });
+    expect(screen.queryByRole('group', { name: 'Darstellung' })).toBeNull();
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(document.querySelector('a[href="/accessibility"]')).toBeNull();
+  });
+
+  /** Spec 000647: "Barrierefreiheit" is its own menu with the eye icon. */
+  it('opens the accessibility menu from its own trigger with the eye icon', async () => {
+    const { fixture } = await setup({ menu: 'a11y' });
+    const button = screen.getByRole('button', { name: 'Barrierefreiheit' });
+    expect(fixture.componentInstance.icon()).toBe('eye');
+    button.click();
+    fixture.detectChanges();
+    const region = screen.getByRole('region', { name: 'Barrierefreiheit' });
+    expect(region).toHaveTextContent('Darstellung');
+    expect(screen.queryByRole('link', { name: /Handbuch im Wiki/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Problem melden' })).toBeNull();
+  });
+
   /** Spec 000496: the statement is one entry away on every page, with and without a login. */
   it('links to the accessibility statement and closes when it is followed', async () => {
-    const { fixture, navigated } = await setup({ signedIn: false });
-    trigger().click();
+    const { fixture, navigated } = await setup({ menu: 'a11y', signedIn: false });
+    screen.getByRole('button', { name: 'Barrierefreiheit' }).click();
     fixture.detectChanges();
-    const link = screen.getByRole('link', { name: 'Barrierefreiheit' });
+    const link = screen.getByRole('link', { name: 'Erklärung zur Barrierefreiheit' });
     expect(link).toHaveAttribute('href', '/accessibility');
     link.click();
     fixture.detectChanges();
     expect(navigated).toHaveBeenCalled();
-    expect(panel()).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Barrierefreiheit' })).toBeNull();
   });
 
   /** Escape on a closed menu does nothing. */
@@ -223,8 +246,9 @@ describe('HelpMenuComponent', () => {
 
   /** §000593 the group "Darstellung" with its five switches, with and without a login. */
   it('shows the display switches in the order of the spec, also for a visitor', async () => {
-    await setup({ variant: 'sheet', signedIn: false });
-    const group = screen.getByRole('group', { name: 'Darstellung' });
+    await setup({ variant: 'sheet', menu: 'a11y', signedIn: false });
+    const group = screen.getByRole('group', { name: 'Barrierefreiheit' });
+    expect(screen.queryByText('Darstellung')).toBeNull();
     const names = Array.from(group.querySelectorAll('[role="switch"]')).map((s) =>
       document.getElementById(s.getAttribute('aria-labelledby')!)!.textContent!.trim(),
     );
@@ -239,7 +263,7 @@ describe('HelpMenuComponent', () => {
 
   /** §000606 very high contrast turns the other switches on and disables them. */
   it('locks the other switches on while very high contrast is on', async () => {
-    const { fixture } = await setup({ variant: 'sheet' });
+    const { fixture } = await setup({ variant: 'sheet', menu: 'a11y' });
     const display = fixture.debugElement.injector.get(DisplaySettingsService);
     display.reset();
     fixture.detectChanges();
@@ -262,7 +286,7 @@ describe('HelpMenuComponent', () => {
 
   /** §000594 a switch shows the state in effect and overrides the system; the reset clears all. */
   it('sets a display setting and the theme, and resets both to the system', async () => {
-    const { fixture } = await setup({ variant: 'sheet' });
+    const { fixture } = await setup({ variant: 'sheet', menu: 'a11y' });
     const display = fixture.debugElement.injector.get(DisplaySettingsService);
     const theme = fixture.debugElement.injector.get(ThemeService);
     display.reset();
@@ -288,7 +312,7 @@ describe('HelpMenuComponent', () => {
   });
 
   it('offers the reset while only the theme is set', async () => {
-    const { fixture } = await setup({ variant: 'sheet' });
+    const { fixture } = await setup({ variant: 'sheet', menu: 'a11y' });
     fixture.debugElement.injector.get(DisplaySettingsService).reset();
     fixture.debugElement.injector.get(ThemeService).setPreference('light');
     fixture.detectChanges();

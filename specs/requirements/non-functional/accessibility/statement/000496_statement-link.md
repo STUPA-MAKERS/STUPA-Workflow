@@ -6,10 +6,10 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-11
 tests:
-  - "frontend/src/app/features/help/a11y-menu/a11y-menu.component.spec.ts:A11yMenuComponent"
+  - "frontend/src/app/features/help/help-menu/help-menu.component.spec.ts:HelpMenuComponent"
   - "frontend/src/app/layout/site-footer/site-footer.component.spec.ts:SiteFooterComponent"
 implementation:
-  - frontend/src/app/features/help/a11y-menu/a11y-menu.component.html
+  - frontend/src/app/features/help/help-menu/help-menu.component.html
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

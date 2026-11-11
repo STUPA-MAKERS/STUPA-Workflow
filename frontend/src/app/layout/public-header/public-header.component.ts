@@ -4,16 +4,18 @@ import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ThemeService, ButtonComponent, ButtonLinkComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ThemeService, ButtonComponent, ButtonLinkComponent } from '@stupa-makers/ui-kit';
 import { HelpMenuComponent } from '../../features/help/help-menu/help-menu.component';
 import { LanguageSelectComponent } from '../language-select/language-select.component';
 
 /**
  * The top bar of the public frame (landing page, apply wizard, status page, magic link,
- * 404 while signed out): the wordmark, the help menu, the language, the appearance and
- * "Anmelden".
+ * 404 while signed out): the wordmark, the language, the menus "Barrierefreiheit" and
+ * "Hilfe", and "Anmelden".
  *
- * A signed-out visitor has no account menu, so language and appearance stay in the bar.
+ * A signed-out visitor has no account menu, so the language stays in the bar. The dark theme
+ * is the switch "Dunkles Design" in "Barrierefreiheit", because one setting has one switch on
+ * a screen (spec 000593).
  *
  * The bar stays at the top while the page scrolls, like the bar of a detail in the signed-in
  * frame: frosted glass with a light shadow once content runs under it (`pub--under`), the
@@ -28,7 +30,6 @@ import { LanguageSelectComponent } from '../language-select/language-select.comp
     TranslatePipe,
     ButtonComponent,
     ButtonLinkComponent,
-    IconComponent,
     HelpMenuComponent,
     LanguageSelectComponent,
   ],

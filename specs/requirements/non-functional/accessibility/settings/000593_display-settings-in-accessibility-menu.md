@@ -6,9 +6,9 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-11
 tests:
-  - "frontend/src/app/features/help/a11y-menu/a11y-menu.component.spec.ts:A11yMenuComponent"
+  - "frontend/src/app/features/help/help-menu/help-menu.component.spec.ts:HelpMenuComponent"
 implementation:
-  - frontend/src/app/features/help/a11y-menu
+  - frontend/src/app/features/help/help-menu
 scope:
   - frontend/src/app/features/help
   - frontend/vendor/ui-kit
@@ -27,9 +27,11 @@ the next one. The "Mehr" sheet must show the switch "Dunkles Design" only in thi
 account part of the sheet has no second one, because one setting has one switch on a screen.
 
 The public header must show its controls in this order: the language select, the
-accessibility button, the help button, the theme switch, then "Anmelden" or "Abmelden".
+accessibility button, the help button, then "Anmelden" or "Abmelden". The public header must not
+have a theme button of its own, because "Dunkles Design" is in the accessibility menu and the
+header has no room for a fourth button on a phone.
 
 Reason: A person who needs one of these settings must find it in one place on every page,
 also without an account and without a change in the system settings.
 
-Test: `frontend/src/app/features/help/a11y-menu/a11y-menu.component.spec.ts`.
+Test: `frontend/src/app/features/help/help-menu/help-menu.component.spec.ts`.

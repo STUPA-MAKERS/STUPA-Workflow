@@ -27,7 +27,7 @@ describe('SiteFooterComponent', () => {
     const { container } = await setup();
     expect(screen.getByText('Eine Plattform des Studierendenparlaments')).toBeInTheDocument();
     expect(container.querySelector('.ft__cols')).toBeNull();
-    expect(screen.getAllByRole('link').map((a) => a.textContent?.trim())).toEqual(['Barrierefreiheit']);
+    expect(screen.queryAllByRole('link')).toEqual([]);
   });
 
   it('shows the copyright and the legal links of the active locale', async () => {
@@ -98,14 +98,14 @@ describe('SiteFooterComponent', () => {
       'Impressum',
       'Datenschutz',
       'Hilfe',
-      'Barrierefreiheit',
     ]);
     expect(screen.getByRole('list')).toBeInTheDocument();
   });
 
-  /** Spec 000496: the statement link shows on every page, also without legal links. */
-  it('always links to the accessibility statement', async () => {
-    await setup(branding({ copyright: { de: '© AStA' } }));
-    expect(screen.getByRole('link', { name: 'Barrierefreiheit' })).toHaveAttribute('href', '/accessibility');
+  /** Spec 000496: the statement link is in the menu "Barrierefreiheit", not in the footer. */
+  it('does not link to the accessibility statement and shows no empty list', async () => {
+    const { container } = await setup(branding({ copyright: { de: '© AStA' } }));
+    expect(container.querySelector('a[href="/accessibility"]')).toBeNull();
+    expect(screen.queryByRole('list')).toBeNull();
   });
 });
