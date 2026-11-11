@@ -13,8 +13,8 @@ scope:
 
 # An invited person answers a Termin
 
-Each invited person must be able to answer a Termin with `Zusage`, `Absage` or `Vielleicht`
-(`Accept`, `Decline`, `Maybe`) and to change the answer until the Termin ends. The creator and
+Each invited person must be able to answer a Termin with `Zusage`, `Absage` or `Vorbehalt`
+(`Accept`, `Decline`, `Tentative`) and to change the answer until the Termin ends. The creator and
 the invited persons must see the answers as a list of names. A change of the start or the end
 must clear the answers.
 
