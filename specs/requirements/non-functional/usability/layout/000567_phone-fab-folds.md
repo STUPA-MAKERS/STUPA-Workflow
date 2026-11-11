@@ -4,10 +4,11 @@ title: A phone FAB folds to its icon on scroll
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-09
+updated: 2026-11-11
 implementation:
   - frontend/vendor/ui-kit/src/lib/fab/fab.component.ts
   - frontend/vendor/ui-kit/src/lib/fab/fab.component.scss
+  - frontend/vendor/ui-kit/src/lib/button/button.component.scss
 scope:
   - frontend/vendor/ui-kit
 ---
