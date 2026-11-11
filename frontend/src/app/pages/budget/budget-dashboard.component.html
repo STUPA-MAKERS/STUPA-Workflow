@@ -353,13 +353,22 @@
       }
     } @else {
       <div class="bd__actions">
+        <!-- § 000670: the actions of a detail head are icon buttons, the rest is in the menu. -->
         @if (canExport()) {
-          <app-button variant="outlined" [size]="wide() ? 'md' : 'sm'" (click)="onExport()" [loading]="exporting()">
-            <span class="bd__btn"><app-icon name="download" />{{ 'budget.dash.export' | t }}</span>
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'budget.dash.export' | t"
+            [title]="'budget.dash.export' | t"
+            [loading]="exporting()"
+            data-testid="bd-export"
+            (click)="onExport()"
+          >
+            <app-icon name="download" />
           </app-button>
         }
         @if (canSeeBookings()) {
-          <app-button variant="tonal" [size]="wide() ? 'md' : 'sm'" (click)="openBookings()">{{ 'budget.usage.viewExpenses' | t }}</app-button>
+          <app-row-menu class="bd__more" [sections]="moreSections()" (selected)="onAction($event)" />
         }
       </div>
     }

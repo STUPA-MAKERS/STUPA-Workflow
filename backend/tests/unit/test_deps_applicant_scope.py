@@ -38,6 +38,7 @@ async def test_valid_session_gives_the_bound_applicant(
         _ANY,
         _ANY,
         _settings(),
+        _ANY,
     )
     assert applicant is not None
     assert applicant.application_id == "aid-1"
@@ -54,6 +55,7 @@ async def test_missing_session_gives_no_applicant(monkeypatch: pytest.MonkeyPatc
             _ANY,
             _ANY,
             _settings(),
+            _ANY,
         )
         is None
     )

@@ -3,7 +3,7 @@
 The tests run against a real Postgres through testcontainers.
 
 An unconfirmed guest submission (`email_confirmed_at IS NULL`) stays invisible in
-`list_applications` and `list_tasks`. These tests prove that the `FilesService` read
+`list_applications` and `list_tasks`. These tests prove that the `AttachmentService` read
 paths (`list_for_application`, `signed_url`, `download_stream`) also answer 404 for a
 principal or Gremium read (`allow_unconfirmed=False`). They do not hand out the
 separated PII, the attachments, of the unconfirmed submission. The owning applicant
@@ -20,14 +20,14 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
+from app.modules.attachments.service import AttachmentService
 from app.modules.files.models import Attachment
-from app.modules.files.service import FilesService
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import NotFoundError
@@ -109,7 +109,7 @@ async def _seed_type(session: AsyncSession) -> tuple[ApplicationType, State]:
     session.add(app_type)
     await session.commit()
 
-    await FormsService(session).create_form_version(
+    await FormVersionWriter(session).create_form_version(
         app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester"
     )
 
@@ -141,7 +141,7 @@ def _payload(app_type_id: uuid.UUID) -> ApplicationCreate:
 
 
 async def _add_clean_attachment(
-    svc: FilesService, application_id: uuid.UUID
+    svc: AttachmentService, application_id: uuid.UUID
 ) -> uuid.UUID:
     """Create a clean-scanned attachment row and its storage object directly.
 
@@ -181,7 +181,7 @@ async def test_unconfirmed_guest_attachments_hidden_from_principal_reads(
     app, _ = await apps.create(_payload(app_type.id))
     assert app.email_confirmed_at is None
 
-    files = FilesService(session, storage=_StubStorage())
+    files = AttachmentService(session, storage=_StubStorage())
     attachment_id = await _add_clean_attachment(files, app.id)
 
     with pytest.raises(NotFoundError):
@@ -212,7 +212,7 @@ async def test_confirmed_app_attachments_readable_by_principal(
     app, _ = await apps.create(_payload(app_type.id), actor="admin")
     assert app.email_confirmed_at is not None
 
-    files = FilesService(session, storage=_StubStorage())
+    files = AttachmentService(session, storage=_StubStorage())
     attachment_id = await _add_clean_attachment(files, app.id)
 
     listed = await files.list_for_application(app.id, allow_unconfirmed=False)

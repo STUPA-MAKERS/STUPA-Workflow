@@ -21,18 +21,18 @@ from sqlalchemy import Engine, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import DbSession, SettingsDep
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.applications.models import Application
 from app.modules.applications.router import get_magic_link_sender
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
+from app.modules.attachments.router import get_files_service
+from app.modules.attachments.service import AttachmentService
 from app.modules.audit.models import AuditEntry
 from app.modules.files.drafts import DraftAttachments, hash_draft_token
 from app.modules.files.models import Attachment, AttachmentDraftToken
-from app.modules.files.router import get_files_service
-from app.modules.files.service import FilesService
 from app.modules.files.storage import ObjectStorage
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.settings import Settings
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import ValidationProblem
@@ -75,7 +75,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> GuestSeed:
     """Seed the guest flow and give the type a form with a `file` field."""
     seed = await seed_guest_flow(maker)
     async with maker() as session:
-        await FormsService(session).create_form_version(
+        await FormVersionWriter(session).create_form_version(
             seed.type_id,
             FormVersionCreate(
                 fields=[
@@ -96,7 +96,7 @@ async def _draft(
 ) -> tuple[uuid.UUID, str]:
     """Upload one draft through the service and return its id and the token."""
     async with maker() as session:
-        files = FilesService(session, storage=_storage(), settings=settings)
+        files = AttachmentService(session, storage=_storage(), settings=settings)
         out = await DraftAttachments(files).upload(
             token=token, filename="angebot.pdf", data=_PDF, by="applicant"
         )
@@ -314,9 +314,9 @@ async def test_http_submit_binds_drafts_and_names_missing_ids(
     storage = _MemoryStorage()
     api = build_api(migrated[1], settings, monkeypatch)
 
-    def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
+    def _files(session: DbSession, request_settings: SettingsDep) -> AttachmentService:
         object_storage: ObjectStorage = storage  # pyright: ignore[reportAssignmentType]
-        return FilesService(session, storage=object_storage, settings=request_settings)
+        return AttachmentService(session, storage=object_storage, settings=request_settings)
 
     async def _sender(_settings: Settings, to: str, app_id: uuid.UUID, _pool: Any) -> None:
         return None

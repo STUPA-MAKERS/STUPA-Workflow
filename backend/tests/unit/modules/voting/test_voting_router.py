@@ -259,7 +259,7 @@ def test_cancel_missing_perm_403(app: FastAPI, client: TestClient) -> None:
 def test_cancel_ok_broadcasts(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    from app.modules.livevote.publisher import get_meeting_publisher
+    from app.modules.meetings.publisher import get_meeting_publisher
 
     class _Pub:
         def __init__(self) -> None:
@@ -404,7 +404,7 @@ def test_ballot_broadcasts_vote_tally(
 
     The ballot publishes one fresh tally.
     """
-    from app.modules.livevote.publisher import get_meeting_publisher
+    from app.modules.meetings.publisher import get_meeting_publisher
 
     class _RecordingPublisher:
         def __init__(self) -> None:

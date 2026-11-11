@@ -370,12 +370,12 @@ describe('AgendaPaneComponent', () => {
   });
 
   describe('To-Do anlegen', () => {
-    it('opens "Neues To-Do" linked to the TOP and its application', async () => {
+    it('opens "To-Do anlegen" linked to the TOP and its application', async () => {
       const view = await setup({ locked: true }, true);
       const menu = await openMenu(2);
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Do anlegen' }));
       view.fixture.detectChanges();
-      expect(screen.getByRole('dialog', { name: 'Neues To-Do' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'To-Do anlegen' })).toBeInTheDocument();
       const chips = [...document.querySelectorAll('.tn__chipText')].map((c) => c.textContent?.trim());
       expect(chips).toEqual(['Antrag · Antrag Kulturfestival', `${meeting().title} · TOP 3`]);
       expect(view.on.remove).not.toHaveBeenCalled();

@@ -35,6 +35,7 @@ import worker.deadlines as wd
 from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
@@ -43,7 +44,6 @@ from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium
 from app.modules.voting.models import Vote
 from app.modules.webhooks.models import Webhook, WebhookDelivery
@@ -89,7 +89,7 @@ async def _seed(
         )
         session.add_all([app_type, budget, hook])
         await session.commit()
-        await FormsService(session).create_form_version(
+        await FormVersionWriter(session).create_form_version(
             app_type.id,
             FormVersionCreate(
                 fields=[FormFieldDef(key="title", type="text", label={"de": "Titel"},

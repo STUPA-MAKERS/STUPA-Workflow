@@ -21,18 +21,18 @@ from collections.abc import AsyncIterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import DbSession, SettingsDep, get_current_principal
 from app.modules.applications.models import Application, Comment
 from app.modules.applications.service import ApplicationsService
-from app.modules.audit.service import AuditService
+from app.modules.attachments.router import get_files_service
+from app.modules.attachments.service import AttachmentService
+from app.modules.audit_log.service import AuditLogService
 from app.modules.auth.principal import Principal
 from app.modules.files.drafts import hash_draft_token
 from app.modules.files.models import Attachment
-from app.modules.files.router import get_files_service
-from app.modules.files.service import FilesService
 from app.modules.files.storage import ObjectStorage
 from app.modules.flow.context import build_base_context
 from app.settings import Settings
@@ -124,9 +124,9 @@ async def test_item_routes_answer_404_for_a_draft_even_for_an_admin(
     draft_id = await _clean_draft(maker, settings, storage)
     api = build_api(migrated[1], settings, monkeypatch)
 
-    def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
+    def _files(session: DbSession, request_settings: SettingsDep) -> AttachmentService:
         object_storage: ObjectStorage = storage
-        return FilesService(session, storage=object_storage, settings=request_settings)
+        return AttachmentService(session, storage=object_storage, settings=request_settings)
 
     api.dependency_overrides[get_files_service] = _files
     api.dependency_overrides[get_current_principal] = lambda: _ADMIN
@@ -150,19 +150,20 @@ async def test_service_paths_ignore_a_draft(
     app_id = await _app(maker)
     draft_id = await _clean_draft(maker, settings, storage)
     async with maker() as session:
-        files = FilesService(session, storage=storage, settings=settings)
+        files = AttachmentService(session, storage=storage, settings=settings)
         assert await files.list_for_application(app_id) == []
         app = await session.get(Application, app_id)
         assert app is not None
         context = await build_base_context(session, app, manual=True)
         assert context.has_attachment is False
 
-        audit = AuditService(session)
+        audit = AuditLogService(session)
         labels = await audit.resolve_target_labels([("attachment", str(draft_id))])
         assert labels == {}
         assert await audit.resolve_data_ids([{"attachmentId": str(draft_id)}]) == {}
 
-        assert await files.delete_for_application(app_id, actor="test") == 0
+        comments = select(Comment.id).where(Comment.application_id == app_id)
+        assert await files.delete_for_application(app_id, comments=comments, actor="test") == 0
         await ApplicationsService(session).anonymize(app_id, actor="test")
         await ApplicationsService(session).anonymize(app_id, files=files, actor="test")
     async with maker() as session:
@@ -190,13 +191,14 @@ async def test_a_bound_attachment_is_still_visible(
         )
         session.add(bound)
         await session.commit()
-        files = FilesService(session, storage=storage, settings=settings)
+        files = AttachmentService(session, storage=storage, settings=settings)
         listed = await files.list_for_application(app_id)
         assert [a.id for a in listed] == [bound.id]
         app = await session.get(Application, app_id)
         assert app is not None
         assert (await build_base_context(session, app, manual=True)).has_attachment
-        labels = await AuditService(session).resolve_target_labels([("attachment", str(bound.id))])
+        target = ("attachment", str(bound.id))
+        labels = await AuditLogService(session).resolve_target_labels([target])
         assert labels == {("attachment", str(bound.id)): "beleg.pdf"}
 
 
@@ -226,7 +228,7 @@ async def test_a_comment_file_is_no_application_attachment(
         )
         session.add(row)
         await session.commit()
-        files = FilesService(session, storage=storage, settings=settings)
+        files = AttachmentService(session, storage=storage, settings=settings)
         assert row.id not in {a.id for a in await files.list_for_application(app_id)}
         app = await session.get(Application, app_id)
         assert app is not None
@@ -234,9 +236,9 @@ async def test_a_comment_file_is_no_application_attachment(
         assert (await build_base_context(session, app, manual=True)).has_attachment is bound
     api = build_api(migrated[1], settings, monkeypatch)
 
-    def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
+    def _files(session: DbSession, request_settings: SettingsDep) -> AttachmentService:
         object_storage: ObjectStorage = storage
-        return FilesService(session, storage=object_storage, settings=request_settings)
+        return AttachmentService(session, storage=object_storage, settings=request_settings)
 
     api.dependency_overrides[get_files_service] = _files
     api.dependency_overrides[get_current_principal] = lambda: _ADMIN

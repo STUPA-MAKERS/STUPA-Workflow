@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import MeetingAgendaItem
+from app.modules.meetings.models import MeetingAgendaItem
 from app.modules.voting.models import Vote
 from app.modules.voting.service import VotingService
 from app.shared.errors import ForbiddenError

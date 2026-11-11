@@ -406,7 +406,7 @@ describe('ShellComponent', () => {
     });
 
     /** The bar entries are not repeated in the sheet. The help entries and the account follow. */
-    it('lists the other areas, the search, the help and the account in the Mehr sheet', async () => {
+    it('lists the other areas, the search, accessibility, the help and the account in the Mehr sheet', async () => {
       const { fixture } = await setup(ADMIN);
       await userEvent.click(more());
       fixture.detectChanges();
@@ -416,7 +416,12 @@ describe('ShellComponent', () => {
       }
       expect(within(sheet).queryByRole('link', { name: 'Start' })).not.toBeInTheDocument();
       expect(within(sheet).getByRole('button', { name: 'Suche' })).toBeInTheDocument();
-      expect(within(sheet).getByRole('group', { name: 'Hilfe' })).toBeInTheDocument();
+      const a11y = within(sheet).getByRole('group', { name: 'Barrierefreiheit' });
+      const help = within(sheet).getByRole('group', { name: 'Hilfe' });
+      expect(a11y.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const statement = within(sheet).getByRole('link', { name: 'Erklärung zur Barrierefreiheit' });
+      expect(a11y.compareDocumentPosition(statement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(statement.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(within(sheet).getByRole('group', { name: 'Konto' })).toBeInTheDocument();
       expect(within(sheet).getByText('Ada Admin')).toBeInTheDocument();
       expect(within(sheet).getByRole('link', { name: 'Benachrichtigungen' })).toBeInTheDocument();
@@ -488,9 +493,14 @@ describe('ShellComponent', () => {
   });
 
   describe('rail foot', () => {
-    it('puts the help menu and the account menu at the foot of the rail', async () => {
+    /** §000647 "Barrierefreiheit" sits directly above "Hilfe". */
+    it('puts the accessibility menu, the help menu and the account menu at the foot of the rail', async () => {
       const { container } = await setup(MEMBER);
-      expect(container.querySelector('.rail__tools app-help-menu')).not.toBeNull();
+      const tools = Array.from(container.querySelectorAll('.rail__tools app-help-menu'));
+      expect(tools.map((t) => t.querySelector('button')?.textContent?.trim())).toEqual([
+        'Barrierefreiheit',
+        'Hilfe',
+      ]);
       expect(
         screen.getByRole('button', { name: 'Konto: Mia Member' }).closest('.rail__account'),
       ).not.toBeNull();

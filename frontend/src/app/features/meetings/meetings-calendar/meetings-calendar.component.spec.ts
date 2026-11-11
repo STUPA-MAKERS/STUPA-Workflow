@@ -351,7 +351,7 @@ describe('MeetingsCalendarComponent', () => {
   it('reads the month again for another Gremium and drops a late answer', async () => {
     const view = await setup();
     load(view, MONTH, [{ id: 'g-1', name: 'StuPa' }, { id: 'g-2', name: 'Finanzausschuss' }]);
-    await userEvent.click(screen.getByRole('button', { name: 'Gremium: Alle Gremien' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Gremium' }));
     await userEvent.click(within(screen.getByRole('listbox', { name: 'Gremium' })).getByRole('option', { name: 'Finanzausschuss' }));
     view.fixture.detectChanges();
     const first = monthReq(view.http);
@@ -364,7 +364,7 @@ describe('MeetingsCalendarComponent', () => {
     second.flush(null, { status: 500, statusText: 'e' });
     view.fixture.detectChanges();
     expect(loadErrorToast()).toContain('Die Sitzungen des Monats konnten nicht geladen werden.');
-    expect(screen.getByRole('button', { name: 'Gremium: Alle Gremien' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gremium' })).toBeInTheDocument();
     retryLoadError();
     const again = monthReq(view.http);
     expect(again.request.params.get('gremiumId')).toBe('g-gone');

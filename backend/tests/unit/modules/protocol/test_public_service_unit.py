@@ -15,8 +15,8 @@ import pytest
 
 from app.modules.audit.actions import AuditAction
 from app.modules.files.storage import StorageError
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol import service as protocol_service_mod
-from app.modules.protocol.models import Protocol
 from app.modules.protocol.public import PublicSnapshot, PublicTop
 from app.modules.protocol.service import (
     ProtocolService,

@@ -8,7 +8,6 @@ code really sends is part of the catalogue.
 
 from __future__ import annotations
 
-from app.modules.notifications import action_dispatcher, auto, comments
 from app.modules.notifications import service as svc
 from app.modules.notifications.templates_catalogue import (
     CATALOGUE_BY_KEY,
@@ -16,6 +15,7 @@ from app.modules.notifications.templates_catalogue import (
     STATUS_UPDATE_TEAM_SUBJECT,
     TEMPLATE_CATALOGUE,
 )
+from app.modules.notifications.texts import comments, meetings, tasks
 
 
 def test_every_spec_has_de_and_en() -> None:
@@ -33,10 +33,12 @@ def test_keys_unique() -> None:
 def test_builtins_are_shared_objects() -> None:
     assert CATALOGUE_BY_KEY["status_update"].subject_i18n is svc._BUILTIN_NOTIFY_SUBJECT
     assert CATALOGUE_BY_KEY["magic_link"].body_i18n is svc._BUILTIN_MAGIC_LINK_BODY
-    assert CATALOGUE_BY_KEY["task_new"].subject_i18n is action_dispatcher._BUILTIN_TASK_SUBJECT
-    assert CATALOGUE_BY_KEY["comment_team"].body_i18n is comments._BUILTIN_TEAM_BODY
-    assert CATALOGUE_BY_KEY["meeting_created"].subject_i18n is auto._BUILTIN_MEETING_SUBJECT
-    assert CATALOGUE_BY_KEY["delegation_revoked"].body_i18n is auto._BUILTIN_DELEGATION_REVOKED_BODY
+    assert CATALOGUE_BY_KEY["task_new"].subject_i18n is tasks.BUILTIN_TASK_SUBJECT
+    assert CATALOGUE_BY_KEY["comment_team"].body_i18n is comments.BUILTIN_TEAM_BODY
+    assert CATALOGUE_BY_KEY["meeting_created"].subject_i18n is meetings.BUILTIN_MEETING_SUBJECT
+    assert (
+        CATALOGUE_BY_KEY["delegation_revoked"].body_i18n is meetings.BUILTIN_DELEGATION_REVOKED_BODY
+    )
 
 
 def test_dead_role_templates_are_gone() -> None:

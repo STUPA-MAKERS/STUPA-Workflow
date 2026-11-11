@@ -18,6 +18,7 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
@@ -37,7 +38,6 @@ from app.modules.config_revision.service import ENTITY_FORM, ConfigRevisionServi
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import ForbiddenError
@@ -156,7 +156,7 @@ async def _seeded_form_change(
     )
     session.add(at)
     await session.commit()
-    forms = FormsService(session)
+    forms = FormVersionWriter(session)
     await forms.create_form_version(
         at.id,
         FormVersionCreate(
@@ -220,7 +220,7 @@ async def test_status_revert_requires_application_transition(
     )
     session.add(at)
     await session.commit()
-    await FormsService(session).create_form_version(
+    await FormVersionWriter(session).create_form_version(
         at.id,
         FormVersionCreate(
             fields=[FormFieldDef(key="title", type="text", label={"de": "Titel"})],

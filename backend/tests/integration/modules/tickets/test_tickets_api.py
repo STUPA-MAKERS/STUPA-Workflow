@@ -21,7 +21,7 @@ from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.auth.principal import Principal
 from app.modules.files.drafts import hash_draft_token
 from app.modules.files.models import Attachment
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.models import Meeting
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from app.settings import Settings
 from tests._support.draft_tokens import add_draft_token

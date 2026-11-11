@@ -14,16 +14,19 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.applications import mail_data as mail_data_mod
 from app.modules.auth.principal import Principal
-from app.modules.flow.models import State, Transition
-from app.modules.notifications import recipients as recipients_mod
-from app.modules.notifications.recipients import (
-    ADMIN_ROLE_KEY,
+from app.modules.flow import actionable as actionable_mod
+from app.modules.flow.actionable import (
     ActionableCandidate,
-    RecipientResolver,
     _candidates_with_transition_permission,
     actionable_principal_emails,
     firable_candidates,
+)
+from app.modules.flow.models import State, Transition
+from app.modules.notifications.recipients import (
+    ADMIN_ROLE_KEY,
+    RecipientResolver,
     principal_rows_with_permission_stmt,
     principals_with_permission_stmt,
 )
@@ -37,7 +40,7 @@ def _sql(perm: str) -> str:
 
 
 def _resolver(session: FakeSession) -> RecipientResolver:
-    return RecipientResolver(cast(AsyncSession, session))
+    return RecipientResolver(cast(AsyncSession, session), mail_data_mod.application_specs)
 
 
 async def test_resolve_group_filters_none_and_sorts() -> None:
@@ -355,7 +358,7 @@ async def test_actionable_vote_state_mails_open_vote_casters(
         seen.append(a)
         return ["v@x.de"]
 
-    monkeypatch.setattr(recipients_mod, "_open_vote_casters", fake_casters)
+    monkeypatch.setattr(actionable_mod, "_open_vote_casters", fake_casters)
     out = await actionable_principal_emails(
         cast(AsyncSession, FakeSession(scalar=[app])),
         application_id=app.id,
@@ -367,17 +370,19 @@ async def test_actionable_vote_state_mails_open_vote_casters(
 
 async def test_resolver_vote_and_budget_gremium(monkeypatch: pytest.MonkeyPatch) -> None:
     """`voteGremium` reads the snapshot; `budgetGremium` the cost center's Gremium."""
-    from app.modules.notifications import recipients as rec_mod
-
     gid, budget = uuid.uuid4(), uuid.uuid4()
 
     async def _eff(_s: object, budget_id: object) -> object:
         return gid if budget_id == budget else None
 
-    monkeypatch.setattr(rec_mod, "effective_decision_gremium", _eff)
-    resolver = RecipientResolver(cast(AsyncSession, FakeSession(
-        scalar=[gid, budget, None, None], scalars=[["a@x.de"], ["b@x.de"]]
-    )))
+    monkeypatch.setattr(mail_data_mod, "effective_decision_gremium", _eff)
+    resolver = RecipientResolver(
+        cast(
+            AsyncSession,
+            FakeSession(scalar=[gid, budget, None, None], scalars=[["a@x.de"], ["b@x.de"]]),
+        ),
+        mail_data_mod.application_specs,
+    )
     app_id = uuid.uuid4()
     assert await resolver.resolve([{"kind": "voteGremium"}], application_id=app_id) == ["a@x.de"]
     assert await resolver.resolve([{"kind": "budgetGremium"}], application_id=app_id) == [
@@ -432,8 +437,8 @@ async def test_actionable_excludes_admin_without_firable_guard(
         captured["base"] = (app, manual)
         return GuardContext(manual=True)
 
-    monkeypatch.setattr(recipients_mod, "_readers", _all_read)
-    monkeypatch.setattr(recipients_mod, "build_base_context", fake_base)
+    monkeypatch.setattr(actionable_mod, "_readers", _all_read)
+    monkeypatch.setattr(actionable_mod, "build_base_context", fake_base)
 
     app = _app_ns(gremium_id=uuid.uuid4())
     pid1, pid2 = uuid.uuid4(), uuid.uuid4()
@@ -468,11 +473,9 @@ async def test_actionable_dedups(
             _candidate(sub="c", email="a@x.de"),
         ]
 
-    monkeypatch.setattr(recipients_mod, "_readers", _all_read)
-    monkeypatch.setattr(recipients_mod, "build_base_context", fake_base)
-    monkeypatch.setattr(
-        recipients_mod, "_candidates_with_transition_permission", fake_candidates
-    )
+    monkeypatch.setattr(actionable_mod, "_readers", _all_read)
+    monkeypatch.setattr(actionable_mod, "build_base_context", fake_base)
+    monkeypatch.setattr(actionable_mod, "_candidates_with_transition_permission", fake_candidates)
 
     gid = uuid.uuid4()
     app = _app_ns(gremium_id=gid)

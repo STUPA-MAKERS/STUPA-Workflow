@@ -31,6 +31,7 @@ import pytest
 from sqlalchemy import Engine, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.access import resolve_app_read
 from app.modules.applications.models import Application
@@ -47,10 +48,9 @@ from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.agenda_service import AgendaService
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.agenda_service import AgendaService
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.voting.schemas import VoteCreate
 from app.modules.voting.service import VotingService
 from app.shared.config_schemas import FormFieldDef, VoteConfig
@@ -139,7 +139,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:
                                    has_budget=False)
         session.add_all([leaf, app_type])
         await session.commit()
-        await FormsService(session).create_form_version(
+        await FormVersionWriter(session).create_form_version(
             app_type.id,
             FormVersionCreate(
                 fields=[FormFieldDef(key="title", type="text", label={"de": "Titel"},

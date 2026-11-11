@@ -2,7 +2,7 @@
 
 The create route is public and ALTCHA-guarded. The other routes accept an
 applicant or a principal. They cover the detail view, the patch that writes a
-new version, the timeline, the versions, the comments and the erasure request.
+new version, the timeline, the versions and the comments.
 Only a principal reads the PII and the internal comments.
 """
 
@@ -28,6 +28,7 @@ from app.deps import (
     require_applicant,
     require_principal,
 )
+from app.modules.applications import email_login
 from app.modules.applications.access import (
     ARCHIVE_PERMISSION,
     DELETE_PERMISSION,
@@ -41,6 +42,9 @@ from app.modules.applications.access import (
     require_app_read,
     resolve_app_read,
 )
+from app.modules.applications.captured_mail import notify_application_captured
+from app.modules.applications.mail_data import resolve_application_lang
+from app.modules.applications.mention_mails import notify_comment_mentions
 from app.modules.applications.schemas import (
     ApplicantApplicationsOut,
     ApplicantCandidateOut,
@@ -59,22 +63,14 @@ from app.modules.applications.schemas import (
 from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.auth import email_login
 from app.modules.auth.people import PersonRef
 from app.modules.files.service import FilesService
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.forms.schemas import EffectiveFormOut
-from app.modules.notifications.captured import notify_application_captured
-from app.modules.notifications.comments import comment_mail_text
-from app.modules.notifications.mentions import notify_comment_mentions
-from app.modules.notifications.privacy import notify_erasure_requested
+from app.modules.notifications.chat_mail import comment_mail_text
 from app.modules.notifications.provider import mail_queue_from_pool
-from app.modules.notifications.service import (
-    NotificationService,
-    resolve_application_lang,
-)
-from app.modules.privacy.service import ErasureRequestService
+from app.modules.notifications.service import NotificationService
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_application_payload_limit,
@@ -734,7 +730,7 @@ async def _deliver_comment_mails(
     pool: object,
 ) -> None:
     """Send the comment mails in an own session, in the background after the 201."""
-    from app.modules.notifications.comments import send_comment_notifications
+    from app.modules.applications.comment_mails import send_comment_notifications
 
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
@@ -1017,42 +1013,6 @@ async def delete_comment(
         allow_unconfirmed=access.is_owning_applicant,
         files=FilesService(service.session, storage=storage),
     )
-
-
-@router.post(
-    "/applications/{application_id}/erasure-request",
-    status_code=202,
-    responses=_errors(401, 403, 404),
-)
-async def request_erasure(
-    application_id: UUID,
-    session: DbSession,
-    settings: SettingsDep,
-    background: BackgroundTasks,
-    request: Request,
-    access: Annotated[Access, Depends(require_app_read)],
-) -> Response:
-    """File an erasure request (GDPR Art. 17) into the ``/admin/privacy`` queue.
-
-    The route notifies the privacy officers.
-
-    Every identity that may read the application may request the erasure of the PII: the
-    magic-link applicant, the creator and an authorized principal.
-    """
-    result = await ErasureRequestService(session).create(
-        subject_type="applicant",
-        application_id=access.application_id,
-        requested_by=access.actor,
-    )
-    pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(
-        notify_erasure_requested,
-        queue=mail_queue_from_pool(pool),
-        settings=settings,
-        request_id=result.id,
-        subject_type="applicant",
-    )
-    return Response(status_code=202)
 
 
 @router.get(

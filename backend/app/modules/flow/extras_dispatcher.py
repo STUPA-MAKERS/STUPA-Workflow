@@ -37,8 +37,8 @@ from app.modules.budget.tree_rules import _SEP, pick_fiscal_year
 from app.modules.flow.context import committee_ids_for_sub
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.vote_gremium import fill_snapshot, in_budget_vote_state
-from app.modules.livevote.agenda_service import AgendaService
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.agenda_service import AgendaService
+from app.modules.meetings.models import Meeting
 from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError
 
@@ -270,7 +270,7 @@ class FlowExtrasActionDispatcher:
         pick replaces many fixed triage edges in the flow graph.
 
         The applicant controls the field value, so the handler accepts only the set that
-        the form offered (see `FormService._budget_field_options`). It skips the action
+        the form offered (see `budget.form_options.budget_field_options`). It skips the action
         (fail closed) when the node is missing or inactive. It also does not overwrite a
         different cost center that the application already has, because a staff decision
         wins over an applicant value.

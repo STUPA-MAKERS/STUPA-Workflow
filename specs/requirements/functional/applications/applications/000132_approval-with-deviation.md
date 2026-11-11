@@ -8,7 +8,7 @@ updated: 2026-11-10
 implementation:
   - backend/app/modules/applications/decision.py
   - backend/app/modules/applications/models.py
-  - backend/app/modules/notifications/action_dispatcher.py
+  - backend/app/modules/flow/mail_actions.py
   - backend/app/modules/budget/tree/applications.py
   - frontend/src/app/pages/applications/decision-dialog/decision-dialog.component.ts
   - frontend/src/app/pages/applications/applications-detail.component.html

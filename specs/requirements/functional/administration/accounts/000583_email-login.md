@@ -6,10 +6,10 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
-  - backend/app/modules/auth/email_login.py
-  - backend/app/modules/auth/router.py
+  - backend/app/modules/applications/email_login.py
+  - backend/app/modules/applications/login_router.py
   - backend/app/modules/applications/router.py
-  - backend/app/modules/notifications/captured.py
+  - backend/app/modules/applications/captured_mail.py
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py

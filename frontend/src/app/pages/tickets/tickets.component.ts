@@ -26,6 +26,7 @@ import {
   type TicketStatus,
 } from '@core/api/tickets.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
@@ -34,6 +35,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  filterChipText,
   IconComponent,
   type IconName,
   ListDetailLayoutComponent,
@@ -200,19 +202,23 @@ export class TicketsComponent {
 
   readonly assignees = signal<PersonRef[]>([]);
 
-  readonly searchPlaceholder = computed(() => {
-    const n = this.total() + this.closedTotal();
-    if (this.loading() && n === 0) return this.i18n.translate('tickets.list.searchLabel');
-    return this.i18n.translate('tickets.list.search', { n });
-  });
+  readonly searchPlaceholder = computed(() =>
+    searchPlaceholder(
+      this.i18n,
+      { plain: 'tickets.list.searchLabel', one: 'tickets.list.searchOne', many: 'tickets.list.search' },
+      this.total() + this.closedTotal(),
+      this.loading(),
+    ),
+  );
 
   readonly statusOptions = computed<FilterSelectOption[]>(() =>
     STATUS_FILTERS.map((s) => ({ value: s, label: this.i18n.translate(this.statusFilterLabel(s)) })),
   );
   readonly statusChipLabel = computed(() =>
-    this.i18n.translate('tickets.list.filter.statusChip', {
-      value: this.i18n.translate(this.statusFilterLabel(this.statusFilter())),
-    }),
+    filterChipText(
+      this.i18n.translate('tickets.list.filter.status'),
+      this.statusFilter() === 'all' ? null : this.i18n.translate(this.statusFilterLabel(this.statusFilter())),
+    ),
   );
 
   readonly kindOptions = computed<FilterSelectOption[]>(() => [
@@ -221,7 +227,7 @@ export class TicketsComponent {
   ]);
   readonly kindChipLabel = computed(() => {
     const k = this.kindFilter();
-    return k ? this.i18n.translate(KIND_LABEL[k]) : this.i18n.translate('tickets.list.filter.kind');
+    return filterChipText(this.i18n.translate('tickets.list.filter.kind'), k ? this.i18n.translate(KIND_LABEL[k]) : null);
   });
 
   readonly assigneeOptions = computed<FilterSelectOption[]>(() => {
@@ -245,8 +251,10 @@ export class TicketsComponent {
   });
   readonly assigneeChipLabel = computed(() => {
     const v = this.assigneeFilter();
-    if (!v) return this.i18n.translate('tickets.list.filter.assignee');
-    return this.assigneeOptions().find((o) => o.value === v)?.label ?? this.i18n.translate('tickets.list.filter.assignee');
+    return filterChipText(
+      this.i18n.translate('tickets.list.filter.assignee'),
+      v ? this.assigneeOptions().find((o) => o.value === v)?.label : null,
+    );
   });
 
   /** The groups of the list, in the order of the states. */

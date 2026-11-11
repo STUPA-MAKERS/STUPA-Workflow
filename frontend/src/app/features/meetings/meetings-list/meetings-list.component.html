@@ -23,7 +23,7 @@
     <app-sticky-bar class="ld-pane__filters">
       <app-search-pill
         [size]="phone() ? 'md' : 'lg'"
-        [placeholder]="(phone() ? 'meetings.overview.searchShort' : 'meetings.list.searchPlaceholder') | t"
+        [placeholder]="'meetings.list.searchPlaceholder' | t"
         [label]="'meetings.list.searchPlaceholder' | t"
         [value]="timeline.searchQuery()"
         (valueChange)="timeline.onSearch($event)"
@@ -165,8 +165,8 @@
           <span class="mono mtl__time">{{ time(m) }}</span>
           <span class="mtl__tops">{{ tops(m) }}</span>
         </span>
+        <app-row-chevron />
       }
-      <app-row-chevron />
     </span>
   </app-list-item>
 </ng-template>

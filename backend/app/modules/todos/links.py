@@ -56,7 +56,7 @@ from app.modules.budget.access import has_budget_read
 from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import Ticket
 from app.modules.tickets.service import format_number

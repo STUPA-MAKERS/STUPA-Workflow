@@ -74,13 +74,6 @@
   --tab-pager-page-top: var(--space-5);
   margin-top: calc(-1 * var(--space-5));
 }
-.td__tabs ::ng-deep .tabs {
-  gap: 0;
-}
-.td__tabs ::ng-deep .tabs__tab {
-  flex: 1 1 0;
-  justify-content: center;
-}
 .td:not(.td--split) .td__actions {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));

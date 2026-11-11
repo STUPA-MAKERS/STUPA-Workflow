@@ -16,10 +16,10 @@ from uuid import uuid4
 import pytest
 
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.models import Meeting
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.pdf.typst_client import TypstError
 from app.modules.protocol import service as protocol_service_mod
-from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService, protocol_storage_key
 from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError, ServiceUnavailableError

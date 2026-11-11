@@ -250,7 +250,8 @@ async def test_removing_a_note_or_a_ticket_removes_the_note_files(
         assert client.get(f"/api/attachments/{second}").status_code == 404
     async with maker() as session:
         files = FilesService(session, storage=storage, settings=settings)
-        await files.delete_for_ticket(ticket_id, actor="test")
+        notes = select(TicketNote.id).where(TicketNote.ticket_id == ticket_id)
+        await files.delete_for_ticket(ticket_id, notes=notes, actor="test")
         await session.commit()
         assert await session.get(Attachment, second) is None
     assert f"drafts/{second}/b.pdf" not in storage.blobs

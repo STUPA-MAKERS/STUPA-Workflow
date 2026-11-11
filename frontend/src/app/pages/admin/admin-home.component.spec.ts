@@ -6,7 +6,7 @@ describe('AdminHomeComponent', () => {
   it('shows the empty sheet of a list/detail page, no gremien list', async () => {
     await render(AdminHomeComponent);
     expect(screen.getByText(de['admin.home.none'])).toBeInTheDocument();
-    expect(screen.getByText(de['admin.home.noneBody'])).toBeInTheDocument();
+    expect(screen.queryByText(/Wähle links/)).toBeNull();
     expect(screen.queryByRole('list')).toBeNull();
   });
 });

@@ -132,7 +132,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add the default API headers that the route did not set itself.
 
     A route can replace a default on purpose: the inline attachment preview sets its
-    own CSP and ``X-Frame-Options: SAMEORIGIN`` (see `app.modules.files.router`).
+    own CSP and ``X-Frame-Options: SAMEORIGIN`` (see `app.modules.attachments.router`).
     Every answer of a public route (protocols page, QR join), an error included,
     carries noindex, because these routes are never for search engines.
     """

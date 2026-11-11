@@ -26,8 +26,10 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.access import _committee_can_read, committee_gremium_ids
+from app.modules.applications.mention_mails import send_comment_mentions
 from app.modules.applications.mentions import mentionable_people
 from app.modules.applications.models import Application, Comment
 from app.modules.applications.schemas import ApplicationCreate, CommentOut
@@ -38,12 +40,11 @@ from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.models import Meeting
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
-from app.modules.notifications.mentions import send_comment_mentions, send_ticket_mentions
 from app.modules.notifications.models import NotificationPreference
+from app.modules.tickets.mention_mails import send_ticket_mentions
 from app.modules.tickets.models import Ticket, TicketNote
 from app.modules.todos.merge import rewrite_mentions
 from app.modules.voting.models import Vote
@@ -143,7 +144,7 @@ async def _seed(session: AsyncSession) -> _World:
     )
     session.add(app_type)
     await session.commit()
-    await FormsService(session).create_form_version(
+    await FormVersionWriter(session).create_form_version(
         app_type.id,
         FormVersionCreate(
             fields=[FormFieldDef(key="title", type="text", label={"de": "Titel"}, required=True)],

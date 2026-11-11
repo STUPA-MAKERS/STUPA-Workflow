@@ -164,6 +164,12 @@
 .dash__tabs {
   flex: 1 1 auto;
 }
+// Spec 000650: "Antrag stellen" stands at the end of the tab line. The button is 4px lower
+// than a control and has a 4px gap to the line, so the tab line keeps its height.
+.dash__new {
+  height: calc(var(--control-height) - var(--space-1));
+  margin-bottom: var(--space-1);
+}
 .dash__tabs ::ng-deep .tabs {
   gap: var(--space-1);
   border-bottom: 0;
@@ -185,12 +191,11 @@
 // header.
 :host(.dash--wide) > .dash__work {
   margin-bottom: calc(-1 * var(--pane-foot-gap, 0px));
-  // The button keeps its place above the foot gap of the page.
-  --fab-inset: calc(var(--space-4) + var(--pane-foot-gap, 0px));
 }
 :host(.dash--wide) .dash__panel {
   flex: 1 1 auto;
-  padding-bottom: calc(56px + var(--space-6) + var(--pane-foot-gap, 0px));
+  // The last row ends above the foot gap of the page; no floating button needs room (000650).
+  padding-bottom: var(--pane-foot-gap, 0px);
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;

@@ -447,9 +447,17 @@
   @if (canWrite() || card.links.length) {
     <app-section class="cd__sec" [heading]="'todos.card.links' | t">
       @if (canWrite()) {
-        <app-button sectionAction class="cd__secAction" variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
+        <app-button
+          sectionAction
+          class="cd__secAction cd__secAction--icon"
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="'todos.card.link' | t"
+          data-testid="cd-link-add"
+          (click)="pickerOpen.set(!pickerOpen())"
+        >
           <app-icon name="link" />
-          {{ 'todos.card.link' | t }}
         </app-button>
       }
       <div class="cd__pickerAnchor">

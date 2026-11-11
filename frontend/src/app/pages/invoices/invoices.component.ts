@@ -16,6 +16,7 @@ import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
 import { problemDetail } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
@@ -41,8 +42,8 @@ import {
   type RowSwipeAction,
   ScrollFadeDirective,
   SearchPillComponent,
-  SegmentedComponent,
-  type SegmentedOption,
+  FilterSelectComponent,
+  type FilterSelectOption,
   type SelectOption,
   SideSheetComponent,
   SkeletonComponent,
@@ -104,8 +105,8 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
  * beside a detail sheet, like the applications page. An invoice is a document of its own;
  * a booking can reference one invoice, so one invoice can serve many bookings.
  *
- * The list: title with the import; the search and the chips (invoice date, due date,
- * amount); the segments Alle / Eingang / Verbucht / Bezahlt (no counts, spec 000560); the drop
+ * The list: title with the import; the search and the chips (the status chip Alle /
+ * Eingang / Verbucht / Bezahlt first, § 000667, then invoice date, due date, amount); the drop
  * zone; the rows by month. The detail: the open invoice (`?id=`, also the target of the
  * global search), or the form of a new, an imported or an edited invoice.
  *
@@ -144,7 +145,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
     RowMenuComponent,
     ScrollFadeDirective,
     SearchPillComponent,
-    SegmentedComponent,
+    FilterSelectComponent,
     SideSheetComponent,
     SkeletonComponent,
     StatusTextComponent,
@@ -198,6 +199,15 @@ export class InvoicesComponent implements InvoiceFormHost {
    */
   readonly reloading = signal(false);
   readonly loadingMore = signal(false);
+  /** The search placeholder with the number of invoices (§ 000661). */
+  readonly searchPlaceholder = computed(() =>
+    searchPlaceholder(
+      this.i18n,
+      { plain: 'invoices.searchLabel', one: 'invoices.searchCountOne', many: 'invoices.searchCount' },
+      this.total(),
+      this.loading(),
+    ),
+  );
   readonly hasMore = computed(() => this.items().length < this.total());
   readonly q = signal('');
   readonly saving = signal(false);
@@ -252,7 +262,7 @@ export class InvoicesComponent implements InvoiceFormHost {
   );
 
   /** The segments, by their labels alone (spec 000560). */
-  readonly segmentOptions = computed<SegmentedOption[]>(() =>
+  readonly segmentOptions = computed<FilterSelectOption[]>(() =>
     SEGMENTS.map((value) => ({ value, label: this.i18n.translate(`invoices.segment.${value}`) })),
   );
 

@@ -8,6 +8,7 @@ updated: 2026-11-06
 implementation:
   - backend/app/modules/auth/sessions.py
   - backend/app/modules/auth/router.py
+  - backend/app/modules/applications/login_router.py
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py

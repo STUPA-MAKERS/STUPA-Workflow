@@ -24,7 +24,7 @@ from app.modules.livevote.guests import (
     qr_matrix,
     token_hash,
 )
-from app.modules.livevote.models import MeetingGuest
+from app.modules.meetings.models import MeetingGuest
 from app.modules.voting.schemas import (
     ElectionLotOut,
     ElectionResultOut,

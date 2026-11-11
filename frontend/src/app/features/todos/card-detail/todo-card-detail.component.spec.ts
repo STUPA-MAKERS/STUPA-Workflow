@@ -745,7 +745,10 @@ describe('TodoCardDetailComponent', () => {
     expect(api.addLink).toHaveBeenCalledWith('k-1', 'ticket', 't-1');
     fireEvent.click(screen.getByRole('button', { name: 'Verknüpfung mit Lerncafé entfernen' }));
     expect(api.removeLink).toHaveBeenCalledTimes(2);
-    fireEvent.click(screen.getByRole('button', { name: /Verknüpfen/ }));
+    // § 000669: the action of the section is an icon button with its text as name.
+    const linkButton = screen.getByRole('button', { name: 'Verknüpfen' });
+    expect(linkButton.textContent?.trim()).toBe('');
+    fireEvent.click(linkButton);
     expect(cmp.pickerOpen()).toBe(true);
     expect(cmp.route('/meetings/m-1?item=t-1')).toEqual({ path: '/meetings/m-1', query: { item: 't-1' } });
   });

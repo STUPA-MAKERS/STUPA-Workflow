@@ -29,10 +29,10 @@ from typing import TYPE_CHECKING, Any, Final
 from sqlalchemy import select, text
 
 from app.modules.admin.cd_builtin import BUILTIN_LOGO_MIME, builtin_logo_bytes
-from app.modules.admin.models import CdVariant, CdVariantLogo
 from app.modules.admin.service.cd_variants import CD_LOGO_PREFIX
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.site_config.models import CdVariant, CdVariantLogo
 from app.shared.errors import ServiceUnavailableError
 
 if TYPE_CHECKING:

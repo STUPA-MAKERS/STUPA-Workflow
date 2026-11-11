@@ -76,7 +76,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, aliased
 
 from app.db import Base
-from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.schemas import (
     MergeArea,
     MergeAreaOut,
@@ -106,23 +105,21 @@ from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.auth.rbac import resolve_principal
 from app.modules.backup.models import Backup
 from app.modules.budget.tree_models import BudgetExpense, Invoice
-from app.modules.delegations.models import (
-    DelegationSubstitute,
-    MeetingDelegation,
-)
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.forms.models import FormVersion
 from app.modules.gremien.membership_sync import sync_principal_memberships
-from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import (
+from app.modules.gremien.models import DelegationSubstitute, Gremium, GremiumMembership, GremiumRole
+from app.modules.meetings.models import (
     Meeting,
     MeetingAttendance,
     MeetingGuest,
     MeetingSettings,
     ProtocolKeeperPeriod,
 )
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
-from app.modules.protocol.models import Protocol
+from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.merge import fold_personal_board, rewrite_mentions
 from app.modules.todos.models import (

@@ -28,14 +28,15 @@
           [text]="topChipText()"
         />
         @if (fyOptions().length) {
-          <div class="bt__years">
-            <app-segmented width="equal"
-              [options]="fyOptions()"
-              [value]="selectedFyId()"
-              (valueChange)="selectFy($event)"
-              [ariaLabel]="'budget.tree.fyLabel' | t"
-            />
-          </div>
+          <app-filter-select
+            class="bt__year"
+            size="md"
+            icon="cal"
+            [label]="'budget.tree.fyLabel' | t"
+            [options]="fyOptions()"
+            [value]="selectedFyId()"
+            (valueChange)="selectFy($event)"
+          />
         } @else {
           <span class="bt__noFy">{{ 'budget.tree.noFy' | t }}</span>
         }

@@ -6,7 +6,6 @@ from uuid import UUID
 
 from sqlalchemy import distinct, func, or_, select
 
-from app.modules.admin.models import CdVariant
 from app.modules.admin.schemas import (
     GremiumAdminOut,
     GremiumCreate,
@@ -23,6 +22,7 @@ from app.modules.auth.principal import Principal
 from app.modules.files.service import FilesService
 from app.modules.gremien.gremium_roles import GremiumRoleService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.site_config.models import CdVariant
 from app.modules.todos.boards import ensure_gremium_board
 from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
@@ -143,7 +143,7 @@ class GremiumOps(ConfigServiceBase):
         """
         if await self.session.get(Gremium, gremium_id) is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
-        from app.modules.protocol.models import Protocol
+        from app.modules.meetings.protocol_models import Protocol
 
         base = (
             select(func.count())
@@ -352,8 +352,8 @@ class GremiumOps(ConfigServiceBase):
         the delete. Those votes stay; only the votes of the meetings go. The imports
         are local, because livevote and voting import the admin models.
         """
-        from app.modules.livevote.models import Meeting
         from app.modules.livevote.service import MeetingService
+        from app.modules.meetings.models import Meeting
         from app.modules.voting.service import VotingService
 
         meetings = (

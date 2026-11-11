@@ -46,8 +46,6 @@ from app.deps import (
     require_any_permission,
     require_principal,
 )
-from app.modules.admin.branding import Branding
-from app.modules.admin.cd_logos import LogoSlot
 from app.modules.admin.oidc_mappings import OidcMappingService
 from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.admin.principal_revoke import PrincipalRevokeService
@@ -111,6 +109,7 @@ from app.modules.admin.site_config_service import ManifestScheme, SiteConfigServ
 from app.modules.applications.guest_settings import GuestSettingsService
 from app.modules.auth.login_settings import LoginSettingsService
 from app.modules.auth.policy import can_view_gremium
+from app.modules.delegations.mails import DelegationMailer, get_delegation_mailer
 from app.modules.gremien.gremium_roles import GremiumRoleService
 from app.modules.gremien.role_schemas import (
     GremiumMembershipOut,
@@ -119,7 +118,8 @@ from app.modules.gremien.role_schemas import (
     GremiumRoleUpdate,
 )
 from app.modules.livevote.open_window import MeetingSettingsService
-from app.modules.notifications.auto import AutoMailer, get_auto_mailer
+from app.modules.site_config.branding import Branding
+from app.modules.site_config.cd_logos import LogoSlot
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
@@ -194,7 +194,7 @@ OidcMappingServiceDep = Annotated[OidcMappingService, Depends(get_oidc_mapping_s
 CdVariantServiceDep = Annotated[CdVariantService, Depends(get_cd_variant_service)]
 MergeServiceDep = Annotated[PrincipalMergeService, Depends(get_principal_merge_service)]
 RevokeServiceDep = Annotated[PrincipalRevokeService, Depends(get_principal_revoke_service)]
-AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
+DelegationMailerDep = Annotated[DelegationMailer, Depends(get_delegation_mailer)]
 
 #: Content-Length cap for a logo upload, applied before FastAPI buffers the body.
 #: Defense in depth next to the nginx cap and the authoritative in-service check.
@@ -918,7 +918,7 @@ async def revoke_principal(
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
-    mailer: AutoMailerDep,
+    mailer: DelegationMailerDep,
 ) -> RevokeResultOut:
     """Clear the selected Gremien completely and remove the selected global roles.
 

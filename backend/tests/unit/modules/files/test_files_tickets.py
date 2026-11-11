@@ -11,6 +11,7 @@ import uuid
 from typing import Any
 
 import pytest
+from sqlalchemy import select
 
 from app.modules.files import service as files_service
 from app.modules.files.drafts import bind_drafts
@@ -21,6 +22,7 @@ from app.modules.files.service import (
     _owner_data,
     upload_audit_data,
 )
+from app.modules.tickets.models import TicketNote
 from app.settings import load_settings
 from app.shared.errors import (
     ConflictError,
@@ -48,6 +50,9 @@ def _att(**kw: Any) -> Attachment:
     }
     base.update(kw)
     return Attachment(**base)
+
+
+_NOTES = select(TicketNote.id).where(TicketNote.ticket_id == TICKET)
 
 
 def _svc(session: ScriptedSession, storage: object | None = None) -> FilesService:
@@ -180,15 +185,16 @@ async def test_delete_for_ticket_removes_rows_objects_and_audits(
     keep, gone = _att(storage_key="k1"), _att(storage_key=None)
     storage = FakeStorage()
     session = ScriptedSession(scalars=[[keep, gone]])
-    assert await _svc(session, storage).delete_for_ticket(TICKET, actor="sys") == 2
+    assert await _svc(session, storage).delete_for_ticket(TICKET, notes=_NOTES, actor="sys") == 2
     assert session.deleted == [keep, gone]
     assert storage.removed == ["k1"]
     assert [a["data"] for a in audits] == [{"ticket_id": str(TICKET)}] * 2
     assert "ticket_note_id IN" in str(session.statements[0])
     session = ScriptedSession(scalars=[[_att()]])
-    assert await _svc(session, FailingStorage()).delete_for_ticket(TICKET, actor="sys") == 1
+    failing = _svc(session, FailingStorage())
+    assert await failing.delete_for_ticket(TICKET, notes=_NOTES, actor="sys") == 1
     session = ScriptedSession(scalars=[[_att()]])
-    assert await _svc(session, None).delete_for_ticket(TICKET, actor="sys") == 1
+    assert await _svc(session, None).delete_for_ticket(TICKET, notes=_NOTES, actor="sys") == 1
 
 
 def test_the_owner_of_an_audit_entry() -> None:

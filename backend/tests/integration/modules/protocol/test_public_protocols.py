@@ -30,13 +30,13 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormVersion
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.models import (
+from app.modules.meetings.models import (
     Meeting,
     MeetingAgendaItem,
     MeetingAttendance,
     MeetingGuest,
 )
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.service import ProtocolService
 from app.modules.voting.models import Vote
 from tests.integration.modules.livevote.conftest import CONFIG

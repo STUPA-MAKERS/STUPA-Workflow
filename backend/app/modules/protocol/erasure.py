@@ -27,9 +27,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.livevote.models import MeetingAgendaItem
+from app.modules.meetings.models import MeetingAgendaItem
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.markdown import build_election_snippet
-from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import election_snippet_of
 from app.modules.voting.erasure import ErasedCandidacy
 from app.modules.voting.models import Vote

@@ -25,11 +25,11 @@ from app.db import get_sessionmaker
 from app.modules.files.storage import build_object_storage
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.events import MeetingStateEvent
-from app.modules.livevote.models import Meeting
 from app.modules.livevote.service import meeting_channel
+from app.modules.meetings.models import Meeting
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.pdf.typst_client import build_typst_client
-from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService
 from app.settings import Settings, load_settings
 from app.shared.errors import ServiceUnavailableError

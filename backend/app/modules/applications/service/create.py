@@ -26,6 +26,7 @@ from app.modules.applications.service.service_base import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.budget.form_options import budget_field_options
 from app.modules.files.drafts import DRAFT_ATTACHMENTS_MISSING, bind_drafts, check_drafts
 from app.modules.flow.models import FlowVersion, State
 from app.modules.flow.vote_gremium import resolve_vote_gremium
@@ -91,7 +92,7 @@ class CreateOps(ApplicationsServiceBase):
 
         A public submission starts unconfirmed and rests in the flow: no automatic
         transition and no mail. The magic-link verify starts the flow
-        (``auth.service.verify_magic_link``).
+        (``applications.magic_link.verify_magic_link``).
 
         ``email_confirmed`` tells whether the applicant email is already confirmed.
         The router sets it to False for a logged-in person who enters an email
@@ -134,7 +135,7 @@ class CreateOps(ApplicationsServiceBase):
             raise NotFoundError(f"application type {payload.type_id} not found")
         flow_version_id = await self._resolve_flow_version_id(app_type)
 
-        forms = FormsService(self.session)
+        forms = FormsService(self.session, budget_field_options)
         effective = await forms.get_effective_form(payload.type_id)
         fields = [f for section in effective.sections for f in section.fields]
 

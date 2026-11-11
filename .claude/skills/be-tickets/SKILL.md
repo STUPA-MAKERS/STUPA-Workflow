@@ -30,11 +30,11 @@ context of the report.
 - `router.py` — the routes; `get_ticket_service` is where the todos module wires its
   hooks; `get_ticket_mail_sender` is the override point for tests.
 - `access.py` — `TICKET_MANAGE`.
-- Outside the module: `notifications/tickets.py` (both mails), `worker/tickets.py`
+- Mails: `mails.py` and `mention_mails.py` (the texts are in `notifications/texts/tickets.py` and `texts/mentions.py`). Outside the module: `worker/tickets.py`
   (retention cron), `auth/people.py` (`PersonRef`, `person_of`, `person_refs`),
-  `files/{drafts,service,router}.py` (ticket attachments), `admin/branding.py`
-  (`HelpSettings`, `TicketSettings`, `PublicBranding`), `admin/site_config_service.py`
-  (`active_branding`, `help_tickets`, `put_help_tickets`).
+  `files/{drafts,service,router}.py` (ticket attachments), `site_config/branding.py`
+  (`HelpSettings`, `TicketSettings`, `PublicBranding`), `site_config/reads.py` (`active_branding`) and `admin/site_config_service.py`
+  (`help_tickets`, `put_help_tickets`).
 
 **API surface:**
 - `POST /api/tickets` — dependencies in the order of `POST /applications`:

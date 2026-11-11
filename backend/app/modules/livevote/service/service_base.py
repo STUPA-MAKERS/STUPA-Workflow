@@ -15,14 +15,14 @@ from sqlalchemy import func, select
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.agenda_service import agenda_order, title_of
-from app.modules.livevote.keepers import KeeperSummary
-from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingGuest
 from app.modules.livevote.open_window import OpenWindow, load_meeting_settings, open_window
 from app.modules.livevote.schemas import CurrentAgendaItemOut, MeetingOut, MeetingVoteOut
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.agenda_service import agenda_order, title_of
+from app.modules.meetings.keepers import KeeperSummary
+from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingGuest
+from app.modules.meetings.protocol_models import Protocol
+from app.modules.meetings.rules import MeetingReads
 from app.settings import get_settings
-from app.shared.errors import NotFoundError
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,7 +57,7 @@ def _current_item(
             )
 
 
-class MeetingServiceBase:
+class MeetingServiceBase(MeetingReads):
     """Meeting operations bound to one `AsyncSession` and an optional publisher."""
 
     def __init__(self, session: AsyncSession, publisher: BrokerPublisher | None = None) -> None:
@@ -233,12 +233,6 @@ class MeetingServiceBase:
         ).all()
         return {app_id: title_of(data) for app_id, data in rows}
 
-    async def _principal_id(self, sub: str) -> UUID | None:
-        """Return the `principal.id` for an OIDC `sub`, used for the protokollant check."""
-        return (
-            await self.session.execute(select(PrincipalRow.id).where(PrincipalRow.sub == sub))
-        ).scalar_one_or_none()
-
     @staticmethod
     async def _name_for(session: AsyncSession, principal_id: UUID | None) -> str | None:
         if principal_id is None:
@@ -256,27 +250,6 @@ class MeetingServiceBase:
             return None
         row = await self.session.get(Gremium, gremium_id)
         return row.name if row is not None else None
-
-    async def _get(self, meeting_id: UUID, *, for_update: bool = False) -> Meeting:
-        """Load a meeting by id.
-
-        ``for_update`` locks the meeting row until the commit and reads the current
-        values again. A status change, an agenda change and a vote open all take this
-        lock first, so they run one after the other.
-
-        Raises:
-            NotFoundError: No meeting has this id.
-        """
-        query = select(Meeting).where(Meeting.id == meeting_id)
-        stmt = (
-            query.with_for_update().execution_options(populate_existing=True)
-            if for_update
-            else query
-        )
-        meeting = (await self.session.execute(stmt)).scalar_one_or_none()
-        if meeting is None:
-            raise NotFoundError(f"meeting {meeting_id} not found")
-        return meeting
 
     async def _protocol_id(self, meeting_id: UUID) -> UUID | None:
         """Return the `protocol.id` for the unique `meeting_id`, or `None`."""

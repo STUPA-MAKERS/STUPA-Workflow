@@ -15,12 +15,12 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import NotFoundError
@@ -77,7 +77,7 @@ def _fields() -> list[FormFieldDef]:
 
 async def test_create_first_version_activates_type(session: AsyncSession) -> None:
     app_type = await _make_type(session)
-    svc = FormsService(session)
+    svc = FormVersionWriter(session)
 
     out = await svc.create_form_version(
         app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
@@ -98,7 +98,7 @@ async def test_create_first_version_activates_type(session: AsyncSession) -> Non
 
 async def test_version_counter_increments(session: AsyncSession) -> None:
     app_type = await _make_type(session)
-    svc = FormsService(session)
+    svc = FormVersionWriter(session)
     v1 = await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
     v2 = await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
     assert (v1.version, v2.version) == (1, 2)
@@ -106,7 +106,7 @@ async def test_version_counter_increments(session: AsyncSession) -> None:
 
 async def test_activating_new_version_deactivates_old(session: AsyncSession) -> None:
     app_type = await _make_type(session)
-    svc = FormsService(session)
+    svc = FormVersionWriter(session)
     v1 = await svc.create_form_version(
         app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
     v2 = await svc.create_form_version(
@@ -124,7 +124,7 @@ async def test_inactive_version_does_not_touch_active_pointer(
     session: AsyncSession,
 ) -> None:
     app_type = await _make_type(session)
-    svc = FormsService(session)
+    svc = FormVersionWriter(session)
     v1 = await svc.create_form_version(
         app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
     await svc.create_form_version(
@@ -136,7 +136,7 @@ async def test_inactive_version_does_not_touch_active_pointer(
 async def test_running_application_keeps_pinned_version(session: AsyncSession) -> None:
     """Pin: a new version keeps the `form_version_id` of a running application."""
     app_type = await _make_type(session)
-    svc = FormsService(session)
+    svc = FormVersionWriter(session)
     v1 = await svc.create_form_version(
         app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
 
@@ -157,7 +157,7 @@ async def test_running_application_keeps_pinned_version(session: AsyncSession) -
 
 
 async def test_create_version_unknown_type_404(session: AsyncSession) -> None:
-    svc = FormsService(session)
+    svc = FormVersionWriter(session)
     with pytest.raises(NotFoundError):
         await svc.create_form_version(
             uuid.uuid4(), FormVersionCreate(fields=_fields()), "tester")
@@ -166,7 +166,7 @@ async def test_create_version_unknown_type_404(session: AsyncSession) -> None:
 async def test_effective_form_main_only(session: AsyncSession) -> None:
     """Build the main section; the camelCase round trip keeps the promoted flags."""
     app_type = await _make_type(session)
-    svc = FormsService(session)
+    svc = FormVersionWriter(session)
     await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
 
     eff = await svc.get_effective_form(app_type.id)
@@ -178,7 +178,7 @@ async def test_effective_form_main_only(session: AsyncSession) -> None:
 
 async def test_effective_form_no_active_version_404(session: AsyncSession) -> None:
     app_type = await _make_type(session)
-    svc = FormsService(session)
+    svc = FormVersionWriter(session)
     with pytest.raises(NotFoundError, match="no active form version"):
         await svc.get_effective_form(app_type.id)
 

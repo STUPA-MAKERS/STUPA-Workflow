@@ -20,13 +20,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.branding import Branding
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.avatars.cache import CachedAvatar
 from app.modules.avatars.gravatar import AvatarImage, FetchResult
 from app.modules.avatars.router import get_avatar_cache, get_gravatar_fetcher
+from app.modules.site_config.branding import Branding
 from tests._support.guest_apps import build_api, guest_settings
 from tests._support.read_models import as_principal
 

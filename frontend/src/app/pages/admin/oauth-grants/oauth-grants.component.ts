@@ -12,6 +12,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  filterChipText,
   NoteComponent,
   SkeletonComponent,
   ToastService,
@@ -110,9 +111,8 @@ export class AdminOAuthGrantsComponent {
   /** The text of the person chip: "Person: Alle Personen" or "Person: <name>". */
   readonly principalChipText = computed(() => {
     const id = this.principalId();
-    const hit = this.principalOptions().find((o) => o.value === id);
-    const name = hit?.label ?? this.i18n.translate('admin.oauthGrants.filter.allPrincipals');
-    return `${this.i18n.translate('admin.oauthGrants.filter.principal')}: ${name}`;
+    const hit = id ? this.principalOptions().find((o) => o.value === id) : undefined;
+    return filterChipText(this.i18n.translate('admin.oauthGrants.filter.principal'), hit?.label);
   });
 
   readonly hasPrev = computed(() => this.offset() > 0);

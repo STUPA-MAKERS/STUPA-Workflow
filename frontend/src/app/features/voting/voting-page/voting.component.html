@@ -1,7 +1,6 @@
 <div class="vl" [class.vl--split]="split()">
   <app-list-detail
     [detailOpen]="selectedId() !== null"
-    [backButton]="!phone()"
     (back)="closeDetail()"
   >
     <section list class="ld-pane vl__pane" aria-labelledby="vl-title">
@@ -18,7 +17,7 @@
 
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
-          [placeholder]="'voting.list.search' | t"
+          [placeholder]="searchPlaceholder()"
           [results]="loading() || reloading() ? null : total()"
           [value]="search.text()"
           [clearable]="true"
@@ -158,9 +157,6 @@
               </app-button>
             </div>
           }
-          <p class="vl__count" aria-live="polite">
-            {{ 'voting.list.count' | t: { count: items().length, total: total() } }}
-          </p>
         }
       </div>
 

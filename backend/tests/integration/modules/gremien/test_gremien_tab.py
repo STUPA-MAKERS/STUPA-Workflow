@@ -25,13 +25,13 @@ import app.main as main_mod
 from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
-from app.modules.admin.models import CdVariant, CdVariantLogo
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
-from app.modules.protocol.models import Protocol
+from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.meetings.protocol_models import Protocol
+from app.modules.site_config.models import CdVariant, CdVariantLogo
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.settings import get_settings, load_settings
 from app.shared.config_schemas import VoteConfig

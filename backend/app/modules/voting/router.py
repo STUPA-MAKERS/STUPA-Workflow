@@ -35,10 +35,10 @@ from app.deps import DbSession, SettingsDep, require_principal
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
-from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
-from app.modules.notifications.polls import notify_poll_started
+from app.modules.meetings.publisher import MeetingPublisher, get_meeting_publisher
 from app.modules.voting.election import ElectionService
 from app.modules.voting.poll import PollService
+from app.modules.voting.poll_mails import notify_poll_started
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,
@@ -86,7 +86,7 @@ PublisherDep = Annotated[MeetingPublisher, Depends(get_meeting_publisher)]
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 
 
-def _mail_poll_start(
+def mail_poll_start(
     vote: VoteOut, background: BackgroundTasks, request: Request, settings: SettingsDep
 ) -> None:
     """Send ``poll_started`` after the open of a poll of a Gremium (background task).
@@ -122,7 +122,7 @@ async def create_poll(
     get the mail ``poll_started``.
     """
     vote = await PollService(service).create(payload, principal, now=datetime.now(UTC))
-    _mail_poll_start(vote, background, request, settings)
+    mail_poll_start(vote, background, request, settings)
     return vote
 
 
@@ -172,51 +172,6 @@ async def create_vote(
     """
     await service.assert_can_manage_group(str(payload.eligible_group), None, principal)
     return await service.create(application_id, payload, principal)
-
-
-@router.post(
-    "/votes/{vote_id}/open",
-    response_model=VoteOut,
-    responses=_errors(401, 403, 404, 409),
-)
-async def open_vote(
-    vote_id: UUID,
-    service: ServiceDep,
-    publisher: PublisherDep,
-    principal: ReaderDep,
-    background: BackgroundTasks,
-    request: Request,
-    settings: SettingsDep,
-) -> VoteOut:
-    """Open a vote and move it from ``draft`` to ``open``.
-
-    Gremium-scoped manage right. The call returns 409 when the vote is not
-    ``draft``. If a meeting holds the vote, the publisher broadcasts ``vote_opened``
-    on the live-vote channel. Without a meeting the broadcast is a no-op.
-
-    A meeting vote runs the checks of the open route of the meeting first
-    (``livevote.vote_open``): a prepared draft can wait while the state changes, and
-    this route must not open it around them. The quorum denominator then comes from
-    the current roster. A poll of a Gremium opens only with its end at least one hour
-    ahead (422 ``closes_at_too_soon``) and sends ``poll_started``.
-
-    The livevote import is local, because the livevote modules import this module.
-    """
-    from app.modules.livevote.vote_open import check_draft_open
-
-    await service.assert_can_run_vote(vote_id, principal)
-    meeting_id = await service.meeting_id_of(vote_id)
-    eligible = (
-        await check_draft_open(service.session, meeting_id, vote_id, principal)
-        if meeting_id is not None
-        else None
-    )
-    vote = await service.open(
-        vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
-    )
-    await publisher.vote_opened(vote)
-    _mail_poll_start(vote, background, request, settings)
-    return vote
 
 
 @router.post(

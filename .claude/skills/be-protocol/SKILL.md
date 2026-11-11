@@ -9,6 +9,7 @@ description: Protocol — a Markdown editor backing per meeting, embedded vote s
 
 **Key files:**
 - `models.py` — `Protocol` (1:1 per meeting), `ProtocolVoteRef` (embedded-vote anchor), and `PROTOCOL_STATUSES`.
+- `public_images_router.py` — `GET /api/public/protocols/{protocol_id}/images/{image_id}`: an image of a public protocol (the response comes from `media.router.image_response`).
 - `router.py` — the FastAPI routes. It wires `ProtocolService` to the render infrastructure (storage and mail from app.state, typst from settings) and applies the RBAC gating.
 - `service.py` — `ProtocolService`: lifecycle (`get_or_create`, `update_markdown`, `embed_votes`, `start_finalize`, `finalize`, `revert_to_draft`), agenda assembly, dual internal/public render, mail send, recipient resolution, quorum.
 - `markdown.py` — DB-free Markdown builders: `build_protocol_document` (YAML frontmatter + body), `build_vote_snippet` (`> [!abstimmung]` callout), `demote_headings`, `sanitize_user_markdown` (RCE/path-traversal hardening), `protocol_variant_for`.

@@ -127,7 +127,7 @@ describe('InvoiceFormComponent', () => {
     const h = host();
     h.importNotice.set('manual');
     const { view, user } = await setup('create', h);
-    expect(screen.getByRole('heading', { name: 'Rechnung hinzufügen' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Rechnung anlegen' })).toBeInTheDocument();
     expect(screen.getByText(/Kein ZUGFeRD erkannt/)).toBeInTheDocument();
     const input = view.container.querySelector('input[type=file]') as HTMLInputElement;
     const click = jest.spyOn(input, 'click').mockImplementation(() => undefined);
@@ -176,7 +176,7 @@ describe('InvoiceFormComponent', () => {
 
   it('leaves out its head in the bottom sheet', async () => {
     await setup('create', host(), 'sheet');
-    expect(screen.queryByRole('heading', { name: 'Rechnung hinzufügen' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Rechnung anlegen' })).toBeNull();
     expect(screen.getByRole('button', { name: /Hinzufügen/ })).toBeInTheDocument();
   });
 });

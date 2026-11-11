@@ -21,7 +21,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.calendar.ics import CardEvent, DueCard
 from app.modules.gremien.gremium_roles import gremium_reader_ids
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.models import Meeting
+from app.modules.meetings.models import Meeting
 
 #: 32 bytes give about 43 URL-safe characters. An unguessable token needs no rate limit.
 _TOKEN_BYTES = 32

@@ -8,12 +8,12 @@ description: Append-only audit log with a sha256(prev_hash||canonical_json) hash
 **Does:** Append-only, tamper-evident audit log. The service hashes every security, config, or money relevant action into a forward-linked chain (`hash = sha256(prev_hash || canonical_json(entry))`). The verify route re-checks that chain end to end. Other modules write entries through a service hook. Admins read, verify, and revert config/budget changes from the log.
 
 **Key files:**
-- `service.py` — `AuditService` (record/verify_chain/verify_and_store/run_manual_verification/prune_verifications/latest_verification/query/query_cursor/list_actors + actor/target/data-id resolvers) and the module-level `record()` hook that other modules call.
+- `service.py` — `AuditService` (record/verify_chain/verify_and_store/run_manual_verification/prune_verifications/latest_verification/query/query_cursor/list_actors + the actor resolver) and the module-level `record()` hook that other modules call.
 - `models.py` — `AuditEntry` ORM row (`audit_entry` table). Append-only: a DB trigger and the least-privilege `audit_writer` grant block UPDATE and DELETE (both in the baseline migration). `AuditVerification` (`audit_verification` table) holds the stored chain checks. It is NOT part of the chain and NOT append-only.
 - `worker/audit_verify.py` — the nightly cron `process_audit_verification` (04:30) and `verify_after_restore`, which `worker/backup.restore_backup` calls.
 - `hashing.py` — pure `canonical_payload(...)` (deterministic UTF-8 bytes, UTC-normalized `at`, sorted keys) and `compute_hash(prev_hash, canonical)`.
 - `actions.py` — `AuditAction` StrEnum (closed action catalog) + `REVERTABLE_BUDGET_ACTIONS` frozenset.
-- `router.py` — `/admin/audit` FastAPI router (list/actors/verify/revert).
+- `../audit_log/router.py` — `/admin/audit` FastAPI router (list/actors/verify/revert). `../audit_log/service.py` — `AuditLogService(AuditService)`: `resolve_target_labels`, `resolve_data_ids`, `revertable_flags`. They are in the module `audit_log` (layer 1), because `audit` imports no higher module (spec 000649). `audit_log` is under the 100 % branch gate too.
 - `schemas.py` — read-only camelCase out-models (`AuditEntryOut`, `AuditPageOut`, `AuditActorOut`, `ChainVerificationOut`, `AuditVerificationOut`, `AuditRevertOut`).
 - `__init__.py` — re-exports `AuditAction`, `AuditService`, `record`.
 

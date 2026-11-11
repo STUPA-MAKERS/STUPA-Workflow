@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/livevote/attendance_service.py
+  - backend/app/modules/meetings/attendance_service.py
   - frontend/src/app/features/meetings/attendance-sheet/attendance-sheet.component.ts
 scope:
   - backend/app/modules/delegations

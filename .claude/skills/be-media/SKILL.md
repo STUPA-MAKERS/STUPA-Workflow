@@ -36,8 +36,10 @@ images of a protocol for the typst render.
   (404 unknown, 503 storage), `render_assets(markdown)` with `RENDER_MAX_IMAGES` 48,
   `RENDER_MAX_BYTES` 24 MiB, `RENDER_MAX_ASSET_BYTES` 8 MiB; `render_asset_name`
   (`img-<uuid>.png|jpg|gif|webp`).
-- `router.py` — `router` (`/media/images`) and `public_router` (`/public/...`),
-  `IMAGE_CSP`, `get_media_service`, `get_public_protocols`.
+- `router.py` — `router` (`/media/images`), `IMAGE_CSP`, `get_media_service`,
+  `image_response`. The public protocol image route is in
+  `../protocol/public_images_router.py` (with `get_public_protocols`), because it reads
+  the protocol (spec 000651).
 
 **API surface:**
 - `POST /api/media/images` — multipart `file`. Principal only (applicant and anonymous:

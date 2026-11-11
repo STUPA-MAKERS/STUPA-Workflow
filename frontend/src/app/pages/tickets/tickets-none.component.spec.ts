@@ -23,7 +23,7 @@ describe('TicketsNoneComponent', () => {
 
   it('asks for a pick when the list has tickets', async () => {
     await setup(page());
-    expect(screen.getByText('Kein Ticket ausgewählt')).toBeInTheDocument();
+    expect(screen.getByText('Kein Ticket geöffnet')).toBeInTheDocument();
   });
 
   it('says that there are no tickets', async () => {

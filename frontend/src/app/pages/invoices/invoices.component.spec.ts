@@ -1510,7 +1510,7 @@ describe('InvoicesComponent (list/detail)', () => {
     c.openCreate();
     expect(c.formMode()).toBe('create');
     expect(c.detailView()).toBe('form');
-    expect(c.formTitle()).toBe('Rechnung hinzufügen');
+    expect(c.formTitle()).toBe('Rechnung anlegen');
     c.closeDetail();
     expect(c.formMode()).toBeNull();
     expect(navigate).not.toHaveBeenCalled();
@@ -1582,7 +1582,7 @@ describe('InvoicesComponent (list/detail)', () => {
     c.onHeaderMenu({ id: 'refresh', label: 'Aktualisieren' });
     expect(reload).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Rechnung anlegen' }));
-    expect(screen.getByRole('dialog', { name: 'Rechnung hinzufügen' }).classList.contains('ss--bottom')).toBe(true);
+    expect(screen.getByRole('dialog', { name: 'Rechnung anlegen' }).classList.contains('ss--bottom')).toBe(true);
     expect(c.detailView()).toBe('none');
     expect(screen.queryByRole('button', { name: 'Rechnung anlegen' })).toBeNull();
   });

@@ -3,7 +3,7 @@
 The suite adds the paths that `test_protocol_service` and `test_files_service` do not
 reach. It covers the protocol dual-render assembly from the agenda (#PII-Re-Add) and the
 public PDF variant, plus `_quorate`, `_header_meta` and `_local_end_time`. Finally it
-covers the `FilesService` operations `list_for_application`, `delete` and
+covers the `AttachmentService` operations `list_for_application`, `delete` and
 `delete_for_application`.
 
 The suite runs without a database, typst, MinIO or Redis. The sessions are fakes with
@@ -21,12 +21,14 @@ from typing import Any, cast
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
 
-from app.modules.applications.models import Application
+from app.modules.applications.models import Application, Comment
+from app.modules.attachments.service import AttachmentService
 from app.modules.files import service as files_service
 from app.modules.files.models import Attachment
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.pdf.typst_client import TypstError
-from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import (
     ProtocolService,
     protocol_public_storage_key,
@@ -718,13 +720,16 @@ class _FilesSession(NotifSession):
         self.flushed += 1
 
 
+_NO_COMMENTS = select(Comment.id).where(Comment.id.is_(None))
+
+
 def _files_service(
     session: NotifSession,
     *,
     storage: object | None = None,
     queue: object | None = None,
-) -> files_service.FilesService:
-    return files_service.FilesService(
+) -> AttachmentService:
+    return AttachmentService(
         session, storage=storage, queue=queue, settings=SETTINGS  # type: ignore[arg-type]
     )
 
@@ -866,7 +871,7 @@ async def test_delete_for_application_removes_all_and_audits(
     storage = FakeStorage()
     storage.objects["k/1"] = (b"x", "application/pdf")
     n = await _files_service(session, storage=storage).delete_for_application(
-        uuid.uuid4(), actor="dsgvo"
+        uuid.uuid4(), comments=_NO_COMMENTS, actor="dsgvo"
     )
     assert n == 2
     assert storage.removed == ["k/1"]
@@ -887,7 +892,7 @@ async def test_delete_for_application_tolerates_remove_error(
     session._scalars = [[a1]]
     n = await _files_service(
         session, storage=FailingStorage()
-    ).delete_for_application(uuid.uuid4(), actor="dsgvo")
+    ).delete_for_application(uuid.uuid4(), comments=_NO_COMMENTS, actor="dsgvo")
     assert n == 1
 
 
@@ -901,7 +906,7 @@ async def test_delete_for_application_empty_returns_zero(
     session = NotifSession()
     session._scalars = [[]]
     n = await _files_service(session, storage=FakeStorage()).delete_for_application(
-        uuid.uuid4(), actor="dsgvo"
+        uuid.uuid4(), comments=_NO_COMMENTS, actor="dsgvo"
     )
     assert n == 0
 

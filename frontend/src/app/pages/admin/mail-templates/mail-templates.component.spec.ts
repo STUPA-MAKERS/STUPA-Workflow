@@ -60,6 +60,10 @@ describe('MailTemplatesComponent', () => {
     fixture.detectChanges();
     expect(screen.getByDisplayValue('Anmeldung')).toBeInTheDocument();
     expect(screen.getByText(/name/)).toBeInTheDocument();
+    // § 000672: the language picker stands in the page head.
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('app-page-header app-content-lang-switch')).not.toBeNull();
+    expect(root.querySelectorAll('app-content-lang-switch')).toHaveLength(1);
   });
 
   /** § 000635 */

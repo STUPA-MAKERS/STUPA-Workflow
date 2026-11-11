@@ -20,8 +20,6 @@ from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
-from app.modules.livevote.agenda_service import AgendaService
-from app.modules.livevote.attendance_service import AttendanceService
 from app.modules.livevote.broker import InMemoryBroker, MeetingBroker
 from app.modules.livevote.connection import (
     WS_FORBIDDEN,
@@ -33,14 +31,12 @@ from app.modules.livevote.connection import (
 from app.modules.livevote.events import ErrorEvent
 from app.modules.livevote.guests import GuestService
 from app.modules.livevote.locks import InMemoryLocker, Locker
+from app.modules.livevote.mails import MeetingMailer, get_meeting_mailer
 from app.modules.livevote.schemas import (
     AgendaAddBody,
     AgendaBodyBody,
     AgendaDoneBody,
-    AgendaItemOut,
     AgendaReorderBody,
-    AssignableApplicationOut,
-    AttendanceOut,
     AttendanceSelfBody,
     AttendanceSetBody,
     GuestNameBody,
@@ -50,7 +46,6 @@ from app.modules.livevote.schemas import (
     MeetingDefaultsOut,
     MeetingGremiumOut,
     MeetingGuestOut,
-    MeetingMemberOut,
     MeetingOut,
     MeetingPage,
     MeetingPatch,
@@ -70,7 +65,14 @@ from app.modules.livevote.vote_repeat import (
     reopen_application,
     repeat_source,
 )
-from app.modules.notifications.auto import AutoMailer, get_auto_mailer
+from app.modules.meetings.agenda_service import AgendaService
+from app.modules.meetings.attendance_service import AttendanceService
+from app.modules.meetings.schemas import (
+    AgendaItemOut,
+    AssignableApplicationOut,
+    AttendanceOut,
+    MeetingMemberOut,
+)
 from app.modules.todos.live import publish_pings, todo_broker
 from app.modules.todos.service import TodoService
 from app.modules.voting.service import VotingService
@@ -210,7 +212,7 @@ VotingDep = Annotated[VotingService, Depends(get_voting_service)]
 BrokerRestDep = Annotated[MeetingBroker, Depends(get_broker_rest)]
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
-AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
+MeetingMailerDep = Annotated[MeetingMailer, Depends(get_meeting_mailer)]
 BrokerWsDep = Annotated[MeetingBroker, Depends(get_broker_ws)]
 LockerWsDep = Annotated[Locker, Depends(get_locker_ws)]
 MeetingServiceWsDep = Annotated[MeetingService, Depends(get_meeting_service_ws)]
@@ -226,7 +228,7 @@ async def create_meeting(
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
-    mailer: AutoMailerDep,
+    mailer: MeetingMailerDep,
 ) -> MeetingOut:
     """Create a meeting in status ``planned``.
 

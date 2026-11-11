@@ -21,7 +21,7 @@ from app.deps import get_current_applicant, get_current_principal
 from app.main import create_app
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
-from app.modules.livevote.service import MeetingService
+from app.modules.meetings.rules import MeetingRules
 from app.modules.voting import listing
 from app.modules.voting.router import get_voting_service
 from app.modules.voting.schemas import MyBallot, VoteListItem
@@ -70,13 +70,13 @@ def scope(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     """Stub the meeting read scope and the gremium manage rights."""
     state: dict[str, Any] = {"visible": {GID}, "delegated": set(), "manage": {}}
 
-    async def _meeting_scope(_self: MeetingService, _p: Principal) -> tuple[Any, Any]:
+    async def _meeting_scope(_self: MeetingRules, _p: Principal) -> tuple[Any, Any]:
         return state["visible"], state["delegated"]
 
     async def _ids_for(_s: Any, _p: Principal, perm: str) -> set[UUID]:
         return set(state["manage"].get(perm, set()))
 
-    monkeypatch.setattr(MeetingService, "meeting_read_scope", _meeting_scope)
+    monkeypatch.setattr(MeetingRules, "meeting_read_scope", _meeting_scope)
     monkeypatch.setattr(listing, "held_gremium_ids", _ids_for)
     return state
 
@@ -257,7 +257,7 @@ async def test_service_delegates_to_listing(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 async def test_meeting_read_scope_all_and_scoped() -> None:
-    svc = MeetingService(fake_session())
+    svc = MeetingRules(fake_session())
     assert await svc.meeting_read_scope(Principal(sub="a", roles=["admin"])) == (None, set())
 
     mid = uuid4()

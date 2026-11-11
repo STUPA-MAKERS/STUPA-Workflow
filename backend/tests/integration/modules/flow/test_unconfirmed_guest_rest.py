@@ -31,18 +31,18 @@ import app.main as main_mod
 from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
+from app.modules.applications import magic_link
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
-from app.modules.auth import service as auth_service
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import DispatchedAction
+from app.modules.flow.mail_actions import NotificationActionDispatcher
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium
-from app.modules.notifications.action_dispatcher import NotificationActionDispatcher
 from app.modules.notifications.mail import MailMessage
 from app.settings import Settings, get_settings, load_settings
 from app.shared.config_schemas import FormFieldDef
@@ -115,7 +115,7 @@ async def _seed(
         )
         session.add(app_type)
         await session.commit()
-        await FormsService(session).create_form_version(
+        await FormVersionWriter(session).create_form_version(
             app_type.id,
             FormVersionCreate(
                 fields=[FormFieldDef(key="title", type="text", label={"de": "Titel"},
@@ -174,7 +174,7 @@ async def _magic_token(
         links.append(link)
 
     async with maker() as session:
-        await auth_service.request_magic_link(
+        await magic_link.request_magic_link(
             session, settings, email="gast@example.org", application_id=app_id,
             deliver=_deliver,
         )
@@ -190,7 +190,7 @@ async def _verify(
     recorder: _Recorder,
 ) -> None:
     async with maker() as session:
-        await auth_service.verify_magic_link(
+        await magic_link.verify_magic_link(
             session, settings, token=token, dispatcher=recorder
         )
         await session.commit()

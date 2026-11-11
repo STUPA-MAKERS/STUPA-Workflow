@@ -4,7 +4,7 @@ The first part fakes the API and checks the arguments that the tools hand to it.
 second part runs the real `ApiClient` against an `httpx.MockTransport` and checks the
 exact multipart request on the wire: the path, the part name `file`, the file name, the
 part content type and the form field `field_key`. These are the names of
-`POST /api/applications/{id}/attachments` in `backend/app/modules/files/router.py`.
+`POST /api/applications/{id}/attachments` in `backend/app/modules/attachments/router.py`.
 `test_attachment_contract.py` runs the same tools against that router itself.
 """
 

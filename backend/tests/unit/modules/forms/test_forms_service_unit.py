@@ -12,14 +12,14 @@ from uuid import uuid4
 
 import pytest
 
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import ValidationProblem
 
 
 def test_create_form_version_bad_definition_is_422_before_db() -> None:
-    svc = FormsService(None)  # type: ignore[arg-type]  — validation runs before session use
+    svc = FormVersionWriter(None)  # type: ignore[arg-type]  — validation runs before session use
     payload = FormVersionCreate(
         fields=[
             FormFieldDef(key="dup", type="text", label={"de": "A"}),

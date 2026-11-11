@@ -8,7 +8,8 @@ The editor (`/admin/mail-templates`) shows every mail through this catalogue. A 
 override wins when it exists, otherwise the builtin default applies. The editor and the
 real send therefore never drift apart. Nothing copies a seed into the DB.
 
-The module imports the builtins from the sender modules. Only ``task_reminder`` (the
+The builtin texts are in `app.modules.notifications.texts`, and the sender modules
+import them from there. Only ``task_reminder`` (the
 worker sends it) and ``status_update_team`` live here as the single source.
 """
 
@@ -16,18 +17,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.modules.notifications import (
-    action_dispatcher,
-    auto,
+from app.modules.notifications import service as _svc
+from app.modules.notifications.texts import (
     captured,
     comments,
+    meetings,
     mentions,
     polls,
     privacy,
+    tasks,
     tickets,
     todos,
 )
-from app.modules.notifications import service as _svc
 
 #: Subject of ``task_reminder``. The worker (``worker/task_reminders.py``) sends it and
 #: imports these constants from here, because the app never imports the worker.
@@ -115,8 +116,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "task_new",
         "task",
-        action_dispatcher._BUILTIN_TASK_SUBJECT,
-        action_dispatcher._BUILTIN_TASK_BODY,
+        tasks.BUILTIN_TASK_SUBJECT,
+        tasks.BUILTIN_TASK_BODY,
         {
             "link": "Link zur Aufgabe (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -140,8 +141,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "comment_applicant",
         "comment",
-        comments._BUILTIN_APPLICANT_SUBJECT,
-        comments._BUILTIN_APPLICANT_BODY,
+        comments.BUILTIN_APPLICANT_SUBJECT,
+        comments.BUILTIN_APPLICANT_BODY,
         {
             "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -155,8 +156,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "comment_team",
         "comment",
-        comments._BUILTIN_TEAM_SUBJECT,
-        comments._BUILTIN_TEAM_BODY,
+        comments.BUILTIN_TEAM_SUBJECT,
+        comments.BUILTIN_TEAM_BODY,
         {
             "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -177,8 +178,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "meeting_created",
         "meeting",
-        auto._BUILTIN_MEETING_SUBJECT,
-        auto._BUILTIN_MEETING_BODY,
+        meetings.BUILTIN_MEETING_SUBJECT,
+        meetings.BUILTIN_MEETING_BODY,
         {
             "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
             "meetingTitle": "Titel der Sitzung",
@@ -191,8 +192,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "delegation_granted",
         "delegation",
-        auto._BUILTIN_DELEGATION_GRANTED_SUBJECT,
-        auto._BUILTIN_DELEGATION_GRANTED_BODY,
+        meetings.BUILTIN_DELEGATION_GRANTED_SUBJECT,
+        meetings.BUILTIN_DELEGATION_GRANTED_BODY,
         {
             "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
             "meetingTitle": "Titel der Sitzung",
@@ -202,8 +203,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "delegation_revoked",
         "delegation",
-        auto._BUILTIN_DELEGATION_REVOKED_SUBJECT,
-        auto._BUILTIN_DELEGATION_REVOKED_BODY,
+        meetings.BUILTIN_DELEGATION_REVOKED_SUBJECT,
+        meetings.BUILTIN_DELEGATION_REVOKED_BODY,
         {
             "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
             "meetingTitle": "Titel der Sitzung",

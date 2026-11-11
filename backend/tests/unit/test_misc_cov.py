@@ -50,7 +50,6 @@ from app.middleware import (
     CsrfMiddleware,
     DefaultWriteRateLimitMiddleware,
 )
-from app.modules.admin.branding import Branding, PublicBranding
 from app.modules.admin.router import (
     get_config_service,
     get_gremium_role_service,
@@ -73,6 +72,7 @@ from app.modules.applications.router import (
 )
 from app.modules.applications.schemas import ApplicationListItem, StateOut
 from app.modules.gremien.role_schemas import GremiumRoleOut
+from app.modules.site_config.branding import Branding, PublicBranding
 from app.settings import Settings, get_settings, load_settings
 from app.shared import search as search_mod
 from app.shared.errors import ForbiddenError, UnauthorizedError
@@ -739,8 +739,8 @@ async def test_deliver_comment_mails_invokes_send(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """`_deliver_comment_mails` opens the session and calls `send_comment_notifications`."""
+    import app.modules.applications.comment_mails as comments_mod
     import app.modules.applications.router as ar
-    import app.modules.notifications.comments as comments_mod
 
     fake_db = _FakeMagicSession()
     monkeypatch.setattr(ar, "get_sessionmaker", lambda: _FakeSessionmaker(fake_db))
@@ -890,7 +890,7 @@ def test_request_erasure_202(
     TestClient runs the background task synchronously, so the notification fires within the
     call.
     """
-    import app.modules.applications.router as ar
+    import app.modules.privacy.request_router as ar
     from app.db import get_session
     from app.deps import get_current_applicant
 

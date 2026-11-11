@@ -14,12 +14,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.admin.branding import Branding
-from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.privacy.service import PrincipalService
+from app.modules.site_config.branding import Branding
+from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from tests._support.files_fakes import FakeStorage
 from tests.integration.modules.tickets.conftest import ADMIN, Api, add_principal

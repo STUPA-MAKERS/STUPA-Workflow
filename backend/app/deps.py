@@ -13,7 +13,7 @@ a leaf, so the re-export avoids an import cycle between `deps` and `auth`.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Annotated
@@ -36,6 +36,7 @@ __all__ = [
     "Principal",
     "get_current_applicant",
     "get_current_principal",
+    "get_email_session_resolver",
     "require_applicant",
     "require_group",
     "require_principal",
@@ -43,6 +44,19 @@ __all__ = [
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+#: The lookup that turns the address of an e-mail session into an `Applicant`.
+EmailSessionResolver = Callable[[AsyncSession, str], Awaitable[Applicant]]
+
+
+def get_email_session_resolver() -> EmailSessionResolver:
+    """Return the lookup of the e-mail sessions. `create_app` overrides this dependency.
+
+    The module `applications` owns the lookup, and this file must import no module
+    above `auth` (§S/backend/python/000649). So the app wires the lookup in, and an
+    app without it fails loudly at the first e-mail session.
+    """
+    raise RuntimeError("The e-mail session resolver is not configured.")
+
 
 
 def _bearer_token(request: Request, settings: Settings) -> str | None:
@@ -152,6 +166,9 @@ async def get_current_applicant(
     request: Request,
     db: DbSession,
     settings: SettingsDep,
+    resolve_email_session: Annotated[
+        EmailSessionResolver, Depends(get_email_session_resolver)
+    ],
 ) -> Applicant | None:
     """Resolve the server-side magic-link session (signed opaque `sid`) to an Applicant.
 
@@ -164,8 +181,8 @@ async def get_current_applicant(
     edit service answers 409 in a locked state.
 
     A session of the e-mail login is bound to an address. It is resolved fresh at
-    each request (`email_login.resolve_session`), so the applications of the address
-    are read again.
+    each request, so the applications of the address are read again. The module
+    `applications` owns this lookup (`get_email_session_resolver`).
     """
     token = _bearer_token(request, settings)
     if not token:
@@ -180,9 +197,7 @@ async def get_current_applicant(
     if row is None:
         return None
     if row.email is not None:
-        from app.modules.auth.email_login import resolve_session
-
-        return await resolve_session(db, row.email)
+        return await resolve_email_session(db, row.email)
     return Applicant(application_id=str(row.application_id))
 
 

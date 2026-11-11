@@ -119,7 +119,8 @@ class AnonymizeOps(ApplicationsServiceBase):
             self.session, application_id, now=datetime.now(UTC)
         )
         if files is not None:
-            await files.delete_for_application(application_id, actor=actor)
+            comments = select(Comment.id).where(Comment.application_id == application_id)
+            await files.delete_for_application(application_id, comments=comments, actor=actor)
         else:
             await self.session.execute(
                 delete(Attachment).where(

@@ -33,10 +33,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.gremien.models import Gremium
-from app.modules.livevote.models import Meeting
 from app.modules.media.refs import image_ids_in
+from app.modules.meetings.models import Meeting
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.filename import protocol_pdf_filename
-from app.modules.protocol.models import Protocol
 from app.shared.config_schemas import ElectionConfig
 from app.shared.errors import NotFoundError, ServiceUnavailableError
 from app.shared.schemas import FrozenCamelModel

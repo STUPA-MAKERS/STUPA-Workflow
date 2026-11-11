@@ -8,7 +8,7 @@ updated: 2026-11-06
 implementation:
   - backend/worker/audit_verify.py
   - backend/worker/main.py
-  - backend/app/modules/audit/router.py
+  - backend/app/modules/audit_log/router.py
 scope:
   - backend/app/modules/audit
   - backend/worker

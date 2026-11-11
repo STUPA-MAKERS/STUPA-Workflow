@@ -23,14 +23,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.applications.models import Application, StatusEvent
+from app.modules.flow.actionable import actionable_principal_emails, state_actionable
 from app.modules.flow.models import State
 from app.modules.notifications.links import task_link
 from app.modules.notifications.models import TaskReminderLog
 from app.modules.notifications.provider import MailQueue
-from app.modules.notifications.recipients import (
-    actionable_principal_emails,
-    state_actionable,
-)
 from app.modules.notifications.service import NotificationService
 from app.modules.notifications.templates_catalogue import (
     TASK_REMINDER_BODY as _BUILTIN_REMINDER_BODY,

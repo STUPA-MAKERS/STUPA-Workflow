@@ -8,6 +8,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  filterChipText,
   IconComponent,
   InputComponent,
   NoteComponent,
@@ -184,8 +185,21 @@ export class AdminTranslationsComponent {
     })),
   ]);
 
-  protected readonly localeText = computed(
-    () => this.localeOptions().find((o) => o.value === this.locale())?.label ?? this.locale(),
+  /** The texts of the three chips (§ 000663): the name, then the name and the value. */
+  protected readonly localeText = computed(() =>
+    filterChipText(
+      this.i18n.translate('admin.translations.locale'),
+      this.localeOptions().find((o) => o.value === this.locale())?.label ?? this.locale(),
+    ),
+  );
+  protected readonly areaText = computed(() =>
+    filterChipText(this.i18n.translate('admin.translations.area'), this.area()),
+  );
+  protected readonly changedText = computed(() =>
+    filterChipText(
+      this.i18n.translate('admin.translations.changedFilter'),
+      this.changedOnly() ? this.i18n.translate('admin.translations.changedOnly') : null,
+    ),
   );
 
   protected readonly areaOptions = computed<FilterSelectOption[]>(() => {

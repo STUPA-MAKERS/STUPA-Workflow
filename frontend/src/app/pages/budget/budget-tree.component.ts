@@ -36,8 +36,6 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-  SegmentedComponent,
-  type SegmentedOption,
   SelectFieldComponent,
   type SelectOption,
   StatusTextComponent,
@@ -131,7 +129,6 @@ const MAX_CUTOFF_DAY = 28;
     BreadcrumbsComponent,
     RowDetailDirective,
     RowMenuComponent,
-    SegmentedComponent,
     SelectFieldComponent,
     StatusTextComponent,
     SwitchComponent,
@@ -256,8 +253,8 @@ export class BudgetTreeComponent {
     return this.i18n.translate('budget.tree.topChip', { name: t.name, key: t.key, cutoff: this.cutoffLabel() });
   });
 
-  /** The fiscal years as segments, newest first; an inactive or a closed year says so. */
-  readonly fyOptions = computed<SegmentedOption[]>(() =>
+  /** The fiscal years of the year chip (§ 000668), newest first; an inactive or a closed year says so. */
+  readonly fyOptions = computed<FilterSelectOption[]>(() =>
     [...this.fiscalYears()]
       .sort((a, b) => b.year - a.year)
       .map((fy) => ({

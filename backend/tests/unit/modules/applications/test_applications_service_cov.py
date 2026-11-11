@@ -461,8 +461,9 @@ class _FakeForms:
 
     effective: Any = None
 
-    def __init__(self, session: object) -> None:
+    def __init__(self, session: object, budget_options: object = None) -> None:
         self.session = session
+        self.budget_options = budget_options
 
     async def get_effective_form(
         self, _type_id: Any, _pot_id: Any = None, *, form_version_id: Any = None
@@ -1516,7 +1517,9 @@ async def test_anonymize_full_with_files_service_commit(
     files_calls: list[Any] = []
 
     class _Files:
-        async def delete_for_application(self, app_id: Any, *, actor: str) -> None:
+        async def delete_for_application(
+            self, app_id: Any, *, comments: Any, actor: str
+        ) -> None:
             files_calls.append((app_id, actor))
 
     svc = ApplicationsService(session)  # type: ignore[arg-type]

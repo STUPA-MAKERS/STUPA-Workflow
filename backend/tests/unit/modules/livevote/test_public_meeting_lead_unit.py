@@ -527,7 +527,7 @@ async def test_votes_for_counts_guests_of_a_guest_vote() -> None:
 async def test_agenda_refuses_non_public_on_a_guest_vote_item(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.modules.livevote.agenda_service import AgendaService
+    from app.modules.meetings.agenda_service import AgendaService
 
     service = AgendaService(FakeSession())  # type: ignore[arg-type]
     row = SimpleNamespace(id=uuid4(), application_id=None, body=None, title="T", non_public=False)

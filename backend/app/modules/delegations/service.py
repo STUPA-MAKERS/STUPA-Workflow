@@ -51,14 +51,7 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.policy import has_gremium_permission, holds_gremium_permission
 from app.modules.auth.principal import Principal
-from app.modules.delegations.models import (
-    DelegationSubstitute,
-    MeetingDelegation,
-)
-from app.modules.delegations.pool import (
-    substitute_gremien_for_sub,
-    substitutes_for,
-)
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.pool_seat import (
     lock_meeting_delegations,
     pool_seat_clause,
@@ -74,9 +67,13 @@ from app.modules.delegations.schemas import (
     VoteDelegationStatus,
 )
 from app.modules.gremien.gremium_roles import gremium_member_ids
-from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.livevote.models import Meeting, MeetingAttendance
-from app.modules.livevote.roster import planned_start_utc
+from app.modules.gremien.models import DelegationSubstitute, Gremium, GremiumMembership, GremiumRole
+from app.modules.gremien.pool import (
+    substitute_gremien_for_sub,
+    substitutes_for,
+)
+from app.modules.meetings.models import Meeting, MeetingAttendance
+from app.modules.meetings.roster import planned_start_utc
 from app.modules.voting.models import Vote
 from app.settings import Settings
 from app.shared.errors import (

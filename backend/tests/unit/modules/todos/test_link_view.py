@@ -12,7 +12,7 @@ import pytest
 
 from app.modules.applications.models import Application
 from app.modules.budget.tree_models import Invoice
-from app.modules.livevote.models import MeetingAgendaItem
+from app.modules.meetings.models import MeetingAgendaItem
 from app.modules.todos.link_view import LinkViewer
 from app.modules.todos.links import Resolved
 from app.modules.todos.schemas import TodoLinkDetail

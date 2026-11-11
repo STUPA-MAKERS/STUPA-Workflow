@@ -10,10 +10,10 @@ denominator comes from the roster.
 
 from __future__ import annotations
 
-from app.modules.livevote.models import MeetingAgendaItem
 from app.modules.livevote.schemas import MeetingOut, MeetingVoteBody
 from app.modules.livevote.service import MeetingService
 from app.modules.livevote.vote_open import eligible_count
+from app.modules.meetings.models import MeetingAgendaItem
 from app.modules.voting.poll import build_config as build_poll_config
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import secret_only

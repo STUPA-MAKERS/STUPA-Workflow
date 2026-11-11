@@ -11,7 +11,8 @@ The pure validation and merge logic lives in `app.modules.forms.validation`.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -19,25 +20,15 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.application_types.models import ApplicationType
-from app.modules.audit.actions import AuditAction
-from app.modules.budget.tree_models import Budget
-from app.modules.config_revision.service import (
-    ENTITY_FORM,
-    ConfigRevisionService,
-)
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.forms.schemas import (
     SECTION_LABELS,
     EffectiveFormOut,
     FormDraftOut,
     FormSectionOut,
-    FormVersionCreate,
-    FormVersionOut,
 )
 from app.modules.forms.validation import (
-    FormDefinitionError,
     effective_form,
-    validate_definition,
 )
 from app.modules.gremien.models import Gremium
 from app.shared.config_schemas import FieldOption, FormFieldDef
@@ -64,6 +55,9 @@ def _row_to_field_def(row: FormField) -> FormFieldDef:
     )
 
 
+#: The read of the cost-center options of a `budget_select` field.
+BudgetOptions = Callable[[AsyncSession], Awaitable[list[FieldOption]]]
+
 #: Field types whose options the server injects at render time, not the form builder.
 DYNAMIC_OPTION_TYPES: frozenset[str] = frozenset({"gremium_select", "budget_select"})
 
@@ -85,7 +79,7 @@ def _inject_dynamic_options(
     )
 
 
-def _field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
+def field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
     """Convert a ``FormFieldDef`` into the kwargs of a ``form_field`` row."""
     return {
         "key": field.key,
@@ -112,12 +106,17 @@ def _field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
     }
 
 
+@dataclass(frozen=True)
 class FormsService:
-    """DB-backed form operations, bound to one ``AsyncSession``."""
+    """DB-backed form operations, bound to one ``AsyncSession``.
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Bind the service to a database session."""
-        self.session = session
+    ``budget_options`` reads the options of a ``budget_select`` field. The module
+    `budget` owns this read (`budget.form_options`), and a caller passes it in, because
+    `forms` imports no higher module (§S/backend/python/000651).
+    """
+
+    session: AsyncSession
+    budget_options: BudgetOptions | None = None
 
     async def _get_type(self, type_id: UUID) -> ApplicationType:
         app_type = await self.session.get(ApplicationType, type_id)
@@ -186,6 +185,17 @@ class FormsService:
             ),
         )
 
+    async def _budget_field_options(self) -> list[FieldOption]:
+        """Return the options of a `budget_select` field from the wired source.
+
+        Raises:
+            RuntimeError: The caller wired no source. A form with a cost-center field
+                must never render without its options.
+        """
+        if self.budget_options is None:
+            raise RuntimeError("The cost-center options of the form are not wired.")
+        return await self.budget_options(self.session)
+
     async def _gremium_field_options(self) -> list[FieldOption]:
         """Return the current Gremien as `select` options for `gremium_select`.
 
@@ -198,121 +208,6 @@ class FormsService:
         return [
             FieldOption(value=str(gid), label={"de": name, "en": name}) for gid, name in rows
         ]
-
-    async def _budget_field_options(self) -> list[FieldOption]:
-        """Return the active cost centers as `select` options for `budget_select`.
-
-        The label is `name (path key)`. The stored answer value is the budget UUID. Each
-        option also carries the parent, the key and the own color, because the form shows
-        the cost centers as a tree with the colors of the budget page. A parent that is not
-        active has no option, so its active children are top-level options.
-        """
-        rows = (
-            await self.session.execute(
-                select(
-                    Budget.id,
-                    Budget.name,
-                    Budget.path_key,
-                    Budget.parent_id,
-                    Budget.key,
-                    Budget.color,
-                )
-                .where(Budget.active.is_(True))
-                .order_by(Budget.path_key)
-            )
-        ).all()
-        active = {bid for bid, *_ in rows}
-        return [
-            FieldOption(
-                value=str(bid),
-                label={"de": f"{name} ({path})", "en": f"{name} ({path})"},
-                parentId=str(parent) if parent in active else None,
-                key=key,
-                color=color,
-            )
-            for bid, name, path, parent, key, color in rows
-        ]
-
-    async def create_form_version(
-        self,
-        type_id: UUID,
-        payload: FormVersionCreate,
-        actor: str,
-        *,
-        action: AuditAction = AuditAction.CONFIG_CHANGE,
-        extra_data: dict[str, Any] | None = None,
-    ) -> FormVersionOut:
-        """Create a new form version and validate the definition.
-
-        The service activates the new version when ``payload.activate`` is set. The old
-        versions stay unchanged. The service also writes a ``config_revision`` snapshot
-        and a linked audit entry. ``action`` and ``extra_data`` carry the restore and
-        revert path.
-
-        The service validates the input before any DB access, so a broken definition gives 422,
-        not 500.
-
-        Raises:
-            ValidationProblem: The form definition is invalid.
-            NotFoundError: The application type does not exist.
-        """
-        try:
-            validate_definition(payload.fields)
-        except FormDefinitionError as exc:
-            raise ValidationProblem(
-                "Invalid form definition.", errors=[{"field": "fields", "msg": str(exc)}]
-            ) from exc
-        await self._get_type(type_id)
-
-        next_version = await self._next_version(type_id)
-
-        version = FormVersion(
-            application_type_id=type_id,
-            version=next_version,
-            active=payload.activate,
-            description_i18n=payload.description,
-        )
-        if payload.activate:
-            await self.session.execute(
-                update(FormVersion)
-                .where(
-                    FormVersion.application_type_id == type_id,
-                    FormVersion.active.is_(True),
-                )
-                .values(active=False)
-            )
-        self.session.add(version)
-        await self.session.flush()
-
-        for order, field in enumerate(payload.fields):
-            self.session.add(
-                FormField(form_version_id=version.id, **_field_def_to_row_kwargs(field, order))
-            )
-
-        if payload.activate:
-            app_type = await self._get_type(type_id)
-            app_type.active_form_version_id = version.id
-
-        await ConfigRevisionService(self.session).record(
-            entity_type=ENTITY_FORM,
-            entity_id=str(type_id),
-            snapshot={
-                "fields": [f.model_dump(by_alias=True) for f in payload.fields],
-                "description": payload.description,
-            },
-            actor=actor,
-            action=action,
-            extra_data=extra_data,
-        )
-        await self.session.commit()
-        return FormVersionOut(
-            id=version.id,
-            applicationTypeId=type_id,
-            version=next_version,
-            active=payload.activate,
-            fields=payload.fields,
-            description=payload.description,
-        )
 
     async def set_form_active(self, type_id: UUID, active: bool) -> FormDraftOut:
         """Activate or deactivate the form of an application type.
@@ -378,12 +273,3 @@ class FormsService:
             description=version.description_i18n,
             fields=list(fields),
         )
-
-    async def _next_version(self, type_id: UUID) -> int:
-        current_max = await self.session.scalar(
-            select(FormVersion.version)
-            .where(FormVersion.application_type_id == type_id)
-            .order_by(FormVersion.version.desc())
-            .limit(1)
-        )
-        return (current_max or 0) + 1

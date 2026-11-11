@@ -12,9 +12,9 @@ import copy
 from typing import Any
 from uuid import uuid4
 
-from app.modules.livevote.models import MeetingAgendaItem
+from app.modules.meetings.models import MeetingAgendaItem
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.erasure import erase_candidate_names, rewrite_callouts
-from app.modules.protocol.models import Protocol
 from app.modules.voting.erasure import ERASED_CANDIDATE_NAME, ErasedCandidacy
 from app.modules.voting.models import Vote
 from tests._support.privacy_fakes import FakeResult, FakeSession

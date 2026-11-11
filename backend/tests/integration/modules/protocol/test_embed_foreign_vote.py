@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.protocol.models import ProtocolVoteRef
+from app.modules.meetings.protocol_models import ProtocolVoteRef
 from app.modules.voting.models import Vote
 from tests.integration.modules.livevote.conftest import CONFIG, seed
 

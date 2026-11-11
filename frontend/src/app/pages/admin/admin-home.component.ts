@@ -16,7 +16,7 @@ import { EmptyStateComponent } from '@stupa-makers/ui-kit';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, EmptyStateComponent],
   template: `
-    <app-empty-state plain icon="shield" fill [heading]="'admin.home.none' | t" [body]="'admin.home.noneBody' | t" />
+    <app-empty-state plain icon="shield" fill [heading]="'admin.home.none' | t" />
   `,
   styles: [
     `

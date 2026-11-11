@@ -33,7 +33,6 @@ from sqlalchemy import Engine, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin import principal_merge as merge_mod
-from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.applications.models import (
     Application,
@@ -63,13 +62,10 @@ from app.modules.auth.service import upsert_principal
 from app.modules.backup.models import Backup
 from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear, Invoice
 from app.modules.config_revision.models import ConfigRevision
-from app.modules.delegations.models import (
-    DelegationSubstitute,
-    MeetingDelegation,
-)
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.forms.models import FormVersion
-from app.modules.gremien.models import GremiumMembership, GremiumRole
-from app.modules.livevote.models import (
+from app.modules.gremien.models import DelegationSubstitute, GremiumMembership, GremiumRole
+from app.modules.meetings.models import (
     Meeting,
     MeetingAgendaItem,
     MeetingAttendance,
@@ -77,9 +73,10 @@ from app.modules.livevote.models import (
     MeetingSettings,
     ProtocolKeeperPeriod,
 )
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
-from app.modules.protocol.models import Protocol
+from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.models import (
     TodoAssignee,

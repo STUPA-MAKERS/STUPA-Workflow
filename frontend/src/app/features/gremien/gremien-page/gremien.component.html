@@ -39,14 +39,12 @@
           <div class="grl__chips">
             <app-filter-select
               class="grl__chip"
-              icon="check"
-              [chevron]="false"
               [label]="'gremien.list.show' | t"
               [options]="scopeOptions()"
               [value]="scope()"
               (valueChange)="setScope($event)"
-              [text]="scopeText()"
-              [active]="true"
+              filled
+              unsetValue="all"
             />
           </div>
         }
@@ -126,7 +124,7 @@
                 <span class="grl__none">{{ 'gremien.list.nonePlanned' | t }}</span>
               }
             }
-            @if (!split()) {
+            @if (!split() && !phone()) {
               <app-row-chevron />
             }
           </span>

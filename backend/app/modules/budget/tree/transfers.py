@@ -302,7 +302,7 @@ class TransferOps(ExpenseOps):
         revert already writes. It records the prior values under `prior`
         instead of `before` ON PURPOSE: the audit revert restores exactly one
         `budget_expense` row, and a one-sided revert would desync the pair.
-        `AuditService.revertable_flags` therefore reports the entry as not
+        `AuditLogService.revertable_flags` therefore reports the entry as not
         revertable, and the operator deletes and re-books instead.
 
         Raises:

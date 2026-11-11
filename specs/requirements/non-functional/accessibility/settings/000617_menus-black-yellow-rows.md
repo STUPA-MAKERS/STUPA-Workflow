@@ -4,7 +4,7 @@ title: In very high contrast, every menu is black with yellow rows
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-10
+updated: 2026-11-11
 tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:menusBlackYellowRows"
   - "frontend/src/app/shared/very-high-contrast.styles.spec.ts:menuRows"
@@ -19,9 +19,10 @@ scope:
 # In very high contrast, every menu is black with yellow rows
 
 While "Hoher Kontrast" is on, every menu must have a black fill and a 2 px white edge. This
-applies to the 3-dot menu, the filter menu, the help menu, the account menu and the list of a
+applies to the 3-dot menu, the filter menu, the help menu, the accessibility menu, the account menu, the board picker and the list of a
 select. Each row that a person can press must have yellow text and a yellow icon. The chosen row
-must have a yellow fill and black text. A heading in a menu must be white. A destructive row must
+must have a yellow fill and black text. The row under the pointer or with the focus must have a
+2 px yellow edge and must keep its yellow text. A heading in a menu must be white. A destructive row must
 have light red text (`#ff8a8a`).
 
 Reason: Two different menu pictures make a person learn each menu again. In a menu that is all

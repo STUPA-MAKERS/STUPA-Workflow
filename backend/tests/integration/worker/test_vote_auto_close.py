@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
@@ -21,7 +22,6 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.settings import load_settings
@@ -60,7 +60,7 @@ async def _seed_flow(session: AsyncSession) -> tuple[ApplicationType, dict[str, 
     session.add(app_type)
     await session.commit()
 
-    await FormsService(session).create_form_version(
+    await FormVersionWriter(session).create_form_version(
         app_type.id,
         FormVersionCreate(
             fields=[FormFieldDef(key="title", type="text", label={"de": "T"}, required=True)],

@@ -21,6 +21,7 @@ from fastapi import APIRouter, FastAPI
 from starlette.requests import HTTPConnection
 
 from app.db import dispose_engine, get_sessionmaker
+from app.deps import EmailSessionResolver, get_email_session_resolver
 from app.logging_config import configure_logging
 from app.middleware import (
     CsrfMiddleware,
@@ -29,14 +30,19 @@ from app.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.modules.account.router import router as account_router
+from app.modules.admin.forms_router import router as form_versions_router
 from app.modules.admin.router import authed_router as gremien_authed_router
 from app.modules.admin.router import public_router as site_config_public_router
 from app.modules.admin.router import router as admin_router
 from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
+from app.modules.applications.email_login import resolve_session as resolve_email_session
 from app.modules.applications.links_router import router as application_links_router
+from app.modules.applications.login_router import router as applicant_login_router
 from app.modules.applications.router import router as applications_router
-from app.modules.audit.router import router as audit_router
+from app.modules.attachments.router import router as files_router
+from app.modules.audit_log.router import router as audit_router
 from app.modules.auth.mcp_router import router as mcp_router
 from app.modules.auth.oauth_admin_router import router as oauth_admin_router
 from app.modules.auth.oauth_router import router as oauth_router
@@ -44,23 +50,25 @@ from app.modules.auth.oauth_router import well_known_router as oauth_well_known_
 from app.modules.auth.router import router as auth_router
 from app.modules.avatars.router import router as avatars_router
 from app.modules.backup.router import router as backup_router
+from app.modules.budget.form_options import budget_field_options
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.calendar.router import router as calendar_router
 from app.modules.config_revision.router import router as config_revision_router
 from app.modules.delegations.router import router as delegations_router
-from app.modules.files.router import router as files_router
 from app.modules.files.storage import build_object_storage
 from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
+from app.modules.forms.router import get_budget_options
 from app.modules.forms.router import router as forms_router
-from app.modules.gremien.router import router as gremien_tab_router
+from app.modules.forms.service import BudgetOptions
+from app.modules.gremien_overview.router import router as gremien_tab_router
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.locks import RedisLocker
 from app.modules.livevote.public_router import router as public_meeting_router
 from app.modules.livevote.router import router as livevote_router
 from app.modules.livevote.service import BrokerPublisher
-from app.modules.media.router import public_router as public_media_router
+from app.modules.livevote.vote_open_router import router as vote_open_router
 from app.modules.media.router import router as media_router
 from app.modules.notifications.provider import close_mail_pool, create_mail_pool
 from app.modules.notifications.router import (
@@ -70,7 +78,9 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.notifications.router import (
     templates_router as mail_templates_router,
 )
+from app.modules.privacy.request_router import router as erasure_request_router
 from app.modules.privacy.router import router as privacy_router
+from app.modules.protocol.public_images_router import router as public_media_router
 from app.modules.protocol.public_router import router as public_protocol_router
 from app.modules.protocol.router import router as protocol_router
 from app.modules.search.router import router as search_router
@@ -93,16 +103,20 @@ def health() -> dict[str, str]:
 
 
 api_router.include_router(auth_router)
+api_router.include_router(account_router)
+api_router.include_router(applicant_login_router)
 api_router.include_router(oauth_router)
 api_router.include_router(oauth_admin_router)
 api_router.include_router(mcp_router)
 api_router.include_router(oauth_well_known_router)
 api_router.include_router(forms_router)
+api_router.include_router(form_versions_router)
 api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
 api_router.include_router(application_links_router)
 api_router.include_router(flow_router)
 api_router.include_router(voting_router)
+api_router.include_router(vote_open_router)
 api_router.include_router(livevote_router)
 api_router.include_router(public_meeting_router)
 api_router.include_router(protocol_router)
@@ -122,6 +136,7 @@ api_router.include_router(config_revision_router)
 api_router.include_router(admin_router)
 api_router.include_router(delegations_router)
 api_router.include_router(privacy_router)
+api_router.include_router(erasure_request_router)
 api_router.include_router(backup_router)
 api_router.include_router(search_router)
 api_router.include_router(tickets_router)
@@ -211,6 +226,16 @@ def _flow_action_dispatcher(conn: HTTPConnection) -> ActionDispatcher:
     return build_worker_dispatcher(pool, get_sessionmaker())
 
 
+def _email_session_resolver() -> EmailSessionResolver:
+    """Give `app.deps` the e-mail session lookup of `applications` (§S/backend/python/000649)."""
+    return resolve_email_session
+
+
+def _budget_options() -> BudgetOptions:
+    """Give `forms` the cost-center options of `budget` (§S/backend/python/000651)."""
+    return budget_field_options
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the FastAPI app with its middleware, handlers and routers.
 
@@ -244,7 +269,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
 
-    app.dependency_overrides.update({get_action_dispatcher: _flow_action_dispatcher})
+    app.dependency_overrides.update(
+        {
+            get_action_dispatcher: _flow_action_dispatcher,
+            get_email_session_resolver: _email_session_resolver,
+            get_budget_options: _budget_options,
+        }
+    )
 
     app.include_router(api_router)
     app.include_router(oauth_well_known_router)
