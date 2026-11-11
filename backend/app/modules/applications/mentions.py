@@ -36,8 +36,8 @@ from app.modules.applications.access import (
 )
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.people import PersonRef, permission_holders, person_of
 from app.modules.gremien.models import GremiumMembership
-from app.shared.people import PersonRef, permission_holders, person_of
 
 Row = tuple[UUID, str | None, str | None]
 

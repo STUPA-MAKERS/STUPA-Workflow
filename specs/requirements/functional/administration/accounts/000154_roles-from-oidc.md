@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/admin/oidc_mappings.py
-  - backend/app/modules/admin/membership_sync.py
+  - backend/app/modules/gremien/membership_sync.py
   - frontend/src/app/pages/admin/group-mappings/group-mappings.component.ts
 scope:
   - backend/app/modules/auth

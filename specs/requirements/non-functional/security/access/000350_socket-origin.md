@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/livevote/router.py
-  - backend/app/shared/ws.py
+  - backend/app/modules/auth/ws.py
 scope:
   - backend/app/modules/livevote
 ---

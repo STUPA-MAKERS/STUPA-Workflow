@@ -16,13 +16,8 @@ from pydantic import ValidationError
 from app.deps import Principal, get_current_principal
 from app.main import create_app
 from app.modules.admin.router import get_config_service, get_gremium_role_service
-from app.modules.admin.schemas import (
-    ROLE_KEY_PATTERN,
-    GremiumRoleCreate,
-    GremiumRoleUpdate,
-    RoleCreate,
-    RoleUpdate,
-)
+from app.modules.admin.schemas import RoleCreate, RoleUpdate
+from app.modules.gremien.role_schemas import ROLE_KEY_PATTERN, GremiumRoleCreate, GremiumRoleUpdate
 
 _GOOD = ["admin", "vorstand", "manager", "kasse_2", "a", "finanz_referat"]
 _BAD = [
@@ -79,7 +74,7 @@ def client() -> TestClient:
     app.dependency_overrides[get_config_service] = _NoService
     app.dependency_overrides[get_gremium_role_service] = _NoService
     app.dependency_overrides[get_current_principal] = lambda: Principal(
-        sub="admin", permissions={"admin.roles", "admin.gremium_roles", "admin.gremien"}
+        sub="admin", permissions={"admin.roles", "gremien.gremium_roles", "admin.gremien"}
     )
     return TestClient(app)
 

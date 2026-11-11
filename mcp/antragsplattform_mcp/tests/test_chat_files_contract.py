@@ -59,6 +59,7 @@ from app.modules.applications.router import (  # noqa: E402
 )
 from app.modules.applications.schemas import CommentOut  # noqa: E402
 from app.modules.auth import oauth  # noqa: E402
+from app.modules.auth.people import PersonRef  # noqa: E402
 from app.modules.auth.principal import Principal  # noqa: E402
 from app.modules.files import mime as backend_mime  # noqa: E402
 from app.modules.files.drafts import DRAFT_ATTACHMENTS_MISSING  # noqa: E402
@@ -89,7 +90,6 @@ from app.shared.errors import (  # noqa: E402
     ValidationProblem,
 )
 from app.shared.filenames import sanitize_display_name  # noqa: E402
-from app.shared.people import PersonRef  # noqa: E402
 
 from antragsplattform_mcp.client import ApiClient, ApiError  # noqa: E402
 from antragsplattform_mcp.config import DEFAULT_SCOPE, Config  # noqa: E402

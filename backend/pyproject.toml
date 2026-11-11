@@ -107,14 +107,11 @@ root_package = "app"
 [[tool.importlinter.contracts]]
 id = "module-layers"
 ignore_imports = [
-    "app.modules.applications.access -> app.modules.admin.gremium_roles",
     "app.modules.applications.access -> app.modules.livevote.models",
     "app.modules.applications.decision -> app.modules.livevote.agenda_service",
     "app.modules.applications.decision -> app.modules.livevote.models",
     "app.modules.applications.router -> app.modules.privacy.service",
-    "app.modules.applications.service.listing -> app.modules.admin.gremium_roles",
     "app.modules.applications.service.listing -> app.modules.livevote.models",
-    "app.modules.applications.service.service_base -> app.shared.config_schemas",
     "app.modules.audit.router -> app.modules.config_revision.revert",
     "app.modules.audit.router -> app.modules.livevote.publisher",
     "app.modules.audit.service -> app.modules.admin.models",
@@ -130,9 +127,6 @@ ignore_imports = [
     "app.modules.auth.email_login -> app.modules.applications.models",
     "app.modules.auth.email_login -> app.modules.flow.dispatch",
     "app.modules.auth.email_login -> app.modules.flow.service",
-    "app.modules.auth.oauth_router -> app.modules.admin.gremium_roles",
-    "app.modules.auth.policy -> app.modules.admin.gremium_roles",
-    "app.modules.auth.router -> app.modules.admin.gremium_roles",
     "app.modules.auth.router -> app.modules.budget.tree_models",
     "app.modules.auth.router -> app.modules.delegations.pool",
     "app.modules.auth.router -> app.modules.flow.dispatch",
@@ -140,15 +134,11 @@ ignore_imports = [
     "app.modules.auth.router -> app.modules.notifications.provider",
     "app.modules.auth.router -> app.modules.notifications.service",
     "app.modules.auth.router -> app.modules.tickets.service",
-    "app.modules.auth.service -> app.modules.admin.membership_sync",
     "app.modules.auth.service -> app.modules.applications.guest_settings",
     "app.modules.auth.service -> app.modules.applications.models",
     "app.modules.auth.service -> app.modules.flow.dispatch",
     "app.modules.auth.service -> app.modules.flow.service",
-    "app.modules.auth.session_renewal -> app.modules.admin.membership_sync",
     "app.modules.avatars.service -> app.modules.admin.models",
-    "app.modules.budget.tree_router -> app.modules.admin.gremium_roles",
-    "app.modules.delegations.service -> app.modules.admin.gremium_roles",
     "app.modules.files.router -> app.modules.applications.access",
     "app.modules.files.router -> app.modules.applications.models",
     "app.modules.files.router -> app.modules.tickets.access",
@@ -168,7 +158,7 @@ ignore_imports = [
     "app.modules.flow.service -> app.modules.livevote.service",
     "app.modules.forms.service -> app.modules.budget.tree_models",
     "app.modules.forms.service -> app.modules.config_revision.service",
-    "app.modules.forms.validation -> app.shared.config_schemas",
+    "app.modules.gremien.gremium_roles -> app.modules.delegations.pool",
     "app.modules.gremien.service -> app.modules.admin.cd_logos",
     "app.modules.gremien.service -> app.modules.admin.models",
     "app.modules.gremien.service -> app.modules.applications.models",
@@ -180,10 +170,6 @@ ignore_imports = [
     "app.modules.gremien.service -> app.modules.voting.listing",
     "app.modules.gremien.service -> app.modules.voting.models",
     "app.modules.gremien.service -> app.modules.voting.schemas",
-    "app.modules.gremien.service -> app.shared.config_schemas",
-    "app.modules.livevote.service.handover -> app.modules.admin.gremium_roles",
-    "app.modules.livevote.service.permissions -> app.modules.admin.gremium_roles",
-    "app.modules.livevote.vote_build -> app.shared.config_schemas",
     "app.modules.media.router -> app.modules.protocol.public",
     "app.modules.notifications.action_dispatcher -> app.modules.applications.decision",
     "app.modules.notifications.action_dispatcher -> app.modules.applications.models",
@@ -215,7 +201,6 @@ ignore_imports = [
     "app.modules.notifications.todos -> app.modules.todos.models",
     "app.modules.notifications.todos -> app.modules.todos.service",
     "app.modules.protocol.service -> app.modules.admin.cd_resolver",
-    "app.modules.protocol.service -> app.shared.config_schemas",
     "app.modules.tickets.router -> app.modules.admin.site_config_service",
     "app.modules.voting.listing -> app.modules.livevote.agenda_service",
     "app.modules.voting.listing -> app.modules.livevote.models",
@@ -229,9 +214,7 @@ ignore_imports = [
     "app.modules.voting.service -> app.modules.livevote.models",
     "app.modules.voting.service -> app.modules.livevote.service",
     "app.modules.voting.service -> app.modules.protocol.models",
-    "app.modules.voting.tally -> app.shared.config_schemas",
     "app.modules.webhooks.action_dispatcher -> app.modules.flow.dispatch",
-    "app.shared.config_schemas -> app.modules.admin.branding",
 ]
 name = "A module imports only from its layer and from lower layers"
 type = "layers"
@@ -247,17 +230,6 @@ layers = [
 
 [[tool.importlinter.contracts]]
 id = "shared-imports-no-module"
-ignore_imports = [
-    "app.shared.config_schemas -> app.modules.admin.branding",
-    "app.shared.people -> app.modules.auth.models",
-    "app.shared.ws -> app.modules.auth.models",
-    "app.shared.ws -> app.modules.auth.principal",
-    "app.shared.ws -> app.modules.auth.rbac",
-    "app.shared.ws -> app.modules.auth.session_renewal",
-    "app.shared.ws -> app.modules.auth.sessions",
-    "app.shared.xlsx -> app.modules.applications.schemas",
-    "app.shared.xlsx -> app.modules.budget.tree_schemas",
-]
 name = "The shared code imports no module"
 type = "forbidden"
 source_modules = ["app.shared", "app.db", "app.settings", "app.logging_config"]

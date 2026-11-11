@@ -1,6 +1,5 @@
 {
   "backend/app/modules/admin/cd_builtin/convert.py": 4,
-  "backend/app/modules/admin/gremium_roles.py": 2,
   "backend/app/modules/admin/image_size.py": 3,
   "backend/app/modules/admin/oidc_mappings.py": 4,
   "backend/app/modules/admin/principal_merge.py": 3,

@@ -465,7 +465,7 @@ def test_tree_without_permission_is_gremium_scoped(
     The router passes the member Gremien as visible_gremium_ids. Without a membership the
     tree stays empty.
     """
-    import app.modules.admin.gremium_roles as gr
+    import app.modules.gremien.gremium_roles as gr
 
     async def _members(session, sub, now=None):
         return set()

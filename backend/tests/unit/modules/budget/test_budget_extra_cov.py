@@ -392,7 +392,7 @@ def test_list_tree_gremium_scoped(
     fake: _FakeService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Without a full view the router passes the member Gremien as visible_gremium_ids."""
-    import app.modules.admin.gremium_roles as gr
+    import app.modules.gremien.gremium_roles as gr
 
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
         return {_GID}
@@ -523,7 +523,7 @@ def test_list_applications_scoped_allowed(
     fake: _FakeService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Without a full view the router loads the member Gremien and `can_view_node` allows."""
-    import app.modules.admin.gremium_roles as gr
+    import app.modules.gremien.gremium_roles as gr
 
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
         return {_GID}
@@ -539,7 +539,7 @@ def test_list_expenses_scoped_denied(
     fake: _FakeService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Without a full view and with `can_view_node` False the router gives 403."""
-    import app.modules.admin.gremium_roles as gr
+    import app.modules.gremien.gremium_roles as gr
 
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
         return set()
@@ -554,7 +554,7 @@ def test_list_expenses_scoped_denied(
 def test_list_expenses_scoped_allowed(
     fake: _FakeService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import app.modules.admin.gremium_roles as gr
+    import app.modules.gremien.gremium_roles as gr
 
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
         return {_GID}
@@ -569,7 +569,7 @@ def test_list_expenses_scoped_allowed(
 def test_list_fiscal_years_scoped_allowed(
     fake: _FakeService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import app.modules.admin.gremium_roles as gr
+    import app.modules.gremien.gremium_roles as gr
 
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
         return {_GID}

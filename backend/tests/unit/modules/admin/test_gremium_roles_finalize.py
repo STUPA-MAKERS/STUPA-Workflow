@@ -9,14 +9,14 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from app.modules.admin.gremium_roles import (
+from app.modules.gremien.gremium_roles import (
     FORCED_ROLE_DEFAULT_PERMS,
     GREMIUM_PERMISSIONS,
     GremiumRoleService,
     _sanitize_perms,
 )
-from app.modules.admin.schemas import GremiumRoleCreate, GremiumRoleUpdate
 from app.modules.gremien.models import GremiumRole
+from app.modules.gremien.role_schemas import GremiumRoleCreate, GremiumRoleUpdate
 from app.shared.permissions import PERMISSION_CATALOGUE
 from tests._support.auth_fakes import fake_session, result
 

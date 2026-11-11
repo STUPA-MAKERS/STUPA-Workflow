@@ -19,8 +19,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.modules.admin import gremium_roles as gremium_roles_mod
 from app.modules.auth.principal import Principal
+from app.modules.gremien import gremium_roles as gremium_roles_mod
 from app.modules.livevote.service import MeetingService
 from app.modules.livevote.service import permissions as permissions_mod
 from app.modules.voting.service import VotingService

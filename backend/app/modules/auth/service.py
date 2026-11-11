@@ -18,7 +18,6 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.membership_sync import sync_principal_memberships
 from app.modules.applications.guest_settings import load_guest_settings
 from app.modules.applications.models import Applicant as ApplicantRow
 from app.modules.applications.models import Application, MagicLink
@@ -34,6 +33,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.session_renewal import session_expiry
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.service import FlowService
+from app.modules.gremien.membership_sync import sync_principal_memberships
 from app.settings import Settings
 from app.shared.errors import ForbiddenError, GoneError
 

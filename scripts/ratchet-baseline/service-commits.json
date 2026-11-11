@@ -1,7 +1,6 @@
 {
   "backend/app/main.py": 1,
   "backend/app/modules/admin/cd_builtin/convert.py": 1,
-  "backend/app/modules/admin/gremium_roles.py": 4,
   "backend/app/modules/admin/oidc_mappings.py": 1,
   "backend/app/modules/admin/principal_merge.py": 1,
   "backend/app/modules/admin/principal_revoke.py": 1,
@@ -37,6 +36,7 @@
   "backend/app/modules/flow/extras_dispatcher.py": 4,
   "backend/app/modules/flow/service.py": 5,
   "backend/app/modules/forms/service.py": 2,
+  "backend/app/modules/gremien/gremium_roles.py": 4,
   "backend/app/modules/livevote/agenda_service.py": 5,
   "backend/app/modules/livevote/attendance_service.py": 3,
   "backend/app/modules/livevote/guest_connection.py": 2,

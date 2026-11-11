@@ -16,12 +16,12 @@ from uuid import UUID
 
 from pydantic import ConfigDict, EmailStr, Field, JsonValue, field_validator
 
+from app.modules.auth.people import PersonRef
 from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut, MessageFilesIn
 from app.settings import get_settings
 from app.shared.altcha import AltchaSolutionStr
 from app.shared.i18n import Lang
 from app.shared.mentions import MAX_MENTIONS
-from app.shared.people import PersonRef
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 TicketKind = Literal["bug", "question", "idea", "barrier"]

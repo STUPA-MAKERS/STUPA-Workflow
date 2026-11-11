@@ -25,9 +25,9 @@ from fastapi.testclient import TestClient
 
 from app.deps import get_current_principal
 from app.main import create_app
-from app.modules.admin import gremium_roles as gremium_roles_mod
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import NullActionDispatcher
+from app.modules.gremien import gremium_roles as gremium_roles_mod
 from app.modules.livevote import router as router_mod
 from app.modules.livevote.agenda_service import AgendaService, title_of
 from app.modules.livevote.attendance_service import AttendanceService

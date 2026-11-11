@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
+from app.modules.auth.people import PersonRef
 from app.modules.auth.principal import Principal
 from app.modules.todos import live as live_mod
 from app.modules.todos import router as router_mod
@@ -52,7 +53,6 @@ from app.modules.todos.service import TodoMail, TodoService
 from app.settings import load_settings
 from app.shared.errors import ConflictError
 from app.shared.paging import Page
-from app.shared.people import PersonRef
 
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
 BID = uuid.uuid4()

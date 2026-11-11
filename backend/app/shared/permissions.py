@@ -7,7 +7,7 @@ The keys stay grouped by area to keep the contract stable and deterministic.
 
 Voting, meeting management and protocol rights are NOT in this catalog. They are
 gremium permissions (`vote.cast`, `vote.manage`, `session.manage`, `protocol.write`,
-`protocol.finalize`) of the gremium role catalog in `app.modules.admin.gremium_roles`.
+`protocol.finalize`) of the gremium role catalog in `app.modules.gremien.gremium_roles`.
 A vote names its gremium in `eligibleGroup`.
 
 Keys that need a note:
@@ -45,7 +45,7 @@ Keys that need a note:
   admin-only by default.
 - `admin.types_delete`: delete an application type, separate from `admin.types`
   (create, edit), because a form and a flow hang on the type.
-- `admin.roles`, `admin.users`, `admin.group_mappings`, `admin.gremium_roles`,
+- `admin.roles`, `admin.users`, `admin.group_mappings`, `gremien.gremium_roles`,
   `admin.cd_variants`, `admin.delegations`, `admin.deadlines`: one key per admin page
   (/admin/roles, /admin/users, /admin/group-mappings, /admin/committees/:id/roles,
   /admin/cd-variants with the logo upload and download, /admin/delegations with the
@@ -113,7 +113,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.users.merge",
     "admin.users.revoke_groups",
     "admin.group_mappings",
-    "admin.gremium_roles",
+    "gremien.gremium_roles",
     "admin.cd_variants",
     "admin.delegations",
     "admin.deadlines",

@@ -13,8 +13,8 @@ from uuid import UUID
 
 from pydantic import ConfigDict, Field, JsonValue
 
+from app.modules.auth.people import PersonRef
 from app.modules.files.schemas import MessageAttachmentOut, MessageFilesIn
-from app.shared.people import PersonRef
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 TodoBoardKind = Literal["gremium", "personal", "team"]

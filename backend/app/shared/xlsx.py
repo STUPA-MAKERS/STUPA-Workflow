@@ -14,7 +14,7 @@ from decimal import Decimal
 from functools import reduce
 from io import BytesIO
 from itertools import count
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:  # pragma: no cover - types only
     from uuid import UUID
@@ -22,8 +22,71 @@ if TYPE_CHECKING:  # pragma: no cover - types only
     from openpyxl import Workbook
     from openpyxl.worksheet.worksheet import Worksheet
 
-    from app.modules.applications.schemas import ApplicationListItem
-    from app.modules.budget.tree_schemas import BudgetTreeNodeOut
+
+
+class _Allocation(Protocol):
+    """The sums of one cost center in one fiscal year, as the budget sheet reads them."""
+
+    @property
+    def fiscal_year_id(self) -> UUID: ...
+    @property
+    def allocated(self) -> Decimal: ...
+    @property
+    def committed(self) -> Decimal: ...
+    @property
+    def requested(self) -> Decimal: ...
+    @property
+    def available(self) -> Decimal: ...
+
+
+class _BudgetNode(Protocol):
+    """One cost center of the budget tree, as the budget sheet reads it.
+
+    The shared code imports no module (§S/backend/python/000644), so it names the fields
+    that it reads and not the schema of the module `budget`.
+    """
+
+    @property
+    def name(self) -> str: ...
+    @property
+    def path_key(self) -> str: ...
+    @property
+    def currency(self) -> str: ...
+    @property
+    def by_fiscal_year(self) -> Sequence[_Allocation]: ...
+    @property
+    def children(self) -> Sequence[_BudgetNode]: ...
+
+
+class _State(Protocol):
+    """The state of an application, as the application sheet reads it."""
+
+    @property
+    def label(self) -> Mapping[str, str]: ...
+
+
+class _ApplicationRow(Protocol):
+    """One application of the list, as the application sheet reads it (000644)."""
+
+    @property
+    def title(self) -> str | None: ...
+    @property
+    def type_id(self) -> UUID: ...
+    @property
+    def state(self) -> _State | None: ...
+    @property
+    def gremium_id(self) -> UUID | None: ...
+    @property
+    def amount(self) -> Decimal | None: ...
+    @property
+    def currency(self) -> str | None: ...
+    @property
+    def created_at(self) -> datetime: ...
+    @property
+    def updated_at(self) -> datetime: ...
+    @property
+    def state_since(self) -> datetime | None: ...
+
 
 XLSX_MEDIA_TYPE = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -105,15 +168,15 @@ def _workbook_bytes(workbook: Workbook) -> bytes:
 
 
 def _iter_nodes(
-    nodes: Iterable[BudgetTreeNodeOut], depth: int = 0
-) -> Iterable[tuple[int, BudgetTreeNodeOut]]:
+    nodes: Iterable[_BudgetNode], depth: int = 0
+) -> Iterable[tuple[int, _BudgetNode]]:
     for node in nodes:
         yield depth, node
         yield from _iter_nodes(node.children, depth + 1)
 
 
 def build_budget_workbook(
-    roots: Sequence[BudgetTreeNodeOut],
+    roots: Sequence[_BudgetNode],
     *,
     fiscal_year_labels: Mapping[UUID, str],
     fiscal_year_id: UUID | None = None,
@@ -174,7 +237,7 @@ def build_budget_workbook(
     return _workbook_bytes(wb)
 
 
-def _budget_row(depth: int, node: BudgetTreeNodeOut, fy: object) -> list[object]:
+def _budget_row(depth: int, node: _BudgetNode, fy: object) -> list[object]:
     """Return the row of one cost center in the sheet of fiscal year ``fy``.
 
     A cost center without an allocation in that year gets empty amount cells.
@@ -232,7 +295,7 @@ def _sheet_title(label: str, used: set[str]) -> str:
 
 
 def build_applications_workbook(
-    items: Sequence[ApplicationListItem],
+    items: Sequence[_ApplicationRow],
     *,
     type_names: dict[Any, str],
     gremium_names: dict[Any, str],
@@ -276,7 +339,7 @@ def build_applications_workbook(
     return _workbook_bytes(wb)
 
 
-def _state_label(item: ApplicationListItem, locale: str) -> str:
+def _state_label(item: _ApplicationRow, locale: str) -> str:
     """Return the state label of an application in ``locale``, else German, else English."""
     label = (item.state.label or {}) if item.state is not None else {}
     return label.get(locale) or label.get("de") or label.get("en") or ""

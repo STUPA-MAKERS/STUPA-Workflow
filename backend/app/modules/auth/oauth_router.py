@@ -25,11 +25,11 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
-from app.modules.admin.gremium_roles import active_gremium_roles
 from app.modules.auth import oauth, oauth_service, sessions
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthToken
 from app.modules.auth.oauth_service import IssuedTokens
+from app.modules.gremien.gremium_roles import active_gremium_roles
 from app.settings import Settings
 from app.shared.errors import BadRequestError, ForbiddenError, NotFoundError, ProblemDetail
 from app.shared.schemas import FrozenModel

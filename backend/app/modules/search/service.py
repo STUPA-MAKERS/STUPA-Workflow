@@ -271,7 +271,7 @@ class SearchService:
         A global budget permission needs no filter. Anyone else is limited to the nodes of
         the Gremien they read, and a caller who reads no Gremium sees no node at all.
         """
-        from app.modules.admin.gremium_roles import gremium_reader_ids
+        from app.modules.gremien.gremium_roles import gremium_reader_ids
 
         if has_budget_read(principal):
             return ()

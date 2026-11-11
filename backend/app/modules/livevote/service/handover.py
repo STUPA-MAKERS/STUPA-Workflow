@@ -33,11 +33,11 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.admin.gremium_roles import gremium_member_ids
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.gremien.gremium_roles import gremium_member_ids
 from app.modules.livevote.agenda_service import agenda_order
 from app.modules.livevote.keepers import KEEPER_PERMISSION, keeper_principal_ids
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, ProtocolKeeperPeriod

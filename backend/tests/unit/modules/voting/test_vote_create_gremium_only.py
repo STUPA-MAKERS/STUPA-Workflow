@@ -23,9 +23,9 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from app.modules.admin import gremium_roles as gremium_roles_mod
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
+from app.modules.gremien import gremium_roles as gremium_roles_mod
 from app.modules.voting.schemas import VoteCreate
 from app.modules.voting.service import VotingService, secret_only
 from app.shared.config_schemas import VoteConfig

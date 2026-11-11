@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/admin/membership_sync.py
+  - backend/app/modules/gremien/membership_sync.py
   - backend/app/modules/auth/service.py
   - backend/app/modules/auth/session_renewal.py
 scope:

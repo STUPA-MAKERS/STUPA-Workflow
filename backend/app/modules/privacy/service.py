@@ -16,7 +16,6 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.membership_sync import sync_principal_memberships
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import (
     Applicant,
@@ -31,6 +30,7 @@ from app.modules.auth.models import AuthSession, Principal
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.flow.models import State
+from app.modules.gremien.membership_sync import sync_principal_memberships
 from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names

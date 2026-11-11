@@ -31,7 +31,7 @@ context of the report.
   hooks; `get_ticket_mail_sender` is the override point for tests.
 - `access.py` — `TICKET_MANAGE`.
 - Outside the module: `notifications/tickets.py` (both mails), `worker/tickets.py`
-  (retention cron), `shared/people.py` (`PersonRef`, `person_of`, `person_refs`),
+  (retention cron), `auth/people.py` (`PersonRef`, `person_of`, `person_refs`),
   `files/{drafts,service,router}.py` (ticket attachments), `admin/branding.py`
   (`HelpSettings`, `TicketSettings`, `PublicBranding`), `admin/site_config_service.py`
   (`active_branding`, `help_tickets`, `put_help_tickets`).

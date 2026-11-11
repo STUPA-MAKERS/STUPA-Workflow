@@ -44,7 +44,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import delete, select
 
 from app.db import get_sessionmaker
-from app.modules.admin.membership_sync import sync_all_memberships
+from app.modules.gremien.membership_sync import sync_all_memberships
 from app.modules.gremien.models import Gremium, GremiumMembershipMapping, GremiumRole, GremiumRoleMapping
 from app.modules.auth.models import GroupMapping, Principal, Role, RoleAssignment
 from app.modules.auth.sessions import create_principal_session

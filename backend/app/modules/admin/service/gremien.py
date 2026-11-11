@@ -6,7 +6,6 @@ from uuid import UUID
 
 from sqlalchemy import distinct, func, or_, select
 
-from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.models import CdVariant
 from app.modules.admin.schemas import (
     GremiumAdminOut,
@@ -22,6 +21,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.service import FilesService
+from app.modules.gremien.gremium_roles import GremiumRoleService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.todos.boards import ensure_gremium_board
 from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
