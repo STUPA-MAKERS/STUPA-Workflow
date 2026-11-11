@@ -2,10 +2,13 @@
 id: "000702"
 title: A month or year shortcut stops at the end of the month
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "frontend/vendor/ui-kit/src/lib/datepicker/relative-date.spec.ts:resolveRelativeDate"
+implementation:
+  - frontend/vendor/ui-kit/src/lib/datepicker/relative-date.ts
 scope:
   - frontend/vendor/ui-kit/src/lib/datepicker
 ---

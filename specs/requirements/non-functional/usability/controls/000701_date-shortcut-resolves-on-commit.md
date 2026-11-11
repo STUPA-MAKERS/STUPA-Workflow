@@ -2,10 +2,14 @@
 id: "000701"
 title: A date shortcut becomes the date when the field commits
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "frontend/vendor/ui-kit/src/lib/datepicker/datepicker.component.spec.ts:DatepickerComponent"
+implementation:
+  - frontend/vendor/ui-kit/src/lib/datepicker/relative-date.ts
+  - frontend/vendor/ui-kit/src/lib/datepicker/datepicker.component.ts
 scope:
   - frontend/vendor/ui-kit/src/lib/datepicker
   - frontend/src/app/

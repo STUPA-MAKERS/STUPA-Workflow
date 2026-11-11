@@ -2,10 +2,14 @@
 id: "000700"
 title: A date field takes a shortcut relative to today
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "frontend/vendor/ui-kit/src/lib/datepicker/relative-date.spec.ts:resolveRelativeDate"
+implementation:
+  - frontend/vendor/ui-kit/src/lib/datepicker/relative-date.ts
+  - frontend/vendor/ui-kit/src/lib/datepicker/datepicker.component.ts
 scope:
   - frontend/vendor/ui-kit/src/lib/datepicker
   - frontend/src/app/
