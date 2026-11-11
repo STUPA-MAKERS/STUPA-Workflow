@@ -48,11 +48,11 @@ pytest.importorskip("fastapi")
 backend_main = pytest.importorskip("app.main")
 
 from app.deps import get_current_applicant, get_current_principal, get_session  # noqa: E402
+from app.modules.attachments.router import get_files_service  # noqa: E402
 from app.modules.auth import oauth  # noqa: E402
 from app.modules.auth.principal import Principal  # noqa: E402
 from app.modules.files import mime as backend_mime  # noqa: E402
 from app.modules.files.models import MAX_ATTACHMENT_BYTES, Attachment  # noqa: E402
-from app.modules.attachments.router import get_files_service  # noqa: E402
 from app.modules.files.schemas import AttachmentOut  # noqa: E402
 from app.shared.errors import UnsupportedMediaTypeError  # noqa: E402
 from app.shared.filenames import sanitize_display_name  # noqa: E402

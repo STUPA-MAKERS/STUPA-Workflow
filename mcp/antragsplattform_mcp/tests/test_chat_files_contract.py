@@ -58,16 +58,16 @@ from app.modules.applications.router import (  # noqa: E402
     get_comment_mail_sender,
 )
 from app.modules.applications.schemas import CommentOut  # noqa: E402
-from app.modules.auth import oauth  # noqa: E402
-from app.modules.auth.people import PersonRef  # noqa: E402
-from app.modules.auth.principal import Principal  # noqa: E402
-from app.modules.files import mime as backend_mime  # noqa: E402
-from app.modules.files.drafts import DRAFT_ATTACHMENTS_MISSING  # noqa: E402
 from app.modules.attachments.router import (  # noqa: E402
     DRAFT_TOKEN_HEADER,
     get_draft_attachments,
     get_files_service,
 )
+from app.modules.auth import oauth  # noqa: E402
+from app.modules.auth.people import PersonRef  # noqa: E402
+from app.modules.auth.principal import Principal  # noqa: E402
+from app.modules.files import mime as backend_mime  # noqa: E402
+from app.modules.files.drafts import DRAFT_ATTACHMENTS_MISSING  # noqa: E402
 from app.modules.files.schemas import (  # noqa: E402
     MAX_MESSAGE_ATTACHMENTS,
     DraftAttachmentOut,
