@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - backend/app/modules/todos/links.py
+  - backend/app/modules/todos/link_view.py
+  - frontend/src/app/features/todos/link-picker/todo-link-picker.component.ts
+  - frontend/src/app/features/calendar/appointment-detail/appointment-detail.component.html
 scope:
   - backend/app/modules/todos
   - backend/app/modules/calendar

@@ -127,6 +127,10 @@ describe('todos.util', () => {
       ).toBe('Abstimmung · 33. Sitzung · Angenommen');
       expect(sub(link({ kind: 'vote', detail: { voteStatus: 'draft' } }))).toBe('Abstimmung · Entwurf');
       expect(sub(link({ kind: 'vote', detail: {} }))).toBe('Abstimmung');
+      expect(
+        sub(link({ kind: 'appointment', detail: { date: '2026-11-18', startTime: '14:00:00', place: 'Aula' } })),
+      ).toBe('Termin · Mi, 18.11.2026 · 14:00 · Aula');
+      expect(sub(link({ kind: 'appointment', detail: {} }))).toBe('Termin');
       expect(sub(link({ kind: 'gremium', title: 'StuPa', detail: {} }))).toBe('Gremium');
       expect(
         sub(link({ kind: 'invoice', title: 'RE-7', detail: { number: 'RE-7', counterparty: 'Druckhaus', amount: '119.00' } })),
@@ -157,6 +161,9 @@ describe('todos.util', () => {
         linkLine(link({ kind: 'agenda_item', title: 'TOP Haushalt', detail: { date: 'bad' } }), TODAY, 'de-DE', t),
       ).toBe('TOP · TOP Haushalt');
       expect(linkLine(link({ kind: 'meeting', title: 'S', detail: null }), TODAY, 'de-DE', t)).toBe('Sitzung · S');
+      expect(
+        linkLine(link({ kind: 'appointment', title: 'Vollversammlung', detail: { date: '2026-11-03' } }), TODAY, 'de-DE', t),
+      ).toBe('Termin · Vollversammlung · Di, 03.11.');
       expect(linkLine(link({ kind: 'invoice', title: 'RE-7', detail: { amount: '119.00' } }), TODAY, 'de-DE', t)).toBe(
         `Rechnung · RE-7 · ${formatMoney('119.00', 'de-DE')}`,
       );

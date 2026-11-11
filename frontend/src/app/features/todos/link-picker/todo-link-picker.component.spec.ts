@@ -132,6 +132,7 @@ describe('TodoLinkPickerComponent', () => {
   it('groups votes, gremien, invoices and bookings with their icons', async () => {
     const hits: TodoLinkTarget[] = [
       { kind: 'vote', targetId: 'v-1', title: 'Plakate annehmen?', detail: { voteStatus: 'open' } },
+      { kind: 'appointment', targetId: 'a-1', title: 'Vollversammlung', detail: { date: '2026-11-18', place: 'Aula' } },
       { kind: 'gremium', targetId: 'g-1', title: 'StuPa', detail: {} },
       { kind: 'invoice', targetId: 'i-1', title: 'RE-7', detail: { number: 'RE-7', counterparty: 'Druckhaus' } },
       { kind: 'expense', targetId: 'e-1', title: 'Plakate', detail: { costCentre: 'VS-800' } },
@@ -141,15 +142,17 @@ describe('TodoLinkPickerComponent', () => {
     await open();
     type('Pla');
     const groups = [...document.querySelectorAll('.lp__group')].map((g) => g.textContent?.trim());
-    expect(groups).toEqual(['Abstimmungen', 'Gremien', 'Rechnungen', 'Buchungen']);
+    expect(groups).toEqual(['Abstimmungen', 'Termine', 'Gremien', 'Rechnungen', 'Buchungen']);
+    expect(screen.getByText('Termin · Mi, 18.11.2026 · Aula')).toBeInTheDocument();
     expect(screen.getByText('Abstimmung · Offen')).toBeInTheDocument();
     expect(screen.getByText('Rechnung · Druckhaus')).toBeInTheDocument();
     expect(screen.getByText('Buchung · VS-800')).toBeInTheDocument();
-    expect(hits.map((h) => fixture.componentInstance.icon(h))).toEqual(['vote', 'landmark', 'receipt', 'swap']);
+    expect(hits.map((h) => fixture.componentInstance.icon(h))).toEqual(['vote', 'cal', 'landmark', 'receipt', 'swap']);
     fireEvent.click(screen.getByRole('button', { name: /StuPa/ }));
-    expect(picked).toHaveBeenCalledWith(hits[1]);
+    expect(picked).toHaveBeenCalledWith(hits[2]);
     for (const [label, kind] of [
       ['Abstimmungen', 'vote'],
+      ['Termine', 'appointment'],
       ['Gremien', 'gremium'],
       ['Rechnungen', 'invoice'],
       ['Buchungen', 'expense'],

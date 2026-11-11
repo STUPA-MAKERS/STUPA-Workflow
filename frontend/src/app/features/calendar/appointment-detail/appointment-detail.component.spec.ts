@@ -1,8 +1,10 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { Appointment } from '@core/api/calendar.service';
+import type { TodoLinkedCard } from '@core/api/todos.service';
 import { appointment } from '../../../../testing/calendar-fixtures';
 import { runAxe } from '../../../../testing/a11y';
 import { errorToasts } from '../../../../testing/load-error';
@@ -11,14 +13,27 @@ import { AppointmentDetailComponent } from './appointment-detail.component';
 
 const URL = '/api/calendar/appointments/a-1';
 
-async function setup(a: Appointment | null = appointment(), now = new Date(2026, 10, 11, 9, 0)) {
+const LINKED = '/api/todos/linked';
+
+async function setup(
+  a: Appointment | null = appointment(),
+  now = new Date(2026, 10, 11, 9, 0),
+  cards: readonly TodoLinkedCard[] = [],
+) {
   const on = { closed: jest.fn(), edit: jest.fn(), answered: jest.fn(), removed: jest.fn() };
   const view = await render(AppointmentDetailComponent, {
     inputs: { open: true, appointment: a },
     on,
-    providers: [provideHttpClient(), provideHttpClientTesting(), { provide: CALENDAR_NOW, useValue: () => now }],
+    providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      provideRouter([]),
+      { provide: CALENDAR_NOW, useValue: () => now },
+    ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
+  http.match((r) => r.url === LINKED).forEach((r) => r.flush(cards));
+  view.fixture.detectChanges();
   return { ...view, on, http };
 }
 
@@ -51,6 +66,26 @@ describe('AppointmentDetailComponent', () => {
     expect(within(dialog).queryByRole('radiogroup')).toBeNull();
     expect(within(dialog).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
     expect(within(dialog).queryByRole('button', { name: 'Löschen' })).toBeNull();
+  });
+
+  /** § 000735: the detail of a Termin shows the cards that link it. */
+  it('shows the cards that link the Termin', async () => {
+    const card: TodoLinkedCard = {
+      id: 'k-1',
+      boardId: 'b-1',
+      boardName: 'Studierendenparlament',
+      title: 'Raum buchen',
+      columnName: 'In Arbeit',
+      isDone: false,
+      dueDate: null,
+      assignees: [],
+      event: null,
+      balance: null,
+    };
+    const view = await setup(appointment(), undefined, [card]);
+    const dialog = screen.getByRole('dialog', { name: 'Jour fixe' });
+    expect(within(dialog).getByRole('link', { name: 'Raum buchen' })).toBeInTheDocument();
+    expect(await runAxe(view.container)).toHaveNoViolations();
   });
 
   it('shows no dialog without a Termin', async () => {

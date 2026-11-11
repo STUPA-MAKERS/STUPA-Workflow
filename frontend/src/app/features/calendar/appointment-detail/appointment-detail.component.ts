@@ -19,6 +19,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { CALENDAR_NOW } from '../calendar-grid.util';
 import { answerKey, answerKind, hasEnded, spanText } from '../calendar.util';
+import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 
 /**
  * The dialog of one Termin (§ 000714, 000719): when, where, from whom, the description,
@@ -41,6 +42,7 @@ import { answerKey, answerKind, hasEnded, spanText } from '../calendar.util';
     IconComponent,
     SegmentedComponent,
     StatusTextComponent,
+    TodoLinkedListComponent,
     TranslatePipe,
   ],
   templateUrl: './appointment-detail.component.html',

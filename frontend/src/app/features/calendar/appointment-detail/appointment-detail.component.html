@@ -68,6 +68,7 @@
           </div>
         </div>
       }
+      <app-todo-linked-list kind="appointment" headingId="apv-todos" [targetId]="a.id" />
     </div>
     @if (a.canEdit) {
       <app-button dialog-footer variant="text" (click)="confirming.set(true)">

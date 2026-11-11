@@ -40,6 +40,7 @@ export const LINK_ICON: Record<TodoLinkKind, IconName> = {
   meeting: 'users',
   agenda_item: 'list',
   vote: 'vote',
+  appointment: 'cal',
   gremium: 'landmark',
   invoice: 'receipt',
   expense: 'swap',
@@ -53,6 +54,7 @@ export const LINK_KIND_LABEL: Record<TodoLinkKind, TranslationKey> = {
   meeting: 'todos.linkKind.meeting',
   agenda_item: 'todos.linkKind.agenda_item',
   vote: 'todos.linkKind.vote',
+  appointment: 'todos.linkKind.appointment',
   gremium: 'todos.linkKind.gremium',
   invoice: 'todos.linkKind.invoice',
   expense: 'todos.linkKind.expense',
@@ -166,6 +168,8 @@ function linkFacts(
       const status = d.voteStatus ? t(VOTE_STATUS_LABEL[d.voteStatus]) : null;
       return [d.meetingTitle, d.voteResult ? t(VOTE_RESULT_LABEL[d.voteResult]) : status];
     }
+    case 'appointment':
+      return [d.date ? weekdayDate(d.date, locale) : null, d.startTime ? d.startTime.slice(0, 5) : null, d.place];
     case 'invoice': {
       const counterparty = d.counterparty !== title ? d.counterparty : null;
       const date = d.date ? weekdayDate(d.date, locale) : null;
@@ -212,7 +216,7 @@ export function linkSub(
 /** The day and weekday of a meeting or agenda item link ("Di, 03.11."), else null. */
 function linkDay(link: TodoLink, today: string, locale: string): string | null {
   const day =
-    (link.kind === 'meeting' || link.kind === 'agenda_item') && link.detail?.date
+    (link.kind === 'meeting' || link.kind === 'agenda_item' || link.kind === 'appointment') && link.detail?.date
       ? parseDay(link.detail.date)
       : null;
   return day ? `${weekdayName(day, locale)}, ${shortDay(day, locale, today)}` : null;

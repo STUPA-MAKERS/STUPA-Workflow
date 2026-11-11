@@ -23,6 +23,7 @@ export type TodoLinkKind =
   | 'meeting'
   | 'agenda_item'
   | 'vote'
+  | 'appointment'
   | 'gremium'
   | 'invoice'
   | 'expense'
@@ -78,6 +79,11 @@ export interface TodoLinkDetail {
   readonly bookingKind?: 'expense' | 'income' | null;
   readonly voteStatus?: TodoVoteStatus | null;
   readonly voteResult?: TodoVoteResult | null;
+  /** A Termin: its last day, its times (`HH:MM:SS`) and its place. `date` is its first day. */
+  readonly endDate?: string | null;
+  readonly startTime?: string | null;
+  readonly endTime?: string | null;
+  readonly place?: string | null;
 }
 
 export interface TodoLink {
