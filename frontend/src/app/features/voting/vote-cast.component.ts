@@ -293,6 +293,9 @@ export class VoteCastComponent implements OnDestroy {
       this.lostToast = this.toast.showNotice({
         message: this.i18n.translate('voting.live.reconnecting'),
         variant: 'warning',
+        // On a phone the notice is the bar at the top of the frame, like "Server nicht
+        // erreichbar": a card that stays would cover the back arrow of the detail.
+        phonePlacement: 'top',
       });
     } else if (!lost && this.lostToast !== null) {
       this.toast.dismiss(this.lostToast);

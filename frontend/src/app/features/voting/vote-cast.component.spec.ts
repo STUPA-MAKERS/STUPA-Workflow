@@ -883,6 +883,7 @@ describe('VoteCastComponent', () => {
         expect(toast.showNotice).toHaveBeenCalledWith({
           message: 'Verbindung verloren — verbinde neu …',
           variant: 'warning',
+          phonePlacement: 'top',
         });
         expect(screen.queryByText('Verbindung verloren — verbinde neu …')).toBeNull();
         jest.advanceTimersByTime(60_000);

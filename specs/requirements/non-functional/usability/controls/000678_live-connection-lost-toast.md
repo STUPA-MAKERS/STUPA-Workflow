@@ -20,7 +20,9 @@ scope:
 
 When the live connection of a view is lost, the view must show the toast "Verbindung verloren
 — verbinde neu …". The toast must stay while the connection is lost. It must close by itself
-when the connection is back. The view must not show the text as a line in the page. While
+when the connection is back. The view must not show the text as a line in the page. On the phone
+the toast must show as the bar at the top of the frame, so that it does not cover the back
+arrow of the detail. While
 the bar "Server nicht erreichbar" shows (000578), the toast must not show.
 
 Reason: The vote detail shows the text as a small line above the title, where it moves the
