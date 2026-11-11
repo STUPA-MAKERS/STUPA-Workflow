@@ -363,14 +363,17 @@ export class TopSheetComponent {
 
   /**
    * The document key of the editor. The minute-taker's editor keeps its key while they
-   * type, and only an insert from outside raises `revision`. The participant view
-   * (`follow`) has no input of its own: the text that the room writes reaches it with
-   * each read of the agenda, so its key changes with the text.
+   * type, and only an insert from outside raises `revision`. A read-only editor has no
+   * input of its own: the participant view (`follow`) and the pane of a reader with
+   * `canWrite` who does not keep the minutes (the session lead, an admin). The text that
+   * the room writes reaches it with each live draft and each read of the agenda, so its
+   * key changes with the text.
    */
   protected readonly docKey = computed(() => {
     const t = this.top();
     if (!t) return '';
-    return this.follow() ? `${t.id}:${textHash(t.body ?? '')}` : `${t.id}:${this.revision()}`;
+    const reader = this.follow() || !this.editable();
+    return reader ? `${t.id}:${textHash(t.body ?? '')}` : `${t.id}:${this.revision()}`;
   });
 
   /** The item is the one that the room handles now (participant view, live meeting). */

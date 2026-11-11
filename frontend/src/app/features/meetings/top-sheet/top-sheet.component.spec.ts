@@ -415,6 +415,14 @@ describe('TopSheetComponent', () => {
       expect(container.querySelector('.ProseMirror')?.textContent).toContain('Die Sitzung ist beschlussfähig.');
     });
 
+    it('shows the live text in the read-only pane of a writer who does not keep the minutes', async () => {
+      const { fixture, container } = await setup({ editable: false, canEdit: true });
+      expect(container.querySelector('.ProseMirror')?.textContent).toContain('Eröffnet.');
+      fixture.componentRef.setInput('top', { ...AGENDA[0], body: 'Eröffnet. Die Sitzung ist beschlussfähig.' });
+      fixture.detectChanges();
+      expect(container.querySelector('.ProseMirror')?.textContent).toContain('Die Sitzung ist beschlussfähig.');
+    });
+
     it('keeps the document of the minute-taker while the text changes', async () => {
       const view = await setup();
       const editor = editorOf(view);
