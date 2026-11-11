@@ -2,7 +2,7 @@
 id: "000713"
 title: The Kalender filters by kind and by Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

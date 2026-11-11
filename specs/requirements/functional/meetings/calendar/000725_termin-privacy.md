@@ -2,7 +2,7 @@
 id: "000725"
 title: Termine are part of the privacy export and erasure
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

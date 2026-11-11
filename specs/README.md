@@ -262,23 +262,23 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/calendar/000331](requirements/functional/meetings/calendar/000331_feed.md) | Each person has a calendar feed | approved |
 | [F/meetings/calendar/000332](requirements/functional/meetings/calendar/000332_feed-404.md) | A wrong feed token is not found | approved |
 | [F/meetings/calendar/000333](requirements/functional/meetings/calendar/000333_event-defaults.md) | A calendar event has a reminder | approved |
-| [F/meetings/calendar/000710](requirements/functional/meetings/calendar/000710_calendar-tab.md) | The Kalender is its own tab | draft |
-| [F/meetings/calendar/000711](requirements/functional/meetings/calendar/000711_calendar-sources.md) | The Kalender shows five kinds of entries | draft |
-| [F/meetings/calendar/000712](requirements/functional/meetings/calendar/000712_calendar-due-cards.md) | The Kalender shows every readable card with a due date | draft |
-| [F/meetings/calendar/000713](requirements/functional/meetings/calendar/000713_calendar-filters.md) | The Kalender filters by kind and by Gremium | draft |
-| [F/meetings/calendar/000714](requirements/functional/meetings/calendar/000714_calendar-entry-opens.md) | An entry opens its own element | draft |
-| [F/meetings/calendar/000715](requirements/functional/meetings/calendar/000715_termin.md) | A Termin has a title and a time span | draft |
-| [F/meetings/calendar/000716](requirements/functional/meetings/calendar/000716_termin-create.md) | Each signed-in person creates a Termin | draft |
-| [F/meetings/calendar/000717](requirements/functional/meetings/calendar/000717_termin-invitations.md) | A Termin invites Gremien and persons | draft |
-| [F/meetings/calendar/000718](requirements/functional/meetings/calendar/000718_termin-visibility.md) | Only the creator and the invited persons read a Termin | draft |
-| [F/meetings/calendar/000719](requirements/functional/meetings/calendar/000719_termin-answers.md) | An invited person answers a Termin | draft |
-| [F/meetings/calendar/000720](requirements/functional/meetings/calendar/000720_termin-mails.md) | An invited person gets a mail | draft |
-| [F/meetings/calendar/000721](requirements/functional/meetings/calendar/000721_external-calendars.md) | An admin subscribes an external calendar | draft |
-| [F/meetings/calendar/000722](requirements/functional/meetings/calendar/000722_external-fetch.md) | The worker fetches external calendars | draft |
-| [F/meetings/calendar/000723](requirements/functional/meetings/calendar/000723_external-entries.md) | External entries are plain and read-only | draft |
-| [F/meetings/calendar/000724](requirements/functional/meetings/calendar/000724_feed-termine-external.md) | The personal feed holds Termine and external entries | draft |
-| [F/meetings/calendar/000725](requirements/functional/meetings/calendar/000725_termin-privacy.md) | Termine are part of the privacy export and erasure | draft |
-| [F/meetings/calendar/000726](requirements/functional/meetings/calendar/000726_calendar-phone.md) | The Kalender on the phone is a list of days | draft |
+| [F/meetings/calendar/000710](requirements/functional/meetings/calendar/000710_calendar-tab.md) | The Kalender is its own tab | approved |
+| [F/meetings/calendar/000711](requirements/functional/meetings/calendar/000711_calendar-sources.md) | The Kalender shows five kinds of entries | approved |
+| [F/meetings/calendar/000712](requirements/functional/meetings/calendar/000712_calendar-due-cards.md) | The Kalender shows every readable card with a due date | approved |
+| [F/meetings/calendar/000713](requirements/functional/meetings/calendar/000713_calendar-filters.md) | The Kalender filters by kind and by Gremium | approved |
+| [F/meetings/calendar/000714](requirements/functional/meetings/calendar/000714_calendar-entry-opens.md) | An entry opens its own element | approved |
+| [F/meetings/calendar/000715](requirements/functional/meetings/calendar/000715_termin.md) | A Termin has a title and a time span | approved |
+| [F/meetings/calendar/000716](requirements/functional/meetings/calendar/000716_termin-create.md) | Each signed-in person creates a Termin | approved |
+| [F/meetings/calendar/000717](requirements/functional/meetings/calendar/000717_termin-invitations.md) | A Termin invites Gremien and persons | approved |
+| [F/meetings/calendar/000718](requirements/functional/meetings/calendar/000718_termin-visibility.md) | Only the creator and the invited persons read a Termin | approved |
+| [F/meetings/calendar/000719](requirements/functional/meetings/calendar/000719_termin-answers.md) | An invited person answers a Termin | approved |
+| [F/meetings/calendar/000720](requirements/functional/meetings/calendar/000720_termin-mails.md) | An invited person gets a mail | approved |
+| [F/meetings/calendar/000721](requirements/functional/meetings/calendar/000721_external-calendars.md) | An admin subscribes an external calendar | approved |
+| [F/meetings/calendar/000722](requirements/functional/meetings/calendar/000722_external-fetch.md) | The worker fetches external calendars | approved |
+| [F/meetings/calendar/000723](requirements/functional/meetings/calendar/000723_external-entries.md) | External entries are plain and read-only | approved |
+| [F/meetings/calendar/000724](requirements/functional/meetings/calendar/000724_feed-termine-external.md) | The personal feed holds Termine and external entries | approved |
+| [F/meetings/calendar/000725](requirements/functional/meetings/calendar/000725_termin-privacy.md) | Termine are part of the privacy export and erasure | approved |
+| [F/meetings/calendar/000726](requirements/functional/meetings/calendar/000726_calendar-phone.md) | The Kalender on the phone is a list of days | approved |
 | [F/meetings/delegations/000110](requirements/functional/meetings/delegations/000110_per-gremium.md) | Vote delegation is a Gremium setting | approved |
 | [F/meetings/delegations/000111](requirements/functional/meetings/delegations/000111_delegation-blocks-presence.md) | A member with an active delegation is not present | approved |
 | [F/meetings/delegations/000112](requirements/functional/meetings/delegations/000112_one-pool.md) | The substitute pool is the only substitute rule | approved |

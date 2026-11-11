@@ -2,7 +2,7 @@
 id: "000726"
 title: The Kalender on the phone is a list of days
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

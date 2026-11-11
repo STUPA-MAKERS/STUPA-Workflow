@@ -2,7 +2,7 @@
 id: "000719"
 title: An invited person answers a Termin
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

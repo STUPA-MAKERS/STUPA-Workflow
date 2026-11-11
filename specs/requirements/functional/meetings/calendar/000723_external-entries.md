@@ -2,7 +2,7 @@
 id: "000723"
 title: External entries are plain and read-only
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

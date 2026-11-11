@@ -2,7 +2,7 @@
 id: "000711"
 title: The Kalender shows five kinds of entries
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

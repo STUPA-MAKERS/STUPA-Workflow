@@ -2,7 +2,7 @@
 id: "000724"
 title: The personal feed holds Termine and external entries
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

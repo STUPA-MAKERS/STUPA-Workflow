@@ -2,7 +2,7 @@
 id: "000718"
 title: Only the creator and the invited persons read a Termin
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null

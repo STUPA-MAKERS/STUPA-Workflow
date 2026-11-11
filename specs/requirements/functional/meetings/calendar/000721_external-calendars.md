@@ -2,7 +2,7 @@
 id: "000721"
 title: An admin subscribes an external calendar
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null
