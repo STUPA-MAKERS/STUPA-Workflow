@@ -50,6 +50,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('voting'),
   { path: 'voting/:id', url: () => `/voting/${MISSING}` },
   fixed('meetings'),
+  fixed('calendar'),
   { path: 'meetings/:id', url: (ids) => `/meetings/${ids.meeting}` },
   fixed('committees'),
   { path: 'committees/:id', url: (ids) => `/committees/${ids.gremium}` },

@@ -327,6 +327,13 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'calendar',
+        data: { title: 'nav.calendar', wide: true },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/calendar/calendar.component').then((m) => m.CalendarComponent),
+      },
+      {
         path: 'todos',
         data: { title: 'nav.todos', wide: true },
         canActivate: [authGuard],
@@ -636,7 +643,7 @@ export const routes: Routes = [
           },
           {
             path: 'calendar',
-            redirectTo: '/meetings',
+            redirectTo: '/calendar',
             pathMatch: 'full',
           },
         ],

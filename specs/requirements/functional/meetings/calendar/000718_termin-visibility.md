@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - backend/app/modules/calendar/rules.py
+  - backend/app/modules/calendar/appointments.py
 scope:
   - backend/app/modules/calendar
 ---

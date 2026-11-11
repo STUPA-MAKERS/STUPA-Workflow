@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - backend/app/modules/calendar/mails.py
+  - backend/app/modules/notifications/kinds.py
 scope:
   - backend/app/modules/calendar
   - backend/app/modules/notifications

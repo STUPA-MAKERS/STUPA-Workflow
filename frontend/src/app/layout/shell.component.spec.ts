@@ -283,6 +283,7 @@ describe('ShellComponent', () => {
         'Anträge',
         'Aufgaben',
         'Boards',
+        'Kalender',
         'Sitzungen',
         'Gremien',
         'Abstimmungen',

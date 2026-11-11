@@ -62,15 +62,11 @@ import { MeetingPageSkeletonComponent } from './meeting-page-skeleton/meeting-pa
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /**
- * Meetings page: the overview (`/meetings`, `MeetingsOverviewComponent`: list or
- * calendar) and the meeting
+ * Meetings page: the overview (`/meetings`, `MeetingsOverviewComponent`: the list) and the meeting
  * page (`/meetings/:id`). The meeting page is the session page for the minute-taker
  * and the lead, and the participant view for a member. This component wires
  * the component-scoped services and the meeting dialogs; its public surface also
  * drives the specs.
- *
- * The overview in a pane layout (the list beside the detail, the wide calendar) fills the
- * free height and scrolls only inside its panes.
  */
 @Component({
   selector: 'app-meetings',
@@ -105,7 +101,6 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
     AgendaItemDialogComponent,
     HandoverDialogComponent,
   ],
-  host: { '[class.pane-page]': 'overviewPane()' },
   templateUrl: './meetings.component.html',
   styleUrl: './meetings.component.scss',
 })
@@ -119,9 +114,6 @@ export class MeetingsComponent {
   protected readonly dialogs = inject(MeetingDialogsService);
   /** The session page, for "Ändern" in the handover dialog (back to the dock picker). */
   private readonly page = viewChild(MeetingPageComponent);
-  /** The overview (`/meetings`), for its pane layout. */
-  private readonly overview = viewChild(MeetingsOverviewComponent);
-  readonly overviewPane = computed(() => this.overview()?.pane() === true);
 
   /** Detail route (`/meetings/:id`) vs. list (`/meetings`). */
   readonly detailMode = signal(false);

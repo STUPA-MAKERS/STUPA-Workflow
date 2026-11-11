@@ -22,15 +22,11 @@
   ) {
   display: contents;
 }
-:host(:not(.pane-page)):has(> app-meetings-overview) {
+:host:has(> app-meetings-overview) {
   flex: 1 0 auto;
 }
 :host > app-meetings-overview {
   flex: 1 0 auto;
-}
-:host(.pane-page) > app-meetings-overview {
-  flex: 1 1 0;
-  min-height: 0;
 }
 :host:has(> app-card) {
   flex: 1 0 auto;

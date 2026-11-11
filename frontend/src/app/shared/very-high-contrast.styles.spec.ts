@@ -113,8 +113,8 @@ describe('rowsAndFills (§000619, §000621)', () => {
     expect(fill).toContain('.ah__tile--on');
   });
 
-  it('turns the text of the chosen budget node and of a live calendar entry black', () => {
-    expect(RULES).toMatch(/\.tn--on,\s*\.cal__entry--live \{\s*@include vh\.ink\(var\(--vh-bg\), var\(--vh-bg\)\);/);
+  it('turns the text of the chosen budget node black', () => {
+    expect(RULES).toMatch(/\.tn--on \{\s*@include vh\.ink\(var\(--vh-bg\), var\(--vh-bg\)\);/);
   });
 });
 

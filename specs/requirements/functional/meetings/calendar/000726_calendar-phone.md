@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - frontend/src/app/features/calendar/calendar.component.ts
+  - frontend/src/app/features/calendar/calendar.util.ts
 scope:
   - frontend/src/app/features
 ---

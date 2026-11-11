@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - frontend/src/app/features/calendar/calendar.component.ts
+  - frontend/src/app/layout/nav.service.ts
+  - frontend/src/app/features/meetings/meetings-overview/meetings-overview.component.ts
 scope:
   - frontend/src/app/features
   - frontend/src/app/layout
