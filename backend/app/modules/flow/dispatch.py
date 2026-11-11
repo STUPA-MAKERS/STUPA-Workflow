@@ -178,8 +178,8 @@ def build_worker_dispatcher(
     """
     from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
     from app.modules.flow.mail_actions import NotificationActionDispatcher
+    from app.modules.flow.webhook_actions import WebhookActionDispatcher
     from app.modules.notifications.provider import mail_queue_from_pool
-    from app.modules.webhooks.action_dispatcher import WebhookActionDispatcher
     from app.modules.webhooks.queue import webhook_queue_from_pool
     from app.settings import get_settings
 

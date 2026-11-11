@@ -17,6 +17,7 @@ from app.modules.applications.schemas import (
     TimelineEventOut,
 )
 from app.modules.applications.service.service_base import ApplicationsServiceBase
+from app.modules.budget.form_options import budget_field_options
 from app.modules.flow.models import Transition
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.forms.service import FormsService
@@ -36,7 +37,7 @@ class ReadOps(ApplicationsServiceBase):
         `form_version_id`.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
-        return await FormsService(self.session).get_effective_form(
+        return await FormsService(self.session, budget_field_options).get_effective_form(
             app.type_id,
             form_version_id=app.form_version_id,
         )

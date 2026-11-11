@@ -131,6 +131,8 @@ class FakeFiles:
     async def list_for_ticket(self, _ticket_id: uuid.UUID) -> list[AttachmentOut]:
         return self.attachments
 
-    async def delete_for_ticket(self, ticket_id: uuid.UUID, *, actor: str) -> int:
+    async def delete_for_ticket(
+        self, ticket_id: uuid.UUID, *, notes: object, actor: str
+    ) -> int:
         self.deleted.append((ticket_id, actor))
         return 1

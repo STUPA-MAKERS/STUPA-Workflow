@@ -14,6 +14,8 @@ from typing import Any
 
 import pytest
 
+from app.modules.attachments.router import get_draft_attachments
+from app.modules.attachments.service import AttachmentService
 from app.modules.files import drafts as drafts_mod
 from app.modules.files import service as files_service
 from app.modules.files.drafts import (
@@ -26,7 +28,6 @@ from app.modules.files.drafts import (
     hash_draft_token,
 )
 from app.modules.files.models import Attachment
-from app.modules.files.router import get_draft_attachments
 from app.modules.files.service import FilesService, application_id_of
 from app.settings import load_settings
 from app.shared.errors import (
@@ -373,5 +374,5 @@ async def test_get_attachment_hides_a_draft() -> None:
 
 
 def test_get_draft_attachments_wraps_the_files_service() -> None:
-    files = FilesService(_Session(), settings=SETTINGS)  # type: ignore[arg-type]
+    files = AttachmentService(_Session(), settings=SETTINGS)  # type: ignore[arg-type]
     assert get_draft_attachments(files).files is files

@@ -18,8 +18,8 @@ import pytest
 from sqlalchemy import true
 
 from app.modules.auth.principal import Principal
-from app.modules.gremien import service as svc
-from app.modules.gremien.service import GremienService
+from app.modules.gremien_overview import service as svc
+from app.modules.gremien_overview.service import GremienService
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import BadRequestError, NotFoundError, ValidationProblem
 from tests._support.auth_fakes import fake_session, result

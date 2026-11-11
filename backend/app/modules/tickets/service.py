@@ -1151,7 +1151,8 @@ class TicketService:
         reporter and the detail would show the name.
         ``anonymized_at`` marks it.
         """
-        await self.files.delete_for_ticket(ticket.id, actor=actor)
+        notes = select(TicketNote.id).where(TicketNote.ticket_id == ticket.id)
+        await self.files.delete_for_ticket(ticket.id, notes=notes, actor=actor)
         if ticket.reporter_principal_id is not None:
             await self.session.execute(
                 update(TicketNote)

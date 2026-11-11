@@ -21,9 +21,9 @@ from app.modules.media.router import (
     IMAGE_CSP,
     UPLOAD_SCOPES,
     get_media_service,
-    get_public_protocols,
 )
 from app.modules.media.service import MediaService
+from app.modules.protocol.public_images_router import get_public_protocols
 from app.settings import get_settings, load_settings
 from app.shared.errors import NotFoundError
 from tests._support.media_fakes import MediaSession, MediaStorage, add_image

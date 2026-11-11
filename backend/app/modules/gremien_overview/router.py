@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.gremien.access import require_gremium
-from app.modules.gremien.schemas import (
+from app.modules.gremien_overview.schemas import (
     AttendanceOut,
     DecisionKind,
     DecisionPageOut,
@@ -25,7 +25,7 @@ from app.modules.gremien.schemas import (
     GremiumOverviewOut,
     MemberAttendanceOut,
 )
-from app.modules.gremien.service import GremienService
+from app.modules.gremien_overview.service import GremienService
 from app.shared.errors import ProblemDetail, ValidationProblem
 
 router = APIRouter(prefix="/committees", tags=["gremien"])

@@ -1,4 +1,4 @@
-"""Files API router.
+"""Attachments API router.
 
 ``POST /api/applications/{id}/attachments`` takes a multipart upload of at most 10 MB.
 Access is A(edit)/P. The route sniffs the MIME type and enqueues the ClamAV scan.
@@ -12,6 +12,10 @@ removed it.
 The routes declare their errors as ``ProblemDetail`` (problem+json). Storage and scan are
 optional infrastructure. Without MinIO an upload gives 503. Without Redis the file stays
 quarantined.
+
+The routes are in `attachments` and not in `files`, because they check the read rule of
+the owner of a file: an application, a ticket or a to-do comment
+(§S/backend/python/000651). The URLs and the tag ``files`` are unchanged.
 """
 
 from __future__ import annotations
@@ -37,12 +41,14 @@ from app.modules.applications.access import (
     resolve_app_read,
 )
 from app.modules.applications.models import Application, Comment
+from app.modules.attachments.service import AttachmentService
 from app.modules.auth.principal import Applicant, Principal
+from app.modules.files.body import read_capped
 from app.modules.files.drafts import DraftAttachments, invalid_token
 from app.modules.files.models import Attachment
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedUrlOut
-from app.modules.files.service import AttachmentOwner, FilesService, application_id_of
+from app.modules.files.service import AttachmentOwner, application_id_of
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import TicketNote
 from app.modules.tickets.service import reporter_reads_file
@@ -58,7 +64,6 @@ from app.shared.errors import (
     BadRequestError,
     ForbiddenError,
     NotFoundError,
-    PayloadTooLargeError,
     ProblemDetail,
     UnauthorizedError,
 )
@@ -67,7 +72,6 @@ from app.shared.filenames import content_disposition
 router = APIRouter(tags=["files"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
-_CHUNK = 64 * 1024
 
 #: Types the browser may render inline in the attachment preview: PDF and raster images
 #: from the upload allowlist. HTML, SVG and XML never appear here, so there is no
@@ -98,11 +102,11 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 def get_files_service(
     session: DbSession, request: Request, settings: SettingsDep
-) -> FilesService:
+) -> AttachmentService:
     """Wire the service with the optional storage and scan queue from the app state."""
     storage = getattr(request.app.state, "object_storage", None)
     pool = getattr(request.app.state, "arq_pool", None)
-    return FilesService(
+    return AttachmentService(
         session,
         storage=storage,
         queue=scan_queue_from_pool(pool),
@@ -110,7 +114,7 @@ def get_files_service(
     )
 
 
-ServiceDep = Annotated[FilesService, Depends(get_files_service)]
+ServiceDep = Annotated[AttachmentService, Depends(get_files_service)]
 
 
 def get_draft_attachments(service: ServiceDep) -> DraftAttachments:
@@ -192,7 +196,7 @@ async def _assert_not_pii_hidden(db: AsyncSession, access: Access, attachment: A
 
 async def _assert_owner_reader(
     db: AsyncSession,
-    service: FilesService,
+    service: AttachmentService,
     owner: AttachmentOwner,
     principal: Principal | None,
     applicant: Applicant | None,
@@ -278,7 +282,7 @@ async def _assert_todo_comment_reader(
 
 async def _assert_comment_reader(
     db: AsyncSession,
-    service: FilesService,
+    service: AttachmentService,
     owner: AttachmentOwner,
     principal: Principal | None,
     applicant: Applicant | None,
@@ -308,7 +312,7 @@ async def _assert_comment_reader(
 
 async def _application_access(
     db: AsyncSession,
-    service: FilesService,
+    service: AttachmentService,
     attachment_id: UUID,
     principal: Principal | None,
     applicant: Applicant | None,
@@ -334,7 +338,7 @@ async def _application_access(
 
 async def _open_download(
     db: AsyncSession,
-    service: FilesService,
+    service: AttachmentService,
     attachment_id: UUID,
     principal: Principal | None,
     applicant: Applicant | None,
@@ -352,32 +356,6 @@ async def _open_download(
     return await service.download_stream(
         attachment_id, allow_unconfirmed=access.is_owning_applicant
     )
-
-
-async def _read_chunks(file: UploadFile, budget: int, max_bytes: int) -> tuple[bytes, ...]:
-    """Read the rest of the upload while at most ``budget`` more bytes fit the cap.
-
-    Raises:
-        PayloadTooLargeError: The body is larger than ``max_bytes`` (HTTP 413).
-    """
-    chunk = await file.read(_CHUNK)
-    if not chunk:
-        return ()
-    if len(chunk) > budget:
-        raise PayloadTooLargeError(f"Attachment exceeds {max_bytes} bytes.")
-    return (chunk, *await _read_chunks(file, budget - len(chunk), max_bytes))
-
-
-async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
-    """Read the upload in chunks with a size cap.
-
-    The function stops as soon as the body passes the cap. It never buffers a body that
-    is larger than ``max_bytes``.
-
-    Raises:
-        PayloadTooLargeError: The body is larger than ``max_bytes`` (HTTP 413).
-    """
-    return b"".join(await _read_chunks(file, max_bytes, max_bytes))
 
 
 @router.post(
@@ -402,7 +380,7 @@ async def upload_attachment(
     that is too large, 415 for a bad type or sniff, 429 at the rate limit and 503 when the
     storage is off.
     """
-    data = await _read_capped(file, service.max_bytes)
+    data = await read_capped(file, service.max_bytes)
     return await service.upload(
         application_id,
         filename=file.filename,
@@ -644,7 +622,7 @@ async def upload_draft_attachment(
             raise BadRequestError(
                 "Altcha verification failed.", code="altcha_failed"
             ) from exc
-    data = await _read_capped(file, drafts.files.max_bytes)
+    data = await read_capped(file, drafts.files.max_bytes)
     return await drafts.upload(
         token=draft_token,
         filename=file.filename,

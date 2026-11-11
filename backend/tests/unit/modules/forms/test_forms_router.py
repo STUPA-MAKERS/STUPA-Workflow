@@ -15,7 +15,9 @@ from fastapi.testclient import TestClient
 
 from app.deps import Principal, get_current_principal
 from app.main import create_app
-from app.modules.forms.router import get_forms_service
+from app.modules.admin.forms_router import get_form_version_writer
+from app.modules.budget.form_options import budget_field_options
+from app.modules.forms.router import get_budget_options, get_forms_service
 from app.modules.forms.schemas import (
     EffectiveFormOut,
     FormSectionOut,
@@ -69,6 +71,7 @@ def fake_service() -> _FakeService:
 def app(fake_service: _FakeService) -> FastAPI:
     application = create_app()
     application.dependency_overrides[get_forms_service] = lambda: fake_service
+    application.dependency_overrides[get_form_version_writer] = lambda: fake_service
     return application
 
 
@@ -181,3 +184,11 @@ def test_openapi_declares_error_responses(app_client: TestClient) -> None:
     post = spec["paths"]["/api/admin/application-types/{type_id}/form-versions"]["post"]
     assert {"400", "401", "403", "404", "422"} <= set(post["responses"])
     assert "application/problem+json" in get_form["responses"]["404"]["content"]
+
+
+def test_budget_options_come_from_the_app() -> None:
+    """Wire the cost-center options of `budget` in the app (§S/backend/python/000651)."""
+    application = create_app()
+    assert application.dependency_overrides[get_budget_options]() is budget_field_options
+    with pytest.raises(RuntimeError, match="not wired"):
+        get_budget_options()

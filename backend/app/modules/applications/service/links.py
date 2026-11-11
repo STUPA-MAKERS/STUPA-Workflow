@@ -35,6 +35,7 @@ from app.modules.applications.service.service_base import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.budget.form_options import budget_field_options
 from app.modules.flow.models import State
 from app.modules.forms.service import FormsService
 from app.modules.forms.validation import value_is_valid
@@ -342,7 +343,8 @@ class LinkOps(ApplicationsServiceBase):
             NotFoundError: The Vorgänger does not exist or its type has no form.
         """
         app = await self._get_app(predecessor_id, allow_unconfirmed=False)
-        effective = await FormsService(self.session).get_effective_form(app.type_id)
+        forms = FormsService(self.session, budget_field_options)
+        effective = await forms.get_effective_form(app.type_id)
         fields = [f for section in effective.sections for f in section.fields]
         return ApplicationPrefillOut(
             typeId=app.type_id, data=prefill_data(fields, app.data or {}, hidden)

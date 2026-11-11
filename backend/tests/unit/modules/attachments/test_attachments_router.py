@@ -15,11 +15,12 @@ from fastapi.testclient import TestClient
 
 from app.deps import Principal, get_current_applicant, get_current_principal, get_session
 from app.main import create_app
+from app.modules.attachments.router import PREVIEW_CSP, get_files_service
+from app.modules.attachments.service import AttachmentService
 from app.modules.auth.principal import Applicant
 from app.modules.files.models import Attachment
-from app.modules.files.router import PREVIEW_CSP, get_files_service
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
-from app.modules.files.service import AttachmentOwner, FilesService
+from app.modules.files.service import AttachmentOwner
 from app.settings import load_settings
 from app.shared.errors import ConflictError, NotFoundError
 
@@ -380,7 +381,7 @@ def test_get_files_service_builds_from_app_state() -> None:
         app = _App()
 
     svc = get_files_service(object(), _Req(), load_settings())  # type: ignore[arg-type]
-    assert isinstance(svc, FilesService)
+    assert isinstance(svc, AttachmentService)
     assert svc.storage is None
     assert svc.queue is None
 

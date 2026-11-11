@@ -270,7 +270,7 @@ class FlowExtrasActionDispatcher:
         pick replaces many fixed triage edges in the flow graph.
 
         The applicant controls the field value, so the handler accepts only the set that
-        the form offered (see `FormService._budget_field_options`). It skips the action
+        the form offered (see `budget.form_options.budget_field_options`). It skips the action
         (fail closed) when the node is missing or inactive. It also does not overwrite a
         different cost center that the application already has, because a staff decision
         wins over an applicant value.

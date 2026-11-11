@@ -7,8 +7,8 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 
 from app.deps import DbSession, SettingsDep
-from app.modules.files.router import get_files_service
-from app.modules.files.service import FilesService
+from app.modules.attachments.router import get_files_service
+from app.modules.attachments.service import AttachmentService
 
 
 class MemoryStorage:
@@ -36,7 +36,7 @@ class MemoryStorage:
 def wire_storage(app: FastAPI, storage: MemoryStorage) -> None:
     """Serve the attachment routes from ``storage``."""
 
-    def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
-        return FilesService(session, storage=storage, settings=request_settings)
+    def _files(session: DbSession, request_settings: SettingsDep) -> AttachmentService:
+        return AttachmentService(session, storage=storage, settings=request_settings)
 
     app.dependency_overrides[get_files_service] = _files

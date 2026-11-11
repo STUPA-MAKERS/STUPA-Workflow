@@ -146,7 +146,7 @@ def enforce_attachment_body_cap(request: Request, settings: SettingsDep) -> None
 
     The limit is ``attachment_max_bytes`` plus room for the multipart frame. Like
     ``body_cap`` this is an early, cheap check only. The route reads the file under the
-    authoritative cap (``_read_capped``), also for a chunked body.
+    authoritative cap (`files.body.read_capped`), also for a chunked body.
     """
     limit = settings.attachment_max_bytes + _MULTIPART_OVERHEAD_BYTES
     raw = request.headers.get("content-length")

@@ -14,15 +14,16 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import select
 
 from app.modules.applications.models import Comment
+from app.modules.attachments import router as router_mod
+from app.modules.attachments.router import _assert_owner_reader
 from app.modules.auth.principal import Applicant, Principal
 from app.modules.files import drafts as drafts_mod
-from app.modules.files import router as router_mod
 from app.modules.files import service as files_service
 from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.models import Attachment
-from app.modules.files.router import _assert_owner_reader
 from app.modules.files.schemas import (
     MAX_MESSAGE_ATTACHMENTS,
     MessageFilesIn,
@@ -280,7 +281,9 @@ async def test_delete_for_application_also_removes_the_comment_files(
     own = _att(ticket_note_id=None, application_id=app_id)
     of_comment = _att(ticket_note_id=None, comment_id=comment_id)
     session = ScriptedSession(scalars=[[own, of_comment]])
-    assert await _svc(session, FakeStorage()).delete_for_application(app_id, actor="x") == 2
+    assert await _svc(session, FakeStorage()).delete_for_application(
+        app_id, comments=select(Comment.id).where(Comment.application_id == app_id), actor="x"
+    ) == 2
     sql = str(session.statements[0])
     assert "attachment.comment_id IN" in sql
     assert "attachment.application_id IS NOT NULL" in sql

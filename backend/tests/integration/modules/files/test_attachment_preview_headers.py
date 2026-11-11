@@ -27,10 +27,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.deps import DbSession, SettingsDep, get_current_principal
 from app.modules.applications.models import Application
+from app.modules.attachments.router import PREVIEW_CSP, get_files_service
+from app.modules.attachments.service import AttachmentService
 from app.modules.auth.principal import Principal
 from app.modules.files.models import Attachment
-from app.modules.files.router import PREVIEW_CSP, get_files_service
-from app.modules.files.service import FilesService
 from app.modules.files.storage import ObjectStorage
 from app.settings import Settings
 from tests._support.guest_apps import (
@@ -133,9 +133,9 @@ def _api(
 ) -> FastAPI:
     api = build_api(migrated[1], settings, monkeypatch)
 
-    def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
+    def _files(session: DbSession, request_settings: SettingsDep) -> AttachmentService:
         object_storage: ObjectStorage = storage
-        return FilesService(session, storage=object_storage, settings=request_settings)
+        return AttachmentService(session, storage=object_storage, settings=request_settings)
 
     api.dependency_overrides[get_files_service] = _files
     api.dependency_overrides[get_current_principal] = lambda: _READER

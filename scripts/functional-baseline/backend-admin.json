@@ -5,6 +5,7 @@
   "backend/app/modules/admin/principal_revoke.py": 2,
   "backend/app/modules/admin/service/application_types.py": 5,
   "backend/app/modules/admin/service/cd_variants.py": 2,
+  "backend/app/modules/admin/service/forms.py": 1,
   "backend/app/modules/admin/service/gremien.py": 10,
   "backend/app/modules/admin/service/rbac.py": 4,
   "backend/app/modules/admin/service/service_base.py": 1,
