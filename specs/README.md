@@ -556,12 +556,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/backend/python/000473](style/backend/python/000473_no-role-check.md) | A permission check never reads principal.roles | approved |
 | [S/backend/python/000474](style/backend/python/000474_services-do-not-commit.md) | Service functions do not commit | approved |
 | [S/backend/python/000640](style/backend/python/000640_service-commit-ratchet.md) | A CI ratchet lowers the commits in services | approved |
-| [S/backend/python/000643](style/backend/python/000643_module-layers.md) | A backend module imports only from its layer and from lower layers | approved |
+| [S/backend/python/000643](style/backend/python/000643_module-layers.md) | A backend module imports only from its layer and from lower layers | draft |
 | [S/backend/python/000644](style/backend/python/000644_shared-imports-no-module.md) | The shared code imports no module | approved |
 | [S/backend/python/000645](style/backend/python/000645_model-in-subject-module.md) | A model is in the module of its subject | approved |
 | [S/backend/python/000646](style/backend/python/000646_import-exception-ratchet.md) | A CI ratchet lowers the accepted import violations | approved |
 | [S/backend/python/000648](style/backend/python/000648_notifications-mail-engine-only.md) | The module notifications holds the mail engine only | approved |
 | [S/backend/python/000649](style/backend/python/000649_auth-audit-no-upward-import.md) | The modules auth and audit import no higher module | approved |
+| [S/backend/python/000650](style/backend/python/000650_meeting-core-module.md) | The meeting core is in the module meetings | draft |
+| [S/backend/python/000651](style/backend/python/000651_no-import-exception.md) | The import contract has no exception | draft |
 | [S/frontend/angular/000073](style/frontend/angular/000073_i18n-parity.md) | Every UI text is in both catalogs | approved |
 | [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | approved |
 | [S/frontend/angular/000075](style/frontend/angular/000075_narrow-with-as.md) | A template narrows a signal with as | approved |
