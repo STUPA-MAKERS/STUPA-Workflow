@@ -2,7 +2,7 @@
 id: "000649"
 title: The modules auth and audit import no higher module
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation: null
