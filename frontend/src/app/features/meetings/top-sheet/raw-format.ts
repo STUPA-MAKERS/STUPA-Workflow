@@ -7,7 +7,7 @@ export interface RawText {
   readonly end: number;
 }
 
-const MARKS: Partial<Record<MarkdownFormat, string>> = { bold: '**', italic: '*' };
+const MARKS: Partial<Record<MarkdownFormat, string>> = { bold: '**', italic: '*', blackout: '%%' };
 const PREFIXES: Partial<Record<MarkdownFormat, string>> = { heading: '## ', bulletList: '- ' };
 
 /**
@@ -27,7 +27,12 @@ export function applyRawFormat(raw: RawText, format: MarkdownFormat): RawText {
 function toggleMark({ text, start, end }: RawText, mark: string): RawText {
   const n = mark.length;
   const stars = Math.min(starsBefore(text, start), starsAfter(text, end));
-  const has = n === 2 ? stars >= 2 : stars % 2 === 1;
+  const has =
+    mark === '%%'
+      ? text.slice(start - 2, start) === '%%' && text.slice(end, end + 2) === '%%'
+      : n === 2
+        ? stars >= 2
+        : stars % 2 === 1;
   if (has) {
     return {
       text: text.slice(0, start - n) + text.slice(start, end) + text.slice(end + n),

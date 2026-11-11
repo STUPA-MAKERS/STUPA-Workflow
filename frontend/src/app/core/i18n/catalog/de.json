@@ -4005,5 +4005,11 @@
   "myApps.heading": "Meine Anträge",
   "myApps.signedInAs": "Angemeldet als {email}",
   "myApps.empty": "Zu dieser Adresse gibt es keine Anträge.",
-  "login.linkInvalid": "Dieser Link ist abgelaufen oder wurde schon benutzt. Fordere unten einen neuen an."
+  "login.linkInvalid": "Dieser Link ist abgelaufen oder wurde schon benutzt. Fordere unten einen neuen an.",
+  "meetings.editor.blackout": "Schwärzen (Strg+Umschalt+X)",
+  "markdown.blackout.mark": "Wird öffentlich geschwärzt",
+  "markdown.blackout.bar": "geschwärzt",
+  "meetings.editor.blackoutOpen": "Eine Schwärzung ist nicht geschlossen: Das schließende %% fehlt. So bleibt der Name öffentlich sichtbar, und das Protokoll lässt sich nicht finalisieren.",
+  "meetings.toast.blackoutOpen": "Eine Schwärzung ist nicht geschlossen ({where}). Ergänze das schließende %%.",
+  "meetings.toast.blackoutOpenFree": "im Freitext"
 }

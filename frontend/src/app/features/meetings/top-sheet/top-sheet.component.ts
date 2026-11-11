@@ -47,6 +47,7 @@ import { meetingKeeperLine } from '../keepers.util';
 import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
+import { hasOpenBlackout } from '../../../shared/markdown/markdown.util';
 import { applyRawFormat, insertRawTable } from './raw-format';
 import { topApplicationLead } from '../top-application-lead.util';
 
@@ -71,6 +72,7 @@ const TOOLS: readonly FormatTool[] = [
   { format: 'italic', icon: 'italic', label: 'meetings.editor.italic' },
   { format: 'bulletList', icon: 'list', label: 'meetings.editor.list' },
   { format: 'blockquote', icon: 'quote', label: 'meetings.editor.quote' },
+  { format: 'blackout', icon: 'eyeslash', label: 'meetings.editor.blackout' },
 ];
 
 /**
@@ -290,6 +292,9 @@ export class TopSheetComponent {
     }
   };
 
+  /** The text has a `%%` without its closing pair (000686): the public variant would show the name. */
+  protected readonly openBlackout = computed(() => hasOpenBlackout(this.top()?.body ?? ''));
+
   /** The formats at the cursor. The Markdown source shows none as pressed. */
   readonly activeFormats = computed(() =>
     this.mode() === 'raw' ? NO_FORMATS : (this.editor()?.activeFormats() ?? NO_FORMATS),
@@ -363,14 +368,17 @@ export class TopSheetComponent {
 
   /**
    * The document key of the editor. The minute-taker's editor keeps its key while they
-   * type, and only an insert from outside raises `revision`. The participant view
-   * (`follow`) has no input of its own: the text that the room writes reaches it with
-   * each read of the agenda, so its key changes with the text.
+   * type, and only an insert from outside raises `revision`. A read-only editor has no
+   * input of its own: the participant view (`follow`) and the pane of a reader with
+   * `canWrite` who does not keep the minutes (the session lead, an admin). The text that
+   * the room writes reaches it with each live draft and each read of the agenda, so its
+   * key changes with the text.
    */
   protected readonly docKey = computed(() => {
     const t = this.top();
     if (!t) return '';
-    return this.follow() ? `${t.id}:${textHash(t.body ?? '')}` : `${t.id}:${this.revision()}`;
+    const reader = this.follow() || !this.editable();
+    return reader ? `${t.id}:${textHash(t.body ?? '')}` : `${t.id}:${this.revision()}`;
   });
 
   /** The item is the one that the room handles now (participant view, live meeting). */

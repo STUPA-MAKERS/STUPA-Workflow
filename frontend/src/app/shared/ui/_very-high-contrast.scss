@@ -6,6 +6,12 @@
 @use 'very-high' as vh;
 
 @include d.on(veryHigh) {
+  // A segment for blackout has a solid edge instead of the dashed one (000689).
+  .mdv .md-blackout,
+  .mde__host .ProseMirror .mde-blackout {
+    outline: 2px solid currentColor;
+    background: none;
+  }
   // A surface has the white edge (000605), because no shade sets it apart from the black
   // page: on a wide screen the pane "Heute" of the start page, and the grid and
   // the day pane of the calendar.

@@ -65,6 +65,7 @@ from app.modules.meetings.models import (
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import BallotAccepted
 from app.modules.voting.service import Choice, VotingService, guest_voter_sub
+from app.shared.blackout import black_out
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import (
     ConflictError,
@@ -987,7 +988,8 @@ class GuestService:
         """Build the guest view of a meeting.
 
         The view never holds the text of a non-public item, and no text before the start,
-        because the minute-taker can prepare the text of a planned meeting.
+        because the minute-taker can prepare the text of a planned meeting. A blackout
+        mark comes as the empty marker, so a marked name never reaches a guest (000687).
         """
         items = (
             (
@@ -1010,7 +1012,9 @@ class GuestService:
                 or (titles.get(item.application_id) if item.application_id else None),
                 kind="application" if item.application_id else "freetext",
                 nonPublic=item.non_public,
-                body=None if item.non_public or meeting.status == "planned" else item.body,
+                body=None
+                if item.non_public or meeting.status == "planned" or item.body is None
+                else black_out(item.body),
                 done=item.done_at is not None and not item.non_public,
             )
             for position, item in enumerate(items, start=1)

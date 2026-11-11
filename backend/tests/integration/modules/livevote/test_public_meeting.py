@@ -359,6 +359,29 @@ async def test_join_admit_and_guest_view_without_non_public_content(
     assert "Jana" not in str(entry.data)
 
 
+async def test_guest_view_blacks_out_marked_names(
+    maker: async_sessionmaker[AsyncSession], ctx: Ctx
+) -> None:
+    """§000687: the guest view holds the bar, never a marked name."""
+    s = await seed(maker)
+    async with maker() as session:
+        await session.execute(
+            update(MeetingAgendaItem)
+            .where(MeetingAgendaItem.id == s.public_item)
+            .values(body="%%Lena Hoffmann%% stellt den Antrag vor.")
+        )
+        await session.commit()
+    code = await code_of(maker, s.meeting_id)
+    with TestClient(ctx.app) as lead, guest_client(ctx.app) as phone:
+        assert join(phone, code).status_code == 200
+        listed = lead.get(f"/api/meetings/{s.meeting_id}/guests").json()
+        admit_one(lead, s, listed[0]["id"])
+        me = phone.get(f"/api/public/meetings/{code}/me")
+        assert "Lena" not in me.text
+        by_id = {a["id"]: a for a in me.json()["view"]["agenda"]}
+        assert by_id[str(s.public_item)]["body"] == "%%%% stellt den Antrag vor."
+
+
 async def test_public_routes_reject_bad_tokens_and_codes(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
