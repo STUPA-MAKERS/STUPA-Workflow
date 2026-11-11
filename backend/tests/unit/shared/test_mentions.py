@@ -9,12 +9,12 @@ import pytest
 
 from app.modules.admin import principal_merge as merge_mod
 from app.modules.admin.principal_merge import PrincipalMergeService, _Tally
-from app.modules.notifications import mentions as mails
 from app.modules.notifications.kinds import NOTIFICATION_KINDS
 from app.modules.notifications.layout import _REASONS, reason_text
 from app.modules.notifications.links import ticket_link
 from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
 from app.modules.notifications.templating import render_mail
+from app.modules.notifications.texts import mentions as mails
 from app.modules.todos.merge import MENTION_TABLES, rewrite_mentions
 from app.settings import load_settings
 from app.shared.errors import ValidationProblem

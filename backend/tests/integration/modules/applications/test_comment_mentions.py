@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.access import _committee_can_read, committee_gremium_ids
+from app.modules.applications.mention_mails import send_comment_mentions
 from app.modules.applications.mentions import mentionable_people
 from app.modules.applications.models import Application, Comment
 from app.modules.applications.schemas import ApplicationCreate, CommentOut
@@ -42,8 +43,8 @@ from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.models import Meeting
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
-from app.modules.notifications.mentions import send_comment_mentions, send_ticket_mentions
 from app.modules.notifications.models import NotificationPreference
+from app.modules.tickets.mention_mails import send_ticket_mentions
 from app.modules.tickets.models import Ticket, TicketNote
 from app.modules.todos.merge import rewrite_mentions
 from app.modules.voting.models import Vote

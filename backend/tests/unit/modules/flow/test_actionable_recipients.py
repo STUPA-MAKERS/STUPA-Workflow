@@ -17,7 +17,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.principal import Principal
-from app.modules.notifications import recipients as recipients_mod
+from app.modules.flow import actionable as recipients_mod
 from app.modules.notifications import service as service_mod
 from app.modules.notifications.kinds import DEFAULT_OFF_KINDS, kind_default
 from app.modules.notifications.models import NotificationPreference

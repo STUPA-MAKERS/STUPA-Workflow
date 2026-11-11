@@ -48,7 +48,7 @@ from app.modules.admin.schemas import (
 from app.modules.audit.actions import AuditAction
 from app.modules.auth.identity import PrincipalRef
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.notifications.auto import DelegationMailInfo
+from app.modules.delegations.mails import DelegationMailInfo
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests._support.auth_fakes import FakeResult
 
@@ -648,9 +648,9 @@ def api(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, _FakeRevoke, list[Any
     async def delegation_changed(_self: Any, _settings: Any, info: Any, **kw: Any) -> None:
         mailed.append((info, kw["granted"]))
 
-    from app.modules.notifications.auto import AutoMailer
+    from app.modules.delegations.mails import DelegationMailer
 
-    monkeypatch.setattr(AutoMailer, "delegation_changed", delegation_changed)
+    monkeypatch.setattr(DelegationMailer, "delegation_changed", delegation_changed)
     return application, fake, mailed
 
 

@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from app.deps import get_current_applicant, get_current_principal
 from app.main import create_app
+from app.modules.applications import captured_mail as captured_mod
 from app.modules.applications import router as router_mod
 from app.modules.applications.router import (
     get_applications_service,
@@ -31,7 +32,6 @@ from app.modules.applications.schemas import (
 from app.modules.applications.service import ApplicationsService
 from app.modules.applications.service.create import Capture
 from app.modules.auth.principal import Principal
-from app.modules.notifications import captured as captured_mod
 from app.modules.notifications.mail import MailMessage
 from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
 from app.shared.errors import ValidationProblem

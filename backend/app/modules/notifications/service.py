@@ -38,7 +38,7 @@ from app.modules.notifications.models import (
     NotificationSettings,
 )
 from app.modules.notifications.queue import MailQueue
-from app.modules.notifications.recipients import RecipientResolver
+from app.modules.notifications.recipients import RecipientResolver, SpecExpander
 from app.modules.notifications.schemas import (
     MailPreviewOut,
     MailPreviewPayloadRequest,
@@ -144,12 +144,18 @@ class NotificationService:
         *,
         queue: MailQueue | None = None,
         settings: Settings | None = None,
+        expand_specs: SpecExpander | None = None,
     ) -> None:
-        """Bind the service to a session, an optional mail queue and the settings."""
+        """Bind the service to a session, an optional mail queue and the settings.
+
+        ``expand_specs`` resolves the recipient kinds that need an application. A
+        sender that mails about an application passes
+        `app.modules.applications.mail_data.application_specs`.
+        """
         self.session = session
         self.queue = queue
         self.settings = settings or get_settings()
-        self.resolver = RecipientResolver(session)
+        self.resolver = RecipientResolver(session, expand_specs)
 
     async def create_template(self, payload: MailTemplateCreate) -> MailTemplateOut:
         """Create a mail template.
@@ -965,39 +971,3 @@ def _template_out(tpl: MailTemplate, *, source: str = "override") -> MailTemplat
         placeholders=tpl.placeholders,
         source=source,  # type: ignore[arg-type]
     )
-
-
-async def resolve_application_lang(
-    session: AsyncSession, *, application_id: uuid.UUID | None, settings: Settings
-) -> str:
-    """Return the mail language of an application.
-
-    The order is: the language of the application, then the default language of its
-    gremium, then the configured default language. The applicant sets the first one at
-    submit time, so every mail to that applicant must follow it. Without an application
-    (a magic link asked for by mail address alone) the function returns the default.
-    """
-    if application_id is None:
-        return settings.mail_default_lang
-    from app.modules.applications.models import Application
-    from app.modules.gremien.models import Gremium
-
-    row = (
-        await session.execute(
-            select(Application.lang, Application.gremium_id).where(
-                Application.id == application_id
-            )
-        )
-    ).first()
-    if row is None:
-        return settings.mail_default_lang
-    lang, gremium_id = row
-    if lang:
-        return str(lang)
-    if gremium_id is not None:
-        gremium_lang = await session.scalar(
-            select(Gremium.default_lang).where(Gremium.id == gremium_id)
-        )
-        if gremium_lang:
-            return str(gremium_lang)
-    return settings.mail_default_lang

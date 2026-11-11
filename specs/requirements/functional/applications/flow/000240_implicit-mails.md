@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/notifications/auto.py
+  - backend/app/modules/flow/mail_actions.py
   - backend/app/modules/flow/dispatch.py
 scope:
   - backend/app/modules/flow

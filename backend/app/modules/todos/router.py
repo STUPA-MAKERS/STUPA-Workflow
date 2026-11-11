@@ -34,9 +34,9 @@ from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.files.service import FilesService
 from app.modules.livevote.broker import PatternBroker
 from app.modules.notifications.provider import mail_queue_from_pool
-from app.modules.notifications.todos import notify_todo_mails
 from app.modules.todos.access import token_reads
 from app.modules.todos.live import publish_pings, todo_broker
+from app.modules.todos.mails import notify_todo_mails
 from app.modules.todos.schemas import (
     AssigneeIn,
     BoardPatch,

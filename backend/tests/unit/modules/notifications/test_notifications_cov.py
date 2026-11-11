@@ -16,25 +16,27 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.notifications import auto, privacy, recipients
-from app.modules.notifications import service as service_mod
-from app.modules.notifications.auto import (
-    AutoMailer,
+from app.modules.applications import erasure_mail
+from app.modules.applications.mail_data import application_specs
+from app.modules.delegations import mails as delegation_mails
+from app.modules.delegations.mails import (
+    DelegationMailer,
     DelegationMailInfo,
-    get_auto_mailer,
+    get_delegation_mailer,
     meeting_delegation_mail_info,
 )
+from app.modules.flow.actionable import actionable_principal_emails, state_actionable
+from app.modules.livevote import mails as meeting_mails
+from app.modules.livevote.mails import MeetingMailer, get_meeting_mailer
+from app.modules.notifications import recipients
+from app.modules.notifications import service as service_mod
 from app.modules.notifications.kinds import kind_default
 from app.modules.notifications.models import (
     MailTemplate,
     NotificationPreference,
     NotificationSettings,
 )
-from app.modules.notifications.recipients import (
-    RecipientResolver,
-    actionable_principal_emails,
-    state_actionable,
-)
+from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.schemas import (
     MailPreviewPayloadRequest,
     MailTemplateUpsert,
@@ -43,6 +45,7 @@ from app.modules.notifications.service import (
     NotificationService,
     filter_recipients_by_preference,
 )
+from app.modules.privacy import mails as privacy
 from app.settings import load_settings
 from app.shared.errors import NotFoundError, ValidationProblem
 
@@ -718,7 +721,7 @@ async def test_resolve_group_emails() -> None:
 
 async def test_resolve_applicant_truthy_email() -> None:
     session = FakeSession(scalar=["app@x.de"])
-    out = await RecipientResolver(cast(AsyncSession, session)).resolve(
+    out = await RecipientResolver(cast(AsyncSession, session), application_specs).resolve(
         [{"kind": "applicant"}], application_id=uuid.uuid4()
     )
     assert out == ["app@x.de"]
@@ -726,7 +729,7 @@ async def test_resolve_applicant_truthy_email() -> None:
 
 async def test_resolve_applicant_none_email_not_added() -> None:
     session = FakeSession(scalar=[None])
-    out = await RecipientResolver(cast(AsyncSession, session)).resolve(
+    out = await RecipientResolver(cast(AsyncSession, session), application_specs).resolve(
         [{"kind": "applicant"}], application_id=uuid.uuid4()
     )
     assert out == []
@@ -939,11 +942,11 @@ async def test_auto_mailer_meeting_created_sends(
         ],
     )
     session.store[mid] = meeting
-    monkeypatch.setattr(auto, "get_sessionmaker", _sessionmaker_for(session))
+    monkeypatch.setattr(meeting_mails, "get_sessionmaker", _sessionmaker_for(session))
     queue = FakeQueue()
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: queue)
+    monkeypatch.setattr(meeting_mails, "mail_queue_from_pool", lambda _pool: queue)
 
-    await AutoMailer().meeting_created(SETTINGS, mid, pool=object())
+    await MeetingMailer().meeting_created(SETTINGS, mid, pool=object())
     assert queue.messages
     assert queue.messages[0].to == ("m@x.de",)
 
@@ -953,9 +956,9 @@ async def test_auto_mailer_meeting_created_meeting_missing(
 ) -> None:
     """Send nothing and do not crash when the meeting is missing."""
     session = FakeSession()
-    monkeypatch.setattr(auto, "get_sessionmaker", _sessionmaker_for(session))
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
-    await AutoMailer().meeting_created(SETTINGS, uuid.uuid4(), pool=object())
+    monkeypatch.setattr(meeting_mails, "get_sessionmaker", _sessionmaker_for(session))
+    monkeypatch.setattr(meeting_mails, "mail_queue_from_pool", lambda _pool: FakeQueue())
+    await MeetingMailer().meeting_created(SETTINGS, uuid.uuid4(), pool=object())
 
 
 async def test_auto_mailer_meeting_created_no_date_no_time(
@@ -971,10 +974,10 @@ async def test_auto_mailer_meeting_created_no_date_no_time(
         scalars=[["m@x.de"], [], []],
     )
     session.store[mid] = meeting
-    monkeypatch.setattr(auto, "get_sessionmaker", _sessionmaker_for(session))
+    monkeypatch.setattr(meeting_mails, "get_sessionmaker", _sessionmaker_for(session))
     queue = FakeQueue()
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: queue)
-    await AutoMailer().meeting_created(SETTINGS, mid, pool=object())
+    monkeypatch.setattr(meeting_mails, "mail_queue_from_pool", lambda _pool: queue)
+    await MeetingMailer().meeting_created(SETTINGS, mid, pool=object())
     assert queue.messages
 
 
@@ -986,18 +989,18 @@ async def test_auto_mailer_meeting_created_swallows_exception(
     def boom() -> Any:
         raise RuntimeError("sessionmaker boom")
 
-    monkeypatch.setattr(auto, "get_sessionmaker", boom)
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
-    await AutoMailer().meeting_created(SETTINGS, uuid.uuid4(), pool=object())
+    monkeypatch.setattr(meeting_mails, "get_sessionmaker", boom)
+    monkeypatch.setattr(meeting_mails, "mail_queue_from_pool", lambda _pool: FakeQueue())
+    await MeetingMailer().meeting_created(SETTINGS, uuid.uuid4(), pool=object())
 
 
 async def test_auto_mailer_delegation_granted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = FakeSession(scalars=[[], []])
-    monkeypatch.setattr(auto, "get_sessionmaker", _sessionmaker_for(session))
+    monkeypatch.setattr(delegation_mails, "get_sessionmaker", _sessionmaker_for(session))
     queue = FakeQueue()
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: queue)
+    monkeypatch.setattr(delegation_mails, "mail_queue_from_pool", lambda _pool: queue)
     info = DelegationMailInfo(
         delegation_id=uuid.uuid4(),
         email="d@x.de",
@@ -1007,7 +1010,7 @@ async def test_auto_mailer_delegation_granted(
         delegator_name="Max",
         voting=True,
     )
-    await AutoMailer().delegation_changed(SETTINGS, info, granted=True, pool=object())
+    await DelegationMailer().delegation_changed(SETTINGS, info, granted=True, pool=object())
     assert queue.messages
     assert "Sitzung 1" in queue.messages[0].subject
 
@@ -1016,9 +1019,9 @@ async def test_auto_mailer_delegation_revoked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = FakeSession(scalars=[[], []])
-    monkeypatch.setattr(auto, "get_sessionmaker", _sessionmaker_for(session))
+    monkeypatch.setattr(delegation_mails, "get_sessionmaker", _sessionmaker_for(session))
     queue = FakeQueue()
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: queue)
+    monkeypatch.setattr(delegation_mails, "mail_queue_from_pool", lambda _pool: queue)
     info = DelegationMailInfo(
         delegation_id=uuid.uuid4(),
         email="d@x.de",
@@ -1028,21 +1031,21 @@ async def test_auto_mailer_delegation_revoked(
         delegator_name=None,
         voting=False,
     )
-    await AutoMailer().delegation_changed(SETTINGS, info, granted=False, pool=object())
+    await DelegationMailer().delegation_changed(SETTINGS, info, granted=False, pool=object())
     assert queue.messages
 
 
 async def test_auto_mailer_delegation_info_none_skips(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
-    await AutoMailer().delegation_changed(SETTINGS, None, granted=True, pool=object())
+    monkeypatch.setattr(delegation_mails, "mail_queue_from_pool", lambda _pool: FakeQueue())
+    await DelegationMailer().delegation_changed(SETTINGS, None, granted=True, pool=object())
 
 
 async def test_auto_mailer_delegation_no_email_skips(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
+    monkeypatch.setattr(delegation_mails, "mail_queue_from_pool", lambda _pool: FakeQueue())
     info = DelegationMailInfo(
         delegation_id=uuid.uuid4(),
         email=None,
@@ -1052,7 +1055,7 @@ async def test_auto_mailer_delegation_no_email_skips(
         delegator_name=None,
         voting=False,
     )
-    await AutoMailer().delegation_changed(SETTINGS, info, granted=True, pool=object())
+    await DelegationMailer().delegation_changed(SETTINGS, info, granted=True, pool=object())
 
 
 async def test_auto_mailer_delegation_swallows_exception(
@@ -1061,8 +1064,8 @@ async def test_auto_mailer_delegation_swallows_exception(
     def boom() -> Any:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(auto, "get_sessionmaker", boom)
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
+    monkeypatch.setattr(delegation_mails, "get_sessionmaker", boom)
+    monkeypatch.setattr(delegation_mails, "mail_queue_from_pool", lambda _pool: FakeQueue())
     info = DelegationMailInfo(
         delegation_id=uuid.uuid4(),
         email="d@x.de",
@@ -1072,11 +1075,12 @@ async def test_auto_mailer_delegation_swallows_exception(
         delegator_name=None,
         voting=False,
     )
-    await AutoMailer().delegation_changed(SETTINGS, info, granted=True, pool=object())
+    await DelegationMailer().delegation_changed(SETTINGS, info, granted=True, pool=object())
 
 
-def test_get_auto_mailer_returns_instance() -> None:
-    assert isinstance(get_auto_mailer(), AutoMailer)
+def test_get_mailers_return_instances() -> None:
+    assert isinstance(get_meeting_mailer(), MeetingMailer)
+    assert isinstance(get_delegation_mailer(), DelegationMailer)
 
 
 async def test_notify_erasure_requested_with_recipients(
@@ -1090,9 +1094,9 @@ async def test_notify_erasure_requested_with_recipients(
             [],
         ]
     )
-    monkeypatch.setattr(privacy, "get_sessionmaker", _sessionmaker_for(session))
+    monkeypatch.setattr(erasure_mail, "get_sessionmaker", _sessionmaker_for(session))
     queue = FakeQueue()
-    await privacy.notify_erasure_requested(
+    await erasure_mail.notify_erasure_requested(
         queue=cast(Any, queue),
         settings=SETTINGS,
         request_id=uuid.uuid4(),
@@ -1108,9 +1112,9 @@ async def test_notify_erasure_requested_no_recipients_skips(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = FakeSession(scalars=[[]])
-    monkeypatch.setattr(privacy, "get_sessionmaker", _sessionmaker_for(session))
+    monkeypatch.setattr(erasure_mail, "get_sessionmaker", _sessionmaker_for(session))
     queue = FakeQueue()
-    await privacy.notify_erasure_requested(
+    await erasure_mail.notify_erasure_requested(
         queue=cast(Any, queue),
         settings=SETTINGS,
         request_id=uuid.uuid4(),

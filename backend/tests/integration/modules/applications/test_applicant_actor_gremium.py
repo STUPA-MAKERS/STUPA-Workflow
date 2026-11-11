@@ -18,11 +18,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.applications.comment_mails import send_comment_notifications
 from app.modules.applications.router import get_comment_mail_sender
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.notifications.comments import send_comment_notifications
 from tests._support.guest_apps import guest_settings
 from tests._support.notifications_fakes import FakeQueue
 from tests._support.read_models import (

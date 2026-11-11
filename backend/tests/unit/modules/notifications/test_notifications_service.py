@@ -10,6 +10,7 @@ import uuid
 
 import pytest
 
+from app.modules.applications.mail_data import resolve_application_lang
 from app.modules.notifications.links import MailLink
 from app.modules.notifications.models import MailTemplate
 from app.modules.notifications.schemas import (
@@ -17,10 +18,7 @@ from app.modules.notifications.schemas import (
     MailTemplateCreate,
     MailTemplateUpdate,
 )
-from app.modules.notifications.service import (
-    NotificationService,
-    resolve_application_lang,
-)
+from app.modules.notifications.service import NotificationService
 from app.settings import load_settings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests._support.notifications_fakes import FakeQueue, FakeResolver, FakeSession

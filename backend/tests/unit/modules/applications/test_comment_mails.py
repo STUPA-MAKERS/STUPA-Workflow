@@ -8,8 +8,8 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import app.modules.notifications.comments as mod
-from app.modules.notifications.comments import send_comment_notifications
+import app.modules.applications.comment_mails as mod
+from app.modules.applications.comment_mails import send_comment_notifications
 from app.settings import load_settings
 from tests._support.notifications_fakes import FakeQueue, FakeResolver, FakeSession
 
@@ -21,7 +21,9 @@ class _FakeService:
 
     last: _FakeService | None = None
 
-    def __init__(self, session: Any, *, queue: Any, settings: Any) -> None:
+    def __init__(
+        self, session: Any, *, queue: Any, settings: Any, expand_specs: Any = None
+    ) -> None:
         self.session = session
         self.queue = queue
         self.settings = settings

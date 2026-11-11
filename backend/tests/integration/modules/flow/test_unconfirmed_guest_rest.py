@@ -38,11 +38,11 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.auth import service as auth_service
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import DispatchedAction
+from app.modules.flow.mail_actions import NotificationActionDispatcher
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
 from app.modules.gremien.models import Gremium
-from app.modules.notifications.action_dispatcher import NotificationActionDispatcher
 from app.modules.notifications.mail import MailMessage
 from app.settings import Settings, get_settings, load_settings
 from app.shared.config_schemas import FormFieldDef

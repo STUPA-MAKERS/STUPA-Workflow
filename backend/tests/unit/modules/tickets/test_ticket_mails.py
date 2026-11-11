@@ -13,11 +13,11 @@ import pytest
 
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.files.schemas import MessageAttachmentOut
-from app.modules.notifications import tickets as mails
 from app.modules.notifications.kinds import NOTIFICATION_KINDS
 from app.modules.notifications.layout import _REASONS
 from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
 from app.modules.site_config.branding import Branding, HelpSettings, TicketSettings
+from app.modules.tickets import mails as mails
 from app.modules.tickets.models import Ticket, TicketNote
 from app.settings import load_settings
 from tests.unit.modules.tickets.fakes import ScriptedSession

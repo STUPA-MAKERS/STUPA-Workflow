@@ -11,8 +11,9 @@ from typing import Any
 
 import pytest
 
+from app.modules.applications import mention_mails as mails
 from app.modules.applications import router as app_router
-from app.modules.notifications import mentions as mails
+from app.modules.tickets import mention_mails as ticket_mails
 from app.modules.tickets import router as ticket_router
 from app.settings import load_settings
 
@@ -45,7 +46,7 @@ async def test_the_wrappers_send_in_an_own_session(monkeypatch: pytest.MonkeyPat
         return 2
 
     monkeypatch.setattr(mails, "send_comment_mentions", _send)
-    monkeypatch.setattr(mails, "send_ticket_mentions", _send)
+    monkeypatch.setattr(ticket_mails, "send_ticket_mentions", _send)
     maker: Any = _Maker()
     assert (
         await mails.notify_comment_mentions(
@@ -59,7 +60,7 @@ async def test_the_wrappers_send_in_an_own_session(monkeypatch: pytest.MonkeyPat
         == 2
     )
     assert (
-        await mails.notify_ticket_mentions(
+        await ticket_mails.notify_ticket_mentions(
             queue=None, settings=SETTINGS, note_id=NOTE, recipients=[ADA], sessionmaker=maker
         )
         == 2
@@ -82,7 +83,7 @@ async def test_a_failure_never_breaks_the_write() -> None:
         == 0
     )
     assert (
-        await mails.notify_ticket_mentions(
+        await ticket_mails.notify_ticket_mentions(
             queue=None, settings=SETTINGS, note_id=NOTE, recipients=[ADA], sessionmaker=maker
         )
         == 0

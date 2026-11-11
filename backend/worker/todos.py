@@ -31,8 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
-from app.modules.notifications.todos import send_todo_due
 from app.modules.todos.access import BoardAccess
+from app.modules.todos.mails import send_todo_due
 from app.modules.todos.models import (
     TodoAssignee,
     TodoBoard,

@@ -8,9 +8,9 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.modules.flow import mail_actions as mod
 from app.modules.flow.dispatch import DispatchedAction
-from app.modules.notifications import action_dispatcher as mod
-from app.modules.notifications.action_dispatcher import NotificationActionDispatcher
+from app.modules.flow.mail_actions import NotificationActionDispatcher
 from app.settings import load_settings
 from tests._support.notifications_fakes import FakeSession
 
@@ -45,7 +45,7 @@ async def test_dispatch_notify_calls_service(monkeypatch: pytest.MonkeyPatch) ->
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, session, *, queue, settings) -> None:
+        def __init__(self, session, *, queue, settings, expand_specs=None) -> None:
             captured["session"] = session
 
         async def handle_notify_action(self, action, **kw):
@@ -144,7 +144,7 @@ async def test_dispatch_task_notify_sends_kind_mail(
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, session, *, queue, settings) -> None:
+        def __init__(self, session, *, queue, settings, expand_specs=None) -> None:
             pass
 
         async def send_kind_mail(self, recipients, **kw):
@@ -159,7 +159,7 @@ async def test_dispatch_task_notify_sends_kind_mail(
     async def fake_state_actionable(session, state):
         return True
 
-    import app.modules.notifications.recipients as recipients_mod
+    import app.modules.flow.actionable as recipients_mod
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     monkeypatch.setattr(
@@ -189,7 +189,7 @@ async def test_dispatch_task_notify_skips_non_actionable_state(
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, session, *, queue, settings) -> None:
+        def __init__(self, session, *, queue, settings, expand_specs=None) -> None:
             pass
 
         async def send_kind_mail(self, recipients, **kw):
@@ -199,7 +199,7 @@ async def test_dispatch_task_notify_skips_non_actionable_state(
     async def fake_state_actionable(session, state):
         return False
 
-    import app.modules.notifications.recipients as recipients_mod
+    import app.modules.flow.actionable as recipients_mod
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     monkeypatch.setattr(recipients_mod, "state_actionable", fake_state_actionable)
@@ -218,7 +218,7 @@ class _CapturingService:
 
     captured: dict[str, object] = {}
 
-    def __init__(self, session, *, queue, settings) -> None:
+    def __init__(self, session, *, queue, settings, expand_specs=None) -> None:
         pass
 
     async def handle_notify_action(self, action, **kw):
@@ -252,7 +252,7 @@ async def test_applicant_only_notify_uses_the_application_language(
     from tests._support.notifications_fakes import FakeQueue, FakeResolver
 
     class _Service(NotificationService):
-        def __init__(self, session, *, queue, settings) -> None:
+        def __init__(self, session, *, queue, settings, expand_specs=None) -> None:
             super().__init__(session, queue=queue, settings=settings)
             self.resolver = FakeResolver(["applicant@example.org"])
 
@@ -424,3 +424,52 @@ async def test_notify_for_a_missing_application_still_runs(
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch([_action("notify", {"recipients": [{"kind": "email"}]})])
     assert sent == [None]
+
+
+async def test_dispatch_task_notify_skips_a_missing_application(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without the application row the dispatcher sends no task mail."""
+    made: list[bool] = []
+
+    class FakeService:
+        def __init__(self, *a, **k) -> None:
+            made.append(True)
+
+    monkeypatch.setattr(mod, "NotificationService", FakeService)
+    session = FakeSession(executes=[[]])
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch([_action("taskNotify")])
+
+    assert made == []
+
+
+async def test_dispatch_task_notify_skips_a_state_nobody_can_act_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An actionable state without a person who can act sends no task mail."""
+    made: list[bool] = []
+
+    class FakeService:
+        def __init__(self, *a, **k) -> None:
+            made.append(True)
+
+    async def nobody(session, *, application_id, state):
+        return []
+
+    async def actionable(session, state):
+        return True
+
+    import app.modules.flow.actionable as actionable_mod
+
+    monkeypatch.setattr(mod, "NotificationService", FakeService)
+    monkeypatch.setattr(actionable_mod, "actionable_principal_emails", nobody)
+    monkeypatch.setattr(actionable_mod, "state_actionable", actionable)
+    session = FakeSession(
+        executes=[[({"title": "Beamer"}, uuid.uuid4(), True)]],
+        scalar=[None],
+    )
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch([_action("taskNotify")])
+
+    assert made == []

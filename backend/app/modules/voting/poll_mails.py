@@ -33,40 +33,18 @@ from app.modules.notifications.links import vote_link
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
+from app.modules.notifications.texts.polls import (
+    POLL_REMINDER_BODY,
+    POLL_REMINDER_KEY,
+    POLL_REMINDER_SUBJECT,
+    POLL_STARTED_BODY,
+    POLL_STARTED_KEY,
+    POLL_STARTED_SUBJECT,
+)
 from app.modules.voting.models import Vote, VotedMarker
 from app.settings import Settings
 
 logger = logging.getLogger("app.notifications")
-
-POLL_STARTED_KEY = "poll_started"
-POLL_REMINDER_KEY = "poll_reminder"
-
-POLL_STARTED_SUBJECT: dict[str, str] = {
-    "de": "Neue Umfrage: {{ question }}",
-    "en": "New poll: {{ question }}",
-}
-POLL_STARTED_BODY: dict[str, str] = {
-    "de": "Hallo,\n\nim Gremium {{ gremiumName }} läuft eine Umfrage:\n\n{{ question }}\n\n"
-    "Sie endet am {{ closesAt }}.\n",
-    "en": "Hello,\n\nthe committee {{ gremiumName }} runs a poll:\n\n{{ question }}\n\n"
-    "It ends on {{ closesAt }}.\n",
-}
-POLL_REMINDER_SUBJECT: dict[str, str] = {
-    "de": "Erinnerung: Umfrage „{{ question }}“",
-    "en": 'Reminder: poll "{{ question }}"',
-}
-POLL_REMINDER_BODY: dict[str, str] = {
-    "de": "Hallo,\n\ndie Umfrage „{{ question }}“ im Gremium {{ gremiumName }} endet am "
-    "{{ closesAt }}. Sie haben noch nicht geantwortet.\n",
-    "en": 'Hello,\n\nthe poll "{{ question }}" of the committee {{ gremiumName }} ends on '
-    "{{ closesAt }}. You have not answered yet.\n",
-}
-POLL_PLACEHOLDERS: dict[str, str] = {
-    "link": "Link zur Umfrage (ohne den Platzhalter hängt die Mail ihn an)",
-    "question": "Frage der Umfrage",
-    "gremiumName": "Name des Gremiums",
-    "closesAt": "Ende der Umfrage (TT.MM.JJJJ, HH:MM)",
-}
 
 
 def _maker(
