@@ -1,13 +1,14 @@
-"""The entries of the Kalender page: meetings, due cards, Events and Termine.
+"""The entries of the Kalender page: meetings, due cards, Events, Termine, external entries.
 
 Each kind is read under the rule of its own module, so the Kalender never shows an
 entry that the list of that module does not show: the meetings through the read scope
 of the meeting list (`MeetingRules.meeting_read_scope`), the cards and the Events
-through the board scope of the to-dos, and the Termine through `appointments.readable`.
+through the board scope of the to-dos, the Termine through `appointments.readable`,
+and the external entries through the scope of their calendar (`external`).
 
 The filter "Nur meine" limits the cards and the Events to the assigned ones and the
-Termine to those that the caller created or is invited to. The meetings stay, because a
-meeting has no person that it belongs to.
+Termine to those that the caller created or is invited to. The meetings and the
+external entries stay, because neither has a person that it belongs to.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.auth.principal import Principal
 from app.modules.calendar import rules
 from app.modules.calendar.appointments import AppointmentService, Loaded, my_answer
+from app.modules.calendar.external import ExternalCalendarService, external_entry
 from app.modules.calendar.rules import Viewer
 from app.modules.calendar.schemas import EntryOut
 from app.modules.gremien.models import Gremium
@@ -191,20 +193,22 @@ class CalendarEntries:
             principal, start=start, end=end, only_mine=only_mine
         )
         termine = await self.appointments.between(viewer, start, end, only_mine=only_mine)
+        external = await ExternalCalendarService(self.session).between(principal, start, end)
         return by_day(
             [
                 *meetings,
                 *(card_entry(card, board, mine) for card, board, mine in cards),
                 *(event_entry(card, board, event, mine) for card, board, event, mine in events),
                 *(await self._appointment_entries(viewer, termine)),
+                *(external_entry(entry, calendar) for entry, calendar in external),
             ]
         )
 
     async def search(self, principal: Principal, q: str, today: date) -> tuple[EntryOut, ...]:
         """The entries of every month whose title holds ``q``, the nearest to today first.
 
-        A Termin also matches by its place. A query of less than two characters finds
-        nothing.
+        A Termin and an external entry also match by their place. A query of less than
+        two characters finds nothing.
         """
         term = q.strip()
         if len(term) < 2:
@@ -218,12 +222,16 @@ class CalendarEntries:
         cards = await todos.calendar_due_between(principal, pattern=pattern, limit=PER_KIND)
         events = await todos.calendar_events_between(principal, pattern=pattern, limit=PER_KIND)
         termine = await self.appointments.matching(viewer, pattern, PER_KIND)
+        external = await ExternalCalendarService(self.session).matching(
+            principal, pattern, PER_KIND
+        )
         return nearest(
             [
                 *meetings,
                 *(card_entry(card, board, mine) for card, board, mine in cards),
                 *(event_entry(card, board, event, mine) for card, board, event, mine in events),
                 *(await self._appointment_entries(viewer, termine)),
+                *(external_entry(entry, calendar) for entry, calendar in external),
             ],
             today,
             SEARCH_LIMIT,

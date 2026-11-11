@@ -13,6 +13,13 @@ the end deletes the answers of the Termin.
 
 ``creator_id`` is NULL after the erasure of the creator. The Termin stays for the
 invited persons.
+
+``calendar_external`` is an ICS feed that an admin subscribed, for all persons
+(``gremium_id`` NULL) or for one Gremium. ``due_at`` is the time of its next fetch: the
+worker fetches a calendar whose ``due_at`` is over, and a save of the URL sets it to
+now. ``last_error`` is a short code of the newest failure and NULL after a success.
+``calendar_external_entry`` holds the entries of the newest good fetch as plain text,
+one row per date of a recurring entry.
 """
 
 from __future__ import annotations
@@ -37,6 +44,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
+
+#: The fetch intervals of an external calendar in minutes.
+FETCH_INTERVALS: tuple[int, ...] = (15, 60, 360, 1440)
 
 #: The answers of an invited person, in the order of the answer control.
 ANSWERS: tuple[str, ...] = ("accept", "tentative", "decline")
@@ -132,4 +142,58 @@ class Answer(Base):
         PrimaryKeyConstraint("appointment_id", "principal_id"),
         CheckConstraint("answer IN ('accept','tentative','decline')", name="answer"),
         Index("ix_calendar_answer_principal_id", "principal_id"),
+    )
+
+
+class ExternalCalendar(UUIDPkMixin, TimestampMixin, Base):
+    """An ICS feed of another system that an admin subscribed."""
+
+    __tablename__ = "calendar_external"
+
+    name: Mapped[str] = mapped_column(Text)
+    url: Mapped[str] = mapped_column(Text)
+    #: NULL: each signed-in person reads the entries. Else the readers of the meetings
+    #: of this Gremium read them.
+    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
+    )
+    interval_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_success_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("interval_minutes IN (15, 60, 360, 1440)", name="interval"),
+        Index("ix_calendar_external_gremium_id", "gremium_id"),
+        Index("ix_calendar_external_due_at", "due_at"),
+    )
+
+
+class ExternalEntry(UUIDPkMixin, Base):
+    """One dated entry of an external calendar, as plain text."""
+
+    __tablename__ = "calendar_external_entry"
+
+    calendar_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("calendar_external.id", ondelete="CASCADE")
+    )
+    title: Mapped[str] = mapped_column(Text)
+    starts_on: Mapped[date] = mapped_column(Date)
+    ends_on: Mapped[date] = mapped_column(Date)
+    #: NULL for an all-day entry. ``end_time`` is then NULL too.
+    start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    end_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    place: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("ends_on >= starts_on", name="days"),
+        Index("ix_calendar_external_entry_calendar_id", "calendar_id"),
+        Index("ix_calendar_external_entry_starts_on", "starts_on"),
+        Index("ix_calendar_external_entry_ends_on", "ends_on"),
     )

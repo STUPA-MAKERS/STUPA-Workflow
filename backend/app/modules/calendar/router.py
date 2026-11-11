@@ -10,6 +10,11 @@ page, each kind under the rule of its own module (`entries`). The routes under
 `/calendar/appointments` create, read, change, delete and answer a Termin; the object
 rule is `calendar.rules`. A write commits here and then sends its mails as a
 background task, so a mail failure never fails the write.
+
+`GET /calendar/external/{entry_id}` reads one entry of an external calendar under the
+read rule of its calendar. `admin_router` (`/admin/calendars`) manages the external
+calendars behind `admin.calendars`. No route fetches an external address: a write makes
+the calendar due, and the worker fetches it.
 """
 
 from __future__ import annotations
@@ -27,6 +32,7 @@ from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.calendar import service
 from app.modules.calendar.appointments import BERLIN, AppointmentMail, AppointmentService
 from app.modules.calendar.entries import CalendarEntries
+from app.modules.calendar.external import ExternalCalendarService
 from app.modules.calendar.ics import MeetingEvent, build_calendar
 from app.modules.calendar.mails import notify_appointment_mails
 from app.modules.calendar.schemas import (
@@ -35,6 +41,9 @@ from app.modules.calendar.schemas import (
     AppointmentOut,
     CalendarFeedOut,
     EntriesOut,
+    ExternalCalendarIn,
+    ExternalCalendarOut,
+    ExternalEntryOut,
     PersonOut,
 )
 from app.modules.notifications.provider import mail_queue_from_pool
@@ -42,6 +51,7 @@ from app.settings import Settings
 from app.shared.errors import NotFoundError, ProblemDetail, ValidationProblem
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
+admin_router = APIRouter(prefix="/admin/calendars", tags=["calendar"])
 
 _ICS_MEDIA_TYPE = "text/calendar; charset=utf-8"
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
@@ -268,6 +278,7 @@ async def calendar_feed(token: str, db: DbSession, settings: SettingsDep) -> Res
     card_events = await service.readable_events(db, principal)
     due_cards = await service.due_cards(db, principal, settings.public_base_url)
     appointments = await service.feed_appointments(db, principal)
+    external = await service.feed_external(db, principal)
     events = [
         MeetingEvent(
             uid=str(meeting.id),
@@ -286,6 +297,7 @@ async def calendar_feed(token: str, db: DbSession, settings: SettingsDep) -> Res
         card_events=card_events,
         due_cards=due_cards,
         appointments=appointments,
+        external=external,
     )
     return Response(
         content=body,
@@ -296,3 +308,73 @@ async def calendar_feed(token: str, db: DbSession, settings: SettingsDep) -> Res
             "Cache-Control": "private, max-age=300",
         },
     )
+
+
+@router.get("/external/{entry_id}", responses={401: _PROBLEM, 404: _PROBLEM})
+async def calendar_external_entry(
+    entry_id: UUID, principal: Member, db: DbSession
+) -> ExternalEntryOut:
+    """Read one entry of an external calendar that the caller reads."""
+    return await ExternalCalendarService(db).entry(principal, entry_id)
+
+
+CalendarsAdmin = Annotated[Principal, Depends(require_principal("admin.calendars"))]
+_ADMIN_ERRORS: dict[int | str, dict[str, Any]] = {401: _PROBLEM, 403: _PROBLEM}
+
+
+@admin_router.get("", responses=_ADMIN_ERRORS)
+async def list_external_calendars(
+    _admin: CalendarsAdmin, db: DbSession
+) -> list[ExternalCalendarOut]:
+    """List the external calendars with the state of their newest fetch."""
+    return list(await ExternalCalendarService(db).listing())
+
+
+@admin_router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    responses={**_ADMIN_ERRORS, 422: _PROBLEM},
+)
+async def create_external_calendar(
+    data: ExternalCalendarIn, _admin: CalendarsAdmin, db: DbSession
+) -> ExternalCalendarOut:
+    """Subscribe an external calendar. The worker fetches it within a minute."""
+    created = await ExternalCalendarService(db).create(data)
+    await db.commit()
+    return created
+
+
+@admin_router.put(
+    "/{calendar_id}", responses={**_ADMIN_ERRORS, 404: _PROBLEM, 422: _PROBLEM}
+)
+async def change_external_calendar(
+    calendar_id: UUID, data: ExternalCalendarIn, _admin: CalendarsAdmin, db: DbSession
+) -> ExternalCalendarOut:
+    """Change an external calendar. A new address starts a fetch."""
+    changed = await ExternalCalendarService(db).change(calendar_id, data)
+    await db.commit()
+    return changed
+
+
+@admin_router.delete(
+    "/{calendar_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={**_ADMIN_ERRORS, 404: _PROBLEM},
+)
+async def delete_external_calendar(
+    calendar_id: UUID, _admin: CalendarsAdmin, db: DbSession
+) -> Response:
+    """Delete an external calendar together with its entries."""
+    await ExternalCalendarService(db).remove(calendar_id)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@admin_router.post("/{calendar_id}/fetch", responses={**_ADMIN_ERRORS, 404: _PROBLEM})
+async def fetch_external_calendar(
+    calendar_id: UUID, _admin: CalendarsAdmin, db: DbSession
+) -> ExternalCalendarOut:
+    """Make an external calendar due at once ("Jetzt abrufen")."""
+    due = await ExternalCalendarService(db).request_fetch(calendar_id)
+    await db.commit()
+    return due

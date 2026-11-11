@@ -15,7 +15,7 @@ from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
 from app.modules.calendar import service as calendar_service
-from app.modules.calendar.ics import AppointmentEvent, CardEvent, DueCard
+from app.modules.calendar.ics import AppointmentEvent, CardEvent, DueCard, ExternalEvent
 from app.settings import get_settings, load_settings
 from tests._support.auth_fakes import fake_session, result
 
@@ -121,6 +121,21 @@ def test_feed_returns_ics_with_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
         return [termin]
 
     monkeypatch.setattr(calendar_service, "feed_appointments", _termine)
+    extern = ExternalEvent(
+        uid="x1",
+        title="Vorlesungsbeginn",
+        starts_on=date(2026, 10, 5),
+        ends_on=date(2026, 10, 5),
+        start_time=None,
+        end_time=None,
+        stamp=datetime(2026, 1, 1, tzinfo=UTC),
+        calendar="Hochschule",
+    )
+
+    async def _external(_db: object, _row: object) -> list[ExternalEvent]:
+        return [extern]
+
+    monkeypatch.setattr(calendar_service, "feed_external", _external)
     principal_row = SimpleNamespace(sub="u1")
     gid = uuid.uuid4()
     meeting = SimpleNamespace(
@@ -150,7 +165,26 @@ def test_feed_returns_ics_with_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "DTSTART;VALUE=DATE:20261120" in body
     assert "DTEND;VALUE=DATE:20261122" in body
     assert "SUMMARY:Klausurtagung" in body
+    assert "SUMMARY:Vorlesungsbeginn" in body and "CATEGORIES:Hochschule" in body
     assert "PARTSTAT=ACCEPTED" in body
     assert "LOCATION:Mensa" in body
     assert "SUMMARY:Raum buchen" in body
     assert "DTSTART;VALUE=DATE:20261118" in body
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("GET", "/api/admin/calendars"),
+        ("POST", "/api/admin/calendars"),
+        ("PUT", f"/api/admin/calendars/{uuid.uuid4()}"),
+        ("DELETE", f"/api/admin/calendars/{uuid.uuid4()}"),
+        ("POST", f"/api/admin/calendars/{uuid.uuid4()}/fetch"),
+    ],
+)
+def test_external_calendar_routes_need_admin_calendars(method: str, path: str) -> None:
+    """§F/meetings/calendar/000729: each route answers 403 without `admin.calendars`."""
+    other = Principal(sub="u1", permissions={"calendar.manage", "admin.gremien"})
+    body = {"name": "Hochschule", "url": "https://example.org/a.ics"}
+    resp = _client(fake_session(), other).request(method, path, json=body)
+    assert resp.status_code == 403

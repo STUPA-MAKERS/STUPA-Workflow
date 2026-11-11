@@ -78,6 +78,9 @@ Keys that need a note:
   no member. A personal board stays private.
 - `calendar.manage`: read, change and delete every Termin of the Kalender and invite
   any Gremium. Without it a person changes only the own Termine.
+- `admin.calendars`: subscribe, change and delete the external calendars
+  (/admin/calendars). The holder gives the server an address to fetch, so the key is
+  separate from `calendar.manage`.
 - `calendar.publish`: set the switch "Für alle" of a Termin, which shows the Termin to
   each signed-in person. It is separate from `calendar.manage`, so no Termin is visible
   to all by accident.
@@ -132,4 +135,5 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "todo.all",
     "calendar.manage",
     "calendar.publish",
+    "admin.calendars",
 )

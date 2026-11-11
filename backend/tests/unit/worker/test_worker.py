@@ -37,7 +37,11 @@ def test_worker_settings_registers_tasks() -> None:
     assert process_retention in WorkerSettings.functions
     assert purge_draft_attachments in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
-    assert len(WorkerSettings.cron_jobs) == 10
+    assert len(WorkerSettings.cron_jobs) == 11
+    from worker.calendars import fetch_external_calendars
+
+    assert fetch_external_calendars in WorkerSettings.functions
+    assert any(job.coroutine is fetch_external_calendars for job in WorkerSettings.cron_jobs)
     from worker.todos import archive_done_todos
 
     assert archive_done_todos in WorkerSettings.functions

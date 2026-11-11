@@ -5,7 +5,8 @@ storage is acceptable here. The token only exposes the meeting titles and times
 of the Gremien of the principal, the title, dates, place and board of the Events
 that the principal reads, the title, due date and board of the open cards assigned
 to the principal, and the Termine that the principal reads with the principal's own
-answer, which is low-sensitivity data. Every function
+answer, which is low-sensitivity data, and the entries of the external calendars that
+the principal reads. Every function
 binds to `principal.sub` and never commits.
 """
 
@@ -19,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.calendar.ics import AppointmentEvent, CardEvent, DueCard
+from app.modules.calendar.ics import AppointmentEvent, CardEvent, DueCard, ExternalEvent
 from app.modules.gremien.gremium_roles import gremium_reader_ids
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
@@ -197,4 +198,31 @@ async def feed_appointments(db: AsyncSession, row: PrincipalRow) -> list[Appoint
             answer=my_answer(viewer, item),
         )
         for item in loaded
+    ]
+
+
+async def feed_external(db: AsyncSession, row: PrincipalRow) -> list[ExternalEvent]:
+    """The entries of the external calendars that the person reads (spec 000724).
+
+    The rights come from the `principal` row, as for the Termine. The stamp is the time
+    of the newest good fetch, because an entry has no time of its own.
+    """
+    from app.modules.auth.rbac import resolve_principal
+    from app.modules.calendar.external import ExternalCalendarService
+
+    principal = await resolve_principal(db, row, datetime.now(UTC))
+    return [
+        ExternalEvent(
+            uid=str(entry.id),
+            title=entry.title,
+            starts_on=entry.starts_on,
+            ends_on=entry.ends_on,
+            start_time=entry.start_time,
+            end_time=entry.end_time,
+            stamp=calendar.last_success_at or calendar.created_at,
+            calendar=calendar.name,
+            place=entry.place,
+            description=entry.description,
+        )
+        for entry, calendar in await ExternalCalendarService(db).readable(principal)
     ]

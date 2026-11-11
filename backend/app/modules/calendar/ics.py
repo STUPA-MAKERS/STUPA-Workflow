@@ -16,6 +16,9 @@ answer of the feed owner as `PARTSTAT` of an `ATTENDEE` line with the owner's ow
 address. `build_appointment_file` renders one Termin as the `.ics` attachment of a
 mail: `SEQUENCE` counts its changes, so a calendar app replaces the older copy, and a
 deleted Termin has `METHOD:CANCEL` and `STATUS:CANCELLED`.
+
+An entry of an external calendar is timed or all-day, with the name of its calendar as
+`CATEGORIES`.
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from datetime import date as _date
 from datetime import time as _time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:  # pragma: no cover - types only (icalendar imported lazily)
@@ -126,6 +129,26 @@ class AppointmentEvent:
     attendee: str | None = None
     answer: str | None = None
     cancelled: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ExternalEvent:
+    """An entry of an external calendar as a calendar event.
+
+    `uid` is the id of the stored entry. The times are local naive values, and both are
+    `None` for an all-day entry. `calendar` is the name of the external calendar.
+    """
+
+    uid: str
+    title: str
+    starts_on: _date
+    ends_on: _date
+    start_time: _time | None
+    end_time: _time | None
+    stamp: datetime
+    calendar: str
+    place: str | None = None
+    description: str | None = None
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -282,6 +305,30 @@ def _build_appointment(event: AppointmentEvent, *, domain: str) -> Event:
     return _filled(Event(), properties)
 
 
+def _build_external(event: ExternalEvent, *, domain: str) -> Event:
+    """Build one VEVENT for an entry of an external calendar."""
+    from icalendar import Event
+
+    timed = event.start_time is not None and event.end_time is not None
+    properties = (
+        ("uid", f"external-{event.uid}@{domain}"),
+        ("dtstamp", _as_utc(event.stamp)),
+        ("summary", event.title),
+        ("categories", [event.calendar]),
+        *_when(event.place, ("location", event.place)),
+        *_when(event.description, ("description", event.description)),
+        *(
+            (
+                ("dtstart", _local_to_utc(event.starts_on, cast(_time, event.start_time))),
+                ("dtend", _local_to_utc(event.ends_on, cast(_time, event.end_time))),
+            )
+            if timed
+            else (("dtstart", event.starts_on), ("dtend", event.ends_on + timedelta(days=1)))
+        ),
+    )
+    return _filled(Event(), properties)
+
+
 def build_appointment_file(event: AppointmentEvent, *, domain: str) -> bytes:
     """Render one Termin as the `.ics` attachment of a mail."""
     from icalendar import Calendar
@@ -302,6 +349,7 @@ def build_calendar(
     card_events: Sequence[CardEvent] | None = None,
     due_cards: Sequence[DueCard] | None = None,
     appointments: Sequence[AppointmentEvent] | None = None,
+    external: Sequence[ExternalEvent] | None = None,
     calendar_name: str = "STUPA — Sitzungen",
     default_duration: timedelta = DEFAULT_DURATION,
 ) -> bytes:
@@ -325,5 +373,6 @@ def build_calendar(
         *(_build_card_event(c, domain=domain) for c in card_events or ()),
         *(_build_due_card(d, domain=domain) for d in due_cards or ()),
         *(_build_appointment(a, domain=domain) for a in appointments or ()),
+        *(_build_external(x, domain=domain) for x in external or ()),
     )
     return _filled(Calendar(), properties, parts).to_ical()

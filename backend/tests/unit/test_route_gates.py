@@ -84,6 +84,9 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("PUT", "/api/calendar/appointments/{appointment_id}"): _TERMIN_EDIT,
     ("DELETE", "/api/calendar/appointments/{appointment_id}"): _TERMIN_EDIT,
     ("PUT", "/api/calendar/appointments/{appointment_id}/answer"): "calendar.rules.is_invited",
+    ("GET", "/api/calendar/external/{entry_id}"): (
+        "ExternalCalendarService.entry (MeetingRules.meeting_read_scope of the calendar)"
+    ),
     ("GET", "/api/calendar/me"): _SELF,
     ("POST", "/api/calendar/me/rotate"): _SELF,
     ("GET", "/api/delegations"): "DelegationService.list (own delegations, _can_manage)",
