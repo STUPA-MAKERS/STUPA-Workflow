@@ -339,10 +339,10 @@ describe('VotingComponent', () => {
     it('offers "Neue Umfrage" only with vote.manage and opens the new poll', async () => {
       const member = await start('/voting');
       expect(member.cmp.canCreatePoll()).toBe(false);
-      expect(screen.queryByRole('button', { name: 'Neue Umfrage' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Umfrage anlegen' })).toBeNull();
       TestBed.resetTestingModule();
       const manager = await start('/voting', { manager: true });
-      expect(screen.getByRole('button', { name: 'Neue Umfrage' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Umfrage anlegen' })).toBeInTheDocument();
       const navigate = jest.spyOn(manager.router, 'navigate');
       manager.listVotes.mockClear();
       manager.cmp.pollDialog.set(false);
@@ -376,11 +376,10 @@ describe('VotingComponent', () => {
       const { listVotes, settle } = await start('/voting', {
         pages: [page([item('v1')], 2), page([item('v2')], 2, 1)],
       });
-      expect(screen.getByText('1 von 2 Abstimmungen')).toBeInTheDocument();
+      expect(screen.queryByText(/von 2 Abstimmungen/)).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Mehr laden' }));
       await settle();
       expect(listVotes).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 1, limit: 30 }));
-      expect(screen.getByText('2 von 2 Abstimmungen')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Mehr laden' })).not.toBeInTheDocument();
     });
 
@@ -447,7 +446,7 @@ describe('VotingComponent', () => {
         offset: 0,
       });
       expect(cmp.activeFilterCount()).toBe(3);
-      expect(cmp.gremiumChipLabel()).toBe('g2');
+      expect(cmp.gremiumChipLabel()).toBe('Gremium: g2');
     });
 
     it('ignores an unknown status and sends the default without cancelled votes', async () => {
@@ -523,7 +522,7 @@ describe('VotingComponent', () => {
       TestBed.resetTestingModule();
       const manager = await start('/voting?status=draft', { manager: true });
       expect(manager.cmp.statusOptions().map((o) => o.value)).toEqual(['', 'open', 'ended', 'draft']);
-      expect(manager.cmp.statusChipLabel()).toBe('Entwürfe');
+      expect(manager.cmp.statusChipLabel()).toBe('Status: Entwürfe');
       expect(manager.listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: ['draft'] }));
     });
 
@@ -537,9 +536,9 @@ describe('VotingComponent', () => {
     /** A member has no draft option, so the chip shows the raw value. */
     it('labels the status chip by its value', async () => {
       const { cmp } = await start('/voting?status=open');
-      expect(cmp.statusChipLabel()).toBe('Offen');
+      expect(cmp.statusChipLabel()).toBe('Status: Offen');
       cmp.statusFilter.set('draft');
-      expect(cmp.statusChipLabel()).toBe('draft');
+      expect(cmp.statusChipLabel()).toBe('Status: draft');
       cmp.statusFilter.set('');
       expect(cmp.statusChipLabel()).toBe('Status');
       cmp.gremiumId.set('');
@@ -619,7 +618,7 @@ describe('VotingComponent', () => {
     beforeEach(() => (restore = matchMediaQueries(MEDIA.wide)));
     afterEach(() => restore());
 
-    it('is a pane page and opens the first open vote on the first load', async () => {
+    it('is a pane page and opens no vote by itself on the load (000664)', async () => {
       const { cmp, router, settle, harness, pageService } = await start('/voting', {
         pages: [page([item('v1'), item('v2')])],
       });
@@ -627,10 +626,11 @@ describe('VotingComponent', () => {
       expect(cmp.split()).toBe(true);
       expect(pageService.split()).toBe(true);
       expect(harness.routeNativeElement?.parentElement?.querySelector('app-voting')).toHaveClass('pane-page');
-      expect(router.url).toBe('/voting/v1');
+      expect(router.url).toBe('/voting');
+      expect(screen.getByRole('heading', { name: 'Keine Abstimmung geöffnet' })).toBeInTheDocument();
     });
 
-    it('opens nothing when the first vote is not open, and only once', async () => {
+    it('opens nothing when the list changes after the load', async () => {
       const { router, settle, cmp } = await start('/voting', {
         pages: [page([item('c1', { status: 'closed', result: 'passed' })])],
       });

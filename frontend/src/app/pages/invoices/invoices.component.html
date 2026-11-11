@@ -31,13 +31,22 @@
 
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
-          [placeholder]="'invoices.search' | t"
+          [placeholder]="searchPlaceholder()"
           [label]="'invoices.searchLabel' | t"
           [results]="loading() || reloading() ? null : total()"
           [value]="q()"
           (valueChange)="onSearch($event)"
         />
         <div class="inv__chips" role="group" [attr.aria-label]="'invoices.filter.group' | t">
+          <app-filter-select
+            class="inv__status"
+            [label]="'invoices.filter.status' | t"
+            [options]="segmentOptions()"
+            [value]="segment()"
+            (valueChange)="setSegment($event)"
+            filled
+            unsetValue="all"
+          />
           <app-range-chip
             kind="date"
             [label]="'invoices.filter.issueRange' | t"
@@ -59,16 +68,7 @@
             [to]="grossMax()"
             (applied)="onGrossRange($event)"
           />
-          <span class="inv__count" [class.inv__count--wait]="loading()" role="status">{{ 'invoices.count' | t: { count: items().length, total: total() } }}</span>
         </div>
-        <app-segmented
-          class="inv__seg"
-          width="fill"
-          [ariaLabel]="'invoices.segment.label' | t"
-          [options]="segmentOptions()"
-          [value]="segment()"
-          (valueChange)="setSegment($event ?? 'all')"
-        />
         @if (reloading()) {
           <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>
         }

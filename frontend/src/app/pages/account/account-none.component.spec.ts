@@ -7,6 +7,6 @@ describe('AccountNoneComponent', () => {
   it('says that no account page is open', async () => {
     await render(AccountNoneComponent);
     expect(screen.getByRole('heading', { name: 'Keine Seite geöffnet' })).toBeInTheDocument();
-    expect(screen.getByText('Wähle links einen Bereich deines Kontos.')).toBeInTheDocument();
+    expect(screen.queryByText(/Wähle links/)).toBeNull();
   });
 });

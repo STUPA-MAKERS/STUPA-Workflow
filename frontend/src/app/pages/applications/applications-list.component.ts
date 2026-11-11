@@ -18,6 +18,7 @@ import {
 } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type {
@@ -376,11 +377,18 @@ export class ApplicationsListComponent {
   ]);
 
   /** The search placeholder with the number of applications. */
-  readonly searchPlaceholder = computed(() => {
-    if (this.loading() && this.total() === 0) return this.i18n.translate('applications.list.searchPlain');
-    if (this.total() === 1) return this.i18n.translate('applications.list.searchCountOne');
-    return this.i18n.translate('applications.list.searchCount', { count: this.total() });
-  });
+  readonly searchPlaceholder = computed(() =>
+    searchPlaceholder(
+      this.i18n,
+      {
+        plain: 'applications.list.searchPlain',
+        one: 'applications.list.searchCountOne',
+        many: 'applications.list.searchCount',
+      },
+      this.total(),
+      this.loading(),
+    ),
+  );
 
   /** True while unloaded applications are left. It controls the sentinel and "load more". */
   readonly hasMore = computed(() => this.items().length < this.total());

@@ -395,7 +395,7 @@ describe('TasksComponent', () => {
 
     it('filters the applications and the To-Dos by the search, a board name included', async () => {
       const { cmp, harness } = await start('/tasks', [THREE], { todos: TODOS });
-      expect(screen.getByRole('searchbox', { name: 'Aufgaben durchsuchen' })).toBeInTheDocument();
+      expect(screen.getByRole('searchbox', { name: /Aufgaben durchsuchen$/ })).toBeInTheDocument();
       cmp.search.set('informatik');
       cmp.search.flush();
       harness.detectChanges();
@@ -422,9 +422,9 @@ describe('TasksComponent', () => {
       expect(container.querySelector('app-list-group h2')).toBeNull();
     });
 
-    it('shows one group with "Anzeigen" and filters the To-Dos by due date', async () => {
+    it('shows one group with the "Art" chip and filters the To-Dos by due date', async () => {
       const { cmp, harness } = await start('/tasks', [THREE], { todos: TODOS });
-      expect(cmp.showText()).toBe('Anzeigen: Alles');
+      expect(cmp.showText()).toBe('Art');
       cmp.setShow('todos');
       harness.detectChanges();
       expect(screen.queryByTestId('tasks-apps-head')).toBeNull();
@@ -438,7 +438,7 @@ describe('TasksComponent', () => {
       expect(cmp.dueText()).toBe('Fällig');
       cmp.setDue('overdue');
       harness.detectChanges();
-      expect(cmp.dueText()).toBe('Überfällig');
+      expect(cmp.dueText()).toBe('Fällig: Überfällig');
       expect(cmp.todoRows().map((r: { item: TodoMineItem }) => r.item.id)).toEqual(['k-1']);
       cmp.setDue('none');
       expect(cmp.todoRows().map((r: { item: TodoMineItem }) => r.item.id)).toEqual(['k-4']);

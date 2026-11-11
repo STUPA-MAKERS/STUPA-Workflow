@@ -93,7 +93,7 @@ describe('TodoNewDialogComponent', () => {
       inputs: { boardId: 'b-2', columnId: 'c-2', initialTitle: 'Bus', initialLinks: links },
     });
     open();
-    expect(screen.getByRole('dialog', { name: 'Neues To-Do' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'To-Do anlegen' })).toBeInTheDocument();
     expect(api.board).toHaveBeenCalledWith('b-2');
     expect(cmp.selectedBoard()).toBe('b-2');
     expect(cmp.column()).toBe('c-2');

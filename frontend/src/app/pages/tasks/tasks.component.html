@@ -14,7 +14,7 @@
 
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
-          [placeholder]="'tasks.search' | t"
+          [placeholder]="searchPlaceholder()"
           [results]="loading() ? null : rows().length + todoRows().length"
           [value]="search.text()"
           [clearable]="true"

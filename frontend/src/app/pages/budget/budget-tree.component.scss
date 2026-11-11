@@ -12,15 +12,6 @@
   gap: var(--space-3);
   min-width: 0;
 }
-.bt__years {
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.bt__years app-segmented,
-.bt__years ::ng-deep .seg {
-  max-width: none;
-}
 .bt__noFy {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);

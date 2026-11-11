@@ -22,6 +22,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  filterChipText,
   IconComponent,
   RangeChipComponent,
   type RangeValue,
@@ -368,8 +369,8 @@ export class AuditLogComponent {
   }
 
   private chipText(label: TranslationKey, options: FilterSelectOption[], value: string): string {
-    const hit = options.find((o) => o.value === value) ?? options[0];
-    return `${this.i18n.translate(label)}: ${hit.label}`;
+    const hit = value ? options.find((o) => o.value === value) : undefined;
+    return filterChipText(this.i18n.translate(label), hit?.label);
   }
 
   /** Check the chain now. The server stores the result, so the tiles see it too. */

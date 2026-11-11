@@ -20,6 +20,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { Application, Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
@@ -30,6 +31,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  filterChipText,
   IconComponent,
   InfiniteScrollDirective,
   ListDetailLayoutComponent,
@@ -336,12 +338,20 @@ export class ExpensesComponent implements OnDestroy {
   /** The value of the "Art" chip: "transfer" while the transfers show, else the kind. */
   readonly kindValue = computed(() => (this.tab() === 'transfers' ? 'transfer' : this.kind()));
 
+  /** The search placeholder with the number of bookings (§ 000661). */
+  readonly searchPlaceholder = computed(() =>
+    searchPlaceholder(
+      this.i18n,
+      { plain: 'expenses.searchLabel', one: 'expenses.searchCountOne', many: 'expenses.searchCount' },
+      this.total(),
+      this.loading(),
+    ),
+  );
+
   readonly kindChipLabel = computed(() => {
     const k = this.kindValue();
-    if (k === 'transfer') return this.i18n.translate('expenses.kind.transfer');
-    return k
-      ? this.i18n.translate(k === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense')
-      : this.i18n.translate('expenses.filter.kind');
+    const KIND = { transfer: 'expenses.kind.transfer', income: 'expenses.kind.income', expense: 'expenses.kind.expense' } as const;
+    return filterChipText(this.i18n.translate('expenses.filter.kind'), k ? this.i18n.translate(KIND[k]) : null);
   });
 
   readonly sortSections = computed<RowMenuSection[]>(() => {

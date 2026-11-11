@@ -21,7 +21,7 @@ describe('GremienNoneComponent', () => {
     await render(GremienNoneComponent, {
       providers: [{ provide: GremienStore, useValue: storeWith({ items: [gremium()] }) }],
     });
-    expect(screen.getByText('Gremium wählen')).toBeTruthy();
+    expect(screen.getByText('Kein Gremium geöffnet')).toBeTruthy();
   });
 
   it('says that there is no gremium', async () => {

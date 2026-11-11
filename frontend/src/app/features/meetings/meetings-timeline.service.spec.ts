@@ -57,7 +57,7 @@ describe('MeetingsTimelineService', () => {
     expect(svc.filterGremien()).toEqual([]);
   });
 
-  /** A Gremium that left the list reads as "Alle Gremien". */
+  /** A Gremium that left the list reads as no choice. */
   it('shows the Gremium chip only for more than one Gremium and names the chosen one', () => {
     const one = setup().svc;
     expect(one.showGremiumFilter()).toBe(false);
@@ -70,11 +70,11 @@ describe('MeetingsTimelineService', () => {
         ]),
     });
     expect(svc.showGremiumFilter()).toBe(true);
-    expect(svc.gremiumFilterLabel()).toBe('Alle Gremien');
+    expect(svc.gremiumFilterLabel()).toBe('Gremium');
     svc.gremiumFilter.set('g2');
-    expect(svc.gremiumFilterLabel()).toBe('AStA');
+    expect(svc.gremiumFilterLabel()).toBe('Gremium: AStA');
     svc.gremiumFilter.set('gone');
-    expect(svc.gremiumFilterLabel()).toBe('Alle Gremien');
+    expect(svc.gremiumFilterLabel()).toBe('Gremium');
   });
 
   it('holds the place of the filter chip while the filter Gremien load, for a member of several', () => {

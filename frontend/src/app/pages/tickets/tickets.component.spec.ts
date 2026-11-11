@@ -245,8 +245,8 @@ describe('TicketsComponent', () => {
     harness.detectChanges();
     expect(router.url).toBe('/tickets?status=done&kind=bug&assignee=me');
     expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ kind: ['bug'], assignee: 'me' }));
-    expect(cmp.kindChipLabel()).toBe('Fehler');
-    expect(cmp.assigneeChipLabel()).toBe('Mir');
+    expect(cmp.kindChipLabel()).toBe('Art: Fehler');
+    expect(cmp.assigneeChipLabel()).toBe('Zugewiesen: Mir');
     expect(cmp.statusChipLabel()).toBe('Status: Erledigt');
 
     cmp.setStatus('open');
@@ -267,7 +267,7 @@ describe('TicketsComponent', () => {
   it('lists the people with tickets, and names an unknown one by the chip', async () => {
     const { cmp, go } = await start('/tickets?assignee=p1');
     expect(cmp.assigneeOptions().map((o) => o.label)).toEqual(['Alle', 'Mir', 'Niemandem', 'Mara Keller', 'p3']);
-    expect(cmp.assigneeChipLabel()).toBe('Mara Keller');
+    expect(cmp.assigneeChipLabel()).toBe('Zugewiesen: Mara Keller');
     await go('/tickets?assignee=gone');
     expect(cmp.assigneeChipLabel()).toBe('Zugewiesen');
   });

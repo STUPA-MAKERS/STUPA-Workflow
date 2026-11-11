@@ -64,7 +64,7 @@ describe('NewPollDialogComponent', () => {
   it('offers the Gremien with vote.manage and the fields of the spec', async () => {
     const { cmp } = await setup();
     expect(cmp.gremiumOptions().map((o) => o.label)).toEqual(['STUPA', 'AStA']);
-    expect(screen.getByRole('heading', { name: 'Neue Umfrage' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Umfrage anlegen' })).toBeInTheDocument();
     expect(screen.getByLabelText('Frage')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Terminumfrage' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Endet am/)).toBeInTheDocument();

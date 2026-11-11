@@ -31,6 +31,7 @@ import {
 } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
@@ -41,6 +42,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  filterChipText,
   focusableIn,
   IconComponent,
   liveSearch,
@@ -432,6 +434,18 @@ export class TodosComponent implements OnDestroy {
   /** The entry of the shown board in the board list: known before the board loads. */
   readonly summary = computed(() => this.boards().find((b) => b.id === this.boardId()) ?? null);
 
+  /** The search placeholder with the number of open to-dos (§ 000661). */
+  readonly searchPlaceholder = computed(() =>
+    searchPlaceholder(
+      this.i18n,
+      {
+        plain: 'todos.search.label',
+        one: 'todos.search.placeholderOne',
+        many: 'todos.search.placeholder',
+      },
+      this.openCount(),
+    ),
+  );
   readonly openCount = computed(() => {
     if (this.all()) return this.rowsView()?.openCount() ?? 0;
     const board = this.board();
@@ -496,25 +510,33 @@ export class TodosComponent implements OnDestroy {
 
   readonly assigneeText = computed(() => {
     const v = this.filter().assignee;
-    if (!v) return this.i18n.translate('todos.filter.assignee');
-    return this.assigneeOptions().find((o) => o.value === v)?.label ?? this.i18n.translate('todos.filter.assignee');
+    return filterChipText(
+      this.i18n.translate('todos.filter.assignee'),
+      v ? this.assigneeOptions().find((o) => o.value === v)?.label : null,
+    );
   });
   readonly labelText = computed(() => {
     const ids = this.filter().labels;
-    if (!ids.length) return this.i18n.translate('todos.filter.label');
-    if (ids.length === 1) return this.labelsById().get(ids[0])?.name ?? this.i18n.translate('todos.filter.label');
-    return this.i18n.translate('todos.filter.labels', { n: ids.length });
+    const name = this.i18n.translate('todos.filter.label');
+    if (ids.length <= 1) return filterChipText(name, ids.length ? this.labelsById().get(ids[0])?.name : null);
+    return filterChipText(name, String(ids.length));
   });
-  readonly dueText = computed(() => this.i18n.translate(DUE_TEXT[this.filter().due]));
+  readonly dueText = computed(() =>
+    filterChipText(
+      this.i18n.translate('todos.filter.due'),
+      this.filter().due ? this.i18n.translate(DUE_TEXT[this.filter().due]) : null,
+    ),
+  );
   readonly kindOptions = computed<FilterSelectOption[]>(() => [
     { value: '', label: this.i18n.translate('todos.filter.kindAll') },
     { value: 'events', label: this.i18n.translate('todos.filter.kindEvents') },
     { value: 'archive', label: this.i18n.translate('todos.filter.kindArchive') },
   ]);
   readonly kindText = computed(() =>
-    this.filter().kind
-      ? (this.kindOptions().find((o) => o.value === this.filter().kind)?.label ?? '')
-      : this.i18n.translate('todos.eventCard.kind'),
+    filterChipText(
+      this.i18n.translate('todos.eventCard.kind'),
+      this.filter().kind ? this.kindOptions().find((o) => o.value === this.filter().kind)?.label : null,
+    ),
   );
 
   readonly phoneMenu = computed<RowMenuSection[]>(() => {

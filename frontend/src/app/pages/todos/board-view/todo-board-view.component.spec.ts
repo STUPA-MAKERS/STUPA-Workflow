@@ -95,7 +95,7 @@ describe('TodoBoardViewComponent', () => {
   it('reads only without the write right', async () => {
     const { cmp } = await setup(board({ canWrite: false, canConfigure: false }));
     expect(cmp.columnMenu(cmp.columns()[0])).toEqual([]);
-    expect(screen.queryByRole('button', { name: /To-Do hinzufügen/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /To-Do anlegen/ })).toBeNull();
     const { item } = { item: screen.getByRole('button', { name: 'Raum buchen' }).closest('.bv__item') as HTMLElement };
     fireEvent.keyDown(item, { key: ' ' });
     expect(cmp.kb()).toBeNull();
@@ -103,7 +103,7 @@ describe('TodoBoardViewComponent', () => {
 
   it('adds a card with a quick title: Enter, Escape and the buttons', async () => {
     const { cmp, on, fixture } = await setup();
-    fireEvent.click(screen.getAllByRole('button', { name: /To-Do hinzufügen/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /To-Do anlegen/ })[0]);
     fixture.detectChanges();
     await fixture.whenStable();
     const field = screen.getByRole('textbox', { name: 'Titel der neuen Karte in Offen' });
@@ -124,7 +124,7 @@ describe('TodoBoardViewComponent', () => {
 
   it('has no quick field in the done column', async () => {
     await setup();
-    expect(screen.getAllByRole('button', { name: /To-Do hinzufügen/ })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: /To-Do anlegen/ })).toHaveLength(3);
   });
 
   it('turns a pointer drop into a move with one neighbour', async () => {
