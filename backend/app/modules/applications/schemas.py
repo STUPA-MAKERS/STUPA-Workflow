@@ -19,11 +19,11 @@ from uuid import UUID
 from pydantic import ConfigDict, EmailStr, Field, model_validator
 
 from app.modules.applications.diff import DataDiff
+from app.modules.auth.people import PersonRef
 from app.modules.files.schemas import MessageAttachmentOut, MessageFilesIn
 from app.shared.altcha import AltchaSolutionStr
 from app.shared.i18n import DEFAULT_LANG, I18nMap, Lang
 from app.shared.mentions import MAX_MENTIONS
-from app.shared.people import PersonRef
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 

@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
+from app.modules.auth.people import PersonRef
 from app.modules.todos import service as svc_mod
 from app.modules.todos.links import LinkResolver
-from app.shared.people import PersonRef
 
 
 @pytest.fixture(autouse=True)

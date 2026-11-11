@@ -89,7 +89,7 @@ from app.shared.errors import (  # noqa: E402
     ValidationProblem,
 )
 from app.shared.filenames import sanitize_display_name  # noqa: E402
-from app.shared.people import PersonRef  # noqa: E402
+from app.modules.auth.people import PersonRef  # noqa: E402
 
 from antragsplattform_mcp.client import ApiClient, ApiError  # noqa: E402
 from antragsplattform_mcp.config import DEFAULT_SCOPE, Config  # noqa: E402

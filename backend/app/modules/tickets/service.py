@@ -43,6 +43,12 @@ from app.modules.applications.access import resolve_app_read
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _title_of
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.people import (
+    DELETED_PERSON,
+    PersonRef,
+    permission_holders,
+    person_of,
+)
 from app.modules.auth.principal import Principal
 from app.modules.files.drafts import bind_drafts, check_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
@@ -86,12 +92,6 @@ from app.shared.mentions import (
     unique_mentions,
 )
 from app.shared.paging import Page
-from app.shared.people import (
-    DELETED_PERSON,
-    PersonRef,
-    permission_holders,
-    person_of,
-)
 from app.shared.search import escape_like
 
 #: ``T-0040``, ``t0040``, ``0040`` and ``40`` all name ticket 40.

@@ -28,8 +28,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin import gremium_roles
 from app.modules.auth.principal import Principal
+from app.modules.gremien import gremium_roles
 
 GREMIUM_VIEW_ALL: Final = "gremium.view_all"
 

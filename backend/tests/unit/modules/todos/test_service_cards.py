@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from app.modules.auth.people import PersonRef
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.tickets.models import TicketEvent
 from app.modules.todos import service as svc_mod
@@ -31,7 +32,6 @@ from app.modules.todos.schemas import (
 )
 from app.modules.todos.service import TodoMail, TodoService
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
-from app.shared.people import PersonRef
 from tests.unit.modules.todos.fakes import (
     ME,
     OTHER,

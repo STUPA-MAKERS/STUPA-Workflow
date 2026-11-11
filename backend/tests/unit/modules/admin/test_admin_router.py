@@ -32,11 +32,9 @@ from app.modules.admin.schemas import (
     GremiumAdminOut,
     GremiumMailRecipients,
     GremiumMembershipMappingOut,
-    GremiumMembershipOut,
     GremiumOut,
     GremiumPublicPreview,
     GremiumRoleMappingOut,
-    GremiumRoleOut,
     GroupMappingOut,
     PrincipalOut,
     PublicSiteConfigOut,
@@ -45,6 +43,7 @@ from app.modules.admin.schemas import (
     SiteConfigOut,
     WebhookOut,
 )
+from app.modules.gremien.role_schemas import GremiumMembershipOut, GremiumRoleOut
 from app.shared.errors import ConflictError, NotFoundError
 
 _ALL_PERMS = {
@@ -55,7 +54,7 @@ _ALL_PERMS = {
     "admin.roles",
     "admin.users",
     "admin.group_mappings",
-    "admin.gremium_roles",
+    "gremien.gremium_roles",
     "admin.delegations",
     "admin.deadlines",
     "webhook.manage",

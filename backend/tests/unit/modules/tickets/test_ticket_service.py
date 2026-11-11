@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 from app.modules.applications.models import Application
+from app.modules.auth.people import DELETED_PERSON, PersonRef
 from app.modules.auth.principal import Principal
 from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut
 from app.modules.livevote.models import Meeting
@@ -27,7 +28,6 @@ from app.modules.tickets.service import (
     ticket_managers,
 )
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
-from app.shared.people import DELETED_PERSON, PersonRef
 from tests.unit.modules.tickets.fakes import FakeFiles, ScriptedSession
 
 ME = uuid.uuid4()

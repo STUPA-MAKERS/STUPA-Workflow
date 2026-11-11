@@ -32,7 +32,7 @@ frame `already_voted`, the same code as the REST 409. The handler broadcasts
 Disconnect: `WebSocketDisconnect` tears both tasks down. The broker context
 manager closes the subscription.
 
-The handshake helpers live in `app.shared.ws`, because the to-do channel uses them too. The
+The handshake helpers live in `app.modules.auth.ws`, because the to-do channel uses them too. The
 names stay importable from here, so the routers and the tests keep their imports.
 """
 
@@ -52,6 +52,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.auth.ws import WS_FORBIDDEN as WS_FORBIDDEN
+from app.modules.auth.ws import WS_NOT_FOUND as WS_NOT_FOUND
+from app.modules.auth.ws import WS_UNAUTHENTICATED as WS_UNAUTHENTICATED
+from app.modules.auth.ws import origin_allowed as origin_allowed
+from app.modules.auth.ws import resolve_ws_principal as resolve_ws_principal
 from app.modules.livevote.broker import MeetingBroker
 from app.modules.livevote.events import (
     BodyDraftEvent,
@@ -72,11 +77,6 @@ from app.modules.livevote.service import BrokerPublisher, MeetingService, meetin
 from app.modules.voting.schemas import VoteOut
 from app.modules.voting.service import VotingService
 from app.shared.errors import AppError, ForbiddenError
-from app.shared.ws import WS_FORBIDDEN as WS_FORBIDDEN
-from app.shared.ws import WS_NOT_FOUND as WS_NOT_FOUND
-from app.shared.ws import WS_UNAUTHENTICATED as WS_UNAUTHENTICATED
-from app.shared.ws import origin_allowed as origin_allowed
-from app.shared.ws import resolve_ws_principal as resolve_ws_principal
 
 logger = logging.getLogger("app.livevote")
 

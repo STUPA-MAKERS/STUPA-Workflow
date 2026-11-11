@@ -297,7 +297,7 @@ class ListingOps(ApplicationsServiceBase):
             An empty list when the principal holds no active membership. The caller
             then adds no extra scope.
         """
-        from app.modules.admin.gremium_roles import gremium_reader_ids
+        from app.modules.gremien.gremium_roles import gremium_reader_ids
 
         member_ids = await gremium_reader_ids(self.session, sub)
         if not member_ids:

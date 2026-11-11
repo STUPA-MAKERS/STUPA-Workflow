@@ -43,12 +43,12 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.membership_sync import sync_principal_memberships
 from app.modules.auth import oidc
 from app.modules.auth.login_settings import load_login_settings, session_days
 from app.modules.auth.models import MAX_SESSION_DAYS, AuthSession
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oidc import OidcError, OidcUnavailableError
+from app.modules.gremien.membership_sync import sync_principal_memberships
 from app.settings import Settings
 from app.shared.errors import ForbiddenError
 

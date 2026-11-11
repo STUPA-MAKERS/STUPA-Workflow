@@ -36,6 +36,7 @@ from pydantic import JsonValue
 from sqlalchemy import ColumnElement, and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.auth.people import DELETED_PERSON, PersonRef, person_refs
 from app.modules.auth.principal import Principal
 from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
@@ -103,7 +104,6 @@ from app.modules.todos.schemas import (
 )
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
-from app.shared.people import DELETED_PERSON, PersonRef, person_refs
 from app.shared.search import dialect_of, escape_like, trigram_rank
 
 #: The local calendar of the due dates ("due within 7 days", "due tomorrow").

@@ -1114,7 +1114,7 @@ async def test_me_gremien_helpers_with_rows(monkeypatch: pytest.MonkeyPatch) -> 
     ``_gremien_for`` reads the member ids, then the gremium rows. A ``read`` token caps
     the gremium permission away.
     """
-    from app.modules.admin import gremium_roles as gr
+    from app.modules.gremien import gremium_roles as gr
 
     gid = "11111111-1111-1111-1111-111111111111"
 
@@ -1145,7 +1145,7 @@ async def test_me_gremium_permissions_scope_capped(monkeypatch: pytest.MonkeyPat
     The keys come in catalog order without unknown keys. A role without keys keeps
     the gremium.
     """
-    from app.modules.admin import gremium_roles as gr
+    from app.modules.gremien import gremium_roles as gr
 
     async def _roles(db: object, sub: str, *a: object) -> list[tuple[str, object]]:
         return [
@@ -1164,7 +1164,7 @@ async def test_me_gremium_permissions_scope_capped(monkeypatch: pytest.MonkeyPat
 
 
 async def test_me_gremien_for_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.admin import gremium_roles as gr
+    from app.modules.gremien import gremium_roles as gr
 
     async def _empty(db: object, sub: str, *a: object) -> set[str]:
         return set()
@@ -1179,7 +1179,7 @@ async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) 
     No member Gremium gives False at once. A member with a budget hit gives True, a
     member without a budget root False.
     """
-    from app.modules.admin import gremium_roles as gr
+    from app.modules.gremien import gremium_roles as gr
 
     gid = "22222222-2222-2222-2222-222222222222"
 

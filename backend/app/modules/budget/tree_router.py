@@ -112,7 +112,7 @@ _has_full_view = has_budget_read
 
 
 async def _member_gremium_ids(service: BudgetTreeService, sub: str) -> set[UUID]:
-    from app.modules.admin.gremium_roles import gremium_reader_ids
+    from app.modules.gremien.gremium_roles import gremium_reader_ids
 
     return await gremium_reader_ids(service.session, sub)
 

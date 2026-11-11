@@ -1262,8 +1262,8 @@ async def test_merged_principal_gets_no_membership_and_no_bootstrap_admin(
 
     The test deletes its mapping, because the mapping table is not cleared between tests.
     """
-    from app.modules.admin.membership_sync import sync_all_memberships
     from app.modules.auth.bootstrap import ensure_bootstrap_admins
+    from app.modules.gremien.membership_sync import sync_all_memberships
     from app.modules.gremien.models import GremiumMembershipMapping
     from app.settings import load_settings
 

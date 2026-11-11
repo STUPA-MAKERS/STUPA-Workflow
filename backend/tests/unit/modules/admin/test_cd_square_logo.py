@@ -29,7 +29,6 @@ from fastapi.testclient import TestClient
 from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
-from app.modules.admin import gremium_roles
 from app.modules.admin import router as admin_router
 from app.modules.admin.cd_logos import (
     MAX_CD_LOGO_BYTES,
@@ -44,6 +43,7 @@ from app.modules.admin.router import get_cd_variant_service
 from app.modules.admin.service.cd_variants import SquareLogoRef
 from app.modules.auth import policy
 from app.modules.auth.policy import GREMIUM_VIEW_ALL, can_view_gremium
+from app.modules.gremien import gremium_roles
 from app.shared.errors import (
     NotFoundError,
     PayloadTooLargeError,

@@ -59,7 +59,6 @@ from app.modules.admin.router import (
 from app.modules.admin.schemas import (
     FlowVersionOut,
     GremiumOut,
-    GremiumRoleOut,
     PrincipalOut,
     PublicSiteConfigOut,
     RoleOut,
@@ -73,6 +72,7 @@ from app.modules.applications.router import (
     get_magic_link_sender,
 )
 from app.modules.applications.schemas import ApplicationListItem, StateOut
+from app.modules.gremien.role_schemas import GremiumRoleOut
 from app.settings import Settings, get_settings, load_settings
 from app.shared import search as search_mod
 from app.shared.errors import ForbiddenError, UnauthorizedError
@@ -449,9 +449,9 @@ async def test_write_rate_limit_default_limiter_from_request(
 
 def test_admin_service_factories_construct() -> None:
     """The three service factory dependencies build their service from the session."""
-    from app.modules.admin.gremium_roles import GremiumRoleService
     from app.modules.admin.service import ConfigService
     from app.modules.admin.site_config_service import SiteConfigService
+    from app.modules.gremien.gremium_roles import GremiumRoleService
 
     sess = SimpleNamespace()
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
