@@ -5,7 +5,13 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
-implementation: null
+tests:
+  - "backend/tests/unit/test_models_metadata.py:test_model_in_module_of_its_subject"
+implementation:
+  - backend/app/modules/gremien/models.py
+  - backend/app/modules/application_types/models.py
+  - backend/app/modules/webhooks/models.py
+  - backend/app/modules/admin/models.py
 scope:
   - backend/app/modules
 ---

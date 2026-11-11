@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/admin/models.py
+  - backend/app/modules/webhooks/models.py
   - backend/app/modules/admin/schemas.py
   - backend/app/modules/webhooks/service.py
   - backend/migrations/versions/08dfb2c28b9a_drop_webhook_events.py

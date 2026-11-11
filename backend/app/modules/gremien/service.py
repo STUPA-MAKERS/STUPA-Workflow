@@ -55,18 +55,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.modules.admin.cd_logos import ALLOWED_SQUARE_LOGO_MIME
-from app.modules.admin.models import (
-    CdVariantLogo,
-    Gremium,
-    GremiumMembership,
-    GremiumRole,
-)
+from app.modules.admin.models import CdVariantLogo
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.policy import GREMIUM_VIEW_ALL
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.access import views_all
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.gremien.schemas import (
     AttendanceCellOut,
     AttendanceMonthOut,

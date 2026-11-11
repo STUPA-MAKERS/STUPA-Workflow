@@ -23,7 +23,7 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import Budget
@@ -38,6 +38,7 @@ from app.modules.budget.tree_schemas import (
 )
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.models import FormVersion
+from app.modules.gremien.models import Gremium
 from app.shared.errors import ConflictError, ValidationProblem
 
 pytestmark = pytest.mark.integration

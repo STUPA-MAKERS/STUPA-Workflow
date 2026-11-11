@@ -41,6 +41,17 @@ describe('surfaceEdges (§000605)', () => {
   it('draws the white edge around a meeting in the day pane of the calendar', () => {
     expect(RULES).toMatch(/\.cal__panel \.cal__card \{[^}]*border: var\(--vh-edge\);/);
   });
+
+  it('draws the white edge around a card of a board', () => {
+    expect(RULES).toMatch(/\n {2}app-todo-card-tile \{\s*outline: var\(--vh-edge\);\s*outline-offset: -2px;/);
+  });
+});
+
+describe('protocolBand (§000605, §000614)', () => {
+  it('gives the band of the protocol white ink on its black surface, the edge, and filled PDF buttons', () => {
+    expect(RULES).toMatch(/\n {2}\.pb \{\s*@include vh\.ink\(var\(--vh-fg\)\);\s*outline: var\(--vh-edge\);/);
+    expect(selectorsOf('  .pb__pdf {', 'fill')).toContain('.pb__pdf');
+  });
 });
 
 describe('menuRows (§000617)', () => {

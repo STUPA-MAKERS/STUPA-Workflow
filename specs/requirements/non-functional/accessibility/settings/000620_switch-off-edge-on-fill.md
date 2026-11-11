@@ -18,7 +18,7 @@ scope:
 
 # In very high contrast, a switch, a checkbox and a radio button are filled only when on
 
-While "Sehr hoher Kontrast" is on, a switch, a checkbox and a radio button that are off must have
+While "Hoher Kontrast" is on, a switch, a checkbox and a radio button that are off must have
 a black fill and a 2 px yellow edge. The knob of a switch that is off must be yellow and on the
 left. When on, each must have a yellow fill: the switch with a black knob on the right, the
 checkbox with a black tick, the radio button with a black dot. A checkbox that a component draws

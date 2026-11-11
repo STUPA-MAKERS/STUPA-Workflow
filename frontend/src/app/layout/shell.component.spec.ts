@@ -441,6 +441,19 @@ describe('ShellComponent', () => {
       expect(screen.queryByRole('dialog', { name: 'Mehr' })).not.toBeInTheDocument();
     });
 
+    /** §000593 the person sets one display switch after the other, so the sheet stays open. */
+    it('keeps the sheet open when a display switch changes and when the display settings reset', async () => {
+      const { fixture } = await setup(ADMIN);
+      await userEvent.click(more());
+      fixture.detectChanges();
+      await userEvent.click(screen.getByRole('switch', { name: 'Mehr Kontrast' }));
+      fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'Mehr' })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Systemeinstellungen verwenden' }));
+      fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'Mehr' })).toBeInTheDocument();
+    });
+
     it('marks Mehr as active on a page that lives in the sheet and on the account pages', async () => {
       const { fixture, router } = await setup(ADMIN);
       await router.navigateByUrl('/expenses');

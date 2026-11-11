@@ -31,8 +31,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import ColumnElement, Date, Select, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import Gremium
 from app.modules.files.storage import ObjectStorage, StorageError
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.models import Meeting
 from app.modules.media.refs import image_ids_in
 from app.modules.protocol.filename import protocol_pdf_filename

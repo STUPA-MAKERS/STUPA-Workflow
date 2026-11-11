@@ -18,13 +18,13 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import Gremium
 from app.modules.admin.schemas import FlowVersionCreate
 from app.modules.admin.service import ConfigService
 from app.modules.applications.models import Application
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import State
 from app.modules.forms.models import FormVersion
+from app.modules.gremien.models import Gremium
 from app.shared.errors import ValidationProblem
 from tests.integration.modules.admin.test_admin_service import _make_type
 

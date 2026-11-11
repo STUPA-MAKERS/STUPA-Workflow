@@ -18,9 +18,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.admin.models import Gremium
 from app.modules.admin.service import ConfigService
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.models import Meeting
 from app.modules.protocol.models import Protocol
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker

@@ -28,7 +28,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.modules.admin.models import Webhook, WebhookDelivery
+from app.modules.webhooks.models import Webhook, WebhookDelivery
 from app.modules.webhooks.signing import build_headers, canonical_body
 from app.shared.ssrf import (
     Resolver,

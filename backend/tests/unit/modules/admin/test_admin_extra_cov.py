@@ -32,7 +32,7 @@ from app.modules.admin.gremium_roles import (
     gremium_member_ids,
     gremium_reader_ids,
 )
-from app.modules.admin.models import GremiumMembership, GremiumRole, SiteConfigVersion
+from app.modules.admin.models import SiteConfigVersion
 from app.modules.admin.schemas import (
     GremiumRoleCreate,
     GremiumRoleUpdate,
@@ -44,6 +44,7 @@ from app.modules.admin.site_config_service import (
     _branding,
 )
 from app.modules.audit.actions import AuditAction
+from app.modules.gremien.models import GremiumMembership, GremiumRole
 from app.shared.errors import ConflictError, NotFoundError
 from tests._support.auth_fakes import fake_session, result
 

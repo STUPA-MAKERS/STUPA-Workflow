@@ -24,9 +24,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.deps import get_current_principal
-from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import GremiumMembership, GremiumRole
 from app.modules.livevote.models import Meeting, ProtocolKeeperPeriod
 from app.modules.livevote.schemas import MeetingOut
 from app.modules.livevote.service.pubsub import BrokerPublisher

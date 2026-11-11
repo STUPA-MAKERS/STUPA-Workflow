@@ -19,11 +19,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.admin.models import Gremium
 from app.modules.delegations.pool import (
     substitute_gremien_for_sub,
     substitutes_for,
 )
+from app.modules.gremien.models import Gremium
 from tests.integration.modules.delegations.conftest import (
     act,
     gremium,

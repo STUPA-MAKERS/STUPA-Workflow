@@ -656,18 +656,15 @@ class AuditService:
         binds it. A site-config version has no name column, so its version number is
         the label: it tells two drafts apart and reads the same in both UI locales.
         """
-        from app.modules.admin.models import (
-            ApplicationType,
-            CdVariant,
-            Gremium,
-            SiteConfigVersion,
-            Webhook,
-        )
+        from app.modules.admin.models import CdVariant, SiteConfigVersion
+        from app.modules.application_types.models import ApplicationType
         from app.modules.applications.models import Application
         from app.modules.auth.identity import refs_by_id
         from app.modules.auth.models import Role
         from app.modules.files.models import Attachment
+        from app.modules.gremien.models import Gremium
         from app.modules.voting.models import Vote
+        from app.modules.webhooks.models import Webhook
 
         by_type = _uuids_by_type(targets)
         application_ids = by_type.get("application", frozenset())
@@ -768,14 +765,16 @@ class AuditService:
         The first table that names an id wins, because `_first_wins` keeps the first
         label of each id.
         """
-        from app.modules.admin.models import ApplicationType, Gremium, Webhook
+        from app.modules.application_types.models import ApplicationType
         from app.modules.applications.models import Application
         from app.modules.auth.identity import refs_by_id
         from app.modules.auth.models import Role
         from app.modules.budget.tree_models import Budget, FiscalYear
         from app.modules.files.models import Attachment
+        from app.modules.gremien.models import Gremium
         from app.modules.livevote.models import Meeting
         from app.modules.voting.models import Vote
+        from app.modules.webhooks.models import Webhook
 
         applications = await self._rows_for(
             candidates,

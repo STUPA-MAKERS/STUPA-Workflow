@@ -106,7 +106,7 @@ for (const theme of THEMES) {
 }
 
 /**
- * § NF/accessibility/settings/000614 and 000621: with "Sehr hoher Kontrast" every control of
+ * § NF/accessibility/settings/000614 and 000621: with "Hoher Kontrast" every control of
  * every route shows yellow, and every text on a yellow fill is black. The names
  * `everyControlShowsYellow` and `textOnYellowIsBlack` are the tests of the two rules.
  */

@@ -15,9 +15,9 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.schemas import MeetingCreate, MeetingPatch
 from app.modules.livevote.service import MeetingService
 

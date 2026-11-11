@@ -19,10 +19,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.deps import get_current_principal
-from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
+from app.modules.gremien.models import GremiumMembership, GremiumRole
 from app.modules.livevote.models import MeetingAttendance
 from tests.integration.modules.livevote.conftest import ADMIN_SUB, admin, audit_actions, seed
 

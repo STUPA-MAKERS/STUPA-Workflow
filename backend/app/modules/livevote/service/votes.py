@@ -12,11 +12,11 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.applications.decision import DecisionIn
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.models import MeetingAttendance, MeetingGuest
 from app.modules.livevote.schemas import MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase

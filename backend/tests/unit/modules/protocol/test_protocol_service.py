@@ -15,7 +15,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.admin.models import Gremium
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.models import Meeting
 from app.modules.pdf.typst_client import TypstError
 from app.modules.protocol import service as protocol_service_mod

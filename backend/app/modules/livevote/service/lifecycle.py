@@ -505,7 +505,7 @@ class LifecycleOps(HandoverOps):
 
     async def gremium_has_quorum(self, gremium_id: UUID) -> bool:
         """Tell if the gremium sets a default quorum (the vote config of its meetings)."""
-        from app.modules.admin.models import Gremium
+        from app.modules.gremien.models import Gremium
 
         percent = await self.session.scalar(
             select(Gremium.quorum_percent).where(Gremium.id == gremium_id)

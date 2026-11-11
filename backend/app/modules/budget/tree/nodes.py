@@ -7,7 +7,6 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
@@ -16,6 +15,7 @@ from app.modules.budget.tree.service_base import BudgetTreeServiceBase, _json_sa
 from app.modules.budget.tree_models import Budget, BudgetExpense
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import BudgetNodeCreate, BudgetNodeOut, BudgetNodeUpdate
+from app.modules.gremien.models import Gremium
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 

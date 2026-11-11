@@ -20,8 +20,8 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.privacy.service import PrincipalService
 from app.modules.protocol.markdown import build_election_snippet

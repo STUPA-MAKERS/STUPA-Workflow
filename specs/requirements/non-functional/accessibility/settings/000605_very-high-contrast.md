@@ -4,7 +4,7 @@ title: Very high contrast shows the app in four colours
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-10
+updated: 2026-11-11
 tests:
   - "frontend/vendor/ui-kit/src/styles/display-settings.spec.ts:veryHighContrast"
   - "frontend/src/app/shared/very-high-contrast.styles.spec.ts:surfaceEdges"
@@ -22,13 +22,15 @@ scope:
 
 # Very high contrast shows the app in four colours
 
-With the switch "Sehr hoher Kontrast" on (000593), every page must use only these colours:
+With the switch "Hoher Kontrast" on (000593), every page must use only these colours:
 black `#000000` for every background, white `#ffffff` for text, icons and edges, yellow
 `#ffff00` for the controls of 000598, and light red `#ff8a8a` for error texts and error edges.
 A destructive button stays dark red on yellow (000598). Every surface (card, bar, sheet,
 menu, dialog, popover, table) must have a 2 px white edge, because no shade or tint sets it
-apart. There must be no shadow, no gradient, no glass, no tint and no accent colour of the
-branding. A link must be yellow and underlined. A colour that marks a state (a status, a
+apart. In a grouped list each row must have the edge, not the group, and the rows must sit
+apart. A card of a board must have the edge. There must be no shadow, no gradient, no glass, no tint and no accent colour of the
+branding. A head that stays in place over a list must be solid black, so that no row shows
+through it, and must end in a white line while rows are under it. A link must be yellow and underlined. A colour that marks a state (a status, a
 state flag, a label of a card, a calendar entry, a budget bar) must turn into white text with
 a white edge, so that the text or the icon tells the state. A chart must draw its parts in the
 four colours and must separate them with a 2 px black edge. A disabled control must have white

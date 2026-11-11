@@ -18,9 +18,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.gremium_roles import gremium_reader_ids
-from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.calendar.ics import CardEvent, DueCard
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.models import Meeting
 
 #: 32 bytes give about 43 URL-safe characters. An unguessable token needs no rate limit.

@@ -18,7 +18,7 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.application_types.models import ApplicationType
 from app.modules.audit.actions import AuditAction
 from app.modules.budget.tree_models import Budget
 from app.modules.config_revision.service import (
@@ -39,6 +39,7 @@ from app.modules.forms.validation import (
     effective_form,
     validate_definition,
 )
+from app.modules.gremien.models import Gremium
 from app.shared.config_schemas import FieldOption, FormFieldDef
 from app.shared.errors import NotFoundError, ValidationProblem
 

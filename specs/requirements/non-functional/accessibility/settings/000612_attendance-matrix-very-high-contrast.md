@@ -16,7 +16,7 @@ scope:
 
 # The attendance matrix follows very high contrast
 
-With "Sehr hoher Kontrast" on (000605), every attendance cell that opens the meetings of a
+With "Hoher Kontrast" on (000605), every attendance cell that opens the meetings of a
 month and the sort button "Gesamt" must be black on yellow with the black edge of 000598. A
 badge in a cell must be a black plate with yellow text. The rows of the matrix must have the
 2 px white edge of a row group. The legend must not show the entries for the colour steps

@@ -15,9 +15,9 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import Gremium
 from app.modules.auth.policy import GREMIUM_VIEW_ALL, can_view_gremium
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import Gremium
 from app.shared.errors import NotFoundError
 
 GREMIUM_NOT_FOUND = "gremium_not_found"

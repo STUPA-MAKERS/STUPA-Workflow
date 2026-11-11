@@ -138,7 +138,7 @@ async def test_resolve_data_ids_resolves_embedded_uuids(session: AsyncSession) -
     """
     import uuid as _uuid
 
-    from app.modules.admin.models import Gremium
+    from app.modules.gremien.models import Gremium
 
     g = Gremium(name="Finanzausschuss", slug="finanz")
     session.add(g)

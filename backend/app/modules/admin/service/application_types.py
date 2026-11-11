@@ -6,13 +6,13 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.admin.models import ApplicationType
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
     ApplicationTypeOut,
     ApplicationTypeUpdate,
 )
 from app.modules.admin.service.service_base import ConfigServiceBase
+from app.modules.application_types.models import ApplicationType
 from app.modules.audit.actions import AuditAction
 from app.modules.forms.models import FormVersion
 from app.shared.errors import ConflictError, NotFoundError

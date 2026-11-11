@@ -35,7 +35,7 @@ import worker.deadlines as wd
 from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
-from app.modules.admin.models import ApplicationType, Gremium, Webhook, WebhookDelivery
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
@@ -44,7 +44,9 @@ from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
+from app.modules.gremien.models import Gremium
 from app.modules.voting.models import Vote
+from app.modules.webhooks.models import Webhook, WebhookDelivery
 from app.settings import get_settings, load_settings
 from app.shared.config_schemas import FormFieldDef, VoteConfig
 

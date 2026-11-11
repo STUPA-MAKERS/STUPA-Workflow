@@ -7,7 +7,6 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.admin.models import Webhook, WebhookDelivery
 from app.modules.admin.schemas import (
     WebhookCreate,
     WebhookDeliveryStatusOut,
@@ -16,6 +15,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service.service_base import ConfigServiceBase, _iso
 from app.modules.audit.actions import AuditAction
+from app.modules.webhooks.models import Webhook, WebhookDelivery
 from app.settings import get_settings
 from app.shared.errors import BadRequestError, NotFoundError
 from app.shared.ssrf import SsrfError, assert_allowed_url
