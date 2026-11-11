@@ -242,7 +242,8 @@ async def test_merge_applies_audits_and_commits(recorded: list[dict[str, Any]]) 
     assert entry["target_id"] == str(OLD)
     assert entry["data"]["sourceId"] == str(OLD)
     assert entry["data"]["counts"]["votes"] == {"rewritten": 1}
-    assert "calendar" not in entry["data"]["counts"]
+    assert "removed" not in entry["data"]["counts"]["calendar"]
+    assert "memberships" not in entry["data"]["counts"]
 
 
 async def test_merge_refuses_a_conflict(recorded: list[dict[str, Any]]) -> None:
