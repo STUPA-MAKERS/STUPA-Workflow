@@ -2,7 +2,7 @@
 id: "000643"
 title: A backend module imports only from its layer and from lower layers
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
 implementation:
