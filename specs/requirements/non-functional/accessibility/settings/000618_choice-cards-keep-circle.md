@@ -17,7 +17,7 @@ scope:
 
 # In very high contrast, a choice card has a yellow edge and a yellow circle
 
-While "Sehr hoher Kontrast" is on, a choice card must have a black fill, yellow text, a 2 px
+While "Hoher Kontrast" is on, a choice card must have a black fill, yellow text, a 2 px
 yellow edge and an empty yellow circle in front of the text. The chosen card must have a yellow
 fill, black text and a black circle with a tick. A choice card is a vote option, a vote option for
 a person that the voter stands in for, and a card of the Antrag type in the wizard.

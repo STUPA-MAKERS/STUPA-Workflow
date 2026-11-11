@@ -230,10 +230,10 @@ describe('HelpMenuComponent', () => {
     );
     expect(names).toEqual([
       'Dunkles Design',
-      'Mehr Kontrast',
       'Weniger Bewegung',
       'Weniger Transparenz',
-      'Sehr hoher Kontrast',
+      'Mehr Kontrast',
+      'Hoher Kontrast',
     ]);
   });
 
@@ -243,7 +243,7 @@ describe('HelpMenuComponent', () => {
     const display = fixture.debugElement.injector.get(DisplaySettingsService);
     display.reset();
     fixture.detectChanges();
-    await userEvent.click(screen.getByRole('switch', { name: 'Sehr hoher Kontrast' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Hoher Kontrast' }));
     fixture.detectChanges();
     for (const name of [
       'Dunkles Design',
@@ -255,7 +255,7 @@ describe('HelpMenuComponent', () => {
       expect(toggle).toHaveAttribute('aria-checked', 'true');
       expect(toggle).toBeDisabled();
     }
-    expect(screen.getByRole('switch', { name: 'Sehr hoher Kontrast' })).toBeEnabled();
+    expect(screen.getByRole('switch', { name: 'Hoher Kontrast' })).toBeEnabled();
     expect(document.documentElement.getAttribute('data-fields')).toBe('highlight');
     display.reset();
   });

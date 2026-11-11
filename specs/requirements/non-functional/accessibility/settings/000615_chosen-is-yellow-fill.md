@@ -19,7 +19,7 @@ scope:
 
 # In very high contrast, the chosen control of a choice is yellow filled
 
-While "Sehr hoher Kontrast" is on, the chosen control of a choice must have a yellow fill and
+While "Hoher Kontrast" is on, the chosen control of a choice must have a yellow fill and
 black text. Each other control of the same choice must have a black fill, yellow text and a 2 px
 yellow edge. This applies to a segmented control, a tab bar, a group of filter chips, a group of
 choice chips and a stepper. A toggle button and the button of an open menu are a choice of two

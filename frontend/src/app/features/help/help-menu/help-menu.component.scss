@@ -280,6 +280,12 @@
 .hm--sheet .hm__groupHead {
   padding-inline: var(--space-2);
 }
+/* In the sheet the group name is a caption like "Hilfe" above it (`.cap`): the same type and
+   the same inset. The head row has the inset, so the caption adds none. */
+.hm--sheet .hm__groupHead > .hm__group {
+  padding: 0;
+  font-size: var(--fs-cap);
+}
 
 /* The phone sheet of the public header sits in the top layer, so no glass or scroll box
    of the header clips it. In the sheet the entries need no rule below them. */
