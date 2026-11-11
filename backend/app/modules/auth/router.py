@@ -21,6 +21,7 @@ from sqlalchemy import select
 
 from app.db import get_sessionmaker
 from app.deps import DbSession, Principal, SettingsDep, require_principal
+from app.modules.applications.mail_data import resolve_application_lang
 from app.modules.auth import email_login, oidc, service, sessions
 from app.modules.auth.login_settings import load_login_settings, session_days
 from app.modules.auth.models import SESSION_CLIENT_WEB, AuthSession
@@ -38,10 +39,7 @@ from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.gremien.models import Gremium
 from app.modules.notifications.provider import mail_queue_from_pool
-from app.modules.notifications.service import (
-    NotificationService,
-    resolve_application_lang,
-)
+from app.modules.notifications.service import NotificationService
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_auth_payload_limit,

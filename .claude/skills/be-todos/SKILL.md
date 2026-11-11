@@ -72,7 +72,7 @@ done (`completed_at`).
   board and then the card (`_card(..., lock=True)`) before the insert, else it deadlocks with
   those two. `merge.py` — `fold_personal_board`,
   `rewrite_mentions`.
-- Outside the module: `notifications/todos.py` (three mails), `worker/todos.py`
+- Mails: `mails.py` (three mails; the texts are in `notifications/texts/todos.py`). Outside the module: `worker/todos.py`
   (`archive_done_todos`, `process_todo_due`), `livevote/agenda_service.add_todo_in_tx`,
   `search/service._todos`, `admin/service/gremien.create_gremium` (board with the
   gremium), `admin/principal_merge._todos`, `auth/people.permission_holders`.

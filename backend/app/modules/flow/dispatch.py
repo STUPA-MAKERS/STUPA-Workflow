@@ -177,9 +177,7 @@ def build_worker_dispatcher(
     The imports are local: the notify and webhook dispatchers import this module.
     """
     from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
-    from app.modules.notifications.action_dispatcher import (
-        NotificationActionDispatcher,
-    )
+    from app.modules.flow.mail_actions import NotificationActionDispatcher
     from app.modules.notifications.provider import mail_queue_from_pool
     from app.modules.webhooks.action_dispatcher import WebhookActionDispatcher
     from app.modules.webhooks.queue import webhook_queue_from_pool

@@ -13,9 +13,11 @@ from typing import Any
 
 import pytest
 
+from app.modules.applications import mention_mails as mails
 from app.modules.applications.models import Comment
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.notifications import mentions as mails
+from app.modules.notifications import chat_mail
+from app.modules.tickets import mention_mails as ticket_mails
 from app.modules.tickets.models import Ticket, TicketNote
 from app.settings import load_settings
 
@@ -85,8 +87,9 @@ def fakes(monkeypatch: pytest.MonkeyPatch) -> None:
     _Mail.refuse = set()
     _Files.names = {}
     _Files.asked = []
-    monkeypatch.setattr(mails, "NotificationService", _Mail)
+    monkeypatch.setattr(chat_mail, "NotificationService", _Mail)
     monkeypatch.setattr(mails, "FilesService", _Files)
+    monkeypatch.setattr(ticket_mails, "FilesService", _Files)
 
 
 def _person(pid: uuid.UUID, name: str | None, email: str | None = None) -> SimpleNamespace:
@@ -233,7 +236,7 @@ def _note(**kw: Any) -> SimpleNamespace:
 
 
 async def _ticket_send(session: _Session, recipients: list[uuid.UUID]) -> int:
-    return await mails.send_ticket_mentions(
+    return await ticket_mails.send_ticket_mentions(
         session,  # type: ignore[arg-type]
         queue=None,
         settings=SETTINGS,
@@ -265,7 +268,7 @@ async def test_ticket_mentions_mail_the_mentioned_holders() -> None:
     assert mail["template_key"] == "ticket_mentioned"
     assert mail["context"] == {
         "actor": "moritz@example.org",
-        "number": mails.format_number(42),
+        "number": ticket_mails.format_number(42),
         "title": "Drucker",
         "message": "Schau mal",
         "author": "moritz@example.org",

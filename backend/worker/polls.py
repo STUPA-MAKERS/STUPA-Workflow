@@ -21,9 +21,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
-from app.modules.notifications.polls import send_poll_mail
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.voting.models import Vote
+from app.modules.voting.poll_mails import send_poll_mail
 from app.settings import Settings, load_settings
 
 logger = logging.getLogger("worker.polls")

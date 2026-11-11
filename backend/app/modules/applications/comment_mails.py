@@ -31,130 +31,38 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.applications.mail_data import application_specs, resolve_application_lang
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import gremium_actor_name
+from app.modules.flow.actionable import actionable_principal_emails
 from app.modules.flow.models import State
+from app.modules.notifications.chat_mail import initials
 from app.modules.notifications.layout import append_link_text
 from app.modules.notifications.links import application_link
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.queue import MailQueue
-from app.modules.notifications.recipients import actionable_principal_emails
-from app.modules.notifications.service import (
-    NotificationService,
-    filter_recipients_by_preference,
-    resolve_application_lang,
-)
+from app.modules.notifications.service import NotificationService, filter_recipients_by_preference
 from app.modules.notifications.templating import (
     TemplateRenderError,
     render_mail,
+)
+from app.modules.notifications.texts.comments import (
+    APPLICANT_AUTHOR_FALLBACK,
+    APPLICANT_TEMPLATE_KEY,
+    BUILTIN_APPLICANT_BODY,
+    BUILTIN_APPLICANT_BODY_HTML,
+    BUILTIN_APPLICANT_SUBJECT,
+    BUILTIN_TEAM_BODY,
+    BUILTIN_TEAM_BODY_HTML,
+    BUILTIN_TEAM_SUBJECT,
+    COMMENT_EXCERPT_LEN,
+    COMMITTEE_AUTHOR_FALLBACK,
+    TEAM_TEMPLATE_KEY,
 )
 from app.settings import Settings
 from app.shared.i18n import pick_lang, resolve_i18n
 
 logger = logging.getLogger("app.notifications")
-
-APPLICANT_TEMPLATE_KEY = "comment_applicant"
-TEAM_TEMPLATE_KEY = "comment_team"
-
-_BUILTIN_APPLICANT_SUBJECT = {
-    "de": "Neuer Kommentar zu Ihrem Antrag"
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
-    "en": "New comment on your application"
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
-}
-_BUILTIN_APPLICANT_BODY = {
-    "de": "Hallo,\n\nzu Ihrem Antrag"
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} "
-    "gibt es einen neuen Kommentar"
-    "{% if commentAuthor %} von {{ commentAuthor }}{% endif %}:"
-    "\n\n{{ comment }}\n",
-    "en": "Hello,\n\nthere is a new comment on your application"
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}'
-    "{% if commentAuthor %} from {{ commentAuthor }}{% endif %}:"
-    "\n\n{{ comment }}\n",
-}
-_BUILTIN_TEAM_SUBJECT = {
-    "de": "Rückfrage zum Antrag{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
-    "en": 'Applicant comment on{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
-}
-_BUILTIN_TEAM_BODY = {
-    "de": "Hallo,\n\nder/die Antragsteller:in hat den Antrag"
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} kommentiert"
-    "{% if status %} (aktueller Status: {{ status }}){% endif %}:"
-    "\n\n{{ comment }}\n",
-    "en": "Hello,\n\nthe applicant commented on the application"
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}'
-    "{% if status %} (current status: {{ status }}){% endif %}:"
-    "\n\n{{ comment }}\n",
-}
-
-_COMMENT_EXCERPT_LEN = 1000
-
-#: Chat bubble of the HTML mail, as the web UI shows a message of another person:
-#: initials avatar, author name, gray left-aligned bubble. Jinja renders it with
-#: autoescape; the ``| e ... | safe`` chain turns only the inserted ``<br>`` into markup,
-#: so the comment text stays escaped.
-_CHAT_BUBBLE_HTML = (
-    '<table role="presentation" cellpadding="0" cellspacing="0"'
-    ' style="margin:16px 0 0;">'
-    "<tr>"
-    '<td style="vertical-align:top;padding-right:8px;">'
-    '<div style="width:28px;height:28px;border-radius:50%;background:#e5e9f0;'
-    "color:#6b7686;font-size:11px;font-weight:600;text-align:center;"
-    'line-height:28px;">{{ commentAuthorInitials }}</div>'
-    "</td>"
-    '<td style="vertical-align:top;">'
-    '<div style="font-size:12px;color:#6b7686;margin:0 0 3px;">'
-    '<strong style="color:#1f2933;">{{ commentAuthor }}</strong></div>'
-    '<div style="background:#eef1f5;border-radius:0 12px 12px 12px;'
-    'padding:8px 12px;font-size:14px;line-height:1.5;color:#1f2933;">'
-    "{{ comment | e | replace('\\n', '<br>' | safe) }}</div>"
-    "</td>"
-    "</tr>"
-    "</table>"
-)
-
-_BUILTIN_APPLICANT_BODY_HTML = {
-    "de": '<p style="margin:0 0 1em;">Hallo,</p>'
-    '<p style="margin:0;">zu Ihrem Antrag'
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} "
-    "gibt es einen neuen Kommentar:</p>" + _CHAT_BUBBLE_HTML,
-    "en": '<p style="margin:0 0 1em;">Hello,</p>'
-    '<p style="margin:0;">there is a new comment on your application'
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}:</p>' + _CHAT_BUBBLE_HTML,
-}
-_BUILTIN_TEAM_BODY_HTML = {
-    "de": '<p style="margin:0 0 1em;">Hallo,</p>'
-    '<p style="margin:0;">der/die Antragsteller:in hat den Antrag'
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} kommentiert"
-    "{% if status %} (aktueller Status: {{ status }}){% endif %}:</p>" + _CHAT_BUBBLE_HTML,
-    "en": '<p style="margin:0 0 1em;">Hello,</p>'
-    '<p style="margin:0;">the applicant commented on the application'
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}'
-    "{% if status %} (current status: {{ status }}){% endif %}:</p>" + _CHAT_BUBBLE_HTML,
-}
-
-#: Author label of an applicant comment without a known display name.
-_APPLICANT_AUTHOR_FALLBACK = {"de": "Antragsteller:in", "en": "Applicant"}
-#: Author label of a member comment on an application without a Gremium (as in the UI).
-_COMMITTEE_AUTHOR_FALLBACK = {"de": "Gremium", "en": "Committee"}
-
-
-def comment_mail_text(body: str, filenames: list[str]) -> str:
-    """Return the text of a comment mail: the body, or the file names without one."""
-    if body.strip() or not filenames:
-        return body
-    return ", ".join(filenames)
-
-
-def _initials(name: str) -> str:
-    """Return the initials for the mail avatar (same rule as the web-UI chat)."""
-    parts = [p for p in name.split() if p]
-    if not parts:
-        return "?"
-    first = parts[0][0]
-    last = parts[-1][0] if len(parts) > 1 else ""
-    return (first + last).upper()
 
 
 async def send_comment_notifications(
@@ -201,29 +109,27 @@ async def send_comment_notifications(
     if author_kind == "principal" and visibility != "public":
         return 0
     title = (data or {}).get("title")
-    service = NotificationService(session, queue=queue, settings=settings)
+    service = NotificationService(
+        session, queue=queue, settings=settings, expand_specs=application_specs
+    )
     to_applicant = author_kind == "principal"
 
     lang = (
-        await resolve_application_lang(
-            session, application_id=application_id, settings=settings
-        )
+        await resolve_application_lang(session, application_id=application_id, settings=settings)
         if to_applicant
         else settings.mail_default_lang
     )
 
     state = await session.get(State, state_id) if state_id is not None else None
     labels = state.label_i18n if state is not None else None
-    status_label = (
-        (resolve_i18n(labels, lang) or "") if isinstance(labels, dict) and labels else ""
-    )
+    status_label = (resolve_i18n(labels, lang) or "") if isinstance(labels, dict) and labels else ""
 
     named_author = (
         (await gremium_actor_name(session, gremium_id) or "")
         if to_applicant
         else (author_name or "")
     ).strip()
-    fallback = _COMMITTEE_AUTHOR_FALLBACK if to_applicant else _APPLICANT_AUTHOR_FALLBACK
+    fallback = COMMITTEE_AUTHOR_FALLBACK if to_applicant else APPLICANT_AUTHOR_FALLBACK
     author_label = named_author or pick_lang(fallback, lang)
 
     link = application_link(
@@ -237,25 +143,21 @@ async def send_comment_notifications(
         "applicationId": str(application_id),
         "applicationTitle": title.strip() if isinstance(title, str) else "",
         "status": status_label,
-        "comment": body[:_COMMENT_EXCERPT_LEN],
+        "comment": body[:COMMENT_EXCERPT_LEN],
         "commentAuthor": author_label,
-        "commentAuthorInitials": _initials(author_label),
+        "commentAuthorInitials": initials(author_label),
     }
 
     resolved = (
-        await service.resolver.resolve(
-            [{"kind": "applicant"}], application_id=application_id
-        )
+        await service.resolver.resolve([{"kind": "applicant"}], application_id=application_id)
         if to_applicant
-        else await actionable_principal_emails(
-            session, application_id=application_id, state=state
-        )
+        else await actionable_principal_emails(session, application_id=application_id, state=state)
     )
     template_key = APPLICANT_TEMPLATE_KEY if to_applicant else TEAM_TEMPLATE_KEY
     builtin = (
-        (_BUILTIN_APPLICANT_SUBJECT, _BUILTIN_APPLICANT_BODY, _BUILTIN_APPLICANT_BODY_HTML)
+        (BUILTIN_APPLICANT_SUBJECT, BUILTIN_APPLICANT_BODY, BUILTIN_APPLICANT_BODY_HTML)
         if to_applicant
-        else (_BUILTIN_TEAM_SUBJECT, _BUILTIN_TEAM_BODY, _BUILTIN_TEAM_BODY_HTML)
+        else (BUILTIN_TEAM_SUBJECT, BUILTIN_TEAM_BODY, BUILTIN_TEAM_BODY_HTML)
     )
 
     recipients = await filter_recipients_by_preference(session, resolved, "comment")

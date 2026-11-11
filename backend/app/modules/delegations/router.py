@@ -22,6 +22,11 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
+from app.modules.delegations.mails import (
+    DelegationMailer,
+    get_delegation_mailer,
+    meeting_delegation_mail_info,
+)
 from app.modules.delegations.schemas import (
     DelegationCreate,
     DelegationOut,
@@ -32,11 +37,6 @@ from app.modules.delegations.schemas import (
     VoteDelegationStatus,
 )
 from app.modules.delegations.service import DelegationService
-from app.modules.notifications.auto import (
-    AutoMailer,
-    get_auto_mailer,
-    meeting_delegation_mail_info,
-)
 from app.shared.errors import ProblemDetail
 
 router = APIRouter(prefix="/delegations", tags=["delegations"])
@@ -54,7 +54,7 @@ def get_delegation_service(session: DbSession, settings: SettingsDep) -> Delegat
 
 
 ServiceDep = Annotated[DelegationService, Depends(get_delegation_service)]
-AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
+DelegationMailerDep = Annotated[DelegationMailer, Depends(get_delegation_mailer)]
 #: Authentication is enough here, because any member may delegate the own vote.
 #: The service checks the domain entitlement, such as the voting membership.
 Member = Annotated[Principal, Depends(require_principal())]
@@ -83,7 +83,7 @@ async def create_delegation(
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
-    mailer: AutoMailerDep,
+    mailer: DelegationMailerDep,
 ) -> DelegationOut:
     """Create a delegation for one meeting.
 
@@ -112,7 +112,7 @@ async def revoke_delegation(
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
-    mailer: AutoMailerDep,
+    mailer: DelegationMailerDep,
 ) -> Response:
     """Revoke a delegation: the delegator before the start, the lead while live.
 

@@ -25,14 +25,16 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.applications.decision import amount_deviates
+from app.modules.applications.mail_data import application_specs, resolve_application_lang
 from app.modules.applications.models import Application, ApplicationDecision
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import State
 from app.modules.notifications.links import application_link, task_link
 from app.modules.notifications.queue import MailQueue
-from app.modules.notifications.service import (
-    NotificationService,
-    resolve_application_lang,
+from app.modules.notifications.service import NotificationService
+from app.modules.notifications.texts.tasks import (
+    BUILTIN_TASK_BODY,
+    BUILTIN_TASK_SUBJECT,
 )
 from app.settings import Settings
 from app.shared.i18n import resolve_i18n
@@ -198,14 +200,11 @@ class NotificationActionDispatcher:
                     application_id=action.application_id,
                     settings=self.settings,
                 )
-                if explicit_lang is None
-                and _applicant_only(action.params.get("recipients"))
+                if explicit_lang is None and _applicant_only(action.params.get("recipients"))
                 else explicit_lang
             )
             label_i18n = (
-                await session.scalar(
-                    select(State.label_i18n).where(State.id == current_state_id)
-                )
+                await session.scalar(select(State.label_i18n).where(State.id == current_state_id))
                 if current_state_id is not None
                 else None
             )
@@ -226,7 +225,10 @@ class NotificationActionDispatcher:
                 **(extra if isinstance(extra, dict) else {}),
             }
             service = NotificationService(
-                session, queue=self.queue, settings=self.settings
+                session,
+                queue=self.queue,
+                settings=self.settings,
+                expand_specs=application_specs,
             )
             await service.handle_notify_action(
                 action.params,
@@ -250,10 +252,7 @@ class NotificationActionDispatcher:
         manual transition with requiresAction), because "you can act" is wrong for a
         pass-through or an end state.
         """
-        from app.modules.notifications.recipients import (
-            actionable_principal_emails,
-            state_actionable,
-        )
+        from app.modules.flow.actionable import actionable_principal_emails, state_actionable
 
         async with self.sessionmaker() as session:
             row = (
@@ -286,39 +285,22 @@ class NotificationActionDispatcher:
             title = (data or {}).get("title")
             status_label = _status_label(state, self.settings.mail_default_lang)
             service = NotificationService(
-                session, queue=self.queue, settings=self.settings
+                session,
+                queue=self.queue,
+                settings=self.settings,
+                expand_specs=application_specs,
             )
             await service.send_kind_mail(
                 recipients,
                 kind="task",
                 template_key="task_new",
-                builtin_subject=_BUILTIN_TASK_SUBJECT,
-                builtin_body=_BUILTIN_TASK_BODY,
+                builtin_subject=BUILTIN_TASK_SUBJECT,
+                builtin_body=BUILTIN_TASK_BODY,
                 context={
                     "applicationId": str(action.application_id),
-                    "applicationTitle": title.strip()
-                    if isinstance(title, str)
-                    else "",
+                    "applicationTitle": title.strip() if isinstance(title, str) else "",
                     "status": status_label,
                 },
                 idempotency_parts=(action.idempotency_key, "task_new"),
                 link=task_link(self.settings, action.application_id),
             )
-
-
-_BUILTIN_TASK_SUBJECT = {
-    "de": "Neue Aufgabe: Antrag"
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
-    "en": "New task: application"
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
-}
-_BUILTIN_TASK_BODY = {
-    "de": "Hallo,\n\nder Antrag"
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} hat einen "
-    "Schritt erreicht, in dem du handeln kannst"
-    "{% if status %} (Status: {{ status }}){% endif %}.\n",
-    "en": "Hello,\n\nthe application"
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %} reached a '
-    "step where you can act"
-    "{% if status %} (status: {{ status }}){% endif %}.\n",
-}

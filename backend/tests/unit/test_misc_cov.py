@@ -739,8 +739,8 @@ async def test_deliver_comment_mails_invokes_send(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """`_deliver_comment_mails` opens the session and calls `send_comment_notifications`."""
+    import app.modules.applications.comment_mails as comments_mod
     import app.modules.applications.router as ar
-    import app.modules.notifications.comments as comments_mod
 
     fake_db = _FakeMagicSession()
     monkeypatch.setattr(ar, "get_sessionmaker", lambda: _FakeSessionmaker(fake_db))

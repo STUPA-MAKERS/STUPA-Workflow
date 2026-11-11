@@ -20,6 +20,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import get_current_principal
+from app.modules.applications import captured_mail as captured_mod
 from app.modules.applications.models import (
     Applicant,
     Application,
@@ -32,7 +33,6 @@ from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import EmailLoginLink
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.notifications import captured as captured_mod
 from app.modules.notifications.mail import MailMessage
 from app.settings import Settings
 from tests._support.guest_apps import GuestSeed, build_api, guest_settings, seed_guest_flow

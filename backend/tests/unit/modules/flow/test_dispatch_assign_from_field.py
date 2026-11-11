@@ -23,7 +23,7 @@ from app.modules.flow.dispatch import (
     build_worker_dispatcher,
 )
 from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
-from app.modules.notifications.action_dispatcher import NotificationActionDispatcher
+from app.modules.flow.mail_actions import NotificationActionDispatcher
 from app.modules.webhooks.action_dispatcher import WebhookActionDispatcher
 from app.settings import load_settings
 

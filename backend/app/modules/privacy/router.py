@@ -18,11 +18,8 @@ from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.files.service import FilesService
-from app.modules.notifications.privacy import (
-    notify_erasure_executed,
-    notify_erasure_rejected,
-)
 from app.modules.notifications.provider import mail_queue_from_pool
+from app.modules.privacy.mails import notify_erasure_executed, notify_erasure_rejected
 from app.modules.privacy.models import ErasureRequest
 from app.modules.privacy.schemas import (
     EmailErasureBody,

@@ -36,7 +36,7 @@ description: DSGVO/GDPR backend — erasure-request queue (Art. 17), application
 
 **Conventions & gotchas:**
 - All routes require permission `privacy.manage` (`require_principal`) except the public erasure-request creation in be-applications.
-- Services NEVER send mail. The router or the worker fires `notify_erasure_{requested,executed,rejected}` best-effort via `BackgroundTasks` **after** the commit (`app.modules.notifications.privacy`, `mail_queue_from_pool`).
+- Services NEVER send mail. The router or the worker fires `notify_erasure_{requested,executed,rejected}` best-effort via `BackgroundTasks` **after** the commit (`privacy/mails.py` for executed and rejected, `applications/erasure_mail.py` for requested, `mail_queue_from_pool`).
 - `execute`/`erase` call inner services with `commit=False` so anonymization + status change land in **one transaction**.
 - `auskunft` writes its own `AuditAction.PII_EXPORT` entry with the queried email as `target_id`. The trail must stay traceable to WHOSE data left the platform (Art. 30 accountability). Other audited actions: `ERASURE_REQUESTED/EXECUTED/REJECTED`, `ANONYMIZATION`, `PRINCIPAL_ERASED`.
 - `ErasureRequestService.create` validates the subject↔id pairing (`ValidationProblem`), checks the application up-front (404 not 500), and copies the applicant email before the erasure sets it to NULL.

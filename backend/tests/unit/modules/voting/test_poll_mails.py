@@ -8,8 +8,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.notifications import polls
 from app.modules.notifications.links import vote_link
+from app.modules.voting import poll_mails as polls
 from app.modules.voting.models import Vote
 from app.settings import load_settings
 from tests.unit.modules.todos.fakes import ScriptedSession

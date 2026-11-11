@@ -10,9 +10,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.flow.dispatch import DispatchedAction
+from app.modules.flow.mail_actions import _decision_context
 from app.modules.notifications import service as svc
 from app.modules.notifications import templates_catalogue as cat
-from app.modules.notifications.action_dispatcher import _decision_context
 from app.modules.notifications.templating import _render_str
 from tests._support.notifications_fakes import FakeSession
 

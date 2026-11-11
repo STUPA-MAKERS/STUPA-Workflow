@@ -8,11 +8,11 @@ from typing import Any
 import pytest
 
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.notifications import todos as mails
 from app.modules.notifications.kinds import NOTIFICATION_KINDS
 from app.modules.notifications.layout import _REASONS
 from app.modules.notifications.links import todo_link
 from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
+from app.modules.todos import mails as mails
 from app.modules.todos.service import TodoMail
 from app.settings import load_settings
 from tests.unit.modules.todos.fakes import ME, OTHER, ScriptedSession, board, card, column

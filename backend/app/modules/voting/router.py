@@ -36,9 +36,9 @@ from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
-from app.modules.notifications.polls import notify_poll_started
 from app.modules.voting.election import ElectionService
 from app.modules.voting.poll import PollService
+from app.modules.voting.poll_mails import notify_poll_started
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,

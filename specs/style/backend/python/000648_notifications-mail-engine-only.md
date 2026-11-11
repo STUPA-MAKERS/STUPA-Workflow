@@ -5,7 +5,15 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/modules/notifications/test_mail_engine_only.py:test_import_contract_has_no_exception_for_notifications"
+implementation:
+  - backend/app/modules/notifications/texts
+  - backend/app/modules/notifications/recipients.py
+  - backend/app/modules/flow/mail_actions.py
+  - backend/app/modules/flow/actionable.py
+  - backend/app/modules/applications/mail_data.py
+  - backend/pyproject.toml
 scope:
   - backend/app/modules
   - backend/pyproject.toml

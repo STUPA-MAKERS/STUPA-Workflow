@@ -41,6 +41,10 @@ from app.modules.applications.access import (
     require_app_read,
     resolve_app_read,
 )
+from app.modules.applications.captured_mail import notify_application_captured
+from app.modules.applications.erasure_mail import notify_erasure_requested
+from app.modules.applications.mail_data import resolve_application_lang
+from app.modules.applications.mention_mails import notify_comment_mentions
 from app.modules.applications.schemas import (
     ApplicantApplicationsOut,
     ApplicantCandidateOut,
@@ -65,15 +69,9 @@ from app.modules.files.service import FilesService
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.forms.schemas import EffectiveFormOut
-from app.modules.notifications.captured import notify_application_captured
-from app.modules.notifications.comments import comment_mail_text
-from app.modules.notifications.mentions import notify_comment_mentions
-from app.modules.notifications.privacy import notify_erasure_requested
+from app.modules.notifications.chat_mail import comment_mail_text
 from app.modules.notifications.provider import mail_queue_from_pool
-from app.modules.notifications.service import (
-    NotificationService,
-    resolve_application_lang,
-)
+from app.modules.notifications.service import NotificationService
 from app.modules.privacy.service import ErasureRequestService
 from app.settings import Settings
 from app.shared.antiabuse import (
@@ -734,7 +732,7 @@ async def _deliver_comment_mails(
     pool: object,
 ) -> None:
     """Send the comment mails in an own session, in the background after the 201."""
-    from app.modules.notifications.comments import send_comment_notifications
+    from app.modules.applications.comment_mails import send_comment_notifications
 
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()

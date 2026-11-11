@@ -25,59 +25,18 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.db import get_sessionmaker
+from app.modules.applications.mail_data import resolve_application_lang
 from app.modules.notifications.links import MailLink
 from app.modules.notifications.queue import MailQueue
-from app.modules.notifications.service import (
-    NotificationService,
-    resolve_application_lang,
+from app.modules.notifications.service import NotificationService
+from app.modules.notifications.texts.captured import (
+    APPLICATION_CAPTURED_BODY,
+    APPLICATION_CAPTURED_KEY,
+    APPLICATION_CAPTURED_SUBJECT,
 )
 from app.settings import Settings
 
 logger = logging.getLogger("app.notifications")
-
-#: The template key and the footer kind of the mail.
-APPLICATION_CAPTURED_KEY = "application_captured"
-
-APPLICATION_CAPTURED_SUBJECT: dict[str, str] = {
-    "de": "Für dich wurde ein Antrag erfasst"
-    "{% if applicationTitle %}: „{{ applicationTitle }}“{% endif %}",
-    "en": "An application was entered for you"
-    '{% if applicationTitle %}: "{{ applicationTitle }}"{% endif %}',
-}
-APPLICATION_CAPTURED_BODY: dict[str, str] = {
-    "de": "Hallo{% if applicantName %} {{ applicantName }}{% endif %},\n\n"
-    "für dich wurde ein Antrag"
-    "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} "
-    "auf der Antragsplattform erfasst"
-    "{% if gremiumName %} ({{ gremiumName }}){% endif %}."
-    "{% if receivedOn %} Eingegangen am {{ receivedOn }}.{% endif %}"
-    "{% if intake %} Eingang: {{ intake }}.{% endif %}\n\n"
-    "Der Antrag gehört dir. Du kannst ihn hier ansehen und verfolgen:\n{{ link }}\n"
-    "{% if isGuest %}\nDer Link ist dein persönlicher Zugang. Gib ihn nicht weiter.\n"
-    "{% else %}\nMelde dich mit deinem Konto an, um den Antrag zu öffnen.\n{% endif %}",
-    "en": "Hello{% if applicantName %} {{ applicantName }}{% endif %},\n\n"
-    "an application"
-    '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %} '
-    "was entered for you on the application platform"
-    "{% if gremiumName %} ({{ gremiumName }}){% endif %}."
-    "{% if receivedOn %} Received on {{ receivedOn }}.{% endif %}"
-    "{% if intake %} Intake: {{ intake }}.{% endif %}\n\n"
-    "The application is yours. You can view and follow it here:\n{{ link }}\n"
-    "{% if isGuest %}\nThe link is your personal access. Do not share it.\n"
-    "{% else %}\nSign in with your account to open the application.\n{% endif %}",
-}
-
-#: The placeholders of the template editor.
-APPLICATION_CAPTURED_PLACEHOLDERS: dict[str, str] = {
-    "applicationTitle": "Titel des Antrags",
-    "applicantName": "Name der antragstellenden Person",
-    "gremiumName": "Gremium des Antrags",
-    "receivedOn": "Eingangsdatum",
-    "intake": "Eingang (zum Beispiel „per PDF“)",
-    "link": "Link zum Antrag (Konto) oder Zugangslink (Gast)",
-    "isGuest": "Wahr bei einem Gast ohne Konto",
-    "applicationId": "ID des Antrags",
-}
 
 
 def _format_date(value: date | None, lang: str) -> str:
@@ -113,9 +72,7 @@ async def notify_application_captured(
             name = await session.scalar(
                 select(Applicant.name).where(Applicant.application_id == application_id)
             )
-            gremium = (
-                await session.get(Gremium, app.gremium_id) if app.gremium_id else None
-            )
+            gremium = await session.get(Gremium, app.gremium_id) if app.gremium_id else None
             lang = await resolve_application_lang(
                 session, application_id=application_id, settings=settings
             )

@@ -1,13 +1,13 @@
-"""Erasure-request mails: received, executed, rejected.
+"""Erasure-request mails to the data subject: executed, rejected.
 
 Each function runs as a background task after the triggering transaction
 commits. Each opens its own sessionmaker. The send is best effort. The builtin
 subject and body dicts are also the editor defaults.
 
-The mail to the admins links the privacy admin page. The rejection links the
-application of the request. The mail about an executed request has no link,
-because the erasure removed the element: the application is anonymized and its
-page shows nothing to the data subject.
+The rejection links the application of the request. The mail about an executed
+request has no link, because the erasure removed the element: the application is
+anonymized and its page shows nothing to the data subject. The mail to the admins
+about a new request is in `app.modules.applications.erasure_mail`.
 """
 
 from __future__ import annotations
@@ -18,69 +18,18 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.db import get_sessionmaker
-from app.modules.notifications.links import application_link, privacy_admin_link
+from app.modules.notifications.links import application_link
 from app.modules.notifications.queue import MailQueue
-from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import NotificationService
+from app.modules.notifications.texts.privacy import (
+    ERASURE_EXECUTED_BODY,
+    ERASURE_EXECUTED_SUBJECT,
+    ERASURE_REJECTED_BODY,
+    ERASURE_REJECTED_SUBJECT,
+)
 from app.settings import Settings
 
 logger = logging.getLogger("app.privacy")
-
-ERASURE_REQUESTED_SUBJECT: dict[str, str] = {
-    "de": "Neuer Löschantrag (DSGVO Art. 17)",
-    "en": "New erasure request (GDPR Art. 17)",
-}
-ERASURE_REQUESTED_BODY: dict[str, str] = {
-    "de": "Hallo,\n\nein Löschantrag ist eingegangen und wartet auf Bearbeitung in "
-    "der Datenschutz-Verwaltung.\n",
-    "en": "Hello,\n\nan erasure request has been received and is awaiting review in "
-    "the privacy admin area.\n",
-}
-ERASURE_EXECUTED_SUBJECT: dict[str, str] = {
-    "de": "Ihre Daten wurden gelöscht (DSGVO Art. 17)",
-    "en": "Your data has been erased (GDPR Art. 17)",
-}
-ERASURE_EXECUTED_BODY: dict[str, str] = {
-    "de": "Hallo,\n\nIhr Löschantrag wurde ausgeführt. Ihre personenbezogenen Daten "
-    "wurden gemäß DSGVO Art. 17 anonymisiert bzw. gelöscht.\n",
-    "en": "Hello,\n\nyour erasure request has been executed. Your personal data has "
-    "been anonymised or erased in accordance with GDPR Art. 17.\n",
-}
-ERASURE_REJECTED_SUBJECT: dict[str, str] = {
-    "de": "Ihr Löschantrag wurde abgelehnt",
-    "en": "Your erasure request was rejected",
-}
-ERASURE_REJECTED_BODY: dict[str, str] = {
-    "de": "Hallo,\n\nIhr Löschantrag wurde abgelehnt{% if reason %}: {{ reason }}{% endif %}.\n",
-    "en": "Hello,\n\nyour erasure request was rejected{% if reason %}: {{ reason }}{% endif %}.\n",
-}
-
-
-async def notify_erasure_requested(
-    *,
-    queue: MailQueue | None,
-    settings: Settings,
-    request_id: UUID,
-    subject_type: str,
-) -> None:
-    """Notify the privacy admins (`privacy.manage`) about a new request."""
-    sessionmaker = get_sessionmaker()
-    async with sessionmaker() as session:
-        recipients = await RecipientResolver(session).resolve(
-            [{"kind": "permission", "ref": "privacy.manage"}]
-        )
-        if not recipients:
-            return
-        await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
-            recipients,
-            kind="privacy",
-            template_key="erasure_requested",
-            builtin_subject=ERASURE_REQUESTED_SUBJECT,
-            builtin_body=ERASURE_REQUESTED_BODY,
-            context={"subjectType": subject_type, "requestId": str(request_id)},
-            idempotency_parts=("erasure_requested", str(request_id)),
-            link=privacy_admin_link(settings),
-        )
 
 
 async def notify_erasure_executed(
