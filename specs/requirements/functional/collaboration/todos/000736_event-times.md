@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - backend/app/modules/todos/service.py
+  - backend/app/modules/calendar/ics.py
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.html
+  - frontend/src/app/features/todos/new-dialog/todo-new-dialog.component.html
 scope:
   - backend/app/modules/todos
   - backend/app/modules/calendar

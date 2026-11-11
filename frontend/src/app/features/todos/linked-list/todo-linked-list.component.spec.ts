@@ -70,7 +70,7 @@ describe('TodoLinkedListComponent', () => {
   });
 
   it('shows a linked Event with its dates, board, place and balance (spec 000489)', async () => {
-    const event = { startsOn: '2026-11-20', endsOn: '2026-11-21', place: 'Mensa', participants: null, seriesId: null, seriesName: null };
+    const event = { startsOn: '2026-11-20', endsOn: '2026-11-21', startTime: null, endTime: null, place: 'Mensa', participants: null, seriesId: null, seriesName: null };
     await setup(() => of([card({ id: 'ev', title: 'Erstiparty', event, balance: '-725.40' }), card()]));
     const rows = [...document.querySelectorAll('.tl__row')];
     expect(rows[0]).toHaveClass('tl__row--event');

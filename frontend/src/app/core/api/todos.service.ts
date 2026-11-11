@@ -121,6 +121,9 @@ export interface TodoLinkView {
 export interface TodoEventBrief {
   readonly startsOn: string | null;
   readonly endsOn: string | null;
+  /** The time of the start day and of the end day (`HH:MM:SS`), or null for none. */
+  readonly startTime: string | null;
+  readonly endTime: string | null;
   readonly place: string | null;
   readonly participants: number | null;
   readonly seriesId: Uuid | null;
@@ -173,6 +176,8 @@ export interface TodoEventFacts {
 export interface TodoEventIn {
   readonly startsOn?: string | null;
   readonly endsOn?: string | null;
+  readonly startTime?: string | null;
+  readonly endTime?: string | null;
   readonly place?: string | null;
   readonly participants?: number | null;
   readonly seriesId?: Uuid | null;
