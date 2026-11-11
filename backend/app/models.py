@@ -38,6 +38,9 @@ from app.modules.budget.tree_models import (
     BudgetExpense,
     FiscalYear,
 )
+from app.modules.calendar.models import Answer as CalendarAnswer
+from app.modules.calendar.models import Appointment as CalendarAppointment
+from app.modules.calendar.models import Invitation as CalendarInvitation
 from app.modules.config_revision.models import ConfigRevision
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.files.models import Attachment, AttachmentDraftToken
@@ -124,6 +127,9 @@ __all__ = [
     "ErasureRequest",
     "Principal",
     "Backup",
+    "CalendarAnswer",
+    "CalendarAppointment",
+    "CalendarInvitation",
     "PrivacySettings",
     "Protocol",
     "ProtocolVoteRef",

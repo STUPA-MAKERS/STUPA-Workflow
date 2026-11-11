@@ -76,6 +76,11 @@ Keys that need a note:
 - `todo.all`: global read AND write of the cards of every Gremium and team board. It
   never configures a board (that is the Gremium permission `todo.configure`) and makes
   no member. A personal board stays private.
+- `calendar.manage`: read, change and delete every Termin of the Kalender and invite
+  any Gremium. Without it a person changes only the own Termine.
+- `calendar.publish`: set the switch "Für alle" of a Termin, which shows the Termin to
+  each signed-in person. It is separate from `calendar.manage`, so no Termin is visible
+  to all by accident.
 """
 
 from __future__ import annotations
@@ -125,4 +130,6 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "ticket.manage",
     "todo.read_all",
     "todo.all",
+    "calendar.manage",
+    "calendar.publish",
 )

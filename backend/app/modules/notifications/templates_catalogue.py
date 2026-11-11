@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 from app.modules.notifications import service as _svc
 from app.modules.notifications.texts import (
+    calendar,
     captured,
     comments,
     meetings,
@@ -330,6 +331,27 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         mentions.TICKET_MENTIONED_SUBJECT,
         mentions.TICKET_MENTIONED_BODY,
         mentions.TICKET_MENTIONED_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        calendar.APPOINTMENT_INVITED_KEY,
+        calendar.APPOINTMENT_KIND,
+        calendar.APPOINTMENT_INVITED_SUBJECT,
+        calendar.APPOINTMENT_INVITED_BODY,
+        calendar.APPOINTMENT_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        calendar.APPOINTMENT_CHANGED_KEY,
+        calendar.APPOINTMENT_KIND,
+        calendar.APPOINTMENT_CHANGED_SUBJECT,
+        calendar.APPOINTMENT_CHANGED_BODY,
+        calendar.APPOINTMENT_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        calendar.APPOINTMENT_CANCELLED_KEY,
+        calendar.APPOINTMENT_KIND,
+        calendar.APPOINTMENT_CANCELLED_SUBJECT,
+        calendar.APPOINTMENT_CANCELLED_BODY,
+        calendar.APPOINTMENT_PLACEHOLDERS,
     ),
 )
 

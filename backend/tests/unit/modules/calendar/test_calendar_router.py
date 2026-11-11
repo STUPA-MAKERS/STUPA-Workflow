@@ -15,7 +15,7 @@ from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
 from app.modules.calendar import service as calendar_service
-from app.modules.calendar.ics import CardEvent, DueCard
+from app.modules.calendar.ics import AppointmentEvent, CardEvent, DueCard
 from app.settings import get_settings, load_settings
 from tests._support.auth_fakes import fake_session, result
 
@@ -105,6 +105,22 @@ def test_feed_returns_ics_with_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
         return [due]
 
     monkeypatch.setattr(calendar_service, "due_cards", _due)
+    termin = AppointmentEvent(
+        uid="a1",
+        title="Klausurtagung",
+        starts_on=date(2026, 12, 1),
+        ends_on=date(2026, 12, 1),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        stamp=datetime(2026, 1, 1, tzinfo=UTC),
+        attendee="u1@example.org",
+        answer="accept",
+    )
+
+    async def _termine(_db: object, _row: object) -> list[AppointmentEvent]:
+        return [termin]
+
+    monkeypatch.setattr(calendar_service, "feed_appointments", _termine)
     principal_row = SimpleNamespace(sub="u1")
     gid = uuid.uuid4()
     meeting = SimpleNamespace(
@@ -133,6 +149,8 @@ def test_feed_returns_ics_with_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "SUMMARY:Erstiparty" in body
     assert "DTSTART;VALUE=DATE:20261120" in body
     assert "DTEND;VALUE=DATE:20261122" in body
+    assert "SUMMARY:Klausurtagung" in body
+    assert "PARTSTAT=ACCEPTED" in body
     assert "LOCATION:Mensa" in body
     assert "SUMMARY:Raum buchen" in body
     assert "DTSTART;VALUE=DATE:20261118" in body

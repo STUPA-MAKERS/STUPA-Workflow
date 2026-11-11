@@ -21,6 +21,8 @@ Groups of ``OBJECT_CHECK_ROUTES`` that authorize no object:
   own grants, preferences, calendar feed and avatar, the OAuth consent).
 - Master data: ``GET /api/committees`` serves id, name and variant to any member, and
   the avatar of a principal is the same Gravatar image that the person list shows.
+  ``GET /api/calendar/people`` serves id and name of the active accounts to any session
+  for the invitation of a person, never an address, and nothing to a scoped token.
 """
 
 from __future__ import annotations
@@ -51,6 +53,8 @@ _PROTOCOL_WRITE = "ProtocolService.authorize_write"
 _PROTOCOL_READ = "ProtocolService.authorize_read"
 _BUDGET_NODE = "budget.tree_router._require_node_view"
 _SELF = "self: the data of the caller only"
+_TERMIN_READ = "calendar.rules.can_read (AppointmentService._readable_row)"
+_TERMIN_EDIT = "calendar.rules.can_edit"
 
 OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/admin/config-revisions/{revision_id}/restore"): (
@@ -66,6 +70,20 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/budgets/{budget_id}/applications"): _BUDGET_NODE,
     ("GET", "/api/budgets/{budget_id}/expenses"): _BUDGET_NODE,
     ("GET", "/api/budgets/{budget_id}/fiscal-years"): _BUDGET_NODE,
+    ("GET", "/api/calendar/entries"): (
+        "CalendarEntries.between (meeting_read_scope, BoardAccess.scope, appointments.readable)"
+    ),
+    ("GET", "/api/calendar/search"): (
+        "CalendarEntries.search (meeting_read_scope, BoardAccess.scope, appointments.readable)"
+    ),
+    ("GET", "/api/calendar/people"): "master data: id and name, AppointmentService.people_search",
+    ("POST", "/api/calendar/appointments"): (
+        "AppointmentService.create (own Termin; calendar.publish, rules.forbidden_gremien)"
+    ),
+    ("GET", "/api/calendar/appointments/{appointment_id}"): _TERMIN_READ,
+    ("PUT", "/api/calendar/appointments/{appointment_id}"): _TERMIN_EDIT,
+    ("DELETE", "/api/calendar/appointments/{appointment_id}"): _TERMIN_EDIT,
+    ("PUT", "/api/calendar/appointments/{appointment_id}/answer"): "calendar.rules.is_invited",
     ("GET", "/api/calendar/me"): _SELF,
     ("POST", "/api/calendar/me/rotate"): _SELF,
     ("GET", "/api/delegations"): "DelegationService.list (own delegations, _can_manage)",

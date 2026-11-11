@@ -1,6 +1,6 @@
 ---
 name: be-calendar
-description: Backend calendar/ICS module. It serves a personal token-authenticated iCal subscription feed (text/calendar, RFC5545 VCALENDAR) of the meetings of every Gremium a principal belongs to. It also reads and rotates the feed token. Triggers: calendar_token, .ics feed, iCal subscription, MeetingEvent, build_calendar, /calendar routes. Use when working on the ICS calendar feed in backend/app/modules/calendar.
+description: Backend calendar module. It serves the entries of the Kalender page (meetings, due cards, Events, Termine) and their search, the Termine (calendar_appointment) with invitations of Gremien and persons, answers and mails with an .ics file, and the personal token-authenticated iCal subscription feed. Triggers: Termin, Appointment, Invitation, Answer, AppointmentService, CalendarEntries, calendar.manage, calendar.publish, calendar_token, .ics feed, build_calendar, /calendar routes. Use when working on the Kalender, Termine or the ICS feed in backend/app/modules/calendar.
 ---
 
 # Calendar / ICS Feed — `backend/app/modules/calendar`
@@ -32,4 +32,28 @@ description: Backend calendar/ICS module. It serves a personal token-authenticat
 - The service functions never commit. The router calls `db.commit()` in `/me/rotate`. The feed read path is read-only.
 - `build_calendar` is a pure function. It touches no DB and imports `icalendar` lazily, like openpyxl and minio. That keeps it easy to unit-test. The service must pass `events` already filtered and sorted.
 
-**Related:** be-livevote, be-admin, be-auth
+## Kalender page and Termine (specs `meetings/calendar` 000710-000738)
+
+**Key files:**
+- `models.py` — `Appointment` (`calendar_appointment`: title, `starts_on`/`ends_on`, `start_time`/`end_time` NULL = all-day, place, description, `creator_id` SET NULL, `for_all`, `sequence`), `Invitation` (exactly one of `gremium_id`/`principal_id`), `Answer` (PK appointment + principal; `accept`/`tentative`/`decline`).
+- `rules.py` — the pure rules: `Viewer`, `Targets`, `Span`, `can_read`, `is_invited`, `can_edit`, `sees_answers`, `time_changed`, `needs_mail`, `has_ended`, `forbidden_gremien`.
+- `appointments.py` — `AppointmentService` (create, update, delete, answer, `between`, `matching`, `people_search`) and the SQL forms `readable`/`mine`. A write returns `Written(out, mails)`; the router commits and sends the mails as a background task.
+- `entries.py` — `CalendarEntries.between`/`search`: the entries of the page, each kind under the rule of its own module (`MeetingRules.meeting_read_scope`, `TodoService.calendar_due_between`/`calendar_events_between`, `appointments.readable`).
+- `mails.py` — one mail per person with the `.ics` file (`build_appointment_file`), notification kind `appointment`, templates `appointment_invited`/`_changed`/`_cancelled` (`notifications/texts/calendar.py`).
+- `privacy.py` — `erase_appointments`, `appointment_export` (called by `privacy/service.py`). The account merge handles the three principal columns in `admin/principal_merge.py`.
+
+**API surface:**
+- `GET /api/calendar/entries?from&to&mine` — at most 100 days. `mine` limits the cards and Events to the assigned ones and the Termine to created or invited.
+- `GET /api/calendar/search?q` — two characters or more, every month, the nearest to today first.
+- `GET /api/calendar/people?q` — id and name of the active accounts, never an address (000738).
+- `POST /api/calendar/appointments`, `GET|PUT|DELETE /api/calendar/appointments/{id}`, `PUT …/{id}/answer`.
+
+**Conventions & gotchas:**
+- An invited Gremium stands for its members and its substitute pool at the time of the read (`gremium_person_ids`, `gremium_reader_ids`). `meeting.view_all` invites nobody.
+- The creator invites only a Gremium whose meetings the creator reads; a Gremium that the Termin invites already stays. `calendar.manage` invites any Gremium and edits every Termin. Only `calendar.publish` changes `for_all`.
+- A read without the right answers 404. A scoped OAuth token has no `Viewer.id` and reads and writes no Termin, because no OAuth scope names the Kalender.
+- A change of the start or the end deletes the answers. A change of the start, the end or the place raises `sequence` and mails the invited persons. The actor never gets a mail.
+- `update` and `answer` write with statements, not through attribute writes, because of the functional ratchet. `load` therefore reads the answers with `populate_existing`.
+- The feed holds every readable Termin (`service.feed_appointments`). An invited owner is the `ATTENDEE` with the answer as `PARTSTAT`.
+
+**Related:** be-livevote, be-admin, be-auth, be-todos, be-notifications, be-privacy

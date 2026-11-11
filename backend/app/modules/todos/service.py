@@ -33,7 +33,7 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import JsonValue
-from sqlalchemy import ColumnElement, and_, delete, func, or_, select
+from sqlalchemy import ColumnElement, and_, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.people import DELETED_PERSON, PersonRef, person_refs
@@ -2516,6 +2516,129 @@ class TodoService:
         )
         return list(rows)
 
+    async def calendar_due_between(
+        self,
+        principal: Principal,
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        pattern: str | None = None,
+        only_mine: bool = False,
+        limit: int | None = None,
+    ) -> list[tuple[TodoCard, TodoBoard, bool]]:
+        """The open cards with a due date on every board that the principal reads.
+
+        The Kalender shows them (spec 000712). ``start`` and ``end`` limit the due date,
+        both ends included, and ``pattern`` is an ILIKE pattern for the title. A done or
+        archived card, a card on an archived board and an Event stay out, as in
+        `calendar_due_cards`.
+
+        Returns:
+            ``(card, board, mine)`` rows, where ``mine`` tells if the card is assigned
+            to the principal. With ``only_mine`` every row is assigned. Without a
+            span the newest due date comes first, for the search.
+        """
+        if not token_reads(principal):
+            return []
+        me = await self.access.me(principal)
+        scope = await self.access.scope(principal)
+        assigned = exists().where(
+            TodoAssignee.card_id == TodoCard.id, TodoAssignee.principal_id == me
+        )
+        rows = (
+            (
+                await self.session.execute(
+                    select(TodoCard, TodoBoard, assigned)
+                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                    .join(TodoColumn, TodoColumn.id == TodoCard.column_id)
+                    .outerjoin(TodoCardEvent, TodoCardEvent.card_id == TodoCard.id)
+                    .where(
+                        TodoCard.due_date.is_not(None),
+                        TodoCard.archived_at.is_(None),
+                        TodoColumn.is_done.is_(False),
+                        TodoBoard.archived_at.is_(None),
+                        TodoCardEvent.card_id.is_(None),
+                        scope.condition(),
+                        *((TodoCard.due_date >= start,) if start is not None else ()),
+                        *((TodoCard.due_date <= end,) if end is not None else ()),
+                        *(
+                            (TodoCard.title.ilike(pattern, escape="\\"),)
+                            if pattern is not None
+                            else ()
+                        ),
+                        *((assigned,) if only_mine else ()),
+                    )
+                    .order_by(
+                        TodoCard.due_date if start is not None else TodoCard.due_date.desc(),
+                        TodoCard.id,
+                    )
+                    .limit(limit)
+                )
+            )
+            .tuples()
+            .all()
+        )
+        return list(rows)
+
+    async def calendar_events_between(
+        self,
+        principal: Principal,
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        pattern: str | None = None,
+        only_mine: bool = False,
+        limit: int | None = None,
+    ) -> list[tuple[TodoCard, TodoBoard, TodoCardEvent, bool]]:
+        """The Events with a start on the boards that the principal reads, for the Kalender.
+
+        ``start`` and ``end`` keep the Events with a day in the span. An Event without an
+        end takes one day. Archived Events stay, as in `calendar_events`.
+
+        Returns:
+            ``(card, board, event, mine)`` rows, where ``mine`` tells if the Event is
+            assigned to the principal.
+        """
+        if not token_reads(principal):
+            return []
+        me = await self.access.me(principal)
+        scope = await self.access.scope(principal)
+        assigned = exists().where(
+            TodoAssignee.card_id == TodoCard.id, TodoAssignee.principal_id == me
+        )
+        last_day = func.coalesce(TodoCardEvent.ends_on, TodoCardEvent.starts_on)
+        rows = (
+            (
+                await self.session.execute(
+                    select(TodoCard, TodoBoard, TodoCardEvent, assigned)
+                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                    .join(TodoCardEvent, TodoCardEvent.card_id == TodoCard.id)
+                    .where(
+                        scope.condition(),
+                        TodoCardEvent.starts_on.is_not(None),
+                        *((last_day >= start,) if start is not None else ()),
+                        *((TodoCardEvent.starts_on <= end,) if end is not None else ()),
+                        *(
+                            (TodoCard.title.ilike(pattern, escape="\\"),)
+                            if pattern is not None
+                            else ()
+                        ),
+                        *((assigned,) if only_mine else ()),
+                    )
+                    .order_by(
+                        TodoCardEvent.starts_on
+                        if start is not None
+                        else TodoCardEvent.starts_on.desc(),
+                        TodoCard.id,
+                    )
+                    .limit(limit)
+                )
+            )
+            .tuples()
+            .all()
+        )
+        return list(rows)
+
     async def card_for_agenda(
         self, card_id: uuid.UUID, gremium_id: uuid.UUID, principal: Principal
     ) -> TodoCard:
@@ -2702,7 +2825,10 @@ def _event_row(card_id: uuid.UUID, payload: EventIn) -> TodoCardEvent:
 
 
 def _link_between(
-    card_id: uuid.UUID, kind: str, target_id: uuid.UUID, column: Any  # noqa: ANN401
+    card_id: uuid.UUID,
+    kind: str,
+    target_id: uuid.UUID,
+    column: Any,  # noqa: ANN401
 ) -> ColumnElement[bool]:
     """The links of the card to the target, and for a card target also its links back."""
     own = and_(TodoLink.card_id == card_id, column == target_id)

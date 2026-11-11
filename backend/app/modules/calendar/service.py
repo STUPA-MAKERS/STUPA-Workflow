@@ -3,8 +3,9 @@
 The feed token authenticates the `.ics` URL without a session or OIDC. Plaintext
 storage is acceptable here. The token only exposes the meeting titles and times
 of the Gremien of the principal, the title, dates, place and board of the Events
-that the principal reads, and the title, due date and board of the open cards assigned
-to the principal, which is low-sensitivity data. Every function
+that the principal reads, the title, due date and board of the open cards assigned
+to the principal, and the Termine that the principal reads with the principal's own
+answer, which is low-sensitivity data. Every function
 binds to `principal.sub` and never commits.
 """
 
@@ -18,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.calendar.ics import CardEvent, DueCard
+from app.modules.calendar.ics import AppointmentEvent, CardEvent, DueCard
 from app.modules.gremien.gremium_roles import gremium_reader_ids
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
@@ -153,4 +154,47 @@ async def due_cards(db: AsyncSession, row: PrincipalRow, base_url: str) -> list[
             url=f"{base_url.rstrip('/')}{card_url(card.id)}",
         )
         for card, board in rows
+    ]
+
+
+async def feed_appointments(db: AsyncSession, row: PrincipalRow) -> list[AppointmentEvent]:
+    """The Termine that the person reads, with the person's answer (spec 000724).
+
+    The rights come from the `principal` row, as for the Events. An invited person is
+    the `ATTENDEE` of the entry, so a calendar app shows the answer as the
+    participation status. A Termin that the person only reads has no attendee.
+    """
+    from app.modules.auth.rbac import resolve_principal
+    from app.modules.calendar import rules
+    from app.modules.calendar.appointments import AppointmentService, my_answer, readable
+    from app.modules.calendar.models import Appointment
+
+    principal = await resolve_principal(db, row, datetime.now(UTC))
+    appointments = AppointmentService(db)
+    viewer = await appointments.viewer(principal)
+    loaded = await appointments.load(
+        (
+            await db.scalars(
+                select(Appointment)
+                .where(readable(viewer))
+                .order_by(Appointment.starts_on, Appointment.id)
+            )
+        ).all()
+    )
+    return [
+        AppointmentEvent(
+            uid=str(item.row.id),
+            title=item.row.title,
+            starts_on=item.row.starts_on,
+            ends_on=item.row.ends_on,
+            start_time=item.row.start_time,
+            end_time=item.row.end_time,
+            stamp=item.row.created_at,
+            place=item.row.place,
+            description=item.row.description,
+            sequence=item.row.sequence,
+            attendee=row.email if rules.is_invited(viewer, item.targets) else None,
+            answer=my_answer(viewer, item),
+        )
+        for item in loaded
     ]
