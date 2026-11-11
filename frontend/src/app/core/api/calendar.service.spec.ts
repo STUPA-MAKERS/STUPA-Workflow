@@ -6,6 +6,7 @@ import {
   CalendarApiService,
   type ExternalCalendarInput,
   ExternalCalendarsApiService,
+  PublicCalendarApiService,
 } from './calendar.service';
 
 const BODY: AppointmentInput = {
@@ -17,6 +18,7 @@ const BODY: AppointmentInput = {
   place: null,
   description: null,
   forAll: false,
+  public: false,
   gremiumIds: ['g-1'],
   principalIds: [],
 };
@@ -105,5 +107,41 @@ describe('CalendarApiService', () => {
     expect(http.expectOne('/api/admin/calendars/c-1/fetch').request.method).toBe('POST');
     admin.remove('c-1').subscribe();
     expect(http.expectOne('/api/admin/calendars/c-1').request.method).toBe('DELETE');
+  });
+});
+
+describe('PublicCalendarApiService', () => {
+  let api: PublicCalendarApiService;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    api = TestBed.inject(PublicCalendarApiService);
+    http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => http.verify());
+
+  it('reads the entries, the hits and the Gremien of the public calendar', () => {
+    const got: unknown[] = [];
+    api.entries('2026-11-01', '2026-11-30').subscribe((items) => got.push(items));
+    const entries = http.expectOne((r) => r.url === '/api/public/calendar/entries');
+    expect(entries.request.params.get('from')).toBe('2026-11-01');
+    expect(entries.request.params.get('to')).toBe('2026-11-30');
+    entries.flush({ items: [{ id: 'a' }] });
+    api.search('Voll').subscribe((items) => got.push(items));
+    const search = http.expectOne((r) => r.url === '/api/public/calendar/search');
+    expect(search.request.params.get('q')).toBe('Voll');
+    search.flush({ items: [{ id: 'b' }] });
+    api.gremien().subscribe((list) => got.push(list));
+    http.expectOne('/api/public/calendar/committees').flush([{ id: 'g-1', name: 'StuPa' }]);
+    expect(got).toEqual([[{ id: 'a' }], [{ id: 'b' }], [{ id: 'g-1', name: 'StuPa' }]]);
+  });
+
+  it('reads one Termin and one meeting and knows the address of the feed', () => {
+    api.appointment('a-7').subscribe();
+    expect(http.expectOne('/api/public/calendar/appointments/a-7').request.method).toBe('GET');
+    api.meeting('m-35').subscribe();
+    expect(http.expectOne('/api/public/calendar/meetings/m-35').request.method).toBe('GET');
+    expect(api.feedUrl()).toBe('http://localhost/api/public/calendar.ics');
   });
 });

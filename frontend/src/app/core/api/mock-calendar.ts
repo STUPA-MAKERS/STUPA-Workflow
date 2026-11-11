@@ -16,6 +16,8 @@ import type {
   ExternalCalendar,
   ExternalCalendarInput,
   ExternalEntry,
+  PublicAppointment,
+  PublicMeeting,
 } from './calendar.service';
 
 /** The answer of a mock route: the status and the body. */
@@ -60,6 +62,7 @@ function appointment(
     place: null,
     description: null,
     forAll: false,
+    public: false,
     creator: ME,
     gremien: [],
     persons: [],
@@ -94,6 +97,14 @@ function initialAppointments(): readonly Appointment[] {
       canEdit: false,
     }),
     appointment(5, 'Kurzer Abgleich', 0, 0, ['14:30', '14:45'], { persons: [PEOPLE[2]] }),
+    appointment(6, 'Vollversammlung', 7, 7, ['14:00', '16:00'], {
+      place: 'Aula',
+      description: 'Offen für alle Studierenden. Bericht des AStA und Aussprache.',
+      forAll: true,
+      public: true,
+      creator: PEOPLE[3],
+      canEdit: false,
+    }),
   ];
 }
 
@@ -330,6 +341,7 @@ function fromInput(id: string, body: AppointmentInput, before: Appointment | nul
     place: body.place,
     description: body.description,
     forAll: body.forAll,
+    public: body.public,
     creator: before?.creator ?? ME,
     gremien: GREMIEN.filter((g) => body.gremiumIds.includes(g.id)),
     persons: PEOPLE.filter((p) => body.principalIds.includes(p.id)),
@@ -352,6 +364,62 @@ function answered(a: Appointment, answer: AnswerKey): Appointment {
   };
 }
 
+/** The entries of the public calendar: the meetings and the public Termine, without a Gremium for a Termin. */
+function publicEntries(): readonly CalendarEntry[] {
+  return [
+    ...fixed().filter((e) => e.kind === 'meeting'),
+    ...appointments()
+      .filter((a) => a.public)
+      .map((a) => ({ ...entryOf(a), source: null, gremiumIds: [], mine: false, myAnswer: null })),
+  ];
+}
+
+/** Answer a route of the public calendar (`/public/calendar/…`), or null for an unknown path. */
+function mockPublicCalendar(tail: string, params: { get(name: string): string | null }): MockCalendarReply | null {
+  if (tail === 'committees') return { status: 200, body: [STUPA, HHA] };
+  if (tail === 'entries') {
+    const from = params.get('from') ?? '';
+    const to = params.get('to') ?? '';
+    return { status: 200, body: { items: publicEntries().filter((e) => e.startsOn <= to && e.endsOn >= from) } };
+  }
+  if (tail === 'search') {
+    const q = (params.get('q') ?? '').trim().toLowerCase();
+    const items = q.length < 2 ? [] : publicEntries().filter((e) => e.title.toLowerCase().includes(q));
+    return { status: 200, body: { items } };
+  }
+  const id = tail.split('/')[1] ?? '';
+  if (tail.startsWith('appointments/')) {
+    const a = appointments().find((row) => row.public && row.id === id);
+    const body: PublicAppointment | null = a
+      ? {
+          id: a.id,
+          title: a.title,
+          startsOn: a.startsOn,
+          endsOn: a.endsOn,
+          startTime: a.startTime,
+          endTime: a.endTime,
+          place: a.place,
+          description: a.description,
+        }
+      : null;
+    return body ? { status: 200, body } : null;
+  }
+  const meeting = tail.startsWith('meetings/') ? fixed().find((e) => e.kind === 'meeting' && e.id === id) : undefined;
+  const body: PublicMeeting | null = meeting
+    ? {
+        id: meeting.id,
+        title: meeting.title,
+        day: meeting.startsOn,
+        startTime: meeting.startTime,
+        endTime: meeting.endTime,
+        gremium: meeting.source ?? '',
+        tops: ['Begrüßung und Feststellung der Beschlussfähigkeit', 'Bericht des AStA', 'Haushaltsplan 2027', 'Verschiedenes'],
+        protocolId: null,
+      }
+    : null;
+  return body ? { status: 200, body } : null;
+}
+
 /** Answer a Kalender route, or null for a path that this module does not know. */
 export function mockCalendar(
   method: string,
@@ -359,6 +427,8 @@ export function mockCalendar(
   params: { get(name: string): string | null },
   body: unknown,
 ): MockCalendarReply | null {
+  const open = path.split('/public/calendar/')[1];
+  if (open !== undefined) return method === 'GET' ? mockPublicCalendar(open, params) : null;
   const admin = path.split('/admin/calendars')[1];
   if (admin !== undefined) return mockExternalCalendars(method, admin, body);
   const tail = path.split('/calendar/')[1] ?? '';

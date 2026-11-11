@@ -5,7 +5,18 @@
   @if (rotateError()) {
     <p class="cs__error" role="alert">{{ 'account.calendar.rotateError' | t }}</p>
   }
-  @if (loading()) {
+  @if (fixedUrl(); as openUrl) {
+    <span class="cs__label" id="{{ headingId }}-url">{{ 'account.calendar.urlLabel' | t }}</span>
+    <code class="cs__url" [attr.aria-labelledby]="headingId + '-url'">{{ openUrl }}</code>
+    <div class="cs__actions">
+      <app-copy-button
+        [text]="openUrl"
+        [share]="true"
+        [label]="'account.calendar.copy' | t"
+        [copiedLabel]="'account.calendar.copied' | t"
+      />
+    </div>
+  } @else if (loading()) {
     <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
   } @else if (url(); as feedUrl) {
     <span class="cs__label" id="{{ headingId }}-url">{{ 'account.calendar.urlLabel' | t }}</span>

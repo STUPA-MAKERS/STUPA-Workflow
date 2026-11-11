@@ -31,6 +31,7 @@ export function appointment(over: Partial<Appointment> = {}): Appointment {
     place: 'AStA-Büro',
     description: 'Offene Buchungen',
     forAll: false,
+    public: false,
     creator: { id: 'p-1', name: 'Dana Meier' },
     gremien: [{ id: 'g-1', name: 'Haushaltsausschuss' }],
     persons: [{ id: 'p-2', name: 'Jonas Weber' }],

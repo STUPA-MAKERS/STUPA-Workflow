@@ -101,6 +101,12 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'public-calendar',
+        data: { title: 'calendar.public.title', footer: true, wide: true, public: true },
+        loadComponent: () =>
+          import('./features/calendar/calendar.component').then((m) => m.CalendarComponent),
+      },
+      {
         path: 'accessibility',
         data: { title: 'a11yStatement.title', footer: true },
         loadComponent: () =>

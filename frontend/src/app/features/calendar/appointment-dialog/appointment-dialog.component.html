@@ -125,6 +125,9 @@
       <app-switch [id]="'apd-forall'" [checked]="form().forAll" (checkedChange)="patch({ forAll: $event })">
         <span class="apd__switch">{{ 'calendar.field.forAll' | t }}</span>
       </app-switch>
+      <app-switch [id]="'apd-public'" [checked]="form().public" (checkedChange)="patch({ public: $event })">
+        <span class="apd__switch">{{ 'calendar.field.public' | t }}</span>
+      </app-switch>
     }
     <button type="submit" hidden></button>
   </form>

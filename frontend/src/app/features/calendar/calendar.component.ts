@@ -25,6 +25,7 @@ import {
   type CalendarEntry,
   type CalendarGremium,
   type ExternalEntry,
+  PublicCalendarApiService,
 } from '@core/api/calendar.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -55,9 +56,11 @@ import {
   liveSearch,
   mediaQuery,
 } from '@stupa-makers/ui-kit';
+import { useNoindex } from '../public-protocols/public-protocols.util';
 import { CalendarSubscribeComponent } from '../meetings/calendar-subscribe/calendar-subscribe.component';
 import { AppointmentDetailComponent } from './appointment-detail/appointment-detail.component';
 import { ExternalEntryComponent } from './external-entry/external-entry.component';
+import { type PublicEntry, PublicEntryComponent } from './public-entry/public-entry.component';
 import { AppointmentDialogComponent } from './appointment-dialog/appointment-dialog.component';
 import {
   CALENDAR_NOW,
@@ -116,6 +119,12 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
  * search asks the server and finds entries of every month: a hit shows its month and
  * picks its day (on a phone it opens the entry). `?appointment=<id>` opens a Termin,
  * so the link of a mail lands on it.
+ *
+ * The route `/public-calendar` (route data `public`, § 000731-000733) shows the same
+ * views without a sign-in. It reads the public API, which gives only the public Termine
+ * and the meetings of the Gremien with public protocols. It has the filter by Gremium
+ * and no other filter, no button that creates a Termin, and an entry opens its public
+ * fields in a dialog. "Kalender abonnieren" shows the address of the feed without a token.
  */
 @Component({
   selector: 'app-calendar',
@@ -137,6 +146,7 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
     ListItemComponent,
     LoadErrorComponent,
     PageHeaderComponent,
+    PublicEntryComponent,
     RowMenuComponent,
     ScrollFadeDirective,
     SearchPillComponent,
@@ -152,6 +162,7 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
 })
 export class CalendarComponent implements OnDestroy {
   private readonly api = inject(CalendarApiService);
+  private readonly publicApi = inject(PublicCalendarApiService);
   private readonly client = inject(ApiClient);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
@@ -162,6 +173,12 @@ export class CalendarComponent implements OnDestroy {
   private readonly injector = inject(Injector);
   private readonly zone = inject(NgZone);
   private readonly now = inject(CALENDAR_NOW);
+
+  /** The public calendar: the page without a sign-in. */
+  readonly isPublic = this.route.snapshot.data['public'] === true;
+  readonly titleKey = this.isPublic ? 'calendar.public.title' : 'nav.calendar';
+  /** The address of the public feed, which needs no token. */
+  readonly publicFeed = this.isPublic ? this.publicApi.feedUrl() : null;
 
   readonly phone = mediaQuery(MEDIA.phone);
   /** Wide (>= 1200px): the cards beside the grid, and the page does not scroll. */
@@ -247,7 +264,7 @@ export class CalendarComponent implements OnDestroy {
   readonly activeHit = signal(0);
   readonly searching = computed(() => this.query().trim().length >= 2);
   private readonly search = liveSearch<readonly CalendarEntry[]>({
-    run: (q) => this.api.search(q),
+    run: (q) => (this.isPublic ? this.publicApi.search(q) : this.api.search(q)),
     result: (hits) => {
       this.hits.set(hits);
       this.activeHit.set(0);
@@ -263,6 +280,9 @@ export class CalendarComponent implements OnDestroy {
   /** The external entry of the read-only dialog. */
   readonly external = signal<ExternalEntry | null>(null);
   readonly externalOpen = signal(false);
+  /** The entry of the dialog of the public calendar. */
+  readonly publicEntry = signal<PublicEntry | null>(null);
+  readonly publicOpen = signal(false);
   /** The Termin of the form dialog, or null for a new one. */
   readonly editing = signal<Appointment | null>(null);
   readonly formOpen = signal(false);
@@ -272,7 +292,11 @@ export class CalendarComponent implements OnDestroy {
   });
 
   readonly phoneMenu = computed<RowMenuSection[]>(() => [
-    { items: [{ id: 'calendar', label: this.i18n.translate('meetings.overview.subscribe'), icon: 'cal' }] },
+    { items: [{
+          id: 'calendar',
+          label: this.i18n.translate(this.isPublic ? 'calendar.public.subscribe' : 'meetings.overview.subscribe'),
+          icon: 'cal',
+        },] },
     refreshMenuSection((key) => this.i18n.translate(key)),
   ]);
 
@@ -283,10 +307,11 @@ export class CalendarComponent implements OnDestroy {
 
   constructor() {
     this.scheduleMidnight();
+    if (this.isPublic) useNoindex();
     inject(DestroyRef).onDestroy(() => {
       if (this.midnightTimer !== null) clearTimeout(this.midnightTimer);
     });
-    this.client.listMeetingFilterGremien().subscribe({
+    (this.isPublic ? this.publicApi.gremien() : this.client.listMeetingFilterGremien()).subscribe({
       next: (list) => this.gremien.set(list),
       error: () => this.gremien.set([]),
     });
@@ -299,7 +324,7 @@ export class CalendarComponent implements OnDestroy {
     });
     effect(() => {
       const id = this.linked();
-      if (id) untracked(() => this.openAppointment(id));
+      if (id && !this.isPublic) untracked(() => this.openAppointment(id));
     });
   }
 
@@ -423,6 +448,7 @@ export class CalendarComponent implements OnDestroy {
 
   /** A meeting and a card open their own page, a Termin and an external entry a dialog. */
   openEntry(e: CalendarEntry): void {
+    if (this.isPublic) return this.openPublic(e);
     const link = entryLink(e);
     if (link) void this.router.navigate([...link.commands], { queryParams: link.queryParams });
     else if (e.kind === 'external') this.openExternal(e.id);
@@ -528,6 +554,21 @@ export class CalendarComponent implements OnDestroy {
     });
   }
 
+  /** Read the public fields of a meeting or a Termin and show them. */
+  private openPublic(e: CalendarEntry): void {
+    const read =
+      e.kind === 'meeting'
+        ? this.publicApi.meeting(e.id).pipe(map((data): PublicEntry => ({ kind: 'meeting', data })))
+        : this.publicApi.appointment(e.id).pipe(map((data): PublicEntry => ({ kind: 'appointment', data })));
+    read.subscribe({
+      next: (entry) => {
+        this.publicEntry.set(entry);
+        this.publicOpen.set(true);
+      },
+      error: () => this.toast.error(this.i18n.translate('calendar.external.loadFailed')),
+    });
+  }
+
   private openAppointment(id: string): void {
     this.api.appointment(id).subscribe({
       next: (a) => {
@@ -542,7 +583,9 @@ export class CalendarComponent implements OnDestroy {
     this.seq += 1;
     const seq = this.seq;
     this.loading.set(true);
-    forkJoin(ranges.map((r) => this.api.entries(r.from, r.to, mine))).subscribe({
+    const read = (r: DayRange) =>
+      this.isPublic ? this.publicApi.entries(r.from, r.to) : this.api.entries(r.from, r.to, mine);
+    forkJoin(ranges.map(read)).subscribe({
       next: (parts) => {
         if (seq !== this.seq) return;
         this.items.set(parts.reduce<readonly CalendarEntry[]>(mergeEntries, []));

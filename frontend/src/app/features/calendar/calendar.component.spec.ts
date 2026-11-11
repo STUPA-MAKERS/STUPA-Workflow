@@ -1,9 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import type { TestRequest } from '@angular/common/http/testing';
-import { Router, provideRouter } from '@angular/router';
+import { Meta } from '@angular/platform-browser';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { of } from 'rxjs';
 import type { CalendarEntry } from '@core/api/calendar.service';
 import { AuthService } from '@core/auth/auth.service';
 import { LIVE_SEARCH_DEBOUNCE_MS, MEDIA, PageFrame } from '@stupa-makers/ui-kit';
@@ -62,7 +64,9 @@ afterEach(() => {
   localStorage.clear();
 });
 
-async function setup(opts: { media?: string[]; view?: string; url?: string; now?: () => Date } = {}) {
+async function setup(
+  opts: { media?: string[]; view?: string; url?: string; now?: () => Date; public?: boolean } = {},
+) {
   if (opts.media) restoreMedia = matchMediaQueries(...opts.media);
   if (opts.view) localStorage.setItem(VIEW_STORAGE_KEY, opts.view);
   const view = await render(CalendarComponent, {
@@ -74,6 +78,14 @@ async function setup(opts: { media?: string[]; view?: string; url?: string; now?
       provideRouter([]),
       { provide: CALENDAR_NOW, useValue: opts.now ?? (() => NOW) },
       { provide: AuthService, useValue: { can: () => false } },
+      ...(opts.public
+        ? [
+            {
+              provide: ActivatedRoute,
+              useValue: { snapshot: { data: { public: true } }, queryParamMap: of(convertToParamMap({})) },
+            },
+          ]
+        : []),
     ],
   });
   const injector = view.fixture.debugElement.injector;
@@ -708,5 +720,133 @@ describe('CalendarComponent (phone)', () => {
     view.fixture.detectChanges();
     expect(loadErrorToast()).toBe('Der Kalender konnte nicht geladen werden.');
     expect(screen.queryByText('Keine Einträge in diesem Zeitraum.')).toBeNull();
+  });
+});
+
+/** § 000730-000734: the public calendar reads the public routes only and shows no person. */
+describe('CalendarComponent (public)', () => {
+  const PUBLIC_MEETING = { ...MEETING, gremiumIds: [], mine: false };
+  const PUBLIC_TERMIN = calendarEntry('a-7', { title: 'Vollversammlung', startTime: '14:00:00', endTime: '16:00:00', place: 'Aula' });
+  const ITEMS = [PUBLIC_TERMIN, PUBLIC_MEETING];
+
+  function loadPublic(view: View, items: readonly CalendarEntry[] = ITEMS): TestRequest {
+    view.http.expectOne('/api/public/calendar/committees').flush(GREMIEN);
+    const req = view.http.expectOne((r) => r.url === '/api/public/calendar/entries');
+    req.flush({ items });
+    view.fixture.detectChanges();
+    return req;
+  }
+
+  it('reads the public routes and offers no Termin, no kind filter and no "Nur meine"', async () => {
+    const view = await setup({ public: true, url: '/public-calendar' });
+    const req = loadPublic(view);
+    expect(req.request.params.keys().sort()).toEqual(['from', 'to']);
+    expect(screen.getByRole('heading', { level: 1, name: 'Kalender' })).toBeInTheDocument();
+    expect(cards()).toEqual(['Vollversammlung']);
+    expect(screen.queryByRole('button', { name: 'Termin anlegen' })).toBeNull();
+    expect(screen.queryByText('Nur meine')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Art/ })).toBeNull();
+    expect(view.fixture.debugElement.injector.get(Meta).getTag('name="robots"')?.content).toBe('noindex');
+    expect(await runAxe(view.container)).toHaveNoViolations();
+    view.http.verify();
+    view.fixture.destroy();
+    expect(document.querySelector('meta[name="robots"]')).toBeNull();
+  });
+
+  it('shows the public fields of a Termin in a dialog', async () => {
+    const view = await setup({ public: true });
+    loadPublic(view);
+    await userEvent.click(within(panel()).getByRole('button', { name: /Vollversammlung/ }));
+    view.http.expectOne('/api/public/calendar/appointments/a-7').flush({
+      id: 'a-7',
+      title: 'Vollversammlung',
+      startsOn: '2026-11-11',
+      endsOn: '2026-11-11',
+      startTime: '14:00:00',
+      endTime: '16:00:00',
+      place: 'Aula',
+      description: 'Alle Studierenden sind eingeladen.',
+    });
+    view.fixture.detectChanges();
+    const dialog = await screen.findByRole('dialog', { name: 'Vollversammlung' });
+    expect(within(dialog).getByText('Mi, 11.11.2026 · 14:00 – 16:00')).toBeInTheDocument();
+    expect(within(dialog).getByText('Aula')).toBeInTheDocument();
+    expect(within(dialog).getByText('Alle Studierenden sind eingeladen.')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('radio')).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    view.http.verify();
+  });
+
+  it('shows the TOPs of a meeting and stays on the page', async () => {
+    const view = await setup({ public: true });
+    loadPublic(view);
+    view.cmp.openEntry(PUBLIC_MEETING);
+    view.http.expectOne('/api/public/calendar/meetings/m-35').flush({
+      id: 'm-35',
+      title: '35. Sitzung',
+      day: '2026-11-12',
+      startTime: '18:00:00',
+      endTime: '20:00:00',
+      gremium: 'Studierendenparlament',
+      tops: ['Begrüßung', 'Haushalt 2027'],
+      protocolId: null,
+    });
+    view.fixture.detectChanges();
+    const dialog = await screen.findByRole('dialog', { name: '35. Sitzung' });
+    expect(within(dialog).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Begrüßung', 'Haushalt 2027']);
+    expect(view.router.url).not.toContain('/meetings/');
+    view.cmp.publicOpen.set(false);
+  });
+
+  it('reports an entry that is not public any more', async () => {
+    const view = await setup({ public: true });
+    loadPublic(view);
+    view.cmp.openEntry(PUBLIC_TERMIN);
+    view.http
+      .expectOne('/api/public/calendar/appointments/a-7')
+      .flush(null, { status: 404, statusText: 'Not Found' });
+    expect(errorToasts()).toEqual(['Der Eintrag ließ sich nicht laden.']);
+    expect(view.cmp.publicOpen()).toBe(false);
+  });
+
+  it('shows the address of the public feed without a read', async () => {
+    const view = await setup({ public: true });
+    loadPublic(view);
+    await userEvent.click(screen.getByRole('button', { name: 'Kalender abonnieren' }));
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    const dialog = screen.getByRole('dialog', { name: 'Kalender-Abo' });
+    expect(dialog).toHaveTextContent('http://localhost/api/public/calendar.ics');
+    expect(within(dialog).getByRole('button', { name: 'Kopieren' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Neue URL erzeugen' })).toBeNull();
+    view.http.verify();
+  });
+
+  it('searches the public entries', async () => {
+    jest.useFakeTimers();
+    try {
+      const view = await setup({ public: true });
+      loadPublic(view);
+      fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'Voll' } });
+      jest.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
+      const req = view.http.expectOne((r) => r.url === '/api/public/calendar/search');
+      expect(req.request.params.get('q')).toBe('Voll');
+      req.flush({ items: [PUBLIC_TERMIN] });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('names the subscription in the menu of a phone and has no FAB', async () => {
+    const view = await setup({ public: true, media: [MEDIA.phone] });
+    loadPublic(view);
+    expect(view.cmp.phoneMenu()[0].items[0].label).toBe('Kalender abonnieren');
+    expect(screen.queryByRole('button', { name: 'Termin anlegen' })).toBeNull();
+  });
+
+  it('shows an empty Gremium filter when the Gremien cannot be read', async () => {
+    const view = await setup({ public: true });
+    view.http.expectOne('/api/public/calendar/committees').flush(null, { status: 500, statusText: 'Error' });
+    expect(view.cmp.gremien()).toEqual([]);
   });
 });

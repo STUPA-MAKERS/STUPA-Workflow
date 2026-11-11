@@ -1,14 +1,14 @@
 @if (phone()) {
   <div class="cal-list">
     <section class="ld-pane" aria-labelledby="cal-title">
-      <app-page-header [pane]="true" titleId="cal-title" [title]="'nav.calendar' | t">
+      <app-page-header [pane]="true" titleId="cal-title" [title]="titleKey | t">
         <ng-container ngProjectAs="[actions]">
           <app-row-menu
             [label]="'meetings.overview.menu' | t"
             [sections]="phoneMenu()"
             (selected)="onPhoneMenu($event, abo)"
           />
-          <app-calendar-subscribe #abo />
+          <app-calendar-subscribe #abo [fixedUrl]="publicFeed" />
         </ng-container>
       </app-page-header>
       <app-sticky-bar class="ld-pane__filters">
@@ -87,25 +87,34 @@
           }
         }
       </div>
-      <app-fab [label]="'fab.appointment' | t" (activate)="createAppointment()" />
+      @if (!isPublic) {
+        <app-fab [label]="'fab.appointment' | t" (activate)="createAppointment()" />
+      }
     </section>
   </div>
 } @else {
   <div class="cal">
-    <app-page-header [pane]="true" [title]="'nav.calendar' | t">
+    <app-page-header [pane]="true" [title]="titleKey | t">
       <ng-container ngProjectAs="[actions]">
-        <app-button
-          variant="text"
-          [iconOnly]="true"
-          [ariaLabel]="'meetings.overview.subscribe' | t"
-          [ariaPressed]="abo.isOpen()"
-          (click)="abo.toggle($event.currentTarget)"
-        ><app-icon name="cal" /></app-button>
-        <app-calendar-subscribe #abo />
+        @if (isPublic) {
+          <app-button variant="outlined" [ariaPressed]="abo.isOpen()" (click)="abo.toggle($event.currentTarget)">
+            <app-icon name="cal" />
+            {{ 'calendar.public.subscribe' | t }}
+          </app-button>
+        } @else {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'meetings.overview.subscribe' | t"
+            [ariaPressed]="abo.isOpen()"
+            (click)="abo.toggle($event.currentTarget)"
+          ><app-icon name="cal" /></app-button>
+        }
+        <app-calendar-subscribe #abo [fixedUrl]="publicFeed" />
       </ng-container>
     </app-page-header>
 
-    <div class="cal__tools" role="toolbar" [attr.aria-label]="'nav.calendar' | t">
+    <div class="cal__tools" role="toolbar" [attr.aria-label]="titleKey | t">
       <div class="cal__nav">
         <app-button
           variant="text"
@@ -250,7 +259,9 @@
           }
         </div>
       }
-      <app-fab [contained]="true" [label]="'fab.appointment' | t" (activate)="createAppointment()" />
+      @if (!isPublic) {
+        <app-fab [contained]="true" [label]="'fab.appointment' | t" (activate)="createAppointment()" />
+      }
     </div>
 
     <aside class="cal__panel" [attr.aria-label]="dayHeading()">
@@ -295,6 +306,7 @@
 </ng-template>
 
 <ng-template #chips let-size="size">
+  @if (!isPublic) {
   <app-filter-select
     class="cal__chip"
     icon="funnel"
@@ -306,6 +318,7 @@
     (valuesChange)="kinds.set($event)"
     [active]="kinds().length > 0"
   />
+  }
   @if (gremiumOptions().length > 1) {
     <app-filter-select
       class="cal__chip"
@@ -319,6 +332,7 @@
       [active]="gremium() !== ''"
     />
   }
+  @if (!isPublic) {
   <app-filter-select
     class="cal__chip"
     icon="user"
@@ -330,8 +344,12 @@
     [text]="(mine() ? 'calendar.filter.mine' : 'calendar.filter.all') | t"
     [active]="mine() !== ''"
   />
+  }
 </ng-template>
 
+@if (isPublic) {
+  <app-public-entry [open]="publicOpen()" [entry]="publicEntry()" (closed)="publicOpen.set(false)" />
+} @else {
 <app-appointment-detail
   [open]="detailOpen()"
   [appointment]="detail()"
@@ -348,3 +366,4 @@
   (closed)="formOpen.set(false)"
   (saved)="onSaved($event)"
 />
+}

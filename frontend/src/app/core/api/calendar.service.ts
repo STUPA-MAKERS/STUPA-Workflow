@@ -70,6 +70,8 @@ export interface Appointment {
   readonly place: string | null;
   readonly description: string | null;
   readonly forAll: boolean;
+  /** The public calendar shows the Termin without a sign-in. */
+  readonly public: boolean;
   readonly creator: CalendarPerson | null;
   readonly gremien: readonly CalendarGremium[];
   readonly persons: readonly CalendarPerson[];
@@ -89,6 +91,8 @@ export interface AppointmentInput {
   readonly place: string | null;
   readonly description: string | null;
   readonly forAll: boolean;
+  /** The public calendar shows the Termin without a sign-in. */
+  readonly public: boolean;
   readonly gremiumIds: readonly Uuid[];
   readonly principalIds: readonly Uuid[];
 }
@@ -187,6 +191,78 @@ export class CalendarApiService {
   }
   externalEntry(id: Uuid): Observable<ExternalEntry> {
     return this.http.get<ExternalEntry>(`${this.base}/external/${id}`);
+  }
+}
+
+/** The public fields of a Termin: no creator, no invitation, no answer. */
+export interface PublicAppointment {
+  readonly id: Uuid;
+  readonly title: string;
+  readonly startsOn: string;
+  readonly endsOn: string;
+  readonly startTime: string | null;
+  readonly endTime: string | null;
+  readonly place: string | null;
+  readonly description: string | null;
+}
+
+/** The public fields of a meeting. `tops` holds the titles of the TOPs that are not internal. */
+export interface PublicMeeting {
+  readonly id: Uuid;
+  readonly title: string;
+  readonly day: string;
+  readonly startTime: string | null;
+  readonly endTime: string | null;
+  readonly gremium: string;
+  readonly tops: readonly string[];
+  /** The public protocol of the meeting, when it exists. */
+  readonly protocolId: Uuid | null;
+}
+
+/**
+ * The public calendar (`/api/public/calendar`), without a sign-in: the public Termine
+ * and the meetings of the Gremien with public protocols, and no other kind of entry.
+ */
+@Injectable({ providedIn: 'root' })
+export class PublicCalendarApiService {
+  private readonly http = inject(HttpClient);
+  private readonly api = inject(API_BASE_URL);
+  private readonly base = `${this.api}/public/calendar`;
+
+  entries(from: string, to: string): Observable<readonly CalendarEntry[]> {
+    return this.http
+      .get<{ items: readonly CalendarEntry[] }>(`${this.base}/entries`, {
+        params: httpParams({ from, to }),
+        context: skipLoading(),
+      })
+      .pipe(map((page) => page.items));
+  }
+
+  search(q: string): Observable<readonly CalendarEntry[]> {
+    return this.http
+      .get<{ items: readonly CalendarEntry[] }>(`${this.base}/search`, {
+        params: httpParams({ q }),
+        context: skipLoading(),
+      })
+      .pipe(map((page) => page.items));
+  }
+
+  /** The Gremien whose meetings are public, for the filter. */
+  gremien(): Observable<readonly CalendarGremium[]> {
+    return this.http.get<readonly CalendarGremium[]>(`${this.base}/committees`, { context: skipLoading() });
+  }
+
+  appointment(id: Uuid): Observable<PublicAppointment> {
+    return this.http.get<PublicAppointment>(`${this.base}/appointments/${id}`);
+  }
+
+  meeting(id: Uuid): Observable<PublicMeeting> {
+    return this.http.get<PublicMeeting>(`${this.base}/meetings/${id}`);
+  }
+
+  /** The address of the public ICS feed, with the origin of the page. */
+  feedUrl(): string {
+    return new URL(`${this.api}/public/calendar.ics`, document.baseURI).href;
   }
 }
 

@@ -276,6 +276,7 @@ export interface AppointmentForm {
   readonly place: string;
   readonly description: string;
   readonly forAll: boolean;
+  readonly public: boolean;
 }
 
 /** A new Termin on `day`: all-day, one day. */
@@ -290,6 +291,7 @@ export function emptyForm(day: string): AppointmentForm {
     place: '',
     description: '',
     forAll: false,
+    public: false,
   };
 }
 
@@ -319,6 +321,7 @@ export function toInput(
     place: form.place.trim() || null,
     description: form.description.trim() || null,
     forAll: form.forAll,
+    public: form.public,
     gremiumIds,
     principalIds,
   };

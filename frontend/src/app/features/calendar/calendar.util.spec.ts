@@ -328,6 +328,7 @@ describe('calendar.util', () => {
         place: null,
         description: null,
         forAll: false,
+        public: false,
         gremiumIds: ['g-1'],
         principalIds: ['p-1'],
       });

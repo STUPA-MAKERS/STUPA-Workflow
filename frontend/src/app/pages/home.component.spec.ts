@@ -56,16 +56,18 @@ describe('HomeComponent', () => {
   afterEach(() => localStorage.clear());
 
   /**
-   * Both choices are router links: the login choice opens `/login`, which offers the account and
-   * the e-mail link (F/public/public-pages/000589). Nothing else competes with them.
+   * Every choice is a router link: the login choice opens `/login`, which offers the account and
+   * the e-mail link (F/public/public-pages/000589), and the calendar choice opens the public
+   * calendar. Nothing else competes with them.
    */
-  it('offers exactly two ways in and nothing else without public protocols', async () => {
+  it('offers the application, the calendar and the login and nothing else without public protocols', async () => {
     const { protocols } = await setup();
     expect(protocols.list).toHaveBeenCalledWith({ limit: 3 });
     const apply = screen.getByRole('link', { name: /Antrag stellen/ });
     expect(apply).toHaveAttribute('href', '/apply');
     expect(screen.getByRole('link', { name: /^Anmelden/ })).toHaveAttribute('href', '/login');
-    expect(screen.getAllByRole('link')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: /^Kalender/ })).toHaveAttribute('href', '/public-calendar');
+    expect(screen.getAllByRole('link')).toHaveLength(3);
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
@@ -141,7 +143,7 @@ describe('HomeComponent', () => {
     it('looks as before when the protocols cannot load', async () => {
       await setup(undefined, {}, protocolsApi(throwError(() => new Error('down'))));
       expect(screen.queryByText('Zuletzt veröffentlicht')).toBeNull();
-      expect(screen.getAllByRole('link')).toHaveLength(2);
+      expect(screen.getAllByRole('link')).toHaveLength(3);
     });
   });
 });

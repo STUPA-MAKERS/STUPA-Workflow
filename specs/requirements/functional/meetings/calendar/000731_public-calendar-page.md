@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - backend/app/modules/calendar/public_router.py
+  - frontend/src/app/features/calendar/calendar.component.ts
+  - frontend/src/app/features/calendar/public-entry/public-entry.component.ts
+  - frontend/src/app/pages/home.component.html
 scope:
   - backend/app/modules/calendar
   - frontend/src/app/features

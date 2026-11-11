@@ -12,6 +12,8 @@ import type {
   ExternalCalendar,
   ExternalCalendarInput,
   ExternalEntry,
+  PublicAppointment,
+  PublicMeeting,
 } from './calendar.service';
 import { mockApiInterceptor } from './mock-api.interceptor';
 import { mockCalendar, resetMockCalendar } from './mock-calendar';
@@ -29,6 +31,7 @@ const BODY: AppointmentInput = {
   place: null,
   description: null,
   forAll: false,
+  public: false,
   gremiumIds: ['g0000000-0000-0000-0000-000000000001'],
   principalIds: ['p0000000-0000-0000-0000-000000000002'],
 };
@@ -145,6 +148,38 @@ describe('mockCalendar (demo data)', () => {
     expect(mockCalendar('GET', `${base}/${fresh.id}/fetch`, NONE, null)).toBeNull();
     resetMockCalendar();
     expect(list().length).toBe(3);
+  });
+
+  /** The public calendar holds the meetings and the public Termine, and a Termin has no Gremium. */
+  it('serves the public calendar without a private Termin and without a person', () => {
+    const base = '/api/public/calendar';
+    const get = (tail: string, values: Record<string, string> = {}) => mockCalendar('GET', `${base}/${tail}`, params(values), null);
+    const items = (get('entries', { from: '2000-01-01', to: '2999-01-01' })!.body as { items: CalendarEntry[] }).items;
+    expect(new Set(items.map((e) => e.kind))).toEqual(new Set(['meeting', 'appointment']));
+    const termine = items.filter((e) => e.kind === 'appointment');
+    expect(termine.map((e) => e.title)).toEqual(['Vollversammlung']);
+    expect(termine[0]).toMatchObject({ source: null, gremiumIds: [], mine: false, myAnswer: null });
+    expect((get('entries')!.body as { items: CalendarEntry[] }).items).toEqual([]);
+    expect((get('committees')!.body as unknown[]).length).toBe(2);
+    const hits = (q: string) => (get('search', { q })!.body as { items: CalendarEntry[] }).items;
+    expect(hits('vollvers').map((e) => e.id)).toEqual([termine[0].id]);
+    expect(hits('v')).toEqual([]);
+    expect(hits('jour fixe')).toEqual([]);
+    expect((get('search')!.body as { items: CalendarEntry[] }).items).toEqual([]);
+    const termin = get(`appointments/${termine[0].id}`)!.body as PublicAppointment;
+    expect(Object.keys(termin).sort()).toEqual(
+      ['description', 'endTime', 'endsOn', 'id', 'place', 'startTime', 'startsOn', 'title'],
+    );
+    expect(termin.place).toBe('Aula');
+    expect(get('appointments/a0000000-0000-0000-0000-000000000001')).toBeNull();
+    expect(get('appointments')).toBeNull();
+    const sitzung = items.find((e) => e.kind === 'meeting')!;
+    const meeting = get(`meetings/${sitzung.id}`)!.body as PublicMeeting;
+    expect(meeting).toMatchObject({ title: sitzung.title, day: sitzung.startsOn, gremium: sitzung.source, protocolId: null });
+    expect(meeting.tops.length).toBe(4);
+    expect(get('meetings/none')).toBeNull();
+    expect(get('other')).toBeNull();
+    expect(mockCalendar('POST', `${base}/entries`, NONE, null)).toBeNull();
   });
 
   it('does not know other paths and methods', () => {

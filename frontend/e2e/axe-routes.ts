@@ -36,6 +36,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('my-applications', { public: true }),
   { path: 'my-applications/:id', url: () => `/my-applications/${MISSING}`, public: true },
   fixed('protocols', { public: true }),
+  fixed('public-calendar', { public: true }),
   { path: 'protocols/:id', url: () => `/protocols/${MISSING}`, public: true },
   { path: 'j/:code', url: () => '/j/ZZZZZZ', public: true },
   fixed('accessibility', { public: true }),

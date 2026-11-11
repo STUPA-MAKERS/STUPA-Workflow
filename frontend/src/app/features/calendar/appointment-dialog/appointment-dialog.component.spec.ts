@@ -64,6 +64,7 @@ describe('AppointmentDialogComponent', () => {
       place: 'Tübingen',
       description: 'Mit Übernachtung',
       forAll: false,
+      public: false,
       gremiumIds: [],
       principalIds: [],
     });
@@ -190,6 +191,7 @@ describe('AppointmentDialogComponent', () => {
       place: '',
       description: '',
       forAll: true,
+      public: false,
     });
   });
 
@@ -198,6 +200,20 @@ describe('AppointmentDialogComponent', () => {
     const view = await setup({ publish: true });
     await userEvent.click(screen.getByRole('switch', { name: 'Für alle sichtbar' }));
     expect(view.cmp.form().forAll).toBe(true);
+  });
+
+  /** § 000730: the switch "Öffentlich" needs `calendar.publish` too, and an edit keeps its value. */
+  it('shows "Öffentlich" with the permission calendar.publish', async () => {
+    const view = await setup({ publish: true, appointment: appointment({ public: true }) });
+    const toggle = screen.getByRole('switch', { name: 'Öffentlich' });
+    expect(toggle).toBeChecked();
+    await userEvent.click(toggle);
+    expect(view.cmp.form().public).toBe(false);
+  });
+
+  it('hides "Öffentlich" without the permission', async () => {
+    await setup();
+    expect(screen.queryByRole('switch', { name: 'Öffentlich' })).toBeNull();
   });
 
   it.each([

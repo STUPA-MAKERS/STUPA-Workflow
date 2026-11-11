@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+implementation:
+  - backend/app/modules/calendar/public.py
+  - frontend/src/app/features/calendar/public-entry/public-entry.component.html
 scope:
   - backend/app/modules/calendar
   - backend/app/modules/meetings

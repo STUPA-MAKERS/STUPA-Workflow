@@ -5,6 +5,7 @@ import {
   ElementRef,
   afterRenderEffect,
   inject,
+  input,
   signal,
   untracked,
   viewChild,
@@ -88,6 +89,11 @@ export class CalendarSubscribeComponent {
   readonly isOpen = signal(false);
   readonly headingId = `cs-title-${nextId++}`;
 
+  /**
+   * A fixed address without a token (the public calendar). The popover then shows it
+   * with "Kopieren" only: it reads nothing, and no new address can be made.
+   */
+  readonly fixedUrl = input<string | null>(null);
   readonly url = signal<string | null>(null);
   readonly loading = signal(false);
   readonly error = signal(false);
@@ -142,7 +148,7 @@ export class CalendarSubscribeComponent {
     this.copyButton()?.reset();
     this.rotateError.set(false);
     this.isOpen.set(true);
-    if (!this.loaded) this.load();
+    if (!this.loaded && this.fixedUrl() === null) this.load();
   }
 
   /**

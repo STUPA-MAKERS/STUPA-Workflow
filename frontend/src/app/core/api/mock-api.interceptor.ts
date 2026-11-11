@@ -109,6 +109,8 @@ const MOCK_PRINCIPAL: Principal = {
     'flow.configure',
     'webhook.manage',
     'admin.calendars',
+    'calendar.manage',
+    'calendar.publish',
     'admin.users',
     'admin.users.merge',
     'admin.users.revoke_groups',
@@ -1642,7 +1644,7 @@ const MOCK_ACCOUNT_PATH =
 
 /** The routes of the Kalender page and of the admin page `Kalender` (`mock-calendar.ts`). */
 const MOCK_CALENDAR_PATH =
-  /(^|\/)api\/(calendar\/(entries|search|people|external\/[^/]+|appointments(\/[^/]+(\/answer)?)?)|admin\/calendars(\/[^/]+(\/fetch)?)?)$/;
+  /(^|\/)api\/(calendar\/(entries|search|people|external\/[^/]+|appointments(\/[^/]+(\/answer)?)?)|public\/calendar\/(committees|entries|search|(appointments|meetings)\/[^/]+)|admin\/calendars(\/[^/]+(\/fetch)?)?)$/;
 
 /** The routes of the public meeting: the guest side and the lead side. */
 const PUBLIC_MEETING_PATH =

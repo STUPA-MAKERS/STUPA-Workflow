@@ -43,6 +43,7 @@ function formOf(a: Appointment): AppointmentForm {
     place: a.place ?? '',
     description: a.description ?? '',
     forAll: a.forAll,
+    public: a.public,
   };
 }
 

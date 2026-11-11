@@ -1,0 +1,43 @@
+@let e = entry();
+<app-dialog [open]="open() && !!e" [title]="title()" [closeLabel]="'action.close' | t" (closed)="closed.emit()">
+  @if (e) {
+    <div class="apv">
+      <dl class="apv__facts">
+        <div>
+          <dt>{{ 'calendar.detail.when' | t }}</dt>
+          <dd class="mono">{{ when() }}</dd>
+        </div>
+        @if (e.kind === 'meeting') {
+          <div>
+            <dt>{{ 'calendar.filter.gremium' | t }}</dt>
+            <dd>{{ e.data.gremium }}</dd>
+          </div>
+        } @else if (e.data.place) {
+          <div>
+            <dt>{{ 'calendar.field.place' | t }}</dt>
+            <dd>{{ e.data.place }}</dd>
+          </div>
+        }
+      </dl>
+      @if (e.kind === 'appointment' && e.data.description) {
+        <p class="apv__desc">{{ e.data.description }}</p>
+      }
+      @if (e.kind === 'meeting' && e.data.tops.length) {
+        <div class="apv__block">
+          <span class="apv__cap">{{ 'calendar.public.tops' | t }}</span>
+          <ol class="pe__tops">
+            @for (top of e.data.tops; track $index) {
+              <li>{{ top }}</li>
+            }
+          </ol>
+        </div>
+      }
+      @if (e.kind === 'meeting' && e.data.protocolId; as protocolId) {
+        <app-button class="pe__link" variant="tonal" (click)="openProtocol(protocolId)">
+          <app-icon name="archive" />
+          {{ 'calendar.public.protocol' | t }}
+        </app-button>
+      }
+    </div>
+  }
+</app-dialog>
