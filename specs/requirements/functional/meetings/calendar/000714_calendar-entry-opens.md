@@ -12,9 +12,11 @@ scope:
 
 # An entry opens its own element
 
-A meeting entry must open the meeting, a card entry must open the card, and a Termin must open
-the Termin sheet. An entry of an external calendar must open a read-only sheet with the title,
-the time, the place, the description and the name of the calendar.
+The side panel of the desktop must show each entry of the picked day as one card that is
+pressable as a whole. A meeting entry must open the meeting and a card entry must open the card.
+A Termin and an entry of an external calendar must open in a dialog on the desktop and in a
+bottom sheet on the phone. The dialog of an external entry must be read-only and must show the
+title, the time, the place, the description and the name of the calendar.
 
 Reason: The Kalender does not copy the detail views of the modules.
 
