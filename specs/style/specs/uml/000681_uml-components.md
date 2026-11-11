@@ -5,7 +5,11 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/scripts/test_build_uml.py:test_component_view_has_the_layer_of_each_module"
+implementation:
+  - scripts/build_uml.py
+  - specs/uml/components.json
 scope:
   - specs/
   - scripts/

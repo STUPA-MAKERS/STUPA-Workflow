@@ -5,7 +5,11 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/scripts/test_build_uml.py:test_format_finds_unknown_edge_ends_and_double_ids"
+implementation:
+  - scripts/build_uml.py
+  - specs/uml
 scope:
   - specs/
   - scripts/

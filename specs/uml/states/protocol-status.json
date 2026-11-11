@@ -1,0 +1,44 @@
+{
+  "column": "status",
+  "edges": [
+    {
+      "from": "draft",
+      "path": "backend/app/modules/protocol/service.py",
+      "to": "rendering",
+      "trigger": "Protokoll abschließen after the meeting closed"
+    },
+    {
+      "from": "rendering",
+      "path": "backend/app/modules/protocol/service.py",
+      "to": "final",
+      "trigger": "Worker renders the PDF"
+    },
+    {
+      "from": "rendering",
+      "path": "backend/app/modules/protocol/service.py",
+      "to": "draft",
+      "trigger": "Render fails"
+    }
+  ],
+  "elements": [
+    {
+      "id": "draft",
+      "initial": true,
+      "name": "draft",
+      "path": "backend/app/modules/protocol/service.py"
+    },
+    {
+      "id": "rendering",
+      "name": "rendering",
+      "path": "backend/app/modules/protocol/service.py"
+    },
+    {
+      "id": "final",
+      "name": "final",
+      "path": "backend/app/modules/protocol/service.py"
+    }
+  ],
+  "table": "protocol",
+  "title": "Protocol",
+  "view": "state"
+}

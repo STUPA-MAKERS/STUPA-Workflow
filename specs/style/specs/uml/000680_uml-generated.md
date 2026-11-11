@@ -5,7 +5,12 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/scripts/test_build_uml.py:test_views_are_written_with_the_same_bytes"
+  - "backend/tests/unit/scripts/test_build_uml.py:test_committed_views_are_current"
+implementation:
+  - scripts/build_uml.py
+  - .github/workflows/ci.yml
 scope:
   - specs/
   - scripts/

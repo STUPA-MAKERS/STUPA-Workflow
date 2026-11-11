@@ -5,7 +5,11 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-11
-implementation: null
+tests:
+  - "backend/tests/unit/scripts/test_build_uml.py:test_state_view_must_have_the_values_of_its_check_constraint"
+implementation:
+  - scripts/build_uml.py
+  - specs/uml/states
 scope:
   - specs/
   - scripts/

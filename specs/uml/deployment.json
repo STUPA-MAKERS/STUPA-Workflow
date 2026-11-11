@@ -1,0 +1,145 @@
+{
+  "edges": [
+    {
+      "from": "api",
+      "to": "migrate"
+    },
+    {
+      "from": "api",
+      "to": "minio"
+    },
+    {
+      "from": "api",
+      "to": "postgres"
+    },
+    {
+      "from": "api",
+      "to": "redis"
+    },
+    {
+      "from": "migrate",
+      "to": "postgres"
+    },
+    {
+      "from": "web",
+      "to": "api"
+    },
+    {
+      "from": "worker",
+      "to": "clamav"
+    },
+    {
+      "from": "worker",
+      "to": "migrate"
+    },
+    {
+      "from": "worker",
+      "to": "minio"
+    },
+    {
+      "from": "worker",
+      "to": "postgres"
+    },
+    {
+      "from": "worker",
+      "to": "redis"
+    }
+  ],
+  "elements": [
+    {
+      "id": "altcha",
+      "image": "ghcr.io/altcha-org/sentinel:1.31.1",
+      "name": "altcha",
+      "networks": [
+        "internal"
+      ],
+      "path": "deploy/docker-compose.yml"
+    },
+    {
+      "build": "backend",
+      "id": "api",
+      "name": "api",
+      "networks": [
+        "internal",
+        "typst_net"
+      ],
+      "path": "deploy/docker-compose.yml"
+    },
+    {
+      "id": "clamav",
+      "image": "clamav/clamav:1.4.3",
+      "name": "clamav",
+      "networks": [
+        "internal"
+      ],
+      "path": "deploy/docker-compose.yml"
+    },
+    {
+      "build": "backend",
+      "id": "migrate",
+      "name": "migrate",
+      "networks": [
+        "internal"
+      ],
+      "path": "deploy/docker-compose.yml"
+    },
+    {
+      "id": "minio",
+      "image": "pgsty/minio:RELEASE.2026-08-04T00-00-00Z",
+      "name": "minio",
+      "networks": [
+        "internal"
+      ],
+      "path": "deploy/docker-compose.yml"
+    },
+    {
+      "id": "postgres",
+      "image": "postgres:16-alpine",
+      "name": "postgres",
+      "networks": [
+        "internal"
+      ],
+      "path": "deploy/docker-compose.yml"
+    },
+    {
+      "id": "redis",
+      "image": "redis:7-alpine",
+      "name": "redis",
+      "networks": [
+        "internal"
+      ],
+      "path": "deploy/docker-compose.yml"
+    },
+    {
+      "build": "typst",
+      "id": "typst",
+      "name": "typst",
+      "networks": [
+        "typst_net"
+      ],
+      "path": "deploy/docker-compose.yml"
+    },
+    {
+      "build": ".",
+      "id": "web",
+      "name": "web",
+      "networks": [
+        "internal",
+        "proxy"
+      ],
+      "path": "deploy/docker-compose.yml"
+    },
+    {
+      "build": "backend",
+      "id": "worker",
+      "name": "worker",
+      "networks": [
+        "internal",
+        "typst_net"
+      ],
+      "path": "deploy/docker-compose.yml"
+    }
+  ],
+  "title": "Compose stack",
+  "view": "deployment"
+}
