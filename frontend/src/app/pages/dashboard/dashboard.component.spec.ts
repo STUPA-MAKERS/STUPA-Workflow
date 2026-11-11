@@ -239,13 +239,13 @@ describe('DashboardComponent', () => {
       http.verify();
     });
 
-    it('opens the search from the pill; "Antrag stellen" is the floating button', async () => {
+    /** § F/applications/dashboard/000650: the link in the tab line, no floating button. */
+    it('opens the search from the pill; "Antrag stellen" is a link in the tab line', async () => {
       const { http, fixture } = await setup(MEMBER);
-      expect(screen.queryByRole('link', { name: /Antrag stellen/ })).not.toBeInTheDocument();
-      const router = fixture.debugElement.injector.get(Router);
-      const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
-      screen.getByRole('button', { name: 'Antrag stellen' }).click();
-      expect(nav).toHaveBeenCalledWith('/apply');
+      const apply = screen.getByRole('link', { name: /Antrag stellen/ });
+      expect(apply).toHaveAttribute('href', '/apply');
+      expect(apply.closest('.dash__tabbar')).not.toBeNull();
+      expect((fixture.nativeElement as HTMLElement).querySelector('app-fab')).toBeNull();
       const palette = fixture.debugElement.injector.get(CommandPalette);
       screen.getByRole('button', { name: /Suche/ }).click();
       expect(palette.isOpen()).toBe(true);
@@ -451,7 +451,8 @@ describe('DashboardComponent', () => {
 
   describe('Heute', () => {
     /**
-     * On the wide layout "Antrag stellen" stands at the foot of the work list, outside the sheet.
+     * § F/applications/dashboard/000650: on the wide layout "Antrag stellen" stands in the tab
+     * line of the work list, outside the sheet, and no floating button shows.
      */
     it('shows the live meeting with progress, keeper, own vote state and "Live beitreten"', async () => {
       const started = new Date(2026, 8, 29, 18, 4).toISOString();
@@ -474,9 +475,10 @@ describe('DashboardComponent', () => {
         },
       });
       expect(fixture.nativeElement.classList).toContain('pane-page');
-      const fab = (fixture.nativeElement as HTMLElement).querySelector('app-fab');
-      expect(fab?.closest('.dash__work')).not.toBeNull();
-      expect(fab?.closest('.dash__today')).toBeNull();
+      expect((fixture.nativeElement as HTMLElement).querySelector('app-fab')).toBeNull();
+      const apply = screen.getByRole('link', { name: /Antrag stellen/ });
+      expect(apply.closest('.dash__tabbar')).not.toBeNull();
+      expect(apply.closest('.dash__today')).toBeNull();
       const live = screen.getByRole('region', { name: 'Laufende Sitzung' });
       expect(within(live).getByText('seit 18:04 · Du führst Protokoll')).toBeInTheDocument();
       expect(within(live).getByText('3 / 8')).toBeInTheDocument();
@@ -627,8 +629,10 @@ describe('DashboardComponent', () => {
   });
 
   describe('phone', () => {
+    /** § F/applications/dashboard/000650: the phone keeps the floating button. */
     it('gives the compact head with the account sheet and the floating button', async () => {
       const { fixture } = await setup(MEMBER, { phone: true });
+      expect(screen.queryByRole('link', { name: /Antrag stellen/ })).not.toBeInTheDocument();
       const router = fixture.debugElement.injector.get(Router);
       const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
       screen.getByRole('button', { name: 'Antrag stellen' }).click();
