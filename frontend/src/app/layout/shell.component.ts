@@ -33,7 +33,8 @@ import { SiteFooterComponent } from './site-footer/site-footer.component';
  *   ({@link NavService}), with the task count, the ticket count and the live mark of the
  *   meetings ({@link NavMarkComponent}). Start, Anträge, Sitzungen and Aufgaben sit in the
  *   phone bar; the rest go into "Mehr".
- * - The help menu sits in the rail and in "Mehr", the account menu at the foot of the rail
+ * - The menus "Barrierefreiheit" and "Hilfe" sit in the rail and in "Mehr", in this order
+ *   (spec 000647), the account menu at the foot of the rail
  *   and at the end of "Mehr". "Mehr" is also active on `/account`.
  * - The public frame has the public header and the branded footer; the rail frame has
  *   the footer only on a route with `footer: true`.
@@ -74,7 +75,13 @@ import { SiteFooterComponent } from './site-footer/site-footer.component';
       </ng-template>
 
       @if (shell.current() === 'rail') {
+        <app-help-menu shellRailTools variant="rail" menu="a11y" />
+      }
+      @if (shell.current() === 'rail') {
         <app-help-menu shellRailTools variant="rail" />
+      }
+      @if (shell.current() === 'rail') {
+        <app-help-menu shellMore variant="sheet" menu="a11y" />
       }
       @if (shell.current() === 'rail') {
         <app-help-menu shellMore variant="sheet" />

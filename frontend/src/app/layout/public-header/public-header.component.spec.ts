@@ -73,15 +73,10 @@ describe('PublicHeaderComponent', () => {
     expect(screen.queryByRole('link', { name: 'Anmelden' })).not.toBeInTheDocument();
   });
 
-  it('toggles the appearance and says which state it is in', async () => {
-    const { fixture, theme } = await setup();
-    theme.setPreference('light');
-    fixture.detectChanges();
-    const toggle = screen.getByRole('button', { name: 'Erscheinungsbild wechseln' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    await userEvent.click(toggle);
-    expect(theme.resolved()).toBe('dark');
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  /** §000593 "Dunkles Design" has one switch, in the menu "Barrierefreiheit". */
+  it('has no theme button of its own', async () => {
+    await setup();
+    expect(screen.queryByRole('button', { name: 'Erscheinungsbild wechseln' })).toBeNull();
   });
 
   it('switches the language with a reload', async () => {
@@ -98,5 +93,16 @@ describe('PublicHeaderComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Hilfe' }));
     fixture.detectChanges();
     expect(screen.getByRole('link', { name: /Handbuch im Wiki/ })).toHaveAttribute('target', '_blank');
+  });
+
+  /** Spec 000647: "Barrierefreiheit" is its own button, before "Hilfe". */
+  it('offers the accessibility menu before the help menu, with the statement', async () => {
+    const { fixture } = await setup();
+    const a11y = screen.getByRole('button', { name: 'Barrierefreiheit' });
+    const help = screen.getByRole('button', { name: 'Hilfe' });
+    expect(a11y.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await userEvent.click(a11y);
+    fixture.detectChanges();
+    expect(screen.getByRole('link', { name: 'Erklärung zur Barrierefreiheit' })).toHaveAttribute('href', '/accessibility');
   });
 });

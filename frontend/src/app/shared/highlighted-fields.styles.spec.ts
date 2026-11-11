@@ -43,7 +43,6 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['pages/admin/forms/form-editor.component.scss', '.fe__pv-control'],
   ['pages/dashboard/dashboard.component.scss', '.dash__btn--fill'],
   ['pages/todos/board-picker/todo-board-picker.component.scss', '.bp__chip'],
-  ['layout/public-header/public-header.component.scss', '.pub__icon'],
   ['features/help/help-menu/help-menu.component.scss', '.hm__head'],
   ['features/meetings/top-sheet/top-sheet.component.scss', '.ts'],
   ['pages/home.component.scss', '.home__latestItem'],

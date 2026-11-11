@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -7,8 +6,8 @@ import { resolveI18n } from '@shared/forms/i18n-text';
 
 /**
  * The branded footer: the copyright line and the legal links, both from the admin
- * branding (public site config, no session needed), and always the link to the
- * accessibility statement (spec 000496).
+ * branding (public site config, no session needed). The link to the accessibility
+ * statement is in the menu "Barrierefreiheit", not here (spec 000496).
  *
  * The public frame shows it at the foot of every page. The rail shell shows it at the
  * end of the main content (not in an installed app, see the shell styles).
@@ -17,7 +16,7 @@ import { resolveI18n } from '@shared/forms/i18n-text';
   selector: 'app-site-footer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe],
+  imports: [TranslatePipe],
   templateUrl: './site-footer.component.html',
   styleUrl: './site-footer.component.scss',
 })
