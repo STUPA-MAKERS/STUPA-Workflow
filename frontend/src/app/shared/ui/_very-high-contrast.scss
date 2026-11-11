@@ -34,6 +34,12 @@
     border-radius: var(--radius-lg);
   }
 
+  // A card of a board is a surface, so it has the white edge too.
+  app-todo-card-tile {
+    outline: var(--vh-edge);
+    outline-offset: -2px;
+  }
+
   // A menu (000617): the rows of the help menu and of the account menu.
   .hm__item {
     @include vh.text;

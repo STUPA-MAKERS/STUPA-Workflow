@@ -41,6 +41,10 @@ describe('surfaceEdges (§000605)', () => {
   it('draws the white edge around a meeting in the day pane of the calendar', () => {
     expect(RULES).toMatch(/\.cal__panel \.cal__card \{[^}]*border: var\(--vh-edge\);/);
   });
+
+  it('draws the white edge around a card of a board', () => {
+    expect(RULES).toMatch(/\n  app-todo-card-tile \{\s*outline: var\(--vh-edge\);\s*outline-offset: -2px;/);
+  });
 });
 
 describe('menuRows (§000617)', () => {

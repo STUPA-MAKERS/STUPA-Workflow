@@ -16,7 +16,7 @@ scope:
 
 # In very high contrast, the navigation has yellow text and yellow icons
 
-While "Sehr hoher Kontrast" is on, each entry of the navigation rail and of the bottom bar must
+While "Hoher Kontrast" is on, each entry of the navigation rail and of the bottom bar must
 have yellow text and a yellow icon without an edge. This includes "Suche", "Hilfe", "Mehr" and the
 account button. The current entry must keep its yellow filled pill with a black icon. The entries
 of the "Mehr" sheet follow the same rule, and its current entry must be yellow filled with black

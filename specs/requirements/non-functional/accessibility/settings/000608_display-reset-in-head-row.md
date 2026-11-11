@@ -20,7 +20,7 @@ centre line as the text of the heading "Darstellung". Its end edge must line up 
 edge of the switch tracks of the group, in the popover and in both sheets. This applies in
 every display setting.
 
-Reason: In "Sehr hoher Kontrast" the button shows yellow (000614). A button that is offset
+Reason: In "Hoher Kontrast" the button shows yellow (000614). A button that is offset
 from the heading and sticks out past the switches looks misplaced.
 
 Test: `frontend/src/app/features/help/help-menu/help-menu.styles.spec.ts`.

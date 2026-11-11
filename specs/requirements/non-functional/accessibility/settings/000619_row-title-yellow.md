@@ -18,7 +18,7 @@ scope:
 
 # In very high contrast, a row that opens something has a yellow title
 
-While "Sehr hoher Kontrast" is on, the title of each row that a person can press must be yellow.
+While "Hoher Kontrast" is on, the title of each row that a person can press must be yellow.
 The other texts of the row stay white, and the row has no edge. This applies to a list row, a
 table row, a row that folds open, a row of the budget tree, a tile and a day of a calendar. The
 open row must have a yellow fill and black text.

@@ -51,10 +51,10 @@ const DISPLAY_ROWS: readonly {
   readonly label: TranslationKey;
 }[] = [
   { key: 'dark', icon: 'moon', label: 'help.display.dark' },
-  { key: 'contrast', icon: 'half', label: 'help.display.contrast' },
   { key: 'motion', icon: 'play', label: 'help.display.motion' },
   { key: 'transparency', icon: 'square', label: 'help.display.transparency' },
-  { key: 'veryHigh', icon: 'palette', label: 'help.display.veryHigh' },
+  { key: 'contrast', icon: 'half', label: 'help.display.contrast' },
+  { key: 'veryHigh', icon: 'bulb', label: 'help.display.veryHigh' },
 ];
 
 /** Space between the trigger and the popover, and the least distance to the viewport edge. */
@@ -69,7 +69,7 @@ let nextId = 0;
  * dialog.
  *
  * "Darstellung" (specs 000593, 000594) has one switch per display setting: the dark theme,
- * more contrast, less motion, less transparency and, last, very high contrast, which also
+ * less motion, less transparency, more contrast and, last, high contrast, which also
  * highlights the fields (spec 000598). A switch shows the
  * state in effect, which is the system setting until the person sets it. The choice holds
  * in this browser only. "Systemeinstellungen verwenden" removes every choice, the theme

@@ -29,4 +29,14 @@ describe('HelpMenuStyles', () => {
     expect(rule('.hm--sheet .hm__groupHead')).toMatch(/padding-inline: var\(--space-2\);/);
     expect(rule('.hm__reset')).not.toMatch(/margin: (?!0;)/);
   });
+
+  /** In the sheet "Darstellung" is a caption like "Hilfe": the same type and the same inset. */
+  it('gives the group name of the sheet the type and the inset of the caption', () => {
+    const name = rule('.hm--sheet .hm__groupHead > .hm__group');
+    expect(name).toMatch(/padding: 0;/);
+    expect(name).toMatch(/font-size: var\(--fs-cap\);/);
+    expect(rule('.hm__cap')).toMatch(/padding: var\(--space-2\) var\(--space-2\) var\(--space-1\);/);
+    const html = readFileSync(join(__dirname, 'help-menu.component.html'), 'utf8');
+    expect(html).toContain(`class="hm__group" [class.cap]="variant() === 'sheet'"`);
+  });
 });

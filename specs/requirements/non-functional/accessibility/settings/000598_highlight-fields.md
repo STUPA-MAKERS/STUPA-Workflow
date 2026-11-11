@@ -35,7 +35,7 @@ scope:
 
 # Very high contrast highlights the fields black on yellow
 
-While "Sehr hoher Kontrast" is on (000605), every input field (text, text area, select, date,
+While "Hoher Kontrast" is on (000605), every input field (text, text area, select, date,
 time, amount and search field) must have a yellow fill, black text, a black label, a black
 placeholder and black icons. A Markdown editor, a chat composer and the check box "Ich bin kein
 Roboter" (ALTCHA) are input fields too. In the protocol, the whole rounded pane of the TOP is

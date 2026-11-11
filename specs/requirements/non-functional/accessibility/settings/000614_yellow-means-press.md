@@ -21,7 +21,7 @@ scope:
 
 # In very high contrast, yellow shows what a person can press
 
-While "Sehr hoher Kontrast" is on (000605), every element that a person can press must show
+While "Hoher Kontrast" is on (000605), every element that a person can press must show
 yellow. It shows yellow as a fill, as an edge or as its text. A text that a person cannot press
 must not be yellow. White text must not be a control.
 
