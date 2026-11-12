@@ -285,7 +285,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000824](requirements/functional/finance/budget/000824_plan-version-keeps-steps.md) | A version keeps the steps it started with | draft |
 | [F/finance/budget/000825](requirements/functional/finance/budget/000825_plan-step-recorded.md) | A person records a passed step | draft |
 | [F/finance/budget/000826](requirements/functional/finance/budget/000826_plan-step-by-vote.md) | An accepted vote of the Gremium passes its step | draft |
-| [F/finance/budget/000827](requirements/functional/finance/budget/000827_plan-steps-edit.md) | The steps of a budget are edited at its Kostenstelle | draft |
+| [F/finance/budget/000827](requirements/functional/finance/budget/000827_plan-steps-edit.md) | The steps of a budget are edited in its edit form | draft |
+| [F/finance/budget/000828](requirements/functional/finance/budget/000828_admin-lists-budgets.md) | Verwaltung lists only the budgets | draft |
+| [F/finance/budget/000829](requirements/functional/finance/budget/000829_cost-centre-create-in-budget-tab.md) | A Kostenstelle is created in the Budget tab | draft |
+| [F/finance/budget/000830](requirements/functional/finance/budget/000830_cost-centre-create-in-draft.md) | A Kostenstelle created in a draft gets a line | draft |
+| [F/finance/budget/000831](requirements/functional/finance/budget/000831_cost-centre-edit-in-budget-tab.md) | A Kostenstelle is edited in the Budget tab | draft |
+| [F/finance/budget/000832](requirements/functional/finance/budget/000832_cost-centre-delete-in-budget-tab.md) | A Kostenstelle is deleted in the Budget tab | draft |
+| [F/finance/budget/000833](requirements/functional/finance/budget/000833_allocation-set-in-budget-tab.md) | The allocation of a year without a plan is set in the Budget tab | draft |
+| [F/finance/budget/000834](requirements/functional/finance/budget/000834_inactive-cost-centre-hidden.md) | An inactive Kostenstelle is hidden in the Budget tab | draft |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | approved |
