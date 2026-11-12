@@ -44,6 +44,8 @@
               [class.cw__block--short]="b.short"
               [class.cw__block--narrow]="b.width < 100"
               [class.cw__block--tight]="b.width < 40"
+              [class.cw__block--over]="b.over"
+              [style.z-index]="b.lane + 1"
               [class.cw__block--fromBefore]="b.start === null"
               [class.cw__block--goesOn]="b.end === null && b.entry.endsOn !== col.day.iso"
               [attr.title]="blockLabel(b.entry)"
