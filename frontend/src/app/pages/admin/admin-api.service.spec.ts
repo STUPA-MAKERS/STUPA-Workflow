@@ -428,6 +428,18 @@ describe('AdminApiService — real mode (contract)', () => {
     req.flush({ ...settings, retentionMonths: 6 });
   });
 
+  it('reads and replaces the feature switches', () => {
+    const switches = { todos: true, calendar: true, meetings: true, voting: true, budget: false, invoices: true, tickets: true };
+    let read: unknown;
+    s.getFeatures().subscribe((v) => (read = v));
+    http.expectOne({ method: 'GET', url: '/api/admin/features' }).flush(switches);
+    expect(read).toEqual(switches);
+    s.putFeatures({ ...switches, tickets: false }).subscribe();
+    const req = http.expectOne({ method: 'PUT', url: '/api/admin/features' });
+    expect(req.request.body).toEqual({ ...switches, tickets: false });
+    req.flush(req.request.body);
+  });
+
   it('POSTs a new application type and maps the wire response', () => {
     let created: { hasBudget: boolean; name: unknown } | undefined;
     s.createApplicationType({ key: 'k', name: { de: 'N' }, gremiumId: 'g1', hasBudget: true }).subscribe(
@@ -1077,6 +1089,14 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
       notifyNew: false,
       retentionMonths: null,
     });
+  });
+
+  it('keeps the feature switches in the mock store', async () => {
+    const s = svc();
+    const before = await firstValueFrom(s.getFeatures());
+    expect(before.todos).toBe(true);
+    await firstValueFrom(s.putFeatures({ ...before, todos: false }));
+    expect((await firstValueFrom(s.getFeatures())).todos).toBe(false);
   });
 
   it('keeps the login settings in the mock store', async () => {

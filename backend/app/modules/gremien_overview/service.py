@@ -83,6 +83,7 @@ from app.modules.meetings.agenda_service import title_of
 from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.site_config.cd_logos import ALLOWED_SQUARE_LOGO_MIME
+from app.modules.site_config.features import Feature, feature_on
 from app.modules.site_config.models import CdVariantLogo
 from app.modules.voting.election import election_config, is_election
 from app.modules.voting.listing import read_scope
@@ -413,6 +414,8 @@ class GremienService:
         A member sees the own gremien; ``gremium.view_all`` and the admin role see
         every gremium. Four queries for any number of gremien: the own roles, the
         gremien, the member counts and the next meetings, plus one for the logos.
+        No row names a next meeting while `Sitzungen` is off
+        (§F/administration/admin/000757).
         """
         now = datetime.now(UTC)
         own = await self._own_roles(principal)
@@ -426,7 +429,11 @@ class GremienService:
             return []
         ids = [g.id for g in gremien]
         counts = await self._member_counts(ids)
-        upcoming = await self._next_meetings(ids, self._today(now))
+        upcoming = (
+            await self._next_meetings(ids, self._today(now))
+            if await feature_on(self.session, Feature.MEETINGS)
+            else {}
+        )
         logos = await self._square_logos(ids)
         return [
             _overview_row(

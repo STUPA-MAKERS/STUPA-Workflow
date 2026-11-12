@@ -1,3 +1,4 @@
+import { FeatureService } from '@core/features/feature.service';
 import type { EditorMode } from '../top-sheet/top-sheet.component';
 import {
   ChangeDetectionStrategy,
@@ -404,10 +405,12 @@ export class MeetingPageComponent {
     return [{ items: main }, { items: danger }];
   });
 
+  /** The page shows no vote while `Abstimmungen` is off (spec 000758). */
+  private readonly votingOn = inject(FeatureService).isOn('voting');
   /** The votes of the open item: the open one first, then the newest first. */
   protected readonly votes = computed<MeetingVote[]>(() => {
     const t = this.top();
-    if (!t) return [];
+    if (!t || !this.votingOn) return [];
     const own = this.meeting().votes.filter((v) => v.agendaItemId === t.id);
     const open = own.filter((v) => v.status === 'open');
     const rest = own.filter((v) => v.status !== 'open').reverse();

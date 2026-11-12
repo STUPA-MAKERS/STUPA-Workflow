@@ -28,6 +28,7 @@ from app.modules.site_config.branding import (
     check_http_url,
 )
 from app.modules.site_config.cd_logos import LogoSlot, RenderSlot, VendoredLogoName
+from app.modules.site_config.features import FeatureSwitches
 from app.shared.config_schemas import ComparisonOffers, FlowGraph
 from app.shared.i18n import I18nMap, Lang
 from app.shared.permissions import PERMISSION_CATALOGUE
@@ -833,7 +834,8 @@ class PublicSiteConfigOut(FrozenCamelModel, frozen=True):
     new magic link in days; null means that the link does not expire. The
     confirmation page and the status page show it. ``attachmentLimits`` holds the
     upload limits of the wizard. ``help`` and ``tickets`` hold the public part of the
-    help and ticket settings; ``branding`` omits both.
+    help and ticket settings; ``branding`` omits both. ``features`` names the state of
+    each feature, so the public pages follow the switches without a session.
     """
 
     version: int
@@ -847,6 +849,8 @@ class PublicSiteConfigOut(FrozenCamelModel, frozen=True):
     )
     help: PublicHelpOut | None = None
     tickets: PublicTicketsOut | None = None
+    #: The features that are on. A feature that needs a feature that is off reads as off.
+    features: FeatureSwitches = Field(default_factory=FeatureSwitches)
 
 
 #: The API caps the link lifetime at ten years. A larger value adds nothing, and a

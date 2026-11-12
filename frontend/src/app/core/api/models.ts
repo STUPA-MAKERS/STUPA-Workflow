@@ -13,6 +13,8 @@
  *  - `*Body` types are request bodies in the camelCase wire form.
  */
 
+import type { FeatureStates } from '@core/features/feature.service';
+
 export type Uuid = string;
 export type IsoDateTime = string;
 
@@ -43,6 +45,8 @@ export interface PublicFooterLink {
  *  texts (for example `applyInfo`), the app name and the footer. */
 export interface PublicSiteConfig {
   readonly version: number;
+  /** The state of each feature. A feature that needs a feature that is off reads as off. */
+  readonly features?: FeatureStates;
   /**
    * Hours a guest has to confirm the email before the platform discards the
    * application (admin setting `guest_application_settings.confirm_ttl_hours`).

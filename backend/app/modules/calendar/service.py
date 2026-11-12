@@ -24,6 +24,7 @@ from app.modules.calendar.ics import AppointmentEvent, CardEvent, DueCard, Exter
 from app.modules.gremien.gremium_roles import gremium_reader_ids
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
+from app.modules.site_config.features import Feature, feature_on
 
 #: 32 bytes give about 43 URL-safe characters. An unguessable token needs no rate limit.
 _TOKEN_BYTES = 32
@@ -90,8 +91,11 @@ async def member_meetings(db: AsyncSession, sub: str) -> list[tuple[Meeting, str
     The query drops meetings without a date.
 
     Returns:
-        `(Meeting, gremium_name)` pairs sorted by date and start time.
+        `(Meeting, gremium_name)` pairs sorted by date and start time. None while
+        `Sitzungen` is off.
     """
+    if not await feature_on(db, Feature.MEETINGS):
+        return []
     gremium_ids = await gremium_reader_ids(db, sub)
     if not gremium_ids:
         return []

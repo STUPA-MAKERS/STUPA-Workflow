@@ -1186,8 +1186,10 @@ export class ApiClient {
   }
 
   /** GET /site-config — public (auth-free) active branding config. */
-  publicSiteConfig(): Observable<PublicSiteConfig> {
-    return this.http.get<PublicSiteConfig>(`${this.base}/site-config`);
+  publicSiteConfig(version: string | null = null): Observable<PublicSiteConfig> {
+    return this.http.get<PublicSiteConfig>(`${this.base}/site-config`, {
+      params: version ? { v: version } : {},
+    });
   }
 
   /** POST /meetings/{id}/protocol — create or load the protocol (idempotent). */

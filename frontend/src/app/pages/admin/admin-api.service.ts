@@ -7,7 +7,7 @@
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { skipLoading } from '@stupa-makers/ui-kit';
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { type Observable, map, of, throwError } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -39,6 +39,7 @@ import {
   type NotificationSettings,
   type GuestSettings,
   type MeetingSettings,
+  type FeatureSwitches,
   type HelpTicketsSettings,
   type LoginSettings,
   type AuditPage,
@@ -110,6 +111,7 @@ import {
   MOCK_GROUP_MAPPINGS,
   MOCK_GUEST_SETTINGS,
   MOCK_MEETING_SETTINGS,
+  MOCK_FEATURES,
   MOCK_HELP_TICKETS,
   MOCK_LOGIN_SETTINGS,
   MOCK_MAIL_TEMPLATES,
@@ -1317,6 +1319,32 @@ export class AdminApiService {
       return of(structuredCopy(this.store.helpTickets));
     }
     return this.http.put<HelpTicketsSettings>(`${this.base}/admin/help-tickets`, body);
+  }
+
+  /** The feature switches of the mock mode. */
+  private readonly mockFeatures = signal<FeatureSwitches>({ ...MOCK_FEATURES });
+
+  /**
+   * GET /admin/features — the stored switch of each feature ("Funktionen"). The GET and
+   * the PUT need P(admin.features).
+   */
+  getFeatures(): Observable<FeatureSwitches> {
+    if (this.mock) return of(this.mockFeatures());
+    return this.http.get<FeatureSwitches>(`${this.base}/admin/features`, {
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * PUT /admin/features — writes a new active site-config version. 409 `feature_in_use`
+   * while the Antrag flow or an Antragsart uses a feature that would go off.
+   */
+  putFeatures(body: FeatureSwitches): Observable<FeatureSwitches> {
+    if (this.mock) {
+      this.mockFeatures.set({ ...body });
+      return of(this.mockFeatures());
+    }
+    return this.http.put<FeatureSwitches>(`${this.base}/admin/features`, body);
   }
 
   /**

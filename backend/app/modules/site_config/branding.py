@@ -27,6 +27,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from app.modules.site_config.features import FeatureSwitches
 from app.modules.site_config.statement import default_statement
 from app.shared.i18n import I18nMap
 from app.shared.schemas import FrozenStrictCamelModel
@@ -306,6 +307,9 @@ class Branding(FrozenStrictCamelModel, frozen=True):
     #: fields reads as the defaults.
     help: HelpSettings = Field(default_factory=HelpSettings)
     tickets: TicketSettings = Field(default_factory=TicketSettings)
+    #: The feature switches of the page "Funktionen". A config without the field reads
+    #: as every feature on.
+    features: FeatureSwitches = Field(default_factory=FeatureSwitches)
 
     @model_validator(mode="before")
     @classmethod
@@ -335,8 +339,11 @@ class PublicBranding(Branding, frozen=True):
 
     The help and ticket settings stay out of it, because ``notifyNew`` and
     ``retentionMonths`` are not public. The public config names ``help.wikiUrl`` and
-    ``tickets.publicEnabled`` on its top level instead.
+    ``tickets.publicEnabled`` on its top level instead. The stored feature switches
+    stay out too: the public config names the features that are on, which also follows
+    the features a feature needs.
     """
 
     help: HelpSettings = Field(default_factory=HelpSettings, exclude=True)
     tickets: TicketSettings = Field(default_factory=TicketSettings, exclude=True)
+    features: FeatureSwitches = Field(default_factory=FeatureSwitches, exclude=True)

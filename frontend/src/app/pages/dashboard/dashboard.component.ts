@@ -2,9 +2,10 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, map, of, startWith, Subject, switchMap, type Observable } from 'rxjs';
+import { catchError, map, of, startWith, Subject, switchMap, throwError, type Observable } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { TodosApiService, type TodoMineItem } from '@core/api/todos.service';
+import { FeatureService } from '@core/features/feature.service';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -190,6 +191,7 @@ interface Load<T> {
     '[class.dash--phone]': 'phone()',
     '[class.dash--wide]': 'wide()',
     '[class.pane-page]': 'wide()',
+    '[class.dash--noToday]': '!todayShown()',
   },
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
@@ -201,6 +203,7 @@ export class DashboardComponent {
   private readonly api = inject(ApiClient);
   private readonly i18n = inject(I18nService);
   private readonly nav = inject(NavService);
+  private readonly features = inject(FeatureService);
   private readonly delegationsApi = inject(DelegationsApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -224,10 +227,16 @@ export class DashboardComponent {
   private readonly mine = this.mineLoad.value;
   /** The live and the next meetings. The timeline already scopes and sorts them. */
   private readonly timeline = this.load<MeetingPage>(
-    this.api.listMeetingsTimeline({ direction: 'upcoming', limit: TIMELINE_LIMIT }),
+    this.features.isOn('meetings')
+      ? this.api.listMeetingsTimeline({ direction: 'upcoming', limit: TIMELINE_LIMIT })
+      : throwError(() => null),
   ).value;
+  /** `Sitzungen` is on: the sheet shows the meetings. */
+  readonly meetingsOn = computed(() => this.features.isOn('meetings'));
   private readonly delegationsRaw = toSignal(
-    this.delegationsApi.list().pipe(catchError(() => of([] as Delegation[]))),
+    (this.features.isOn('meetings') ? this.delegationsApi.list() : of([] as Delegation[])).pipe(
+      catchError(() => of([] as Delegation[])),
+    ),
     { initialValue: [] as Delegation[] },
   );
   private readonly types = toSignal(
@@ -380,7 +389,7 @@ export class DashboardComponent {
 
   /** "Di, 29.09.2026". */
 
-  readonly meetingsLoading = computed(() => this.timeline() === undefined);
+  readonly meetingsLoading = computed(() => this.meetingsOn() && this.timeline() === undefined);
   /** The meetings page is open to the user: the sheet links to it. */
   readonly canSeeMeetings = computed(() => this.nav.meetingsVisible());
 
@@ -404,8 +413,10 @@ export class DashboardComponent {
 
   private readonly todos = inject(TodosApiService);
   private readonly myCards = toSignal(
-    this.todos.mine().pipe(
-      map((m) => m.items),
+    (this.features.isOn('todos')
+      ? this.todos.mine().pipe(map((m) => m.items))
+      : of([] as TodoMineItem[])
+    ).pipe(
       catchError(() => of([] as TodoMineItem[])),
     ),
     { initialValue: [] as readonly TodoMineItem[] },
@@ -429,8 +440,18 @@ export class DashboardComponent {
 
   /** No live and no planned meeting (after the load): the sheet says so. */
   readonly noMeetings = computed(
-    () => !this.meetingsLoading() && this.live().length === 0 && this.planned().length === 0,
+    () =>
+      this.meetingsOn() &&
+      !this.meetingsLoading() &&
+      this.live().length === 0 &&
+      this.planned().length === 0,
   );
+
+  /**
+   * The sheet shows while it has a part: the meetings while `Sitzungen` is on, or a due
+   * card. Without a part the list takes the whole width.
+   */
+  readonly todayShown = computed(() => this.meetingsOn() || this.dueTodos().length > 0);
 
   private liveCard(m: Meeting): LiveCard {
     const since = m.startedAt ? clock(m.startedAt, this.i18n.formatLocale()) : shortTime(m.startTime);

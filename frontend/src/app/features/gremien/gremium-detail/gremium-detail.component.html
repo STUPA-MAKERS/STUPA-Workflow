@@ -7,13 +7,15 @@
           <h2 id="gd-title" class="sheet-title gd__title">{{ g.name }}</h2>
         </div>
         @if (!phone()) {
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'gremien.detail.subscribe' | t"
-            [ariaPressed]="abo.isOpen()"
-            (click)="abo.toggle($event.currentTarget)"
-          ><app-icon name="cal" /></app-button>
+          @if (canSubscribe()) {
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'gremien.detail.subscribe' | t"
+              [ariaPressed]="abo.isOpen()"
+              (click)="abo.toggle($event.currentTarget)"
+            ><app-icon name="cal" /></app-button>
+          }
           @if (canAdmin()) {
             <app-button
               variant="text"

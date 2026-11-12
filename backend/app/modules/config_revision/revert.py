@@ -11,6 +11,7 @@ is revertable where that makes sense.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -53,6 +54,20 @@ _BUDGET_REVERT_PERM: dict[AuditAction, str] = {
     AuditAction.BUDGET_EXPENSE_CREATE: "budget.book",
     AuditAction.BUDGET_EXPENSE_UPDATE: "budget.book",
 }
+
+
+#: A save of the feature switches needs ``admin.features``, not ``admin.site``, and so
+#: does its revert.
+FEATURES_REVERT_PERM = "admin.features"
+
+
+def _is_features_save(entity_type: str, data: Mapping[str, object]) -> bool:
+    """Return whether the audit entry is a save of the feature switches.
+
+    Such an entry carries ``section = features``. Its revert sets only the switches
+    back, and a revert of that revert is again a save of the switches.
+    """
+    return entity_type == ENTITY_SITE_CONFIG and data.get("section") == "features"
 
 
 def _uuid_or_none(raw: object) -> UUID | None:
@@ -150,7 +165,10 @@ class RevertService:
         if recorded is None:
             raise NotFoundError(f"config revision {revision_id} not found")
 
-        perm = _CONFIG_REVERT_PERM.get(recorded.entity_type)
+        features_only = _is_features_save(recorded.entity_type, entry.data or {})
+        perm = (
+            FEATURES_REVERT_PERM if features_only else _CONFIG_REVERT_PERM.get(recorded.entity_type)
+        )
         if perm is None:
             raise ForbiddenError(
                 f"Cannot revert unknown config entity {recorded.entity_type}."
@@ -184,6 +202,7 @@ class RevertService:
                 "revertedAuditId": entry.id,
                 "revertedRevisionId": str(recorded.id),
             },
+            features_only=features_only,
         )
         return RevertResult(
             entity_type=recorded.entity_type,

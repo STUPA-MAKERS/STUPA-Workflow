@@ -319,4 +319,12 @@ describe('HelpMenuComponent', () => {
     expect(screen.getByRole('button', { name: 'Systemeinstellungen verwenden' })).toBeInTheDocument();
     fixture.debugElement.injector.get(ThemeService).setPreference('system');
   });
+
+  /** Spec 000758: no report entry while Tickets is off. */
+  it('shows no report entry while Tickets is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['tickets']));
+    await setup();
+    await userEvent.click(trigger());
+    expect(screen.queryByRole('button', { name: 'Problem melden' })).toBeNull();
+  });
 });

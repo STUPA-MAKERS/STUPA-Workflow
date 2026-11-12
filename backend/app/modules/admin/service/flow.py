@@ -19,6 +19,8 @@ from app.modules.config_revision.service import (
     ConfigRevisionService,
 )
 from app.modules.flow.models import FlowVersion, State, Transition
+from app.modules.site_config.feature_uses import flow_uses, uses_of
+from app.modules.site_config.features import ALL_FEATURES, active_features
 from app.shared.config_schemas import (
     FlowGraph,
     FlowValidationError,
@@ -99,6 +101,24 @@ class FlowOps(ConfigServiceBase):
             }
         )
 
+    async def _check_features(self, graph: FlowGraph) -> None:
+        """Refuse a graph that uses a feature that is off.
+
+        An Antrag must not reach a state that waits for a vote or a meeting that nobody
+        can open.
+
+        Raises:
+            ValidationProblem: A state or a transition needs a feature that is off.
+                ``errors`` names each one.
+        """
+        off = ALL_FEATURES - await active_features(self.session)
+        blocked = uses_of(flow_uses(graph), off)
+        if blocked:
+            raise ValidationProblem(
+                "The flow uses a feature that is switched off.",
+                errors=[use.as_error() for use in blocked],
+            )
+
     async def create_global_flow_version(
         self,
         payload: FlowVersionCreate,
@@ -130,7 +150,7 @@ class FlowOps(ConfigServiceBase):
         ``onupdate=func.now()`` would set the activation time.
 
         Raises:
-            ValidationProblem: The graph is invalid.
+            ValidationProblem: The graph is invalid, or it uses a feature that is off.
         """
         from app.modules.applications.models import Application
 
@@ -140,6 +160,7 @@ class FlowOps(ConfigServiceBase):
             raise ValidationProblem(
                 "Invalid flow graph.", errors=[{"field": "graph", "msg": str(exc)}]
             ) from exc
+        await self._check_features(payload.graph)
         await self._check_budget_refs(payload.graph)
 
         app_rows = (

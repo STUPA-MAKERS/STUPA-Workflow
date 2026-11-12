@@ -1,3 +1,4 @@
+import type { FeatureKey } from '@core/features/feature.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { IconName } from '@stupa-makers/ui-kit';
 import { ACCOUNT_GROUPS, ACCOUNT_PAGES } from '../../account/account-pages';
@@ -18,6 +19,8 @@ export interface FramePage {
    * and the server stay authoritative.
    */
   readonly permissions: readonly string[];
+  /** The feature of the page. The entry does not show while the feature is off. */
+  readonly feature?: FeatureKey;
 }
 
 /** A group of a frame navigation. A group without a title shows its entries only. */

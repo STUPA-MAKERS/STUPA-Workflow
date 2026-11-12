@@ -20,6 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db import get_sessionmaker
 from app.modules.calendar.external import ExternalCalendarService
 from app.modules.calendar.external_fetch import FeedFetcher, HttpFeedFetcher
+from app.modules.site_config.features import Feature
+from worker.features import job_feature_on
 
 logger = logging.getLogger("worker.calendars")
 
@@ -57,10 +59,12 @@ async def fetch_external_calendars(ctx: dict[str, Any], now: datetime | None = N
     """Fetch every due external calendar.
 
     Returns:
-        The number of good fetches.
+        The number of good fetches. None while `Kalender` is off.
     """
     moment = now or datetime.now(UTC)
     maker = _sessionmaker(ctx)
+    if not await job_feature_on(maker, Feature.CALENDAR):
+        return 0
     fetcher = _fetcher(ctx)
     async with maker() as session:
         due = await ExternalCalendarService(session).due(moment)

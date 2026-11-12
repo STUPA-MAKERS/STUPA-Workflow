@@ -6,6 +6,7 @@
  * developable and testable. Branding/site-config uses the local `/api/admin/site-config`
  * path, which is not part of the API spec.
  */
+import type { FeatureKey } from '@core/features/feature.service';
 import type {
   DataDiff,
   DataDiffWire,
@@ -1236,6 +1237,12 @@ export interface Branding {
   /** The ticket settings (page "Hilfe & Tickets"). */
   tickets?: { publicEnabled: boolean; notifyNew: boolean; retentionMonths: number | null };
 }
+
+/**
+ * The page "Funktionen" (`GET`/`PUT /admin/features`, permission `admin.features`): the
+ * stored switch of each feature. A save writes a new active site-config version.
+ */
+export type FeatureSwitches = Readonly<Record<FeatureKey, boolean>>;
 
 /**
  * The page "Hilfe & Tickets" (`GET`/`PUT /admin/help-tickets`, permission `admin.site`).

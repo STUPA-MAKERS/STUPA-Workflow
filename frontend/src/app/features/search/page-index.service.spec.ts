@@ -112,4 +112,15 @@ describe('PageIndexService', () => {
     const entry = svc.visible().find((e) => e.path === '/admin/roles');
     expect(entry?.label).toBe('admin.roles.title');
   });
+
+  /** Spec 000758: the palette offers no page of a feature that is off. */
+  it('withholds the pages of a feature that is off', () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['todos', 'budget']));
+    const paths = setup({ canAny: () => true }).visible().map((e) => e.path);
+    localStorage.clear();
+    expect(paths).not.toContain('/todos');
+    expect(paths).not.toContain('/budget');
+    expect(paths).not.toContain('/admin/cost-centres');
+    expect(paths).toContain('/calendar');
+  });
 });

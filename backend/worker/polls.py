@@ -22,9 +22,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
+from app.modules.site_config.features import Feature
 from app.modules.voting.models import Vote
 from app.modules.voting.poll_mails import send_poll_mail
 from app.settings import Settings, load_settings
+from worker.features import job_feature_on
 
 logger = logging.getLogger("worker.polls")
 
@@ -54,8 +56,11 @@ async def process_poll_reminders(ctx: dict[str, Any], now: datetime | None = Non
     Returns:
         The number of polls with an enqueued reminder.
 
-    One bad poll is logged and does not stop the run.
+    One bad poll is logged and does not stop the run. No mail goes out while
+    `Abstimmungen` is off.
     """
+    if not await job_feature_on(_sessionmaker(ctx), Feature.VOTING):
+        return 0
     moment = now or datetime.now(UTC)
     settings: Settings = ctx.get("settings") or load_settings()
     queue = _mail_queue(ctx)

@@ -354,6 +354,15 @@ describe('CalendarComponent (desktop)', () => {
     expect(view.http.match(() => true).length).toBe(0);
   });
 
+  /** Spec 000758: the filter offers no kind of a feature that is off. */
+  it('offers no kind of a feature that is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['meetings', 'todos']));
+    const view = await setup();
+    localStorage.removeItem('ap.features.off');
+    load(view);
+    expect(view.cmp.kindOptions().map((o) => o.label)).toEqual(['Termin', 'Extern']);
+  });
+
   it('filters by kind in the browser and asks the server for "Nur meine"', async () => {
     const view = await setup();
     load(view);

@@ -257,6 +257,39 @@ describe('GremiumDetailComponent', () => {
     expect(d.menu()[0].items.map((i) => i.id)).toEqual(['calendar', 'meetings', 'votes']);
   });
 
+  /** Spec 000758: the detail leaves out the parts of a feature that is off. */
+  it('opens on the members without Sitzungen, Abstimmungen, Boards and Kalender', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['meetings', 'voting', 'todos', 'calendar']));
+    const s = await start('/committees/g-1', { media: [MEDIA.phone], plan: true, boards: [{ id: 'b-1', kind: 'gremium' }] });
+    restore = s.restore;
+    const d = s.detail();
+    expect(d.tabs().map((t) => t.label)).toEqual(['Mitglieder']);
+    expect(d.tab()).toBe('members');
+    expect(s.api.meetings).not.toHaveBeenCalled();
+    expect(s.todos.boards).not.toHaveBeenCalled();
+    expect(d.canPlan()).toBe(false);
+    expect(d.showNext()).toBe(false);
+    expect(d.menu()[0].items.map((i) => i.id)).toEqual([]);
+    expect(screen.queryByRole('button', { name: /Sitzung planen/ })).toBeNull();
+  });
+
+  it('keeps the first tab out of the URL while Sitzungen is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['meetings']));
+    const s = await start('/committees/g-1?tab=attendance', { media: [MEDIA.wide] });
+    restore = s.restore;
+    const d = s.detail();
+    expect(d.tab()).toBe('members');
+    expect(d.tabs().map((t) => t.label)).toEqual(['Mitglieder', 'Beschlüsse']);
+    d.selectTab('decisions');
+    await s.settle();
+    expect(s.router.url).toBe('/committees/g-1?tab=decisions');
+    d.selectTab('members');
+    await s.settle();
+    expect(s.router.url).toBe('/committees/g-1');
+    const sheet = within(s.harness.fixture.nativeElement.querySelector('app-gremium-detail') as HTMLElement);
+    expect(sheet.getByRole('button', { name: 'Sitzungen abonnieren' })).toBeTruthy();
+  });
+
   it('says when the gremium is not there, or the list failed', async () => {
     const s = await start('/committees/g-x');
     restore = s.restore;

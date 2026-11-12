@@ -88,11 +88,13 @@
       [ngModel]="form().nameEn"
       (ngModelChange)="patch('nameEn', $event)"
     />
-    <app-checkbox
-      [ngModel]="form().hasBudget"
-      (ngModelChange)="patch('hasBudget', $event)"
-      name="hasBudget"
-    >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
+    @if (budgetOn) {
+      <app-checkbox
+        [ngModel]="form().hasBudget"
+        (ngModelChange)="patch('hasBudget', $event)"
+        name="hasBudget"
+      >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
+    }
   </form>
   <div dialog-footer class="fl__foot">
     <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>

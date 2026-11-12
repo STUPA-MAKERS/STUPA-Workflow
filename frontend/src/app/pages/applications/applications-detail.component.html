@@ -306,6 +306,7 @@
           }
         </div>
       }
+      @if (budgetOn()) {
       <app-field-row
         [label]="application.fiscalYearId && fiscalLabel(application.fiscalYearId)
           ? ('applications.detail.budgetWithYear' | t: { year: fiscalLabel(application.fiscalYearId) })
@@ -331,6 +332,7 @@
           </app-button>
         }
       </app-field-row>
+      }
       @if (links(); as l) {
         @if (l.predecessor || canLink()) {
           <app-field-row [label]="'applications.predecessor.field' | t">

@@ -21,6 +21,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { ObserversDialogComponent } from '../../features/apply/observers-dialog/observers-dialog.component';
 import { API_BASE_URL } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
+import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -224,6 +225,9 @@ export class ApplicationsDetailComponent {
   private readonly api = inject(ApiClient);
   private readonly apiBase = inject(API_BASE_URL);
   private readonly budgetApi = inject(BudgetTreeApi);
+  private readonly features = inject(FeatureService);
+  /** The row "Kostenstelle" shows only while `Budget` is on (spec 000758). */
+  protected readonly budgetOn = computed(() => this.features.isOn('budget'));
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);

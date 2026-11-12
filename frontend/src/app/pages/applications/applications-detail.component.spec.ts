@@ -919,6 +919,21 @@ describe('ApplicationsDetailComponent', () => {
     return label.closest('app-field-row') as HTMLElement;
   }
 
+  /** Spec 000758: the Antrag omits the Kostenstelle while Budget is off. */
+  it('shows no cost centre and asks for no tree while Budget is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['budget']));
+    const { http, detectChanges } = await setup(['application.manage']);
+    localStorage.removeItem('ap.features.off');
+    http.expectOne(url('')).flush({ ...appWire(), budgetId: 'b1' });
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    http.expectNone((r) => r.url === '/api/budgets');
+    flushForm(http);
+    detectChanges();
+    expect(screen.queryByText('Kostenstelle')).toBeNull();
+    flushAttachments(http);
+  });
+
   /** Only a manager changes it. */
   it('names the cost centre also for a reader without application.manage', async () => {
     const { http, detectChanges } = await setup(['application.read']);

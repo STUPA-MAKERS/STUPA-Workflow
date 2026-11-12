@@ -697,6 +697,15 @@ describe('MeetingPageComponent', () => {
   });
 
   describe('votes', () => {
+    /** Spec 000758: the page shows no vote while Abstimmungen is off. */
+    it('shows no vote card while Abstimmungen is off', async () => {
+      localStorage.setItem('ap.features.off', JSON.stringify(['voting']));
+      await setup({ meeting: meeting({ votes: [vote({ id: 'v-1' })] }) }, [MEDIA.wide]);
+      localStorage.removeItem('ap.features.off');
+      expect(screen.queryByRole('button', { name: 'Abstimmung schließen' })).toBeNull();
+      expect(screen.queryByText('Wird der Nachtragshaushalt beschlossen?')).toBeNull();
+    });
+
     /** A second vote can be prepared while the open one runs. */
     it('shows the open vote first and runs it', async () => {
       const votes = [
