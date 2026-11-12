@@ -4230,7 +4230,6 @@
   "budget.plan.toast.added": "Cost centre added.",
   "budget.plan.toast.removed": "Line removed.",
   "budget.plan.error.failed": "The change could not be saved.",
-  "budget.plan.error.belowChildren": "The planned amount is below the sum of the child cost centres.",
   "budget.plan.error.blockedAbove": "The blocked amount is above the planned amount.",
   "budget.plan.error.hasChildren": "Remove the lines of the child cost centres first.",
   "budget.plan.error.notBalanced": "The plan is not balanced.",

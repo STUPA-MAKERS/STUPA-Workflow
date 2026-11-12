@@ -580,8 +580,10 @@ class PlanOps(NodeOps, AllocationOps):
     async def set_line(self, version_id: UUID, budget_id: UUID, payload: PlanLineSet) -> PlanOut:
         """Set the line of one cost center in a draft version.
 
-        A sum of children above the Ansatz of a parent raises that parent, up to the
-        node below the top level.
+        A cost center with a child in the version holds the sum of the Ansätze of
+        those children: the amount of the payload does not count for it, and each
+        ancestor up to the node below the top level follows a change of a child. A
+        blocked amount of an ancestor falls with its Ansatz.
 
         Raises:
             NotFoundError: The version or the cost center does not exist (404).
@@ -589,8 +591,7 @@ class PlanOps(NodeOps, AllocationOps):
                 a version that is not a draft.
             ValidationProblem: `plan_line_node_invalid` (422) for the top-level node
                 or a node of a different tree, `plan_side_missing` (422),
-                `plan_marks_income` (422), `plan_blocked_above_amount` (422),
-                `plan_line_below_children` (422).
+                `plan_marks_income` (422), `plan_blocked_above_amount` (422).
         """
         version, plan, _fy, top = await self._version_context(version_id)
         if version.state != "draft":
@@ -606,32 +607,31 @@ class PlanOps(NodeOps, AllocationOps):
                 code="plan_line_node_invalid",
                 errors=[{"field": "budgetId", "msg": "not below the top level of the plan"}],
             )
-        self._check_line(node, payload)
         lines = {line.budget_id: line for line in await self._lines(version.id)}
         previous = lines.get(node.id)
         parent_of = {n.id: n.parent_id for n in nodes}
+        has_children = any(n.parent_id == node.id and n.id in lines for n in nodes)
+        amount = (
+            plan_rules.children_sum(node.id, parent_of, {b: ln.amount for b, ln in lines.items()})
+            if has_children
+            else payload.amount
+        )
+        self._check_line(node, payload, amount)
         amounts: dict[UUID, Decimal] = {
             **{bid: line.amount for bid, line in lines.items()},
-            node.id: payload.amount,
+            node.id: amount,
         }
-        if payload.amount < plan_rules.children_sum(node.id, parent_of, amounts):
-            raise ValidationProblem(
-                "The Ansatz is below the sum of the child cost centres.",
-                code="plan_line_below_children",
-                errors=[{"field": "amount", "msg": "below the sum of the children"}],
-            )
-        raised = plan_rules.raised_ancestors(node.id, parent_of, amounts, top.id)
+        raised = plan_rules.summed_ancestors(node.id, parent_of, amounts, top.id)
         before = str(previous.amount) if previous is not None else None
         _assign(
             self._line_for(version.id, node.id, lines),
-            amount=payload.amount,
+            amount=amount,
             note=payload.note,
             transferable=payload.transferable,
             coverable=payload.coverable,
             blocked=payload.blocked,
         )
-        for ancestor_id, amount in raised.items():
-            _assign(self._line_for(version.id, ancestor_id, lines), amount=amount)
+        self._set_ancestors(version.id, raised, lines)
         await self._audit(
             AuditAction.BUDGET_PLAN_LINE_SET,
             target_type="budget_plan",
@@ -640,12 +640,20 @@ class PlanOps(NodeOps, AllocationOps):
                 "versionId": str(version.id),
                 "number": version.number,
                 "budgetId": str(node.id),
-                "amount": str(payload.amount),
+                "amount": str(amount),
                 "previousAmount": before,
                 "raised": {str(k): str(v) for k, v in raised.items()},
             },
         )
         return await self._plan_out(plan, top.id)
+
+    def _set_ancestors(
+        self, version_id: UUID, sums: dict[UUID, Decimal], lines: dict[UUID, BudgetPlanLine]
+    ) -> None:
+        """Write the summed Ansatz of each ancestor. A blocked amount falls with it."""
+        for ancestor_id, total in sums.items():
+            line = self._line_for(version_id, ancestor_id, lines)
+            _assign(line, amount=total, blocked=min(line.blocked, total))
 
     def _line_for(
         self, version_id: UUID, budget_id: UUID, lines: dict[UUID, BudgetPlanLine]
@@ -665,8 +673,8 @@ class PlanOps(NodeOps, AllocationOps):
         return line
 
     @staticmethod
-    def _check_line(node: Budget, payload: PlanLineSet) -> None:
-        """Check a line against the side of its cost center.
+    def _check_line(node: Budget, payload: PlanLineSet, amount: Decimal) -> None:
+        """Check a line against the side of its cost center and its Ansatz `amount`.
 
         Raises:
             ValidationProblem: `plan_side_missing`, `plan_marks_income` or
@@ -685,7 +693,7 @@ class PlanOps(NodeOps, AllocationOps):
                 code="plan_marks_income",
                 errors=[{"field": "transferable", "msg": "no Vermerk on an income line"}],
             )
-        if payload.blocked > payload.amount:
+        if payload.blocked > amount:
             raise ValidationProblem(
                 "The blocked amount is above the Ansatz.",
                 code="plan_blocked_above_amount",
@@ -695,7 +703,8 @@ class PlanOps(NodeOps, AllocationOps):
     async def delete_line(self, version_id: UUID, budget_id: UUID) -> PlanOut:
         """Remove the line of one cost center from a draft version.
 
-        The cost center then does not belong to the plan of that year.
+        The cost center then does not belong to the plan of that year. Each ancestor
+        that still has a child in the version falls to the sum of those children.
 
         Raises:
             NotFoundError: The version does not exist, or `plan_line_not_found` (404).
@@ -714,13 +723,20 @@ class PlanOps(NodeOps, AllocationOps):
             raise NotFoundError(
                 "The version has no line for this cost centre.", code="plan_line_not_found"
             )
-        children = [n.id for n in await self._subtree(top) if n.parent_id == budget_id]
-        if any(child in lines for child in children):
+        nodes = await self._subtree(top)
+        if any(n.parent_id == budget_id and n.id in lines for n in nodes):
             raise ValidationProblem(
                 "A child cost centre has a line. Remove it first.",
                 code="plan_line_has_children",
                 errors=[{"field": "budgetId", "msg": "a child cost centre has a line"}],
             )
+        raised = plan_rules.summed_ancestors(
+            budget_id,
+            {n.id: n.parent_id for n in nodes},
+            {bid: ln.amount for bid, ln in lines.items() if bid != budget_id},
+            top.id,
+        )
+        self._set_ancestors(version.id, raised, lines)
         await self.session.delete(line)
         await self._audit(
             AuditAction.BUDGET_PLAN_LINE_SET,
@@ -732,7 +748,7 @@ class PlanOps(NodeOps, AllocationOps):
                 "budgetId": str(budget_id),
                 "amount": None,
                 "previousAmount": str(line.amount),
-                "raised": {},
+                "raised": {str(k): str(v) for k, v in raised.items()},
             },
         )
         return await self._plan_out(plan, top.id)

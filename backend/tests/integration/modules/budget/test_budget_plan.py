@@ -328,20 +328,38 @@ async def test_create_plan_copies_the_plan_in_force_of_another_year(
     )
 
 
-async def test_set_line_raises_the_parent(session: AsyncSession) -> None:
-    """§000794: a sum of children above the parent raises the parent."""
+async def test_a_parent_holds_the_sum_of_its_children(session: AsyncSession) -> None:
+    """§000794: the Ansatz of a parent rises and falls with its children."""
     t = await _tree(session)
     vid = _version(await _draft(t)).id
+    plan = await t.svc.set_line(vid, t.exp.id, PlanLineSet(amount=D(90), blocked=D(70)))
+    assert _amounts(_version(plan)) == {t.exp.id: D(90)}
     plan = await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(60)))
     assert _amounts(_version(plan)) == {t.exp_a.id: D(60), t.exp.id: D(60)}
-    plan = await t.svc.set_line(vid, t.exp.id, PlanLineSet(amount=D(90), note="Topf"))
-    plan = await t.svc.set_line(vid, t.exp_b.id, PlanLineSet(amount=D(20)))
-    assert _amounts(_version(plan))[t.exp.id] == D(90)
+    parent = next(x for x in _version(plan).lines if x.budget_id == t.exp.id)
+    assert parent.blocked == D(60)
     plan = await t.svc.set_line(vid, t.exp_b.id, PlanLineSet(amount=D(50)))
     assert _amounts(_version(plan))[t.exp.id] == D(110)
+    plan = await t.svc.set_line(vid, t.exp_b.id, PlanLineSet(amount=D(20)))
+    assert _amounts(_version(plan))[t.exp.id] == D(80)
+    plan = await t.svc.set_line(vid, t.exp.id, PlanLineSet(amount=D(5), note="Topf"))
+    parent = next(x for x in _version(plan).lines if x.budget_id == t.exp.id)
+    assert (parent.amount, parent.note) == (D(80), "Topf")
     with pytest.raises(ValidationProblem) as exc:
-        await t.svc.set_line(vid, t.exp.id, PlanLineSet(amount=D(109)))
-    assert _code(exc) == "plan_line_below_children"
+        await t.svc.set_line(vid, t.exp.id, PlanLineSet(amount=D(500), blocked=D(81)))
+    assert _code(exc) == "plan_blocked_above_amount"
+
+
+async def test_delete_line_lowers_the_parent(session: AsyncSession) -> None:
+    """§000794: a removed line of a child lowers the parent to the sum that is left."""
+    t = await _tree(session)
+    vid = _version(await _draft(t)).id
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(60)))
+    await t.svc.set_line(vid, t.exp_b.id, PlanLineSet(amount=D(40)))
+    plan = await t.svc.delete_line(vid, t.exp_b.id)
+    assert _amounts(_version(plan)) == {t.exp_a.id: D(60), t.exp.id: D(60)}
+    plan = await t.svc.delete_line(vid, t.exp_a.id)
+    assert _amounts(_version(plan)) == {t.exp.id: D(60)}
 
 
 async def test_set_line_checks_the_node_and_the_marks(session: AsyncSession) -> None:

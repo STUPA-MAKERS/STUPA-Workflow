@@ -110,22 +110,26 @@ def test_children_sum() -> None:
     assert plan_rules.children_sum(EXP_B, PARENT_OF, amounts) == D(0)
 
 
-def test_raised_ancestors_raises_each_parent_up_to_the_top() -> None:
-    """§000794: a sum of children above the parent raises the parent."""
+def test_summed_ancestors_follow_the_children_up_to_the_top() -> None:
+    """§000794: a parent holds the sum of its children, so it rises and falls."""
     amounts = {EXP: D(40), EXP_A: D(30), EXP_B: D(10), EXP_A1: D(50)}
-    raised = plan_rules.raised_ancestors(EXP_A1, PARENT_OF, amounts, TOP)
-    assert raised == {EXP_A: D(50), EXP: D(60)}
+    assert plan_rules.summed_ancestors(EXP_A1, PARENT_OF, amounts, TOP) == {
+        EXP_A: D(50), EXP: D(60),
+    }
+    lower = {EXP: D(100), EXP_A: D(80), EXP_B: D(10), EXP_A1: D(5)}
+    assert plan_rules.summed_ancestors(EXP_A1, PARENT_OF, lower, TOP) == {
+        EXP_A: D(5), EXP: D(15),
+    }
 
 
-def test_raised_ancestors_stops_at_a_parent_that_is_large_enough() -> None:
-    amounts = {EXP: D(100), EXP_A: D(30), EXP_A1: D(50)}
-    assert plan_rules.raised_ancestors(EXP_A1, PARENT_OF, amounts, TOP) == {EXP_A: D(50)}
-    assert plan_rules.raised_ancestors(EXP_A1, PARENT_OF, {EXP_A: D(50), EXP_A1: D(50)}, TOP) == {}
+def test_summed_ancestors_stop_at_a_parent_without_a_child_line() -> None:
+    """A removed last child leaves the Ansatz of its parent as it is."""
+    assert plan_rules.summed_ancestors(EXP_A1, PARENT_OF, {EXP_A: D(50), EXP: D(70)}, TOP) == {}
 
 
-def test_raised_ancestors_of_a_direct_child_and_of_the_top() -> None:
-    assert plan_rules.raised_ancestors(EXP, PARENT_OF, {EXP: D(5)}, TOP) == {}
-    assert plan_rules.raised_ancestors(TOP, PARENT_OF, {}, TOP) == {}
+def test_summed_ancestors_of_a_direct_child_and_of_the_top() -> None:
+    assert plan_rules.summed_ancestors(EXP, PARENT_OF, {EXP: D(5)}, TOP) == {}
+    assert plan_rules.summed_ancestors(TOP, PARENT_OF, {}, TOP) == {}
 
 
 def test_allocations_from_lines() -> None:

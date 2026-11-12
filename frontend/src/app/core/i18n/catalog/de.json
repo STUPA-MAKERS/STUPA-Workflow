@@ -4230,7 +4230,6 @@
   "budget.plan.toast.added": "Kostenstelle aufgenommen.",
   "budget.plan.toast.removed": "Zeile entfernt.",
   "budget.plan.error.failed": "Die Änderung konnte nicht gespeichert werden.",
-  "budget.plan.error.belowChildren": "Der Ansatz liegt unter der Summe der untergeordneten Kostenstellen.",
   "budget.plan.error.blockedAbove": "Der gesperrte Betrag liegt über dem Ansatz.",
   "budget.plan.error.hasChildren": "Entferne zuerst die Zeilen der untergeordneten Kostenstellen.",
   "budget.plan.error.notBalanced": "Der Plan ist nicht ausgeglichen.",
