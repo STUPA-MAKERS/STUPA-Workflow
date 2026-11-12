@@ -2,7 +2,7 @@
 id: "000750"
 title: The two buttons in the tab line of the start page have the same size
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 tests:
