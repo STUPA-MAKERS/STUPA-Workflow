@@ -1414,14 +1414,6 @@ export class AdminApiService {
   getBackup(id: Uuid): Observable<Backup> {
     if (this.mock) {
       const row = this.store.backups.find((b) => b.id === id);
-      if (row && (row.status === 'pending' || row.status === 'running')) {
-        Object.assign(row, {
-          status: 'done',
-          finishedAt: new Date().toISOString(),
-          sizeBytes: 12_582_912,
-          objectCount: 8,
-        });
-      }
       return of(structuredCopy(row ?? ({ id } as Backup)));
     }
     return this.http.get<Backup>(`${this.base}/admin/backups/${id}`, {
@@ -1432,8 +1424,8 @@ export class AdminApiService {
   /**
    * POST /admin/backups — 202 with the whole pending row. The worker builds the archive.
    *
-   * The mock answers `pending` like the API, and the next poll finishes the row, so the
-   * mock shows the same row the page shows against the real API.
+   * The mock answers `pending` like the API and stores the finished row, so the next poll
+   * finishes the row and the mock shows the same row the page shows against the real API.
    */
   createBackup(note?: string | null): Observable<Backup> {
     if (this.mock) {
@@ -1448,10 +1440,21 @@ export class AdminApiService {
         note: note ?? null,
         pinned: false,
       };
-      this.store.backups.unshift(row);
+      this.addMockBackup({
+        ...row,
+        status: 'done',
+        finishedAt: row.createdAt,
+        sizeBytes: 12_582_912,
+        objectCount: 8,
+      });
       return of(structuredCopy(row));
     }
     return this.http.post<Backup>(`${this.base}/admin/backups`, { note: note ?? null });
+  }
+
+  /** Put a new row at the top of the mock catalogue, the place of the newest backup. */
+  private addMockBackup(row: Backup): void {
+    this.store.backups.unshift(row);
   }
 
   /** PATCH /admin/backups/{id} — edit the note, or pin against retention. */
@@ -1492,7 +1495,7 @@ export class AdminApiService {
         note: null,
         pinned: false,
       };
-      this.store.backups.unshift(row);
+      this.addMockBackup(row);
       return of(structuredCopy(row));
     }
     const body = new FormData();
