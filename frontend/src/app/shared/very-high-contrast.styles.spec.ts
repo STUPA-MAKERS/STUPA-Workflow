@@ -67,7 +67,9 @@ describe('surfaceEdges (§000605)', () => {
 
 describe('boardPicker (§000617)', () => {
   it('draws the picker as a menu: white edge, yellow rows, the open board filled', () => {
-    expect(RULES).toMatch(/\.bp__pop \{\s*border: var\(--vh-edge\) !important;\s*outline: none !important;/);
+    expect(RULES).toMatch(
+      /\.bp__pop \{\s*border: var\(--vh-edge\) !important;[^}]*--pop-edge: none !important;/,
+    );
     expect(RULES).toMatch(/\n {2}\.bp__row \{\s*@include vh\.text;/);
     expect(RULES).toMatch(/\.bp__row\[aria-current='true'\] \{\s*@include vh\.fill;/);
     expect(RULES).toMatch(/\.bp__cap \{\s*color: var\(--vh-fg\) !important;/);
