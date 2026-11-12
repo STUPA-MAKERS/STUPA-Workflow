@@ -2,7 +2,7 @@
 id: "000754"
 title: An observer gets the status mails
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation:

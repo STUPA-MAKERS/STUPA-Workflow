@@ -2,7 +2,7 @@
 id: "000753"
 title: An observer does not see personal fields
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation:

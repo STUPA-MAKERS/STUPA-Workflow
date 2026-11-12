@@ -37,7 +37,7 @@ from app.modules.applications.access import (
     _resolve_with_creator,
     hidden_pii_keys,
     require_app_edit,
-    require_app_read,
+    require_app_view,
     resolve_app_read,
 )
 from app.modules.applications.models import Application, Comment
@@ -142,7 +142,7 @@ async def _resolve_attachment_read(
     no availability gap. The router still maps a cross-object miss to 404, so the API
     is no existence oracle.
     """
-    return await resolve_app_read(db, application_id, principal, applicant)
+    return await resolve_app_read(db, application_id, principal, applicant, observers=True)
 
 
 async def _pii_attachment_filter(
@@ -300,7 +300,9 @@ async def _assert_comment_reader(
     if comment is None:
         raise missing
     try:
-        access = await resolve_app_read(db, comment.application_id, principal, applicant)
+        access = await resolve_app_read(
+            db, comment.application_id, principal, applicant, observers=True
+        )
     except ForbiddenError as exc:
         raise missing from exc
     if comment.visibility != "public" and not access.can_see_internal:
@@ -399,7 +401,7 @@ async def list_attachments(
     application_id: UUID,
     service: ServiceDep,
     db: DbSession,
-    access: Annotated[Access, Depends(require_app_read)],
+    access: Annotated[Access, Depends(require_app_view)],
 ) -> list[AttachmentOut]:
     """List the attachments of an application.
 

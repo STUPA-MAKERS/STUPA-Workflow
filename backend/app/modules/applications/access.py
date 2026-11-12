@@ -14,6 +14,10 @@ member when the creator reads through the Gremium read scope, or holds
 
 `Access.via` records the path that granted the access. The applicant view and the PII
 rule (`can_read_pii`) read it.
+
+An observer (``via="observer"``) reads the application in the applicant view, without
+the ``isPII`` fields and without the applicant block. Only the read routes admit the
+observer path (`require_app_view`), so every write route refuses an observer.
 """
 
 from __future__ import annotations
@@ -27,7 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import DbSession, get_current_applicant, get_current_principal
-from app.modules.applications.models import Application
+from app.modules.applications.models import Application, ApplicationObserver
 from app.modules.auth.principal import Applicant, Principal
 from app.shared.errors import ForbiddenError, UnauthorizedError
 
@@ -55,8 +59,9 @@ MEMBER_PERMISSIONS = _MEMBER_PERMISSIONS
 
 
 #: The path that granted the access: a permission, the magic link of the applicant,
-#: the logged-in creator (owner), or the Gremium read scope (committee).
-AccessVia = Literal["permission", "applicant", "owner", "committee"]
+#: the logged-in creator (owner), the Gremium read scope (committee), or an observer
+#: address (observer).
+AccessVia = Literal["permission", "applicant", "owner", "committee", "observer"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,7 +94,11 @@ class Access:
         Gremium read scope or a member right. The creator who is no member reads as
         the applicant, so the internal comments of the Gremium stay hidden.
         """
-        return self.principal is not None and not self._owner_as_applicant
+        return (
+            self.principal is not None
+            and not self._owner_as_applicant
+            and self.via != "observer"
+        )
 
     @property
     def is_owning_applicant(self) -> bool:
@@ -99,7 +108,12 @@ class Access:
         (``email_confirmed_at IS NULL``) through the item route. A principal and
         the committee scope may not. This mirrors the invisible-in-lists rule.
         """
-        return self.applicant is not None
+        return self.applicant is not None and self.via != "observer"
+
+    @property
+    def is_observer(self) -> bool:
+        """Tell whether the caller reads the application as an observer."""
+        return self.via == "observer"
 
     @property
     def is_applicant_view(self) -> bool:
@@ -109,7 +123,7 @@ class Access:
         member (see `can_see_internal`). The applicant view shows the Gremium
         instead of member names and the version metadata without values.
         """
-        return self.applicant is not None or self._owner_as_applicant
+        return self.applicant is not None or self._owner_as_applicant or self.is_observer
 
     @property
     def author_kind(self) -> str:
@@ -157,6 +171,47 @@ async def _is_creator(db: AsyncSession, application_id: UUID, principal: Princip
         select(Application.created_by).where(Application.id == application_id)
     )
     return created_by is not None and created_by == principal.sub
+
+
+def _address(principal: Principal | None, applicant: Applicant | None) -> str | None:
+    """Return the e-mail of the caller that an observer row can match, or None.
+
+    A principal matches with the account e-mail, an e-mail session with its address.
+    The link of one Antrag carries no address.
+    """
+    if principal is not None:
+        return principal.email
+    return applicant.email if applicant is not None else None
+
+
+async def observes(db: AsyncSession, application_id: UUID, email: str | None) -> bool:
+    """Tell whether the address observes the application (case-insensitive, CITEXT)."""
+    if not email:
+        return False
+    found = await db.scalar(
+        select(ApplicationObserver.id).where(
+            ApplicationObserver.application_id == application_id,
+            ApplicationObserver.email == email,
+        )
+    )
+    return found is not None
+
+
+async def _observer_access(
+    db: AsyncSession,
+    application_id: UUID,
+    principal: Principal | None,
+    applicant: Applicant | None,
+) -> Access | None:
+    """Return the observer access of the caller, or None when the address observes nothing."""
+    if not await observes(db, application_id, _address(principal, applicant)):
+        return None
+    return Access(
+        application_id,
+        principal,
+        applicant if principal is None else None,
+        via="observer",
+    )
 
 
 async def _committee_can_read(
@@ -299,6 +354,8 @@ async def resolve_app_read(
     application_id: UUID,
     principal: Principal | None,
     applicant: Applicant | None,
+    *,
+    observers: bool = False,
 ) -> Access:
     """Resolve read access to one application.
 
@@ -314,6 +371,9 @@ async def resolve_app_read(
     `require_app_read` and the attachment routes of the files module use this
     function, so that both apply the same paths.
 
+    ``observers`` admits an observer address as the last path (``via="observer"``).
+    Only a read route passes it, because an observer must not write.
+
     Raises:
         ForbiddenError: No path grants read access.
         UnauthorizedError: The request carries neither a principal nor an applicant.
@@ -323,13 +383,33 @@ async def resolve_app_read(
     try:
         return resolve_access(application_id, principal, applicant, perm=READ_PERMISSION)
     except ForbiddenError:
-        if principal is None:
+        member = (
+            await _member_access(db, application_id, principal) if principal is not None else None
+        )
+        observer = (
+            await _observer_access(db, application_id, principal, applicant)
+            if member is None and observers
+            else None
+        )
+        found = member or observer
+        if found is None:
             raise
-        if await _committee_can_read(db, application_id, principal):
-            return Access(application_id, principal, None, via="committee")
-        if await _is_creator(db, application_id, principal):
-            return Access(application_id, principal, None, via="owner")
-        raise
+        return found
+
+
+async def _member_access(
+    db: AsyncSession, application_id: UUID, principal: Principal
+) -> Access | None:
+    """Return the Gremium read access or the creator access of a principal, or None.
+
+    The Gremium read scope comes first, so a creator who also reads through the Gremium
+    reads as a member.
+    """
+    if await _committee_can_read(db, application_id, principal):
+        return Access(application_id, principal, None, via="committee")
+    if await _is_creator(db, application_id, principal):
+        return Access(application_id, principal, None, via="owner")
+    return None
 
 
 async def require_app_read(
@@ -340,6 +420,20 @@ async def require_app_read(
 ) -> Access:
     """Grant read access to one application (see `resolve_app_read`)."""
     return await resolve_app_read(db, application_id, principal, applicant)
+
+
+async def require_app_view(
+    application_id: UUID,
+    db: DbSession,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+) -> Access:
+    """Grant read access to one application, also to an observer.
+
+    Only the read routes depend on this gate. A write route depends on
+    `require_app_read`, which refuses an observer.
+    """
+    return await resolve_app_read(db, application_id, principal, applicant, observers=True)
 
 
 async def require_app_edit(
@@ -420,6 +514,8 @@ async def can_read_pii(db: AsyncSession, access: Access) -> bool:
     alone, gets ``data`` without the ``isPII`` fields and without the applicant
     block.
     """
+    if access.is_observer:
+        return False
     if access.applicant is not None:
         return True
     principal = access.principal

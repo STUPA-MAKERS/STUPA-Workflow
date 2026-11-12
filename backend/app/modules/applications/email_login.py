@@ -107,10 +107,12 @@ async def request_email_login(
 ) -> None:
     """Make and send a login link, or nothing.
 
-    An address gets a link only when at least one application has the address. The
-    state of an account with the address does not matter.
+    An address gets a link only when at least one application has the address or the
+    address observes one. The state of an account with the address does not matter.
     """
-    if not await application_ids(db, email):
+    from app.modules.applications.observers import observed_ids
+
+    if not await application_ids(db, email) and not await observed_ids(db, email):
         return
     link = await issue_link(db, settings, email=email, expires_at=_now() + LINK_TTL)
     await _call(send_link(email, link))

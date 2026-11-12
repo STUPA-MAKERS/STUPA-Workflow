@@ -25,7 +25,7 @@ from sqlalchemy.dialects.postgresql import JSONB, array
 from sqlalchemy.orm import InstrumentedAttribute
 
 from app.modules.application_types.models import ApplicationType
-from app.modules.applications.models import Application
+from app.modules.applications.models import Application, ApplicationObserver
 from app.modules.applications.schemas import (
     ApplicantApplicationItem,
     ApplicationListItem,
@@ -67,6 +67,7 @@ class ListingOps(ApplicationsServiceBase):
         order: str = "desc",
         owner_sub: str | None = None,
         committee_sub: str | None = None,
+        observer_email: str | None = None,
         hide_pii_in_search: bool = False,
         limit: int,
         offset: int,
@@ -79,6 +80,10 @@ class ListingOps(ApplicationsServiceBase):
         `committee_sub` adds the Gremium read scope. The result then holds an
         application in a view cost center of a member Gremium. It also holds an
         application in a `vote` state of such a Gremium.
+
+        `observer_email` marks each row that the address observes (``observed``) unless
+        `owner_sub` created it. With `committee_sub` (a restricted reader) it also adds
+        the applications that the address observes to the read scope.
 
         The query combines both limits with OR. If the caller sets neither, the list
         holds every application. That is the full view for `application.read` and for
@@ -112,7 +117,11 @@ class ListingOps(ApplicationsServiceBase):
         relevant row first, and the chosen sort acts as a deterministic tiebreak. `created_to`
         is inclusive, so the filter ends at 00:00 UTC of the next day.
         """
-        read_scope = await self._read_scope(owner_sub=owner_sub, committee_sub=committee_sub)
+        read_scope = await self._read_scope(
+            owner_sub=owner_sub,
+            committee_sub=committee_sub,
+            observer_email=observer_email if committee_sub is not None else None,
+        )
         budget_scope = await self._budget_scope(budget_id) if budget_id is not None else None
         search = (
             await self._search_filter(q, hide_pii_in_search=hide_pii_in_search, owner_sub=owner_sub)
@@ -164,16 +173,32 @@ class ListingOps(ApplicationsServiceBase):
                 .offset(offset)
             )
         ).all()
+        observed = await self._observed_among(
+            observer_email, {app.id for app, _ in rows if app.created_by != owner_sub}
+        )
         items = [
             _list_item(
                 app,
                 await self._state_out_resolved(await self._get_state(app.current_state_id)),
                 since or app.created_at,
                 archived_at=app.archived_at,
+                observed=app.id in observed,
             )
             for app, since in rows
         ]
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
+
+    async def _observed_among(self, email: str | None, ids: set[UUID]) -> set[UUID]:
+        """Return the ids among ``ids`` that the address observes."""
+        if not email or not ids:
+            return set()
+        rows = await self.session.scalars(
+            select(ApplicationObserver.application_id).where(
+                ApplicationObserver.email == email,
+                ApplicationObserver.application_id.in_(ids),
+            )
+        )
+        return set(rows)
 
     async def _budget_scope(self, budget_id: UUID) -> ColumnElement[bool]:
         """Keep the applications in the subtree of a cost center, or none for an unknown one."""
@@ -203,19 +228,35 @@ class ListingOps(ApplicationsServiceBase):
         return trigram_rank(q, [search_col], dialect=dialect)
 
     async def _read_scope(
-        self, *, owner_sub: str | None, committee_sub: str | None
+        self,
+        *,
+        owner_sub: str | None,
+        committee_sub: str | None,
+        observer_email: str | None = None,
     ) -> ColumnElement[bool] | None:
         """Build the read scope of the list as one SQL clause.
 
         The clause holds the own applications (`owner_sub`) OR the Gremium read scope
-        (`committee_sub`, see `_committee_read_clauses`). None means no limit: the
-        full view of `application.read`, `application.read_all` and admin.
+        (`committee_sub`, see `_committee_read_clauses`) OR the applications that the
+        address observes (`observer_email`). None means no limit: the full view of
+        `application.read`, `application.read_all` and admin.
         """
         owner = (Application.created_by == owner_sub,) if owner_sub is not None else ()
         committee = (
             await self._committee_read_clauses(committee_sub) if committee_sub is not None else []
         )
-        clauses = (*owner, *committee)
+        observer = (
+            (
+                Application.id.in_(
+                    select(ApplicationObserver.application_id).where(
+                        ApplicationObserver.email == observer_email
+                    )
+                ),
+            )
+            if observer_email
+            else ()
+        )
+        clauses = (*owner, *committee, *observer)
         return or_(*clauses) if clauses else None
 
     async def read_scope_for(self, principal: Principal) -> ColumnElement[bool] | None:
@@ -230,7 +271,9 @@ class ListingOps(ApplicationsServiceBase):
 
         if principal_reads_all(principal):
             return None
-        return await self._read_scope(owner_sub=principal.sub, committee_sub=principal.sub)
+        return await self._read_scope(
+            owner_sub=principal.sub, committee_sub=principal.sub, observer_email=principal.email
+        )
 
     async def _all_pii_keys(self) -> set[str]:
         """Collect the ``isPII`` field keys of every form version of every type.
@@ -337,20 +380,29 @@ class ListingOps(ApplicationsServiceBase):
         return type_names, gremium_names
 
     async def list_for_applicant(
-        self, application_ids: frozenset[str]
+        self, application_ids: frozenset[str], observed_ids: frozenset[str] = frozenset()
     ) -> list[ApplicantApplicationItem]:
         """List the Anträge of an applicant session, newest first.
 
         The caller passes the ids that the session reaches (`Applicant`), so the list
-        never shows more than the item routes open.
+        never shows more than the item routes open. ``observed_ids`` are the Anträge
+        that the address observes. Such a row carries ``observed`` unless the session
+        is also its applicant, and an unconfirmed guest submission stays out of them,
+        because the observer read route does not open it.
         """
-        if not application_ids:
+        observed = observed_ids - application_ids
+        if not application_ids and not observed:
             return []
+        own_clause = Application.id.in_([UUID(i) for i in application_ids])
+        observed_clause = and_(
+            Application.id.in_([UUID(i) for i in observed]),
+            Application.email_confirmed_at.is_not(None),
+        )
         rows = (
             await self.session.execute(
                 select(Application, State)
                 .outerjoin(State, State.id == Application.current_state_id)
-                .where(Application.id.in_([UUID(i) for i in application_ids]))
+                .where(or_(own_clause, observed_clause))
                 .order_by(Application.created_at.desc())
             )
         ).all()
@@ -364,6 +416,7 @@ class ListingOps(ApplicationsServiceBase):
                 approvedAmount=app.approved_amount,
                 currency=app.currency,
                 createdAt=app.created_at,
+                observed=str(app.id) in observed,
             )
             for app, state in rows
         ]
@@ -565,6 +618,7 @@ def _list_item(
     since: datetime,
     *,
     archived_at: datetime | None,
+    observed: bool = False,
 ) -> ApplicationListItem:
     """Build one row of the list or of the tasks."""
     return ApplicationListItem(
@@ -580,4 +634,5 @@ def _list_item(
         updatedAt=app.updated_at,
         archivedAt=archived_at,
         stateSince=since,
+        observed=observed,
     )

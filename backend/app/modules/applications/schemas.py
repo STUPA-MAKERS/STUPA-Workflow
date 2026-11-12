@@ -185,6 +185,10 @@ class ApplicationOut(FrozenCamelModel, frozen=True):
             requested.
         decision: The valid decision (approval with deviations), null before any
             decision.
+        observer: The requester reads the application as an observer: read only,
+            without the ``isPII`` fields and without the applicant block.
+        submitted_by: The name of the applicant, only in the observer view, for the
+            line "Eingereicht von <Name>".
     """
 
     id: UUID
@@ -211,6 +215,8 @@ class ApplicationOut(FrozenCamelModel, frozen=True):
     capture: CaptureOut | None = None
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
     decision: DecisionOut | None = None
+    observer: bool = False
+    submitted_by: str | None = Field(default=None, alias="submittedBy")
 
 
 class DecisionOut(FrozenCamelModel, frozen=True):
@@ -392,6 +398,8 @@ class ApplicationListItem(FrozenCamelModel, frozen=True):
     archived_at: datetime | None = Field(default=None, alias="archivedAt")
     #: Time of the last status change, for "waiting since".
     state_since: datetime | None = Field(default=None, alias="stateSince")
+    #: The caller observes the application and reads it only through that path.
+    observed: bool = False
 
 
 class ApplicantApplicationItem(FrozenCamelModel, frozen=True):
@@ -402,6 +410,7 @@ class ApplicantApplicationItem(FrozenCamelModel, frozen=True):
     Attributes:
         approved_amount: The approved amount of the valid decision, null = as
             requested or no decision.
+        observed: The session observes the Antrag and is not its applicant.
     """
 
     id: UUID
@@ -412,6 +421,7 @@ class ApplicantApplicationItem(FrozenCamelModel, frozen=True):
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
     currency: str | None = None
     created_at: datetime = Field(alias="createdAt")
+    observed: bool = False
 
 
 class ApplicantApplicationsOut(FrozenCamelModel, frozen=True):
@@ -554,3 +564,26 @@ class ApplicationPrefillOut(FrozenCamelModel, frozen=True):
 
     type_id: UUID = Field(alias="typeId")
     data: dict[str, Any]
+
+
+class ObserverCreate(FrozenStrictCamelModel, frozen=True):
+    """Add an observer of an application by e-mail address."""
+
+    email: EmailStr = Field(max_length=254)
+
+
+class ObserverOut(FrozenCamelModel, frozen=True):
+    """One observer of an application, for the dialog of the applicant.
+
+    The answer never tells whether the address belongs to an account.
+    """
+
+    id: UUID
+    email: str
+    added_at: datetime = Field(alias="addedAt")
+
+
+class ObserverEnd(FrozenStrictCamelModel, frozen=True):
+    """End an observation with the token of the end link of a mail."""
+
+    token: str = Field(min_length=1, max_length=200)

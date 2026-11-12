@@ -2,7 +2,7 @@
 id: "000751"
 title: An Antrag can have observers
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation:

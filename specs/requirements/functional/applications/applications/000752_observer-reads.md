@@ -2,7 +2,7 @@
 id: "000752"
 title: An observer reads the Antrag and does not change it
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation:

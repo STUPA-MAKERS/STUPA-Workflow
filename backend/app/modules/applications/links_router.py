@@ -24,6 +24,7 @@ from app.modules.applications.access import (
     hidden_pii_keys,
     require_app_edit,
     require_app_read,
+    require_app_view,
     resolve_app_read,
 )
 from app.modules.applications.router import get_applications_service
@@ -97,7 +98,7 @@ async def _links_out(service: ApplicationsService, access: Access) -> Applicatio
 )
 async def get_links(
     service: ServiceDep,
-    access: Annotated[Access, Depends(require_app_read)],
+    access: Annotated[Access, Depends(require_app_view)],
 ) -> ApplicationLinksOut:
     """Read the Vorgänger, the Folgeanträge and the link history of an application.
 

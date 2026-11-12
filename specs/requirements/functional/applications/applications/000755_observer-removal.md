@@ -2,7 +2,7 @@
 id: "000755"
 title: A removed observer loses the access at once
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation:
