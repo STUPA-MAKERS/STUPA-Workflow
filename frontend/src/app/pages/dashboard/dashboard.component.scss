@@ -170,6 +170,25 @@
   height: calc(var(--control-height) - var(--space-1));
   margin-bottom: var(--space-1);
 }
+// Spec 000750: the link of the tab has the size of "Antrag stellen" beside it. It is a tonal
+// pill, the look of `.sheet-back-link`.
+.dash__tabbar .dash__all {
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--control-height) - var(--space-1));
+  margin-bottom: var(--space-1);
+  padding: 0 var(--space-5);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  line-height: 1;
+  @include press.chrome-text;
+}
+@media (hover: hover) {
+  .dash__tabbar .dash__all:hover {
+    background: var(--color-surface-4);
+  }
+}
 .dash__tabs ::ng-deep .tabs {
   gap: var(--space-1);
   border-bottom: 0;
@@ -481,5 +500,12 @@
   .dash__live {
     outline: var(--vh-edge);
     outline-offset: -2px;
+  }
+  // Spec 000750: the link in the tab line has a yellow edge and yellow text, as the tab
+  // "Meine Anträge" beside it.
+  .dash__tabbar .dash__all {
+    outline: 2px solid var(--vh-hi);
+    outline-offset: -2px;
+    color: var(--vh-hi);
   }
 }
