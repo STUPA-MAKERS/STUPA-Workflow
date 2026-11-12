@@ -1,0 +1,107 @@
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { skipLoading } from '@stupa-makers/ui-kit';
+import type { Observable } from 'rxjs';
+import { API_BASE_URL } from '@core/api/api.config';
+import type { Uuid } from '@core/api/models';
+
+/** The side of a Kostenstelle in a Haushaltsplan. */
+export type Side = 'income' | 'expense';
+
+/** The state of a plan version, in the order a version passes them. */
+export type PlanState = 'draft' | 'resolved' | 'approved' | 'in_force' | 'replaced';
+
+/** One line of a plan version. Money is a string (Decimal). */
+export interface PlanLine {
+  readonly budgetId: Uuid;
+  readonly amount: string;
+  readonly note: string | null;
+  /** The name and the path key at the decision. `null` in a draft. */
+  readonly name: string | null;
+  readonly pathKey: string | null;
+  readonly transferable: boolean;
+  readonly coverable: boolean;
+  readonly blocked: string;
+}
+
+/** One version of a Haushaltsplan: the Stammplan (number 0) or a Nachtrag. */
+export interface PlanVersion {
+  readonly id: Uuid;
+  readonly number: number;
+  readonly state: PlanState;
+  readonly createdAt: string;
+  readonly resolvedAt: string | null;
+  readonly approvedAt: string | null;
+  readonly inForceAt: string | null;
+  readonly lines: readonly PlanLine[];
+}
+
+/** The Haushaltsplan of a fiscal year with every version, the Stammplan first. */
+export interface BudgetPlan {
+  readonly id: Uuid;
+  readonly budgetId: Uuid;
+  readonly fiscalYearId: Uuid;
+  readonly versions: readonly PlanVersion[];
+}
+
+/** The body of a line write. */
+export interface PlanLineSet {
+  readonly amount: string;
+  readonly note: string | null;
+  readonly transferable: boolean;
+  readonly coverable: boolean;
+  readonly blocked: string;
+}
+
+/** The problem code of a plan read for a year without a plan (404). */
+export const PLAN_NOT_FOUND = 'plan_not_found';
+
+/** The routes of the Haushaltsplan. A write needs `budget.structure`. */
+@Injectable({ providedIn: 'root' })
+export class BudgetPlanApi {
+  private readonly http = inject(HttpClient);
+  private readonly base = inject(API_BASE_URL);
+
+  /** The plan of a fiscal year. A year without a plan answers 404 `plan_not_found`. */
+  plan(topId: Uuid, fiscalYearId: Uuid): Observable<BudgetPlan> {
+    return this.http.get<BudgetPlan>(this.planUrl(topId, fiscalYearId), { context: skipLoading() });
+  }
+
+  /** Create the plan with a Stammplan in draft, empty or as a copy of another year. */
+  createPlan(topId: Uuid, fiscalYearId: Uuid, copyFromFiscalYearId: Uuid | null): Observable<BudgetPlan> {
+    return this.http.post<BudgetPlan>(this.planUrl(topId, fiscalYearId), { copyFromFiscalYearId });
+  }
+
+  /** Create a Nachtrag as a copy of the version in force. */
+  createNachtrag(topId: Uuid, fiscalYearId: Uuid): Observable<BudgetPlan> {
+    return this.http.post<BudgetPlan>(`${this.planUrl(topId, fiscalYearId)}/versions`, {});
+  }
+
+  setLine(versionId: Uuid, budgetId: Uuid, body: PlanLineSet): Observable<BudgetPlan> {
+    return this.http.put<BudgetPlan>(this.lineUrl(versionId, budgetId), body, { context: skipLoading() });
+  }
+
+  deleteLine(versionId: Uuid, budgetId: Uuid): Observable<BudgetPlan> {
+    return this.http.delete<BudgetPlan>(this.lineUrl(versionId, budgetId));
+  }
+
+  setState(versionId: Uuid, state: PlanState): Observable<BudgetPlan> {
+    return this.http.post<BudgetPlan>(`${this.base}/budget-plan-versions/${versionId}/state`, { state });
+  }
+
+  setSide(budgetId: Uuid, side: Side): Observable<unknown> {
+    return this.http.put(`${this.base}/budgets/${budgetId}/side`, { side });
+  }
+
+  setPlanSwitch(topId: Uuid, enabled: boolean): Observable<unknown> {
+    return this.http.put(`${this.base}/budgets/${topId}/plan-switch`, { enabled });
+  }
+
+  private planUrl(topId: Uuid, fiscalYearId: Uuid): string {
+    return `${this.base}/budgets/${topId}/fiscal-years/${fiscalYearId}/plan`;
+  }
+
+  private lineUrl(versionId: Uuid, budgetId: Uuid): string {
+    return `${this.base}/budget-plan-versions/${versionId}/lines/${budgetId}`;
+  }
+}

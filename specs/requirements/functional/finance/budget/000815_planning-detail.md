@@ -2,10 +2,13 @@
 id: "000815"
 title: The detail of Planung shows the plan or one line
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
+implementation:
+  - frontend/src/app/pages/budget/plan/budget-plan.component.ts
 scope:
   - frontend/src/app/pages/budget
 ---

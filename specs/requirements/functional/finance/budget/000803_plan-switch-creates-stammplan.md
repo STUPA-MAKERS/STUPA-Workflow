@@ -2,10 +2,13 @@
 id: "000803"
 title: The plan switch gives each open fiscal year a Stammplan
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_plan_switch_gives_open_years_a_stammplan"
+implementation:
+  - backend/app/modules/budget/tree/plans.py
 scope:
   - backend/app/modules/budget
 ---

@@ -1,0 +1,23 @@
+---
+id: "000816"
+title: A plan line of an expense holds the Vermerke
+kind: functional
+status: approved
+owner: frederikbeimgraben
+updated: 2026-11-12
+tests:
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_set_line_checks_the_node_and_the_marks"
+implementation:
+  - backend/app/modules/budget/tree/plans.py
+scope:
+  - backend/app/modules/budget
+---
+
+# A plan line of an expense holds the Vermerke
+
+A plan line of an expense Kostenstelle must hold the Vermerke "übertragbar" and
+"deckungsfähig" as yes or no and a blocked amount from 0 € to the Ansatz. A line of an income
+Kostenstelle must not hold a Vermerk, else 422 `plan_marks_income`.
+
+Reason: LHO § 19, § 20 and § 22 name these Vermerke as a part of the plan. The plan shows them
+before the platform applies them.

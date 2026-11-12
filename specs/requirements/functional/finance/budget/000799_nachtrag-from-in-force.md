@@ -2,10 +2,14 @@
 id: "000799"
 title: A Nachtrag starts as a copy of the version in force
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_nachtrag"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_nachtrag_needs_a_plan_in_force"
+implementation:
+  - backend/app/modules/budget/tree/plans.py
 scope:
   - backend/app/modules/budget
 ---

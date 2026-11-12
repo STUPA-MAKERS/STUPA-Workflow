@@ -2,10 +2,14 @@
 id: "000807"
 title: The plan page shows the sums and the balance
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
+  - "frontend/src/app/pages/budget/plan/budget-plan.util.spec.ts:sideSum"
+implementation:
+  - frontend/src/app/pages/budget/plan/budget-plan.component.ts
 scope:
   - frontend/src/app/pages/budget
 ---

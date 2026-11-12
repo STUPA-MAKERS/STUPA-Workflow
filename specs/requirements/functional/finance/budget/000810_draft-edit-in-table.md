@@ -2,10 +2,13 @@
 id: "000810"
 title: A draft is edited in the table
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
+implementation:
+  - frontend/src/app/pages/budget/plan/budget-plan.component.ts
 scope:
   - frontend/src/app/pages/budget
 ---

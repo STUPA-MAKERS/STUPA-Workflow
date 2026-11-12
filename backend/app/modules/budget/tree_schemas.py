@@ -15,6 +15,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
+from app.modules.budget.plan_rules import Side
 from app.shared.paging import Page
 from app.shared.schemas import FrozenCamelModel
 
@@ -98,6 +99,10 @@ class BudgetNodeOut(FrozenCamelModel, frozen=True):
     )
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
+    #: Side in the Haushaltsplan, the plan switch and the contribution cost center of
+    #: a top-level node. Read only here: the plan routes change them.
+    side: Side | None = None
+    plan_enabled: bool = Field(default=False, alias="planEnabled")
 
 
 class AllocationView(FrozenCamelModel, frozen=True):
@@ -146,6 +151,10 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     )
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
+    #: Side in the Haushaltsplan, the plan switch and the contribution cost center of
+    #: a top-level node. Read only here: the plan routes change them.
+    side: Side | None = None
+    plan_enabled: bool = Field(default=False, alias="planEnabled")
     by_fiscal_year: tuple[AllocationView, ...] = Field(
         default_factory=tuple, alias="byFiscalYear"
     )

@@ -11,7 +11,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 
 from app.modules.applications.models import Application
-from app.modules.budget import tree_rules
+from app.modules.budget import plan_rules, tree_rules
 from app.modules.budget.tree.service_base import _ZERO, BudgetTreeServiceBase
 from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpense
 from app.modules.budget.tree_rules import _SEP
@@ -197,7 +197,7 @@ class TreeViewOps(BudgetTreeServiceBase):
             for n in nodes
         ]
         alloc_tuples = [(a.budget_id, a.fiscal_year_id, a.allocated) for a in allocs]
-        forest = tree_rules.build_forest(
+        plain = tree_rules.build_forest(
             node_tuples,
             alloc_tuples,
             bound_rows,
@@ -205,6 +205,11 @@ class TreeViewOps(BudgetTreeServiceBase):
             expended_rows,
             income_rows,
             gremium_id=gremium_id,
+        )
+        forest = plan_rules.with_plan_fields(
+            plain,
+            {n.id: n.side for n in nodes},
+            {n.id: bool(n.plan_enabled) for n in nodes},
         )
         scoped = (
             forest

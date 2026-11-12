@@ -2,10 +2,15 @@
 id: "000792"
 title: A plan version moves through five states
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/unit/modules/budget/test_plan_rules.py:test_move_allowed"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_state_moves_and_balance"
+implementation:
+  - backend/app/modules/budget/tree/plans.py
+  - backend/app/modules/budget/plan_rules.py
 scope:
   - backend/app/modules/budget
 ---

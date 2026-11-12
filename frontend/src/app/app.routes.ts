@@ -308,6 +308,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'budget/plan',
+        data: { title: 'nav.budget', permission: BUDGET_PERMISSIONS, parent: ['budget'], wide: true },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/budget/plan/budget-plan.component').then((m) => m.BudgetPlanComponent),
+      },
+      {
         path: 'expenses',
         data: { title: 'nav.expenses', permission: BUDGET_PERMISSIONS, wide: true },
         canActivate: [authGuard],

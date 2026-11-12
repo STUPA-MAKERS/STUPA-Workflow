@@ -107,6 +107,7 @@
           <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
           <ng-container *ngTemplateOutlet="actions" />
         </div>
+        <ng-container *ngTemplateOutlet="modes" />
         <div class="bd__chips">
           <button
             type="button"
@@ -281,6 +282,9 @@
 
   <ng-template #treePane>
     <div class="bd__paneBody" [class.bd__paneBody--side]="!wide()">
+      @if (wide()) {
+        <ng-container *ngTemplateOutlet="modes" />
+      }
       <app-search-pill [size]="wide() ? 'lg' : 'md'" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
       @if (wide()) {
         <div class="bd__chips">
@@ -371,6 +375,19 @@
           <app-row-menu class="bd__more" [sections]="moreSections()" (selected)="onAction($event)" />
         }
       </div>
+    }
+  </ng-template>
+
+  <ng-template #modes>
+    @if (planTop()) {
+      <app-segmented
+        width="equal"
+        size="control"
+        [ariaLabel]="'budget.view.label' | t"
+        [options]="modeOptions()"
+        value="run"
+        (valueChange)="setMode($event)"
+      />
     }
   </ng-template>
 

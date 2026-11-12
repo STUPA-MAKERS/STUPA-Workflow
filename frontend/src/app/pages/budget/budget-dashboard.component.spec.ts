@@ -1364,4 +1364,34 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
     expect(within(list).getByRole('link', { name: 'Inventur Bühnentechnik' })).toHaveAttribute('href', '/todos?card=k-1');
     expect(within(list).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
   });
+
+  describe('views', () => {
+    it('§000804: shows the view switch only when a top level has the plan switch on', async () => {
+      const off = await setup();
+      expect(off.container.querySelector('app-segmented')).toBeNull();
+      expect(off.c.planTop()).toBeNull();
+      off.c.setMode('plan');
+    });
+
+    it('§000804: opens Planung with the top level and the year of this view', async () => {
+      const tree = [{ ...TREE[0], planEnabled: true }, ...TREE.slice(1)];
+      const view = await setup({ tree });
+      expect(view.container.querySelector('app-segmented')).not.toBeNull();
+      const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      view.c.setMode('run');
+      view.c.setMode(null);
+      expect(navigate).not.toHaveBeenCalled();
+      view.c.setMode('plan');
+      expect(navigate).toHaveBeenCalledWith(['/budget/plan'], { queryParams: { budget: 'b-vs', fy: 'fy-1' } });
+      view.c.selectedBudgetId.set('other');
+      view.c.setMode('plan');
+      expect(navigate).toHaveBeenLastCalledWith(['/budget/plan'], { queryParams: { budget: 'b-vs', fy: null } });
+    });
+
+    it('§000804: puts the view switch below the title on a phone', async () => {
+      const tree = [{ ...TREE[0], planEnabled: true }, ...TREE.slice(1)];
+      const view = await setup({ tree, wide: false, phone: true });
+      expect(view.container.querySelector('.bd__top app-segmented')).not.toBeNull();
+    });
+  });
 });

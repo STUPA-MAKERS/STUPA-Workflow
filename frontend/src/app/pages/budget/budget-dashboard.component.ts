@@ -21,6 +21,7 @@ import {
   type RowMenuSection,
   ScrollFadeDirective,
   SearchPillComponent,
+  SegmentedComponent,
   type Seg,
   SegBarComponent,
   SheetBarComponent,
@@ -163,6 +164,7 @@ export const APPS_SHOWN = 5;
     BudgetItemsDialogComponent,
     RowMenuComponent,
     SearchPillComponent,
+    SegmentedComponent,
     SegBarComponent,
     SideSheetComponent,
     SkeletonComponent,
@@ -186,6 +188,28 @@ export class BudgetDashboardComponent {
   /** A phone opens the tree in a sheet from the bottom, a narrow viewport in a sheet
    *  from the start. */
   readonly phone = mediaQuery(MEDIA.phone);
+
+  /** The choices of the view switch of the Budget tab. */
+  readonly modeOptions = computed(() => [
+    { value: 'run', label: this.i18n.translate('budget.view.run') },
+    { value: 'plan', label: this.i18n.translate('budget.view.plan') },
+  ]);
+  /** The top-level cost centre whose Haushaltsplan the view Planung opens: the selected
+   *  root when its plan switch is on, else the first root with the switch on. The view
+   *  switch shows only when there is one. */
+  readonly planTop = computed<BudgetTreeNode | null>(() => {
+    const enabled = this.tree().filter((n) => !n.parentId && n.planEnabled);
+    return enabled.find((n) => n.id === this.selectedBudgetId()) ?? enabled[0] ?? null;
+  });
+
+  /** Open the view Planung with the year of this view. */
+  setMode(mode: string | null): void {
+    const top = this.planTop();
+    if (mode !== 'plan' || !top) return;
+    void this.router.navigate(['/budget/plan'], {
+      queryParams: { budget: top.id, fy: top.id === this.selectedBudgetId() ? this.selectedFyId() : null },
+    });
+  }
 
   readonly canExport = computed(() => this.auth.can('budget.export'));
   /** The bookings page needs a global budget permission; a gremium scope alone has none. */

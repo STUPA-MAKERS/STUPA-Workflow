@@ -372,6 +372,10 @@ export interface BudgetTreeNode {
    *  uses it. */
   readonly fiscalStartMonth: number;
   readonly fiscalStartDay: number;
+  /** The side in a Haushaltsplan. `null` for a top-level node and without a plan. */
+  readonly side?: 'income' | 'expense' | null;
+  /** The plan switch of a top-level node: its years can have a Haushaltsplan. */
+  readonly planEnabled?: boolean;
   readonly byFiscalYear: readonly BudgetAllocationView[];
   readonly children: readonly BudgetTreeNode[];
 }
@@ -392,6 +396,8 @@ export interface BudgetNode {
   readonly decisionGremiumSourceId?: Uuid | null;
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
+  readonly side?: 'income' | 'expense' | null;
+  readonly planEnabled?: boolean;
 }
 
 /** The problem code of a money mutation on a closed fiscal year (409). */

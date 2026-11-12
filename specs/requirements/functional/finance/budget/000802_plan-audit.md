@@ -2,10 +2,14 @@
 id: "000802"
 title: Each plan state change is audited
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_each_plan_change_is_audited"
+implementation:
+  - backend/app/modules/budget/tree/plans.py
+  - backend/app/modules/audit/actions.py
 scope:
   - backend/app/modules/budget
 ---

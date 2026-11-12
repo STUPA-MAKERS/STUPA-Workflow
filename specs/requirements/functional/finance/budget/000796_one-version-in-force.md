@@ -2,10 +2,14 @@
 id: "000796"
 title: One version of a plan is in force
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_nachtrag"
+implementation:
+  - backend/app/modules/budget/tree/plans.py
+  - backend/app/modules/budget/plan_models.py
 scope:
   - backend/app/modules/budget
 ---
