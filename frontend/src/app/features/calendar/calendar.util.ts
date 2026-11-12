@@ -151,6 +151,8 @@ export const SHORT_BLOCK = 0.75;
  * and the first line of the title of the earlier block stay free (§ 000745).
  */
 export const OVERLAP_HEAD = 0.75;
+/** A block that lies on another starts this many percent of the column after it. */
+export const OVERLAP_INDENT = 20;
 /** The height of an hour in the week view, in rem. It matches `--cw-hour` of the styles. */
 export const HOUR_REM = 3.5;
 
@@ -188,7 +190,9 @@ function partEnd(e: CalendarEntry, iso: string, from: number, lastHour: number):
  * its start, and a chain of overlapping blocks divides the column by its number of lanes.
  * A block grows to the right over the lanes that are free. A block whose neighbour to the
  * right starts `OVERLAP_HEAD` later reaches to the end of the column below that neighbour,
- * so the later block lies on the earlier one (§ 000745). Two blocks that start together stay side by side,
+ * so the later block lies on the earlier one (§ 000745). A block that starts that much
+ * later than every block to its left starts `OVERLAP_INDENT` after them, not at its lane,
+ * so it keeps most of the width. Two blocks that start together stay side by side,
  * because the one above would hide the title of the other.
  */
 export function dayBlocks(
@@ -217,14 +221,20 @@ export function dayBlocks(
     const more = placed.filter((o) => !seed.includes(o) && seed.some((s) => meets(o, s)));
     return more.length > 0 ? cluster([...seed, ...more]) : seed;
   };
-  const boxes = placed.map((item) => {
-    const group = placed.filter((o) => meets(o, item));
-    const lanes = Math.max(...cluster([item]).map((o) => o.lane)) + 1;
-    const right = group.filter((o) => o.lane > item.lane);
+  const lanesOf = (item: Placed): number => Math.max(...cluster([item]).map((o) => o.lane)) + 1;
+  const lefts = placed.reduce<readonly { readonly item: Placed; readonly left: number }[]>((done, item) => {
+    const lower = placed.filter((o) => o.lane < item.lane && meets(o, item));
+    const own = (item.lane / lanesOf(item)) * 100;
+    const onTop = lower.length > 0 && lower.every((o) => item.from >= o.from + OVERLAP_HEAD);
+    const below = Math.max(0, ...done.filter((d) => lower.includes(d.item)).map((d) => d.left));
+    return [...done, { item, left: onTop ? Math.min(own, below + OVERLAP_INDENT) : own }];
+  }, []);
+  const boxes = lefts.map(({ item, left }) => {
+    const lanes = lanesOf(item);
+    const right = placed.filter((o) => o.lane > item.lane && meets(o, item));
     const next = Math.min(lanes, ...right.map((o) => o.lane));
     const under = right.length > 0 && right.every((o) => o.lane > next || o.from >= item.from + OVERLAP_HEAD);
-    const left = (item.lane / lanes) * 100;
-    return { item, left, width: under ? 100 - left : ((next - item.lane) * 100) / lanes };
+    return { item, left, width: under ? 100 - left : (next * 100) / lanes - left };
   });
   return boxes.map(({ item, left, width }) => {
     const height = Math.max(item.real, MIN_BLOCK);

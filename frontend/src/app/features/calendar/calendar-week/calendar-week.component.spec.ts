@@ -147,7 +147,7 @@ describe('overlap (§000745)', () => {
     const under = screen.getByRole('button', { name: /Jour fixe/ });
     const over = screen.getByRole('button', { name: /Abgleich/ });
     expect([under.style.left, under.style.width, under.style.zIndex]).toEqual(['0%', '100%', '1']);
-    expect([over.style.left, over.style.width, over.style.zIndex]).toEqual(['50%', '50%', '2']);
+    expect([over.style.left, over.style.width, over.style.zIndex]).toEqual(['20%', '80%', '2']);
     expect(over).toHaveClass('cw__block--over');
     expect(under).not.toHaveClass('cw__block--over');
   });
