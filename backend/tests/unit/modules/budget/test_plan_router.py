@@ -202,6 +202,14 @@ def test_get_plan_with_the_full_view() -> None:
     assert fake.session.commits == 0
 
 
+def test_get_plan_steps() -> None:
+    fake = _FakePlans()
+    resp = _client(fake, "budget.view").get(f"/api/budgets/{_TOP}/plan-steps")
+    assert resp.status_code == 200
+    assert resp.json() == {"budgetId": str(_TOP), "steps": []}
+    assert fake.calls == [("steps", _TOP)]
+
+
 def test_get_plan_follows_the_read_rule_of_the_cost_centre(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

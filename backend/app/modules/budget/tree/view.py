@@ -190,7 +190,6 @@ class TreeViewOps(BudgetTreeServiceBase):
                 n.color,
                 n.fiscal_start_month,
                 n.fiscal_start_day,
-                bool(n.hidden_in_budget),
                 n.view_gremium_id,
                 n.decision_gremium_id,
             )

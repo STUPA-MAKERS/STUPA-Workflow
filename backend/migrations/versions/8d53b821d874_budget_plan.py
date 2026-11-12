@@ -7,9 +7,13 @@
    unique indexes keep at most one version in force and at most one version before
    ``in_force`` per plan. ``budget_plan_line`` holds the
    Ansatz, the Erläuterung and the Vermerke of one cost center in one version.
+   ``budget_plan_step`` holds the ordered steps that a plan version of a top-level
+   cost center passes.
+3. ``budget`` loses ``hidden_in_budget``. A hidden cost center becomes inactive
+   first, because the switch Aktiv now is the one way to hide it.
 
-No data moves: an existing fiscal year gets its Stammplan when a person sets the plan
-switch of its top-level cost center to on.
+No plan data moves: an existing fiscal year gets its Stammplan when a person sets the
+plan switch of its top-level cost center to on.
 
 Idempotent. A fresh database already gets the columns and the tables from the
 ``create_all`` baseline (0001), because the models sit in ``app.models``. A migrated
@@ -48,6 +52,18 @@ def _constraint(table: str, name: str, definition: str) -> str:
 
 
 _UPGRADE: tuple[str, ...] = (
+    """
+    DO $$
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'budget' AND column_name = 'hidden_in_budget'
+        ) THEN
+            UPDATE budget SET active = false WHERE hidden_in_budget;
+        END IF;
+    END $$
+    """,
+    "ALTER TABLE budget DROP COLUMN IF EXISTS hidden_in_budget",
     "ALTER TABLE budget ADD COLUMN IF NOT EXISTS side text",
     "ALTER TABLE budget ADD COLUMN IF NOT EXISTS plan_enabled boolean NOT NULL DEFAULT false",
     _constraint("budget", "ck_budget_budget_side", "CHECK (side IN ('income', 'expense'))"),
@@ -140,6 +156,7 @@ _DOWNGRADE: tuple[str, ...] = (
     "ALTER TABLE budget DROP CONSTRAINT IF EXISTS ck_budget_budget_side",
     "ALTER TABLE budget DROP COLUMN IF EXISTS plan_enabled",
     "ALTER TABLE budget DROP COLUMN IF EXISTS side",
+    "ALTER TABLE budget ADD COLUMN IF NOT EXISTS hidden_in_budget boolean NOT NULL DEFAULT false",
 )
 
 

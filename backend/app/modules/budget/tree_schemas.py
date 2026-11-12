@@ -48,6 +48,9 @@ class BudgetNodeCreate(FrozenCamelModel, frozen=True):
     #: 1..28: the cutoff must exist in EVERY month. Days 29 to 31 would raise a
     #: `date(...)` ValueError. The 500 that follows leaves the budget unusable.
     fiscal_start_day: int = Field(default=1, ge=1, le=28, alias="fiscalStartDay")
+    #: The side of a direct child of a top-level node. A node below takes the side of
+    #: its parent, and a top-level node has none.
+    side: Side | None = None
 
 
 class BudgetNodeUpdate(FrozenCamelModel, frozen=True):
@@ -62,7 +65,6 @@ class BudgetNodeUpdate(FrozenCamelModel, frozen=True):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     active: bool | None = None
     color: str | None = None
-    hidden_in_budget: bool | None = Field(default=None, alias="hiddenInBudget")
     #: Visibility Gremium. `None` in the payload clears the assignment.
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: Deciding Gremium. `None` in the payload clears it; the node then inherits the
@@ -85,7 +87,6 @@ class BudgetNodeOut(FrozenCamelModel, frozen=True):
     currency: str
     active: bool
     color: str | None = None
-    hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
     #: node that holds the effective value. The UI shows "inherited from ..." when the
@@ -137,7 +138,6 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     currency: str
     active: bool
     color: str | None = None
-    hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
     #: node that holds the effective value. The UI shows "inherited from ..." when the

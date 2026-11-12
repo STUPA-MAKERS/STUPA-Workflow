@@ -58,12 +58,6 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
     #: Display color for the pie charts and the tree. NULL selects an auto color.
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
-    #: Hides the node in the budget tab. Display only: the values still count in
-    #: the parent rollups and in the export. A Python default backs up the
-    #: server default, so a new instance carries a bool before the flush.
-    hidden_in_budget: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default="false"
-    )
     #: Visibility Gremium: its members see this cost center and its subtree as a
     #: root in the budget tab without a global budget.* permission. This is
     #: independent of the top-level ``gremium_id`` classification.

@@ -71,6 +71,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/budgets/{budget_id}/expenses"): _BUDGET_NODE,
     ("GET", "/api/budgets/{budget_id}/fiscal-years"): _BUDGET_NODE,
     ("GET", "/api/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/plan"): _BUDGET_NODE,
+    ("GET", "/api/budgets/{budget_id}/plan-steps"): _BUDGET_NODE,
     ("GET", "/api/calendar/entries"): (
         "CalendarEntries.between (meeting_read_scope, BoardAccess.scope, appointments.readable)"
     ),

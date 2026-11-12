@@ -54,7 +54,7 @@ def _node(
     nid: str, parent: str | None, path: str, decision_gremium: object = None
 ) -> tuple[Any, ...]:
     return (nid, parent, None, path.split("-")[-1], path, "N", "EUR", True, None,
-            1, 1, False, None, decision_gremium)
+            1, 1, None, decision_gremium)
 
 
 def test_build_forest_exposes_the_effective_gremium() -> None:

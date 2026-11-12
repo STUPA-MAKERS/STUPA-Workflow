@@ -40,7 +40,6 @@ def _node_out(
         currency=b.currency,
         active=b.active,
         color=b.color,
-        hiddenInBudget=bool(b.hidden_in_budget),
         viewGremiumId=b.view_gremium_id,
         decisionGremiumId=b.decision_gremium_id,
         effectiveDecisionGremiumId=decision[0],
@@ -115,6 +114,14 @@ class NodeOps(BudgetTreeServiceBase):
                 code="budget_key_exists",
             )
         await self._check_decision_gremium(payload.decision_gremium_id)
+        direct = parent is not None and parent.parent_id is None
+        side = payload.side if direct else (parent.side if parent is not None else None)
+        if direct and parent is not None and parent.plan_enabled and side is None:
+            raise ValidationProblem(
+                "A cost centre directly below a budget with a Haushaltsplan needs a side.",
+                code="plan_side_missing",
+                errors=[{"field": "side", "msg": "the cost centre has no side"}],
+            )
 
         node = Budget(
             id=uuid.uuid4(),
@@ -129,7 +136,7 @@ class NodeOps(BudgetTreeServiceBase):
             decision_gremium_id=payload.decision_gremium_id,
             fiscal_start_month=payload.fiscal_start_month,
             fiscal_start_day=payload.fiscal_start_day,
-            side=parent.side if parent is not None else None,
+            side=side,
         )
         self.session.add(node)
         await self._audit(

@@ -169,6 +169,27 @@ async def test_side_goes_to_the_subtree_and_to_a_new_child(session: AsyncSession
     assert child.side == "expense"
 
 
+async def test_a_new_direct_child_of_a_planned_budget_needs_a_side(
+    session: AsyncSession,
+) -> None:
+    """§000829: the create takes the side and refuses a direct child without one."""
+    t = await _tree(session)
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.create_node(BudgetNodeCreate(key="9", name="Neu", parentId=t.top.id))
+    assert _code(exc) == "plan_side_missing"
+    made = await t.svc.create_node(
+        BudgetNodeCreate(key="9", name="Neu", parentId=t.top.id, side="income")
+    )
+    assert made.side == "income"
+    deep = await t.svc.create_node(
+        BudgetNodeCreate(key="1", name="Tief", parentId=made.id, side="expense")
+    )
+    assert deep.side == "income"
+    free = await _tree(session, enabled=False)
+    loose = await free.svc.create_node(BudgetNodeCreate(key="9", name="Neu", parentId=free.top.id))
+    assert loose.side is None
+
+
 async def test_side_is_refused_off_the_first_level(session: AsyncSession) -> None:
     """§000790: a top-level node has no side, and a deeper node takes it from its parent."""
     t = await _tree(session, sides=False)
@@ -342,7 +363,11 @@ async def test_set_line_checks_the_node_and_the_marks(session: AsyncSession) -> 
     )
     line = next(x for x in _version(plan).lines if x.budget_id == t.exp_a.id)
     assert (line.blocked, line.coverable, line.transferable) == (D(5), True, True)
-    orphan = await t.svc.create_node(BudgetNodeCreate(key="7", name="Ohne", parentId=t.top.id))
+    orphan = Budget(
+        id=uuid.uuid4(), parent_id=t.top.id, key="7", path_key=f"{t.top.path_key}-7", name="Ohne"
+    )
+    session.add(orphan)
+    await session.commit()
     with pytest.raises(ValidationProblem) as exc:
         await t.svc.set_line(vid, orphan.id, PlanLineSet(amount=D(1)))
     assert _code(exc) == "plan_side_missing"
@@ -430,6 +455,8 @@ async def test_a_version_passes_the_steps_of_its_budget(session: AsyncSession) -
     with pytest.raises(ConflictError) as early:
         await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
     assert _code(early) == "plan_state_invalid"
+    second = _version(await t.svc.pass_next_step(vid))
+    assert [s.passed_at is not None for s in second.steps] == [True, True]
 
     draft = _version(await t.svc.set_plan_state(vid, PlanStateSet(state="draft")))
     assert draft.state == "draft"
