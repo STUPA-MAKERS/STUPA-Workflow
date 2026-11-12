@@ -39,6 +39,7 @@ from app.modules.applications.models import (
     ApplicationDecision,
     ApplicationLink,
     ApplicationLinkEvent,
+    ApplicationObserver,
     Comment,
     GuestApplicationSettings,
     StatusEvent,
@@ -310,6 +311,11 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         session.add(
             ApplicationLinkEvent(
                 application_id=follow_id, predecessor_id=app_id, action="set", actor=old.sub
+            )
+        )
+        session.add(
+            ApplicationObserver(
+                application_id=app_id, email="observer@example.org", added_by=old.sub
             )
         )
         now = datetime.now(UTC)

@@ -91,7 +91,7 @@ async def test_the_new_observer_gets_one_mail(
 ) -> None:
     """§ 000754: the mail after the add has the login link and the end link."""
     app_id = await _create(maker, seed)
-    (obs_id,) = await _observe(maker, app_id, "adrian@example.org")
+    (obs_id,) = await _observe(maker, app_id, "adrian.observer@example.org")
     queue = _Queue()
 
     async with maker() as session:
@@ -104,7 +104,7 @@ async def test_the_new_observer_gets_one_mail(
 
     assert (sent, gone) == (True, False)
     (msg,) = queue.messages
-    assert msg.to == ("adrian@example.org",)
+    assert msg.to == ("adrian.observer@example.org",)
     assert msg.subject == "Du beobachtest einen Antrag: „Druckauftrag Plakate“"
     assert "Luis Meyer hat dich als Beobachter:in" in msg.text
     assert "/my-applications#t=" in msg.text
@@ -121,7 +121,7 @@ async def test_the_background_task_commits_and_never_raises(
     """§ 000754: the add mail stores its login link; a failure only logs."""
     monkeypatch.setattr(observers_router, "get_sessionmaker", lambda: maker)
     app_id = await _create(maker, seed)
-    (obs_id,) = await _observe(maker, app_id, "adrian@example.org")
+    (obs_id,) = await _observe(maker, app_id, "adrian.observer@example.org")
 
     await observers_router.get_observer_mail_sender()(settings, app_id, obs_id, None)
     async with maker() as session:
@@ -146,11 +146,21 @@ async def test_each_observer_gets_the_status_mail(
     """§ 000754: one mail per observer, its link by account, no mail after an opt-out."""
     app_id = await _create(maker, seed)
     adrian, guest, quiet = await _observe(
-        maker, app_id, "Adrian@Example.org", "guest@example.org", "quiet@example.org"
+        maker,
+        app_id,
+        "Adrian.Observer@Example.org",
+        "guest@example.org",
+        "muted-observer@example.org",
     )
     async with maker() as session:
-        session.add(PrincipalRow(sub="adrian-sub", email="adrian@example.org", active=True))
-        muted = PrincipalRow(sub="quiet-sub", email="quiet@example.org", active=True)
+        session.add(
+            PrincipalRow(
+                sub="adrian-observer-sub", email="adrian.observer@example.org", active=True
+            )
+        )
+        muted = PrincipalRow(
+            sub="muted-observer-sub", email="muted-observer@example.org", active=True
+        )
         session.add(muted)
         await session.flush()
         session.add(
@@ -172,12 +182,12 @@ async def test_each_observer_gets_the_status_mail(
 
     assert sent == 2
     by_to = {m.to[0].lower(): m for m in queue.messages}
-    assert set(by_to) == {"adrian@example.org", "guest@example.org"}
-    assert f"/applications/{app_id}" in by_to["adrian@example.org"].text
-    assert "/my-applications/" not in by_to["adrian@example.org"].text
+    assert set(by_to) == {"adrian.observer@example.org", "guest@example.org"}
+    assert f"/applications/{app_id}" in by_to["adrian.observer@example.org"].text
+    assert "/my-applications/" not in by_to["adrian.observer@example.org"].text
     assert f"/my-applications/{app_id}" in by_to["guest@example.org"].text
     assert "neuen Status: Bewilligt" in by_to["guest@example.org"].text
-    for obs_id, addr in ((adrian, "adrian@example.org"), (guest, "guest@example.org")):
+    for obs_id, addr in ((adrian, "adrian.observer@example.org"), (guest, "guest@example.org")):
         link = end_link(settings.public_base_url, settings.magic_link_secret, obs_id)
         assert link in by_to[addr].text
         assert by_to[addr].idempotency_key == compute_idempotency_key(
