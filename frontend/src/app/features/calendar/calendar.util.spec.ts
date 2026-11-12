@@ -16,7 +16,7 @@ import {
   filterKind,
   formError,
   hasEnded,
-  hourRange,
+  openHour,
   hoursOf,
   kindKey,
   laneCount,
@@ -292,14 +292,16 @@ describe('calendar.util', () => {
       ]);
     });
 
-    it('widens the hour axis for an early or a late entry', () => {
-      expect(hourRange([])).toEqual({ from: 8, to: 21 });
-      expect(hourRange([timed])).toEqual({ from: 8, to: 21 });
+    /** § 000746: the view opens at 08:00, or at the first entry of the week when that is earlier. */
+    it('opens the week at 08:00 or at an earlier entry of the week', () => {
+      const week = ['2026-11-10', '2026-11-11'];
+      expect(openHour([], week)).toBe(8);
+      expect(openHour([timed], week)).toBe(8);
       const early = entry('early', { startTime: '06:30:00', endTime: '07:00:00' });
-      const late = entry('late', { startTime: '22:15:00', endTime: '23:30:00' });
-      const open = entry('open', { startTime: '21:30:00' });
-      expect(hourRange([early, late])).toEqual({ from: 6, to: 24 });
-      expect(hourRange([open])).toEqual({ from: 8, to: 23 });
+      expect(openHour([early, timed], week)).toBe(6);
+      expect(openHour([early], ['2026-11-12'])).toBe(8);
+      const span = entry('span', { startsOn: '2026-11-09', endsOn: '2026-11-11', startTime: '05:00:00' });
+      expect(openHour([span], week)).toBe(8);
     });
   });
 

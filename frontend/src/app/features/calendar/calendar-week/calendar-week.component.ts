@@ -1,11 +1,30 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  type ElementRef,
+  afterNextRender,
+  computed,
+  inject,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 import type { CalendarEntry } from '@core/api/calendar.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { longDate, shortTime, weekdayName } from '@shared/date-format';
 import { IconComponent, ScrollFadeDirective } from '@stupa-makers/ui-kit';
 import type { CalendarDay } from '../calendar-grid.util';
-import { type Block, allDayOf, dayBlocks, entryIcon, hourRange, isSpan, spanText } from '../calendar.util';
+import {
+  type Block,
+  DAY_HOURS,
+  allDayOf,
+  dayBlocks,
+  entryIcon,
+  isSpan,
+  openHour,
+  spanText,
+} from '../calendar.util';
 
 /** One day column of the week view. */
 interface WeekColumn {
@@ -23,8 +42,10 @@ interface WeekColumn {
  * a timed entry over several days has one block on each of its days (§ 000744). An
  * all-day entry and a due card are in the row above the hours.
  *
- * The axis shows 08:00 to 21:00 and widens for an earlier or a later entry. A press on
- * the head of a day picks the day, a press on an entry opens it.
+ * The axis shows the whole day, 00:00 to 24:00, so a block over several days ends at
+ * midnight and not at the last hour of a shorter axis (§ 000746). The view opens at
+ * 08:00, or at the first entry of the week when that is earlier. A press on the head of
+ * a day picks the day, a press on an entry opens it.
  */
 @Component({
   selector: 'app-calendar-week',
@@ -48,19 +69,28 @@ export class CalendarWeekComponent {
   readonly selectDay = output<string>();
   readonly openEntry = output<CalendarEntry>();
 
-  private readonly range = computed(() => hourRange(this.entries()));
-  readonly hours = computed(() =>
-    Array.from({ length: this.range().to - this.range().from }, (_, i) => this.range().from + i),
-  );
+  private readonly scroll = viewChild.required<ElementRef<HTMLElement>>('scroll');
+  readonly hours = Array.from({ length: DAY_HOURS }, (_, i) => i);
   readonly columns = computed<readonly WeekColumn[]>(() =>
     this.days().map((day) => ({
       day,
       weekday: weekdayName(day.iso, this.i18n.formatLocale()),
       label: longDate(day.iso, this.i18n.formatLocale()),
       allDay: allDayOf(this.entries(), day.iso),
-      blocks: dayBlocks(this.entries(), day.iso, this.range().from, this.range().to),
+      blocks: dayBlocks(this.entries(), day.iso, 0, DAY_HOURS),
     })),
   );
+
+  constructor() {
+    afterNextRender(() => {
+      const area = this.scroll().nativeElement;
+      const first = openHour(
+        this.entries(),
+        this.days().map((d) => d.iso),
+      );
+      area.scrollTop = (area.scrollHeight / DAY_HOURS) * first;
+    });
+  }
 
   readonly icon = entryIcon;
   readonly time = shortTime;
