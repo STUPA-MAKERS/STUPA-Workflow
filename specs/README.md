@@ -249,6 +249,20 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000258](requirements/functional/finance/budget/000258_sub-bookings.md) | A booking can have sub-bookings | approved |
 | [F/finance/budget/000259](requirements/functional/finance/budget/000259_gremium-view.md) | Gremium members see their cost centres | approved |
 | [F/finance/budget/000629](requirements/functional/finance/budget/000629_booking-lowers-bound.md) | A booking lowers the bound amount of its Antrag | approved |
+| [F/finance/budget/000790](requirements/functional/finance/budget/000790_cost-centre-side.md) | A Kostenstelle below the top level has a side | draft |
+| [F/finance/budget/000791](requirements/functional/finance/budget/000791_budget-plan.md) | A fiscal year has one Haushaltsplan with versions | draft |
+| [F/finance/budget/000792](requirements/functional/finance/budget/000792_plan-version-states.md) | A plan version moves through five states | draft |
+| [F/finance/budget/000793](requirements/functional/finance/budget/000793_plan-version-editable.md) | Only a draft version can be edited | draft |
+| [F/finance/budget/000794](requirements/functional/finance/budget/000794_plan-line.md) | A plan line holds the Ansatz of one Kostenstelle | draft |
+| [F/finance/budget/000795](requirements/functional/finance/budget/000795_plan-balanced.md) | A plan version is balanced before the decision | draft |
+| [F/finance/budget/000796](requirements/functional/finance/budget/000796_one-version-in-force.md) | One version of a plan is in force | draft |
+| [F/finance/budget/000797](requirements/functional/finance/budget/000797_allocation-from-plan.md) | The plan in force sets the allocations | draft |
+| [F/finance/budget/000798](requirements/functional/finance/budget/000798_allocation-locked-by-plan.md) | A year with a plan refuses a direct allocation change | draft |
+| [F/finance/budget/000799](requirements/functional/finance/budget/000799_nachtrag-from-in-force.md) | A Nachtrag starts as a copy of the version in force | draft |
+| [F/finance/budget/000800](requirements/functional/finance/budget/000800_plan-permission.md) | A plan write needs budget.structure | draft |
+| [F/finance/budget/000801](requirements/functional/finance/budget/000801_plan-closed-year.md) | A closed fiscal year refuses plan changes | draft |
+| [F/finance/budget/000802](requirements/functional/finance/budget/000802_plan-audit.md) | Each plan state change is audited | draft |
+| [F/finance/budget/000803](requirements/functional/finance/budget/000803_plan-for-open-years.md) | Each open fiscal year gets a Stammplan from its allocations | draft |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | approved |
