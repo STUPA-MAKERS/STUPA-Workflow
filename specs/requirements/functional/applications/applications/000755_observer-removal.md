@@ -1,5 +1,5 @@
 ---
-id: "000749"
+id: "000755"
 title: A removed observer loses the access at once
 kind: functional
 status: draft

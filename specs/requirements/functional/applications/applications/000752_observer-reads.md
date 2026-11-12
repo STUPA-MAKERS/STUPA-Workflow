@@ -1,5 +1,5 @@
 ---
-id: "000746"
+id: "000752"
 title: An observer reads the Antrag and does not change it
 kind: functional
 status: draft

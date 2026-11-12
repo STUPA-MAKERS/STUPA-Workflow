@@ -122,11 +122,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/000545](requirements/functional/applications/applications/000545_link-later.md) | A Vorgänger linked later adds only the link | approved |
 | [F/applications/applications/000546](requirements/functional/applications/applications/000546_detail-links.md) | The detail shows Vorgänger and Folgeanträge | approved |
 | [F/applications/applications/000588](requirements/functional/applications/applications/000588_my-applications.md) | Meine Anträge lists the Anträge of the address | approved |
-| [F/applications/applications/000745](requirements/functional/applications/applications/000745_observers.md) | An Antrag can have observers | draft |
-| [F/applications/applications/000746](requirements/functional/applications/applications/000746_observer-reads.md) | An observer reads the Antrag and does not change it | draft |
-| [F/applications/applications/000747](requirements/functional/applications/applications/000747_observer-no-pii.md) | An observer does not see personal fields | draft |
-| [F/applications/applications/000748](requirements/functional/applications/applications/000748_observer-mails.md) | An observer gets the status mails | draft |
-| [F/applications/applications/000749](requirements/functional/applications/applications/000749_observer-removal.md) | A removed observer loses the access at once | draft |
+| [F/applications/applications/000751](requirements/functional/applications/applications/000751_observers.md) | An Antrag can have observers | draft |
+| [F/applications/applications/000752](requirements/functional/applications/applications/000752_observer-reads.md) | An observer reads the Antrag and does not change it | draft |
+| [F/applications/applications/000753](requirements/functional/applications/applications/000753_observer-no-pii.md) | An observer does not see personal fields | draft |
+| [F/applications/applications/000754](requirements/functional/applications/applications/000754_observer-mails.md) | An observer gets the status mails | draft |
+| [F/applications/applications/000755](requirements/functional/applications/applications/000755_observer-removal.md) | A removed observer loses the access at once | draft |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | approved |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | approved |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | approved |
