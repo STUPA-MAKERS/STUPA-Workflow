@@ -2,7 +2,7 @@
 id: "000806"
 title: The plan page shows the steps of the version
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 tests:

@@ -2,7 +2,7 @@
 id: "000834"
 title: An inactive Kostenstelle is hidden in the Budget tab
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation: null

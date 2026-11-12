@@ -56,6 +56,7 @@ ROUTE_PATTERNS: Final[tuple[tuple[Feature, re.Pattern[str]], ...]] = tuple(
         (Feature.BUDGET, r"/budgets"),
         (Feature.BUDGET, r"/budget"),
         (Feature.BUDGET, r"/budget-expenses"),
+        (Feature.BUDGET, r"/budget-plan-versions"),
         (Feature.BUDGET, r"/budget-transfers"),
         (Feature.BUDGET, r"/expenses"),
         (Feature.BUDGET, rf"{_APPLICATION}/(?:assign-budget|move-fiscal-year)"),

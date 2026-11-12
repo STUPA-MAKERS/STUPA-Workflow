@@ -2,7 +2,7 @@
 id: "000824"
 title: A version keeps the steps it started with
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation: null

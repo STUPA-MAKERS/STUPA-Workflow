@@ -2,7 +2,7 @@
 id: "000832"
 title: A Kostenstelle is deleted in the Budget tab
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation: null

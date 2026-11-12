@@ -2,7 +2,7 @@
 id: "000826"
 title: An accepted vote of the Gremium passes its step
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation: null

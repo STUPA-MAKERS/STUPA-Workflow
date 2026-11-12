@@ -2,7 +2,7 @@
 id: "000825"
 title: A person records a passed step
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation: null

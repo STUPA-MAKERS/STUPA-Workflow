@@ -2,7 +2,7 @@
 id: "000828"
 title: Verwaltung lists only the budgets
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation: null

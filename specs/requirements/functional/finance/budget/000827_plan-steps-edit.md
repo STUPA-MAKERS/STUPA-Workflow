@@ -2,7 +2,7 @@
 id: "000827"
 title: The steps of a budget are edited in its edit form
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation: null

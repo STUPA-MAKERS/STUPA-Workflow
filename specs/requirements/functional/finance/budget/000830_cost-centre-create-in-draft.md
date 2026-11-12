@@ -2,7 +2,7 @@
 id: "000830"
 title: A Kostenstelle created in a draft gets a line
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation: null

@@ -2,7 +2,7 @@
 id: "000823"
 title: A budget holds the steps of its Haushaltsplan
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation: null

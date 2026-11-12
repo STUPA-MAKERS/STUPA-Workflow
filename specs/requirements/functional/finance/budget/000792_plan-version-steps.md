@@ -2,7 +2,7 @@
 id: "000792"
 title: A plan version passes the steps of its budget
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 tests:

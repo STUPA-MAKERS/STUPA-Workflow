@@ -2,7 +2,7 @@
 id: "000833"
 title: The allocation of a year without a plan is set in the Budget tab
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 implementation: null
