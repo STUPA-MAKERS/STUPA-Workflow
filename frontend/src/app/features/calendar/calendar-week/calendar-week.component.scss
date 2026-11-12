@@ -164,6 +164,11 @@
   border: 2px solid transparent;
   background: var(--color-surface-3) padding-box;
 }
+// A block that lies on an earlier block has an edge in the colour of the grid, so the two
+// stay apart (§ 000745).
+.cw__block--over {
+  border-color: var(--color-surface-1);
+}
 // A block of an entry over several days is cut straight where the entry goes on.
 .cw__block--fromBefore {
   border-start-start-radius: 0;
@@ -232,5 +237,8 @@
   .cw__block {
     background: var(--vh-bg, #000) padding-box;
     box-shadow: inset 0 0 0 2px var(--vh-fg, #fff);
+  }
+  .cw__block--over {
+    border-color: var(--vh-bg, #000);
   }
 }

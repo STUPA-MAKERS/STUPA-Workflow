@@ -247,14 +247,48 @@ describe('calendar.util', () => {
       expect(b).toMatchObject({ top: 3, height: 1, short: false });
     });
 
-    it('shares the width of the day between entries that overlap', () => {
-      const other = entry('other', { startTime: '14:30:00', endTime: '14:45:00' });
+    it('shares the width of the day between entries that start together', () => {
+      const other = entry('other', { startTime: '14:15:00', endTime: '14:45:00' });
       const later = entry('later', { startTime: '16:00:00', endTime: '17:00:00' });
       const blocks = dayBlocks([other, later, timed], '2026-11-11', 8, 21);
-      expect(blocks.map((b) => [b.entry.id, b.left, b.width])).toEqual([
-        ['timed', 0, 50],
-        ['other', 50, 50],
-        ['later', 0, 100],
+      expect(blocks.map((b) => [b.entry.id, b.left, b.width, b.over])).toEqual([
+        ['timed', 0, 50, false],
+        ['other', 50, 50, false],
+        ['later', 0, 100, false],
+      ]);
+    });
+
+    /** § 000745: a block that starts 45 minutes later lies on the earlier block. */
+    it('lays a later entry on the earlier one', () => {
+      const other = entry('other', { startTime: '14:45:00', endTime: '15:15:00' });
+      const [first, second] = dayBlocks([other, timed], '2026-11-11', 8, 21);
+      expect(first).toMatchObject({ left: 0, width: 100, lane: 0, over: false });
+      expect(second).toMatchObject({ left: 20, width: 80, lane: 1, over: true });
+    });
+
+    it('keeps the lane of a block when a later block of a lower lane meets it', () => {
+      const long = entry('long', { startTime: '09:00:00', endTime: '11:00:00' });
+      const top = entry('top', { startTime: '10:00:00', endTime: '12:00:00' });
+      const late = entry('late', { startTime: '11:15:00', endTime: '12:00:00' });
+      const blocks = dayBlocks([long, top, late], '2026-11-11', 8, 21);
+      expect(blocks.map((b) => [b.entry.id, b.lane, b.left, b.width])).toEqual([
+        ['long', 0, 0, 100],
+        ['top', 1, 50, 50],
+        ['late', 0, 0, 50],
+      ]);
+    });
+
+    it('grows a block over the lanes that are free beside it', () => {
+      const long = entry('long', { startTime: '09:00:00', endTime: '13:00:00' });
+      const mid = entry('mid', { startTime: '09:00:00', endTime: '10:00:00' });
+      const side = entry('side', { startTime: '09:15:00', endTime: '10:00:00' });
+      const late = entry('late', { startTime: '11:00:00', endTime: '12:00:00' });
+      const blocks = dayBlocks([long, mid, side, late], '2026-11-11', 8, 21);
+      expect(blocks.map((b) => [b.entry.id, b.lane, Math.round(b.left), Math.round(b.width), b.over])).toEqual([
+        ['long', 0, 0, 33, false],
+        ['mid', 1, 33, 33, false],
+        ['side', 2, 67, 33, false],
+        ['late', 1, 20, 80, true],
       ]);
     });
 
