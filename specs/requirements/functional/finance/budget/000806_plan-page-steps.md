@@ -1,8 +1,8 @@
 ---
 id: "000806"
-title: The plan page shows the state as four steps
+title: The plan page shows the steps of the version
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-12
 tests:
@@ -14,10 +14,10 @@ scope:
   - frontend/src/app/pages/budget
 ---
 
-# The plan page shows the state as four steps
+# The plan page shows the steps of the version
 
 The plan page must show the state of the version with the step display of the ui-kit. The
-steps must be "Entwurf", "Beschlossen", "Genehmigt" and "In Kraft". A finished step must show
-a check mark.
+steps must be "Entwurf", each step of the version by its name, and "In Kraft". A passed
+step must show a check mark and its date. A draft must show the steps of its budget.
 
 Reason: The person must see which steps the version has passed and which steps remain.
