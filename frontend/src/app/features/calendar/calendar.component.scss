@@ -32,10 +32,6 @@
 .cal-list__more {
   @include lp.more;
 }
-.cal-list__more--start {
-  justify-content: flex-start;
-  padding-inline: var(--space-2);
-}
 
 .cal__lead {
   display: grid;
