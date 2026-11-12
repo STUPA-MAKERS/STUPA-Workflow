@@ -10,7 +10,8 @@
 
 // --cw-hour is the height of an hour. It matches HOUR_REM of calendar.util.ts.
 .cw {
-  --cw-cols: 4.5rem repeat(7, minmax(0, 1fr));
+  --cw-gutter: 4.5rem;
+  --cw-cols: var(--cw-gutter) repeat(7, minmax(0, 1fr));
   --cw-hour: 3.5rem;
   display: flex;
   flex: 1 1 0;
@@ -117,10 +118,18 @@
   font-size: 0.6875rem;
   text-align: end;
 }
+// The scroll area draws the day lines itself, under the columns: a pull past the first or
+// the last hour moves the columns away, and the lines then still reach the all-day row.
 .cw__scroll {
   flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
+  background: repeating-linear-gradient(
+      to right,
+      var(--color-border) 0 1px,
+      transparent 1px calc(100% / 7)
+    )
+    right / calc(100% - var(--cw-gutter)) 100% no-repeat;
 }
 .cw__body {
   position: relative;
@@ -154,6 +163,20 @@
   overflow: hidden;
   border: 2px solid transparent;
   background: var(--color-surface-3) padding-box;
+}
+// A block that lies on an earlier block has an edge in the colour of the grid, so the two
+// stay apart (§ 000745).
+.cw__block--over {
+  border-color: var(--color-surface-1);
+}
+// A block of an entry over several days is cut straight where the entry goes on.
+.cw__block--fromBefore {
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+.cw__block--goesOn {
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
 }
 .cw__time {
   display: flex;
@@ -214,5 +237,8 @@
   .cw__block {
     background: var(--vh-bg, #000) padding-box;
     box-shadow: inset 0 0 0 2px var(--vh-fg, #fff);
+  }
+  .cw__block--over {
+    border-color: var(--vh-bg, #000);
   }
 }

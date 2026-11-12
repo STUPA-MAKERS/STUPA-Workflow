@@ -246,6 +246,14 @@ describe('ApplicationsListComponent', () => {
       expect(document.querySelector('.apps__dot')).toBeNull();
     });
 
+    it('marks an observed row "Beobachtet", with a dot only after a part before it', async () => {
+      await start('/applications', {
+        rows: [row({ observed: true }), row({ id: 'r-bare', typeId: 'unknown', state: null, observed: true })],
+      });
+      expect(screen.getAllByText('Beobachtet')).toHaveLength(2);
+      expect(document.querySelectorAll('.apps__dot')).toHaveLength(2);
+    });
+
     /** The chevron is decoration, and the row menu stays the control. */
     it('puts a chevron in the place of the row menu in the full-width list', async () => {
       const { cmp } = await start();

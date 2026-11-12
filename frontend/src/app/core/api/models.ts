@@ -244,6 +244,10 @@ export interface ApplicationOutWire {
   readonly approvedAmount?: string | null;
   /** The valid decision, or `null` before one. */
   readonly decision?: ApplicationDecision | null;
+  /** True when the reader only observes the application (read-only, no PII). */
+  readonly observer?: boolean;
+  /** The applicant name, set for an observer only (the applicant block stays empty). */
+  readonly submittedBy?: string | null;
 }
 
 /**
@@ -371,6 +375,8 @@ export interface ApplicationListItemWire {
   readonly archivedAt?: IsoDateTime | null;
   /** Time of the last status change. */
   readonly stateSince?: IsoDateTime | null;
+  /** True when the reader sees the application only as an observer. */
+  readonly observed?: boolean;
 }
 
 /** `ApplicationCreated`. The 201 response of `POST /applications`. It holds only the id. */
@@ -745,6 +751,10 @@ export interface Application {
   readonly approvedAmount?: string | null;
   /** The valid decision, or `null` before one. */
   readonly decision?: ApplicationDecision | null;
+  /** True when the reader only observes the application: the view hides every action. */
+  readonly observer?: boolean;
+  /** The applicant name for an observer, else null. */
+  readonly submittedBy?: string | null;
 }
 
 export interface ApplicationListItem {
@@ -763,6 +773,8 @@ export interface ApplicationListItem {
   readonly archivedAt: IsoDateTime | null;
   /** Time of the last status change, for "waiting since". */
   readonly stateSince?: IsoDateTime | null;
+  /** True when the reader sees the application only as an observer. */
+  readonly observed?: boolean;
 }
 
 /** A Vorgänger or a Folgeantrag, frontend view. */
@@ -1106,6 +1118,15 @@ export interface ApplicantApplicationItem {
   readonly approvedAmount: string | null;
   readonly currency: string | null;
   readonly createdAt: IsoDateTime;
+  /** True when the address only observes the Antrag. */
+  readonly observed?: boolean;
+}
+
+/** One observer of an application (`ObserverOut`). */
+export interface ApplicationObserver {
+  readonly id: Uuid;
+  readonly email: string;
+  readonly addedAt: IsoDateTime;
 }
 
 /** The Anträge of the e-mail session, newest first, and the address of the session. */

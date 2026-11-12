@@ -34,7 +34,7 @@ describe('veryHighContrastApp (§000614)', () => {
 
 describe('surfaceEdges (§000605)', () => {
   it('draws the white edge around the calendar grid, its day pane and the pane of the start page', () => {
-    expect(RULES).toMatch(/\.dash--wide \.dash__today,\s*\.cal__panel \{\s*outline: var\(--vh-edge\);\s*outline-offset: -2px;/);
+    expect(RULES).toMatch(/\.dash--wide \.dash__today,\s*\.cal__panel \{\s*border: var\(--vh-edge\) !important;/);
     expect(RULES).toMatch(/\.cal__grid::after \{[^}]*border: var\(--vh-edge\);/);
   });
 
@@ -44,8 +44,17 @@ describe('surfaceEdges (§000605)', () => {
 
   it('draws the white edge around a card and a column of a board', () => {
     expect(RULES).toMatch(
-      /\n {2}app-todo-card-tile,\s*\.bv__col \{\s*outline: var\(--vh-edge\);\s*outline-offset: -2px;/,
+      /\n {2}app-todo-card-tile,\s*\.bv__col \{\s*border: var\(--vh-edge\) !important;/,
     );
+  });
+
+  it('draws the edges of the comments as borders, which scrolling content does not cover', () => {
+    expect(RULES).toMatch(/app-chat:not\(\.chat--phone\) \.chat__log \{\s*border: var\(--vh-edge\) !important;/);
+    expect(RULES).toMatch(/\.chat__bubble,\s*\.chat__row \.chat__bubble--internal \{\s*border: var\(--vh-edge\);\s*box-shadow: none !important;/);
+  });
+
+  it('never draws a surface edge as an outline, because a scroll area inside paints over it', () => {
+    expect(RULES).not.toMatch(/outline: var\(--vh-edge\)/);
   });
 
   it('keeps the top edge of the work list of the start page above its sticky header', () => {
@@ -58,7 +67,9 @@ describe('surfaceEdges (§000605)', () => {
 
 describe('boardPicker (§000617)', () => {
   it('draws the picker as a menu: white edge, yellow rows, the open board filled', () => {
-    expect(RULES).toMatch(/\.bp__pop \{\s*outline: var\(--vh-edge\);\s*outline-offset: -2px;/);
+    expect(RULES).toMatch(
+      /\.bp__pop \{\s*border: var\(--vh-edge\) !important;[^}]*--pop-edge: none !important;/,
+    );
     expect(RULES).toMatch(/\n {2}\.bp__row \{\s*@include vh\.text;/);
     expect(RULES).toMatch(/\.bp__row\[aria-current='true'\] \{\s*@include vh\.fill;/);
     expect(RULES).toMatch(/\.bp__cap \{\s*color: var\(--vh-fg\) !important;/);
@@ -73,7 +84,7 @@ describe('boardPicker (§000617)', () => {
 
 describe('protocolBand (§000605, §000614)', () => {
   it('gives the band of the protocol white ink on its black surface, the edge, and filled PDF buttons', () => {
-    expect(RULES).toMatch(/\n {2}\.pb \{\s*@include vh\.ink\(var\(--vh-fg\)\);\s*outline: var\(--vh-edge\);/);
+    expect(RULES).toMatch(/\n {2}\.pb \{\s*@include vh\.ink\(var\(--vh-fg\)\);\s*border: var\(--vh-edge\);/);
     expect(selectorsOf('  .pb__pdf {', 'fill')).toContain('.pb__pdf');
   });
 });

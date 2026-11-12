@@ -38,7 +38,7 @@ import { toFormlySections } from '@shared/forms/formly-mapper';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { withoutKey } from '@shared/util/immutable';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
-import { actorLabel } from '@shared/actor-label.util';
+import { type ActorLabelOptions, actorLabel } from '@shared/actor-label.util';
 import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
 import { decisionHistoryLine } from '@shared/decision/decision.util';
 import { flowColorKind } from '@shared/status-kind.util';
@@ -78,6 +78,7 @@ import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { formatMoney } from '@shared/format-money';
 import { MY_APPLICATIONS_PAGE } from './my-applications-page';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
+import { ObserversDialogComponent } from './observers-dialog/observers-dialog.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { pageItemTitle } from '../../layout/page-title.service';
@@ -125,6 +126,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ObserversDialogComponent,
     NgTemplateOutlet,
     AmountComponent,
     NoteComponent,
@@ -238,12 +240,25 @@ export class StatusTimelineComponent {
   readonly confirmErase = signal(false);
   readonly requestingErasure = signal(false);
 
+  /** The reader only observes the Antrag (spec 000752): the page hides every action. */
+  readonly observer = computed(() => !!this.application()?.observer);
+  /** The dialog "Beobachter:innen" is open. */
+  readonly observersOpen = signal(false);
+  /** How the history and the comments name the applicant: "Du", or for an observer the name. */
+  private readonly applicantLabel = computed<ActorLabelOptions>(() =>
+    this.observer()
+      ? { applicantName: this.application()?.submittedBy ?? null }
+      : { applicantKey: 'status.history.you' },
+  );
+
   readonly canEdit = computed(
-    () => this.editScope() && Boolean(this.application()?.state?.editAllowed),
+    () =>
+      this.editScope() && !this.observer() && Boolean(this.application()?.state?.editAllowed),
   );
 
   /** Why "Angaben bearbeiten" is off: the link (old view scope) or the status. */
   readonly lockReason = computed<TranslationKey | null>(() => {
+    if (this.observer()) return null;
     if (!this.editScope()) return 'status.edit.linkOnly';
     if (!this.application()?.state?.editAllowed) return 'status.edit.locked';
     return null;
@@ -255,7 +270,7 @@ export class StatusTimelineComponent {
    * data change: the panel gets `canEdit()` for it, and the backend answers 409 in a
    * locked state.
    */
-  readonly canUploadAttachments = computed(() => this.editScope());
+  readonly canUploadAttachments = computed(() => this.editScope() && !this.observer());
   /** A file dropped anywhere on the page becomes an attachment; an open sheet takes its own. */
   readonly takesDrop = computed(
     () => this.canUploadAttachments() && !this.commentsOpen(),
@@ -273,8 +288,13 @@ export class StatusTimelineComponent {
   readonly stateKind = computed(() => flowColorKind(this.application()?.state?.color));
   readonly looks = computed(() => transitionLooks(this.actions()));
 
-  /** The ⋮ menu: the anonymization request. */
-  readonly menu = computed<RowMenuSection[]>(() => [
+  /** The ⋮ menu: the observers and the anonymization request; empty for an observer. */
+  readonly menu = computed<RowMenuSection[]>(() => this.observer() ? [] : [
+    {
+      items: [
+        { id: 'observers', label: this.i18n.translate('observers.title'), icon: 'eye' },
+      ],
+    },
     {
       items: [
         {
@@ -304,7 +324,7 @@ export class StatusTimelineComponent {
     const t = (key: TranslationKey, params?: Record<string, string | number>) =>
       this.i18n.translate(key, params);
     const actor = (info: ActorInfo | null | undefined, legacy: string | null): string | null =>
-      actorLabel(info, legacy, t, { applicantKey: 'status.history.you' });
+      actorLabel(info, legacy, t, this.applicantLabel());
     const events = [...this.timeline()].sort((a, b) => a.at.localeCompare(b.at));
     const statusEntries: readonly HistoryEntry[] = events.map((e, i) => {
       const decision = e.decision
@@ -456,7 +476,7 @@ export class StatusTimelineComponent {
         this.application.set(application);
         this.timeline.set(timeline);
         this.comments.set(comments);
-        this.actions.set(actions);
+        this.actions.set(application.observer ? [] : actions);
         this.versions.set(versions);
         this.loadForm(application);
       },
@@ -519,8 +539,9 @@ export class StatusTimelineComponent {
     if (comment.isOwn) return this.i18n.translate('status.history.you');
     const info =
       comment.authorInfo ?? (comment.authorKind === 'applicant' ? { kind: 'applicant' as const } : null);
+    const named = this.observer() ? this.applicantLabel() : {};
     return (
-      actorLabel(info, comment.author, (key, params) => this.i18n.translate(key, params)) ??
+      actorLabel(info, comment.author, (key, params) => this.i18n.translate(key, params), named) ??
       this.i18n.translate('applications.comments.author.committee')
     );
   }
@@ -562,6 +583,7 @@ export class StatusTimelineComponent {
 
   onMenu(item: RowMenuItem): void {
     if (item.id === 'erase') this.confirmErase.set(true);
+    if (item.id === 'observers') this.observersOpen.set(true);
   }
 
   /**

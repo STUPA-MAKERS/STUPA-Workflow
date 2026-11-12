@@ -161,10 +161,13 @@
             @if (application.amount !== null) {
               <span class="ad__part"><app-amount [amount]="amount(application)" [approved]="approvedAmount(application)" /></span>
             }
+            @if (application.submittedBy) {
+              <span class="ad__part ell">{{ 'observers.submittedBy' | t: { name: application.submittedBy } }}</span>
+            }
           </span>
         </p>
 
-        @if (canTransition() && transitions().length) {
+        @if (canTransition() && !application.observer && transitions().length) {
           <div class="ad__transitions" role="group" [attr.aria-label]="'applications.transitions.title' | t">
             @for (t of transitions(); track t.id) {
               <app-button
@@ -180,7 +183,7 @@
               </app-button>
             }
           </div>
-        } @else if (canTransition() && transitionsLoading()) {
+        } @else if (canTransition() && !application.observer && transitionsLoading()) {
           <ng-container *ngTemplateOutlet="transitionsSkel" />
         }
 
@@ -250,6 +253,7 @@
           [messages]="chatMessages()"
           [visibilityOptions]="chatVisibilities()"
           [canAttach]="canAttach()"
+          [canPost]="!observer()"
           [mentionables]="mentionables()"
           [publicMentions]="false"
           placeholder="applications.comments.placeholder"
@@ -401,6 +405,16 @@
   (confirm)="doDelete()"
   (cancel)="confirmDelete.set(false)"
 />
+
+@if (app(); as current) {
+  @if (canManageObservers()) {
+    <app-observers-dialog
+      [applicationId]="current.id"
+      [open]="observersOpen()"
+      (closed)="observersOpen.set(false)"
+    />
+  }
+}
 
 <app-confirm-dialog
   [open]="confirmErase()"

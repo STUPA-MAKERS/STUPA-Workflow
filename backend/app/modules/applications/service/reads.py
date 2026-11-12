@@ -8,7 +8,12 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.modules.applications.decision import amount_deviates, decisions_by_event
-from app.modules.applications.models import Application, ApplicationDecision, StatusEvent
+from app.modules.applications.models import (
+    Applicant,
+    Application,
+    ApplicationDecision,
+    StatusEvent,
+)
 from app.modules.applications.schemas import (
     ActorOut,
     ApplicationOut,
@@ -54,6 +59,7 @@ class ReadOps(ApplicationsServiceBase):
         strip_pii_fields: bool = False,
         applicant_view: bool = False,
         magic_link_view: bool = False,
+        observer: bool = False,
     ) -> ApplicationOut:
         """Read one application.
 
@@ -63,11 +69,13 @@ class ReadOps(ApplicationsServiceBase):
         block then names the Gremium instead of the capturing member.
         ``requester_edits_any`` is ``application.edit_any``: it sets ``canEdit`` and
         ``canEditLocked``, because the PATCH lifts the state lock for that holder.
+        ``observer`` marks the observer view and adds the applicant name as
+        ``submittedBy``.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         is_owner = requester_sub is not None and app.created_by == requester_sub
         can_edit = requester_can_manage or requester_edits_any or is_owner
-        return await self._to_out(
+        out = await self._to_out(
             app,
             include_pii=include_pii,
             can_edit=can_edit,
@@ -76,6 +84,18 @@ class ReadOps(ApplicationsServiceBase):
             strip_pii_fields=strip_pii_fields,
             applicant_view=applicant_view,
             magic_link_view=magic_link_view,
+        )
+        submitted_by = (
+            await self.session.scalar(
+                select(Applicant.name).where(Applicant.application_id == application_id)
+            )
+            if observer
+            else None
+        )
+        return (
+            out.model_copy(update={"observer": True, "submitted_by": submitted_by})
+            if observer
+            else out
         )
 
     async def timeline(

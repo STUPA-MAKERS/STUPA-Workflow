@@ -24,6 +24,7 @@ from app.modules.notifications.texts import (
     comments,
     meetings,
     mentions,
+    observers,
     polls,
     privacy,
     tasks,
@@ -232,6 +233,20 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         captured.APPLICATION_CAPTURED_SUBJECT,
         captured.APPLICATION_CAPTURED_BODY,
         captured.APPLICATION_CAPTURED_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        observers.OBSERVER_ADDED_KEY,
+        observers.OBSERVER_ADDED_KEY,
+        observers.OBSERVER_ADDED_SUBJECT,
+        observers.OBSERVER_ADDED_BODY,
+        observers.OBSERVER_ADDED_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        observers.OBSERVER_STATUS_KEY,
+        "status_update",
+        observers.OBSERVER_STATUS_SUBJECT,
+        observers.OBSERVER_STATUS_BODY,
+        observers.OBSERVER_STATUS_PLACEHOLDERS,
     ),
     MailTemplateSpec(
         "erasure_requested",

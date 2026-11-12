@@ -43,6 +43,12 @@
                           @if (r.typeLabel) {
                             <span>{{ r.typeLabel }}</span>
                           }
+                          @if (r.observed) {
+                            @if (r.stateLabel || r.typeLabel) {
+                              <span class="ma__dot" aria-hidden="true">·</span>
+                            }
+                            <span class="ma__observed"><app-icon name="eye" [size]="14" />{{ 'observers.observed' | t }}</span>
+                          }
                         </span>
                         <span trail class="ma__trail">
                           <app-amount [amount]="r.amount" [approved]="r.approved" layout="stack" />

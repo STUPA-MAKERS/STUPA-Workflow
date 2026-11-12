@@ -127,9 +127,9 @@ export function laneCount(bars: readonly Bar[]): number {
   return bars.reduce((max, b) => Math.max(max, b.lane + 1), 0);
 }
 
-/** The entry is a block in the hour grid: one day and a start time. */
+/** The entry is a block in the hour grid: it has a start time (§ 000744). */
 export function isTimed(e: CalendarEntry): boolean {
-  return !isSpan(e) && e.startTime !== null;
+  return e.startTime !== null;
 }
 
 /** The entries of a day for the row above the hours (§ 000728). */
@@ -146,10 +146,17 @@ export function hoursOf(clock: string): number {
 export const MIN_BLOCK = 0.4;
 /** A block below this length shows its time and its title in one line. */
 export const SHORT_BLOCK = 0.75;
+/**
+ * A block that starts this many hours after the block to its left may cover it: the time
+ * and the first line of the title of the earlier block stay free (§ 000745).
+ */
+export const OVERLAP_HEAD = 0.75;
+/** A block that lies on another starts this many percent of the column after it. */
+export const OVERLAP_INDENT = 20;
 /** The height of an hour in the week view, in rem. It matches `--cw-hour` of the styles. */
 export const HOUR_REM = 3.5;
 
-/** A timed entry as a block of the week view. `top` and `height` are hours. */
+/** A timed entry on one day as a block of the week view. `top` and `height` are hours. */
 export interface Block {
   readonly entry: CalendarEntry;
   readonly top: number;
@@ -157,23 +164,49 @@ export interface Block {
   /** The start and the width of the block in percent of the day column. */
   readonly left: number;
   readonly width: number;
+  /** The lane of the block. A block of a higher lane lies above the blocks to its left. */
+  readonly lane: number;
+  /** The block covers a part of a block to its left (§ 000745). */
+  readonly over: boolean;
   readonly short: boolean;
   /** The lines of the title that fit below the time. */
   readonly lines: number;
+  /** The clock time where the entry starts or ends on this day, or null where it goes on. */
+  readonly start: string | null;
+  readonly end: string | null;
+}
+
+/** The hour where the part of an entry on the day `iso` ends. */
+function partEnd(e: CalendarEntry, iso: string, from: number, lastHour: number): number {
+  if (e.endsOn !== iso) return lastHour;
+  if (e.endTime) return Math.max(hoursOf(e.endTime), from);
+  return isSpan(e) ? lastHour : from + 1;
 }
 
 /**
- * The blocks of a day. Entries that overlap share the width of the column: each takes
- * the first lane that is free at its start, and a group of overlapping blocks divides
- * the column by its number of lanes.
+ * The blocks of a day. An entry over several days has one block on each of its days: from
+ * its start time to the last hour, the whole day, and from the first hour to its end time
+ * (§ 000744). Entries that overlap take lanes: each takes the first lane that is free at
+ * its start, and a chain of overlapping blocks divides the column by its number of lanes.
+ * A block grows to the right over the lanes that are free. A block whose neighbour to the
+ * right starts `OVERLAP_HEAD` later reaches to the end of the column below that neighbour,
+ * so the later block lies on the earlier one (§ 000745). A block that starts that much
+ * later than every block to its left starts `OVERLAP_INDENT` after them, not at its lane,
+ * so it keeps most of the width. Two blocks that start together stay side by side,
+ * because the one above would hide the title of the other.
  */
-export function dayBlocks(entries: readonly CalendarEntry[], iso: string, firstHour: number): readonly Block[] {
+export function dayBlocks(
+  entries: readonly CalendarEntry[],
+  iso: string,
+  firstHour: number,
+  lastHour: number,
+): readonly Block[] {
   const items = [
-    ...entries
-      .filter((e) => e.startsOn === iso && isTimed(e))
+    ...onDay(entries, iso)
+      .filter(isTimed)
       .map((e) => {
-        const from = hoursOf(e.startTime ?? '');
-        const real = e.endTime ? Math.max(hoursOf(e.endTime) - from, 0) : 1;
+        const from = e.startsOn === iso ? hoursOf(e.startTime ?? '') : firstHour;
+        const real = partEnd(e, iso, from, lastHour) - from;
         return { entry: e, from, real, to: from + Math.max(real, MIN_BLOCK) };
       }),
   ].sort((a, b) => a.from - b.from || b.to - a.to);
@@ -182,18 +215,43 @@ export function dayBlocks(entries: readonly CalendarEntry[], iso: string, firstH
     const lane = Array.from({ length: done.length + 1 }, (_, i) => i).find((i) => !taken.has(i)) ?? 0;
     return [...done, { ...item, lane }];
   }, []);
-  return placed.map((item) => {
-    const group = placed.filter((o) => o.from < item.to && item.from < o.to);
-    const lanes = Math.max(...group.map((o) => o.lane)) + 1;
+  type Placed = (typeof placed)[number];
+  const meets = (a: Placed, b: Placed): boolean => a.from < b.to && b.from < a.to;
+  const cluster = (seed: readonly Placed[]): readonly Placed[] => {
+    const more = placed.filter((o) => !seed.includes(o) && seed.some((s) => meets(o, s)));
+    return more.length > 0 ? cluster([...seed, ...more]) : seed;
+  };
+  const lanesOf = (item: Placed): number => Math.max(...cluster([item]).map((o) => o.lane)) + 1;
+  const lefts = placed.reduce<readonly { readonly item: Placed; readonly left: number }[]>((done, item) => {
+    const lower = placed.filter((o) => o.lane < item.lane && meets(o, item));
+    const own = (item.lane / lanesOf(item)) * 100;
+    const onTop = lower.length > 0 && lower.every((o) => item.from >= o.from + OVERLAP_HEAD);
+    const below = Math.max(0, ...done.filter((d) => lower.includes(d.item)).map((d) => d.left));
+    return [...done, { item, left: onTop ? Math.min(own, below + OVERLAP_INDENT) : own }];
+  }, []);
+  const boxes = lefts.map(({ item, left }) => {
+    const lanes = lanesOf(item);
+    const right = placed.filter((o) => o.lane > item.lane && meets(o, item));
+    const next = Math.min(lanes, ...right.map((o) => o.lane));
+    const under = right.length > 0 && right.every((o) => o.lane > next || o.from >= item.from + OVERLAP_HEAD);
+    return { item, left, width: under ? 100 - left : (next * 100) / lanes - left };
+  });
+  return boxes.map(({ item, left, width }) => {
     const height = Math.max(item.real, MIN_BLOCK);
     return {
       entry: item.entry,
       top: item.from - firstHour,
       height,
-      left: (item.lane / lanes) * 100,
-      width: 100 / lanes,
+      left,
+      width,
+      lane: item.lane,
+      over: boxes.some(
+        (o) => o.left < left && o.left + o.width > left + 0.01 && meets(o.item, item),
+      ),
       short: item.real < SHORT_BLOCK,
       lines: Math.max(1, Math.floor((height * HOUR_REM * 16 - 28) / 16)),
+      start: item.entry.startsOn === iso ? item.entry.startTime : null,
+      end: item.entry.endsOn === iso ? item.entry.endTime : null,
     };
   });
 }

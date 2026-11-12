@@ -63,6 +63,7 @@ import type {
   MagicLinkVerifyResult,
   EmailLoginRequest,
   ApplicantApplications,
+  ApplicationObserver,
   Meeting,
   MeetingCreateBody,
   MeetingMember,
@@ -371,6 +372,28 @@ export class ApiClient {
         context: readContext({ quiet: true, ...opts }),
       })
       .pipe(map((wire) => mapApplicationLinks(wire, lang)));
+  }
+
+  /** GET /applications/{id}/observers — the observers, the oldest first (applicant only). */
+  applicationObservers(id: Uuid): Observable<readonly ApplicationObserver[]> {
+    return this.http.get<readonly ApplicationObserver[]>(`${this.base}/applications/${id}/observers`, {
+      context: readContext({ quiet: true }),
+    });
+  }
+
+  /** POST /applications/{id}/observers — add an observer; the server mails the address. */
+  addApplicationObserver(id: Uuid, email: string): Observable<ApplicationObserver> {
+    return this.http.post<ApplicationObserver>(`${this.base}/applications/${id}/observers`, { email });
+  }
+
+  /** DELETE /applications/{id}/observers/{observerId} — remove an observer. */
+  removeApplicationObserver(id: Uuid, observerId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/applications/${id}/observers/${observerId}`);
+  }
+
+  /** POST /observers/end — end an observation with the token of the end link, no login. */
+  endObservation(token: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/observers/end`, { token });
   }
 
   /**

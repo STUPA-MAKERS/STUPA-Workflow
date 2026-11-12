@@ -30,6 +30,12 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because an application was entered "
         "for you on the application platform.",
     },
+    "application_observer_added": {
+        "de": "Sie erhalten diese E-Mail, weil Sie jemand als Beobachter:in eines "
+        "Antrags eingetragen hat.",
+        "en": "You are receiving this email because someone added you as an observer "
+        "of an application.",
+    },
     "status_update": {
         "de": "Sie erhalten diese E-Mail, weil sich der Status eines Antrags "
         "geändert hat, der Sie betrifft.",

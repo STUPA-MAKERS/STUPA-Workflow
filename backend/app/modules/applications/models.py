@@ -198,6 +198,38 @@ class ApplicationLinkEvent(UUIDPkMixin, Base):
     )
 
 
+class ApplicationObserver(UUIDPkMixin, Base):
+    """One observer of an application: an e-mail address that reads it.
+
+    The applicant adds at most `MAX_OBSERVERS` addresses. An observer reads the
+    application in the applicant view without the ``isPII`` fields and without the
+    applicant block, through an account with the same e-mail or through the e-mail
+    login of the address. An observer never edits, comments or uploads. ``email`` is
+    CITEXT, so the match with an account or a session address ignores the case. The
+    row holds personal data: the anonymization of the application deletes it.
+    """
+
+    __tablename__ = "application_observer"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    email: Mapped[str] = mapped_column(CITEXT)
+    added_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("application_id", "email"),
+        Index("ix_application_observer_email", "email"),
+    )
+
+
+#: The most observers that one application can have.
+MAX_OBSERVERS = 5
+
+
 class Applicant(UUIDPkMixin, Base):
     """PII of the applicant, split out 1:1 from the application.
 

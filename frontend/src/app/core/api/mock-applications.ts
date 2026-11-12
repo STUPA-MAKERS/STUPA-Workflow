@@ -172,6 +172,19 @@ function replaceRow(d: DemoApp, patch: Partial<DemoApp>): DemoApp {
   return next;
 }
 
+/**
+ * `localStorage['mockObserver'] = '1'` makes the demo person an observer of the second demo
+ * row: the list marks it "Beobachtet" and its detail is the read-only observer view.
+ */
+const OBSERVED_ROW = 2;
+function observes(d: DemoApp): boolean {
+  try {
+    return d.n === OBSERVED_ROW && localStorage.getItem('mockObserver') === '1';
+  } catch {
+    return false;
+  }
+}
+
 function listItem(d: DemoApp): ApplicationListItemWire {
   return {
     id: idOf(d.n),
@@ -186,6 +199,7 @@ function listItem(d: DemoApp): ApplicationListItemWire {
     updatedAt: d.created,
     archivedAt: d.archived ?? null,
     stateSince: d.created,
+    observed: observes(d),
   };
 }
 
@@ -203,6 +217,9 @@ function detail(d: DemoApp): ApplicationOutWire {
     hiddenKeys: [],
     capture: d.capture ?? null,
     decision: decisionOf(d),
+    ...(observes(d)
+      ? { applicant: null, canEdit: false, observer: true, submittedBy: 'Erika Beispiel' }
+      : {}),
   };
 }
 

@@ -98,6 +98,8 @@ export const AUDIT_ACTIONS = [
   'application_decision',
   'application_link_set',
   'application_link_remove',
+  'application_observer_add',
+  'application_observer_remove',
   'application_delete',
   'comment_update',
   'comment_delete',

@@ -40,11 +40,13 @@ from app.modules.applications.access import (
     principal_reads_pii,
     require_app_edit,
     require_app_read,
+    require_app_view,
     resolve_app_read,
 )
 from app.modules.applications.captured_mail import notify_application_captured
 from app.modules.applications.mail_data import resolve_application_lang
 from app.modules.applications.mention_mails import notify_comment_mentions
+from app.modules.applications.observers import observed_ids
 from app.modules.applications.schemas import (
     ApplicantApplicationsOut,
     ApplicantCandidateOut,
@@ -422,6 +424,7 @@ async def list_applications(
         order=order,
         owner_sub=principal.sub if (mine or not can_read) else None,
         committee_sub=principal.sub if restricted else None,
+        observer_email=principal.email,
         hide_pii_in_search=not can_read,
         limit=page.limit,
         offset=page.offset,
@@ -509,7 +512,7 @@ async def export_applications_xlsx(
 )
 async def get_application(
     service: ServiceDep,
-    access: Annotated[Access, Depends(require_app_read)],
+    access: Annotated[Access, Depends(require_app_view)],
 ) -> ApplicationOut:
     """Read an application.
 
@@ -521,8 +524,11 @@ async def get_application(
     The applicant block goes to a principal with the PII right, also to the logged-in
     creator. The magic-link applicant gets none. ``canEditLocked`` is true for a
     holder of ``application.edit_any``, whose edit the state lock does not stop.
+
+    An observer gets ``observer: true``, ``submittedBy`` with the applicant name, no
+    edit flag, no applicant block and no ``isPII`` field.
     """
-    principal = access.principal
+    principal = access.principal if not access.is_observer else None
     pii = await can_read_pii(service.session, access)
     return await service.get(
         access.application_id,
@@ -536,6 +542,7 @@ async def get_application(
         strip_pii_fields=not pii,
         applicant_view=access.is_applicant_view,
         magic_link_view=access.is_owning_applicant,
+        observer=access.is_observer,
     )
 
 
@@ -546,7 +553,7 @@ async def get_application(
 )
 async def get_application_form(
     service: ServiceDep,
-    access: Annotated[Access, Depends(require_app_read)],
+    access: Annotated[Access, Depends(require_app_view)],
 ) -> EffectiveFormOut:
     """Return the effective form of the pinned version of the application.
 
@@ -671,7 +678,7 @@ async def _principal_reads_pii(
 )
 async def get_timeline(
     service: ServiceDep,
-    access: Annotated[Access, Depends(require_app_read)],
+    access: Annotated[Access, Depends(require_app_view)],
 ) -> list[TimelineEventOut]:
     """Status timeline of the application.
 
@@ -694,7 +701,7 @@ async def get_timeline(
 )
 async def get_versions(
     service: ServiceDep,
-    access: Annotated[Access, Depends(require_app_read)],
+    access: Annotated[Access, Depends(require_app_view)],
 ) -> list[VersionOut]:
     """Return the version history.
 
@@ -910,7 +917,7 @@ async def add_comment(
 )
 async def list_comments(
     service: ServiceDep,
-    access: Annotated[Access, Depends(require_app_read)],
+    access: Annotated[Access, Depends(require_app_view)],
 ) -> list[CommentOut]:
     """List the comments.
 
@@ -1026,13 +1033,16 @@ async def list_applicant_applications(
 ) -> ApplicantApplicationsOut:
     """List the Anträge of the applicant session, newest first.
 
-    An e-mail session lists every Antrag of its address as it is now; the link of one
-    Antrag lists that Antrag. 401 without an applicant session.
+    An e-mail session lists every Antrag of its address as it is now, and every Antrag
+    that the address observes (``observed: true``); the link of one Antrag lists that
+    Antrag. 401 without an applicant session.
     """
     ids = (
         applicant.application_ids
         if applicant.email is not None
         else frozenset({applicant.application_id} if applicant.application_id else ())
     )
-    items = await service.list_for_applicant(ids)
+    items = await service.list_for_applicant(
+        ids, await observed_ids(service.session, applicant.email)
+    )
     return ApplicantApplicationsOut(email=applicant.email, items=tuple(items))

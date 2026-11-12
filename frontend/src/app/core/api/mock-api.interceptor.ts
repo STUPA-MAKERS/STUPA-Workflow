@@ -56,11 +56,14 @@ import type {
  * true to the contract and exercises the mapper layer.
  */
 /** The Anträge of the mock e-mail session (`/my-applications`). */
+/** The Antrag of the applicant demo that the address only observes (spec 000752). */
+const MOCK_OBSERVED_ID = '4f8a03b6-0000-4000-8000-000000000002';
+
 const MOCK_APPLICANT_APPLICATIONS = {
   email: 'lena.berger@example.org',
   items: [
     { id: '7c2e91d4-0000-4000-8000-000000000003', title: 'Zuschuss Erstsemesterfahrt 2027', state: { id: '00000000-0000-4000-8000-0000000000a1', key: 'eingereicht', label: { de: 'Eingereicht', en: 'Submitted' }, color: '#2563eb', editAllowed: true }, typeId: '11111111-1111-1111-1111-111111111111', amount: '480.00', approvedAmount: null, currency: 'EUR', createdAt: '2026-11-04T09:12:00Z' },
-    { id: '4f8a03b6-0000-4000-8000-000000000002', title: 'Technik für das Sommerfest', state: { id: '00000000-0000-4000-8000-0000000000a2', key: 'bewilligt', label: { de: 'Bewilligt', en: 'Approved' }, color: '#16a34a', editAllowed: false }, typeId: '11111111-1111-1111-1111-111111111111', amount: '1250.00', approvedAmount: '1000.00', currency: 'EUR', createdAt: '2026-06-18T15:40:00Z' },
+    { id: MOCK_OBSERVED_ID, title: 'Technik für das Sommerfest', state: { id: '00000000-0000-4000-8000-0000000000a2', key: 'bewilligt', label: { de: 'Bewilligt', en: 'Approved' }, color: '#16a34a', editAllowed: false }, typeId: '11111111-1111-1111-1111-111111111111', amount: '1250.00', approvedAmount: '1000.00', currency: 'EUR', createdAt: '2026-06-18T15:40:00Z', observed: true },
     { id: 'b915e2c0-0000-4000-8000-000000000001', title: 'Neue Bänke im Innenhof', state: { id: '00000000-0000-4000-8000-0000000000a3', key: 'abgelehnt', label: { de: 'Abgelehnt', en: 'Rejected' }, color: '#dc2626', editAllowed: false }, typeId: '22222222-2222-2222-2222-222222222222', amount: null, approvedAmount: null, currency: null, createdAt: '2026-03-02T11:05:00Z' },
   ],
 } as const;
@@ -1638,6 +1641,9 @@ export function mockMediaImage(body: unknown): MediaImage {
   };
 }
 
+/** The routes of the observers of an application (`mock-observers.ts`). */
+const MOCK_OBSERVERS_PATH = /(^|\/)api\/(applications\/[^/]+\/observers(\/[^/]+)?|observers\/end)$/;
+
 /** The paths of the account pages and the consent page (`mock-account.ts`). */
 const MOCK_ACCOUNT_PATH =
   /(^|\/)api\/(notifications\/preferences|oauth\/grants(\/[^/]+)?|oauth\/consent(-request)?|mcp\/(config|package))$/;
@@ -1711,6 +1717,21 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         const reply = m.mockPublicProtocols(req.method, p);
         if (!reply) return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
         return ok(reply.body);
+      }),
+    );
+  }
+
+  if (MOCK_OBSERVERS_PATH.test(p)) {
+    return from(import('./mock-observers')).pipe(
+      mergeMap((m) => {
+        const reply = m.mockObservers(req.method, p, req.body);
+        if (!reply) return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
+        if (reply.status >= 400) {
+          return throwError(
+            () => new HttpErrorResponse({ status: reply.status, error: reply.body, url: req.url }),
+          );
+        }
+        return ok(reply.body, reply.status);
       }),
     );
   }
@@ -1951,6 +1972,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith(`/meetings/${MOCK_PLANNED_MEETING.id}`)) return ok(MOCK_PLANNED_MEETING);
     if (/\/meetings\/[^/]+$/.test(p)) return ok(MOCK_MEETING);
     if (/\/applications\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
+    if (p.endsWith(`/applications/${MOCK_OBSERVED_ID}`)) {
+      return ok({ ...mockApplication(), id: MOCK_OBSERVED_ID, observer: true, submittedBy: 'Luis Meyer' });
+    }
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
   }
 

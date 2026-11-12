@@ -34,6 +34,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('apply/confirmation', { public: true }),
   fixed('login', { public: true }),
   fixed('my-applications', { public: true }),
+  fixed('stop-observing', { public: true }),
   { path: 'my-applications/:id', url: () => `/my-applications/${MISSING}`, public: true },
   fixed('protocols', { public: true }),
   fixed('public-calendar', { public: true }),

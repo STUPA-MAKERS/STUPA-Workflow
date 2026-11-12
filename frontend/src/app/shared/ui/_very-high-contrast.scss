@@ -15,10 +15,10 @@
   // A surface has the white edge (000605), because no shade sets it apart from the black
   // page: on a wide screen the pane "Heute" of the start page, and the grid and
   // the day pane of the calendar.
+  // The edge is a border, so content that scrolls inside the box does not paint over it.
   .dash--wide .dash__today,
   .cal__panel {
-    outline: var(--vh-edge);
-    outline-offset: -2px;
+    border: var(--vh-edge) !important;
   }
   // The cells of the calendar paint over an outline, so its edge is a layer on top.
   .cal__grid {
@@ -42,8 +42,19 @@
   // surface that holds the cards, so it has the edge as well.
   app-todo-card-tile,
   .bv__col {
-    outline: var(--vh-edge);
-    outline-offset: -2px;
+    border: var(--vh-edge) !important;
+  }
+
+  // The comment log: on a wide screen a surface with the edge on every side; on the phone it
+  // fills a sheet, so it only ends in the line of a scroll area. Every message has the edge,
+  // also an internal one, whose tinted ring has no colour of its own in the mode.
+  app-chat:not(.chat--phone) .chat__log {
+    border: var(--vh-edge) !important;
+  }
+  .chat__bubble,
+  .chat__row .chat__bubble--internal {
+    border: var(--vh-edge);
+    box-shadow: none !important;
   }
 
   // The work list of the start page scrolls inside its panel, and the column header sticks
@@ -68,8 +79,9 @@
   // rows and white headings. The open board is a yellow fill, and the row under the pointer
   // or with the focus has a yellow edge.
   .bp__pop {
-    outline: var(--vh-edge);
-    outline-offset: -2px;
+    border: var(--vh-edge) !important;
+    // The edge of the frosted pop is an outline (`--pop-edge`); the border replaces it.
+    --pop-edge: none !important;
   }
   .bp__row {
     @include vh.text;
@@ -96,8 +108,7 @@
   // its PDF links are buttons with the fill.
   .pb {
     @include vh.ink(var(--vh-fg));
-    outline: var(--vh-edge);
-    outline-offset: -2px;
+    border: var(--vh-edge);
     color: var(--vh-fg);
   }
   .pb__pdf {

@@ -166,12 +166,12 @@
       "to": "application_types"
     },
     {
-      "count": 16,
+      "count": 18,
       "from": "applications",
       "to": "audit"
     },
     {
-      "count": 24,
+      "count": 25,
       "from": "applications",
       "to": "auth"
     },
@@ -206,12 +206,12 @@
       "to": "meetings"
     },
     {
-      "count": 27,
+      "count": 32,
       "from": "applications",
       "to": "notifications"
     },
     {
-      "count": 47,
+      "count": 52,
       "from": "applications",
       "to": "shared"
     },
@@ -556,7 +556,7 @@
       "to": "application_types"
     },
     {
-      "count": 16,
+      "count": 17,
       "from": "flow",
       "to": "applications"
     },

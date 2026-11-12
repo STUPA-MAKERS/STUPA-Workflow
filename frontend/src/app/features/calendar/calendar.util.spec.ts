@@ -194,35 +194,101 @@ describe('calendar.util', () => {
       expect(hoursOf('08:15')).toBe(8.25);
     });
 
-    /** § 000728: an all-day entry, an entry over days and a due card are above the hours. */
-    it('puts untimed entries and entries over several days above the hours', () => {
+    /** § 000728: an all-day entry and a due card are above the hours. */
+    it('puts untimed entries above the hours', () => {
       const card = entry('card', { kind: 'card' });
-      const span = entry('span', { startsOn: '2026-11-10', endsOn: '2026-11-12', startTime: '09:00:00' });
-      expect(allDayOf([timed, card, span], '2026-11-11').map((e) => e.id)).toEqual(['card', 'span']);
-      expect(dayBlocks([timed, card, span], '2026-11-11', 8).map((b) => b.entry.id)).toEqual(['timed']);
+      const days = entry('days', { startsOn: '2026-11-10', endsOn: '2026-11-12' });
+      expect(allDayOf([timed, card, days], '2026-11-11').map((e) => e.id)).toEqual(['card', 'days']);
+      expect(dayBlocks([timed, card, days], '2026-11-11', 8, 21).map((b) => b.entry.id)).toEqual(['timed']);
+    });
+
+    /** § 000744: a timed entry over several days is a block on each of its days. */
+    it('cuts a timed entry over several days into one block per day', () => {
+      const span = entry('span', {
+        startsOn: '2026-11-10',
+        endsOn: '2026-11-12',
+        startTime: '14:00:00',
+        endTime: '12:00:00',
+      });
+      expect(allDayOf([span], '2026-11-11')).toEqual([]);
+      expect(dayBlocks([span], '2026-11-10', 8, 21)[0]).toMatchObject({
+        top: 6,
+        height: 7,
+        start: '14:00:00',
+        end: null,
+      });
+      expect(dayBlocks([span], '2026-11-11', 8, 21)[0]).toMatchObject({ top: 0, height: 13, start: null, end: null });
+      expect(dayBlocks([span], '2026-11-12', 8, 21)[0]).toMatchObject({
+        top: 0,
+        height: 4,
+        start: null,
+        end: '12:00:00',
+      });
+      expect(dayBlocks([span], '2026-11-13', 8, 21)).toEqual([]);
+    });
+
+    it('fills the last day of a span without an end time and never ends a block before its start', () => {
+      const open = entry('open', { startsOn: '2026-11-10', endsOn: '2026-11-11', startTime: '14:00:00' });
+      expect(dayBlocks([open], '2026-11-11', 8, 21)[0]).toMatchObject({ top: 0, height: 13 });
+      const back = entry('back', { startTime: '14:00:00', endTime: '13:00:00' });
+      expect(dayBlocks([back], '2026-11-11', 8, 21)[0]).toMatchObject({ top: 6, height: 0.4, short: true });
     });
 
     it('places a block at its time', () => {
-      const [block] = dayBlocks([timed], '2026-11-11', 8);
+      const [block] = dayBlocks([timed], '2026-11-11', 8, 21);
       expect(block).toMatchObject({ top: 6, height: 1.5, left: 0, width: 100, short: false, lines: 3 });
     });
 
     it('gives a short entry the least height and an open end one hour', () => {
       const short = entry('short', { startTime: '09:00:00', endTime: '09:10:00' });
       const open = entry('open', { startTime: '11:00:00' });
-      const [a, b] = dayBlocks([open, short], '2026-11-11', 8);
+      const [a, b] = dayBlocks([open, short], '2026-11-11', 8, 21);
       expect(a).toMatchObject({ top: 1, height: 0.4, short: true, lines: 1 });
       expect(b).toMatchObject({ top: 3, height: 1, short: false });
     });
 
-    it('shares the width of the day between entries that overlap', () => {
-      const other = entry('other', { startTime: '14:30:00', endTime: '14:45:00' });
+    it('shares the width of the day between entries that start together', () => {
+      const other = entry('other', { startTime: '14:15:00', endTime: '14:45:00' });
       const later = entry('later', { startTime: '16:00:00', endTime: '17:00:00' });
-      const blocks = dayBlocks([other, later, timed], '2026-11-11', 8);
-      expect(blocks.map((b) => [b.entry.id, b.left, b.width])).toEqual([
-        ['timed', 0, 50],
-        ['other', 50, 50],
-        ['later', 0, 100],
+      const blocks = dayBlocks([other, later, timed], '2026-11-11', 8, 21);
+      expect(blocks.map((b) => [b.entry.id, b.left, b.width, b.over])).toEqual([
+        ['timed', 0, 50, false],
+        ['other', 50, 50, false],
+        ['later', 0, 100, false],
+      ]);
+    });
+
+    /** § 000745: a block that starts 45 minutes later lies on the earlier block. */
+    it('lays a later entry on the earlier one', () => {
+      const other = entry('other', { startTime: '14:45:00', endTime: '15:15:00' });
+      const [first, second] = dayBlocks([other, timed], '2026-11-11', 8, 21);
+      expect(first).toMatchObject({ left: 0, width: 100, lane: 0, over: false });
+      expect(second).toMatchObject({ left: 20, width: 80, lane: 1, over: true });
+    });
+
+    it('keeps the lane of a block when a later block of a lower lane meets it', () => {
+      const long = entry('long', { startTime: '09:00:00', endTime: '11:00:00' });
+      const top = entry('top', { startTime: '10:00:00', endTime: '12:00:00' });
+      const late = entry('late', { startTime: '11:15:00', endTime: '12:00:00' });
+      const blocks = dayBlocks([long, top, late], '2026-11-11', 8, 21);
+      expect(blocks.map((b) => [b.entry.id, b.lane, b.left, b.width])).toEqual([
+        ['long', 0, 0, 100],
+        ['top', 1, 50, 50],
+        ['late', 0, 0, 50],
+      ]);
+    });
+
+    it('grows a block over the lanes that are free beside it', () => {
+      const long = entry('long', { startTime: '09:00:00', endTime: '13:00:00' });
+      const mid = entry('mid', { startTime: '09:00:00', endTime: '10:00:00' });
+      const side = entry('side', { startTime: '09:15:00', endTime: '10:00:00' });
+      const late = entry('late', { startTime: '11:00:00', endTime: '12:00:00' });
+      const blocks = dayBlocks([long, mid, side, late], '2026-11-11', 8, 21);
+      expect(blocks.map((b) => [b.entry.id, b.lane, Math.round(b.left), Math.round(b.width), b.over])).toEqual([
+        ['long', 0, 0, 33, false],
+        ['mid', 1, 33, 33, false],
+        ['side', 2, 67, 33, false],
+        ['late', 1, 20, 80, true],
       ]);
     });
 

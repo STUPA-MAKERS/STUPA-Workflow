@@ -14,7 +14,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { shortTime } from '@shared/date-format';
 import {
-  AutocompleteComponent,
   AvatarComponent,
   ButtonComponent,
   ChipComponent,
@@ -23,6 +22,8 @@ import {
   FilterSelectComponent,
   IconComponent,
   InputComponent,
+  ListItemComponent,
+  SearchPillComponent,
   SwitchComponent,
   TextareaComponent,
   TimeInputComponent,
@@ -68,7 +69,6 @@ const SAVE_ERRORS: Readonly<Record<string, TranslationKey>> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
-    AutocompleteComponent,
     AvatarComponent,
     ButtonComponent,
     ChipComponent,
@@ -77,6 +77,8 @@ const SAVE_ERRORS: Readonly<Record<string, TranslationKey>> = {
     FilterSelectComponent,
     IconComponent,
     InputComponent,
+    ListItemComponent,
+    SearchPillComponent,
     SwitchComponent,
     TextareaComponent,
     TimeInputComponent,
@@ -130,7 +132,6 @@ export class AppointmentDialogComponent {
     reset: () => this.personHits.set([]),
     error: () => this.personHits.set([]),
   });
-  readonly personLabel = (p: CalendarPerson): string => p.name;
 
   /** Each opening starts from the Termin, or from an empty form on the picked day. */
   constructor() {

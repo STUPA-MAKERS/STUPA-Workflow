@@ -122,9 +122,15 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/000545](requirements/functional/applications/applications/000545_link-later.md) | A Vorgänger linked later adds only the link | approved |
 | [F/applications/applications/000546](requirements/functional/applications/applications/000546_detail-links.md) | The detail shows Vorgänger and Folgeanträge | approved |
 | [F/applications/applications/000588](requirements/functional/applications/applications/000588_my-applications.md) | Meine Anträge lists the Anträge of the address | approved |
+| [F/applications/applications/000751](requirements/functional/applications/applications/000751_observers.md) | An Antrag can have observers | approved |
+| [F/applications/applications/000752](requirements/functional/applications/applications/000752_observer-reads.md) | An observer reads the Antrag and does not change it | approved |
+| [F/applications/applications/000753](requirements/functional/applications/applications/000753_observer-no-pii.md) | An observer does not see personal fields | approved |
+| [F/applications/applications/000754](requirements/functional/applications/applications/000754_observer-mails.md) | An observer gets the status mails | approved |
+| [F/applications/applications/000755](requirements/functional/applications/applications/000755_observer-removal.md) | A removed observer loses the access at once | approved |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | approved |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | approved |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | approved |
+| [F/applications/dashboard/000750](requirements/functional/applications/dashboard/000750_start-tab-line-buttons-same-size.md) | The two buttons in the tab line of the start page have the same size | approved |
 | [F/applications/flow/000137](requirements/functional/applications/flow/000137_flow-auto-layout.md) | The flow editor lays out automatically | approved |
 | [F/applications/flow/000227](requirements/functional/applications/flow/000227_one-active-flow.md) | There is one active flow | approved |
 | [F/applications/flow/000228](requirements/functional/applications/flow/000228_state-kinds.md) | A state is normal or a vote state | approved |
@@ -292,6 +298,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/calendar/000737](requirements/functional/meetings/calendar/000737_event-as-termin.md) | The Kalender shows an Event like a Termin | approved |
 | [F/meetings/calendar/000738](requirements/functional/meetings/calendar/000738_termin-invite-person-search.md) | The invitation search finds each active account by name | approved |
 | [F/meetings/calendar/000740](requirements/functional/meetings/calendar/000740_termin-open-answers.md) | The answer list of a Termin names the invited persons without an answer | approved |
+| [F/meetings/calendar/000742](requirements/functional/meetings/calendar/000742_termin-invite-search-rows.md) | The invitation search of a Termin shows its hits as rows with an avatar | approved |
+| [F/meetings/calendar/000744](requirements/functional/meetings/calendar/000744_week-span-blocks.md) | A timed entry over several days is a block on each of its days in the week view | approved |
 | [F/meetings/delegations/000110](requirements/functional/meetings/delegations/000110_per-gremium.md) | Vote delegation is a Gremium setting | approved |
 | [F/meetings/delegations/000111](requirements/functional/meetings/delegations/000111_delegation-blocks-presence.md) | A member with an active delegation is not present | approved |
 | [F/meetings/delegations/000112](requirements/functional/meetings/delegations/000112_one-pool.md) | The substitute pool is the only substitute rule | approved |
@@ -598,6 +606,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/000673](requirements/non-functional/usability/layout/000673_phone-detail-tabs-packed.md) | The tabs of a phone detail are packed at the start | approved |
 | [NF/usability/layout/000674](requirements/non-functional/usability/layout/000674_phone-vote-detail-bar.md) | The phone vote detail uses the bar of the other details | approved |
 | [NF/usability/layout/000677](requirements/non-functional/usability/layout/000677_public-page-title-size.md) | A public page has a title of 28 px | approved |
+| [NF/usability/layout/000743](requirements/non-functional/usability/layout/000743_week-day-lines-on-pull.md) | The day lines of the week grid stay when the hours are pulled | approved |
+| [NF/usability/layout/000745](requirements/non-functional/usability/layout/000745_week-blocks-overlap.md) | A later entry lies on an earlier one in the week view | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
 | [S/backend/database/000070](style/backend/database/000070_idempotent-tables.md) | A migration that adds a table is idempotent | approved |
