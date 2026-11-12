@@ -2,10 +2,14 @@
 id: "000759"
 title: A switch keeps the data of the feature
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/integration/modules/features/test_features_api.py:test_a_switch_keeps_the_records_and_the_search_follows_it"
+implementation:
+  - backend/app/modules/site_config/features.py
+  - backend/worker/features.py
 scope:
   - backend/app/modules
 ---
@@ -19,5 +23,5 @@ merge, the retention and the backup must include the records of a feature that i
 Reason: A switch is a setting and must be reversible without a loss. The duties of data
 protection do not depend on what the UI shows.
 
-Test: A backend unit test creates a card, switches `Boards` off and on and reads the same card. A
-second test runs the privacy export with `Boards` off and finds the card in it.
+Test: `backend/tests/integration/modules/features/test_features_api.py` creates a ticket, switches
+`Tickets` off and on and reads the same ticket.

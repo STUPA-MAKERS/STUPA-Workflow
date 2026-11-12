@@ -160,6 +160,18 @@ describe('TransitionDetailComponent', () => {
     expect(screen.queryByText('gone')).toBeNull();
   });
 
+  /** Spec 000761: the editor offers no step of a feature that is off. */
+  it('offers no action of a feature that is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['budget', 'meetings']));
+    const { c } = await setup({ from: 'a', to: 'b', actions: [] });
+    localStorage.removeItem('ap.features.off');
+    const values = c.actionOptions().map((o: { value: string }) => o.value);
+    expect(values).toContain('webhook');
+    expect(values).not.toContain('addToNextSession');
+    expect(values).not.toContain('assignBudget');
+    expect(values).not.toContain('assignBudgetFromMap');
+  });
+
   it('hides the cost-center actions when the target takes its gremium from the cost center', async () => {
     const { c } = await setup({ from: 'a', to: 'b', actions: [] }, { targetBudgetVote: true });
     const values = c.actionOptions().map((o: { value: string }) => o.value);

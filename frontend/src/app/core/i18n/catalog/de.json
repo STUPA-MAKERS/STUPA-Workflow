@@ -4153,5 +4153,17 @@
   "observers.end.doneText": "Du bekommst keine Mails mehr zu diesem Antrag.",
   "observers.end.invalidTitle": "Link ungültig",
   "observers.end.invalidText": "Die Beobachtung ist schon beendet, oder der Link ist unvollständig.",
-  "observers.end.home": "Zur Startseite"
+  "observers.end.home": "Zur Startseite",
+  "admin.nav.features": "Funktionen",
+  "admin.nav.featuresDesc": "Bereiche der Plattform ein- und ausschalten",
+  "admin.features.title": "Funktionen",
+  "admin.features.forbidden": "Für diese Einstellungen fehlt das Recht, Funktionen zu schalten.",
+  "admin.features.needs": "Benötigt {name}",
+  "admin.features.confirmTitle": "Funktionen ausschalten",
+  "admin.features.confirm": "Für alle ausgeblendet und gesperrt: {names}. Die Daten bleiben erhalten.",
+  "admin.features.confirmAction": "Ausschalten",
+  "admin.features.inUse": "Ausschalten nicht möglich: Der Antrags-Flow oder eine Antragsart nutzt die Funktion noch.",
+  "admin.features.use.state": "{feature}: Status „{name}“ im Antrags-Flow",
+  "admin.features.use.transition": "{feature}: Übergang „{name}“ im Antrags-Flow",
+  "admin.features.use.type": "{feature}: Antragsart „{name}“"
 }

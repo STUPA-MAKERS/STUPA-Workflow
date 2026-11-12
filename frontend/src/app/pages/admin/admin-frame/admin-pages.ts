@@ -1,3 +1,4 @@
+import type { FeatureKey } from '@core/features/feature.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { IconName } from '@stupa-makers/ui-kit';
 
@@ -26,6 +27,8 @@ export interface AdminPage {
    * 403 page. This is UX only; the server stays authoritative.
    */
   readonly permissions: readonly string[];
+  /** The feature of the page. The page does not show while the feature is off. */
+  readonly feature?: FeatureKey;
 }
 
 /** The groups of the admin navigation, in order. */
@@ -57,15 +60,16 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'group-mappings', title: 'admin.nav.groupMappings', desc: 'admin.nav.groupMappingsDesc', icon: 'link', group: 'people', permissions: ['admin.group_mappings'] },
   { link: 'oauth-grants', title: 'admin.nav.oauthGrants', desc: 'admin.nav.oauthGrantsDesc', icon: 'handshake', group: 'people', permissions: ['admin.users'] },
   { link: 'committees', title: 'admin.nav.gremien', desc: 'admin.nav.gremienDesc', icon: 'landmark', group: 'gremien', permissions: ['admin.gremien'] },
-  { link: 'delegations', title: 'admin.nav.delegations', desc: 'admin.nav.delegationsDesc', icon: 'repeat', group: 'gremien', permissions: ['admin.delegations'] },
-  { link: 'calendars', title: 'admin.nav.calendars', desc: 'admin.nav.calendarsDesc', icon: 'cal', group: 'gremien', permissions: ['admin.calendars'] },
+  { link: 'delegations', title: 'admin.nav.delegations', desc: 'admin.nav.delegationsDesc', icon: 'repeat', group: 'gremien', permissions: ['admin.delegations'], feature: 'meetings' },
+  { link: 'calendars', title: 'admin.nav.calendars', desc: 'admin.nav.calendarsDesc', icon: 'cal', group: 'gremien', permissions: ['admin.calendars'], feature: 'calendar' },
   { link: 'forms', title: 'admin.nav.forms', desc: 'admin.nav.formsDesc', icon: 'form', group: 'applications', permissions: ['form.configure'] },
   { link: 'flow', title: 'admin.nav.flow', desc: 'admin.nav.flowDesc', icon: 'flow', group: 'applications', permissions: ['flow.configure', 'admin.types'] },
   { link: 'deadlines', title: 'admin.nav.deadlines', desc: 'admin.nav.deadlinesDesc', icon: 'clock', group: 'applications', permissions: ['admin.deadlines'] },
-  { link: 'cost-centres', title: 'admin.nav.costCentres', desc: 'admin.nav.costCentresDesc', icon: 'euro', group: 'finance', permissions: ['budget.structure'] },
+  { link: 'cost-centres', title: 'admin.nav.costCentres', desc: 'admin.nav.costCentresDesc', icon: 'euro', group: 'finance', permissions: ['budget.structure'], feature: 'budget' },
   { link: 'branding', title: 'admin.nav.branding', desc: 'admin.nav.brandingDesc', icon: 'palette', group: 'appearance', permissions: ['admin.site'] },
   { link: 'texts', title: 'admin.nav.texts', desc: 'admin.nav.textsDesc', icon: 'heading', group: 'appearance', permissions: ['admin.site'] },
   { link: 'translations', title: 'admin.nav.translations', desc: 'admin.nav.translationsDesc', icon: 'globe', group: 'appearance', permissions: ['admin.translations'] },
+  { link: 'features', title: 'admin.nav.features', desc: 'admin.nav.featuresDesc', icon: 'power', group: 'appearance', permissions: ['admin.features'] },
   { link: 'cd-variants', title: 'admin.nav.cdVariants', desc: 'admin.nav.cdVariantsDesc', icon: 'file', group: 'appearance', permissions: ['admin.cd_variants'] },
   { link: 'notifications', title: 'admin.nav.notifications', desc: 'admin.nav.notificationsDesc', icon: 'bell', group: 'communication', permissions: ['admin.notifications'] },
   { link: 'mail-templates', title: 'admin.nav.mailTemplates', desc: 'admin.nav.mailTemplatesDesc', icon: 'mail', group: 'communication', permissions: ['admin.notifications'] },

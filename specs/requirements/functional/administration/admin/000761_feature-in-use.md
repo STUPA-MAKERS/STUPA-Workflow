@@ -2,10 +2,20 @@
 id: "000761"
 title: A feature in use by the Antrag flow cannot go off
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/integration/modules/features/test_features_api.py:test_a_feature_in_use_by_the_flow_cannot_go_off"
+  - "backend/tests/integration/modules/features/test_features_api.py:test_a_flow_cannot_start_to_use_a_feature_that_is_off"
+  - "backend/tests/integration/modules/features/test_features_api.py:test_budget_is_in_use_while_an_antragsart_has_a_budget"
+  - "backend/tests/unit/modules/site_config/test_features.py:test_the_flow_uses_name_states_and_transitions"
+implementation:
+  - backend/app/modules/site_config/feature_uses.py
+  - backend/app/modules/admin/site_config_service.py
+  - backend/app/modules/admin/service/flow.py
+  - backend/app/modules/admin/service/application_types.py
+  - frontend/src/app/pages/admin/flow/transition-detail.component.ts
 scope:
   - backend/app/modules/admin
   - backend/app/modules/flow
@@ -25,6 +35,6 @@ The flow editor and the Antragsart editor must not offer a step that needs a fea
 Reason: An Antrag must not stop in a state that waits for a vote or a meeting that nobody can
 open.
 
-Test: A backend unit test builds a flow with a vote state and gets 409 `feature_in_use` when it
-switches `Abstimmungen` off. A second test saves a flow with a vote state while `Abstimmungen` is
-off and gets 422.
+Test: `backend/tests/integration/modules/features/test_features_api.py` builds a flow with a vote
+state and gets 409 `feature_in_use` when it switches `Abstimmungen` off. A second test saves a flow
+with a vote state while `Abstimmungen` is off and gets 422.

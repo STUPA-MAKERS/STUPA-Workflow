@@ -1,3 +1,4 @@
+import { FeatureService } from '@core/features/feature.service';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -31,6 +32,7 @@ export class AccessibilityStatementComponent {
   private readonly branding = inject(BrandingService);
   private readonly i18n = inject(I18nService);
   private readonly help = inject(HelpService);
+  private readonly features = inject(FeatureService);
 
   /** The public config loaded: before, the text is not known. */
   protected readonly loaded = this.branding.loaded;
@@ -39,6 +41,9 @@ export class AccessibilityStatementComponent {
   protected readonly markdown = computed(() =>
     resolveI18n(this.branding.freetexts().accessibilityStatement, this.i18n.uiLocale()).trim(),
   );
+
+  /** The report of a barrier is a ticket, so it does not show while `Tickets` is off. */
+  protected readonly canReport = computed(() => this.features.isOn('tickets'));
 
   /** Open the report dialog with the kind "Barriere". */
   protected report(): void {

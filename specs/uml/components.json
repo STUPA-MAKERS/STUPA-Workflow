@@ -26,7 +26,7 @@
       "to": "tickets"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "admin",
       "to": "application_types"
     },
@@ -116,12 +116,12 @@
       "to": "protocol"
     },
     {
-      "count": 31,
+      "count": 32,
       "from": "admin",
       "to": "shared"
     },
     {
-      "count": 12,
+      "count": 19,
       "from": "admin",
       "to": "site_config"
     },
@@ -444,6 +444,11 @@
       "count": 16,
       "from": "calendar",
       "to": "shared"
+    },
+    {
+      "count": 3,
+      "from": "calendar",
+      "to": "site_config"
     },
     {
       "count": 5,
@@ -1001,6 +1006,11 @@
       "to": "shared"
     },
     {
+      "count": 1,
+      "from": "search",
+      "to": "site_config"
+    },
+    {
       "count": 2,
       "from": "search",
       "to": "tickets"
@@ -1011,7 +1021,7 @@
       "to": "todos"
     },
     {
-      "count": 4,
+      "count": 8,
       "from": "site_config",
       "to": "shared"
     },

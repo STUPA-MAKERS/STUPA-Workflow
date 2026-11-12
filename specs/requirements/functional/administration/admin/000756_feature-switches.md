@@ -2,10 +2,16 @@
 id: "000756"
 title: An admin switches each feature on and off
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/unit/modules/site_config/test_features.py:test_a_configuration_without_feature_entries_reads_each_feature_on"
+  - "backend/tests/integration/modules/features/test_features_api.py:test_an_unknown_feature_key_is_refused"
+implementation:
+  - backend/app/modules/site_config/features.py
+  - backend/app/modules/site_config/branding.py
+  - backend/app/feature_routes.py
 scope:
   - backend/app/modules
   - frontend/src/app
@@ -34,5 +40,6 @@ A feature must include all of its parts:
 Reason: A student body that does not use a part of the platform must not see it. The Anträge are
 the core that the flow, the forms and the Aufgaben need, and the Gremien hold the rights.
 
-Test: A backend unit test reads a configuration without feature entries and finds each feature
-on. A second test sends an unknown feature key and gets 422.
+Test: `backend/tests/unit/modules/site_config/test_features.py` reads a configuration without
+feature entries and finds each feature on. `backend/tests/integration/modules/features/test_features_api.py`
+sends an unknown feature key and gets 422.

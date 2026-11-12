@@ -171,6 +171,18 @@ describe('AdminFrameComponent', () => {
     expect(hrefs).toContain('/admin/cost-centres');
   });
 
+  /** Spec 000758: an admin page of a feature that is off has no entry. */
+  it('leaves out the admin pages of a feature that is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['budget', 'calendar', 'meetings']));
+    await setup(ALL);
+    localStorage.removeItem('ap.features.off');
+    const hrefs = navLinks().map((a) => a.getAttribute('href'));
+    expect(hrefs).not.toContain('/admin/cost-centres');
+    expect(hrefs).not.toContain('/admin/calendars');
+    expect(hrefs).not.toContain('/admin/delegations');
+    expect(hrefs).toContain('/admin/features');
+  });
+
   it('shows only the pages of the held permissions, and leaves out empty groups', async () => {
     await setup(['form.configure', 'admin.types']);
     expect(navLinks().map((a) => a.getAttribute('href'))).toEqual(['/admin/forms', '/admin/flow']);

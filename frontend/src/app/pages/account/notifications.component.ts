@@ -6,6 +6,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { EmptyStateComponent, NoteComponent, SkeletonComponent, SwitchComponent, PageHeaderComponent } from '@stupa-makers/ui-kit';
+import { FeatureService, type FeatureKey } from '@core/features/feature.service';
 import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 
 /**
@@ -22,6 +23,22 @@ const HIDDEN_KINDS: ReadonlySet<string> = new Set(['vote', 'role_change']);
 const TEAM_KINDS: ReadonlyMap<string, string> = new Map([
   ['ticket_created', 'ticket.manage'],
   ['ticket_message', 'ticket.manage'],
+]);
+
+/** The feature whose mails a kind switches; a kind without an entry has no feature. */
+const KIND_FEATURE: ReadonlyMap<string, FeatureKey> = new Map<string, FeatureKey>([
+  ['meeting', 'meetings'],
+  ['delegation', 'meetings'],
+  ['protocol', 'meetings'],
+  ['ticket_created', 'tickets'],
+  ['ticket_message', 'tickets'],
+  ['ticket_answer', 'tickets'],
+  ['todo_assigned', 'todos'],
+  ['todo_mentioned', 'todos'],
+  ['todo_due', 'todos'],
+  ['poll_started', 'voting'],
+  ['poll_reminder', 'voting'],
+  ['appointment', 'calendar'],
 ]);
 
 /**
@@ -51,6 +68,7 @@ export class AccountNotificationsComponent {
   private readonly api = inject(ApiClient);
   private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
+  private readonly features = inject(FeatureService);
 
   /** Every kind the server sent, the hidden ones included. */
   private readonly prefs = signal<NotificationPreference[]>([]);
@@ -66,8 +84,16 @@ export class AccountNotificationsComponent {
 
   /** The kinds that get a row. */
   readonly rows = computed(() =>
-    this.prefs().filter((p) => !HIDDEN_KINDS.has(p.kind) && this.mayGet(p.kind)),
+    this.prefs().filter(
+      (p) => !HIDDEN_KINDS.has(p.kind) && this.mayGet(p.kind) && this.featureOn(p.kind),
+    ),
   );
+
+  /** A kind of a feature that is off gets no row (spec 000758). */
+  private featureOn(kind: string): boolean {
+    const feature = KIND_FEATURE.get(kind);
+    return feature === undefined || this.features.isOn(feature);
+  }
 
   /** A team kind shows only to the holders of its permission. */
   private mayGet(kind: string): boolean {

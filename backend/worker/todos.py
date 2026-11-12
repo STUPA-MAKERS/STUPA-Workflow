@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
+from app.modules.site_config.features import Feature
 from app.modules.todos.access import BoardAccess
 from app.modules.todos.mails import send_todo_due
 from app.modules.todos.models import (
@@ -42,6 +43,7 @@ from app.modules.todos.models import (
 )
 from app.modules.todos.service import BERLIN
 from app.settings import Settings, load_settings
+from worker.features import job_feature_on
 
 logger = logging.getLogger("worker.todos")
 
@@ -69,8 +71,10 @@ async def archive_done_todos(ctx: dict[str, Any], now: datetime | None = None) -
     """Archive the cards that stay in the done column past the board's limit.
 
     Returns:
-        The number of archived cards.
+        The number of archived cards. None while `Boards` is off.
     """
+    if not await job_feature_on(_sessionmaker(ctx), Feature.TODOS):
+        return 0
     moment = now or datetime.now(UTC)
     cutoff = moment - func.make_interval(0, 0, 0, TodoBoard.archive_after_days)
     due = (
@@ -138,10 +142,13 @@ async def process_todo_due(ctx: dict[str, Any], now: datetime | None = None) -> 
     Returns:
         The number of reminded cards.
 
-    One bad card is logged and does not stop the run.
+    One bad card is logged and does not stop the run. No mail goes out while `Boards`
+    is off.
     """
     local = (now or datetime.now(UTC)).astimezone(BERLIN)
     if local.hour < DUE_HOUR:
+        return 0
+    if not await job_feature_on(_sessionmaker(ctx), Feature.TODOS):
         return 0
     tomorrow = local.date() + timedelta(days=1)
     settings: Settings = ctx.get("settings") or load_settings()

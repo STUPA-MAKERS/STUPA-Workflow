@@ -27,6 +27,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.middleware import RequestContextMiddleware
+from app.modules.site_config.features import FeatureSwitches
 from app.shared.errors import (
     AppError,
     BadRequestError,
@@ -40,6 +41,24 @@ from app.shared.errors import (
     ValidationProblem,
     register_exception_handlers,
 )
+
+
+@pytest.fixture(autouse=True)
+def _all_features_on(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Read every feature switch as on in the unit suite.
+
+    The feature gate reads the active site configuration for each route of a feature. A
+    unit test has no database, and its fake session knows only the queries of the code
+    under test. A test of the switches sets ``active_switches`` itself. The integration
+    suite reads the real configuration.
+    """
+    if request.node.get_closest_marker("integration") is not None:
+        return
+
+    async def switches(_session: object) -> FeatureSwitches:
+        return FeatureSwitches()
+
+    monkeypatch.setattr("app.modules.site_config.features.active_switches", switches)
 
 
 @pytest.fixture

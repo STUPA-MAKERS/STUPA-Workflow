@@ -2,10 +2,23 @@
 id: "000758"
 title: A feature that is off does not show in the UI
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "frontend/src/app/layout/nav.service.spec.ts:NavService"
+  - "frontend/src/app/core/features/feature.guard.spec.ts:featureMatch"
+  - "frontend/src/app/features/search/page-index.service.spec.ts:PageIndexService"
+  - "backend/tests/integration/modules/features/test_features_api.py:test_a_switch_keeps_the_records_and_the_search_follows_it"
+  - "backend/tests/integration/modules/calendar/test_calendar_features.py:test_the_calendar_omits_the_entries_of_a_feature_that_is_off"
+implementation:
+  - frontend/src/app/core/features/feature.service.ts
+  - frontend/src/app/core/features/feature.guard.ts
+  - frontend/src/app/layout/nav.service.ts
+  - frontend/src/app/app.routes.ts
+  - backend/app/modules/search/service.py
+  - backend/app/modules/calendar/entries.py
+  - backend/app/modules/todos/links.py
 scope:
   - frontend/src/app
   - backend/app/modules/search
@@ -28,6 +41,8 @@ the switches without a session.
 
 Reason: A person must not find a way into a part that the student body does not use.
 
-Test: A frontend unit test switches each feature off in the site configuration and finds no
-navigation entry of it. A route test opens a route of the feature and gets the not-found page. A
-backend unit test of the search finds no hit of a feature that is off.
+Test: `frontend/src/app/layout/nav.service.spec.ts` switches each feature off and finds no
+navigation entry of it. `frontend/src/app/core/features/feature.guard.spec.ts` finds the guard on
+the routes of each feature, and the guard does not match while the feature is off, so the route
+shows the not-found page. `backend/tests/integration/modules/features/test_features_api.py` finds no
+search hit of a feature that is off.

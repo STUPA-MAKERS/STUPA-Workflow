@@ -4153,5 +4153,17 @@
   "observers.end.doneText": "You get no more mails about this application.",
   "observers.end.invalidTitle": "Invalid link",
   "observers.end.invalidText": "The observation has ended already, or the link is incomplete.",
-  "observers.end.home": "To the start page"
+  "observers.end.home": "To the start page",
+  "admin.nav.features": "Features",
+  "admin.nav.featuresDesc": "Switch parts of the platform on and off",
+  "admin.features.title": "Features",
+  "admin.features.forbidden": "You do not have the right to switch features.",
+  "admin.features.needs": "Needs {name}",
+  "admin.features.confirmTitle": "Switch features off",
+  "admin.features.confirm": "Hidden and closed for everyone: {names}. The data stays.",
+  "admin.features.confirmAction": "Switch off",
+  "admin.features.inUse": "Cannot switch off: the application flow or an application type still uses the feature.",
+  "admin.features.use.state": "{feature}: state “{name}” in the application flow",
+  "admin.features.use.transition": "{feature}: transition “{name}” in the application flow",
+  "admin.features.use.type": "{feature}: application type “{name}”"
 }

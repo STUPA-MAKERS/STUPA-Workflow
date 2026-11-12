@@ -33,6 +33,7 @@
       </a>
     }
 
+    @if (calendarOn()) {
     <a routerLink="/public-calendar" class="home__choice">
       <app-icon class="home__icon" name="cal" [size]="24" />
       <span class="home__choice-title">{{ 'home.choice.calendar.title' | t }}</span>
@@ -41,6 +42,7 @@
         {{ 'home.choice.go' | t }} <app-icon name="arrow" [size]="15" />
       </span>
     </a>
+    }
 
     <a routerLink="/login" class="home__choice">
       <app-icon class="home__icon" name="user" [size]="24" />

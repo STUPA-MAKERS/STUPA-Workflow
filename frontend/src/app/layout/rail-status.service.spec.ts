@@ -300,4 +300,20 @@ describe('RailStatusService', () => {
     env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [], nextCursor: null });
     expect(env.svc.taskCount()).toBe(1);
   });
+
+  /** Spec 000758: a source of a feature that is off is not asked. */
+  it('does not ask for the To-Dos and the tickets while they are off', () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['todos', 'tickets', 'meetings']));
+    const env = setup();
+    localStorage.removeItem('ap.features.off');
+    signIn(env, { ...MEMBER, permissions: ['ticket.manage'] } as Principal);
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectNone((r) => r.url === MINE);
+    env.http.expectNone((r) => r.url === '/api/tickets/counts');
+    env.http.expectNone((r) => r.url === TIMELINE);
+    env.http.expectOne((r) => r.url === TASKS).flush([{ id: 't1' }]);
+    expect(env.svc.taskCount()).toBe(1);
+    expect(env.svc.ticketCount()).toBeNull();
+    expect(env.svc.live()).toBe(false);
+  });
 });

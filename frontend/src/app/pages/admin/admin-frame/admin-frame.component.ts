@@ -24,6 +24,7 @@ import {
   RouterOutlet,
 } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
+import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -176,6 +177,7 @@ const sheetScroll = new Map<number, number>();
 })
 export class AdminFrameComponent {
   private readonly auth = inject(AuthService);
+  private readonly features = inject(FeatureService);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly pageFrame = inject(PageFrameService);
@@ -287,7 +289,8 @@ export class AdminFrameComponent {
       this.i18n.translate(p.title).toLocaleLowerCase().includes(q) ||
       this.i18n.translate(p.desc).toLocaleLowerCase().includes(q);
     const allowed = (p: FramePage): boolean =>
-      p.permissions.length === 0 || this.auth.canAny(...p.permissions);
+      (!p.feature || this.features.isOn(p.feature)) &&
+      (p.permissions.length === 0 || this.auth.canAny(...p.permissions));
     return groups
       .map((g) => ({
         ...g,

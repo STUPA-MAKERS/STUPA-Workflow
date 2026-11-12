@@ -128,6 +128,11 @@ def patched(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(wd, "process_todo_due", _no_todos)
 
+    async def _on(_maker: object, _feature: object) -> bool:
+        return True
+
+    monkeypatch.setattr(wd, "job_feature_on", _on)
+
 
 def _ctx(sessions: list[FakeSession]) -> dict[str, Any]:
     return {"settings": SETTINGS, "deadlines_sessionmaker": _maker(sessions)}

@@ -712,3 +712,52 @@ describe('Fällige To-Dos (spec 000550)', () => {
   });
 });
 
+/** Spec 000758: the start page leaves out the parts of a feature that is off. */
+describe('DashboardComponent with features off', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => {
+    localStorage.clear();
+    jest.restoreAllMocks();
+  });
+
+  async function setupOff(off: readonly string[], todos: readonly Partial<TodoMineItem>[] = []) {
+    localStorage.setItem('ap.features.off', JSON.stringify(off));
+    const mine = jest.fn(() => of({ items: todos, dueSoonCount: 0 }));
+    const view = await render(DashboardComponent, {
+      providers: [
+        provideRouter([{ path: '**', children: [] }]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: TodosApiService, useValue: { mine } },
+      ],
+    });
+    const injector = view.fixture.debugElement.injector;
+    const http = injector.get(HttpTestingController);
+    injector.get(AuthService).ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush(MEMBER);
+    http.expectOne((r) => r.url.endsWith('/api/applications/tasks')).flush(TASKS);
+    http.expectOne((r) => r.url.endsWith('/api/applications')).flush(MINE);
+    http.expectOne((r) => r.url.endsWith('/api/application-types')).flush(TYPES);
+    view.detectChanges();
+    return { ...view, http, mine };
+  }
+
+  it('asks for no meeting and shows no sheet while Sitzungen and Boards are off', async () => {
+    const { http, mine, fixture } = await setupOff(['meetings', 'todos']);
+    http.expectNone((r) => r.url.endsWith('/api/meetings/timeline'));
+    http.expectNone((r) => r.url.endsWith('/api/delegations'));
+    expect(mine).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).classList).toContain('dash--noToday');
+    expect(screen.queryByText('Keine Sitzungen')).toBeNull();
+    http.verify();
+  });
+
+  it('keeps the sheet for a due card while Sitzungen is off', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(new Date(2026, 9, 16, 10).getTime());
+    const { fixture } = await setupOff(['meetings'], [{ id: 'k-1', title: 'Karte k-1', dueDate: '2026-10-12', boardName: 'StuPa' }]);
+    expect((fixture.nativeElement as HTMLElement).classList).not.toContain('dash--noToday');
+    expect(screen.getByTestId('dash-due')).toBeInTheDocument();
+  });
+});
+

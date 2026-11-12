@@ -1,3 +1,4 @@
+import { FeatureService } from '@core/features/feature.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -149,6 +150,8 @@ export class FormEditorComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
+  /** "Mit Budget" shows only while `Budget` is on (spec 000761). */
+  protected readonly budgetOn = inject(FeatureService).isOn('budget');
   protected readonly langFieldLabel = langFieldLabel;
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 

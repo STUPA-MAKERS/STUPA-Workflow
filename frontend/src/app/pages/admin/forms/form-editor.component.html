@@ -417,10 +417,12 @@
               [attr.placeholder]="descFallback() || ('admin.forms.descPlaceholder' | t)"
             ></textarea>
           </div>
-          <app-checkbox
-            [ngModel]="hasBudget()"
-            (ngModelChange)="hasBudget.set($event)"
-          >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
+          @if (budgetOn) {
+            <app-checkbox
+              [ngModel]="hasBudget()"
+              (ngModelChange)="hasBudget.set($event)"
+            >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
+          }
           <app-checkbox
             [ngModel]="cmpRequired()"
             (ngModelChange)="cmpRequired.set($event)"

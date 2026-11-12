@@ -195,6 +195,17 @@ describe('TodoLinkedListComponent actions (specs 000547, 000548)', () => {
     expect(screen.getByText('Keine To-Dos verknüpft')).toBeInTheDocument();
   });
 
+  /** Spec 000758: without Boards the section has no card and no action. */
+  it('asks nothing and shows no action while Boards is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['todos']));
+    const { api, cmp } = await withActions(true, [card()]);
+    localStorage.removeItem('ap.features.off');
+    expect(api.linked).not.toHaveBeenCalled();
+    expect(api.boards).not.toHaveBeenCalled();
+    expect(cmp.showActions()).toBe(false);
+    expect(screen.queryByRole('heading', { name: 'Verknüpft' })).toBeNull();
+  });
+
   it('hides the actions from a person who writes no board', async () => {
     await withActions(false);
     expect(screen.queryByRole('button', { name: 'To-Do anlegen' })).toBeNull();
