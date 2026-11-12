@@ -300,8 +300,8 @@
 // open trigger in the rail is black on the yellow pill.
 @include d.host-on(veryHigh) {
   .hm--popover {
-    outline: var(--vh-edge);
-    outline-offset: -2px;
+    border: var(--vh-edge) !important;
+    outline: none !important;
   }
   .hm__rail.is-open {
     color: var(--vh-hi);
