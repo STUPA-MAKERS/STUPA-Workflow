@@ -1,4 +1,5 @@
-import { BehaviorSubject, Subject, of } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
+import type { Observable } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -6,6 +7,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angul
 import { render, screen, within } from '@testing-library/angular';
 import { axe } from 'jest-axe';
 import { AuthService } from '@core/auth/auth.service';
+import { AdminApiService } from '../admin/admin-api.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { BudgetDashboardComponent, utilisation } from './budget-dashboard.component';
 import { BudgetTreeApi } from './budget-tree.api';
@@ -50,7 +52,6 @@ function node(over: Partial<BudgetTreeNode> & { id: string }): BudgetTreeNode {
     currency: over.currency ?? 'EUR',
     active: over.active ?? true,
     color: over.color ?? null,
-    hiddenInBudget: over.hiddenInBudget ?? false,
     viewGremiumId: over.viewGremiumId ?? null,
     fiscalStartMonth: over.fiscalStartMonth ?? 1,
     fiscalStartDay: over.fiscalStartDay ?? 1,
@@ -159,6 +160,8 @@ interface SetupOpts {
   phone?: boolean;
   /** The to-do API of the section "Verknüpft" of the cost centre card. */
   todos?: object;
+  /** The answer of the Gremien list of the settings of a Kostenstelle. */
+  gremien?: Observable<readonly { id: string; name: string }[]>;
 }
 
 /**
@@ -172,6 +175,7 @@ function providers(opts: SetupOpts, params = new BehaviorSubject(convertToParamM
     provideRouter([]),
     opts.todos ? { provide: TodosApiService, useValue: opts.todos } : NO_LINKED_TODOS,
     { provide: AuthService, useValue: authStub(opts.perms) },
+    { provide: AdminApiService, useValue: { listGremienOptions: () => opts.gremien ?? of([]) } },
     {
       provide: ActivatedRoute,
       useValue: {
@@ -201,7 +205,7 @@ async function setup(opts: SetupOpts = {}) {
   const view = await render(BudgetDashboardComponent, { providers: providers(opts, params) });
   const http = TestBed.inject(HttpTestingController);
   http.expectOne((r) => r.url.endsWith('/budgets')).flush(tree);
-  const tops = tree.filter((n) => !n.hiddenInBudget);
+  const tops = tree.filter((n) => n.active);
   for (const top of tops) {
     http.expectOne((r) => r.url.endsWith(`/budgets/${top.id}/fiscal-years`)).flush(fys);
   }
@@ -935,7 +939,7 @@ describe('BudgetDashboardComponent', () => {
       more.click();
       view.fixture.detectChanges();
       const items = view.getAllByRole('menuitem').map((i) => i.textContent?.trim());
-      expect(items).toEqual(['Exportieren', 'Buchungen ansehen']);
+      expect(items).toEqual(['Exportieren', 'Buchungen ansehen', 'Kostenstelle anlegen']);
       const exp = jest.spyOn(c, 'onExport').mockImplementation(() => undefined);
       const book = jest.spyOn(c, 'openBookings').mockImplementation(() => undefined);
       view.getAllByRole('menuitem')[0].click();
@@ -1171,20 +1175,20 @@ describe('BudgetDashboardComponent', () => {
     expect(view.container.querySelector('.bd__main')?.getAttribute('role')).toBeNull();
   });
 
-  it('prunes hidden cost centres from the tree, the roots and the sheet', async () => {
+  it('prunes inactive cost centres from the tree, the roots and the sheet', async () => {
     const tree = [
       node({
         id: 'b-vs',
         key: 'VS',
         byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '100' })],
         children: [
-          node({ id: 'b-hide', key: 'H', hiddenInBudget: true, byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '50' })] }),
+          node({ id: 'b-hide', key: 'H', active: false, byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '50' })] }),
           node({ id: 'b-show', key: 'S', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '50' })] }),
         ],
       }),
-      node({ id: 'b-secret', key: 'SEC', hiddenInBudget: true, byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
+      node({ id: 'b-secret', key: 'SEC', active: false, byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
     ];
-    const { c } = await setup({ tree });
+    const { c } = await setup({ tree, perms: ['budget.view'] });
     expect(c.tops().map((n: { id: string }) => n.id)).toEqual(['b-vs']);
     const ids = c.usageRows().map((r: { node: { id: string } }) => r.node.id);
     expect(ids).toEqual(['b-show']);
@@ -1288,7 +1292,7 @@ describe('BudgetDashboardComponent', () => {
       expect(screen.getByText('Kein Haushaltsjahr angelegt')).toBeTruthy();
       expect(screen.queryByText('Noch keine Budgetdaten')).toBeNull();
       const link = screen.getByRole('link', { name: 'Haushaltsjahr anlegen' });
-      expect(link.getAttribute('href')).toBe('/admin/cost-centres');
+      expect(link.getAttribute('href')).toBe('/admin/budgets');
     });
 
     it('keeps the "nothing is configured" wording when there is no cost centre at all', async () => {
@@ -1363,5 +1367,202 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
     expect(within(list).getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();
     expect(within(list).getByRole('link', { name: 'Inventur Bühnentechnik' })).toHaveAttribute('href', '/todos?card=k-1');
     expect(within(list).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
+  });
+
+  describe('views', () => {
+    it('§000804: shows the view switch only when a top level has the plan switch on', async () => {
+      const off = await setup();
+      expect(off.container.querySelector('app-segmented')).toBeNull();
+      expect(off.c.planTop()).toBeNull();
+      off.c.setMode('plan');
+    });
+
+    it('§000804: opens Planung with the top level and the year of this view', async () => {
+      const tree = [{ ...TREE[0], planEnabled: true }, ...TREE.slice(1)];
+      const view = await setup({ tree });
+      expect(view.container.querySelector('app-segmented')).not.toBeNull();
+      const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      view.c.setMode('run');
+      view.c.setMode(null);
+      expect(navigate).not.toHaveBeenCalled();
+      view.c.setMode('plan');
+      expect(navigate).toHaveBeenCalledWith(['/budget/plan'], { queryParams: { budget: 'b-vs', fy: 'fy-1' } });
+      view.c.selectedBudgetId.set('other');
+      view.c.setMode('plan');
+      expect(navigate).toHaveBeenLastCalledWith(['/budget/plan'], { queryParams: { budget: 'b-vs', fy: null } });
+    });
+
+    it('§000804: puts the view switch below the title on a phone', async () => {
+      const tree = [{ ...TREE[0], planEnabled: true }, ...TREE.slice(1)];
+      const view = await setup({ tree, wide: false, phone: true });
+      expect(view.container.querySelector('.bd__top app-segmented')).not.toBeNull();
+    });
+  });
+
+  describe('Kostenstellen and allocations by hand', () => {
+    const PLAN_TREE = [{ ...TREE[0], planEnabled: true }];
+    const planUrl = (r: { url: string }) => r.url.endsWith('/plan');
+    const treeUrl = (r: { url: string }) => r.url.endsWith('/budgets');
+    const lineOf = (budgetId: string) => ({ budgetId, amount: '1' });
+    const planOf = (state: string, ids: string[]) => ({ id: 'p', budgetId: 'b-vs', fiscalYearId: 'fy-1', versions: [{ id: 'v', number: 0, state, steps: [], lines: ids.map(lineOf) }] });
+
+    it('§000834: shows an inactive Kostenstelle with its mark to a person who can set it active again', async () => {
+      const tree = [{ ...TREE[0], children: [{ ...TREE[0].children[0], active: false }, TREE[0].children[1]] }];
+      const view = await setup({ tree });
+      expect(view.c.treeRows().map((r: { node: { id: string } }) => r.node.id)).toContain('b-800');
+      expect(within(view.container.querySelector('.bd__tree') as HTMLElement).getByText('inaktiv')).toBeInTheDocument();
+    });
+
+    it('§000831: edits by hand in a budget without a Haushaltsplan', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-800' } });
+      expect(view.c.byHand()).toBe(true);
+      expect(view.c.editable()).toBe(true);
+      expect(view.c.allocatable()).toBe(true);
+      expect(view.c.sided()).toBe(false);
+      expect(view.c.parents().map((o: { value: string }) => o.value)).toEqual(['b-vs', 'b-800', 'b-810', 'b-900']);
+      expect(view.c.moreSections().map((sec: { items: { id: string }[] }) => sec.items.map((i) => i.id))).toEqual([['bookings'], ['new'], ['delete']]);
+      expect(view.container.querySelector('app-cost-centre-settings')).not.toBeNull();
+      expect(view.container.querySelector('.bd__allocation')).not.toBeNull();
+    });
+
+    it('offers nothing to edit without budget.structure, and no settings for the budget itself', async () => {
+      const reader = await setup({ perms: ['budget.view'], queryParams: { costCentre: 'b-800' } });
+      expect(reader.c.byHand()).toBe(false);
+      expect(reader.c.moreSections()).toEqual([{ items: [expect.objectContaining({ id: 'bookings' })] }]);
+      expect(reader.container.querySelector('app-cost-centre-settings')).toBeNull();
+      TestBed.resetTestingModule();
+      const top = await setup();
+      expect(top.c.editable()).toBe(false);
+      expect(top.c.parents()).toHaveLength(4);
+      expect(top.container.querySelector('app-cost-centre-settings')).toBeNull();
+      expect(top.container.querySelector('.bd__allocation')).not.toBeNull();
+    });
+
+    it('has no allocation field in a closed year, and no Gremien when their read fails', async () => {
+      const view = await setup({ fys: [{ ...FY, closedAt: '2026-12-31T00:00:00Z' }], gremien: throwError(() => new Error('down')) });
+      expect(view.c.allocatable()).toBe(false);
+      expect(view.c.gremiumOptions()).toEqual([]);
+    });
+
+    it('§000822: shows in a year with a plan in force only its Kostenstellen and edits nothing by hand', async () => {
+      const view = await setup({ tree: [...PLAN_TREE, node({ id: 'b-qs', byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })] })], queryParams: { costCentre: 'b-900' } });
+      expect(view.c.yearPlan()).toBeUndefined();
+      view.http.expectOne(planUrl).flush(planOf('in_force', ['b-800']));
+      view.fixture.detectChanges();
+      const ids = view.c.treeRows().map((r: { node: { id: string } }) => r.node.id);
+      expect(ids).toContain('b-800');
+      expect(ids).toContain('b-qs');
+      expect(view.c.byHand()).toBe(false);
+      expect(view.c.allocatable()).toBe(false);
+      expect(view.c.moreSections().flatMap((sec: { items: { id: string }[] }) => sec.items.map((i) => i.id))).not.toContain('new');
+    });
+
+    it('falls back to the budget when the plan in force has no line for the selected Kostenstelle', async () => {
+      const tree = [{ ...PLAN_TREE[0], children: [node({ id: 'b-out', parentId: 'b-vs', byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })] })] }];
+      const view = await setup({ tree, queryParams: { costCentre: 'b-out' } });
+      view.http.expectOne(planUrl).flush(planOf('in_force', []));
+      expect(view.c.selectedKsId()).toBe('b-vs');
+    });
+
+    it('shows every Kostenstelle while the plan of the year is a draft', async () => {
+      const view = await setup({ tree: PLAN_TREE, queryParams: { costCentre: 'b-800' } });
+      view.http.expectOne(planUrl).flush(planOf('draft', []));
+      expect(view.c.treeRows().map((r: { node: { id: string } }) => r.node.id)).toContain('b-900');
+      expect(view.c.sided()).toBe(true);
+      expect(view.c.byHand()).toBe(false);
+    });
+
+    it('edits by hand in a year without a plan, and keeps the answer of a year that is no longer shown', async () => {
+      const view = await setup({ tree: PLAN_TREE, fys: [FY, FY2] });
+      const first = view.http.expectOne(planUrl);
+      view.c.selectYear('fy-1');
+      const second = view.http.expectOne(planUrl);
+      first.flush(planOf('in_force', []));
+      expect(view.c.yearPlan()).toBeUndefined();
+      second.flush({ code: 'plan_not_found' }, { status: 404, statusText: 'Not Found' });
+      expect(view.c.yearPlan()).toBeNull();
+      expect(view.c.byHand()).toBe(true);
+      view.c.selectYear('fy-2');
+      const third = view.http.expectOne(planUrl);
+      view.c.selectYear('fy-1');
+      third.flush({}, { status: 500, statusText: 'Error' });
+      expect(view.c.yearPlan()).toBeUndefined();
+      view.http.expectOne(planUrl).flush(planOf('draft', []));
+    });
+
+    it('§000829: opens the create dialog and selects the new Kostenstelle', async () => {
+      const view = await setup();
+      view.c.onAction({ id: 'new', label: '' });
+      expect(view.c.createOpen()).toBe(true);
+      view.c.onCreated({ id: 'b-900', plan: null });
+      expect(view.c.createOpen()).toBe(false);
+      view.http.expectOne(treeUrl).flush(TREE);
+      expect(view.c.selectedKsId()).toBe('b-900');
+      view.c.onCreated({ id: null, plan: null });
+      view.http.expectOne(treeUrl).flush(TREE);
+      expect(view.c.selectedKsId()).toBe('b-900');
+    });
+
+    it('selects the budget when the selected Kostenstelle is gone after a refresh, and names a failed refresh', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-900' } });
+      const error = jest.spyOn(TestBed.inject(ToastService), 'error');
+      view.c.refreshTree();
+      view.http.expectOne(treeUrl).flush([{ ...TREE[0], children: [TREE[0].children[0]] }]);
+      expect(view.c.selectedKsId()).toBe('b-vs');
+      view.c.refreshTree();
+      view.http.expectOne(treeUrl).flush({}, { status: 500, statusText: 'Error' });
+      expect(error).toHaveBeenCalledWith('Die Budget-Statistik konnte nicht geladen werden.');
+    });
+
+    it('§000832: deletes the selected Kostenstelle after the confirmation', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-810' } });
+      const toast = TestBed.inject(ToastService);
+      const success = jest.spyOn(toast, 'success');
+      const error = jest.spyOn(toast, 'error');
+      view.c.deleteNode();
+      view.c.onAction({ id: 'delete', label: '' });
+      expect(view.c.deleteTarget().id).toBe('b-810');
+      view.c.deleteNode();
+      view.http.expectOne((r) => r.method === 'DELETE' && r.url.endsWith('/budgets/b-810')).flush({ code: 'budget_has_bookings' }, { status: 409, statusText: 'Conflict' });
+      expect(error).toHaveBeenCalledWith('Die Kostenstelle hat Buchungen und lässt sich nicht löschen.');
+      expect(view.c.selectedKsId()).toBe('b-810');
+      view.c.onAction({ id: 'delete', label: '' });
+      view.c.deleteNode();
+      view.http.expectOne((r) => r.method === 'DELETE').flush(null);
+      expect(success).toHaveBeenCalledWith('Kostenstelle gelöscht.');
+      expect(view.c.selectedKsId()).toBe('b-800');
+      expect(view.c.deleteTarget()).toBeNull();
+      view.http.expectOne(treeUrl).flush(TREE);
+    });
+
+    it('§000833: saves the allocation when the field loses the focus', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-800' } });
+      const toast = TestBed.inject(ToastService);
+      const success = jest.spyOn(toast, 'success');
+      const error = jest.spyOn(toast, 'error');
+      const put = (r: { method: string; url: string }) => r.method === 'PUT' && r.url.endsWith('/budgets/b-800/allocations/fy-1');
+      view.c.saveAllocation();
+      view.c.editAllocation('');
+      view.c.saveAllocation();
+      view.c.editAllocation('400');
+      view.c.saveAllocation();
+      view.http.expectNone(put);
+      view.c.editAllocation('450');
+      view.c.saveAllocation();
+      const req = view.http.expectOne(put);
+      expect(req.request.body).toEqual({ allocated: '450' });
+      req.flush({});
+      expect(success).toHaveBeenCalledWith('Zuteilung gespeichert.');
+      view.http.expectOne(treeUrl).flush(TREE);
+      view.c.editAllocation('9999');
+      view.c.saveAllocation();
+      view.http.expectOne(put).flush({ code: 'children_allocation_exceeds_parent' }, { status: 422, statusText: 'Unprocessable' });
+      expect(error).toHaveBeenCalledWith('Die Zuteilung konnte nicht gespeichert werden.');
+      view.http.expectOne(treeUrl).flush(TREE);
+      view.c.selectedKsId.set('gone');
+      view.c.editAllocation('1');
+      view.c.saveAllocation();
+      view.http.expectNone(put);
+    });
   });
 });

@@ -1,0 +1,61 @@
+.cf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.cf__legend {
+  padding: 0;
+  font-weight: var(--fw-semibold);
+}
+.cf__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cf__pick,
+.cf__native {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.cf:disabled :is(.cf__pick, .cf__native) {
+  cursor: default;
+}
+.cf__pick--on {
+  box-shadow:
+    0 0 0 2px var(--color-surface-1),
+    0 0 0 4px var(--color-text);
+}
+.cf__pick:focus-visible,
+.cf__native:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+.cf__native {
+  background: conic-gradient(#e5484d, #f5a524, #f5d90a, #46a758, #0091ff, #8e4ec6, #e5484d);
+}
+.cf__native::-webkit-color-swatch-wrapper {
+  padding: 5px;
+}
+.cf__native::-webkit-color-swatch {
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+.cf__native::-moz-color-swatch {
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+.cf__hex {
+  width: 9rem;
+}
+.cf__hex ::ng-deep input {
+  font-family: var(--font-mono);
+}

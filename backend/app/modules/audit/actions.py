@@ -139,6 +139,9 @@ class AuditAction(StrEnum):
         BUDGET_NODE_CREATE: The ``BUDGET_*`` entries cover cost-center CRUD,
             allocation, bookings, transfers, invoices and moves of an application to
             another cost center or fiscal year. ``data`` carries ids and amounts.
+        BUDGET_PLAN_VERSION_CREATE: The ``BUDGET_PLAN_*`` entries cover the
+            Haushaltsplan: a new version, a state change of a version and a change of a
+            line. ``data`` names the plan, the version and the amounts.
         BACKUP_CREATE: The ``BACKUP_*`` entries are gated by ``backup.manage``.
             ``data`` carries the backup id, the kind and size metadata, never archive
             contents. A restore replaces the database, so the BACKUP_RESTORE entry
@@ -234,6 +237,14 @@ class AuditAction(StrEnum):
     BUDGET_INVOICE_DELETE = "budget_invoice_delete"
     BUDGET_ASSIGN = "budget_assign"
     BUDGET_MOVE_FISCAL_YEAR = "budget_move_fiscal_year"
+    BUDGET_SIDE_SET = "budget_side_set"
+    BUDGET_PLAN_SWITCH = "budget_plan_switch"
+    BUDGET_PLAN_VERSION_CREATE = "budget_plan_version_create"
+    BUDGET_PLAN_STATE = "budget_plan_state"
+    BUDGET_PLAN_STEPS_SET = "budget_plan_steps_set"
+    BUDGET_PLAN_STEP = "budget_plan_step"
+    BUDGET_PLAN_STEP_VOTE = "budget_plan_step_vote"
+    BUDGET_PLAN_LINE_SET = "budget_plan_line_set"
     BACKUP_CREATE = "backup_create"
     BACKUP_DELETE = "backup_delete"
     BACKUP_EXPORT = "backup_export"

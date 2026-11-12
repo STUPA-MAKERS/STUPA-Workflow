@@ -18,7 +18,6 @@ function node(id: string, color: string | null, children: BudgetTreeNode[] = [])
     currency: 'EUR',
     active: true,
     color,
-    hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
     fiscalStartDay: 1,

@@ -45,7 +45,7 @@ describe('PageIndexService', () => {
     const svc = setup({ canAny: () => true });
     const paths = svc.visible().map((e) => e.path);
     expect(paths).toContain('/admin');
-    expect(paths).toContain('/admin/cost-centres');
+    expect(paths).toContain('/admin/budgets');
     expect(paths).toContain('/admin/backups');
     expect(paths.filter((p) => p === '/admin')).toHaveLength(1);
     expect(svc.visible().find((e) => e.path === '/admin/backups')?.parentLabel).toBe('nav.admin');
@@ -120,7 +120,7 @@ describe('PageIndexService', () => {
     localStorage.clear();
     expect(paths).not.toContain('/todos');
     expect(paths).not.toContain('/budget');
-    expect(paths).not.toContain('/admin/cost-centres');
+    expect(paths).not.toContain('/admin/budgets');
     expect(paths).toContain('/calendar');
   });
 });

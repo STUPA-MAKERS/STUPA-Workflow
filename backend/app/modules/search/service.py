@@ -267,7 +267,7 @@ class SearchService:
         scope = await self._budget_scope(principal)
         if scope is None:
             return []
-        stmt = select(Budget).where(where, Budget.hidden_in_budget.is_(False), *scope)
+        stmt = select(Budget).where(where, Budget.active.is_(True), *scope)
         rows = (await self.session.scalars(stmt.order_by(rank.desc()).limit(PER_KIND + 1))).all()
         return [
             SearchHit(

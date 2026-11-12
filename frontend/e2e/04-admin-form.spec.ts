@@ -70,5 +70,5 @@ test('Admin-Rahmen: über die Verwaltungsnavigation zur Formularliste', async ({
   await nav.getByRole('searchbox', { name: 'Einstellungen durchsuchen' }).fill('Kostenstellen');
   await expect(nav.getByRole('link')).toHaveCount(1);
   await nav.getByRole('link', { name: /Kostenstellen/ }).click();
-  await expect(page).toHaveURL(/\/admin\/cost-centres$/);
+  await expect(page).toHaveURL(/\/admin\/budgets$/);
 });

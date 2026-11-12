@@ -65,7 +65,7 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'forms', title: 'admin.nav.forms', desc: 'admin.nav.formsDesc', icon: 'form', group: 'applications', permissions: ['form.configure'] },
   { link: 'flow', title: 'admin.nav.flow', desc: 'admin.nav.flowDesc', icon: 'flow', group: 'applications', permissions: ['flow.configure', 'admin.types'] },
   { link: 'deadlines', title: 'admin.nav.deadlines', desc: 'admin.nav.deadlinesDesc', icon: 'clock', group: 'applications', permissions: ['admin.deadlines'] },
-  { link: 'cost-centres', title: 'admin.nav.costCentres', desc: 'admin.nav.costCentresDesc', icon: 'euro', group: 'finance', permissions: ['budget.structure'], feature: 'budget' },
+  { link: 'budgets', title: 'admin.nav.budgets', desc: 'admin.nav.budgetsDesc', icon: 'euro', group: 'finance', permissions: ['budget.structure'], feature: 'budget' },
   { link: 'branding', title: 'admin.nav.branding', desc: 'admin.nav.brandingDesc', icon: 'palette', group: 'appearance', permissions: ['admin.site'] },
   { link: 'texts', title: 'admin.nav.texts', desc: 'admin.nav.textsDesc', icon: 'heading', group: 'appearance', permissions: ['admin.site'] },
   { link: 'translations', title: 'admin.nav.translations', desc: 'admin.nav.translationsDesc', icon: 'globe', group: 'appearance', permissions: ['admin.translations'] },

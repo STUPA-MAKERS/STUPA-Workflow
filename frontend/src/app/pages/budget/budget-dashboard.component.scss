@@ -517,3 +517,13 @@
     background: #ffffff !important;
   }
 }
+
+.bd__settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.bd__allocation {
+  display: block;
+  max-width: 14rem;
+}

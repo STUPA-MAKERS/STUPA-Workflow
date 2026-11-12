@@ -381,7 +381,7 @@
       "to": "applications"
     },
     {
-      "count": 14,
+      "count": 15,
       "from": "budget",
       "to": "audit"
     },
@@ -401,14 +401,24 @@
       "to": "flow"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "budget",
       "to": "gremien"
     },
     {
-      "count": 27,
+      "count": 1,
+      "from": "budget",
+      "to": "meetings"
+    },
+    {
+      "count": 31,
       "from": "budget",
       "to": "shared"
+    },
+    {
+      "count": 3,
+      "from": "budget",
+      "to": "voting"
     },
     {
       "count": 1,
@@ -1174,6 +1184,11 @@
       "count": 17,
       "from": "voting",
       "to": "auth"
+    },
+    {
+      "count": 1,
+      "from": "voting",
+      "to": "budget"
     },
     {
       "count": 2,

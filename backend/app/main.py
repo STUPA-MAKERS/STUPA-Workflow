@@ -53,6 +53,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.avatars.router import router as avatars_router
 from app.modules.backup.router import router as backup_router
 from app.modules.budget.form_options import budget_field_options
+from app.modules.budget.plan_router import router as budget_plan_router
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.calendar.public_router import router as public_calendar_router
 from app.modules.calendar.router import admin_router as calendar_admin_router
@@ -130,6 +131,7 @@ api_router.include_router(notifications_router)
 api_router.include_router(notification_settings_router)
 api_router.include_router(mail_templates_router)
 api_router.include_router(budget_tree_router)
+api_router.include_router(budget_plan_router)
 api_router.include_router(calendar_router)
 api_router.include_router(calendar_admin_router)
 api_router.include_router(public_calendar_router)

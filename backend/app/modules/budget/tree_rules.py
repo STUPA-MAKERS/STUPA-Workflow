@@ -277,11 +277,11 @@ def _decision_from[K, G](
 
 
 #: Field order of a node tuple: id, parent_id, gremium_id, key, path_key, name,
-#: currency, active, color, fiscal_start_month, fiscal_start_day, hidden_in_budget,
-#: view_gremium_id, decision_gremium_id.
+#: currency, active, color, fiscal_start_month, fiscal_start_day, view_gremium_id,
+#: decision_gremium_id.
 NodeTuple = tuple[
     object, object | None, object | None, str, str, str, str, bool,
-    str | None, int, int, bool, object | None, object | None,
+    str | None, int, int, object | None, object | None,
 ]
 
 
@@ -401,11 +401,11 @@ def build_forest(
     parents = dict.fromkeys(n[1] for n in nodes)
     children_of = {parent: [n for n in nodes if n[1] == parent] for parent in parents}
     parent_of = {n[0]: n[1] for n in nodes}
-    decision_of = {n[0]: n[13] for n in nodes}
+    decision_of = {n[0]: n[12] for n in nodes}
 
     def to_dict(n: NodeTuple) -> dict[str, Any]:
         (nid, parent_id, n_gremium, key, path, name, currency, active, color,
-         fy_month, fy_day, hidden_in_budget, view_gremium_id, decision_gremium_id) = n
+         fy_month, fy_day, view_gremium_id, decision_gremium_id) = n
         effective, source = resolve_decision_gremium(nid, parent_of, decision_of)
         return {
             "id": nid,
@@ -417,7 +417,6 @@ def build_forest(
             "currency": currency,
             "active": active,
             "color": color,
-            "hidden_in_budget": hidden_in_budget,
             "view_gremium_id": view_gremium_id,
             "decision_gremium_id": decision_gremium_id,
             "effective_decision_gremium_id": effective,

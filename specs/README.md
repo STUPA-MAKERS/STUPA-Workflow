@@ -256,6 +256,50 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000258](requirements/functional/finance/budget/000258_sub-bookings.md) | A booking can have sub-bookings | approved |
 | [F/finance/budget/000259](requirements/functional/finance/budget/000259_gremium-view.md) | Gremium members see their cost centres | approved |
 | [F/finance/budget/000629](requirements/functional/finance/budget/000629_booking-lowers-bound.md) | A booking lowers the bound amount of its Antrag | approved |
+| [F/finance/budget/000790](requirements/functional/finance/budget/000790_cost-centre-side.md) | A Kostenstelle below the top level has a side | approved |
+| [F/finance/budget/000791](requirements/functional/finance/budget/000791_budget-plan.md) | A fiscal year has one Haushaltsplan with versions | approved |
+| [F/finance/budget/000792](requirements/functional/finance/budget/000792_plan-version-steps.md) | A plan version passes the steps of its budget | approved |
+| [F/finance/budget/000793](requirements/functional/finance/budget/000793_plan-version-editable.md) | Only a draft version can be edited | approved |
+| [F/finance/budget/000794](requirements/functional/finance/budget/000794_plan-line.md) | A plan line holds the Ansatz of one Kostenstelle | approved |
+| [F/finance/budget/000795](requirements/functional/finance/budget/000795_plan-balanced.md) | A plan version is balanced before the decision | approved |
+| [F/finance/budget/000796](requirements/functional/finance/budget/000796_one-version-in-force.md) | One version of a plan is in force | approved |
+| [F/finance/budget/000797](requirements/functional/finance/budget/000797_allocation-from-plan.md) | The plan in force sets the allocations | approved |
+| [F/finance/budget/000798](requirements/functional/finance/budget/000798_allocation-locked-by-plan.md) | A year with a plan refuses a direct allocation change | approved |
+| [F/finance/budget/000799](requirements/functional/finance/budget/000799_nachtrag-from-in-force.md) | A Nachtrag starts as a copy of the version in force | approved |
+| [F/finance/budget/000800](requirements/functional/finance/budget/000800_plan-permission.md) | A plan write needs budget.structure | approved |
+| [F/finance/budget/000801](requirements/functional/finance/budget/000801_plan-closed-year.md) | A closed fiscal year refuses plan changes | approved |
+| [F/finance/budget/000802](requirements/functional/finance/budget/000802_plan-audit.md) | Each plan state change is audited | approved |
+| [F/finance/budget/000803](requirements/functional/finance/budget/000803_plan-switch-creates-stammplan.md) | The plan switch gives each open fiscal year a Stammplan | approved |
+| [F/finance/budget/000804](requirements/functional/finance/budget/000804_budget-tab-views.md) | The Budget tab has the views Bewirtschaftung and Planung | approved |
+| [F/finance/budget/000805](requirements/functional/finance/budget/000805_planning-list.md) | The list of Planung shows the plan as a tree | approved |
+| [F/finance/budget/000806](requirements/functional/finance/budget/000806_plan-page-steps.md) | The plan page shows the steps of the version | approved |
+| [F/finance/budget/000807](requirements/functional/finance/budget/000807_plan-page-sums.md) | The plan page shows the sums and the balance | approved |
+| [F/finance/budget/000808](requirements/functional/finance/budget/000808_plan-page-tables.md) | The plan page lists income and expenses in two tables | approved |
+| [F/finance/budget/000809](requirements/functional/finance/budget/000809_plan-page-nachtrag-columns.md) | A Nachtrag is shown beside the version in force | approved |
+| [F/finance/budget/000810](requirements/functional/finance/budget/000810_draft-edit-in-table.md) | A draft is edited in the table | approved |
+| [F/finance/budget/000811](requirements/functional/finance/budget/000811_plan-submit-needs-balance.md) | An unbalanced draft cannot go to the vote | approved |
+| [F/finance/budget/000812](requirements/functional/finance/budget/000812_draft-field-saves-on-leave.md) | An amount field of a draft saves when the person leaves it | approved |
+| [F/finance/budget/000814](requirements/functional/finance/budget/000814_plan-switch.md) | A top-level Kostenstelle has a plan switch | approved |
+| [F/finance/budget/000815](requirements/functional/finance/budget/000815_planning-detail.md) | The detail of Planung shows the plan or one line | approved |
+| [F/finance/budget/000816](requirements/functional/finance/budget/000816_plan-line-marks.md) | A plan line of an expense holds the Vermerke | approved |
+| [F/finance/budget/000817](requirements/functional/finance/budget/000817_cost-centre-side-set.md) | The side is set on a direct child of the top level | approved |
+| [F/finance/budget/000818](requirements/functional/finance/budget/000818_plan-line-is-membership.md) | A plan line makes a Kostenstelle part of the year | approved |
+| [F/finance/budget/000819](requirements/functional/finance/budget/000819_plan-line-remove.md) | A draft version can lose a line | approved |
+| [F/finance/budget/000820](requirements/functional/finance/budget/000820_cost-centre-in-plan-no-delete.md) | A Kostenstelle of a decided plan cannot be deleted | approved |
+| [F/finance/budget/000821](requirements/functional/finance/budget/000821_plan-line-snapshot.md) | A decided version keeps the name and the key of each line | approved |
+| [F/finance/budget/000822](requirements/functional/finance/budget/000822_year-shows-plan-members.md) | A year with a plan shows only its Kostenstellen | approved |
+| [F/finance/budget/000823](requirements/functional/finance/budget/000823_plan-steps-per-budget.md) | A budget holds the steps of its Haushaltsplan | approved |
+| [F/finance/budget/000824](requirements/functional/finance/budget/000824_plan-version-keeps-steps.md) | A version keeps the steps it started with | approved |
+| [F/finance/budget/000825](requirements/functional/finance/budget/000825_plan-step-recorded.md) | A person records a passed step | approved |
+| [F/finance/budget/000826](requirements/functional/finance/budget/000826_plan-step-by-vote.md) | An accepted vote of the Gremium passes its step | approved |
+| [F/finance/budget/000827](requirements/functional/finance/budget/000827_plan-steps-edit.md) | The steps of a budget are edited in its edit form | approved |
+| [F/finance/budget/000828](requirements/functional/finance/budget/000828_admin-lists-budgets.md) | Verwaltung lists only the budgets | approved |
+| [F/finance/budget/000829](requirements/functional/finance/budget/000829_cost-centre-create-in-budget-tab.md) | A Kostenstelle is created in the Budget tab | approved |
+| [F/finance/budget/000830](requirements/functional/finance/budget/000830_cost-centre-create-in-draft.md) | A Kostenstelle created in a draft gets a line | approved |
+| [F/finance/budget/000831](requirements/functional/finance/budget/000831_cost-centre-edit-in-budget-tab.md) | A Kostenstelle is edited in the Budget tab | approved |
+| [F/finance/budget/000832](requirements/functional/finance/budget/000832_cost-centre-delete-in-budget-tab.md) | A Kostenstelle is deleted in the Budget tab | approved |
+| [F/finance/budget/000833](requirements/functional/finance/budget/000833_allocation-set-in-budget-tab.md) | The allocation of a year without a plan is set in the Budget tab | approved |
+| [F/finance/budget/000834](requirements/functional/finance/budget/000834_inactive-cost-centre-hidden.md) | An inactive Kostenstelle is hidden in the Budget tab | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | approved |

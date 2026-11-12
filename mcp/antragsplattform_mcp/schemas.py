@@ -423,11 +423,6 @@ class BudgetNodeUpdate(WireModel, frozen=True):
     name: str | None = None
     active: bool | None = None
     color: str | None = None
-    hiddenInBudget: bool | None = Field(
-        default=None,
-        description="Hide this node (incl. subtree) in the budget tab — display only, "
-        "rollups/export unchanged",
-    )
     viewGremiumId: str | None = Field(
         default=None,
         description="Committee whose members see this node (incl. subtree) as a "

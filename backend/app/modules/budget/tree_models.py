@@ -58,12 +58,6 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
     #: Display color for the pie charts and the tree. NULL selects an auto color.
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
-    #: Hides the node in the budget tab. Display only: the values still count in
-    #: the parent rollups and in the export. A Python default backs up the
-    #: server default, so a new instance carries a bool before the flush.
-    hidden_in_budget: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default="false"
-    )
     #: Visibility Gremium: its members see this cost center and its subtree as a
     #: root in the budget tab without a global budget.* permission. This is
     #: independent of the top-level ``gremium_id`` classification.
@@ -85,9 +79,18 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     #: this cutoff.
     fiscal_start_month: Mapped[int] = mapped_column(SmallInteger, server_default="1")
     fiscal_start_day: Mapped[int] = mapped_column(SmallInteger, server_default="1")
+    #: Side in the Haushaltsplan: 'income' or 'expense'. A person sets it on a direct
+    #: child of a top-level node, and the subtree takes it. NULL on the top level and
+    #: on a node that has no side yet.
+    side: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Plan switch of a top-level node: the rules of the Haushaltsplan apply to its
+    #: subtree. A Python default backs up the server default, so a new instance
+    #: carries a bool before the flush.
+    plan_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     __table_args__ = (
         UniqueConstraint("parent_id", "key", name="uq_budget_parent_key"),
+        CheckConstraint("side IN ('income', 'expense')", name="budget_side"),
         UniqueConstraint("path_key", name="uq_budget_path_key"),
         CheckConstraint("currency = 'EUR'", name="budget_currency_eur"),
         CheckConstraint(

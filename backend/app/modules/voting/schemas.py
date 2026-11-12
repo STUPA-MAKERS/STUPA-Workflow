@@ -235,6 +235,8 @@ class VoteCreateInternal(FrozenCamelModel, frozen=True):
     #: The decision proposal: approved amount and conditions. Only an application
     #: vote takes it. A passed vote writes it as the decision of the application.
     proposal: DecisionIn | None = None
+    #: The version of a Haushaltsplan that the vote decides (the vote of a plan step).
+    plan_version_id: UUID | None = Field(default=None, alias="planVersionId")
 
     @model_validator(mode="after")
     def _percent_quorum_needs_eligible(self) -> VoteCreateInternal:

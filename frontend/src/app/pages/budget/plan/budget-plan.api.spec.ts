@@ -1,0 +1,64 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { API_BASE_URL } from '@core/api/api.config';
+import { BudgetPlanApi } from './budget-plan.api';
+
+describe('BudgetPlanApi', () => {
+  let api: BudgetPlanApi;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: API_BASE_URL, useValue: '/api' }],
+    });
+    api = TestBed.inject(BudgetPlanApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => http.verify());
+
+  const expectCall = (method: string, url: string, body?: unknown): void => {
+    const req = http.expectOne(url);
+    expect(req.request.method).toBe(method);
+    if (body !== undefined) expect(req.request.body).toEqual(body);
+    req.flush({});
+  };
+  const line = { amount: '1', note: null, transferable: false, coverable: false, blocked: '0' };
+
+  it('calls the plan routes', () => {
+    api.plan('t', 'f').subscribe();
+    expectCall('GET', '/api/budgets/t/fiscal-years/f/plan');
+    api.createPlan('t', 'f', 'p').subscribe();
+    expectCall('POST', '/api/budgets/t/fiscal-years/f/plan', { copyFromFiscalYearId: 'p' });
+    api.createNachtrag('t', 'f').subscribe();
+    expectCall('POST', '/api/budgets/t/fiscal-years/f/plan/versions', {});
+    api.setLine('v', 'b', line).subscribe();
+    expectCall('PUT', '/api/budget-plan-versions/v/lines/b', line);
+    api.deleteLine('v', 'b').subscribe();
+    expectCall('DELETE', '/api/budget-plan-versions/v/lines/b');
+    api.setState('v', 'in_force').subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/state', { state: 'in_force' });
+  });
+
+  it('calls the routes of the steps', () => {
+    api.passNextStep('v').subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/steps/next', {});
+    api.createStepVote('v').subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/steps/next/vote', {});
+    api.steps('t').subscribe();
+    expectCall('GET', '/api/budgets/t/plan-steps');
+    const steps = [{ name: 'Beschluss', gremiumId: 'g' }];
+    api.setSteps('t', steps).subscribe();
+    expectCall('PUT', '/api/budgets/t/plan-steps', { steps });
+  });
+
+  it('calls the routes of the Kostenstelle', () => {
+    const body = { parentId: 't', key: '1', name: 'A', side: null, amount: '0' };
+    api.createNode('v', body).subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/cost-centres', body);
+    api.setSide('b', 'income').subscribe();
+    expectCall('PUT', '/api/budgets/b/side', { side: 'income' });
+    api.setPlanSwitch('t', true).subscribe();
+    expectCall('PUT', '/api/budgets/t/plan-switch', { enabled: true });
+  });
+});

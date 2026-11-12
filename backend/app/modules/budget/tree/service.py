@@ -12,6 +12,7 @@ exactly this class. The implementation lives in the ops classes:
 `invoices.InvoiceOps` — invoices and ZUGFeRD import.
 `transfers.TransferOps` — cost-center transfers as one entity (through `ExpenseOps`).
 `revert.RevertOps` — audit-log revert of budget mutations.
+`plans.PlanOps` — the Haushaltsplan: side, plan switch, versions, lines, states.
 `view.TreeViewOps` — scoped tree view with roll-up.
 """
 
@@ -20,6 +21,7 @@ from __future__ import annotations
 from app.modules.budget.tree.applications import AssignmentOps
 from app.modules.budget.tree.fiscal_years import FiscalYearOps
 from app.modules.budget.tree.invoices import InvoiceOps
+from app.modules.budget.tree.plans import PlanOps
 from app.modules.budget.tree.revert import RevertOps
 from app.modules.budget.tree.subbookings import SubBookingOps
 from app.modules.budget.tree.transfers import TransferOps
@@ -33,6 +35,7 @@ class BudgetTreeService(
     InvoiceOps,
     TransferOps,
     RevertOps,
+    PlanOps,
     TreeViewOps,
 ):
     """Cost-center tree operations on the database, bound to one session."""

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,6 +12,8 @@ from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
 from app.modules.budget.decision import decision_gremium_of
+from app.modules.budget.plan_models import BudgetPlanLine, BudgetPlanVersion
+from app.modules.budget.plan_rules import Side
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase, _json_safe
 from app.modules.budget.tree_models import Budget, BudgetExpense
 from app.modules.budget.tree_rules import _SEP
@@ -37,13 +40,14 @@ def _node_out(
         currency=b.currency,
         active=b.active,
         color=b.color,
-        hiddenInBudget=bool(b.hidden_in_budget),
         viewGremiumId=b.view_gremium_id,
         decisionGremiumId=b.decision_gremium_id,
         effectiveDecisionGremiumId=decision[0],
         decisionGremiumSourceId=decision[1],
         fiscalStartMonth=b.fiscal_start_month,
         fiscalStartDay=b.fiscal_start_day,
+        side=cast("Side | None", b.side),
+        planEnabled=bool(b.plan_enabled),
     )
 
 
@@ -110,6 +114,14 @@ class NodeOps(BudgetTreeServiceBase):
                 code="budget_key_exists",
             )
         await self._check_decision_gremium(payload.decision_gremium_id)
+        direct = parent is not None and parent.parent_id is None
+        side = payload.side if direct else (parent.side if parent is not None else None)
+        if direct and parent is not None and parent.plan_enabled and side is None:
+            raise ValidationProblem(
+                "A cost centre directly below a budget with a Haushaltsplan needs a side.",
+                code="plan_side_missing",
+                errors=[{"field": "side", "msg": "the cost centre has no side"}],
+            )
 
         node = Budget(
             id=uuid.uuid4(),
@@ -124,6 +136,7 @@ class NodeOps(BudgetTreeServiceBase):
             decision_gremium_id=payload.decision_gremium_id,
             fiscal_start_month=payload.fiscal_start_month,
             fiscal_start_day=payload.fiscal_start_day,
+            side=side,
         )
         self.session.add(node)
         await self._audit(
@@ -291,6 +304,19 @@ class NodeOps(BudgetTreeServiceBase):
             raise ConflictError(
                 "budget has assigned applications; reassign them first",
                 code="budget_has_applications",
+            )
+        planned = (
+            await self.session.execute(
+                select(BudgetPlanLine.id)
+                .join(BudgetPlanVersion, BudgetPlanVersion.id == BudgetPlanLine.version_id)
+                .where(BudgetPlanLine.budget_id == budget_id, BudgetPlanVersion.state != "draft")
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if planned is not None:
+            raise ConflictError(
+                "budget is part of a decided Haushaltsplan",
+                code="budget_in_plan",
             )
         await self._audit(
             AuditAction.BUDGET_NODE_DELETE,

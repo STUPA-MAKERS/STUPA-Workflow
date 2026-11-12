@@ -1,0 +1,55 @@
+@let n = node();
+<div class="ccs">
+  <div class="ccs__pair">
+    <app-input
+      class="ccs__key"
+      [label]="'budget.tree.key' | t"
+      [ngModel]="key()"
+      (ngModelChange)="key.set($event)"
+      (focusout)="saveText('key')"
+      [name]="'cc-key-' + n.id"
+    />
+    <app-input
+      [label]="'budget.tree.name' | t"
+      [ngModel]="name()"
+      (ngModelChange)="name.set($event)"
+      (focusout)="saveText('name')"
+      [name]="'cc-name-' + n.id"
+    />
+  </div>
+  @if (sided()) {
+    <div class="ccs__side">
+      <span class="ccs__label" [id]="'cc-side-' + n.id">{{ 'budget.cc.side' | t }}</span>
+      <app-segmented
+        width="equal"
+        size="control"
+        [ariaLabel]="'budget.cc.side' | t"
+        [options]="sides()"
+        [value]="n.side ?? null"
+        (valueChange)="saveSide($event)"
+      />
+    </div>
+  }
+  <app-colour-field [(value)]="colour" [name]="'cc-colour-' + n.id" (picked)="saveColour($event)" />
+  <app-switch [id]="'cc-active-' + n.id" [checked]="n.active" (checkedChange)="save({ active: $event })">
+    <span>{{ 'budget.tree.active' | t }}</span>
+  </app-switch>
+  <div class="ccs__pair ccs__pair--even">
+    <app-select
+      [name]="'cc-view-' + n.id"
+      [label]="'budget.tree.viewGremium' | t"
+      [placeholder]="'budget.tree.viewGremiumNone' | t"
+      [options]="gremien()"
+      [ngModel]="n.viewGremiumId ?? ''"
+      (ngModelChange)="saveGremium('viewGremiumId', $event)"
+    />
+    <app-select
+      [name]="'cc-decision-' + n.id"
+      [label]="'budget.tree.decisionGremium' | t"
+      [placeholder]="'budget.tree.decisionGremiumNone' | t"
+      [options]="gremien()"
+      [ngModel]="n.decisionGremiumId ?? ''"
+      (ngModelChange)="saveGremium('decisionGremiumId', $event)"
+    />
+  </div>
+</div>

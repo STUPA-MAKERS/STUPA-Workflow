@@ -10,10 +10,11 @@ from sqlalchemy import and_, select
 
 from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
+from app.modules.budget.plan_models import BudgetPlan
 from app.modules.budget.tree.service_base import _ZERO, BudgetTreeServiceBase
 from app.modules.budget.tree_models import Budget, BudgetAllocation
 from app.modules.budget.tree_schemas import AllocationOut, AllocationSet
-from app.shared.errors import ValidationProblem
+from app.shared.errors import ConflictError, ValidationProblem
 
 
 class AllocationOps(BudgetTreeServiceBase):
@@ -28,6 +29,24 @@ class AllocationOps(BudgetTreeServiceBase):
                 )
             )
         ).scalar_one_or_none()
+
+    async def _refuse_planned(self, top: Budget, fiscal_year_id: UUID) -> None:
+        """Refuse a direct allocation change in a year with a Haushaltsplan.
+
+        The plan in force sets the allocations, and only a Nachtrag changes them. The
+        rule applies while the plan switch of the top-level node is on.
+
+        Raises:
+            ConflictError: `allocation_from_plan` (409).
+        """
+        planned = top.plan_enabled and await self.session.scalar(
+            select(BudgetPlan.id).where(BudgetPlan.fiscal_year_id == fiscal_year_id)
+        )
+        if planned:
+            raise ConflictError(
+                "The Haushaltsplan sets the allocations of this fiscal year.",
+                code="allocation_from_plan",
+            )
 
     async def _lock_budget(self, budget_id: UUID) -> None:
         """Lock the budget row pessimistically (``SELECT … FOR UPDATE``).
@@ -92,6 +111,7 @@ class AllocationOps(BudgetTreeServiceBase):
                 errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
             )
         self._refuse_closed(fy)
+        await self._refuse_planned(top, fiscal_year_id)
 
         await self._lock_budget(node.id)
         if node.parent_id is not None:

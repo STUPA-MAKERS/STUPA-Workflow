@@ -358,8 +358,6 @@ export interface BudgetTreeNode {
   readonly active: boolean;
   /** Display color for the pie and the tree. `null` means automatic. */
   readonly color: string | null;
-  /** Hide in the budget tab. This is display only and the rollups do not change. */
-  readonly hiddenInBudget: boolean;
   /** Visibility gremium: its members see this subtree in the budget tab as a root.
    *  They need no global budget.* permissions. */
   readonly viewGremiumId: Uuid | null;
@@ -373,6 +371,10 @@ export interface BudgetTreeNode {
    *  uses it. */
   readonly fiscalStartMonth: number;
   readonly fiscalStartDay: number;
+  /** The side in a Haushaltsplan. `null` for a top-level node and without a plan. */
+  readonly side?: 'income' | 'expense' | null;
+  /** The plan switch of a top-level node: its years can have a Haushaltsplan. */
+  readonly planEnabled?: boolean;
   readonly byFiscalYear: readonly BudgetAllocationView[];
   readonly children: readonly BudgetTreeNode[];
 }
@@ -387,12 +389,13 @@ export interface BudgetNode {
   readonly currency: string;
   readonly active: boolean;
   readonly color?: string | null;
-  readonly hiddenInBudget?: boolean;
   readonly decisionGremiumId?: Uuid | null;
   readonly effectiveDecisionGremiumId?: Uuid | null;
   readonly decisionGremiumSourceId?: Uuid | null;
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
+  readonly side?: 'income' | 'expense' | null;
+  readonly planEnabled?: boolean;
 }
 
 /** The problem code of a money mutation on a closed fiscal year (409). */
@@ -423,6 +426,8 @@ export interface BudgetNodeCreate {
   readonly color?: string | null;
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
+  /** The side of a direct child of a budget with a Haushaltsplan (422 `plan_side_missing` without). */
+  readonly side?: 'income' | 'expense' | null;
 }
 
 /** Partial update of a node. All fields are optional and ``color:""`` clears the color. */
@@ -431,7 +436,6 @@ export interface BudgetNodeUpdate {
   readonly name?: string;
   readonly active?: boolean;
   readonly color?: string | null;
-  readonly hiddenInBudget?: boolean;
   /** Visibility gremium. `null` clears the assignment. */
   readonly viewGremiumId?: Uuid | null;
   /** Deciding gremium of the node. `null` clears it; the node then inherits. */
@@ -743,11 +747,12 @@ import { simplifyPathKey } from '@shared/budget-path';
 /** Re-exported from `@shared/budget-path`, so the imports from this file keep working. */
 export { simplifyPathKey };
 
-/** Tree (recursive) -> flat option list (pre-order, "pathKey - name", simplified). */
+/** Tree (recursive) -> flat option list (pre-order, "pathKey - name", simplified). A picker
+ *  shows no inactive Kostenstelle and none below it. */
 export function flattenBudgetOptions(
   nodes: readonly BudgetTreeNode[],
 ): readonly { readonly value: Uuid; readonly label: string }[] {
-  return nodes.flatMap((n) => [
+  return nodes.filter((n) => n.active).flatMap((n) => [
     { value: n.id, label: `${simplifyPathKey(n.pathKey)} – ${n.name}` },
     ...(n.children?.length ? flattenBudgetOptions(n.children) : []),
   ]);
