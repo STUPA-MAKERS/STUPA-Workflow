@@ -35,9 +35,10 @@
     @if (versionId()) {
       <app-currency-input name="ccAmount" [label]="amountLabel()" [ngModel]="amount()" (ngModelChange)="amount.set($event)" />
     }
+    <button type="submit" hidden></button>
   </form>
   <div dialog-footer class="ccc__foot">
     <app-button variant="text" (click)="closed.emit()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" type="submit" form="cc-create-form" [disabled]="!valid() || busy()">{{ 'budget.cc.createSubmit' | t }}</app-button>
+    <app-button variant="fill" (click)="submit($event)" [disabled]="!valid() || busy()">{{ 'budget.cc.createSubmit' | t }}</app-button>
   </div>
 </app-dialog>

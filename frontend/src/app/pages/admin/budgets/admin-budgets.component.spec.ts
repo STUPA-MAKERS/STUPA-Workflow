@@ -411,4 +411,40 @@ describe('AdminBudgetsComponent', () => {
       expect(view.c.fyOpen()).toBe(true);
     });
   });
+
+  describe('footer buttons', () => {
+    const press = (view: { fixture: { detectChanges: () => void } }, dialog: string, name: string): void => {
+      view.fixture.detectChanges();
+      const scope = screen.getByRole('dialog', { name: dialog });
+      const button = [...scope.querySelectorAll('button')].find((b) => b.textContent?.trim() === name);
+      button?.click();
+    };
+
+    it('the button of the create dialog creates the budget', async () => {
+      const view = await setup();
+      view.c.openTop();
+      view.c.patchTop('key', 'QS');
+      view.c.patchTop('name', 'QS-Mittel');
+      press(view, 'Budget anlegen', 'Anlegen');
+      expect(view.api.createNode).toHaveBeenCalledTimes(1);
+    });
+
+    it('the button of the edit dialog saves the budget', async () => {
+      const view = await setup();
+      view.c.openEdit(TOP);
+      press(view, 'Budget bearbeiten', 'Speichern');
+      expect(view.api.updateNode).toHaveBeenCalledTimes(1);
+    });
+
+    it('the button of the fiscal year dialog saves the year', async () => {
+      const view = await setup();
+      view.c.openFy(TOP);
+      view.c.openFyEdit(FY25);
+      view.c.patchFyEditYear('2030');
+      view.fixture.detectChanges();
+      const scope = screen.getAllByRole('dialog').at(-1) as HTMLElement;
+      [...scope.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Speichern')?.click();
+      expect(view.api.updateFiscalYear).toHaveBeenCalledTimes(1);
+    });
+  });
 });
