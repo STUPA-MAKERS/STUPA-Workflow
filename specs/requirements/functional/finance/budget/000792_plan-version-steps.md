@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
 tests:
-  - "backend/tests/unit/modules/budget/test_plan_rules.py:test_move_allowed"
-  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_state_moves_and_balance"
+  - "backend/tests/unit/modules/budget/test_plan_rules.py:test_can_enter_force"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_version_passes_the_steps_of_its_budget"
 implementation:
   - backend/app/modules/budget/tree/plans.py
   - backend/app/modules/budget/plan_rules.py

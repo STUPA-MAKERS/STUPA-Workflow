@@ -62,6 +62,34 @@ def test_step_snapshot_and_pass() -> None:
     assert steps[0]["passedAt"] is None
 
 
+def test_step_vote() -> None:
+    """§000826: a step keeps its vote, and only the vote of the next step decides."""
+    steps = plan_rules.step_snapshot([("Beschluss", uuid.uuid4()), ("Genehmigung", None)])
+    voted = plan_rules.with_step_vote(steps, 0, "v1")
+    assert [s.get("voteId") for s in voted] == ["v1", None]
+    assert "voteId" not in steps[0]
+    assert plan_rules.vote_decides_next(voted, "v1")
+    assert not plan_rules.vote_decides_next(voted, "v2")
+    passed = plan_rules.with_step_passed(voted, 0, "2026-11-12T10:00:00+00:00")
+    assert passed[0]["voteId"] == "v1"
+    assert not plan_rules.vote_decides_next(passed, "v1")
+    assert not plan_rules.vote_decides_next([], "v1")
+
+
+def test_step_vote_config_and_question() -> None:
+    assert plan_rules.step_vote_config(None) == {
+        "options": ["yes", "no", "abstain"],
+        "majorityRule": "simple",
+        "secret": True,
+        "tieBreak": "rejected",
+    }
+    assert plan_rules.step_vote_config(50)["quorum"] == {"type": "percent", "value": 50}
+    assert (
+        plan_rules.step_vote_question("VS-Mittel", "2026", "Stammplan", "Beschluss")
+        == "Haushaltsplan VS-Mittel 2026, Stammplan: Beschluss"
+    )
+
+
 def test_version_name() -> None:
     assert plan_rules.version_name(0) == "Stammplan"
     assert plan_rules.version_name(2) == "2. Nachtrag"

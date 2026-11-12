@@ -1002,6 +1002,7 @@ class VotingService:
         agenda_item_id: UUID | None = None,
         planned_ok: bool = False,
         actor: str | None = None,
+        vote_id: UUID | None = None,
     ) -> VoteOut:
         """Create a draft vote from a server-side payload.
 
@@ -1014,7 +1015,8 @@ class VotingService:
         A meeting vote locks the meeting row and needs a ``live`` meeting that still
         has the agenda item (see ``_lock_live_meeting``). ``planned_ok`` also accepts
         a ``planned`` meeting, for a vote that is prepared before the start. A poll
-        writes ``poll_created`` for ``actor``.
+        writes ``poll_created`` for ``actor``. ``vote_id`` presets the id, for a
+        caller that stores the id in the same commit.
 
         A decision proposal needs an application, and its amount must fit the
         requested amount.
@@ -1040,6 +1042,7 @@ class VotingService:
             payload,
             meeting_id=meeting_id,
             agenda_item_id=agenda_item_id,
+            vote_id=vote_id,
             actor=actor,
         )
 
@@ -1086,6 +1089,7 @@ class VotingService:
             closes_at=payload.closes_at,
             result_branch_transition_id=payload.result_branch_transition_id,
             proposal=payload.proposal.to_json() if payload.proposal is not None else None,
+            plan_version_id=payload.plan_version_id,
             status="draft",
         )
         self.session.add(vote)
@@ -2019,6 +2023,8 @@ class VotingService:
         A ``vote`` state has two fixed exits: ``passed`` fires ``pass``; ``rejected``
         and ``tie`` are fail-closed and fire ``fail``. A generic resolution question has
         no application and fires no branch. It only holds the result for the protocol.
+        A passed vote on a version of a Haushaltsplan passes the step of that version
+        in the same commit; a refused vote leaves the step open.
         The audit entry holds aggregates only, never a voter. The status event of a
         fired branch carries the decision for the timeline and the revert.
 
@@ -2080,6 +2086,13 @@ class VotingService:
             vote.result_branch_transition_id = staged.transition.id
             if decision is not None:
                 decision.status_event_id = staged.status_event_id
+        plan_version_id: UUID | None = getattr(vote, "plan_version_id", None)
+        if plan_version_id is not None and result_value == "passed":
+            from app.modules.budget.tree.service import BudgetTreeService
+
+            await BudgetTreeService(self.session, actor=principal.sub).pass_step_by_vote(
+                plan_version_id, vote.id
+            )
         await self.session.commit()
 
         new_state_id = (

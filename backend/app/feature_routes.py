@@ -53,6 +53,7 @@ ROUTE_PATTERNS: Final[tuple[tuple[Feature, re.Pattern[str]], ...]] = tuple(
         (Feature.VOTING, r"/protocols/\{protocol_id\}/votes"),
         (Feature.VOTING, r"/delegations/votes"),
         (Feature.VOTING, rf"{_COMMITTEE}/decisions"),
+        (Feature.VOTING, r"/budget-plan-versions/\{version_id\}/steps/next/vote"),
         (Feature.BUDGET, r"/budgets"),
         (Feature.BUDGET, r"/budget"),
         (Feature.BUDGET, r"/budget-expenses"),

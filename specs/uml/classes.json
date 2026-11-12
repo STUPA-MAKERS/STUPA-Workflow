@@ -309,6 +309,20 @@
       "to": "BudgetPlanVersion"
     },
     {
+      "column": "budget_id",
+      "from": "BudgetPlanStep",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Budget"
+    },
+    {
+      "column": "gremium_id",
+      "from": "BudgetPlanStep",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Gremium"
+    },
+    {
       "column": "plan_id",
       "from": "BudgetPlanVersion",
       "multiplicity": "*",
@@ -1091,6 +1105,13 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Application"
+    },
+    {
+      "column": "plan_version_id",
+      "from": "Vote",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "BudgetPlanVersion"
     },
     {
       "column": "meeting_id",
@@ -2245,12 +2266,6 @@
           "type": "TEXT"
         },
         {
-          "name": "hidden_in_budget",
-          "nullable": false,
-          "primaryKey": false,
-          "type": "BOOLEAN"
-        },
-        {
           "name": "view_gremium_id",
           "nullable": true,
           "primaryKey": false,
@@ -2586,6 +2601,51 @@
     {
       "attributes": [
         {
+          "name": "budget_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetPlanStep",
+      "module": "budget",
+      "name": "BudgetPlanStep",
+      "path": "backend/app/modules/budget/plan_models.py",
+      "table": "budget_plan_step"
+    },
+    {
+      "attributes": [
+        {
           "name": "plan_id",
           "nullable": false,
           "primaryKey": false,
@@ -2604,23 +2664,16 @@
           "type": "TEXT",
           "values": [
             "draft",
-            "resolved",
-            "approved",
+            "in_progress",
             "in_force",
             "replaced"
           ]
         },
         {
-          "name": "resolved_at",
-          "nullable": true,
+          "name": "steps",
+          "nullable": false,
           "primaryKey": false,
-          "type": "DATETIME"
-        },
-        {
-          "name": "approved_at",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "DATETIME"
+          "type": "JSONB"
         },
         {
           "name": "in_force_at",
@@ -6622,6 +6675,12 @@
           "nullable": false,
           "primaryKey": false,
           "type": "INTEGER"
+        },
+        {
+          "name": "plan_version_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
         },
         {
           "name": "id",

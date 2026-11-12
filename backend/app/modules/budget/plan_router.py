@@ -197,6 +197,24 @@ async def pass_next_plan_step(version_id: UUID, service: ServiceDep) -> PlanOut:
 
 
 @router.post(
+    "/budget-plan-versions/{version_id}/steps/next/vote",
+    response_model=PlanOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def create_plan_step_vote(version_id: UUID, service: ServiceDep) -> PlanOut:
+    """Create the draft vote of the Gremium of the next step.
+
+    The vote opens and closes through the vote routes, with the manage right of that
+    Gremium. An accepted vote passes the step.
+    """
+    out = await service.create_step_vote(version_id)
+    await service.session.commit()
+    return out
+
+
+@router.post(
     "/budget-plan-versions/{version_id}/cost-centres",
     response_model=PlanOut,
     status_code=status.HTTP_201_CREATED,

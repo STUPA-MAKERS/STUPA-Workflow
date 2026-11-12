@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_create_a_cost_centre_in_a_draft"
+implementation:
+  - backend/app/modules/budget/tree/plans.py
 scope:
   - backend/app/modules/budget
 ---

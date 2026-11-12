@@ -43,6 +43,11 @@ from app.modules.budget.tree.nodes import NodeOps
 from app.modules.budget.tree.service_base import _ZERO, _subtree_ids
 from app.modules.budget.tree_models import Budget, BudgetAllocation, FiscalYear
 from app.modules.gremien.models import Gremium
+from app.modules.meetings.rules import MeetingRules
+from app.modules.voting.models import Vote
+from app.modules.voting.schemas import VoteCreateInternal
+from app.modules.voting.service import VotingService
+from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
@@ -158,6 +163,17 @@ class PlanOps(NodeOps, AllocationOps):
             await self.session.execute(select(Gremium.id, Gremium.name).where(Gremium.id.in_(ids)))
         ).all()
         names = {str(row.id): row.name for row in rows}
+        vote_ids = {
+            UUID(step["voteId"]) for steps in records for step in steps if step.get("voteId")
+        }
+        votes = {
+            str(row.id): (row.status, row.result)
+            for row in (
+                await self.session.execute(
+                    select(Vote.id, Vote.status, Vote.result).where(Vote.id.in_(vote_ids))
+                )
+            ).all()
+        }
         return [
             tuple(
                 PlanStepOut(
@@ -165,6 +181,9 @@ class PlanOps(NodeOps, AllocationOps):
                     gremiumId=step.get("gremiumId"),
                     gremiumName=names.get(step.get("gremiumId") or ""),
                     passedAt=step.get("passedAt"),
+                    voteId=step.get("voteId"),
+                    voteStatus=votes.get(step.get("voteId") or "", (None, None))[0],
+                    voteResult=votes.get(step.get("voteId") or "", (None, None))[1],
                 )
                 for step in steps
             )
@@ -743,21 +762,21 @@ class PlanOps(NodeOps, AllocationOps):
         for line in lines:
             _assign(line, name=names[line.budget_id][0], path_key=names[line.budget_id][1])
 
-    async def pass_next_step(self, version_id: UUID, *, by_vote: UUID | None = None) -> PlanOut:
-        """Record the next step of a version as passed.
+    async def _open_step(
+        self, version: BudgetPlanVersion, top: Budget
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Return the steps of a version and the index of its next step.
 
-        The first step takes the version out of the draft: the version must be
-        balanced, it keeps the steps of its budget, and each line keeps the name and
-        the path key of its cost center.
+        A draft takes the steps of its budget and leaves the draft with this call:
+        the version must be balanced, and each line keeps the name and the path key
+        of its cost center.
 
         Raises:
-            NotFoundError: The version does not exist (404).
-            ConflictError: `fiscal_year_closed` (409), `plan_state_invalid` (409) for
-                a version in force or replaced, `plan_no_step_left` (409) when the
-                version has no step that is not passed.
-            ValidationProblem: `plan_not_balanced` (422) at the first step.
+            ConflictError: `plan_state_invalid` (409) for a version in force or
+                replaced, `plan_no_step_left` (409) when the version has no step that
+                is not passed.
+            ValidationProblem: `plan_not_balanced` (422) for a draft.
         """
-        version, plan, fy, top = await self._version_context(version_id)
         if version.state not in plan_rules.OPEN_STATES:
             raise ConflictError(
                 f"A version in {version.state!r} passes no step.", code="plan_state_invalid"
@@ -772,6 +791,21 @@ class PlanOps(NodeOps, AllocationOps):
             lines = await self._lines(version.id)
             self._require_balanced(top, nodes, {line.budget_id: line.amount for line in lines})
             self._keep_names(lines, nodes)
+        return steps, index
+
+    async def pass_next_step(self, version_id: UUID, *, by_vote: UUID | None = None) -> PlanOut:
+        """Record the next step of a version as passed.
+
+        The first step takes the version out of the draft (`_open_step`).
+
+        Raises:
+            NotFoundError: The version does not exist (404).
+            ConflictError: `fiscal_year_closed` (409), `plan_state_invalid` (409),
+                `plan_no_step_left` (409).
+            ValidationProblem: `plan_not_balanced` (422) at the first step.
+        """
+        version, plan, fy, top = await self._version_context(version_id)
+        steps, index = await self._open_step(version, top)
         _assign(
             version,
             state="in_progress",
@@ -791,6 +825,111 @@ class PlanOps(NodeOps, AllocationOps):
             },
         )
         return await self._plan_out(plan, top.id)
+
+    async def _vote_runs(self, vote_id: str | None) -> bool:
+        """Say if the vote of a step is a draft or open, so the step waits for it."""
+        status = (
+            await self.session.scalar(select(Vote.status).where(Vote.id == UUID(vote_id)))
+            if vote_id
+            else None
+        )
+        return status in ("draft", "open")
+
+    async def create_step_vote(self, version_id: UUID) -> PlanOut:
+        """Create the vote of the Gremium of the next step, as a draft.
+
+        The vote is a vote of that Gremium without a meeting and without an
+        application, with the quorum of the Gremium. The step keeps its id. A draft
+        version leaves the draft with this call (`_open_step`), because the Gremium
+        must decide on a plan that does not change. A step whose vote ended without
+        an accepted result, or whose vote is gone, takes a new vote.
+
+        The voting service commits the vote, so this call commits the version too.
+
+        Raises:
+            NotFoundError: The version does not exist (404).
+            ConflictError: `fiscal_year_closed` (409), `plan_state_invalid` (409),
+                `plan_no_step_left` (409), `plan_step_vote_runs` (409) when the vote
+                of the step is a draft or open.
+            ValidationProblem: `plan_not_balanced` (422) for a draft,
+                `plan_step_no_gremium` (422) for a step without a Gremium.
+        """
+        version, plan, fy, top = await self._version_context(version_id)
+        steps, index = await self._open_step(version, top)
+        step = steps[index]
+        if not step["gremiumId"]:
+            raise ValidationProblem(
+                "The step names no Gremium.",
+                code="plan_step_no_gremium",
+                errors=[{"field": "step", "msg": "no gremium"}],
+            )
+        if await self._vote_runs(step.get("voteId")):
+            raise ConflictError("The step already has a vote.", code="plan_step_vote_runs")
+        gremium_id = UUID(step["gremiumId"])
+        vote_id = uuid.uuid4()
+        _assign(
+            version,
+            state="in_progress",
+            steps=plan_rules.with_step_vote(steps, index, str(vote_id)),
+        )
+        await self._audit(
+            AuditAction.BUDGET_PLAN_STEP_VOTE,
+            target_type="budget_plan",
+            target_id=str(plan.id),
+            data={
+                "fiscalYearId": str(fy.id),
+                "versionId": str(version.id),
+                "number": version.number,
+                "step": step["name"],
+                "gremiumId": step["gremiumId"],
+                "voteId": str(vote_id),
+            },
+        )
+        await self.session.flush()
+        quorum = await self.session.scalar(
+            select(Gremium.quorum_percent).where(Gremium.id == gremium_id)
+        )
+        await VotingService(self.session).create_internal(
+            None,
+            VoteCreateInternal(
+                config=VoteConfig.model_validate(plan_rules.step_vote_config(quorum)),
+                eligibleGroup=gremium_id,
+                question=plan_rules.step_vote_question(
+                    top.name,
+                    tree_rules.fiscal_year_display(
+                        fy.year, top.fiscal_start_month, top.fiscal_start_day
+                    ),
+                    plan_rules.version_name(version.number),
+                    step["name"],
+                ),
+                eligibleCount=await MeetingRules(self.session).vote_eligible_count(gremium_id),
+                planVersionId=version.id,
+            ),
+            vote_id=vote_id,
+            actor=self.actor,
+        )
+        return await self._plan_out(plan, top.id)
+
+    async def pass_step_by_vote(self, version_id: UUID, vote_id: UUID) -> bool:
+        """Pass the next step of a version for its accepted vote, and say if it did.
+
+        The close of the vote calls this in its own transaction. The call passes
+        nothing when the vote is not the vote of the next step (the version went back
+        to draft, or the step was passed by hand) or when the fiscal year is closed,
+        because the close of a vote must not fail for the state of the plan.
+        """
+        version = await self.session.get(BudgetPlanVersion, version_id)
+        if (
+            version is None
+            or version.state != "in_progress"
+            or not plan_rules.vote_decides_next(list(version.steps or []), str(vote_id))
+        ):
+            return False
+        try:
+            await self.pass_next_step(version_id, by_vote=vote_id)
+        except ConflictError:
+            return False
+        return True
 
     async def set_plan_state(self, version_id: UUID, payload: PlanStateSet) -> PlanOut:
         """Bring a version into force, or move a version in progress back to draft.

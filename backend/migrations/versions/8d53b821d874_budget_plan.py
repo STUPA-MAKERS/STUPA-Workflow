@@ -11,6 +11,7 @@
    cost center passes.
 3. ``budget`` loses ``hidden_in_budget``. A hidden cost center becomes inactive
    first, because the switch Aktiv now is the one way to hide it.
+4. ``vote`` gets ``plan_version_id``: the plan version that a vote of a step decides.
 
 No plan data moves: an existing fiscal year gets its Stammplan when a person sets the
 plan switch of its top-level cost center to on.
@@ -146,9 +147,16 @@ _UPGRADE: tuple[str, ...] = (
         CONSTRAINT ck_budget_plan_step_budget_plan_step_position CHECK (position >= 0)
     )
     """,
+    "ALTER TABLE vote ADD COLUMN IF NOT EXISTS plan_version_id uuid",
+    _constraint(
+        "vote",
+        "fk_vote_plan_version_id_budget_plan_version",
+        "FOREIGN KEY (plan_version_id) REFERENCES budget_plan_version (id) ON DELETE SET NULL",
+    ),
 )
 
 _DOWNGRADE: tuple[str, ...] = (
+    "ALTER TABLE vote DROP COLUMN IF EXISTS plan_version_id",
     "DROP TABLE IF EXISTS budget_plan_step",
     "DROP TABLE IF EXISTS budget_plan_line",
     "DROP TABLE IF EXISTS budget_plan_version",

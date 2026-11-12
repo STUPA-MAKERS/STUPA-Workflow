@@ -134,6 +134,12 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
     )
     attempt: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
+    #: The version of a Haushaltsplan that the vote decides: the vote of the Gremium
+    #: of the next step of that version. A passed vote passes the step at its close.
+    #: SET NULL, because a deleted plan must not delete the record of the vote.
+    plan_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget_plan_version.id", ondelete="SET NULL"), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(

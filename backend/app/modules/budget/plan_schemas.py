@@ -84,12 +84,17 @@ class PlanStepsSet(FrozenCamelModel, frozen=True):
 
 
 class PlanStepOut(FrozenCamelModel, frozen=True):
-    """One step with the name of its Gremium, and the time it was passed in a version."""
+    """One step with its Gremium, its vote, and the time it was passed in a version."""
 
     name: str
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     gremium_name: str | None = Field(default=None, alias="gremiumName")
     passed_at: datetime | None = Field(default=None, alias="passedAt")
+    #: The vote of the Gremium on this step, and its status and result. A deleted
+    #: vote leaves the id without a status.
+    vote_id: UUID | None = Field(default=None, alias="voteId")
+    vote_status: str | None = Field(default=None, alias="voteStatus")
+    vote_result: str | None = Field(default=None, alias="voteResult")
 
 
 class PlanStepsOut(FrozenCamelModel, frozen=True):

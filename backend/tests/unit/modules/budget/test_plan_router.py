@@ -114,6 +114,10 @@ class _FakePlans:
         self.calls.append(("next", version_id))
         return _plan()
 
+    async def create_step_vote(self, version_id: uuid.UUID) -> PlanOut:
+        self.calls.append(("vote", version_id))
+        return _plan()
+
     async def create_plan_node(self, version_id: uuid.UUID, payload: Any) -> PlanOut:
         self.calls.append(("node", payload.key))
         return _plan()
@@ -156,6 +160,7 @@ _WRITES: tuple[tuple[str, str, dict[str, Any] | None, tuple[str, Any]], ...] = (
     ("PUT", f"/api/budgets/{_TOP}/plan-steps", {"steps": [{"name": "Beschluss"}]},
      ("set_steps", ("Beschluss",))),
     ("POST", f"/api/budget-plan-versions/{_VERSION}/steps/next", None, ("next", _VERSION)),
+    ("POST", f"/api/budget-plan-versions/{_VERSION}/steps/next/vote", None, ("vote", _VERSION)),
     ("POST", f"/api/budget-plan-versions/{_VERSION}/cost-centres",
      {"parentId": str(_TOP), "key": "9", "name": "Sport"}, ("node", "9")),
 )

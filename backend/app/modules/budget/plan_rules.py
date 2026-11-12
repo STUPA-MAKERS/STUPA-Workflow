@@ -65,6 +65,45 @@ def with_step_passed(
     ]
 
 
+def with_step_vote(
+    steps: Sequence[Mapping[str, Any]], index: int, vote_id: str
+) -> list[dict[str, Any]]:
+    """Return `steps` with the vote of the step at `index`."""
+    return [
+        {**step, "voteId": vote_id} if i == index else dict(step) for i, step in enumerate(steps)
+    ]
+
+
+def vote_decides_next(steps: Sequence[Mapping[str, Any]], vote_id: str) -> bool:
+    """Say if `vote_id` is the vote of the next step that is not passed."""
+    index = next_step(steps)
+    return index is not None and steps[index].get("voteId") == vote_id
+
+
+#: The options of the vote of a step: the Gremium accepts or refuses the plan.
+STEP_VOTE_OPTIONS: tuple[str, ...] = ("yes", "no", "abstain")
+
+
+def step_vote_config(quorum_percent: int | None) -> dict[str, Any]:
+    """Return the config of the vote of a step, with the quorum of its Gremium."""
+    return {
+        "options": list(STEP_VOTE_OPTIONS),
+        "majorityRule": "simple",
+        "secret": True,
+        "tieBreak": "rejected",
+        **(
+            {}
+            if quorum_percent is None
+            else {"quorum": {"type": "percent", "value": quorum_percent}}
+        ),
+    }
+
+
+def step_vote_question(budget: str, year: str, version: str, step: str) -> str:
+    """Return the question of the vote of a step, such as `Haushaltsplan VS 2026 ...`."""
+    return f"Haushaltsplan {budget} {year}, {version}: {step}"
+
+
 def version_name(number: int) -> str:
     """Name a version for a message: the Stammplan, or the Nachtrag with its number."""
     return "Stammplan" if number == 0 else f"{number}. Nachtrag"

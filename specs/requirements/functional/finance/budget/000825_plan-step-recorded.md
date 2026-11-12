@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_version_passes_the_steps_of_its_budget"
+implementation:
+  - backend/app/modules/budget/tree/plans.py
+  - backend/app/modules/budget/plan_router.py
 scope:
   - backend/app/modules/budget
 ---

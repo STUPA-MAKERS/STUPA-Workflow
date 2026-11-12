@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -18,6 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
+from app.modules.auth.principal import Principal
+from app.modules.auth.rbac import vote_group_key
 from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
 from app.modules.budget.plan_schemas import (
     PlanCreate,
@@ -39,6 +42,8 @@ from app.modules.budget.tree_schemas import (
     FiscalYearOut,
 )
 from app.modules.gremien.models import Gremium
+from app.modules.voting.models import Vote
+from app.modules.voting.service import VotingService
 from app.shared.errors import AppError, ConflictError, NotFoundError, ValidationProblem
 
 pytestmark = pytest.mark.integration
@@ -716,3 +721,129 @@ async def test_each_plan_change_is_audited(session: AsyncSession) -> None:
     assert rows[2].data["raised"] == {str(t.exp.id): "60"}
     assert (rows[-1].data["before"], rows[-1].data["after"]) == ("draft", "in_force")
     assert rows[-1].data["versionId"] == str(plan.versions[0].id)
+
+
+async def _gremium(session: AsyncSession) -> uuid.UUID:
+    gremium = Gremium(id=uuid.uuid4(), slug=f"g{uuid.uuid4().hex[:8]}", name="StuPa")
+    session.add(gremium)
+    await session.commit()
+    return gremium.id
+
+
+async def _decide(
+    session: AsyncSession, vote_id: uuid.UUID, gremium: uuid.UUID, choice: str
+) -> None:
+    """Open the vote of a step, cast one ballot and close it."""
+    voting = VotingService(session)
+    now = datetime.now(UTC)
+    await voting.open(vote_id, now=now, actor="mgr")
+    await voting.cast(
+        vote_id, Principal(sub="v1", groups={vote_group_key(gremium)}), choice, now=now
+    )
+    await voting.close(vote_id, Principal(sub="mgr", roles=["admin"]))
+
+
+async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSession) -> None:
+    """§000826: the step offers a vote of its Gremium, and the accepted vote passes it."""
+    t = await _tree(session)
+    gremium = await _gremium(session)
+    await _steps(t, "Beschluss", "Genehmigung", gremium_id=gremium)
+    vid = _version(await _balanced_draft(t)).id
+
+    asked = _version(await t.svc.create_step_vote(vid))
+    step = asked.steps[0]
+    assert (asked.state, step.passed_at, step.vote_status) == ("in_progress", None, "draft")
+    assert step.vote_id is not None
+    vote = await session.get(Vote, step.vote_id)
+    assert vote is not None
+    assert (vote.plan_version_id, vote.eligible_group) == (vid, str(gremium))
+    assert (vote.application_id, vote.meeting_id) == (None, None)
+    assert vote.question == "Haushaltsplan VS-Mittel 2026, Stammplan: Beschluss"
+    assert "quorum" not in vote.config or vote.config["quorum"] is None
+    with pytest.raises(ConflictError) as twice:
+        await t.svc.create_step_vote(vid)
+    assert _code(twice) == "plan_step_vote_runs"
+    await session.rollback()
+
+    await _decide(session, step.vote_id, gremium, "yes")
+    done = _version(await t.svc.get_plan(t.top.id, t.fy.id))
+    assert [s.passed_at is not None for s in done.steps] == [True, False]
+    assert (done.steps[0].vote_status, done.steps[0].vote_result) == ("closed", "passed")
+    entry = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_PLAN_STEP)
+            .where(AuditEntry.data["versionId"].astext == str(vid))
+        )
+    ).one()
+    assert (entry.data["voteId"], entry.actor) == (str(step.vote_id), "mgr")
+    asked_entry = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_PLAN_STEP_VOTE)
+            .where(AuditEntry.data["versionId"].astext == str(vid))
+        )
+    ).one()
+    assert asked_entry.data["voteId"] == str(step.vote_id)
+
+    with pytest.raises(ValidationProblem) as no_gremium:
+        await t.svc.create_step_vote(vid)
+    assert _code(no_gremium) == "plan_step_no_gremium"
+
+
+async def test_a_refused_vote_leaves_the_step_open(session: AsyncSession) -> None:
+    """§000826: a refused vote passes nothing, and the step takes a new vote."""
+    t = await _tree(session)
+    gremium = await _gremium(session)
+    await _steps(t, "Beschluss", gremium_id=gremium)
+    vid = _version(await _balanced_draft(t)).id
+    first = _version(await t.svc.create_step_vote(vid)).steps[0]
+    assert first.vote_id is not None
+    await _decide(session, first.vote_id, gremium, "no")
+    refused = _version(await t.svc.get_plan(t.top.id, t.fy.id))
+    assert (refused.state, refused.steps[0].passed_at) == ("in_progress", None)
+    assert (refused.steps[0].vote_status, refused.steps[0].vote_result) == ("closed", "rejected")
+
+    second = _version(await t.svc.create_step_vote(vid)).steps[0]
+    assert second.vote_id not in (None, first.vote_id)
+    assert second.vote_status == "draft"
+    await session.delete(await session.get(Vote, second.vote_id))
+    row = await session.get(Gremium, gremium)
+    assert row is not None
+    row.quorum_percent = 50
+    await session.commit()
+    gone = _version(await t.svc.get_plan(t.top.id, t.fy.id)).steps[0]
+    assert (gone.vote_id, gone.vote_status) == (second.vote_id, None)
+    third = _version(await t.svc.create_step_vote(vid)).steps[0]
+    assert third.vote_id not in (first.vote_id, second.vote_id)
+    vote = await session.get(Vote, third.vote_id)
+    assert vote is not None
+    assert vote.config["quorum"] == {"type": "percent", "value": 50}
+
+
+async def test_a_vote_passes_only_the_step_it_decides(session: AsyncSession) -> None:
+    """§000826: the close of a vote never fails for the state of the plan."""
+    t = await _tree(session)
+    gremium = await _gremium(session)
+    await _steps(t, "Beschluss", gremium_id=gremium)
+    vid = _version(await _balanced_draft(t)).id
+    assert not await t.svc.pass_step_by_vote(uuid.uuid4(), uuid.uuid4())
+
+    first = _version(await t.svc.create_step_vote(vid)).steps[0]
+    assert first.vote_id is not None
+    await t.svc.set_plan_state(vid, PlanStateSet(state="draft"))
+    await session.commit()
+    await _decide(session, first.vote_id, gremium, "yes")
+    back = _version(await t.svc.get_plan(t.top.id, t.fy.id))
+    assert (back.state, back.steps[0].vote_id, back.steps[0].passed_at) == ("draft", None, None)
+
+    second = _version(await t.svc.create_step_vote(vid)).steps[0]
+    assert second.vote_id is not None
+    await t.svc.set_fiscal_year_closed(t.top.id, t.fy.id, closed=True)
+    await session.commit()
+    await _decide(session, second.vote_id, gremium, "yes")
+    await t.svc.set_fiscal_year_closed(t.top.id, t.fy.id, closed=False)
+    await session.commit()
+    kept = _version(await t.svc.get_plan(t.top.id, t.fy.id))
+    assert (kept.state, kept.steps[0].passed_at) == ("in_progress", None)
+    assert kept.steps[0].vote_result == "passed"

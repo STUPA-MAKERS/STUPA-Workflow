@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_an_accepted_vote_of_the_gremium_passes_its_step"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_refused_vote_leaves_the_step_open"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_vote_passes_only_the_step_it_decides"
+  - "backend/tests/unit/modules/budget/test_plan_rules.py:test_step_vote"
+implementation:
+  - backend/app/modules/budget/tree/plans.py
+  - backend/app/modules/budget/plan_rules.py
+  - backend/app/modules/voting/service.py
 scope:
   - backend/app/modules/budget
   - backend/app/modules/voting
