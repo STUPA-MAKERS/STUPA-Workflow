@@ -146,6 +146,13 @@ export function hoursOf(clock: string): number {
 export const MIN_BLOCK = 0.4;
 /** A block below this length shows its time and its title in one line. */
 export const SHORT_BLOCK = 0.75;
+/**
+ * A block that starts this many hours after the block to its left may cover it: the time
+ * and the first line of the title of the earlier block stay free (§ 000745).
+ */
+export const OVERLAP_HEAD = 0.5;
+/** The part of the next lane that a covered block takes below the block above it. */
+export const OVERLAP_SHARE = 0.7;
 /** The height of an hour in the week view, in rem. It matches `--cw-hour` of the styles. */
 export const HOUR_REM = 3.5;
 
@@ -157,6 +164,10 @@ export interface Block {
   /** The start and the width of the block in percent of the day column. */
   readonly left: number;
   readonly width: number;
+  /** The lane of the block. A block of a higher lane lies above the blocks to its left. */
+  readonly lane: number;
+  /** The block covers a part of a block to its left (§ 000745). */
+  readonly over: boolean;
   readonly short: boolean;
   /** The lines of the title that fit below the time. */
   readonly lines: number;
@@ -175,9 +186,12 @@ function partEnd(e: CalendarEntry, iso: string, from: number, lastHour: number):
 /**
  * The blocks of a day. An entry over several days has one block on each of its days: from
  * its start time to the last hour, the whole day, and from the first hour to its end time
- * (§ 000744). Entries that overlap share the width of the column: each takes the first
- * lane that is free at its start, and a group of overlapping blocks divides the column by
- * its number of lanes.
+ * (§ 000744). Entries that overlap take lanes: each takes the first lane that is free at
+ * its start, and a chain of overlapping blocks divides the column by its number of lanes.
+ * A block grows to the right over the lanes that are free. A block whose neighbour to the
+ * right starts `OVERLAP_HEAD` later also reaches below that neighbour, so the later block
+ * lies on the earlier one (§ 000745). Two blocks that start together stay side by side,
+ * because the one above would hide the title of the other.
  */
 export function dayBlocks(
   entries: readonly CalendarEntry[],
@@ -199,16 +213,33 @@ export function dayBlocks(
     const lane = Array.from({ length: done.length + 1 }, (_, i) => i).find((i) => !taken.has(i)) ?? 0;
     return [...done, { ...item, lane }];
   }, []);
-  return placed.map((item) => {
-    const group = placed.filter((o) => o.from < item.to && item.from < o.to);
-    const lanes = Math.max(...group.map((o) => o.lane)) + 1;
+  type Placed = (typeof placed)[number];
+  const meets = (a: Placed, b: Placed): boolean => a.from < b.to && b.from < a.to;
+  const cluster = (seed: readonly Placed[]): readonly Placed[] => {
+    const more = placed.filter((o) => !seed.includes(o) && seed.some((s) => meets(o, s)));
+    return more.length > 0 ? cluster([...seed, ...more]) : seed;
+  };
+  const boxes = placed.map((item) => {
+    const group = placed.filter((o) => meets(o, item));
+    const lanes = Math.max(...cluster([item]).map((o) => o.lane)) + 1;
+    const right = group.filter((o) => o.lane > item.lane);
+    const next = Math.min(lanes, ...right.map((o) => o.lane));
+    const under = right.length > 0 && right.every((o) => o.lane > next || o.from >= item.from + OVERLAP_HEAD);
+    const left = (item.lane / lanes) * 100;
+    return { item, left, width: Math.min(100 - left, ((next - item.lane + (under ? OVERLAP_SHARE : 0)) * 100) / lanes) };
+  });
+  return boxes.map(({ item, left, width }) => {
     const height = Math.max(item.real, MIN_BLOCK);
     return {
       entry: item.entry,
       top: item.from - firstHour,
       height,
-      left: (item.lane / lanes) * 100,
-      width: 100 / lanes,
+      left,
+      width,
+      lane: item.lane,
+      over: boxes.some(
+        (o) => o.left < left && o.left + o.width > left + 0.01 && meets(o.item, item),
+      ),
       short: item.real < SHORT_BLOCK,
       lines: Math.max(1, Math.floor((height * HOUR_REM * 16 - 28) / 16)),
       start: item.entry.startsOn === iso ? item.entry.startTime : null,

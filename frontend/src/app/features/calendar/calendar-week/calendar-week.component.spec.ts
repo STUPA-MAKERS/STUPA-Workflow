@@ -54,7 +54,7 @@ describe('CalendarWeekComponent', () => {
     const block = within(view.column(2)).getByRole('button', { name: '14:00 – 15:30 Jour fixe' });
     expect(block.style.top).toBe('21rem');
     expect(block.style.height).toBe('5.25rem');
-    expect(block.style.width).toBe('50%');
+    expect(block.style.width).toBe('85%');
     expect(block).toHaveClass('cw__block--narrow');
     expect(within(view.allDay(2)).getByRole('button', { name: /Angebot einholen/ })).toBeInTheDocument();
     expect(within(view.column(2)).queryByRole('button', { name: /Angebot einholen/ })).toBeNull();
@@ -128,6 +128,28 @@ describe('spanBlocks (§000744)', () => {
     expect(container.querySelector('.cw__chip')).toBeNull();
     await userEvent.click(blocks[1]);
     expect(openEntry).toHaveBeenCalledWith(SPAN);
+  });
+});
+
+describe('overlap (§000745)', () => {
+  it('lays a later entry on the earlier one and keeps the earlier one wider than its lane', async () => {
+    await render(CalendarWeekComponent, {
+      inputs: {
+        days: DAYS,
+        entries: [
+          calendarEntry('a', { title: 'Jour fixe', startTime: '14:00:00', endTime: '15:30:00' }),
+          calendarEntry('b', { title: 'Abgleich', startTime: '14:30:00', endTime: '15:00:00' }),
+        ],
+        selectedDay: '2026-11-11',
+        label: 'Woche',
+      },
+    });
+    const under = screen.getByRole('button', { name: /Jour fixe/ });
+    const over = screen.getByRole('button', { name: /Abgleich/ });
+    expect([under.style.left, under.style.width, under.style.zIndex]).toEqual(['0%', '85%', '1']);
+    expect([over.style.left, over.style.width, over.style.zIndex]).toEqual(['50%', '50%', '2']);
+    expect(over).toHaveClass('cw__block--over');
+    expect(under).not.toHaveClass('cw__block--over');
   });
 });
 
