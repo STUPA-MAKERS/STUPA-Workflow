@@ -31,7 +31,7 @@ from app.modules.notifications.layout import (
     text_to_html,
 )
 from app.modules.notifications.links import MailLink
-from app.modules.notifications.mail import MailMessage, compute_idempotency_key
+from app.modules.notifications.mail import MailAttachment, MailMessage, compute_idempotency_key
 from app.modules.notifications.models import (
     MailTemplate,
     NotificationPreference,
@@ -124,14 +124,10 @@ DECISION_BLOCK = {
 _BUILTIN_NOTIFY_BODY = {
     "de": "Hallo,\n\nes gibt eine Aktualisierung zu Ihrem Antrag"
     "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}."
-    "{% if status %}\n\nNeuer Status: {{ status }}{% endif %}"
-    + DECISION_BLOCK["de"]
-    + "\n",
+    "{% if status %}\n\nNeuer Status: {{ status }}{% endif %}" + DECISION_BLOCK["de"] + "\n",
     "en": "Hello,\n\nthere is an update on your application"
     '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}.'
-    "{% if status %}\n\nNew status: {{ status }}{% endif %}"
-    + DECISION_BLOCK["en"]
-    + "\n",
+    "{% if status %}\n\nNew status: {{ status }}{% endif %}" + DECISION_BLOCK["en"] + "\n",
 }
 
 
@@ -200,10 +196,7 @@ class NotificationService:
             TEMPLATE_CATALOGUE,
         )
 
-        rows = {
-            t.key: t
-            for t in (await self.session.scalars(select(MailTemplate))).all()
-        }
+        rows = {t.key: t for t in (await self.session.scalars(select(MailTemplate))).all()}
         listed = [
             _template_out(rows[spec.key], source="override")
             if spec.key in rows
@@ -412,9 +405,9 @@ class NotificationService:
         rows = (
             (
                 await self.session.execute(
-                    select(
-                        NotificationPreference.kind, NotificationPreference.enabled
-                    ).where(NotificationPreference.principal_id == principal_id)
+                    select(NotificationPreference.kind, NotificationPreference.enabled).where(
+                        NotificationPreference.principal_id == principal_id
+                    )
                 )
             ).all()
             if principal_id is not None
@@ -441,9 +434,7 @@ class NotificationService:
         if principal_id is None:
             raise NotFoundError(f"principal {principal_sub!r} not found")
         for kind, enabled in items:
-            row = await self.session.get(
-                NotificationPreference, (principal_id, kind)
-            )
+            row = await self.session.get(NotificationPreference, (principal_id, kind))
             match enabled == kind_default(kind), row:
                 case True, None:
                     pass
@@ -463,9 +454,7 @@ class NotificationService:
     async def _principal_id(self, sub: str) -> uuid.UUID | None:
         from app.modules.auth.models import Principal as PrincipalRow
 
-        return await self.session.scalar(
-            select(PrincipalRow.id).where(PrincipalRow.sub == sub)
-        )
+        return await self.session.scalar(select(PrincipalRow.id).where(PrincipalRow.sub == sub))
 
     async def send_kind_mail(
         self,
@@ -480,6 +469,7 @@ class NotificationService:
         lang: str | None = None,
         link: MailLink | None = None,
         builtin_html: dict[str, str] | None = None,
+        attachments: tuple[MailAttachment, ...] = (),
     ) -> bool:
         """Send one notification kind.
 
@@ -488,6 +478,7 @@ class NotificationService:
         layout. ``link`` is the deep link to the element of the mail: the context
         gets it as ``link``, and the mail shows it (see `links`). ``builtin_html`` is
         the HTML body of the builtin; without it the layout escapes the text body.
+        ``attachments`` go with the mail, whichever template renders it.
 
         Returns:
             True when the method enqueued a mail.
@@ -509,6 +500,7 @@ class NotificationService:
                 idempotency_parts=idempotency_parts,
                 reason=kind,
                 link=link,
+                attachments=attachments,
             )
         try:
             rendered = render_mail(
@@ -523,7 +515,7 @@ class NotificationService:
             logger.warning("builtin template %r render failed: %s", template_key, exc)
             return False
         return await self._enqueue(
-            self._message(rendered, wanted, kind, idempotency_parts, link)
+            self._message(rendered, wanted, kind, idempotency_parts, link, attachments)
         )
 
     async def handle_notify_action(
@@ -637,13 +629,9 @@ class NotificationService:
             lang=lang or self.settings.mail_default_lang,
             default_lang=self.settings.mail_default_lang,
         )
-        return int(
-            await self._enqueue(self._message(rendered, recipients, reason, idem, link))
-        )
+        return int(await self._enqueue(self._message(rendered, recipients, reason, idem, link)))
 
-    async def send_magic_link(
-        self, *, email: str, link: str, lang: str | None = None
-    ) -> None:
+    async def send_magic_link(self, *, email: str, link: str, lang: str | None = None) -> None:
         """Render and enqueue the magic-link mail in `lang`.
 
         `lang` is the language of the application that the link opens. The applicant
@@ -720,9 +708,7 @@ class NotificationService:
 
     async def _get_template_by_key(self, key: str) -> MailTemplate | None:
         return (
-            await self.session.scalars(
-                select(MailTemplate).where(MailTemplate.key == key)
-            )
+            await self.session.scalars(select(MailTemplate).where(MailTemplate.key == key))
         ).first()
 
     def _render(
@@ -767,6 +753,7 @@ class NotificationService:
         reason: str,
         idempotency_parts: tuple[str, ...],
         link: MailLink | None,
+        attachments: tuple[MailAttachment, ...] = (),
     ) -> MailMessage:
         """Build the mail: the text with the link line, the HTML with the layout.
 
@@ -784,6 +771,7 @@ class NotificationService:
             text=text,
             html=self._layout_html(rendered, reason, link),
             idempotency_key=compute_idempotency_key(*idempotency_parts),
+            attachments=attachments,
         )
 
     async def _render_and_enqueue(
@@ -796,6 +784,7 @@ class NotificationService:
         idempotency_parts: tuple[str, ...],
         reason: str = "generic",
         link: MailLink | None = None,
+        attachments: tuple[MailAttachment, ...] = (),
     ) -> bool:
         """Render the template and enqueue the mail.
 
@@ -811,7 +800,7 @@ class NotificationService:
             logger.warning("template %r render failed: %s", tpl.key, exc)
             return False
         return await self._enqueue(
-            self._message(rendered, recipients, reason, idempotency_parts, link)
+            self._message(rendered, recipients, reason, idempotency_parts, link, attachments)
         )
 
     async def _enqueue(self, msg: MailMessage) -> bool:
@@ -922,9 +911,7 @@ def _notify_sends(
     team_specs = [s for s in specs if s.get("kind") != "applicant"]
     match template_key, bool(applicant_specs and team_specs):
         case str() as key, False:
-            return (
-                _NotifySend(key, specs, applicant_link if applicant_specs else team_link),
-            )
+            return (_NotifySend(key, specs, applicant_link if applicant_specs else team_link),)
         case str() as key, True:
             return (
                 _NotifySend(key, applicant_specs, applicant_link, "applicant"),

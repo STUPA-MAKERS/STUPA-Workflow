@@ -57,7 +57,7 @@ from app.modules.auth.sessions import create_principal_session
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.models import FormField
 from app.modules.forms.schemas import FormVersionCreate
-from app.modules.forms.service import FormsService
+from app.modules.admin.service.forms import FormVersionWriter
 from app.settings import get_settings
 from app.shared.config_schemas import FlowGraph, FormFieldDef
 
@@ -162,7 +162,7 @@ async def _ensure_form(session, type_id: uuid.UUID) -> list[str]:
                 required=False,
             ),
         ]
-        created = await FormsService(session).create_form_version(
+        created = await FormVersionWriter(session).create_form_version(
             type_id, FormVersionCreate(fields=fields, activate=True), ACTOR
         )
         active_id = created.id

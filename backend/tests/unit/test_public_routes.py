@@ -37,6 +37,9 @@ Groups of ``PUBLIC_ROUTES`` and why each one is public:
 - Public protocols: the published protocols page with its Gremien, semesters,
   detail, PDF and images. The service shows public protocols only.
 - Calendar: the ICS feed authenticates by the secret token in the path.
+- Public calendar: the page of the public Termine and of the meetings of the Gremien
+  with public protocols, with its Gremien, search, the two detail reads and the ICS
+  feed without a token. The service shows public entries only.
 - ALTCHA: the challenge comes before every public write.
 - Site config: the SPA reads branding and the PWA manifest before login.
 - UI texts: the SPA reads the text overrides and the extra languages before login.
@@ -128,6 +131,12 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("GET", "/api/public/protocols/{protocol_id}"),
         ("GET", "/api/public/protocols/{protocol_id}/pdf"),
         ("GET", "/api/public/protocols/{protocol_id}/images/{image_id}"),
+        ("GET", "/api/public/calendar/committees"),
+        ("GET", "/api/public/calendar/entries"),
+        ("GET", "/api/public/calendar/search"),
+        ("GET", "/api/public/calendar/appointments/{appointment_id}"),
+        ("GET", "/api/public/calendar/meetings/{meeting_id}"),
+        ("GET", "/api/public/calendar.ics"),
         ("GET", "/api/calendar/{token}.ics"),
         ("GET", "/api/altcha/challenge"),
         ("GET", "/api/site-config"),

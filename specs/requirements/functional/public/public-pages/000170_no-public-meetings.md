@@ -2,12 +2,10 @@
 id: "000170"
 title: Meetings are never public
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/protocol
-  - frontend/src/app/features/public-protocols
+updated: 2026-11-11
+replaced_by: F/meetings/calendar/000732
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/public-protocols

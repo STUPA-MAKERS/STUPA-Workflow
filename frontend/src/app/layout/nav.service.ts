@@ -34,6 +34,7 @@ export const ADMIN_AREA_PERMISSIONS = [
   'admin.notifications',
   'privacy.manage',
   'webhook.manage',
+  'admin.calendars',
   'ticket.manage',
   'audit.read',
   'backup.manage',
@@ -48,6 +49,7 @@ export type NavKey =
   | 'applications'
   | 'tasks'
   | 'todos'
+  | 'calendar'
   | 'meetings'
   | 'gremien'
   | 'voting'
@@ -90,6 +92,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'tasks', path: '/tasks', labelKey: 'nav.tasks', icon: 'tasks', permissions: [], place: 'main' },
   /** Every session has at least the personal board. */
   { key: 'todos', path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [], place: 'main' },
+  { key: 'calendar', path: '/calendar', labelKey: 'nav.calendar', icon: 'cal', permissions: [], place: 'main' },
   {
     key: 'meetings',
     path: '/meetings',

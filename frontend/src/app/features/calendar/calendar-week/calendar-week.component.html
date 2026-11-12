@@ -1,0 +1,67 @@
+<div class="cw" role="group" [attr.aria-label]="label()" [style.--cw-hours]="hours().length">
+  <div class="cw__head">
+    <span></span>
+    @for (col of columns(); track col.day.iso) {
+      <button
+        type="button"
+        class="cw__day"
+        [attr.aria-label]="col.label"
+        [attr.aria-current]="col.day.isToday ? 'date' : null"
+        [class.cw__day--sel]="col.day.iso === selectedDay()"
+        [attr.aria-pressed]="col.day.iso === selectedDay()"
+        (click)="selectDay.emit(col.day.iso)"
+      >
+        <span class="cap cw__wd">{{ col.weekday }}</span>
+        <span class="cw__num" [class.cw__num--today]="col.day.isToday">{{ col.day.day }}</span>
+      </button>
+    }
+  </div>
+  <div class="cw__allday">
+    <span class="cw__hour">{{ 'calendar.allDay' | t }}</span>
+    @for (col of columns(); track col.day.iso) {
+      <div class="cw__cell">
+        @for (e of col.allDay; track e.kind + e.id) {
+          <button type="button" class="cw__chip" [attr.title]="e.title" (click)="openEntry.emit(e)">
+            <app-icon [name]="icon(e.kind)" [size]="12" /><span class="cw__chipTitle">{{ e.title }}</span>
+          </button>
+        }
+      </div>
+    }
+  </div>
+  <div class="cw__scroll" appScrollFade="y">
+    <div class="cw__body">
+      <div class="cw__hours" aria-hidden="true">
+        @for (h of hours(); track h) {
+          <span class="cw__hour mono">{{ hourLabel(h) }}</span>
+        }
+      </div>
+      @for (col of columns(); track col.day.iso) {
+        <div class="cw__col" [class.cw__col--today]="col.day.isToday">
+          @for (b of col.blocks; track b.entry.kind + b.entry.id) {
+            <button
+              type="button"
+              class="cw__block"
+              [class.cw__block--short]="b.short"
+              [class.cw__block--narrow]="b.width < 100"
+              [class.cw__block--tight]="b.width < 40"
+              [attr.title]="blockLabel(b.entry)"
+              [attr.aria-label]="blockLabel(b.entry)"
+              [style.top.rem]="b.top * 3.5"
+              [style.height.rem]="b.height * 3.5"
+              [style.left.%]="b.left"
+              [style.width.%]="b.width"
+              [style.--cw-lines]="b.lines"
+              (click)="openEntry.emit(b.entry)"
+            >
+              <span class="cw__time">
+                <app-icon [name]="icon(b.entry.kind)" [size]="12" />
+                <span class="mono">{{ time(b.entry.startTime) }}@if (!b.short && b.width === 100 && b.entry.endTime) {<span class="cw__end">–{{ time(b.entry.endTime) }}</span>}</span>
+              </span>
+              <span class="cw__title">{{ b.entry.title }}</span>
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

@@ -70,6 +70,7 @@ import {
   SheetBarTitleDirective,
   SideSheetComponent,
   SkeletonComponent,
+  TimeInputComponent,
   ToastService,
   SectionComponent,
   ConfirmDialogComponent,
@@ -179,6 +180,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     SheetBarTitleDirective,
     SideSheetComponent,
     SkeletonComponent,
+    TimeInputComponent,
     TodoDueChipComponent,
     TodoLinkPickerComponent,
     TodoMoveSheetComponent,
@@ -1051,7 +1053,7 @@ export class TodoCardDetailComponent {
   /** The confirmation before a to-do becomes an Event (it cannot be undone). */
   readonly makeEventAsk = signal(false);
   /** The event field in inline edit: place, participants or a new series. */
-  readonly eventEdit = signal<'place' | 'participants' | 'series' | null>(null);
+  readonly eventEdit = signal<'place' | 'participants' | 'series' | 'startTime' | 'endTime' | null>(null);
   readonly draft = signal('');
   readonly series = signal<readonly TodoEventSeries[]>([]);
   private seriesLoaded = false;
@@ -1081,17 +1083,33 @@ export class TodoCardDetailComponent {
   setEvent(change: TodoEventIn): void {
     const c = this.card();
     if (!c?.event) return;
-    const e = c.event;
+    const next = { ...c.event, ...change };
     this.write(
       this.api.setEvent(c.id, {
-        startsOn: e.startsOn,
-        endsOn: e.endsOn,
-        place: e.place,
-        participants: e.participants,
-        seriesId: e.seriesId,
-        ...change,
+        startsOn: next.startsOn,
+        endsOn: next.endsOn,
+        startTime: next.startsOn ? next.startTime : null,
+        endTime: next.endsOn ? next.endTime : null,
+        place: next.place,
+        participants: next.participants,
+        seriesId: next.seriesId,
       }),
     );
+  }
+
+  /** Show the time field of the start or of the end. */
+  editEventTime(field: 'startTime' | 'endTime'): void {
+    this.eventEdit.set(field);
+    this.focusSoon('.cd__evTime input');
+  }
+
+  /** Save the time in edit (`HH:MM`, or empty for none); an unchanged value only closes the field. */
+  saveEventTime(field: 'startTime' | 'endTime', value: string): void {
+    const e = this.card()?.event;
+    this.eventEdit.set(null);
+    if (!e) return;
+    const time = value ? `${value}:00` : null;
+    if (time !== e[field]) this.setEvent({ [field]: time });
   }
 
   /** The to-do becomes an Event, after the confirmation. */

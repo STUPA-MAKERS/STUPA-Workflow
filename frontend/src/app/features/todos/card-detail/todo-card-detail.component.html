@@ -309,12 +309,66 @@
         <dt>{{ 'todos.eventCard.starts' | t }}</dt>
         <dd class="cd__chips">
           <app-todo-due-chip [value]="event.startsOn" [disabled]="!canWrite()" (changed)="setEvent({ startsOn: $event })" />
+          @if (event.startsOn) {
+            @if (eventEdit() === 'startTime') {
+              <app-time-input
+                class="cd__evTime"
+                name="startTime"
+                [ariaLabel]="'todos.eventCard.startTime' | t"
+                [ngModel]="event.startTime"
+                (ngModelChange)="saveEventTime('startTime', $event)"
+                (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); eventEdit.set(null)"
+              />
+            } @else if (canWrite()) {
+              <button
+                type="button"
+                class="cd__evText"
+                [attr.aria-label]="'todos.eventCard.startTime' | t"
+                (click)="editEventTime('startTime')"
+              >
+                @if (event.startTime; as time) {
+                  <span class="mono">{{ time.slice(0, 5) }}</span>
+                } @else {
+                  <span class="cd__muted">{{ 'todos.eventCard.timeEmpty' | t }}</span>
+                }
+              </button>
+            } @else if (event.startTime; as time) {
+              <span class="cd__evText mono">{{ time.slice(0, 5) }}</span>
+            }
+          }
         </dd>
       </div>
       <div class="cd__field">
         <dt>{{ 'todos.eventCard.ends' | t }}</dt>
         <dd class="cd__chips">
           <app-todo-due-chip [value]="event.endsOn" [disabled]="!canWrite()" (changed)="setEvent({ endsOn: $event })" />
+          @if (event.endsOn) {
+            @if (eventEdit() === 'endTime') {
+              <app-time-input
+                class="cd__evTime"
+                name="endTime"
+                [ariaLabel]="'todos.eventCard.endTime' | t"
+                [ngModel]="event.endTime"
+                (ngModelChange)="saveEventTime('endTime', $event)"
+                (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); eventEdit.set(null)"
+              />
+            } @else if (canWrite()) {
+              <button
+                type="button"
+                class="cd__evText"
+                [attr.aria-label]="'todos.eventCard.endTime' | t"
+                (click)="editEventTime('endTime')"
+              >
+                @if (event.endTime; as time) {
+                  <span class="mono">{{ time.slice(0, 5) }}</span>
+                } @else {
+                  <span class="cd__muted">{{ 'todos.eventCard.timeEmpty' | t }}</span>
+                }
+              </button>
+            } @else if (event.endTime; as time) {
+              <span class="cd__evText mono">{{ time.slice(0, 5) }}</span>
+            }
+          }
         </dd>
       </div>
       <div class="cd__field">

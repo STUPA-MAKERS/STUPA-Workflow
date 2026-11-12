@@ -82,6 +82,7 @@
           [disabled]="true"
           [ariaLabel]="'participant.top.protocol' | t"
           [placeholder]="'participant.top.empty' | t"
+            [blackoutTitle]="'markdown.blackout.mark' | t"
         />
       } @placeholder {
         <div class="ts__editor ts__editor--wait" aria-hidden="true">
@@ -159,6 +160,11 @@
       @if (proto && !proto.isLocked && proto.gremiumProtocolsPublic && editable() && !t.nonPublic) {
         <app-note class="ts__public" icon="globe">{{ 'meetings.protocol.publicNotice' | t }}</app-note>
       }
+      @if (editable() && openBlackout()) {
+        <app-note class="ts__public" kind="error" icon="eyeslash" role="alert">{{
+          'meetings.editor.blackoutOpen' | t
+        }}</app-note>
+      }
       @if (mode() === 'raw') {
         <div class="ts__editor ts__editor--raw">
           <textarea
@@ -187,6 +193,7 @@
             [imageUpload]="editable() ? imageUpload : null"
             [ariaLabel]="'participant.top.protocol' | t"
             [placeholder]="'meetings.protocol.placeholder' | t"
+            [blackoutTitle]="'markdown.blackout.mark' | t"
             (valueChange)="onEditorChange(t, $event)"
           />
         } @placeholder {

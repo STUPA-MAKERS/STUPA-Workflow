@@ -37,6 +37,8 @@ export interface MarkdownOptions {
    * session. `null` renders the alt text instead of an image (anonymous contexts).
    */
   readonly imageSrc?: ((id: string) => string) | null;
+  /** The tooltip of a marked segment (`%%Name%%`) and the text of a black bar (`%%%%`). */
+  readonly blackout?: { readonly mark: string; readonly bar: string };
 }
 
 /** The default image source: the canonical path, served to any authenticated session. */
@@ -144,7 +146,10 @@ type Inline = (text: string) => string;
  * because the source is the output of a consumer function and must never break out of the
  * attribute.
  */
-function inlineRenderer(imageSrc: ((id: string) => string) | null): Inline {
+function inlineRenderer(
+  imageSrc: ((id: string) => string) | null,
+  blackout: { readonly mark: string; readonly bar: string },
+): Inline {
   return (text: string): string => {
     const parts: string[] = [];
     const texts: string[] = [];
@@ -170,7 +175,14 @@ function inlineRenderer(imageSrc: ((id: string) => string) | null): Inline {
     const escaped = coded
       .replace(/\\$/, '')
       .replace(/\\(&amp;|&lt;|&gt;|&quot;|&#39;|[!-/:-@[-`{-~])/g, (_m, c: string) => stash(c));
-    const imaged = replaceRefs(escaped, true, (alt, dest) => {
+    const blacked = escaped
+      .replace(/%%%%/g, () =>
+        stash(`<span class="md-bar" role="img" aria-label="${escapeHtml(blackout.bar)}"></span>`, ''),
+      )
+      .replace(/%%([^%\n]+)%%/g, (_m, name: string) =>
+        stash(`<span class="md-blackout" title="${escapeHtml(blackout.mark)}">${name}</span>`, name),
+      );
+    const imaged = replaceRefs(blacked, true, (alt, dest) => {
       const id = IMAGE_PATH_RE.exec(dest)?.[1];
       if (!id || !imageSrc) return alt ? stash(alt) : '';
       const src = escapeHtml(imageSrc(id));
@@ -270,7 +282,10 @@ function renderItem(text: string, inline: Inline): string {
  */
 export function markdownToSafeHtml(src: string, opts: MarkdownOptions = {}): string {
   const offset = opts.headingOffset ?? 3;
-  const inline = inlineRenderer(opts.imageSrc === undefined ? defaultImageSrc : opts.imageSrc);
+  const inline = inlineRenderer(
+    opts.imageSrc === undefined ? defaultImageSrc : opts.imageSrc,
+    opts.blackout ?? { mark: '', bar: '' },
+  );
   const clean = src.replace(/\r\n?/g, '\n').replace(CONTROL_RE, '');
   return linkify(renderBlocks(escapeHtml(clean).split('\n'), offset, inline));
 }
@@ -409,4 +424,15 @@ function renderBlocks(lines: readonly string[], offset: number, inline: Inline):
   const end = lines.reduce(step, start);
   const closed = end.fence ? { ...emit(end, fenceHtml(end.fence)), fence: null } : end;
   return flushAll(closed, ctx).out.join('\n');
+}
+
+/** A closed blackout marker, `%%Name%%` or the bar `%%%%`, that no backslash escapes. */
+const BLACKOUT_RE = /(?<!\\)%%[^%\n]*%%/g;
+
+/**
+ * True if the text has a `%%` without its closing pair (000686). It blacks out nothing, so
+ * the server refuses the finalize. The rule matches `app/shared/blackout.py`.
+ */
+export function hasOpenBlackout(text: string): boolean {
+  return /(?<!\\)%%/.test(text.replace(BLACKOUT_RE, ''));
 }

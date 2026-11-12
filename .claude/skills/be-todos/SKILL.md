@@ -22,9 +22,13 @@ done (`completed_at`).
   target FK is `ON DELETE CASCADE`; `ck_todo_link_one_target` counts the columns of
   `LINK_COLUMNS`, partial indexes `uq_todo_link_<column>` and `ix_todo_link_<column>`).
   `LINK_KINDS` is also the picker order: application, meeting, agenda_item, vote,
-  gremium, invoice, expense (`budget_expense`), budget (the cost centre), ticket, todo.
+  appointment (a Termin, `calendar_appointment`; read rule `calendar.appointments.readable`,
+  a granted Termin gives title, start, end and place only), gremium, invoice, expense
+  (`budget_expense`), budget (the cost centre), ticket, todo.
   Migration `527854b79d68` adds `vote_id`, `gremium_id`, `invoice_id`, `expense_id`;
-  `b3b70dda7d08` adds `budget_id`. Constants
+  `b3b70dda7d08` adds `budget_id`; `d85b3e6a1f47` adds `appointment_id`.
+  `TodoCardEvent` has `start_time`/`end_time` (migration `c7d21f9a4e63`): a time needs its
+  day (`event_time_without_date`), and the end of one day is not before its start. Constants
   `DEFAULT_COLUMNS`, `PERSONAL_BOARD_NAME`, `TEAM_BOARD_NAME`/`TEAM_BOARD_PERMISSION`.
 - `access.py` — `BoardAccess` (per-request cache): `can_read` (write or `todo.read_all`),
   `can_write`, `can_configure`, `scope()` → `ReadScope.condition()` for the cross-board

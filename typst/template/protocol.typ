@@ -160,6 +160,19 @@
       link(n.url, text(fill: palette.hsrturl, inline(n.c)))
     } else if t == "br" {
       linebreak()
+    } else if t == "bar" {
+      // A blacked-out segment (000687, 000688): one fixed width, so the bar does not
+      // tell the length. The black word "geschwärzt" on the black bar is the text
+      // that a screen reader and a copy of the text get.
+      box(
+        width: 4.5em,
+        height: 0.8em,
+        baseline: 0.1em,
+        fill: black,
+        radius: 1pt,
+        clip: true,
+        align(center + horizon, text(fill: black, size: 0.55em)[geschwärzt]),
+      )
     } else if t == "sym" {
       math.equation(block: false, alt: n.v, math-symbols.at(n.v, default: n.v))
     } else if t == "math" {

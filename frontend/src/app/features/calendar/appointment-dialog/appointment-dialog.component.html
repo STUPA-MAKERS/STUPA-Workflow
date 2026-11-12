@@ -1,0 +1,139 @@
+<app-dialog
+  [open]="open()"
+  size="form"
+  [title]="(editing() ? 'calendar.dialog.editTitle' : 'calendar.dialog.createTitle') | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="closed.emit()"
+>
+  <form class="apd" (submit)="$event.preventDefault(); submit()">
+    <app-input
+      name="title"
+      [id]="'apd-title'"
+      [label]="'calendar.field.title' | t"
+      [required]="true"
+      [ngModel]="form().title"
+      (ngModelChange)="patch({ title: $event })"
+    />
+    <app-switch [id]="'apd-allday'" [checked]="form().allDay" (checkedChange)="patch({ allDay: $event })">
+      <span class="apd__switch">{{ 'calendar.allDay' | t }}</span>
+    </app-switch>
+    <div class="apd__when" [class.apd__when--timed]="!form().allDay">
+      <app-datepicker
+        name="startsOn"
+        [id]="'apd-start'"
+        [label]="'calendar.field.start' | t"
+        [required]="true"
+        [ngModel]="form().startsOn"
+        (ngModelChange)="setStart($event)"
+      />
+      @if (!form().allDay) {
+        <app-time-input
+          name="startTime"
+          [id]="'apd-start-time'"
+          [label]="'calendar.field.startTime' | t"
+          [required]="true"
+          [ngModel]="form().startTime"
+          (ngModelChange)="patch({ startTime: $event })"
+        />
+      }
+      <app-datepicker
+        name="endsOn"
+        [id]="'apd-end'"
+        [label]="'calendar.field.end' | t"
+        [required]="true"
+        [min]="form().startsOn"
+        [ngModel]="form().endsOn"
+        (ngModelChange)="patch({ endsOn: $event })"
+      />
+      @if (!form().allDay) {
+        <app-time-input
+          name="endTime"
+          [id]="'apd-end-time'"
+          [label]="'calendar.field.endTime' | t"
+          [required]="true"
+          [ngModel]="form().endTime"
+          (ngModelChange)="patch({ endTime: $event })"
+        />
+      }
+    </div>
+    <app-input
+      name="place"
+      [id]="'apd-place'"
+      [label]="'calendar.field.place' | t"
+      [ngModel]="form().place"
+      (ngModelChange)="patch({ place: $event })"
+    />
+    <app-textarea [label]="'calendar.field.description' | t">
+      <textarea
+        id="apd-description"
+        name="description"
+        rows="3"
+        maxlength="5000"
+        [ngModel]="form().description"
+        (ngModelChange)="patch({ description: $event })"
+      ></textarea>
+    </app-textarea>
+    <div class="apd__field" role="group" aria-labelledby="apd-invited">
+      <span class="apd__cap" id="apd-invited">{{ 'calendar.field.invited' | t }}</span>
+      <div class="apd__chips">
+        @for (g of gremien(); track g.id) {
+          <app-chip
+            removeSize="sm"
+            [removable]="true"
+            [removeLabel]="'calendar.dialog.remove' | t: { name: g.name }"
+            (remove)="removeGremium(g.id)"
+          >
+            <app-icon name="landmark" [size]="14" /><span>{{ g.name }}</span>
+          </app-chip>
+        }
+        @for (p of persons(); track p.id) {
+          <app-chip
+            removeSize="sm"
+            [removable]="true"
+            [removeLabel]="'calendar.dialog.remove' | t: { name: p.name }"
+            (remove)="removePerson(p.id)"
+          >
+            <app-avatar size="xs" [name]="p.name" [decorative]="true" /><span>{{ p.name }}</span>
+          </app-chip>
+        }
+        @if (gremiumOptions().length) {
+          <app-filter-select
+            icon="plus"
+            [chevron]="false"
+            [label]="'calendar.dialog.addGremium' | t"
+            [text]="'calendar.dialog.addGremium' | t"
+            [options]="gremiumOptions()"
+            value=""
+            (valueChange)="addGremium($event)"
+          />
+        }
+      </div>
+      <app-autocomplete
+        inputId="apd-person"
+        name="person"
+        [label]="'calendar.dialog.addPerson' | t"
+        [placeholder]="'calendar.dialog.personPlaceholder' | t"
+        [query]="personQuery()"
+        [options]="personHits()"
+        [open]="personHits().length > 0"
+        [optionLabel]="personLabel"
+        (queryChange)="onPersonQuery($event)"
+        (choose)="addPerson($event)"
+      />
+    </div>
+    @if (canPublish()) {
+      <app-switch [id]="'apd-forall'" [checked]="form().forAll" (checkedChange)="patch({ forAll: $event })">
+        <span class="apd__switch">{{ 'calendar.field.forAll' | t }}</span>
+      </app-switch>
+      <app-switch [id]="'apd-public'" [checked]="form().public" (checkedChange)="patch({ public: $event })">
+        <span class="apd__switch">{{ 'calendar.field.public' | t }}</span>
+      </app-switch>
+    }
+    <button type="submit" hidden></button>
+  </form>
+
+  <app-button dialog-footer variant="text" (click)="closed.emit()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [disabled]="!valid()" [loading]="saving()" (click)="submit()">
+    {{ (editing() ? 'action.save' : 'calendar.dialog.create') | t }}
+  </app-button>
+</app-dialog>

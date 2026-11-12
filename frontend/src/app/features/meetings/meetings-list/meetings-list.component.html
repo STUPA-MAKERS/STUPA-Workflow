@@ -1,23 +1,15 @@
 <div class="mtl">
   <section class="ld-pane" aria-labelledby="mtl-title">
     <app-page-header [pane]="true" titleId="mtl-title" [title]="'meetings.title' | t">
-      <ng-container ngProjectAs="[actions]">
-        @if (phone()) {
+      @if (phone()) {
+        <ng-container ngProjectAs="[actions]">
           <app-row-menu
             [label]="'meetings.overview.menu' | t"
             [sections]="phoneMenu()"
-            (selected)="onPhoneMenu($event, abo)"
+            (selected)="onPhoneMenu($event)"
           />
-        } @else {
-          <app-meetings-view-actions
-            view="list"
-            [showSwitch]="showSwitch()"
-            [abo]="abo"
-            (viewChange)="viewChange.emit($event)"
-          />
-        }
-        <app-calendar-subscribe #abo />
-      </ng-container>
+        </ng-container>
+      }
     </app-page-header>
 
     <app-sticky-bar class="ld-pane__filters">
@@ -132,9 +124,9 @@
 </div>
 
 <ng-template #loadPast>
-  <div class="mtl__more mtl__more--start">
+  <div class="mtl__more">
     <app-button variant="text" size="sm" [loading]="timeline.loadingPast()" (click)="timeline.loadMorePast()">
-      <app-icon name="history" />
+      <app-icon name="down" />
       {{ 'meetings.list.loadPast' | t }}
     </app-button>
   </div>

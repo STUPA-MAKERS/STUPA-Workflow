@@ -10,6 +10,8 @@ facts of one target:
 * expense and invoice — the booking and invoice fields;
 * meeting — the date, the time, the status and the agenda;
 * agenda item — the meeting, the text and the votes of the item;
+* appointment (a Termin) — the start, the end and the place, and nothing else, because
+  the description, the invitations and the answers stay with the invited persons;
 * vote — the question, the meeting, the status and the result;
 * todo — the board, the column, the description and the checklist, without its links,
   because the access does not continue to the links of a linked card.
@@ -33,6 +35,7 @@ from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import pii_keys_for_type
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
+from app.modules.calendar.models import Appointment
 from app.modules.forms.models import FormField
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
@@ -129,6 +132,7 @@ class LinkViewer:
             "meeting": self._meeting,
             "agenda_item": self._agenda_item,
             "vote": self._vote,
+            "appointment": self._appointment,
             "invoice": self._invoice,
             "expense": self._expense,
             "todo": self._todo,
@@ -208,6 +212,22 @@ class LinkViewer:
                 _fact("meetingStatus", meeting.status),
             ),
             rows,
+        )
+
+    async def _appointment(self, target_id: uuid.UUID) -> Built:
+        row = await self.session.get(Appointment, target_id)
+        if row is None:  # pragma: no cover - the resolver found it
+            return (), []
+        start, end = row.start_time, row.end_time
+        return (
+            _facts(
+                _fact("date", row.starts_on, "date"),
+                _fact("endDate", row.ends_on if row.ends_on != row.starts_on else None, "date"),
+                _fact("startTime", start.strftime("%H:%M") if start is not None else None),
+                _fact("endTime", end.strftime("%H:%M") if end is not None else None),
+                _fact("place", row.place),
+            ),
+            [],
         )
 
     async def _agenda_item(self, target_id: uuid.UUID) -> Built:

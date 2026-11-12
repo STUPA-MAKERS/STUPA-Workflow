@@ -1,7 +1,7 @@
 """Link targets of a card: resolve them per viewer, and search them for the picker.
 
-A card links to an application, a meeting, an agenda item, a vote, a gremium, an
-invoice, a booking, a cost centre, a ticket or another card. Each kind has the read rule
+A card links to an application, a meeting, an agenda item, a vote, a Termin, a gremium,
+an invoice, a booking, a cost centre, a ticket or another card. Each kind has the read rule
 of its own module:
 
 * application — the application read access (``resolve_app_read``), confirmed only;
@@ -9,6 +9,8 @@ of its own module:
 * agenda_item — the read scope of its meeting;
 * vote — the read scope of the vote list (``voting.listing.read_scope``, the SQL form
   of ``VotingService.assert_can_read``);
+* appointment (a Termin) — the read rule of the Termine (``calendar.appointments.readable``:
+  the creator, an invited person, every person for a Termin that is for all or public);
 * gremium — the gate of the tab "Gremien" (``gremium_view_scope``, the set form of
   ``can_view_gremium``: ``gremium.view_all`` or an active membership);
 * invoice, expense — the gate of ``GET /api/invoices`` and ``GET /api/expenses``
@@ -24,8 +26,10 @@ cannot read by the rule of its kind resolves as ``granted`` when a card on a boa
 that the viewer reads links it. A granted target has no url, the card opens it in a
 read-only sheet (``link_view``). The grant stops after one step: it comes only from
 cards that the viewer reads by the board rule, never from a granted card. A ticket and
-a gremium give no grant. The link picker and the link check of ``POST .../links`` use
-the rule of the kind only, so a person links only what the person reads.
+a gremium give no grant. A granted Termin gives its title, its start, its end and its
+place only, never its description, its invitations or its answers. The link picker and
+the link check of ``POST .../links`` use the rule of the kind only, so a person links
+only what the person reads.
 
 A target that the viewer cannot read resolves as not accessible: no title, no url,
 no detail. The frontend shows "<Kind> (kein Zugriff)". The resolver loads each kind
@@ -54,6 +58,9 @@ from app.modules.auth.policy import gremium_view_scope
 from app.modules.auth.principal import Principal
 from app.modules.budget.access import has_budget_read
 from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
+from app.modules.calendar.appointments import AppointmentService
+from app.modules.calendar.appointments import readable as appointment_readable
+from app.modules.calendar.models import Appointment
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
@@ -302,6 +309,7 @@ class LinkResolver:
             "meeting": self._meetings,
             "agenda_item": self._agenda_items,
             "vote": self._votes,
+            "appointment": self._appointments,
             "gremium": self._gremien,
             "invoice": self._invoices,
             "expense": self._expenses,
@@ -496,6 +504,37 @@ class LinkResolver:
         return {
             vote.id: _vote_target(vote, meeting_title, meeting_date, titles)
             for vote, meeting_title, meeting_date in rows
+        }
+
+    async def _appointments(
+        self,
+        ids: AbstractSet[uuid.UUID],
+        principal: Principal,
+        open_ids: frozenset[uuid.UUID] = NONE,
+    ) -> dict[uuid.UUID, Resolved]:
+        viewer = await AppointmentService(self.session).viewer(principal)
+        rows = (
+            await self.session.scalars(
+                select(Appointment).where(
+                    Appointment.id.in_(ids),
+                    or_(appointment_readable(viewer), Appointment.id.in_(open_ids)),
+                )
+            )
+        ).all()
+        return {
+            row.id: Resolved(
+                accessible=True,
+                title=row.title,
+                url=f"/calendar?appointment={row.id}",
+                detail=TodoLinkDetail(
+                    date=_iso(row.starts_on),
+                    end_date=_iso(row.ends_on),
+                    start_time=_iso(row.start_time),
+                    end_time=_iso(row.end_time),
+                    place=row.place,
+                ),
+            )
+            for row in rows
         }
 
     async def _gremien(
@@ -710,6 +749,8 @@ class LinkResolver:
                 return await self._agenda_candidates(pattern, principal)
             case "vote":
                 return await self._vote_candidates(term, principal)
+            case "appointment":
+                return await self._appointment_candidates(pattern, principal)
             case "gremium":
                 return await self._gremium_candidates(term, principal)
             case "invoice":
@@ -787,6 +828,12 @@ class LinkResolver:
             self.session, principal, statuses=VOTE_STATUSES, q=term, limit=PER_KIND, offset=0
         )
         return [v.id for v in page.items]
+
+    async def _appointment_candidates(self, pattern: str, principal: Principal) -> list[uuid.UUID]:
+        """The readable Termine by title or place, the newest first."""
+        service = AppointmentService(self.session)
+        found = await service.matching(await service.viewer(principal), pattern, PER_KIND)
+        return [item.row.id for item in found]
 
     async def _gremium_candidates(self, term: str, principal: Principal) -> list[uuid.UUID]:
         """The trigram match of the search source on name and slug, in the Gremien scope."""

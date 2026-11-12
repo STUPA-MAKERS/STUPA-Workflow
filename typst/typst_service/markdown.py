@@ -19,6 +19,9 @@ builder (`backend/app/modules/protocol/markdown.py`):
   ranking.
 * Inline shortcodes: `{{time 18:30}}`, `{{vote ja=1 nein=2 enthaltung=0}}`,
   `{{count anwesend}}` and a bare frontmatter field such as `{{anwesend}}`.
+* Blackout marks: the empty marker `%%%%` is a black bar of one fixed width.
+  The backend puts it in place of each marked name of the public variant. A
+  `%%Name%%` of the internal variant prints the name as plain text.
 * TeX math: `$...$` in a line, and a paragraph that is one `$$...$$` block.
   The formula body goes to the template as a string. The vendored mitex
   package converts it inside math mode.
@@ -452,13 +455,33 @@ def _shortcode(inner: str, meta: Meta) -> list[Node]:
             return [_text("{{" + inner + "}}")]
 
 
-def _inline_text(text: str, meta: Meta) -> Iterator[Node]:
-    """Expand the shortcodes of a text run and split the rest into prose."""
+_BLACKOUT_RE: Final[re.Pattern[str]] = re.compile(r"%%([^%\n]*)%%")
+
+
+def _blackout(text: str, meta: Meta) -> Iterator[Node]:
+    """Turn `%%%%` into a black bar and `%%Name%%` into its plain text.
+
+    The rest of the run goes through the shortcodes. The name of the internal
+    variant does not, so a mark prints its text exactly as written.
+    """
+    for index, piece in enumerate(_BLACKOUT_RE.split(text)):
+        if index % 2:
+            yield {"t": "bar"} if not piece else _text(piece)
+        else:
+            yield from _shortcodes(piece, meta)
+
+
+def _shortcodes(text: str, meta: Meta) -> Iterator[Node]:
     return (
         node
         for index, piece in enumerate(SHORTCODE_RE.split(text))
         for node in (_shortcode(piece, meta) if index % 2 else _prose(piece))
     )
+
+
+def _inline_text(text: str, meta: Meta) -> Iterator[Node]:
+    """Expand the blackout marks and the shortcodes of a text run, the rest is prose."""
+    return _blackout(text, meta)
 
 
 # -- marko helpers ----------------------------------------------------------

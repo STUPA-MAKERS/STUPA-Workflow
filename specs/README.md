@@ -11,7 +11,7 @@ specs/
     backend/   database, functional, python
     frontend/  angular, functional
     shared/    agents, api, functional, git, testing, tooling, writing
-    specs/     content, format, structure
+    specs/     content, format, structure, uml
   requirements/
     functional/
       administration/  accounts, admin, audit, backups, files, privacy, translations
@@ -217,6 +217,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000554](requirements/functional/collaboration/todos/000554_duplicate-card.md) | A card can be duplicated | approved |
 | [F/collaboration/todos/000555](requirements/functional/collaboration/todos/000555_item-to-card.md) | A checklist item becomes a card | approved |
 | [F/collaboration/todos/000573](requirements/functional/collaboration/todos/000573_card-links-both-ways.md) | A link between two cards shows on both cards | approved |
+| [F/collaboration/todos/000735](requirements/functional/collaboration/todos/000735_termin-link.md) | A card can link a Termin | approved |
+| [F/collaboration/todos/000736](requirements/functional/collaboration/todos/000736_event-times.md) | The start and the end of an Event can have a time | approved |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |
@@ -262,6 +264,34 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/calendar/000331](requirements/functional/meetings/calendar/000331_feed.md) | Each person has a calendar feed | approved |
 | [F/meetings/calendar/000332](requirements/functional/meetings/calendar/000332_feed-404.md) | A wrong feed token is not found | approved |
 | [F/meetings/calendar/000333](requirements/functional/meetings/calendar/000333_event-defaults.md) | A calendar event has a reminder | approved |
+| [F/meetings/calendar/000710](requirements/functional/meetings/calendar/000710_calendar-tab.md) | The Kalender is its own tab | approved |
+| [F/meetings/calendar/000711](requirements/functional/meetings/calendar/000711_calendar-sources.md) | The Kalender shows five kinds of entries | approved |
+| [F/meetings/calendar/000712](requirements/functional/meetings/calendar/000712_calendar-due-cards.md) | The Kalender shows every readable card with a due date | approved |
+| [F/meetings/calendar/000713](requirements/functional/meetings/calendar/000713_calendar-filters.md) | The Kalender filters by kind and by Gremium | approved |
+| [F/meetings/calendar/000714](requirements/functional/meetings/calendar/000714_calendar-entry-opens.md) | An entry opens its own element | approved |
+| [F/meetings/calendar/000715](requirements/functional/meetings/calendar/000715_termin.md) | A Termin has a title and a time span | approved |
+| [F/meetings/calendar/000716](requirements/functional/meetings/calendar/000716_termin-create.md) | Each signed-in person creates a Termin | approved |
+| [F/meetings/calendar/000717](requirements/functional/meetings/calendar/000717_termin-invitations.md) | A Termin invites Gremien and persons | approved |
+| [F/meetings/calendar/000718](requirements/functional/meetings/calendar/000718_termin-visibility.md) | Only the creator and the invited persons read a Termin | approved |
+| [F/meetings/calendar/000719](requirements/functional/meetings/calendar/000719_termin-answers.md) | An invited person answers a Termin | approved |
+| [F/meetings/calendar/000720](requirements/functional/meetings/calendar/000720_termin-mails.md) | An invited person gets a mail | approved |
+| [F/meetings/calendar/000721](requirements/functional/meetings/calendar/000721_external-calendars.md) | An admin subscribes an external calendar | approved |
+| [F/meetings/calendar/000722](requirements/functional/meetings/calendar/000722_external-fetch.md) | The worker fetches external calendars | approved |
+| [F/meetings/calendar/000723](requirements/functional/meetings/calendar/000723_external-entries.md) | External entries are plain and read-only | approved |
+| [F/meetings/calendar/000724](requirements/functional/meetings/calendar/000724_feed-termine-external.md) | The personal feed holds Termine and external entries | approved |
+| [F/meetings/calendar/000725](requirements/functional/meetings/calendar/000725_termin-privacy.md) | Termine are part of the privacy export and erasure | approved |
+| [F/meetings/calendar/000726](requirements/functional/meetings/calendar/000726_calendar-phone.md) | The Kalender on the phone is a list of days | approved |
+| [F/meetings/calendar/000727](requirements/functional/meetings/calendar/000727_calendar-search.md) | The Kalender search jumps to the hit | approved |
+| [F/meetings/calendar/000728](requirements/functional/meetings/calendar/000728_calendar-week-view.md) | The desktop Kalender has a week and a month view | approved |
+| [F/meetings/calendar/000729](requirements/functional/meetings/calendar/000729_external-calendars-admin-page.md) | The admin page Kalender lists and edits the external calendars | approved |
+| [F/meetings/calendar/000730](requirements/functional/meetings/calendar/000730_public-termin.md) | A Termin can be public | approved |
+| [F/meetings/calendar/000731](requirements/functional/meetings/calendar/000731_public-calendar-page.md) | The public calendar page shows the public entries | approved |
+| [F/meetings/calendar/000732](requirements/functional/meetings/calendar/000732_public-meetings.md) | The public calendar shows the meetings of Gremien with public protocols | approved |
+| [F/meetings/calendar/000733](requirements/functional/meetings/calendar/000733_public-ics-feed.md) | The public calendar has an ICS feed without a token | approved |
+| [F/meetings/calendar/000734](requirements/functional/meetings/calendar/000734_public-calendar-noindex.md) | The public calendar is not indexed | approved |
+| [F/meetings/calendar/000737](requirements/functional/meetings/calendar/000737_event-as-termin.md) | The Kalender shows an Event like a Termin | approved |
+| [F/meetings/calendar/000738](requirements/functional/meetings/calendar/000738_termin-invite-person-search.md) | The invitation search finds each active account by name | approved |
+| [F/meetings/calendar/000740](requirements/functional/meetings/calendar/000740_termin-open-answers.md) | The answer list of a Termin names the invited persons without an answer | approved |
 | [F/meetings/delegations/000110](requirements/functional/meetings/delegations/000110_per-gremium.md) | Vote delegation is a Gremium setting | approved |
 | [F/meetings/delegations/000111](requirements/functional/meetings/delegations/000111_delegation-blocks-presence.md) | A member with an active delegation is not present | approved |
 | [F/meetings/delegations/000112](requirements/functional/meetings/delegations/000112_one-pool.md) | The substitute pool is the only substitute rule | approved |
@@ -295,7 +325,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000106](requirements/functional/meetings/meetings/000106_guest-modes.md) | Guests vote or only watch | approved |
 | [F/meetings/meetings/000107](requirements/functional/meetings/meetings/000107_guest-view.md) | Guests see public TOPs only | approved |
 | [F/meetings/meetings/000108](requirements/functional/meetings/meetings/000108_guest-pseudonyms.md) | Guest names become pseudonyms | approved |
-| [F/meetings/meetings/000109](requirements/functional/meetings/meetings/000109_list-and-calendar.md) | The meeting list has a list and a calendar | approved |
+| [F/meetings/meetings/000109](requirements/functional/meetings/meetings/000109_list-and-calendar.md) | The meeting list has a list and a calendar | replaced |
 | [F/meetings/meetings/000345](requirements/functional/meetings/meetings/000345_gremium-rights.md) | Meeting rights are per Gremium | approved |
 | [F/meetings/meetings/000346](requirements/functional/meetings/meetings/000346_open-needs-keeper.md) | A meeting opens only with a protokollant | approved |
 | [F/meetings/meetings/000347](requirements/functional/meetings/meetings/000347_keeper-periods.md) | A keeper period follows the current TOP | approved |
@@ -303,7 +333,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000349](requirements/functional/meetings/meetings/000349_aggregates-only.md) | Live data shows only aggregates | approved |
 | [F/meetings/meetings/000351](requirements/functional/meetings/meetings/000351_join-code.md) | A join code is short and unambiguous | approved |
 | [F/meetings/meetings/000353](requirements/functional/meetings/meetings/000353_guest-vote.md) | A vote with guests has no quorum | approved |
-| [F/meetings/meetings/000418](requirements/functional/meetings/meetings/000418_calendar-popover.md) | The calendar subscription is on Sitzungen | approved |
+| [F/meetings/meetings/000418](requirements/functional/meetings/meetings/000418_calendar-popover.md) | The calendar subscription is on Sitzungen | replaced |
 | [F/meetings/meetings/000419](requirements/functional/meetings/meetings/000419_gremium-delete.md) | A Gremium delete deletes its meetings | approved |
 | [F/meetings/meetings/000448](requirements/functional/meetings/meetings/000448_vote-deleted-timeline.md) | The timeline shows a vote deleted with its meeting | approved |
 | [F/meetings/meetings/000449](requirements/functional/meetings/meetings/000449_delete-vote-count.md) | A meeting delete names the vote count | approved |
@@ -326,6 +356,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000359](requirements/functional/meetings/protocols/000359_cd-variant.md) | The CD variant selects the layout | approved |
 | [F/meetings/protocols/000360](requirements/functional/meetings/protocols/000360_text-is-data.md) | Protocol text is data, never code | approved |
 | [F/meetings/protocols/000361](requirements/functional/meetings/protocols/000361_image-budget.md) | A protocol shows at most 48 images | approved |
+| [F/meetings/protocols/000685](requirements/functional/meetings/protocols/000685_blackout-syntax.md) | Protocol text marks a segment for blackout | approved |
+| [F/meetings/protocols/000686](requirements/functional/meetings/protocols/000686_blackout-unclosed.md) | An open blackout marker stops the finalize | approved |
+| [F/meetings/protocols/000689](requirements/functional/meetings/protocols/000689_blackout-internal.md) | Internal views show a marked segment as marked | approved |
+| [F/meetings/protocols/000690](requirements/functional/meetings/protocols/000690_blackout-format-bar.md) | The format bar marks a segment for blackout | approved |
+| [F/meetings/protocols/000691](requirements/functional/meetings/protocols/000691_blackout-mail.md) | A marked segment sends the public PDF to the mailing list | approved |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |
@@ -339,11 +374,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/voting/000380](requirements/functional/meetings/voting/000380_quorum-close.md) | An unmet quorum blocks the manual close | approved |
 | [F/meetings/voting/000381](requirements/functional/meetings/voting/000381_eligible-count.md) | The eligible count comes from the roster | approved |
 | [F/meetings/voting/000382](requirements/functional/meetings/voting/000382_delegation-ballot.md) | A delegation ballot is a second ballot | approved |
-| [F/public/public-pages/000170](requirements/functional/public/public-pages/000170_no-public-meetings.md) | Meetings are never public | approved |
+| [F/public/public-pages/000170](requirements/functional/public/public-pages/000170_no-public-meetings.md) | Meetings are never public | replaced |
 | [F/public/public-pages/000171](requirements/functional/public/public-pages/000171_public-protocols.md) | Only final protocols of public Gremien are public | approved |
 | [F/public/public-pages/000172](requirements/functional/public/public-pages/000172_public-protocol-content.md) | A public protocol has no names and no internal TOPs | approved |
 | [F/public/public-pages/000173](requirements/functional/public/public-pages/000173_noindex.md) | Public pages are not indexed | approved |
 | [F/public/public-pages/000589](requirements/functional/public/public-pages/000589_login-choice.md) | Anmelden offers the account login and the e-mail link | approved |
+| [F/public/public-pages/000687](requirements/functional/public/public-pages/000687_blackout-public.md) | The public variants black out a marked segment | approved |
+| [F/public/public-pages/000688](requirements/functional/public/public-pages/000688_blackout-bar-width.md) | A black bar has one fixed width and the text colour | approved |
 | [NF/accessibility/conformance/000490](requirements/non-functional/accessibility/conformance/000490_wcag-22-aa.md) | Every view meets WCAG 2.2 level AA | approved |
 | [NF/accessibility/conformance/000491](requirements/non-functional/accessibility/conformance/000491_axe-every-route.md) | Every route passes an axe check in both themes | approved |
 | [NF/accessibility/conformance/000492](requirements/non-functional/accessibility/conformance/000492_template-lint.md) | The template lint has the accessibility rules | approved |
@@ -398,6 +435,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/settings/000622](requirements/non-functional/accessibility/settings/000622_no-ring-on-script-focus.md) | A heading that a script focuses shows no focus ring | approved |
 | [NF/accessibility/settings/000623](requirements/non-functional/accessibility/settings/000623_scripts-read-motion-setting.md) | A script reads the motion setting, not the system | approved |
 | [NF/accessibility/settings/000647](requirements/non-functional/accessibility/settings/000647_accessibility-menu.md) | Accessibility has its own menu | approved |
+| [NF/accessibility/settings/000739](requirements/non-functional/accessibility/settings/000739_copy-box-yellow-fill.md) | In very high contrast, a box with a text to copy is a yellow fill | approved |
 | [NF/accessibility/statement/000495](requirements/non-functional/accessibility/statement/000495_statement-page.md) | A public page holds the accessibility statement | approved |
 | [NF/accessibility/statement/000496](requirements/non-functional/accessibility/statement/000496_statement-link.md) | Every page links to the accessibility statement | approved |
 | [NF/accessibility/statement/000497](requirements/non-functional/accessibility/statement/000497_barrier-report.md) | A user can report a barrier as a ticket | approved |
@@ -513,6 +551,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000675](requirements/non-functional/usability/controls/000675_phone-row-end.md) | A phone list row ends with a menu or with nothing | approved |
 | [NF/usability/controls/000676](requirements/non-functional/usability/controls/000676_tickets-word-in-admin.md) | Verwaltung says "Tickets" | approved |
 | [NF/usability/controls/000678](requirements/non-functional/usability/controls/000678_live-connection-lost-toast.md) | A lost live connection shows as a toast | approved |
+| [NF/usability/controls/000700](requirements/non-functional/usability/controls/000700_date-field-relative-shortcut.md) | A date field takes a shortcut relative to today | approved |
+| [NF/usability/controls/000701](requirements/non-functional/usability/controls/000701_date-shortcut-resolves-on-commit.md) | A date shortcut becomes the date when the field commits | approved |
+| [NF/usability/controls/000702](requirements/non-functional/usability/controls/000702_date-shortcut-month-end.md) | A month or year shortcut stops at the end of the month | approved |
+| [NF/usability/controls/000741](requirements/non-functional/usability/controls/000741_load-more-button.md) | A button that loads more rows of a list is centred with a chevron | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll edge fades, or cuts at a line | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
@@ -690,3 +732,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/specs/structure/000013](style/specs/structure/000013_index.md) | The index lists every rule | approved |
 | [S/specs/structure/000014](style/specs/structure/000014_change-process.md) | A change goes through a pull request | approved |
 | [S/specs/structure/000226](style/specs/structure/000226_spec-first.md) | A change request starts as a spec | approved |
+| [S/specs/uml/000679](style/specs/uml/000679_uml-folder.md) | The UML data of the app is in specs/uml | approved |
+| [S/specs/uml/000680](style/specs/uml/000680_uml-generated.md) | A script writes the generated UML views, and CI checks that they are current | approved |
+| [S/specs/uml/000681](style/specs/uml/000681_uml-components.md) | The component view shows the backend modules, their layers and their imports | approved |
+| [S/specs/uml/000682](style/specs/uml/000682_uml-classes.md) | The class view shows every database model and its relations | approved |
+| [S/specs/uml/000683](style/specs/uml/000683_uml-deployment.md) | The deployment view shows the services of the compose stack | approved |
+| [S/specs/uml/000684](style/specs/uml/000684_uml-states.md) | A state view is written by hand and has the states of its check constraint | approved |

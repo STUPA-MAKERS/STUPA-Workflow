@@ -1,0 +1,6533 @@
+{
+  "edges": [
+    {
+      "column": "appointment_id",
+      "from": "Answer",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Appointment"
+    },
+    {
+      "column": "principal_id",
+      "from": "Answer",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "application_id",
+      "from": "Applicant",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "application_id",
+      "from": "ApplicantSession",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "type_id",
+      "from": "Application",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "ApplicationType"
+    },
+    {
+      "column": "budget_id",
+      "from": "Application",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Budget"
+    },
+    {
+      "column": "fiscal_year_id",
+      "from": "Application",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "FiscalYear"
+    },
+    {
+      "column": "flow_version_id",
+      "from": "Application",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "FlowVersion"
+    },
+    {
+      "column": "form_version_id",
+      "from": "Application",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "FormVersion"
+    },
+    {
+      "column": "gremium_id",
+      "from": "Application",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Gremium"
+    },
+    {
+      "column": "vote_gremium_id",
+      "from": "Application",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Gremium"
+    },
+    {
+      "column": "current_state_id",
+      "from": "Application",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "State"
+    },
+    {
+      "column": "application_id",
+      "from": "ApplicationDecision",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "status_event_id",
+      "from": "ApplicationDecision",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "StatusEvent"
+    },
+    {
+      "column": "vote_id",
+      "from": "ApplicationDecision",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Vote"
+    },
+    {
+      "column": "application_id",
+      "from": "ApplicationLink",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "predecessor_id",
+      "from": "ApplicationLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "application_id",
+      "from": "ApplicationLinkEvent",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "predecessor_id",
+      "from": "ApplicationLinkEvent",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Application"
+    },
+    {
+      "column": "active_form_version_id",
+      "from": "ApplicationType",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "FormVersion"
+    },
+    {
+      "column": "gremium_id",
+      "from": "ApplicationType",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "creator_id",
+      "from": "Appointment",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "application_id",
+      "from": "Attachment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "draft_token_hash",
+      "from": "Attachment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "AttachmentDraftToken"
+    },
+    {
+      "column": "comment_id",
+      "from": "Attachment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Comment"
+    },
+    {
+      "column": "ticket_id",
+      "from": "Attachment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Ticket"
+    },
+    {
+      "column": "ticket_note_id",
+      "from": "Attachment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TicketNote"
+    },
+    {
+      "column": "todo_comment_id",
+      "from": "Attachment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoComment"
+    },
+    {
+      "column": "principal_id",
+      "from": "AuthSession",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "parent_id",
+      "from": "Budget",
+      "multiplicity": "*",
+      "onDelete": "RESTRICT",
+      "to": "Budget"
+    },
+    {
+      "column": "decision_gremium_id",
+      "from": "Budget",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Gremium"
+    },
+    {
+      "column": "gremium_id",
+      "from": "Budget",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "view_gremium_id",
+      "from": "Budget",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Gremium"
+    },
+    {
+      "column": "budget_id",
+      "from": "BudgetAllocation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Budget"
+    },
+    {
+      "column": "fiscal_year_id",
+      "from": "BudgetAllocation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "FiscalYear"
+    },
+    {
+      "column": "application_id",
+      "from": "BudgetExpense",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Application"
+    },
+    {
+      "column": "budget_id",
+      "from": "BudgetExpense",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Budget"
+    },
+    {
+      "column": "parent_expense_id",
+      "from": "BudgetExpense",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "BudgetExpense"
+    },
+    {
+      "column": "fiscal_year_id",
+      "from": "BudgetExpense",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "FiscalYear"
+    },
+    {
+      "column": "invoice_id",
+      "from": "BudgetExpense",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Invoice"
+    },
+    {
+      "column": "variant_id",
+      "from": "CdVariantLogo",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "CdVariant"
+    },
+    {
+      "column": "application_id",
+      "from": "Comment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "prev_revision_id",
+      "from": "ConfigRevision",
+      "multiplicity": "*",
+      "onDelete": "RESTRICT",
+      "to": "ConfigRevision"
+    },
+    {
+      "column": "gremium_id",
+      "from": "DelegationSubstitute",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "member_principal_id",
+      "from": "DelegationSubstitute",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "substitute_principal_id",
+      "from": "DelegationSubstitute",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "application_id",
+      "from": "ErasureRequest",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Application"
+    },
+    {
+      "column": "principal_id",
+      "from": "ErasureRequest",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "gremium_id",
+      "from": "ExternalCalendar",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "calendar_id",
+      "from": "ExternalEntry",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "ExternalCalendar"
+    },
+    {
+      "column": "budget_id",
+      "from": "FiscalYear",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Budget"
+    },
+    {
+      "column": "form_version_id",
+      "from": "FormField",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "FormVersion"
+    },
+    {
+      "column": "application_type_id",
+      "from": "FormVersion",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "ApplicationType"
+    },
+    {
+      "column": "cd_variant_id",
+      "from": "Gremium",
+      "multiplicity": "*",
+      "onDelete": "RESTRICT",
+      "to": "CdVariant"
+    },
+    {
+      "column": "gremium_id",
+      "from": "GremiumMembership",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "gremium_role_id",
+      "from": "GremiumMembership",
+      "multiplicity": "*",
+      "onDelete": "RESTRICT",
+      "to": "GremiumRole"
+    },
+    {
+      "column": "principal_id",
+      "from": "GremiumMembership",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "gremium_id",
+      "from": "GremiumMembershipMapping",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "gremium_id",
+      "from": "GremiumRole",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "gremium_role_id",
+      "from": "GremiumRoleMapping",
+      "multiplicity": "*",
+      "onDelete": "RESTRICT",
+      "to": "GremiumRole"
+    },
+    {
+      "column": "role_id",
+      "from": "GroupMapping",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Role"
+    },
+    {
+      "column": "appointment_id",
+      "from": "Invitation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Appointment"
+    },
+    {
+      "column": "gremium_id",
+      "from": "Invitation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "principal_id",
+      "from": "Invitation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "application_id",
+      "from": "MagicLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "active_application_id",
+      "from": "Meeting",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Application"
+    },
+    {
+      "column": "gremium_id",
+      "from": "Meeting",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "current_agenda_item_id",
+      "from": "Meeting",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "MeetingAgendaItem"
+    },
+    {
+      "column": "protokollant_id",
+      "from": "Meeting",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "application_id",
+      "from": "MeetingAgendaItem",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "meeting_id",
+      "from": "MeetingAgendaItem",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Meeting"
+    },
+    {
+      "column": "todo_id",
+      "from": "MeetingAgendaItem",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "TodoCard"
+    },
+    {
+      "column": "meeting_id",
+      "from": "MeetingAttendance",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Meeting"
+    },
+    {
+      "column": "principal_id",
+      "from": "MeetingAttendance",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "gremium_id",
+      "from": "MeetingDelegation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "meeting_id",
+      "from": "MeetingDelegation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Meeting"
+    },
+    {
+      "column": "delegate_principal_id",
+      "from": "MeetingDelegation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "delegator_principal_id",
+      "from": "MeetingDelegation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "meeting_id",
+      "from": "MeetingGuest",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Meeting"
+    },
+    {
+      "column": "decided_by",
+      "from": "MeetingGuest",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "principal_id",
+      "from": "NotificationPreference",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "principal_id",
+      "from": "OAuthAuthorizationCode",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "principal_id",
+      "from": "OAuthToken",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "merged_into",
+      "from": "Principal",
+      "multiplicity": "*",
+      "onDelete": "RESTRICT",
+      "to": "Principal"
+    },
+    {
+      "column": "gremium_id",
+      "from": "Protocol",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "meeting_id",
+      "from": "Protocol",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Meeting"
+    },
+    {
+      "column": "meeting_id",
+      "from": "ProtocolKeeperPeriod",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Meeting"
+    },
+    {
+      "column": "from_agenda_item_id",
+      "from": "ProtocolKeeperPeriod",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "MeetingAgendaItem"
+    },
+    {
+      "column": "to_agenda_item_id",
+      "from": "ProtocolKeeperPeriod",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "MeetingAgendaItem"
+    },
+    {
+      "column": "principal_id",
+      "from": "ProtocolKeeperPeriod",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "protocol_id",
+      "from": "ProtocolVoteRef",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Protocol"
+    },
+    {
+      "column": "vote_id",
+      "from": "ProtocolVoteRef",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Vote"
+    },
+    {
+      "column": "principal_id",
+      "from": "RoleAssignment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "role_id",
+      "from": "RoleAssignment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Role"
+    },
+    {
+      "column": "role_id",
+      "from": "RolePermission",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Role"
+    },
+    {
+      "column": "vote_id",
+      "from": "SecretBallot",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Vote"
+    },
+    {
+      "column": "flow_version_id",
+      "from": "State",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "FlowVersion"
+    },
+    {
+      "column": "application_id",
+      "from": "StatusEvent",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "from_state_id",
+      "from": "StatusEvent",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "State"
+    },
+    {
+      "column": "to_state_id",
+      "from": "StatusEvent",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "State"
+    },
+    {
+      "column": "transition_id",
+      "from": "StatusEvent",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Transition"
+    },
+    {
+      "column": "vote_id",
+      "from": "StatusEvent",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Vote"
+    },
+    {
+      "column": "application_id",
+      "from": "SubmissionVersion",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "application_id",
+      "from": "TaskReminderLog",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "status_event_id",
+      "from": "TaskReminderLog",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "StatusEvent"
+    },
+    {
+      "column": "assignee_id",
+      "from": "Ticket",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "reporter_principal_id",
+      "from": "Ticket",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "duplicate_of_id",
+      "from": "Ticket",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Ticket"
+    },
+    {
+      "column": "actor_id",
+      "from": "TicketEvent",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "ticket_id",
+      "from": "TicketEvent",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Ticket"
+    },
+    {
+      "column": "author_id",
+      "from": "TicketNote",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "ticket_id",
+      "from": "TicketNote",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Ticket"
+    },
+    {
+      "column": "created_by",
+      "from": "TicketSenderBlock",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "principal_id",
+      "from": "TicketSenderBlock",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "source_ticket_id",
+      "from": "TicketSenderBlock",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Ticket"
+    },
+    {
+      "column": "principal_id",
+      "from": "TodoAssignee",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "card_id",
+      "from": "TodoAssignee",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoCard"
+    },
+    {
+      "column": "gremium_id",
+      "from": "TodoBoard",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "owner_id",
+      "from": "TodoBoard",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "created_by",
+      "from": "TodoCard",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "board_id",
+      "from": "TodoCard",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoBoard"
+    },
+    {
+      "column": "column_id",
+      "from": "TodoCard",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "TodoColumn"
+    },
+    {
+      "column": "card_id",
+      "from": "TodoCardEvent",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "TodoCard"
+    },
+    {
+      "column": "series_id",
+      "from": "TodoCardEvent",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "TodoEventSeries"
+    },
+    {
+      "column": "card_id",
+      "from": "TodoCardLabel",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoCard"
+    },
+    {
+      "column": "label_id",
+      "from": "TodoCardLabel",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoLabel"
+    },
+    {
+      "column": "card_id",
+      "from": "TodoCheckItem",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoCard"
+    },
+    {
+      "column": "board_id",
+      "from": "TodoColumn",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoBoard"
+    },
+    {
+      "column": "author_id",
+      "from": "TodoComment",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "card_id",
+      "from": "TodoComment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoCard"
+    },
+    {
+      "column": "actor_id",
+      "from": "TodoEvent",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "card_id",
+      "from": "TodoEvent",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoCard"
+    },
+    {
+      "column": "created_by",
+      "from": "TodoEventSeries",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "board_id",
+      "from": "TodoLabel",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoBoard"
+    },
+    {
+      "column": "application_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "appointment_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Appointment"
+    },
+    {
+      "column": "budget_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Budget"
+    },
+    {
+      "column": "expense_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "BudgetExpense"
+    },
+    {
+      "column": "gremium_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "invoice_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Invoice"
+    },
+    {
+      "column": "meeting_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Meeting"
+    },
+    {
+      "column": "agenda_item_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "MeetingAgendaItem"
+    },
+    {
+      "column": "created_by",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
+      "column": "ticket_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Ticket"
+    },
+    {
+      "column": "card_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoCard"
+    },
+    {
+      "column": "todo_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoCard"
+    },
+    {
+      "column": "vote_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Vote"
+    },
+    {
+      "column": "flow_version_id",
+      "from": "Transition",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "FlowVersion"
+    },
+    {
+      "column": "from_state_id",
+      "from": "Transition",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "State"
+    },
+    {
+      "column": "to_state_id",
+      "from": "Transition",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "State"
+    },
+    {
+      "column": "application_id",
+      "from": "Vote",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "meeting_id",
+      "from": "Vote",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Meeting"
+    },
+    {
+      "column": "agenda_item_id",
+      "from": "Vote",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "MeetingAgendaItem"
+    },
+    {
+      "column": "opens_state_id",
+      "from": "Vote",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "State"
+    },
+    {
+      "column": "result_branch_transition_id",
+      "from": "Vote",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Transition"
+    },
+    {
+      "column": "parent_vote_id",
+      "from": "Vote",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Vote"
+    },
+    {
+      "column": "repeat_of_id",
+      "from": "Vote",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Vote"
+    },
+    {
+      "column": "vote_id",
+      "from": "VotedMarker",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Vote"
+    },
+    {
+      "column": "webhook_id",
+      "from": "WebhookDelivery",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Webhook"
+    }
+  ],
+  "elements": [
+    {
+      "attributes": [
+        {
+          "name": "appointment_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "answer",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "accept",
+            "tentative",
+            "decline"
+          ]
+        },
+        {
+          "name": "answered_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Answer",
+      "module": "calendar",
+      "name": "Answer",
+      "path": "backend/app/modules/calendar/models.py",
+      "table": "calendar_answer"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "email",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "anonymized_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "Applicant",
+      "module": "applications",
+      "name": "Applicant",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "applicant"
+    },
+    {
+      "attributes": [
+        {
+          "name": "sid",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "email",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "expires_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "revoked_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "ApplicantSession",
+      "module": "auth",
+      "name": "ApplicantSession",
+      "path": "backend/app/modules/auth/models.py",
+      "table": "applicant_session"
+    },
+    {
+      "attributes": [
+        {
+          "name": "type_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "form_version_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "flow_version_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "current_state_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "budget_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "fiscal_year_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "vote_gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "amount",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "currency",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(3)"
+        },
+        {
+          "name": "approved_amount",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "data",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "lang",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "email_confirmed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "archived_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "captured_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "capture_intake",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "received_on",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Application",
+      "module": "applications",
+      "name": "Application",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "application"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "approved_amount",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "conditions",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "vote_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "status_event_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "decided_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "decided_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "superseded_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "ApplicationDecision",
+      "module": "applications",
+      "name": "ApplicationDecision",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "application_decision"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "predecessor_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "linked_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "linked_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "ApplicationLink",
+      "module": "applications",
+      "name": "ApplicationLink",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "application_link"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "predecessor_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "action",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "set",
+            "removed"
+          ]
+        },
+        {
+          "name": "actor",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "ApplicationLinkEvent",
+      "module": "applications",
+      "name": "ApplicationLinkEvent",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "application_link_event"
+    },
+    {
+      "attributes": [
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "name_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "has_budget",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "comparison_offers",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "retention_months",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "active_form_version_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "ApplicationType",
+      "module": "application_types",
+      "name": "ApplicationType",
+      "path": "backend/app/modules/application_types/models.py",
+      "table": "application_type"
+    },
+    {
+      "attributes": [
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "starts_on",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "ends_on",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "start_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "end_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "place",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "description",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "creator_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "for_all",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "public",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "sequence",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Appointment",
+      "module": "calendar",
+      "name": "Appointment",
+      "path": "backend/app/modules/calendar/models.py",
+      "table": "calendar_appointment"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "ticket_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "ticket_note_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "todo_comment_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "comment_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "field_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "filename",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "mime",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "size",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "storage_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "scanned",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "scan_result",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "draft_token_hash",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BLOB"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "Attachment",
+      "module": "files",
+      "name": "Attachment",
+      "path": "backend/app/modules/files/models.py",
+      "table": "attachment"
+    },
+    {
+      "attributes": [
+        {
+          "name": "token_hash",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "BLOB"
+        },
+        {
+          "name": "expires_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "AttachmentDraftToken",
+      "module": "files",
+      "name": "AttachmentDraftToken",
+      "path": "backend/app/modules/files/models.py",
+      "table": "attachment_draft_token"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "BIGINT"
+        },
+        {
+          "name": "actor",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "action",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "target_type",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "target_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "data",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "prev_hash",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BLOB"
+        },
+        {
+          "name": "hash",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BLOB"
+        }
+      ],
+      "id": "AuditEntry",
+      "module": "audit",
+      "name": "AuditEntry",
+      "path": "backend/app/modules/audit/models.py",
+      "table": "audit_entry"
+    },
+    {
+      "attributes": [
+        {
+          "name": "started_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "finished_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "valid",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "checked",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "broken_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "reason",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "trigger",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "cron",
+            "manual",
+            "restore"
+          ]
+        },
+        {
+          "name": "triggered_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "AuditVerification",
+      "module": "audit",
+      "name": "AuditVerification",
+      "path": "backend/app/modules/audit/models.py",
+      "table": "audit_verification"
+    },
+    {
+      "attributes": [
+        {
+          "name": "sid",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "expires_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "refresh_token",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id_token",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "client",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "web",
+            "pwa"
+          ]
+        },
+        {
+          "name": "revalidated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "AuthSession",
+      "module": "auth",
+      "name": "AuthSession",
+      "path": "backend/app/modules/auth/models.py",
+      "table": "auth_session"
+    },
+    {
+      "attributes": [
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "manual",
+            "scheduled",
+            "pre_restore",
+            "imported"
+          ]
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "pending",
+            "running",
+            "done",
+            "failed"
+          ]
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "storage_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "size_bytes",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "checksum",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "object_count",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "note",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "app_version",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "schema_revision",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "pinned",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "finished_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Backup",
+      "module": "backup",
+      "name": "Backup",
+      "path": "backend/app/modules/backup/models.py",
+      "table": "backup"
+    },
+    {
+      "attributes": [
+        {
+          "name": "parent_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "path_key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "currency",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(3)"
+        },
+        {
+          "name": "active",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "color",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "hidden_in_budget",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "view_gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "decision_gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "fiscal_start_month",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "SMALLINT"
+        },
+        {
+          "name": "fiscal_start_day",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "SMALLINT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Budget",
+      "module": "budget",
+      "name": "Budget",
+      "path": "backend/app/modules/budget/tree_models.py",
+      "table": "budget"
+    },
+    {
+      "attributes": [
+        {
+          "name": "budget_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "fiscal_year_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "allocated",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetAllocation",
+      "module": "budget",
+      "name": "BudgetAllocation",
+      "path": "backend/app/modules/budget/tree_models.py",
+      "table": "budget_allocation"
+    },
+    {
+      "attributes": [
+        {
+          "name": "budget_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "fiscal_year_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "invoice_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "transfer_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "expense",
+            "income"
+          ]
+        },
+        {
+          "name": "amount",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "currency",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(3)"
+        },
+        {
+          "name": "description",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "actor",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "invoice_date",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "payment_date",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "correspondent",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "note",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "reference_number",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "payment_method",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "category",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "parent_expense_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetExpense",
+      "module": "budget",
+      "name": "BudgetExpense",
+      "path": "backend/app/modules/budget/tree_models.py",
+      "table": "budget_expense"
+    },
+    {
+      "attributes": [
+        {
+          "name": "key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "CdVariant",
+      "module": "site_config",
+      "name": "CdVariant",
+      "path": "backend/app/modules/site_config/models.py",
+      "table": "cd_variant"
+    },
+    {
+      "attributes": [
+        {
+          "name": "variant_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "slot",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "title",
+            "footer",
+            "square"
+          ]
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "vendored_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "object_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "file_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "mime",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "size",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "CdVariantLogo",
+      "module": "site_config",
+      "name": "CdVariantLogo",
+      "path": "backend/app/modules/site_config/models.py",
+      "table": "cd_variant_logo"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "author",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "author_kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "principal",
+            "applicant"
+          ]
+        },
+        {
+          "name": "body",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "visibility",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "internal",
+            "public"
+          ]
+        },
+        {
+          "name": "mentions",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "Comment",
+      "module": "applications",
+      "name": "Comment",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "comment"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "entity_type",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "entity_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "snapshot",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "prev_revision_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "ConfigRevision",
+      "module": "config_revision",
+      "name": "ConfigRevision",
+      "path": "backend/app/modules/config_revision/models.py",
+      "table": "config_revision"
+    },
+    {
+      "attributes": [
+        {
+          "name": "gremium_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "member_principal_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "substitute_principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "DelegationSubstitute",
+      "module": "gremien",
+      "name": "DelegationSubstitute",
+      "path": "backend/app/modules/gremien/models.py",
+      "table": "delegation_substitute"
+    },
+    {
+      "attributes": [
+        {
+          "name": "email",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "token_hash",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BLOB"
+        },
+        {
+          "name": "expires_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "used_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "EmailLoginLink",
+      "module": "auth",
+      "name": "EmailLoginLink",
+      "path": "backend/app/modules/auth/models.py",
+      "table": "email_login_link"
+    },
+    {
+      "attributes": [
+        {
+          "name": "subject_type",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "applicant",
+            "principal"
+          ]
+        },
+        {
+          "name": "application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "principal_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "email",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "open",
+            "executed",
+            "rejected"
+          ]
+        },
+        {
+          "name": "requested_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "handled_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "handled_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "reason",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "ErasureRequest",
+      "module": "privacy",
+      "name": "ErasureRequest",
+      "path": "backend/app/modules/privacy/models.py",
+      "table": "erasure_request"
+    },
+    {
+      "attributes": [
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "url",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "interval_minutes",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER",
+          "values": [
+            "15",
+            "60",
+            "360",
+            "1440"
+          ]
+        },
+        {
+          "name": "due_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "last_attempt_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "last_success_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "last_error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "ExternalCalendar",
+      "module": "calendar",
+      "name": "ExternalCalendar",
+      "path": "backend/app/modules/calendar/models.py",
+      "table": "calendar_external"
+    },
+    {
+      "attributes": [
+        {
+          "name": "calendar_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "starts_on",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "ends_on",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "start_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "end_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "place",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "description",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "ExternalEntry",
+      "module": "calendar",
+      "name": "ExternalEntry",
+      "path": "backend/app/modules/calendar/models.py",
+      "table": "calendar_external_entry"
+    },
+    {
+      "attributes": [
+        {
+          "name": "budget_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "year",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "start_date",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "end_date",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "active",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "closed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "FiscalYear",
+      "module": "budget",
+      "name": "FiscalYear",
+      "path": "backend/app/modules/budget/tree_models.py",
+      "table": "fiscal_year"
+    },
+    {
+      "attributes": [
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "active",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "editor_layout",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "FlowVersion",
+      "module": "flow",
+      "name": "FlowVersion",
+      "path": "backend/app/modules/flow/models.py",
+      "table": "flow_version"
+    },
+    {
+      "attributes": [
+        {
+          "name": "form_version_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "type",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "label_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "help_i18n",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "required",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "validation",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "visible_if",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "compute",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "options",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "order",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "is_pii",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "is_promoted",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "promote_target",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "FormField",
+      "module": "forms",
+      "name": "FormField",
+      "path": "backend/app/modules/forms/models.py",
+      "table": "form_field"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_type_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "active",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "description_i18n",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "FormVersion",
+      "module": "forms",
+      "name": "FormVersion",
+      "path": "backend/app/modules/forms/models.py",
+      "table": "form_version"
+    },
+    {
+      "attributes": [
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "slug",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "cd_variant_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "default_lang",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "allow_vote_delegation",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "delegation_lead_minutes",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "delegation_allow_external",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "quorum_percent",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "protocols_public",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "protocol_recipients",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "ARRAY"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Gremium",
+      "module": "gremien",
+      "name": "Gremium",
+      "path": "backend/app/modules/gremien/models.py",
+      "table": "gremium"
+    },
+    {
+      "attributes": [
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_role_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "GremiumMembership",
+      "module": "gremien",
+      "name": "GremiumMembership",
+      "path": "backend/app/modules/gremien/models.py",
+      "table": "gremium_membership"
+    },
+    {
+      "attributes": [
+        {
+          "name": "gremium_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "oidc_group",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "GremiumMembershipMapping",
+      "module": "gremien",
+      "name": "GremiumMembershipMapping",
+      "path": "backend/app/modules/gremien/models.py",
+      "table": "gremium_membership_mapping"
+    },
+    {
+      "attributes": [
+        {
+          "name": "gremium_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "name_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "permissions",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "GremiumRole",
+      "module": "gremien",
+      "name": "GremiumRole",
+      "path": "backend/app/modules/gremien/models.py",
+      "table": "gremium_role"
+    },
+    {
+      "attributes": [
+        {
+          "name": "gremium_role_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "oidc_group",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "GremiumRoleMapping",
+      "module": "gremien",
+      "name": "GremiumRoleMapping",
+      "path": "backend/app/modules/gremien/models.py",
+      "table": "gremium_role_mapping"
+    },
+    {
+      "attributes": [
+        {
+          "name": "oidc_group",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "role_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "GroupMapping",
+      "module": "auth",
+      "name": "GroupMapping",
+      "path": "backend/app/modules/auth/models.py",
+      "table": "group_mapping"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "confirm_ttl_hours",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "link_ttl_days",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        }
+      ],
+      "id": "GuestApplicationSettings",
+      "module": "applications",
+      "name": "GuestApplicationSettings",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "guest_application_settings"
+    },
+    {
+      "attributes": [
+        {
+          "name": "appointment_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "principal_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "Invitation",
+      "module": "calendar",
+      "name": "Invitation",
+      "path": "backend/app/modules/calendar/models.py",
+      "table": "calendar_invitation"
+    },
+    {
+      "attributes": [
+        {
+          "name": "number",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "issue_date",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "due_date",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "supplier",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "net_amount",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "tax_amount",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "gross_amount",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "currency",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(3)"
+        },
+        {
+          "name": "note",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "open",
+            "paid"
+          ]
+        },
+        {
+          "name": "file_object_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "file_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "file_mime",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "actor",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Invoice",
+      "module": "budget",
+      "name": "Invoice",
+      "path": "backend/app/modules/budget/tree_models.py",
+      "table": "invoice"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "web_session_days",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "pwa_session_days",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        }
+      ],
+      "id": "LoginSettings",
+      "module": "auth",
+      "name": "LoginSettings",
+      "path": "backend/app/modules/auth/models.py",
+      "table": "login_settings"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "token_hash",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BLOB"
+        },
+        {
+          "name": "expires_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "used_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "MagicLink",
+      "module": "applications",
+      "name": "MagicLink",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "magic_link"
+    },
+    {
+      "attributes": [
+        {
+          "name": "key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "subject_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "body_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "body_html_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "placeholders",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "MailTemplate",
+      "module": "notifications",
+      "name": "MailTemplate",
+      "path": "backend/app/modules/notifications/models.py",
+      "table": "mail_template"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "storage_key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "mime",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp"
+          ]
+        },
+        {
+          "name": "size",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "width",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "height",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "MarkdownImage",
+      "module": "media",
+      "name": "MarkdownImage",
+      "path": "backend/app/modules/media/models.py",
+      "table": "markdown_image"
+    },
+    {
+      "attributes": [
+        {
+          "name": "gremium_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "date",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "start_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "end_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "planned",
+            "live",
+            "closed"
+          ]
+        },
+        {
+          "name": "started_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "closed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "active_application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "current_agenda_item_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "protokollant_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "public_join",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "guests_mode",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "vote",
+            "watch"
+          ]
+        },
+        {
+          "name": "join_code",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Meeting",
+      "module": "meetings",
+      "name": "Meeting",
+      "path": "backend/app/modules/meetings/models.py",
+      "table": "meeting"
+    },
+    {
+      "attributes": [
+        {
+          "name": "meeting_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "title",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "todo_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "body",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "non_public",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "done_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "MeetingAgendaItem",
+      "module": "meetings",
+      "name": "MeetingAgendaItem",
+      "path": "backend/app/modules/meetings/models.py",
+      "table": "meeting_agenda_item"
+    },
+    {
+      "attributes": [
+        {
+          "name": "meeting_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "present",
+            "excused",
+            "absent"
+          ]
+        },
+        {
+          "name": "source",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "self",
+            "lead"
+          ]
+        },
+        {
+          "name": "note",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "MeetingAttendance",
+      "module": "meetings",
+      "name": "MeetingAttendance",
+      "path": "backend/app/modules/meetings/models.py",
+      "table": "meeting_attendance"
+    },
+    {
+      "attributes": [
+        {
+          "name": "meeting_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "delegator_principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "delegate_principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "delegate_voting",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "via_pool",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "MeetingDelegation",
+      "module": "delegations",
+      "name": "MeetingDelegation",
+      "path": "backend/app/modules/delegations/models.py",
+      "table": "meeting_delegation"
+    },
+    {
+      "attributes": [
+        {
+          "name": "meeting_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "seq",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "display_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "pending",
+            "admitted",
+            "rejected",
+            "removed",
+            "left"
+          ]
+        },
+        {
+          "name": "token_hash",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BLOB"
+        },
+        {
+          "name": "requested_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "decided_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "decided_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "admitted_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "last_seen_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "MeetingGuest",
+      "module": "meetings",
+      "name": "MeetingGuest",
+      "path": "backend/app/modules/meetings/models.py",
+      "table": "meeting_guest"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "open_lead_minutes",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "confirm_lead_minutes",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        }
+      ],
+      "id": "MeetingSettings",
+      "module": "meetings",
+      "name": "MeetingSettings",
+      "path": "backend/app/modules/meetings/models.py",
+      "table": "meeting_settings"
+    },
+    {
+      "attributes": [
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        },
+        {
+          "name": "enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        }
+      ],
+      "id": "NotificationPreference",
+      "module": "notifications",
+      "name": "NotificationPreference",
+      "path": "backend/app/modules/notifications/models.py",
+      "table": "notification_preference"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "task_reminder_enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "task_reminder_after_days",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "task_reminder_repeat_days",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        }
+      ],
+      "id": "NotificationSettings",
+      "module": "notifications",
+      "name": "NotificationSettings",
+      "path": "backend/app/modules/notifications/models.py",
+      "table": "notification_settings"
+    },
+    {
+      "attributes": [
+        {
+          "name": "code_hash",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BLOB"
+        },
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "client_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "redirect_uri",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "code_challenge",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "scope",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "access_ttl_seconds",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "expires_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "used_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "OAuthAuthorizationCode",
+      "module": "auth",
+      "name": "OAuthAuthorizationCode",
+      "path": "backend/app/modules/auth/oauth_models.py",
+      "table": "oauth_authorization_code"
+    },
+    {
+      "attributes": [
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "client_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "access_token_hash",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BLOB"
+        },
+        {
+          "name": "refresh_token_hash",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BLOB"
+        },
+        {
+          "name": "scope",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "access_ttl_seconds",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "access_expires_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "refresh_expires_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "revoked_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "OAuthToken",
+      "module": "auth",
+      "name": "OAuthToken",
+      "path": "backend/app/modules/auth/oauth_models.py",
+      "table": "oauth_token"
+    },
+    {
+      "attributes": [
+        {
+          "name": "sub",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "email",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "display_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "oidc_groups",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "last_login",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "active",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "calendar_token",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "merged_into",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "merged_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "Principal",
+      "module": "auth",
+      "name": "Principal",
+      "path": "backend/app/modules/auth/models.py",
+      "table": "principal"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "default_retention_months",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        }
+      ],
+      "id": "PrivacySettings",
+      "module": "privacy",
+      "name": "PrivacySettings",
+      "path": "backend/app/modules/privacy/models.py",
+      "table": "privacy_settings"
+    },
+    {
+      "attributes": [
+        {
+          "name": "meeting_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "markdown",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "pdf_storage_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "public_pdf_storage_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "author",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "draft",
+            "rendering",
+            "final"
+          ]
+        },
+        {
+          "name": "sent_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "cd_variant",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "public_withheld",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "public_content",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "public_search_text",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "public_pdf_size",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "public_render_failures",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Protocol",
+      "module": "meetings",
+      "name": "Protocol",
+      "path": "backend/app/modules/meetings/protocol_models.py",
+      "table": "protocol"
+    },
+    {
+      "attributes": [
+        {
+          "name": "meeting_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "from_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "to_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "from_agenda_item_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "to_agenda_item_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "ProtocolKeeperPeriod",
+      "module": "meetings",
+      "name": "ProtocolKeeperPeriod",
+      "path": "backend/app/modules/meetings/models.py",
+      "table": "protocol_keeper_period"
+    },
+    {
+      "attributes": [
+        {
+          "name": "protocol_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "vote_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "ProtocolVoteRef",
+      "module": "meetings",
+      "name": "ProtocolVoteRef",
+      "path": "backend/app/modules/meetings/protocol_models.py",
+      "table": "protocol_vote_ref"
+    },
+    {
+      "attributes": [
+        {
+          "name": "key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "name_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "Role",
+      "module": "auth",
+      "name": "Role",
+      "path": "backend/app/modules/auth/models.py",
+      "table": "role"
+    },
+    {
+      "attributes": [
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "role_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "granted_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "RoleAssignment",
+      "module": "auth",
+      "name": "RoleAssignment",
+      "path": "backend/app/modules/auth/models.py",
+      "table": "role_assignment"
+    },
+    {
+      "attributes": [
+        {
+          "name": "role_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "permission",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        }
+      ],
+      "id": "RolePermission",
+      "module": "auth",
+      "name": "RolePermission",
+      "path": "backend/app/modules/auth/models.py",
+      "table": "role_permission"
+    },
+    {
+      "attributes": [
+        {
+          "name": "vote_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "choice",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "SecretBallot",
+      "module": "voting",
+      "name": "SecretBallot",
+      "path": "backend/app/modules/voting/models.py",
+      "table": "secret_ballot"
+    },
+    {
+      "attributes": [
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "active",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "branding",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "SiteConfigVersion",
+      "module": "site_config",
+      "name": "SiteConfigVersion",
+      "path": "backend/app/modules/site_config/models.py",
+      "table": "site_config_version"
+    },
+    {
+      "attributes": [
+        {
+          "name": "flow_version_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "label_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "color",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "edit_allowed",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "is_initial",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "is_terminal",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "is_approved",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "is_denied",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "normal",
+            "vote"
+          ]
+        },
+        {
+          "name": "config",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "State",
+      "module": "flow",
+      "name": "State",
+      "path": "backend/app/modules/flow/models.py",
+      "table": "state"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "from_state_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "to_state_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "transition_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "actor",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "note",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "vote_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "StatusEvent",
+      "module": "applications",
+      "name": "StatusEvent",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "status_event"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "data",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "changed_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "diff",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "SubmissionVersion",
+      "module": "applications",
+      "name": "SubmissionVersion",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "submission_version"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "status_event_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "reminded_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "TaskReminderLog",
+      "module": "notifications",
+      "name": "TaskReminderLog",
+      "path": "backend/app/modules/notifications/models.py",
+      "table": "task_reminder_log"
+    },
+    {
+      "attributes": [
+        {
+          "name": "number",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "bug",
+            "question",
+            "idea",
+            "barrier"
+          ]
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "body",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "new",
+            "in_progress",
+            "done",
+            "rejected"
+          ]
+        },
+        {
+          "name": "reporter_principal_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "reporter_email",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "assignee_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "duplicate_of_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "context",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "closed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "anonymized_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Ticket",
+      "module": "tickets",
+      "name": "Ticket",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket"
+    },
+    {
+      "attributes": [
+        {
+          "name": "ticket_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "actor_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "created",
+            "status",
+            "assignee",
+            "kind",
+            "todo_done"
+          ]
+        },
+        {
+          "name": "payload",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TicketEvent",
+      "module": "tickets",
+      "name": "TicketEvent",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_event"
+    },
+    {
+      "attributes": [
+        {
+          "name": "ticket_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "author_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "body",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "visibility",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "internal",
+            "public"
+          ]
+        },
+        {
+          "name": "mentions",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "edited_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TicketNote",
+      "module": "tickets",
+      "name": "TicketNote",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_note"
+    },
+    {
+      "attributes": [
+        {
+          "name": "principal_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "email",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "source_ticket_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "hit_count",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "last_hit_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TicketSenderBlock",
+      "module": "tickets",
+      "name": "TicketSenderBlock",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_sender_block"
+    },
+    {
+      "attributes": [
+        {
+          "name": "card_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TodoAssignee",
+      "module": "todos",
+      "name": "TodoAssignee",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_assignee"
+    },
+    {
+      "attributes": [
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "gremium",
+            "personal",
+            "team"
+          ]
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "owner_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "permission",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "archive_after_days",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "archived_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "TodoBoard",
+      "module": "todos",
+      "name": "TodoBoard",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_board"
+    },
+    {
+      "attributes": [
+        {
+          "name": "board_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "column_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "rank",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT COLLATE \"C\""
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "description_md",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "due_date",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "due_reminded_on",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "created_by",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "completed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "archived_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "TodoCard",
+      "module": "todos",
+      "name": "TodoCard",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_card"
+    },
+    {
+      "attributes": [
+        {
+          "name": "card_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "starts_on",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "ends_on",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "start_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "end_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "place",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "participants",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "series_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TodoCardEvent",
+      "module": "todos",
+      "name": "TodoCardEvent",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_card_event"
+    },
+    {
+      "attributes": [
+        {
+          "name": "card_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "label_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TodoCardLabel",
+      "module": "todos",
+      "name": "TodoCardLabel",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_card_label"
+    },
+    {
+      "attributes": [
+        {
+          "name": "card_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "text",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "done",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TodoCheckItem",
+      "module": "todos",
+      "name": "TodoCheckItem",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_check_item"
+    },
+    {
+      "attributes": [
+        {
+          "name": "board_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "is_done",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TodoColumn",
+      "module": "todos",
+      "name": "TodoColumn",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_column"
+    },
+    {
+      "attributes": [
+        {
+          "name": "card_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "author_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "body",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "mentions",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "edited_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TodoComment",
+      "module": "todos",
+      "name": "TodoComment",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_comment"
+    },
+    {
+      "attributes": [
+        {
+          "name": "card_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "actor_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "created",
+            "moved",
+            "assigned",
+            "due",
+            "linked",
+            "unlinked",
+            "checklist",
+            "renamed",
+            "archived",
+            "restored"
+          ]
+        },
+        {
+          "name": "payload",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TodoEvent",
+      "module": "todos",
+      "name": "TodoEvent",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_event"
+    },
+    {
+      "attributes": [
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "TodoEventSeries",
+      "module": "todos",
+      "name": "TodoEventSeries",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_event_series"
+    },
+    {
+      "attributes": [
+        {
+          "name": "board_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "color",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "green",
+            "blue",
+            "violet",
+            "amber",
+            "red",
+            "gray"
+          ]
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TodoLabel",
+      "module": "todos",
+      "name": "TodoLabel",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_label"
+    },
+    {
+      "attributes": [
+        {
+          "name": "card_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "meeting_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "agenda_item_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "vote_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "appointment_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "invoice_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "expense_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "budget_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "ticket_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "todo_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_by",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TodoLink",
+      "module": "todos",
+      "name": "TodoLink",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_link"
+    },
+    {
+      "attributes": [
+        {
+          "name": "flow_version_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "from_state_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "to_state_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "label_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "color",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "guard",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "actions",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "order",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "automatic",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "branch",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "requires_action",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "Transition",
+      "module": "flow",
+      "name": "Transition",
+      "path": "backend/app/modules/flow/models.py",
+      "table": "transition"
+    },
+    {
+      "attributes": [
+        {
+          "name": "code",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "active",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        }
+      ],
+      "id": "UiLanguage",
+      "module": "translations",
+      "name": "UiLanguage",
+      "path": "backend/app/modules/translations/models.py",
+      "table": "ui_language"
+    },
+    {
+      "attributes": [
+        {
+          "name": "locale",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        },
+        {
+          "name": "key",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        },
+        {
+          "name": "value",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        }
+      ],
+      "id": "UiTranslation",
+      "module": "translations",
+      "name": "UiTranslation",
+      "path": "backend/app/modules/translations/models.py",
+      "table": "ui_translation"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "meeting_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "agenda_item_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "eligible_group",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "question",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "config",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "proposal",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "eligible_count",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "opens_state_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "opens_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "closes_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "closed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "draft",
+            "open",
+            "closed",
+            "cancelled"
+          ]
+        },
+        {
+          "name": "result",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "result_branch_transition_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "present_members",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "present_guests",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "motion",
+            "election",
+            "poll"
+          ]
+        },
+        {
+          "name": "parent_vote_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "round",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "election_result",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "poll_result",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "reminded_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "repeat_of_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "attempt",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Vote",
+      "module": "voting",
+      "name": "Vote",
+      "path": "backend/app/modules/voting/models.py",
+      "table": "vote"
+    },
+    {
+      "attributes": [
+        {
+          "name": "vote_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "voter_sub",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "VotedMarker",
+      "module": "voting",
+      "name": "VotedMarker",
+      "path": "backend/app/modules/voting/models.py",
+      "table": "voted_marker"
+    },
+    {
+      "attributes": [
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "url",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "secret",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BLOB"
+        },
+        {
+          "name": "active",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Webhook",
+      "module": "webhooks",
+      "name": "Webhook",
+      "path": "backend/app/modules/webhooks/models.py",
+      "table": "webhook"
+    },
+    {
+      "attributes": [
+        {
+          "name": "webhook_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "event",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "payload",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "pending",
+            "ok",
+            "failed",
+            "dead"
+          ]
+        },
+        {
+          "name": "attempts",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "idempotency_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "last_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "response_code",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "WebhookDelivery",
+      "module": "webhooks",
+      "name": "WebhookDelivery",
+      "path": "backend/app/modules/webhooks/models.py",
+      "table": "webhook_delivery"
+    }
+  ],
+  "title": "Database models",
+  "view": "classes"
+}

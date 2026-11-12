@@ -10,6 +10,15 @@ becomes an all-day event (`VALUE=DATE`). An Event (a to-do card with event data)
 always all-day: `DTEND` is the day after its end, because RFC5545 makes the end of
 a `VALUE=DATE` event exclusive. An Event without an end lasts one day. A due card
 (spec 000549) is an all-day event on its due date with the url of the card.
+
+A Termin is timed or all-day and can span several days. Its feed entry carries the
+answer of the feed owner as `PARTSTAT` of an `ATTENDEE` line with the owner's own
+address. `build_appointment_file` renders one Termin as the `.ics` attachment of a
+mail: `SEQUENCE` counts its changes, so a calendar app replaces the older copy, and a
+deleted Termin has `METHOD:CANCEL` and `STATUS:CANCELLED`.
+
+An entry of an external calendar is timed or all-day, with the name of its calendar as
+`CATEGORIES`.
 """
 
 from __future__ import annotations
@@ -19,7 +28,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from datetime import date as _date
 from datetime import time as _time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:  # pragma: no cover - types only (icalendar imported lazily)
@@ -36,6 +45,8 @@ DEFAULT_DURATION = timedelta(hours=1)
 #: VALARM reminder lead, relative to the start of the event.
 _ALARM_LEAD_TIMED = timedelta(hours=-1)
 _ALARM_LEAD_ALLDAY = timedelta(days=-1)
+#: The length of a timed Event without an end time.
+_EVENT_DURATION = timedelta(hours=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,9 +70,10 @@ class MeetingEvent:
 
 @dataclass(frozen=True, slots=True)
 class CardEvent:
-    """An Event card as an all-day calendar event (spec 000486).
+    """An Event card as a calendar event (spec 000486).
 
-    `uid` is the card id. `end` is the last day, or `None` for one day.
+    `uid` is the card id. `end` is the last day, or `None` for one day. The times are
+    local naive values. An Event without a start time is an all-day event.
     """
 
     uid: str
@@ -71,6 +83,8 @@ class CardEvent:
     stamp: datetime
     place: str | None = None
     board_name: str | None = None
+    start_time: _time | None = None
+    end_time: _time | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +100,60 @@ class DueCard:
     stamp: datetime
     board_name: str
     url: str
+
+
+#: The participation status of an answer, and of an invited person without an answer.
+PARTSTAT: dict[str | None, str] = {
+    "accept": "ACCEPTED",
+    "tentative": "TENTATIVE",
+    "decline": "DECLINED",
+    None: "NEEDS-ACTION",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class AppointmentEvent:
+    """A Termin as a calendar event.
+
+    `uid` is the id of the Termin. The times are local naive values, and both are
+    `None` for an all-day Termin. `attendee` is the address of the person whose feed
+    or mail this is, with `answer` as that person's answer; without an address the
+    event has no `ATTENDEE` line.
+    """
+
+    uid: str
+    title: str
+    starts_on: _date
+    ends_on: _date
+    start_time: _time | None
+    end_time: _time | None
+    stamp: datetime
+    place: str | None = None
+    description: str | None = None
+    sequence: int = 0
+    attendee: str | None = None
+    answer: str | None = None
+    cancelled: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ExternalEvent:
+    """An entry of an external calendar as a calendar event.
+
+    `uid` is the id of the stored entry. The times are local naive values, and both are
+    `None` for an all-day entry. `calendar` is the name of the external calendar.
+    """
+
+    uid: str
+    title: str
+    starts_on: _date
+    ends_on: _date
+    start_time: _time | None
+    end_time: _time | None
+    stamp: datetime
+    calendar: str
+    place: str | None = None
+    description: str | None = None
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -171,18 +239,29 @@ def _build_event(event: MeetingEvent, *, domain: str, default_duration: timedelt
 
 
 def _build_card_event(event: CardEvent, *, domain: str) -> Event:
-    """Build one all-day VEVENT for an Event card."""
+    """Build one VEVENT for an Event card: timed with a start time, else all-day.
+
+    A timed Event without an end time takes `_EVENT_DURATION`.
+    """
     from icalendar import Event
 
     last = event.end if event.end is not None and event.end > event.start else event.start
+    begin = None if event.start_time is None else _local_to_utc(event.start, event.start_time)
+    finish = (
+        None
+        if begin is None
+        else begin + _EVENT_DURATION
+        if event.end_time is None
+        else max(_local_to_utc(last, event.end_time), begin)
+    )
     properties = (
         ("uid", f"event-{event.uid}@{domain}"),
         ("dtstamp", _as_utc(event.stamp)),
         ("summary", event.title),
         *_when(event.place, ("location", event.place)),
         *_when(event.board_name, ("description", f"Board: {event.board_name}")),
-        ("dtstart", event.start),
-        ("dtend", last + timedelta(days=1)),
+        ("dtstart", event.start if begin is None else begin),
+        ("dtend", last + timedelta(days=1) if finish is None else finish),
     )
     return _filled(Event(), properties)
 
@@ -203,12 +282,90 @@ def _build_due_card(card: DueCard, *, domain: str) -> Event:
     return _filled(Event(), properties)
 
 
+def _attendee(address: str, answer: str | None) -> object:
+    """Build the ATTENDEE value of the feed owner with the answer as PARTSTAT."""
+    from icalendar import vCalAddress
+
+    value = vCalAddress(f"mailto:{address}")
+    value.params.update({"PARTSTAT": PARTSTAT.get(answer, PARTSTAT[None])})
+    return value
+
+
+def _appointment_span(event: AppointmentEvent) -> tuple[Property, ...]:
+    """Return DTSTART and DTEND of a Termin: UTC instants, or dates with an exclusive end."""
+    return (
+        (("dtstart", event.starts_on), ("dtend", event.ends_on + timedelta(days=1)))
+        if event.start_time is None or event.end_time is None
+        else (
+            ("dtstart", _local_to_utc(event.starts_on, event.start_time)),
+            ("dtend", _local_to_utc(event.ends_on, event.end_time)),
+        )
+    )
+
+
+def _build_appointment(event: AppointmentEvent, *, domain: str) -> Event:
+    """Build one VEVENT for a Termin."""
+    from icalendar import Event
+
+    properties = (
+        ("uid", f"appointment-{event.uid}@{domain}"),
+        ("dtstamp", _as_utc(event.stamp)),
+        ("sequence", event.sequence),
+        ("summary", event.title),
+        *_when(event.place, ("location", event.place)),
+        *_when(event.description, ("description", event.description)),
+        *_when(event.cancelled, ("status", "CANCELLED")),
+        *((("attendee", _attendee(event.attendee, event.answer)),) if event.attendee else ()),
+        *_appointment_span(event),
+    )
+    return _filled(Event(), properties)
+
+
+def _build_external(event: ExternalEvent, *, domain: str) -> Event:
+    """Build one VEVENT for an entry of an external calendar."""
+    from icalendar import Event
+
+    timed = event.start_time is not None and event.end_time is not None
+    properties = (
+        ("uid", f"external-{event.uid}@{domain}"),
+        ("dtstamp", _as_utc(event.stamp)),
+        ("summary", event.title),
+        ("categories", [event.calendar]),
+        *_when(event.place, ("location", event.place)),
+        *_when(event.description, ("description", event.description)),
+        *(
+            (
+                ("dtstart", _local_to_utc(event.starts_on, cast(_time, event.start_time))),
+                ("dtend", _local_to_utc(event.ends_on, cast(_time, event.end_time))),
+            )
+            if timed
+            else (("dtstart", event.starts_on), ("dtend", event.ends_on + timedelta(days=1)))
+        ),
+    )
+    return _filled(Event(), properties)
+
+
+def build_appointment_file(event: AppointmentEvent, *, domain: str) -> bytes:
+    """Render one Termin as the `.ics` attachment of a mail."""
+    from icalendar import Calendar
+
+    properties = (
+        ("prodid", "-//STUPA-Workflow//iCal Feed//DE"),
+        ("version", "2.0"),
+        ("calscale", "GREGORIAN"),
+        ("method", "CANCEL" if event.cancelled else "PUBLISH"),
+    )
+    return _filled(Calendar(), properties, (_build_appointment(event, domain=domain),)).to_ical()
+
+
 def build_calendar(
     events: Sequence[MeetingEvent],
     *,
     domain: str,
     card_events: Sequence[CardEvent] | None = None,
     due_cards: Sequence[DueCard] | None = None,
+    appointments: Sequence[AppointmentEvent] | None = None,
+    external: Sequence[ExternalEvent] | None = None,
     calendar_name: str = "STUPA — Sitzungen",
     default_duration: timedelta = DEFAULT_DURATION,
 ) -> bytes:
@@ -231,5 +388,7 @@ def build_calendar(
         *(_build_event(e, domain=domain, default_duration=default_duration) for e in events),
         *(_build_card_event(c, domain=domain) for c in card_events or ()),
         *(_build_due_card(d, domain=domain) for d in due_cards or ()),
+        *(_build_appointment(a, domain=domain) for a in appointments or ()),
+        *(_build_external(x, domain=domain) for x in external or ()),
     )
     return _filled(Calendar(), properties, parts).to_ical()

@@ -1,0 +1,100 @@
+@let a = appointment();
+<app-dialog
+  [open]="open() && !!a && !confirming()"
+  [title]="a?.title ?? ''"
+  [closeLabel]="'action.close' | t"
+  (closed)="closed.emit()"
+>
+  @if (a) {
+    <div class="apv">
+      <dl class="apv__facts">
+        <div>
+          <dt>{{ 'calendar.detail.when' | t }}</dt>
+          <dd class="mono">{{ when() }}</dd>
+        </div>
+        @if (a.place) {
+          <div>
+            <dt>{{ 'calendar.field.place' | t }}</dt>
+            <dd>{{ a.place }}</dd>
+          </div>
+        }
+        @if (a.creator) {
+          <div>
+            <dt>{{ 'calendar.detail.from' | t }}</dt>
+            <dd>{{ a.creator.name }}</dd>
+          </div>
+        }
+      </dl>
+      @if (a.description) {
+        <p class="apv__desc">{{ a.description }}</p>
+      }
+      @if (canAnswer()) {
+        <div class="apv__block">
+          <span class="apv__cap" id="apv-answer">{{ 'calendar.detail.myAnswer' | t }}</span>
+          <app-segmented
+            width="fill"
+            [ariaLabel]="'calendar.detail.myAnswer' | t"
+            [options]="answerOptions()"
+            [disabled]="answering()"
+            [value]="a.myAnswer"
+            (valueChange)="setAnswer($event)"
+          />
+        </div>
+      }
+      @if (hasInvited()) {
+        <div class="apv__block">
+          <span class="apv__cap">{{ 'calendar.field.invited' | t }}</span>
+          <div class="apv__chips">
+            @for (g of a.gremien; track g.id) {
+              <app-chip><app-icon name="landmark" [size]="14" /><span>{{ g.name }}</span></app-chip>
+            }
+            @for (p of a.persons; track p.id) {
+              <app-chip><app-avatar size="xs" [name]="p.name" [decorative]="true" /><span>{{ p.name }}</span></app-chip>
+            }
+          </div>
+        </div>
+      }
+      @if (a.answers.length || a.unanswered.length) {
+        <div class="apv__block">
+          <span class="apv__cap">{{ 'calendar.detail.answers' | t }}</span>
+          <div class="rowgroup apv__people" role="list">
+            @for (row of a.answers; track row.principalId) {
+              <div class="apv__person" role="listitem">
+                <app-avatar size="sm" [name]="row.name" [decorative]="true" />
+                <span class="apv__name">{{ row.name }}</span>
+                <app-status-text [kind]="answerKind(row.answer)">{{ answerKey(row.answer) | t }}</app-status-text>
+              </div>
+            }
+            @for (p of a.unanswered; track p.id) {
+              <div class="apv__person" role="listitem">
+                <app-avatar size="sm" [name]="p.name" [decorative]="true" />
+                <span class="apv__name">{{ p.name }}</span>
+                <app-status-text kind="neutral">{{ 'calendar.answer.open' | t }}</app-status-text>
+              </div>
+            }
+          </div>
+        </div>
+      }
+      <app-todo-linked-list kind="appointment" headingId="apv-todos" [targetId]="a.id" />
+    </div>
+  }
+  @if (a?.canEdit) {
+    <app-button dialog-footer variant="text" (click)="confirming.set(true)">
+      <app-icon name="trash" />{{ 'action.delete' | t }}
+    </app-button>
+  }
+  @if (a?.canEdit) {
+    <app-button dialog-footer variant="tonal" (click)="a && edit.emit(a)">
+      <app-icon name="edit" />{{ 'action.edit' | t }}
+    </app-button>
+  }
+</app-dialog>
+
+<app-confirm-dialog
+  [open]="open() && confirming()"
+  [title]="'calendar.remove.title' | t"
+  [body]="'calendar.remove.body' | t: { title: a?.title ?? '' }"
+  [busy]="removing()"
+  (confirm)="remove()"
+  (cancel)="confirming.set(false)"
+/>

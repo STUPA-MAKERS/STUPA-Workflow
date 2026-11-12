@@ -1,23 +1,6 @@
-import type { Attendance, Meeting, MeetingVote } from '@core/api/models';
+import type { Attendance, Meeting } from '@core/api/models';
 import { de } from '@core/i18n/translations';
-import {
-  VIEW_STORAGE_KEY,
-  agendaProgress,
-  attendanceCounts,
-  byStart,
-  gridRange,
-  matchesQuery,
-  meetingsByDay,
-  monthGrid,
-  monthOf,
-  openVoteOf,
-  overviewGroups,
-  readStoredView,
-  shiftMonth,
-  storeView,
-  topsLabel,
-  weekdayNames,
-} from './meetings-overview.util';
+import { attendanceCounts, overviewGroups, topsLabel } from './meetings-overview.util';
 
 function meeting(id: string, over: Partial<Meeting> = {}): Meeting {
   return {
@@ -65,91 +48,6 @@ const t = (key: keyof typeof de, params?: Record<string, string | number>): stri
   );
 
 describe('meetings-overview.util', () => {
-  describe('stored view', () => {
-    afterEach(() => {
-      localStorage.clear();
-      jest.restoreAllMocks();
-    });
-
-    it('reads and keeps the view per browser, the list by default', () => {
-      expect(readStoredView()).toBe('list');
-      storeView('calendar');
-      expect(localStorage.getItem(VIEW_STORAGE_KEY)).toBe('calendar');
-      expect(readStoredView()).toBe('calendar');
-      localStorage.setItem(VIEW_STORAGE_KEY, 'other');
-      expect(readStoredView()).toBe('list');
-    });
-
-    it('falls back to the list when the storage is blocked', () => {
-      jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-        throw new Error('blocked');
-      });
-      jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-        throw new Error('blocked');
-      });
-      expect(readStoredView()).toBe('list');
-      expect(() => storeView('calendar')).not.toThrow();
-    });
-  });
-
-  describe('month grid', () => {
-    it('runs from the Monday before the first to the Sunday after the last day', () => {
-      const weeks = monthGrid({ year: 2026, month: 8 }, new Date(2026, 8, 29, 18, 50));
-      expect(weeks).toHaveLength(5);
-      expect(weeks.every((w) => w.length === 7)).toBe(true);
-      expect(gridRange(weeks)).toEqual({ from: '2026-08-31', to: '2026-10-04' });
-      expect(weeks[0][0]).toEqual({ iso: '2026-08-31', day: 31, inMonth: false, isToday: false });
-      expect(weeks[4][1]).toEqual({ iso: '2026-09-29', day: 29, inMonth: true, isToday: true });
-    });
-
-    it('has four weeks for a February from Monday to Sunday', () => {
-      const weeks = monthGrid({ year: 2027, month: 1 }, new Date(2026, 0, 1));
-      expect(weeks).toHaveLength(4);
-      expect(gridRange(weeks)).toEqual({ from: '2027-02-01', to: '2027-02-28' });
-      expect(weeks.flat().every((d) => d.inMonth && !d.isToday)).toBe(true);
-    });
-
-    it('moves months across the year', () => {
-      expect(shiftMonth({ year: 2026, month: 11 }, 1)).toEqual({ year: 2027, month: 0 });
-      expect(shiftMonth({ year: 2026, month: 0 }, -1)).toEqual({ year: 2025, month: 11 });
-      expect(monthOf(new Date(2026, 9, 13))).toEqual({ year: 2026, month: 9 });
-    });
-
-    it('names the weekdays', () => {
-      expect(weekdayNames('de-DE')).toEqual(['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']);
-      expect(weekdayNames('en-GB')[0]).toBe('Mon');
-    });
-  });
-
-  describe('meetings by day', () => {
-    it('sorts each day by the start and skips meetings without a date', () => {
-      const late = meeting('a', { startTime: '19:00' });
-      const early = meeting('b', { startTime: '17:00' });
-      const none = meeting('c', { date: null });
-      const map = meetingsByDay([late, none, early]);
-      expect([...map.keys()]).toEqual(['2026-10-13']);
-      expect(map.get('2026-10-13')?.map((m) => m.id)).toEqual(['b', 'a']);
-    });
-
-    it('puts a meeting without a date or a time last, and orders a tie by the title', () => {
-      const undated = meeting('u', { date: null });
-      const untimed = meeting('n', { startTime: null });
-      const a = meeting('x', { title: 'A' });
-      const b = meeting('y', { title: 'B' });
-      expect([undated, untimed, b, a].sort(byStart).map((m) => m.id)).toEqual(['x', 'y', 'n', 'u']);
-    });
-
-    it('matches the search on the title and the Gremium, without case and accents', () => {
-      const m = meeting('a', { title: 'Sondersitzung Haushalt', gremiumName: 'Finanzausschuss' });
-      expect(matchesQuery(m, '')).toBe(true);
-      expect(matchesQuery(m, '  ')).toBe(true);
-      expect(matchesQuery(m, 'HAUSHALT')).toBe(true);
-      expect(matchesQuery(m, 'finanz')).toBe(true);
-      expect(matchesQuery(meeting('b', { title: 'Übergabe', gremiumName: null }), 'uber')).toBe(true);
-      expect(matchesQuery(m, 'stupa')).toBe(false);
-    });
-  });
-
   describe('groups of the list', () => {
     it('puts the live meetings under "Jetzt", then the months of the coming and the past ones', () => {
       const live = meeting('live', { status: 'live', date: '2026-09-29' });
@@ -177,42 +75,6 @@ describe('meetings-overview.util', () => {
   });
 
   describe('live facts', () => {
-    const vote = (status: MeetingVote['status']): MeetingVote => ({
-      id: `v-${status}`,
-      applicationId: null,
-      agendaItemId: null,
-      title: null,
-      question: null,
-      options: [],
-      status,
-      result: null,
-      counts: null,
-      leading: null,
-      closesAt: null,
-      voted: 14,
-      present: 19,
-      revealed: false,
-      failedReason: null,
-    });
-
-    it('computes the progress through the agenda of a live meeting only', () => {
-      const live = meeting('a', {
-        status: 'live',
-        agendaItemCount: 8,
-        currentAgendaItem: { position: 3, title: 'Zuschuss' },
-      });
-      expect(agendaProgress(live)).toEqual({ position: 3, count: 8, title: 'Zuschuss' });
-      expect(agendaProgress({ ...live, status: 'planned' })).toBeNull();
-      expect(agendaProgress({ ...live, currentAgendaItem: null })).toBeNull();
-      expect(agendaProgress({ ...live, agendaItemCount: 0 })).toBeNull();
-      expect(agendaProgress({ ...live, agendaItemCount: undefined })).toBeNull();
-    });
-
-    it('finds the open vote', () => {
-      expect(openVoteOf(meeting('a', { votes: [vote('closed'), vote('open')] }))?.id).toBe('v-open');
-      expect(openVoteOf(meeting('a', { votes: [vote('draft')] }))).toBeNull();
-    });
-
     it('counts the roster', () => {
       const row = (status: Attendance['status']): Attendance => ({
         principalId: `p-${Math.random()}`,

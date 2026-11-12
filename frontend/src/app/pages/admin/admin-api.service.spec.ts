@@ -1315,14 +1315,22 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
     const created = await firstValueFrom(s.createBackup('note'));
     expect(created.note).toBe('note');
+    expect(created.kind).toBe('manual');
+    expect(created.status).toBe('pending');
+    expect(created.createdAt).toBeTruthy();
     expect((await firstValueFrom(s.listBackups())).items[0].id).toBe(created.id);
+    const polled = await firstValueFrom(s.getBackup(created.id));
+    expect(polled.status).toBe('done');
+    expect(polled.sizeBytes).toBeGreaterThan(0);
 
     const pinned = await firstValueFrom(s.updateBackup(created.id, { pinned: true }));
     expect(pinned.pinned).toBe(true);
     expect((await firstValueFrom(s.updateBackup('nope', { pinned: true }))).id).toBe('nope');
 
     expect(await firstValueFrom(s.exportBackup(created.id))).toBeInstanceOf(Blob);
-    expect((await firstValueFrom(s.importBackup(new File(['x'], 'a.age')))).note).toBe('a.age');
+    const imported = await firstValueFrom(s.importBackup(new File(['x'], 'a.age')));
+    expect(imported.kind).toBe('imported');
+    expect(imported.status).toBe('done');
     expect((await firstValueFrom(s.restoreBackup(created.id))).id).toBe(created.id);
     expect((await firstValueFrom(s.restoreBackup('nope'))).id).toBe('nope');
 

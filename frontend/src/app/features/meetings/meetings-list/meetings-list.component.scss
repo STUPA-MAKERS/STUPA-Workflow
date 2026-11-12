@@ -68,7 +68,3 @@
 .mtl__more {
   @include lp.more;
 }
-.mtl__more--start {
-  justify-content: flex-start;
-  padding-inline: var(--space-2);
-}

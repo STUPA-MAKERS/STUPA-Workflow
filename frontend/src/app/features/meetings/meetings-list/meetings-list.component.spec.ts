@@ -11,7 +11,6 @@ import { WsService } from '@core/ws/ws.service';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { runAxe } from '../../../../testing/a11y';
-import type { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { MeetingAgendaService } from '../meeting-agenda.service';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { MeetingSessionService } from '../meeting-session.service';
@@ -85,7 +84,7 @@ async function setup(
   opts: { admin?: boolean; managed?: string[]; media?: string[]; url?: string; canCreate?: boolean } = {},
 ) {
   if (opts.media) restoreMedia = matchMediaQueries(...opts.media);
-  const on = { viewChange: jest.fn(), create: jest.fn() };
+  const on = { create: jest.fn() };
   const view = await render(MeetingsListComponent, {
     inputs: { canCreate: opts.canCreate ?? true },
     on,
@@ -337,28 +336,22 @@ describe('MeetingsListComponent', () => {
       expect(await runAxe(view.container)).toHaveNoViolations();
     });
 
-    it('offers the switch, the calendar subscription and the FAB', async () => {
+    /** The month grid and the subscription are on the Kalender page (§ 000710). */
+    it('offers the FAB, and neither a view switch nor the calendar subscription', async () => {
       const view = await setup();
       load(view);
-      await userEvent.click(screen.getByRole('radio', { name: 'Kalender' }));
-      expect(view.on.viewChange).toHaveBeenCalledWith('calendar');
-      await userEvent.click(screen.getByRole('button', { name: 'Kalender-Abo' }));
-      view.http.expectOne('/api/calendar/me').flush({ url: 'https://x/api/calendar/T.ics' });
-      view.fixture.detectChanges();
-      expect(screen.getByRole('dialog', { name: 'Kalender-Abo' })).toHaveTextContent('https://x/api/calendar/T.ics');
+      expect(screen.queryByRole('radiogroup')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Kalender-Abo' })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Sitzung anlegen' }));
       expect(view.on.create).toHaveBeenCalled();
-      view.fixture.componentRef.setInput('showSwitch', false);
       view.fixture.componentRef.setInput('canCreate', false);
       view.fixture.detectChanges();
-      expect(screen.queryByRole('radiogroup')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Sitzung anlegen' })).toBeNull();
     });
   });
 
   describe('phone', () => {
-    /** A phone shows the subscription as a bottom sheet. */
-    it('has the title, the floating "Sitzung anlegen" and a menu with the calendar subscription', async () => {
+    it('has the title, the floating "Sitzung anlegen" and a menu without the calendar subscription', async () => {
       const view = await setup({ media: [MEDIA.phone] });
       load(view);
       expect(screen.queryByRole('radiogroup')).toBeNull();
@@ -366,12 +359,9 @@ describe('MeetingsListComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Sitzung anlegen' }));
       expect(view.on.create).toHaveBeenCalled();
       await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
-      await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Kalender-Abo' }));
-      view.http.expectOne('/api/calendar/me').flush({ url: null });
-      await view.fixture.whenStable();
-      view.fixture.detectChanges();
-      expect(screen.getByRole('dialog', { name: 'Kalender-Abo' })).toHaveTextContent('Abo-Link erzeugen');
-      expect(view.router.url).toBe('/');
+      const menu = await screen.findByRole('menu');
+      expect(within(menu).queryByRole('menuitem', { name: 'Kalender-Abo' })).toBeNull();
+      expect(within(menu).getByRole('menuitem', { name: 'Aktualisieren' })).toBeInTheDocument();
     });
 
     /** A menu item that the page does not know does nothing. */
@@ -387,13 +377,12 @@ describe('MeetingsListComponent', () => {
       expect(view.container.querySelector('app-row-chevron')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Sitzung' })).toBeNull();
       expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Sitzungen durchsuchen');
-      const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;
-      view.fixture.componentInstance.onPhoneMenu({ id: 'x', label: 'x' }, abo);
+      view.fixture.componentInstance.onPhoneMenu({ id: 'x', label: 'x' });
       expect(view.router.url).toBe('/');
       // "Aktualisieren" reloads the list like a pull (app spec 000514).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const refresh = jest.spyOn((view.fixture.componentInstance as any).timeline, 'refreshList');
-      view.fixture.componentInstance.onPhoneMenu({ id: 'refresh', label: 'Aktualisieren' }, abo);
+      view.fixture.componentInstance.onPhoneMenu({ id: 'refresh', label: 'Aktualisieren' });
       expect(refresh).toHaveBeenCalled();
     });
   });

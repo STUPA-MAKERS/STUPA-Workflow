@@ -33,7 +33,15 @@ from app.shared.i18n import pick_lang
 
 #: The element that a link opens. It selects the label of the line and the button.
 LinkTarget = Literal[
-    "application", "task", "meeting", "protocol", "privacy", "ticket", "todo", "poll"
+    "application",
+    "task",
+    "meeting",
+    "protocol",
+    "privacy",
+    "ticket",
+    "todo",
+    "poll",
+    "appointment",
 ]
 
 _LABELS: dict[str, dict[str, str]] = {
@@ -45,6 +53,7 @@ _LABELS: dict[str, dict[str, str]] = {
     "ticket": {"de": "Ticket öffnen", "en": "Open the ticket"},
     "todo": {"de": "To-Do öffnen", "en": "Open the to-do"},
     "poll": {"de": "Umfrage öffnen", "en": "Open the poll"},
+    "appointment": {"de": "Termin öffnen", "en": "Open the appointment"},
 }
 
 
@@ -128,6 +137,11 @@ def todo_link(settings: Settings, card_id: UUID | str) -> MailLink:
     card moves to another board.
     """
     return MailLink(f"{_base(settings)}/todos?card={card_id}", "todo")
+
+
+def appointment_link(settings: Settings, appointment_id: UUID | str) -> MailLink:
+    """Return the link to a Termin: the Kalender opens its dialog (``/calendar``)."""
+    return MailLink(f"{_base(settings)}/calendar?appointment={appointment_id}", "appointment")
 
 
 def vote_link(settings: Settings, vote_id: UUID | str) -> MailLink:

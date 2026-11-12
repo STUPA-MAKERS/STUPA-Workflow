@@ -90,6 +90,8 @@ dev = [
     "basedpyright>=1.28",
     # Checks the import contracts of the modules (see `[tool.importlinter]`).
     "import-linter>=2.3",
+    # Reads the compose file for the UML deployment view (scripts/build_uml.py).
+    "pyyaml>=6",
     "testcontainers[postgres]>=4.8",
     "psycopg[binary]>=3.2",
 ]
@@ -112,8 +114,8 @@ type = "layers"
 containers = ["app.modules"]
 exhaustive = true
 layers = [
-    "admin : search : privacy : backup : config_revision : calendar : audit_log : account : gremien_overview : attachments",
-    "protocol : livevote : todos : tickets",
+    "admin : search : privacy : backup : config_revision : audit_log : account : gremien_overview : attachments",
+    "protocol : livevote : todos : tickets : calendar",
     "voting : budget : applications : flow : meetings : delegations",
     "forms : application_types : notifications : webhooks : files : media : translations : avatars",
     "gremien : site_config : audit : auth : antiabuse : pdf",

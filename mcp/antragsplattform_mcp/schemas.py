@@ -720,6 +720,7 @@ TodoLinkKind = Literal[
     "meeting",
     "agenda_item",
     "vote",
+    "appointment",
     "gremium",
     "invoice",
     "expense",

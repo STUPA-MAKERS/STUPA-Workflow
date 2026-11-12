@@ -64,8 +64,14 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
       # Checks the format of every spec, the index and every § reference in the code.
       - run: python3 scripts/check_specs.py
+      # The UML views in specs/uml are current and well formed (specs 000679-000684). The
+      # script imports the backend models and reads its import graph.
+      - run: pip install -e 'backend[dev]'
+      - run: python3 scripts/build_uml.py --check
 
   # Functional style ratchet (specs/style/shared/functional/000437): the count of violations
   # per Python file must not rise above scripts/functional-baseline/. fe-unit checks the

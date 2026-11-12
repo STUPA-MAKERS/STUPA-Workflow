@@ -225,7 +225,12 @@ def test_create_answers_202_with_a_pending_row(
     _principal(app, "backup.manage")
     response = client.post("/api/admin/backups", json={"note": "before the vote"})
     assert response.status_code == 202
-    assert response.json()["status"] == "pending"
+    body = response.json()
+    assert body["status"] == "pending"
+    assert body["kind"] == "manual"
+    assert body["createdAt"]
+    assert body["note"] == "before the vote"
+    assert body["pinned"] is False
     assert service.created == [("manual", "admin-sub", "before the vote")]
 
 

@@ -70,7 +70,18 @@ describe('TodoNewDialogComponent', () => {
     cmp.endsOn.set('2026-11-20');
     expect(cmp.datesError()).toBe('Das Ende liegt vor dem Beginn.');
     expect(cmp.canSave()).toBe(false);
+    cmp.endsOn.set('2026-11-21');
+    cmp.startTime.set('20:00');
+    cmp.endTime.set('19:00');
+    expect(cmp.datesError()).toBe('Das Ende liegt vor dem Beginn.');
     cmp.endsOn.set('2026-11-22');
+    expect(cmp.datesError()).toBe('');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(screen.getByLabelText('Uhrzeit Beginn')).toHaveValue('20:00');
+    expect(screen.getByLabelText('Uhrzeit Ende')).toBeEnabled();
+    cmp.endTime.set('02:00');
     cmp.place.set(' Mensa ');
     cmp.seriesId.set('__new');
     expect(cmp.canSave()).toBe(false);
@@ -81,7 +92,34 @@ describe('TodoNewDialogComponent', () => {
       expect.objectContaining({
         boardId: 'b-1',
         title: 'Erstiparty WiSe',
-        event: { startsOn: '2026-11-21', endsOn: '2026-11-22', place: 'Mensa', seriesId: 's-2' },
+        event: {
+          startsOn: '2026-11-21',
+          endsOn: '2026-11-22',
+          startTime: '20:00:00',
+          endTime: '02:00:00',
+          place: 'Mensa',
+          seriesId: 's-2',
+        },
+      }),
+    );
+  });
+
+  it('sends no time without its day', async () => {
+    const { cmp, api, open, fixture } = await setup({ inputs: { boardId: 'b-1' } });
+    open();
+    cmp.setKind('event');
+    cmp.title.set('Vortrag');
+    cmp.startTime.set('18:00');
+    cmp.endTime.set('19:00');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(screen.getByLabelText('Uhrzeit Beginn')).toBeDisabled();
+    expect(screen.getByLabelText('Uhrzeit Ende')).toBeDisabled();
+    cmp.save();
+    expect(api.createCard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: { startsOn: null, endsOn: null, startTime: null, endTime: null, place: null, seriesId: null },
       }),
     );
   });
