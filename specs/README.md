@@ -263,6 +263,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000801](requirements/functional/finance/budget/000801_plan-closed-year.md) | A closed fiscal year refuses plan changes | draft |
 | [F/finance/budget/000802](requirements/functional/finance/budget/000802_plan-audit.md) | Each plan state change is audited | draft |
 | [F/finance/budget/000803](requirements/functional/finance/budget/000803_plan-for-open-years.md) | Each open fiscal year gets a Stammplan from its allocations | draft |
+| [F/finance/budget/000804](requirements/functional/finance/budget/000804_plan-page.md) | The Haushaltsplan has a page in the Budget tab | draft |
+| [F/finance/budget/000805](requirements/functional/finance/budget/000805_plan-page-pickers.md) | The plan page chooses Kostenstelle, year and version with chips | draft |
+| [F/finance/budget/000806](requirements/functional/finance/budget/000806_plan-page-steps.md) | The plan page shows the state as four steps | draft |
+| [F/finance/budget/000807](requirements/functional/finance/budget/000807_plan-page-sums.md) | The plan page shows the sums and the balance | draft |
+| [F/finance/budget/000808](requirements/functional/finance/budget/000808_plan-page-tables.md) | The plan page lists income and expenses in two tables | draft |
+| [F/finance/budget/000809](requirements/functional/finance/budget/000809_plan-page-nachtrag-columns.md) | A Nachtrag is shown beside the version in force | draft |
+| [F/finance/budget/000810](requirements/functional/finance/budget/000810_plan-line-sheet.md) | A plan line opens in a sheet | draft |
+| [F/finance/budget/000811](requirements/functional/finance/budget/000811_plan-submit-needs-balance.md) | An unbalanced draft cannot go to the vote | draft |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | approved |
