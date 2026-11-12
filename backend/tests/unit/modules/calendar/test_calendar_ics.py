@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
 
-from app.modules.calendar.ics import DueCard, MeetingEvent, build_calendar
+from app.modules.calendar.ics import CardEvent, DueCard, MeetingEvent, build_calendar
 
 DOMAIN = "stupa.example.org"
 STAMP = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
@@ -147,3 +147,41 @@ def test_due_card_is_an_all_day_event_with_the_card_url() -> None:
     assert "URL:https://stupa.example.org/todos?card=c1" in out
     assert "DTSTART;VALUE=DATE:20261118" in out
     assert "DTEND;VALUE=DATE:20261119" in out
+
+
+def test_card_event_is_timed_with_a_start_time() -> None:
+    """A timed Event gives UTC instants, and one without an end time takes an hour."""
+    party = CardEvent(
+        uid="c1",
+        title="Erstiparty",
+        start=date(2026, 11, 20),
+        end=date(2026, 11, 21),
+        stamp=STAMP,
+        start_time=time(20, 0),
+        end_time=time(2, 0),
+    )
+    out = _ics([], card_events=[party])
+    assert "DTSTART:20261120T190000Z" in out
+    assert "DTEND:20261121T010000Z" in out
+    talk = CardEvent(
+        uid="c2",
+        title="Vortrag",
+        start=date(2026, 7, 15),
+        end=None,
+        stamp=STAMP,
+        start_time=time(18, 0),
+    )
+    out = _ics([], card_events=[talk])
+    assert "DTSTART:20260715T160000Z" in out
+    assert "DTEND:20260715T170000Z" in out
+    day = CardEvent(
+        uid="c3",
+        title="Messe",
+        start=date(2026, 7, 15),
+        end=None,
+        stamp=STAMP,
+        end_time=time(18, 0),
+    )
+    out = _ics([], card_events=[day])
+    assert "DTSTART;VALUE=DATE:20260715" in out
+    assert "DTEND;VALUE=DATE:20260716" in out

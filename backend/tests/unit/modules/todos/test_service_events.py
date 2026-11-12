@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, time
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
@@ -164,6 +164,22 @@ async def test_add_link_on_an_event_refuses_an_element_of_another_event() -> Non
             "event_dates_invalid",
         ),
         ("gremium", EventIn(seriesId=SERIES), "series_not_found"),
+        ("gremium", EventIn(startTime=time(19)), "event_time_without_date"),
+        (
+            "gremium",
+            EventIn(startsOn=date(2026, 5, 2), endTime=time(19)),
+            "event_time_without_date",
+        ),
+        (
+            "gremium",
+            EventIn(
+                startsOn=date(2026, 5, 2),
+                endsOn=date(2026, 5, 2),
+                startTime=time(19),
+                endTime=time(18),
+            ),
+            "event_dates_invalid",
+        ),
     ],
 )
 async def test_set_event_checks_the_event_data(kind: str, payload: EventIn, code: str) -> None:

@@ -1,0 +1,31 @@
+@let e = entry();
+<app-dialog
+  [open]="open() && !!e"
+  [title]="e?.title ?? ''"
+  [closeLabel]="'action.close' | t"
+  (closed)="closed.emit()"
+>
+  @if (e) {
+    <div class="apv">
+      <dl class="apv__facts">
+        <div>
+          <dt>{{ 'calendar.detail.when' | t }}</dt>
+          <dd class="mono">{{ when() }}</dd>
+        </div>
+        @if (e.place) {
+          <div>
+            <dt>{{ 'calendar.field.place' | t }}</dt>
+            <dd>{{ e.place }}</dd>
+          </div>
+        }
+        <div>
+          <dt>{{ 'calendar.external.calendar' | t }}</dt>
+          <dd>{{ e.calendar }}</dd>
+        </div>
+      </dl>
+      @if (e.description) {
+        <p class="apv__desc">{{ e.description }}</p>
+      }
+    </div>
+  }
+</app-dialog>

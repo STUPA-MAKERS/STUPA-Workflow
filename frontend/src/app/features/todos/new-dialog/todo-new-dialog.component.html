@@ -75,6 +75,22 @@
           />
         </div>
         <div class="tn__pair">
+          <app-time-input
+            name="startTime"
+            [label]="'todos.eventCard.startTime' | t"
+            [disabled]="!startsOn()"
+            [ngModel]="startTime()"
+            (ngModelChange)="startTime.set($event)"
+          />
+          <app-time-input
+            name="endTime"
+            [label]="'todos.eventCard.endTime' | t"
+            [disabled]="!endsOn()"
+            [ngModel]="endTime()"
+            (ngModelChange)="endTime.set($event)"
+          />
+        </div>
+        <div class="tn__pair">
           <app-input
             name="place"
             [label]="'todos.eventCard.place' | t"

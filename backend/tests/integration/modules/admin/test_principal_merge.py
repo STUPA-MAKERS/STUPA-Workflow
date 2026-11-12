@@ -61,6 +61,7 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.service import upsert_principal
 from app.modules.backup.models import Backup
 from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear, Invoice
+from app.modules.calendar.models import Appointment as CalendarAppointment
 from app.modules.config_revision.models import ConfigRevision
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.forms.models import FormVersion
@@ -464,6 +465,12 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                 TodoEvent(card_id=card.id, actor_id=old.id, kind="created"),
                 TodoLink(card_id=card.id, ticket_id=ticket.id, created_by=old.id),
                 TodoEventSeries(name=f"Reihe {tag}", created_by=old.id),
+                CalendarAppointment(
+                    title=f"Termin {tag}",
+                    starts_on=date(2031, 5, 5),
+                    ends_on=date(2031, 5, 5),
+                    creator_id=old.id,
+                ),
             ]
         )
 

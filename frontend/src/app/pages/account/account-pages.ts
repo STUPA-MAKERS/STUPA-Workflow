@@ -12,7 +12,7 @@ export const ACCOUNT_GROUPS: readonly FrameGroup[] = [{ key: 'account', title: n
  *   itself has no gate, so a person who lost the permission can still revoke old grants
  *   through a direct link.
  *
- * The calendar subscription is not an account page. It is a popover of the meetings page,
+ * The calendar subscription is not an account page. It is a popover of the Kalender page,
  * and `/account/calendar` redirects there.
  */
 export const ACCOUNT_PAGES: readonly FramePage[] = [

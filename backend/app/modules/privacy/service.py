@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 from itertools import groupby
 from typing import Any, cast
 from uuid import UUID
@@ -27,6 +27,7 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import AuthSession, Principal
+from app.modules.calendar.privacy import appointment_export, erase_appointments
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.flow.models import State
@@ -148,6 +149,7 @@ class PrincipalService:
         storage_keys = await erase_todos(
             self.session, principal_id, files=files, actor=actor, comment_ids=todo_comment_ids
         )
+        await erase_appointments(self.session, principal_id)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )
@@ -581,6 +583,9 @@ class AuskunftService:
         todos = await todo_export(
             self.session, [principal_row.id] if principal_row is not None else []
         )
+        termine = await appointment_export(
+            self.session, [principal_row.id] if principal_row is not None else []
+        )
         blocks = [
             {
                 "kind": "principal" if b.principal_id is not None else "email",
@@ -616,6 +621,8 @@ class AuskunftService:
             "ticket_notes": ticket_notes,
             "todos": todos["cards"],
             "todo_comments": todos["comments"],
+            "appointments": termine["appointments"],
+            "appointment_answers": termine["answers"],
             "sender_blocks": blocks,
             "principal": principal,
         }
@@ -843,17 +850,20 @@ def build_auskunft_workbook(
     todos: Sequence[Mapping[str, Any]] = (),
     todo_comments: Sequence[Mapping[str, Any]] = (),
     sender_blocks: Sequence[Mapping[str, Any]] = (),
+    appointments: Sequence[Mapping[str, Any]] = (),
+    appointment_answers: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
     This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
-    eight sheets: the comments that the subject can see (with the names of their
+    ten sheets: the comments that the subject can see (with the names of their
     files), the attachment metadata of the applications and the reported tickets, the
     meeting attendance with the reason of an excuse, the reported tickets with their
     text and technical context, the own ticket messages (with the names of their
     files), the to-dos that the subject created or is assigned to
     (with the description of the own cards), the own to-do comments (with the names of
-    their files), and the sender blocks of the account or the address.
+    their files), the sender blocks of the account or the address, the Termine that the
+    subject created and the answers of the subject to Termine.
     """
     from io import BytesIO
 
@@ -1005,7 +1015,50 @@ def build_auskunft_workbook(
             for b in sender_blocks
         ],
     )
+    _add_sheet(
+        "Termine",
+        ["Titel", "Beginn", "Ende", "Ort", "Beschreibung", "Erstellt"],
+        [
+            [
+                a.get("title") or "",
+                _fmt_day(a.get("startsOn"), a.get("startTime")),
+                _fmt_day(a.get("endsOn"), a.get("endTime")),
+                a.get("place") or "",
+                a.get("description") or "",
+                _fmt_dt(a.get("createdAt")),
+            ]
+            for a in appointments
+        ],
+    )
+    _add_sheet(
+        "Termin-Antworten",
+        ["Termin", "Beginn", "Antwort", "Zeitpunkt"],
+        [
+            [
+                a.get("title") or "",
+                _fmt_day(a.get("startsOn"), None),
+                _ANSWER_LABELS.get(str(a.get("answer")), ""),
+                _fmt_dt(a.get("answeredAt")),
+            ]
+            for a in appointment_answers
+        ],
+    )
 
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+#: The answers to a Termin as the German UI names them.
+_ANSWER_LABELS: dict[str, str] = {
+    "accept": "Zusage",
+    "tentative": "Vorbehalt",
+    "decline": "Absage",
+}
+
+
+def _fmt_day(day: date | None, clock: time | None) -> str:
+    """A day with an optional time as ``2026-11-20 14:00``."""
+    if day is None:
+        return ""
+    return f"{day.isoformat()} {clock:%H:%M}" if clock is not None else str(day.isoformat())

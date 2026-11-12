@@ -7,7 +7,7 @@ sent" from ``null`` through ``model_fields_set``.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -24,6 +24,7 @@ TodoLinkKind = Literal[
     "meeting",
     "agenda_item",
     "vote",
+    "appointment",
     "gremium",
     "invoice",
     "expense",
@@ -37,6 +38,7 @@ TodoLinkedKind = Literal[
     "meeting",
     "agenda_item",
     "vote",
+    "appointment",
     "gremium",
     "invoice",
     "expense",
@@ -111,6 +113,10 @@ class TodoLinkDetail(FrozenCamelModel, frozen=True):
     booking_kind: BookingKind | None = Field(default=None, serialization_alias="bookingKind")
     vote_status: VoteStatus | None = Field(default=None, serialization_alias="voteStatus")
     vote_result: VoteResult | None = Field(default=None, serialization_alias="voteResult")
+    end_date: str | None = Field(default=None, serialization_alias="endDate")
+    start_time: str | None = Field(default=None, serialization_alias="startTime")
+    end_time: str | None = Field(default=None, serialization_alias="endTime")
+    place: str | None = None
 
 
 class TodoLinkOut(FrozenCamelModel, frozen=True):
@@ -174,6 +180,8 @@ class TodoEventBrief(FrozenCamelModel, frozen=True):
 
     starts_on: date | None = Field(default=None, serialization_alias="startsOn")
     ends_on: date | None = Field(default=None, serialization_alias="endsOn")
+    start_time: time | None = Field(default=None, serialization_alias="startTime")
+    end_time: time | None = Field(default=None, serialization_alias="endTime")
     place: str | None = None
     participants: int | None = None
     series_id: UUID | None = Field(default=None, serialization_alias="seriesId")
@@ -212,6 +220,8 @@ class TodoEventEdition(FrozenCamelModel, frozen=True):
     title: str
     starts_on: date | None = Field(default=None, serialization_alias="startsOn")
     ends_on: date | None = Field(default=None, serialization_alias="endsOn")
+    start_time: time | None = Field(default=None, serialization_alias="startTime")
+    end_time: time | None = Field(default=None, serialization_alias="endTime")
     archived: bool = False
     totals: TodoEventTotals = Field(default_factory=TodoEventTotals)
 
@@ -241,6 +251,8 @@ class TodoEventRef(FrozenCamelModel, frozen=True):
     title: str
     starts_on: date | None = Field(default=None, serialization_alias="startsOn")
     ends_on: date | None = Field(default=None, serialization_alias="endsOn")
+    start_time: time | None = Field(default=None, serialization_alias="startTime")
+    end_time: time | None = Field(default=None, serialization_alias="endTime")
 
 
 class TodoCardTile(FrozenCamelModel, frozen=True):
@@ -464,6 +476,8 @@ class EventIn(FrozenStrictCamelModel, frozen=True):
 
     starts_on: date | None = Field(default=None, alias="startsOn")
     ends_on: date | None = Field(default=None, alias="endsOn")
+    start_time: time | None = Field(default=None, alias="startTime")
+    end_time: time | None = Field(default=None, alias="endTime")
     place: str | None = Field(default=None, max_length=200)
     participants: int | None = Field(default=None, ge=0, le=1_000_000)
     series_id: UUID | None = Field(default=None, alias="seriesId")

@@ -105,6 +105,9 @@ from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.auth.rbac import resolve_principal
 from app.modules.backup.models import Backup
 from app.modules.budget.tree_models import BudgetExpense, Invoice
+from app.modules.calendar.models import Answer as CalendarAnswer
+from app.modules.calendar.models import Appointment as CalendarAppointment
+from app.modules.calendar.models import Invitation as CalendarInvitation
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.forms.models import FormVersion
 from app.modules.gremien.membership_sync import sync_principal_memberships
@@ -221,6 +224,7 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("todos", TodoEvent.actor_id),
     ("todos", TodoLink.created_by),
     ("todos", TodoEventSeries.created_by),
+    ("calendar", CalendarAppointment.creator_id),
 )
 
 #: The rows of the source that the merge deletes, by area. Rights never move to the
@@ -243,6 +247,8 @@ COMBINED_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = (
     DelegationSubstitute.substitute_principal_id,
     TodoAssignee.principal_id,
     TicketSenderBlock.principal_id,
+    CalendarInvitation.principal_id,
+    CalendarAnswer.principal_id,
 )
 
 #: The principal columns that the merge leaves alone, with the reason. A guard test
@@ -704,7 +710,8 @@ class PrincipalMergeService:
         """Combine the rows of the tables with a uniqueness rule.
 
         The row of the target wins for a notification kind, an attendance, a pool
-        entry, a to-do assignment and a sender block. A different attendance is a
+        entry, a to-do assignment, a sender block, and an invitation and an answer of a
+        Termin. A different attendance is a
         conflict and never reaches this step. A moved self report ``absent`` becomes a
         lead entry, because the NOT VALID check ``self_status`` refuses such a row on
         every change; the status stays, so it matches the protocol PDF. A pool entry in
@@ -797,6 +804,31 @@ class PrincipalMergeService:
             old,
             new,
             exists().where(tsb.principal_id == new),
+            tally,
+            apply=apply,
+        )
+
+        ci = aliased(CalendarInvitation)
+        await self._combine(
+            "calendar",
+            CalendarInvitation.principal_id,
+            old,
+            new,
+            exists().where(
+                ci.principal_id == new, ci.appointment_id == CalendarInvitation.appointment_id
+            ),
+            tally,
+            apply=apply,
+        )
+        ca = aliased(CalendarAnswer)
+        await self._combine(
+            "calendar",
+            CalendarAnswer.principal_id,
+            old,
+            new,
+            exists().where(
+                ca.principal_id == new, ca.appointment_id == CalendarAnswer.appointment_id
+            ),
             tally,
             apply=apply,
         )

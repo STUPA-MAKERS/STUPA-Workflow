@@ -2,12 +2,10 @@
 id: "000418"
 title: The calendar subscription is on Sitzungen
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - frontend/src/app/features/meetings/calendar-subscribe/calendar-subscribe.component.ts
-  - frontend/src/app/features/meetings/meetings-view-actions
+updated: 2026-11-11
+replaced_by: F/meetings/calendar/000710
 scope:
   - frontend/src/app/features/meetings
 ---

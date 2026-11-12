@@ -108,6 +108,9 @@ const MOCK_PRINCIPAL: Principal = {
     'form.configure',
     'flow.configure',
     'webhook.manage',
+    'admin.calendars',
+    'calendar.manage',
+    'calendar.publish',
     'admin.users',
     'admin.users.merge',
     'admin.users.revoke_groups',
@@ -1639,6 +1642,10 @@ export function mockMediaImage(body: unknown): MediaImage {
 const MOCK_ACCOUNT_PATH =
   /(^|\/)api\/(notifications\/preferences|oauth\/grants(\/[^/]+)?|oauth\/consent(-request)?|mcp\/(config|package))$/;
 
+/** The routes of the Kalender page and of the admin page `Kalender` (`mock-calendar.ts`). */
+const MOCK_CALENDAR_PATH =
+  /(^|\/)api\/(calendar\/(entries|search|people|external\/[^/]+|appointments(\/[^/]+(\/answer)?)?)|public\/calendar\/(committees|entries|search|(appointments|meetings)\/[^/]+)|admin\/calendars(\/[^/]+(\/fetch)?)?)$/;
+
 /** The routes of the public meeting: the guest side and the lead side. */
 const PUBLIC_MEETING_PATH =
   /\/public\/meetings\/|\/meetings\/join\/[^/]+$|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
@@ -1712,6 +1719,16 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     return from(import('./mock-account')).pipe(
       mergeMap((m) => {
         const reply = m.mockAccount(req.method, p, req.body);
+        if (!reply) return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
+        return ok(reply.body, reply.status);
+      }),
+    );
+  }
+
+  if (MOCK_CALENDAR_PATH.test(p)) {
+    return from(import('./mock-calendar')).pipe(
+      mergeMap((m) => {
+        const reply = m.mockCalendar(req.method, p, req.params, req.body);
         if (!reply) return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
         return ok(reply.body, reply.status);
       }),

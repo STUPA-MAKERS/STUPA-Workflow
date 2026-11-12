@@ -635,6 +635,9 @@ button.cd__evText:focus-visible {
   outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
   box-shadow: var(--field-focus, var(--field-edge, none));
 }
+.cd__evTime {
+  width: 6.5rem;
+}
 .cd__evNeg {
   color: var(--color-danger);
 }

@@ -36,7 +36,7 @@ describe('NavService', () => {
   });
 
   it('shows a plain member only the personal areas', () => {
-    expect(keysFor(BASE)).toEqual(['start', 'applications', 'tasks', 'todos']);
+    expect(keysFor(BASE)).toEqual(['start', 'applications', 'tasks', 'todos', 'calendar']);
   });
 
   it('opens the budget areas with a global budget right', () => {
@@ -45,6 +45,7 @@ describe('NavService', () => {
       'applications',
       'tasks',
       'todos',
+      'calendar',
       'budget',
       'expenses',
       'invoices',
@@ -52,18 +53,26 @@ describe('NavService', () => {
   });
 
   it('opens the tickets with ticket.manage, after the invoices', () => {
-    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['start', 'applications', 'tasks', 'todos', 'tickets', 'admin']);
+    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['start', 'applications', 'tasks', 'todos', 'calendar', 'tickets', 'admin']);
     expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
   });
 
   it('opens the tickets to a reporter without ticket.manage', () => {
-    expect(keysFor({ ...BASE, has_reported_tickets: true })).toEqual(['start', 'applications', 'tasks', 'todos', 'tickets']);
+    expect(keysFor({ ...BASE, has_reported_tickets: true })).toEqual(['start', 'applications', 'tasks', 'todos', 'calendar', 'tickets']);
   });
 
   it('shows the To-Dos to every session, after the tasks', () => {
     const todos = NAV_ITEMS.find((i) => i.key === 'todos');
     expect(todos).toMatchObject({ path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [] });
     expect(NAV_ITEMS.findIndex((i) => i.key === 'todos')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'tasks') + 1);
+  });
+
+  /** § 000710: a person without a Gremium sees the Kalender too. */
+  it('shows the Kalender to every session, after the Boards', () => {
+    const calendar = NAV_ITEMS.find((i) => i.key === 'calendar');
+    expect(calendar).toMatchObject({ path: '/calendar', labelKey: 'nav.calendar', icon: 'cal', permissions: [] });
+    expect(NAV_ITEMS.findIndex((i) => i.key === 'calendar')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'todos') + 1);
+    expect(keysFor(BASE)).toContain('calendar');
   });
 
   it('opens the administration with any area-admin right', () => {

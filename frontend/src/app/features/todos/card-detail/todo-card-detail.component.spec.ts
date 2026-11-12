@@ -26,7 +26,7 @@ const COMMENT: TodoComment = {
   attachments: [{ id: 'f1', filename: 'plan.pdf', mime: 'application/pdf', size: 20, scanState: 'quarantined' }],
 };
 
-const EVENT = { startsOn: '2026-11-20', endsOn: '2026-11-21', place: 'Mensa', participants: 450, seriesId: 's-1', seriesName: 'Erstiparty' };
+const EVENT = { startsOn: '2026-11-20', endsOn: '2026-11-21', startTime: null, endTime: null, place: 'Mensa', participants: 450, seriesId: 's-1', seriesName: 'Erstiparty' };
 const FACTS = {
   totals: { requested: '800.00', approved: '500.00', expenses: '300.00', income: '75.00', balance: '-225.00' },
   decisions: [
@@ -792,7 +792,10 @@ describe('TodoCardDetailComponent', () => {
     cmp.editEventText('place');
     cmp.draft.set('Aula');
     cmp.saveEventText();
-    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', { ...{ startsOn: '2026-11-20', endsOn: '2026-11-21', participants: 450, seriesId: 's-1' }, place: 'Aula' });
+    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', {
+      ...{ startsOn: '2026-11-20', endsOn: '2026-11-21', startTime: null, endTime: null, participants: 450, seriesId: 's-1' },
+      place: 'Aula',
+    });
     cmp.editEventText('participants');
     cmp.draft.set('');
     cmp.saveEventText();
@@ -805,6 +808,37 @@ describe('TodoCardDetailComponent', () => {
     expect(api.setEvent).toHaveBeenLastCalledWith('k-1', expect.objectContaining({ seriesId: 's-2' }));
     cmp.onMenu({ id: 'followUp', label: '' });
     expect(api.followUp).toHaveBeenCalledWith('k-1');
+  });
+
+  /** § 000736: the start and the end of an Event each have an optional time next to the date. */
+  it('shows and sets the times of an Event next to its dates', async () => {
+    const timed = { ...EVENT, startTime: '20:00:00', endTime: null };
+    const { cmp, api, fixture } = await setup({ card: detail({ event: timed, eventFacts: FACTS }) });
+    expect(screen.getByRole('button', { name: 'Uhrzeit Beginn' })).toHaveTextContent('20:00');
+    cmp.editEventTime('startTime');
+    cmp.saveEventTime('startTime', '20:00');
+    expect(api.setEvent).not.toHaveBeenCalled();
+    const end = screen.getByRole('button', { name: 'Uhrzeit Ende' });
+    expect(end).toHaveTextContent('Uhrzeit angeben');
+    fireEvent.click(end);
+    fixture.detectChanges();
+    const field = await screen.findByRole('textbox', { name: 'Uhrzeit Ende' });
+    fireEvent.input(field, { target: { value: '2' } });
+    fireEvent.blur(field);
+    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', expect.objectContaining({ startTime: '20:00:00', endTime: '02:00:00' }));
+    expect(cmp.eventEdit()).toBeNull();
+    cmp.saveEventTime('endTime', '');
+    expect(api.setEvent).toHaveBeenCalledTimes(1);
+    cmp.setEvent({ startsOn: null, endsOn: null, startTime: '20:00:00', endTime: '21:00:00' });
+    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', expect.objectContaining({ startsOn: null, startTime: null, endTime: null }));
+  });
+
+  it('shows the times of an Event read-only and no empty time without the write right', async () => {
+    const timed = { ...EVENT, startTime: '20:00:00', endTime: null };
+    await setup({ card: detail({ event: timed, eventFacts: FACTS, canWrite: false }) });
+    expect(screen.getByText('20:00')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Uhrzeit Beginn' })).toBeNull();
+    expect(screen.queryByText('Uhrzeit angeben')).toBeNull();
   });
 
   /**

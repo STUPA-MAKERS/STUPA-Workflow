@@ -1,0 +1,369 @@
+@if (phone()) {
+  <div class="cal-list">
+    <section class="ld-pane" aria-labelledby="cal-title">
+      <app-page-header [pane]="true" titleId="cal-title" [title]="titleKey | t">
+        <ng-container ngProjectAs="[actions]">
+          <app-row-menu
+            [label]="'meetings.overview.menu' | t"
+            [sections]="phoneMenu()"
+            (selected)="onPhoneMenu($event, abo)"
+          />
+          <app-calendar-subscribe #abo [fixedUrl]="publicFeed" />
+        </ng-container>
+      </app-page-header>
+      <app-sticky-bar class="ld-pane__filters">
+        <app-search-pill
+          size="md"
+          [clearable]="true"
+          [placeholder]="'calendar.search.placeholder' | t"
+          [label]="'calendar.search.label' | t"
+          [value]="query()"
+          (valueChange)="onQuery($event)"
+        />
+        <div class="cal-list__chips">
+          <ng-container *ngTemplateOutlet="chips; context: { size: 'sm' }" />
+        </div>
+      </app-sticky-bar>
+      <div class="cal-list__scroll" appScrollFade="y" [attr.aria-busy]="loading() ? 'true' : null">
+        @if (searching()) {
+          @if (hits().length) {
+            <section class="cal-list__group" [attr.aria-label]="'calendar.search.hits' | t">
+              <div class="rowgroup cal-list__rows" role="list">
+                @for (e of hits(); track e.kind + e.id) {
+                  <app-list-item role="listitem" [title]="e.title" [wrap]="true" (activate)="jump(e)">
+                    <span lead class="cal__lead"><app-icon [name]="icon(e.kind)" /></span>
+                    <span sub class="cal__sub">
+                      <span class="mono">{{ hitWhen(e) }}</span>
+                      <span aria-hidden="true">·</span><span>{{ kindKey(e.kind) | t }}</span>
+                      @if (e.source) {<span aria-hidden="true">·</span><span>{{ e.source }}</span>}
+                    </span>
+                  </app-list-item>
+                }
+              </div>
+            </section>
+          } @else if (searched()) {
+            <app-empty-state shape="date" [heading]="'calendar.search.none' | t" />
+          }
+        } @else {
+          @if (error()) {
+            <app-load-error [message]="'calendar.error' | t" (retry)="reload()" />
+          }
+          @if (firstLoad()) {
+            <div class="skel-in">
+              <app-list-group skeleton="7rem" />
+              <app-skeleton variant="items" [count]="6" [lead]="true" [grouped]="true" [label]="'common.loading' | t" />
+            </div>
+          } @else {
+          <div class="cal-list__more cal-list__more--start">
+            <app-button variant="text" size="sm" [loading]="loading()" (click)="loadEarlier()">
+              <app-icon name="history" />
+              {{ 'calendar.list.earlier' | t }}
+            </app-button>
+          </div>
+          @for (day of days(); track day.iso) {
+            <app-list-group [label]="day.label">
+              <div class="rowgroup cal-list__rows" role="list">
+                @for (e of day.items; track e.kind + e.id) {
+                  <app-list-item role="listitem" [title]="e.title" [wrap]="true" (activate)="openEntry(e)">
+                    <span lead class="cal__lead"><app-icon [name]="icon(e.kind)" /></span>
+                    <span sub class="cal__sub">
+                      <ng-container *ngTemplateOutlet="facts; context: { $implicit: e }" />
+                    </span>
+                  </app-list-item>
+                }
+              </div>
+            </app-list-group>
+          } @empty {
+            @if (!loading() && !error()) {
+              <app-empty-state shape="date" [heading]="'calendar.list.empty' | t" />
+            }
+          }
+          <div class="cal-list__more">
+            <app-button variant="text" size="sm" [loading]="loading()" (click)="loadLater()">
+              <app-icon name="down" />
+              {{ 'calendar.list.later' | t }}
+            </app-button>
+          </div>
+          }
+        }
+      </div>
+      @if (!isPublic) {
+        <app-fab [label]="'fab.appointment' | t" (activate)="createAppointment()" />
+      }
+    </section>
+  </div>
+} @else {
+  <div class="cal">
+    <app-page-header [pane]="true" [title]="titleKey | t">
+      <ng-container ngProjectAs="[actions]">
+        @if (isPublic) {
+          <app-button variant="outlined" [ariaPressed]="abo.isOpen()" (click)="abo.toggle($event.currentTarget)">
+            <app-icon name="cal" />
+            {{ 'calendar.public.subscribe' | t }}
+          </app-button>
+        } @else {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'meetings.overview.subscribe' | t"
+            [ariaPressed]="abo.isOpen()"
+            (click)="abo.toggle($event.currentTarget)"
+          ><app-icon name="cal" /></app-button>
+        }
+        <app-calendar-subscribe #abo [fixedUrl]="publicFeed" />
+      </ng-container>
+    </app-page-header>
+
+    <div class="cal__tools" role="toolbar" [attr.aria-label]="titleKey | t">
+      <div class="cal__nav">
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="(view() === 'week' ? 'calendar.prev.week' : 'calendar.prev.month') | t"
+          [title]="(view() === 'week' ? 'calendar.prev.week' : 'calendar.prev.month') | t"
+          (click)="step(-1)"
+        ><app-icon name="left" /></app-button>
+        <h2 class="cal__month" aria-live="polite">{{ heading() }}</h2>
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
+          [title]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
+          (click)="step(1)"
+        ><app-icon name="right" /></app-button>
+        <app-button class="cal__today" variant="outlined" (click)="goToday()">{{ 'meetings.overview.today' | t }}</app-button>
+        <app-segmented
+          class="cal__view"
+          [ariaLabel]="'calendar.view.label' | t"
+          [options]="viewOptions()"
+          [value]="view()"
+          (valueChange)="setView($event)"
+        />
+      </div>
+      <div class="cal__filters">
+        <div class="cal__searchBox" role="search" tabindex="-1" (keydown)="onSearchKey($event)">
+          <app-search-pill
+            class="cal__search"
+            size="md"
+            [clearable]="true"
+            [busy]="searching() && !searched()"
+            [placeholder]="'calendar.search.placeholder' | t"
+            [label]="'calendar.search.label' | t"
+            [value]="query()"
+            (valueChange)="onQuery($event)"
+          />
+          @if (searching() && (hits().length || searched())) {
+            <div class="cal__pop" role="listbox" [attr.aria-label]="'calendar.search.hits' | t">
+              @for (e of hits(); track e.kind + e.id; let i = $index) {
+                <button
+                  type="button"
+                  class="cal__hit"
+                  role="option"
+                  [class.cal__hit--active]="i === activeHit()"
+                  [attr.aria-selected]="i === activeHit()"
+                  (click)="jump(e)"
+                >
+                  <app-icon [name]="icon(e.kind)" />
+                  <span class="cal__hitText">
+                    <span class="cal__hitTitle">{{ e.title }}</span>
+                    <span class="cal__hitSub">
+                      <span class="mono">{{ hitWhen(e) }}</span> · {{ kindKey(e.kind) | t }}@if (e.source) { · {{ e.source }} }
+                    </span>
+                  </span>
+                </button>
+              } @empty {
+                <p class="cal__none" role="status">{{ 'calendar.search.none' | t }}</p>
+              }
+            </div>
+          }
+        </div>
+        <ng-container *ngTemplateOutlet="chips; context: { size: 'md' }" />
+      </div>
+    </div>
+
+    <div class="cal__gridWrap">
+      @if (view() === 'week') {
+        <app-calendar-week
+          class="cal__grid"
+          [days]="week()"
+          [entries]="visible()"
+          [selectedDay]="selectedDay()"
+          [label]="heading()"
+          (selectDay)="selectDay($event)"
+          (openEntry)="openEntry($event)"
+        />
+      } @else {
+        <div
+          class="cal__grid"
+          role="grid"
+          tabindex="-1"
+          [attr.aria-label]="heading()"
+          [attr.aria-busy]="loading() ? 'true' : null"
+          (keydown)="onGridKey($event)"
+        >
+          <div class="cal__row cal__row--head" role="row">
+            @for (name of weekdays(); track $index) {
+              <span class="cal__wd cap" role="columnheader">{{ name }}</span>
+            }
+          </div>
+          @for (row of rows(); track row.key) {
+            <div class="cal__row" role="row" [style.--cal-lanes]="row.lanes">
+              @for (c of row.cells; track c.day.iso) {
+                <div
+                  class="cal__cell"
+                  role="gridcell"
+                  [class.cal__cell--out]="!c.day.inMonth"
+                  [class.cal__cell--sel]="c.day.iso === selectedDay()"
+                  [attr.aria-selected]="c.day.iso === selectedDay()"
+                >
+                  <button
+                    type="button"
+                    class="cal__day"
+                    [attr.tabindex]="c.day.iso === selectedDay() ? 0 : -1"
+                    [attr.aria-label]="dayLabel(c.day, c.count)"
+                    [attr.aria-current]="c.day.isToday ? 'date' : null"
+                    (click)="selectDay(c.day.iso)"
+                  ></button>
+                  <span class="cal__num" [class.cal__num--today]="c.day.isToday" aria-hidden="true">{{ c.day.day }}</span>
+                  <span class="cal__entries" aria-hidden="true">
+                    @for (e of c.shown; track e.kind + e.id) {
+                      <span class="cal__entry">
+                        <span class="cal__entryTime">
+                          <app-icon [name]="icon(e.kind)" [size]="12" />
+                          <span [class.mono]="!!e.startTime">{{ time(e) || (kindKey(e.kind) | t) }}</span>
+                        </span>
+                        <span class="cal__entryTitle">{{ e.title }}</span>
+                      </span>
+                    }
+                    @if (c.more > 0) {
+                      <span class="cal__more">{{ 'meetings.overview.more' | t: { n: c.more } }}</span>
+                    }
+                  </span>
+                </div>
+              }
+              <div class="cal__bars" aria-hidden="true">
+                @for (b of row.bars; track b.entry.kind + b.entry.id) {
+                  <span
+                    class="cal__bar"
+                    [class.cal__bar--openStart]="b.openStart"
+                    [class.cal__bar--openEnd]="b.openEnd"
+                    [style.grid-column]="b.from + ' / ' + b.to"
+                    [style.grid-row]="b.lane + 1"
+                  >
+                    <app-icon [name]="icon(b.entry.kind)" [size]="12" />
+                    <span class="cal__barTitle">{{ b.entry.title }}</span>
+                  </span>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+      @if (!isPublic) {
+        <app-fab [contained]="true" [label]="'fab.appointment' | t" (activate)="createAppointment()" />
+      }
+    </div>
+
+    <aside class="cal__panel" [attr.aria-label]="dayHeading()">
+      <div class="cal__panelScroll" appScrollFade="y">
+        <section class="cal__cards" aria-live="polite" [attr.aria-label]="dayHeading()">
+          @if (error()) {
+            <app-load-error [message]="'calendar.error' | t" (retry)="reload()" />
+          } @else if (firstLoad()) {
+            <app-skeleton class="skel-in" variant="items" [count]="3" [lead]="true" [label]="'common.loading' | t" />
+          } @else if (!dayEntries().length && !loading()) {
+            <app-empty-state shape="date" rows="3" [heading]="'calendar.day.empty' | t" />
+          }
+          @for (e of dayEntries(); track e.kind + e.id) {
+            <button type="button" class="cal__card" (click)="openEntry(e)">
+              <span class="cal__lead cal__cardIcon"><app-icon [name]="icon(e.kind)" /></span>
+              <span class="cal__cardText">
+                <span class="cal__cardKind">
+                  <ng-container *ngTemplateOutlet="facts; context: { $implicit: e, short: true }" />
+                </span>
+                <span class="cal__cardTitle">{{ e.title }}</span>
+                @if (e.source || e.place) {
+                  <span class="cal__cardSrc">{{ e.source }}@if (e.source && e.place) { · }{{ e.place }}</span>
+                }
+                @if (e.myAnswer; as answer) {
+                  <span class="cal__cardState"><app-status-text [kind]="answerKind(answer)">{{ answerKey(answer) | t }}</app-status-text></span>
+                }
+              </span>
+              <app-icon class="cal__go" name="right" />
+            </button>
+          }
+        </section>
+      </div>
+    </aside>
+  </div>
+}
+
+<ng-template #facts let-e let-short="short">
+  <app-status-text kind="neutral">{{ kindKey(e.kind) | t }}</app-status-text>
+  @if (time(e); as when) {<span aria-hidden="true">·</span><span class="mono">{{ when }}</span>}
+  @if (!short && e.source) {<span aria-hidden="true">·</span><span>{{ e.source }}</span>}
+  @if (!short && e.myAnswer) {<span aria-hidden="true">·</span><app-status-text [kind]="answerKind(e.myAnswer)">{{ answerKey(e.myAnswer) | t }}</app-status-text>}
+</ng-template>
+
+<ng-template #chips let-size="size">
+  @if (!isPublic) {
+  <app-filter-select
+    class="cal__chip"
+    icon="funnel"
+    [size]="size"
+    [label]="'calendar.filter.kind' | t"
+    [multiple]="true"
+    [options]="kindOptions()"
+    [values]="kinds()"
+    (valuesChange)="kinds.set($event)"
+    [active]="kinds().length > 0"
+  />
+  }
+  @if (gremiumOptions().length > 1) {
+    <app-filter-select
+      class="cal__chip"
+      icon="building"
+      [size]="size"
+      [label]="'calendar.filter.gremium' | t"
+      [options]="gremiumOptions()"
+      [value]="gremium()"
+      (valueChange)="gremium.set($event)"
+      [text]="gremiumText()"
+      [active]="gremium() !== ''"
+    />
+  }
+  @if (!isPublic) {
+  <app-filter-select
+    class="cal__chip"
+    icon="user"
+    [size]="size"
+    [label]="'calendar.filter.assigned' | t"
+    [options]="mineOptions()"
+    [value]="mine()"
+    (valueChange)="mine.set($event)"
+    [text]="(mine() ? 'calendar.filter.mine' : 'calendar.filter.all') | t"
+    [active]="mine() !== ''"
+  />
+  }
+</ng-template>
+
+@if (isPublic) {
+  <app-public-entry [open]="publicOpen()" [entry]="publicEntry()" (closed)="publicOpen.set(false)" />
+} @else {
+<app-appointment-detail
+  [open]="detailOpen()"
+  [appointment]="detail()"
+  (closed)="closeDetail()"
+  (edit)="editAppointment($event)"
+  (answered)="onAnswered($event)"
+  (removed)="onRemoved($event)"
+/>
+<app-external-entry [open]="externalOpen()" [entry]="external()" (closed)="externalOpen.set(false)" />
+<app-appointment-dialog
+  [open]="formOpen()"
+  [appointment]="editing()"
+  [day]="selectedDay()"
+  (closed)="formOpen.set(false)"
+  (saved)="onSaved($event)"
+/>
+}

@@ -5,7 +5,7 @@ import { detail, link } from '../../../testing/todo-fixtures';
 import { EventLinkState } from './event-link.state';
 import { TodoLinkedRefresh } from './linked-list/todo-linked-refresh';
 
-const EVENT = { startsOn: '2026-11-20', endsOn: '2026-11-21', place: 'Mensa', participants: null, seriesId: null, seriesName: null };
+const EVENT = { startsOn: '2026-11-20', endsOn: '2026-11-21', startTime: null, endTime: null, place: 'Mensa', participants: null, seriesId: null, seriesName: null };
 
 function linkedEvent(): TodoLinkedCard {
   return {

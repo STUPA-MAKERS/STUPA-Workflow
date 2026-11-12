@@ -29,6 +29,7 @@ from app.modules.flow.dispatch import build_worker_dispatcher
 from worker.audit_verify import process_audit_verification
 from worker.backup import create_backup, restore_backup, scheduled_backup
 from worker.backup import on_startup as backup_on_startup
+from worker.calendars import fetch_external_calendars
 from worker.cd_builtin import migrate_builtin_cd_logos
 from worker.cd_builtin import on_startup as cd_builtin_on_startup
 from worker.deadlines import on_startup as deadlines_on_startup
@@ -140,6 +141,8 @@ class WorkerSettings:
     ``tickets.retentionMonths`` (reporter, context, attachments). The to-do archive at
     03:50 archives cards longer than ``archive_after_days`` in the done column. The
     deadline and vote scan runs every minute; it is idempotent and uses SKIP LOCKED.
+    The fetch of the external calendars runs every minute at second 30 and fetches
+    only the calendars whose interval is over.
     Task reminders run hourly (thresholds in days); ``task_reminder_log`` prevents
     duplicate sends. Expired wizard drafts go hourly with their objects. The public
     protocol heal builds the public versions that a failed or raced backfill left out,
@@ -168,6 +171,7 @@ class WorkerSettings:
         func(restore_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         func(scheduled_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         migrate_builtin_cd_logos,
+        fetch_external_calendars,
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
@@ -175,6 +179,7 @@ class WorkerSettings:
         cron(anonymize_tickets, hour=3, minute=45),
         cron(archive_done_todos, hour=3, minute=50),
         cron(process_deadlines, second=0),
+        cron(fetch_external_calendars, second=30),
         cron(process_task_reminders, minute=10),
         cron(purge_draft_attachments, minute=20),
         cron(heal_public_protocols, minute=40),

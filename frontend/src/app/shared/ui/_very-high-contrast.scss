@@ -33,11 +33,9 @@
     border-radius: inherit;
     pointer-events: none;
   }
-  // A meeting in the day pane is a card of its own, so it has an edge too.
+  // An entry in the day pane is a card of its own, so it has an edge too.
   .cal__panel .cal__card {
-    padding: var(--space-4);
     border: var(--vh-edge);
-    border-radius: var(--radius-lg);
   }
 
   // A card of a board is a surface, so it has the white edge too. A column of a board is a
@@ -165,18 +163,25 @@
     color: var(--vh-hi) !important;
   }
 
-  // The open page of the admin frame, its chosen tile, the chosen node of the budget tree
-  // and a live meeting in the calendar are yellow fills (000619, 000621).
+  // The open page of the admin frame, its chosen tile and the chosen node of the budget
+  // tree are yellow fills (000619, 000621).
   .af__item--on,
   .ah__tile--on {
     @include vh.fill;
   }
-  .tn--on,
-  .cal__entry--live {
+  .tn--on {
     @include vh.ink(var(--vh-bg), var(--vh-bg));
   }
-  .tn--on :is(.tn__main, .tn__name, .tn__amt),
-  .cal__entry--live :is(.cal__entryTime, .cal__entryTitle) {
+  .tn--on :is(.tn__main, .tn__name, .tn__amt) {
     color: var(--vh-bg) !important;
+  }
+
+  // A box with a text to copy (000739): the address of a calendar subscription, and the
+  // command and the configuration of the MCP setup. On the black page the box has no shade,
+  // so it is a yellow fill with black text.
+  .cs__url,
+  .gr__cmd,
+  .gr__config {
+    @include vh.fill;
   }
 }

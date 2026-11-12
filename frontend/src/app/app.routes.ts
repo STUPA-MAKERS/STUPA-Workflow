@@ -101,6 +101,12 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'public-calendar',
+        data: { title: 'calendar.public.title', footer: true, wide: true, public: true },
+        loadComponent: () =>
+          import('./features/calendar/calendar.component').then((m) => m.CalendarComponent),
+      },
+      {
         path: 'accessibility',
         data: { title: 'a11yStatement.title', footer: true },
         loadComponent: () =>
@@ -327,6 +333,13 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'calendar',
+        data: { title: 'nav.calendar', wide: true },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/calendar/calendar.component').then((m) => m.CalendarComponent),
+      },
+      {
         path: 'todos',
         data: { title: 'nav.todos', wide: true },
         canActivate: [authGuard],
@@ -518,6 +531,15 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'calendars',
+            data: { title: 'admin.calendars.title', permission: 'admin.calendars', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/calendars/calendars.component').then(
+                (m) => m.AdminCalendarsComponent,
+              ),
+          },
+          {
             path: 'webhooks',
             data: { title: 'admin.webhook.title', permission: 'webhook.manage', parent: ['admin'] },
             canActivate: [authGuard],
@@ -636,7 +658,7 @@ export const routes: Routes = [
           },
           {
             path: 'calendar',
-            redirectTo: '/meetings',
+            redirectTo: '/calendar',
             pathMatch: 'full',
           },
         ],

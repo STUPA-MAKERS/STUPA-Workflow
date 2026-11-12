@@ -1,0 +1,218 @@
+@use 'display' as d;
+
+:host {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+// --cw-hour is the height of an hour. It matches HOUR_REM of calendar.util.ts.
+.cw {
+  --cw-cols: 4.5rem repeat(7, minmax(0, 1fr));
+  --cw-hour: 3.5rem;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+}
+.cw__head,
+.cw__allday,
+.cw__body {
+  display: grid;
+  grid-template-columns: var(--cw-cols);
+}
+.cw__day {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) 10px;
+  border: 0;
+  border-inline-start: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.cw__day:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.cw__day--sel {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+.cw__wd {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+.cw__num {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 1.625rem;
+  height: 1.625rem;
+  padding-inline: 4px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.cw__num--today {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.cw__allday {
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+.cw__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: 6px;
+  border-inline-start: 1px solid var(--color-border);
+}
+.cw__chip,
+.cw__block {
+  display: flex;
+  min-width: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-3);
+  color: inherit;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-align: start;
+  cursor: pointer;
+}
+.cw__chip:focus-visible,
+.cw__block:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.cw__chip {
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+}
+.cw__chipTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cw__hour {
+  padding: 6px var(--space-2) 0;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  text-align: end;
+}
+.cw__scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+.cw__body {
+  position: relative;
+}
+.cw__hours {
+  display: grid;
+  grid-auto-rows: var(--cw-hour);
+}
+.cw__col {
+  position: relative;
+  min-width: 0;
+  height: calc(var(--cw-hours, 13) * var(--cw-hour));
+  border-inline-start: 1px solid var(--color-border);
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--cw-hour) - 1px),
+    var(--color-border) calc(var(--cw-hour) - 1px) var(--cw-hour)
+  );
+  container-type: inline-size;
+}
+.cw__col--today {
+  background-color: color-mix(in srgb, var(--color-accent) 6%, transparent);
+}
+// The transparent border keeps a gap between two blocks that touch.
+.cw__block {
+  position: absolute;
+  flex-direction: column;
+  gap: 1px;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background: var(--color-surface-3) padding-box;
+}
+.cw__time {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+.cw__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--cw-lines, 2);
+  line-clamp: var(--cw-lines, 2);
+  overflow-wrap: anywhere;
+}
+.cw__block--short {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding-block: 0;
+}
+.cw__block--short .cw__title {
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cw__block--narrow {
+  padding-inline: 4px;
+}
+.cw__block--narrow .cw__title {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: auto;
+}
+.cw__block--tight app-icon,
+.cw__block--tight .cw__time {
+  display: none;
+}
+@container (max-width: 130px) {
+  .cw__end {
+    display: none;
+  }
+}
+
+// More contrast (app spec 000595): an edge sets the entry off its column.
+@include d.host-on(contrast) {
+  .cw__chip,
+  .cw__block {
+    box-shadow: inset 0 0 0 1px var(--color-border);
+  }
+}
+:host-context([data-very-high-contrast='on']) {
+  .cw__chip,
+  .cw__block {
+    background: var(--vh-bg, #000) padding-box;
+    box-shadow: inset 0 0 0 2px var(--vh-fg, #fff);
+  }
+}

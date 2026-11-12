@@ -69,10 +69,15 @@ def gremium_scope(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 def empty_new_kinds(
     monkeypatch: pytest.MonkeyPatch, vote_scope: dict[str, Any], gremium_scope: dict[str, Any]
 ) -> None:
-    """No vote, gremium, invoice or booking matches: their candidates make no query."""
+    """No vote, Termin, gremium, invoice or booking matches: their candidates make no query."""
 
     async def _none(*_a: Any, **_kw: Any) -> Any:
         return SimpleNamespace(items=[])
+
+    async def _no_ids(*_a: Any, **_kw: Any) -> list[uuid.UUID]:
+        return []
+
+    monkeypatch.setattr(LinkResolver, "_appointment_candidates", _no_ids)
 
     monkeypatch.setattr(vote_listing, "list_votes", _none)
     monkeypatch.setattr(BudgetTreeService, "list_invoices_paged", _none)

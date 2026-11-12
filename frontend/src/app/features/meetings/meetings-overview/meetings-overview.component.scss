@@ -3,8 +3,7 @@
   flex-direction: column;
   min-width: 0;
 }
-:host > app-meetings-list,
-:host > app-meetings-calendar {
+:host > app-meetings-list {
   flex: 1 1 auto;
   min-height: 0;
 }

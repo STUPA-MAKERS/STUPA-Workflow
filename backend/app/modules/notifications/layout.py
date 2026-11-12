@@ -21,10 +21,8 @@ from app.shared.i18n import pick_lang
 #: Footer reason per mail kind ("you receive this email because ...").
 _REASONS: dict[str, dict[str, str]] = {
     "magic_link": {
-        "de": "Sie erhalten diese E-Mail, weil für Ihre Adresse ein "
-        "Zugangslink angefordert wurde.",
-        "en": "You are receiving this email because an access link was "
-        "requested for your address.",
+        "de": "Sie erhalten diese E-Mail, weil für Ihre Adresse ein Zugangslink angefordert wurde.",
+        "en": "You are receiving this email because an access link was requested for your address.",
     },
     "application_captured": {
         "de": "Sie erhalten diese E-Mail, weil für Sie ein Antrag auf der "
@@ -83,8 +81,11 @@ _REASONS: dict[str, dict[str, str]] = {
     "ticket_received": {
         "de": "Sie erhalten diese E-Mail, weil Sie ein Problem, eine Frage oder "
         "eine Idee gemeldet haben.",
-        "en": "You are receiving this email because you reported a problem, a "
-        "question or an idea.",
+        "en": "You are receiving this email because you reported a problem, a question or an idea.",
+    },
+    "appointment": {
+        "de": "Sie erhalten diese E-Mail, weil Sie zu einem Termin eingeladen sind.",
+        "en": "You are receiving this email because you are invited to an appointment.",
     },
     "todo_assigned": {
         "de": "Sie erhalten diese E-Mail, weil Ihnen ein To-Do zugewiesen wurde.",
@@ -131,12 +132,9 @@ _BODY_STYLE = (
     "color:#1f2933;"
 )
 _CARD_STYLE = (
-    "background:#ffffff;border:1px solid #e0e4ea;border-radius:8px;"
-    "padding:24px 24px 28px;"
+    "background:#ffffff;border:1px solid #e0e4ea;border-radius:8px;padding:24px 24px 28px;"
 )
-_HEAD_LINK_STYLE = (
-    "font-size:18px;font-weight:700;color:#1f2933;text-decoration:none;"
-)
+_HEAD_LINK_STYLE = "font-size:18px;font-weight:700;color:#1f2933;text-decoration:none;"
 _BUTTON_STYLE = (
     "display:inline-block;background:#0b6e4f;color:#ffffff;font-weight:600;"
     "text-decoration:none;border-radius:6px;padding:10px 18px;"

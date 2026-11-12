@@ -1,6 +1,20 @@
 {
   "edges": [
     {
+      "column": "appointment_id",
+      "from": "Answer",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Appointment"
+    },
+    {
+      "column": "principal_id",
+      "from": "Answer",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
       "column": "application_id",
       "from": "Applicant",
       "multiplicity": "1",
@@ -132,6 +146,13 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Gremium"
+    },
+    {
+      "column": "creator_id",
+      "from": "Appointment",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
     },
     {
       "column": "application_id",
@@ -316,6 +337,20 @@
       "to": "Principal"
     },
     {
+      "column": "gremium_id",
+      "from": "ExternalCalendar",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "calendar_id",
+      "from": "ExternalEntry",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "ExternalCalendar"
+    },
+    {
       "column": "budget_id",
       "from": "FiscalYear",
       "multiplicity": "*",
@@ -391,6 +426,27 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Role"
+    },
+    {
+      "column": "appointment_id",
+      "from": "Invitation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Appointment"
+    },
+    {
+      "column": "gremium_id",
+      "from": "Invitation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "principal_id",
+      "from": "Invitation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
     },
     {
       "column": "application_id",
@@ -890,6 +946,13 @@
       "to": "Application"
     },
     {
+      "column": "appointment_id",
+      "from": "TodoLink",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Appointment"
+    },
+    {
       "column": "budget_id",
       "from": "TodoLink",
       "multiplicity": "*",
@@ -1052,6 +1115,44 @@
     }
   ],
   "elements": [
+    {
+      "attributes": [
+        {
+          "name": "appointment_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "answer",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "accept",
+            "tentative",
+            "decline"
+          ]
+        },
+        {
+          "name": "answered_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Answer",
+      "module": "calendar",
+      "name": "Answer",
+      "path": "backend/app/modules/calendar/models.py",
+      "table": "calendar_answer"
+    },
     {
       "attributes": [
         {
@@ -1490,6 +1591,99 @@
       "name": "ApplicationType",
       "path": "backend/app/modules/application_types/models.py",
       "table": "application_type"
+    },
+    {
+      "attributes": [
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "starts_on",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "ends_on",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "start_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "end_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "place",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "description",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "creator_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "for_all",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "public",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "sequence",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Appointment",
+      "module": "calendar",
+      "name": "Appointment",
+      "path": "backend/app/modules/calendar/models.py",
+      "table": "calendar_appointment"
     },
     {
       "attributes": [
@@ -2603,6 +2797,150 @@
     {
       "attributes": [
         {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "url",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "interval_minutes",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER",
+          "values": [
+            "15",
+            "60",
+            "360",
+            "1440"
+          ]
+        },
+        {
+          "name": "due_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "last_attempt_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "last_success_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "last_error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "ExternalCalendar",
+      "module": "calendar",
+      "name": "ExternalCalendar",
+      "path": "backend/app/modules/calendar/models.py",
+      "table": "calendar_external"
+    },
+    {
+      "attributes": [
+        {
+          "name": "calendar_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "starts_on",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "ends_on",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "start_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "end_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "place",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "description",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "ExternalEntry",
+      "module": "calendar",
+      "name": "ExternalEntry",
+      "path": "backend/app/modules/calendar/models.py",
+      "table": "calendar_external_entry"
+    },
+    {
+      "attributes": [
+        {
           "name": "budget_id",
           "nullable": false,
           "primaryKey": false,
@@ -3118,6 +3456,39 @@
       "name": "GuestApplicationSettings",
       "path": "backend/app/modules/applications/models.py",
       "table": "guest_application_settings"
+    },
+    {
+      "attributes": [
+        {
+          "name": "appointment_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "principal_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "Invitation",
+      "module": "calendar",
+      "name": "Invitation",
+      "path": "backend/app/modules/calendar/models.py",
+      "table": "calendar_invitation"
     },
     {
       "attributes": [
@@ -5240,6 +5611,18 @@
           "type": "DATE"
         },
         {
+          "name": "start_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "end_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
           "name": "place",
           "nullable": true,
           "primaryKey": false,
@@ -5585,6 +5968,12 @@
         },
         {
           "name": "vote_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "appointment_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"

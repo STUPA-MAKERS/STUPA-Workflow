@@ -1,0 +1,136 @@
+<section class="wh admin-page">
+  <app-page-header [flush]="true" [title]="'admin.calendars.title' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
+
+  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.calendars.error' | t" (retry)="load()">
+    <ng-template #loading>
+      <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
+    </ng-template>
+    <ng-template #content>
+      @if (calendars().length) {
+        <ul class="rowgroup wh__list" [attr.aria-label]="'admin.calendars.list' | t">
+          @for (c of calendars(); track c.id) {
+            @let st = state(c);
+            <li>
+              <app-expand-row
+                [title]="c.name"
+                toggle="chevron"
+                [toggleLabel]="('admin.calendars.fetch.title' | t) + ': ' + c.name"
+                [open]="openId() === c.id"
+                (openChange)="toggle(c)"
+                (activate)="openEdit(c)"
+              >
+                <app-status-text status [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                <span sub
+                  >{{ scopeLabel(c) }} · {{ intervalLabel(c.intervalMinutes) }} ·
+                  <span class="mono">{{ c.url }}</span></span
+                >
+                <app-row-menu
+                  trail
+                  [sections]="rowMenu()"
+                  [label]="('ui.rowMenu.trigger' | t) + ': ' + c.name"
+                  (selected)="onMenu($event.id, c)"
+                />
+                <app-section class="wh__status" [level]="2" [heading]="'admin.calendars.fetch.title' | t">
+                  <dl class="kv wh__grid">
+                    <div>
+                      <dt>{{ 'admin.calendars.fetch.state' | t }}</dt>
+                      <dd>
+                        <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{{ 'admin.calendars.fetch.lastAttempt' | t }}</dt>
+                      <dd class="mono">{{ c.lastAttemptAt ? (c.lastAttemptAt | ldate: 'short') : '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ 'admin.calendars.fetch.lastSuccess' | t }}</dt>
+                      <dd class="mono">{{ c.lastSuccessAt ? (c.lastSuccessAt | ldate: 'short') : '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ 'admin.calendars.fetch.entries' | t }}</dt>
+                      <dd class="mono">{{ c.entryCount }}</dd>
+                    </div>
+                    <div class="kv__wide">
+                      <dt>{{ 'admin.calendars.fetch.reason' | t }}</dt>
+                      <dd>{{ reasonLabel(c.lastError) }}</dd>
+                    </div>
+                  </dl>
+                </app-section>
+              </app-expand-row>
+            </li>
+          }
+        </ul>
+      } @else {
+        <app-empty-state [heading]="'admin.calendars.none' | t" />
+      }
+    </ng-template>
+  </app-load-state>
+
+  <app-fab [label]="'fab.calendar' | t" (activate)="openAdd()" />
+</section>
+
+<app-dialog
+  [open]="draft() !== null"
+  [title]="(draft()?.id ? 'admin.calendars.edit' : 'admin.calendars.create') | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="close()"
+>
+  @if (draft(); as d) {
+    <form class="wh__form" (submit)="$event.preventDefault(); save()">
+      <app-input
+        [label]="'admin.calendars.name' | t"
+        [ngModel]="d.name"
+        (ngModelChange)="patch('name', $event)"
+        name="name"
+      />
+      <app-input
+        class="wh__urlField"
+        [label]="'admin.calendars.url' | t"
+        [error]="urlError() ? tr(urlError()) : ''"
+        [ngModel]="d.url"
+        (ngModelChange)="patch('url', $event)"
+        name="url"
+        placeholder="https://"
+      />
+      <app-segmented
+        width="fill"
+        [ariaLabel]="'admin.calendars.scope.label' | t"
+        [options]="scopeOptions()"
+        [value]="d.scope"
+        (valueChange)="patch('scope', $any($event))"
+      />
+      @if (d.scope === 'gremium') {
+        <app-select
+          [label]="'admin.calendars.gremium' | t"
+          [clearable]="false"
+          [options]="gremien()"
+          [ngModel]="d.gremiumId"
+          (ngModelChange)="patch('gremiumId', $event)"
+          name="gremium"
+        />
+      }
+      <app-select
+        [label]="'admin.calendars.interval.label' | t"
+        [clearable]="false"
+        [options]="intervalOptions()"
+        [ngModel]="d.interval"
+        (ngModelChange)="patch('interval', $event)"
+        name="interval"
+      />
+    </form>
+  }
+  <div dialog-footer class="wh__foot">
+    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!canSave()" (click)="save()">{{ 'action.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<app-confirm-dialog
+  [open]="confirmDelete() !== null"
+  [title]="'admin.calendars.deleteTitle' | t"
+  [body]="'admin.calendars.deleteConfirm' | t: { name: confirmDelete()?.name || '' }"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>

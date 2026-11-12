@@ -32,6 +32,7 @@ import {
   ButtonComponent,
   ChipComponent,
   DatepickerComponent,
+  TimeInputComponent,
   DialogComponent,
   IconComponent,
   InputComponent,
@@ -95,6 +96,7 @@ export interface TodoCardCopy {
     TranslatePipe,
     ButtonComponent,
     DatepickerComponent,
+    TimeInputComponent,
     DialogComponent,
     IconComponent,
     InputComponent,
@@ -148,6 +150,8 @@ export class TodoNewDialogComponent {
   ]);
   readonly startsOn = signal('');
   readonly endsOn = signal('');
+  readonly startTime = signal('');
+  readonly endTime = signal('');
   readonly place = signal('');
   /** The series id, `NEW_SERIES` for a new one (then `seriesName`), or '' for none. */
   readonly seriesId = signal('');
@@ -164,7 +168,9 @@ export class TodoNewDialogComponent {
     () => !this.copy() && this.boards().some((b) => b.canWrite && b.kind !== 'personal'),
   );
   readonly datesError = computed(() =>
-    this.kind() === 'event' && this.endsOn() && (!this.startsOn() || this.endsOn() < this.startsOn())
+    this.kind() === 'event' &&
+    ((this.endsOn() && (!this.startsOn() || this.endsOn() < this.startsOn())) ||
+      (this.startTime() && this.endTime() && this.endsOn() === this.startsOn() && this.endTime() < this.startTime()))
       ? this.i18n.translate('todos.error.eventDates')
       : '',
   );
@@ -234,6 +240,8 @@ export class TodoNewDialogComponent {
     this.kind.set('todo');
     this.startsOn.set('');
     this.endsOn.set('');
+    this.startTime.set('');
+    this.endTime.set('');
     this.place.set('');
     this.seriesId.set('');
     this.seriesName.set('');
@@ -352,6 +360,8 @@ export class TodoNewDialogComponent {
     return {
       startsOn: this.startsOn() || null,
       endsOn: this.endsOn() || null,
+      startTime: this.startsOn() && this.startTime() ? `${this.startTime()}:00` : null,
+      endTime: this.endsOn() && this.endTime() ? `${this.endTime()}:00` : null,
       place: this.place().trim() || null,
       seriesId: this.seriesId() || null,
     };

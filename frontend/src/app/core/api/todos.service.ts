@@ -23,6 +23,7 @@ export type TodoLinkKind =
   | 'meeting'
   | 'agenda_item'
   | 'vote'
+  | 'appointment'
   | 'gremium'
   | 'invoice'
   | 'expense'
@@ -78,6 +79,11 @@ export interface TodoLinkDetail {
   readonly bookingKind?: 'expense' | 'income' | null;
   readonly voteStatus?: TodoVoteStatus | null;
   readonly voteResult?: TodoVoteResult | null;
+  /** A Termin: its last day, its times (`HH:MM:SS`) and its place. `date` is its first day. */
+  readonly endDate?: string | null;
+  readonly startTime?: string | null;
+  readonly endTime?: string | null;
+  readonly place?: string | null;
 }
 
 export interface TodoLink {
@@ -121,6 +127,9 @@ export interface TodoLinkView {
 export interface TodoEventBrief {
   readonly startsOn: string | null;
   readonly endsOn: string | null;
+  /** The time of the start day and of the end day (`HH:MM:SS`), or null for none. */
+  readonly startTime: string | null;
+  readonly endTime: string | null;
   readonly place: string | null;
   readonly participants: number | null;
   readonly seriesId: Uuid | null;
@@ -173,6 +182,8 @@ export interface TodoEventFacts {
 export interface TodoEventIn {
   readonly startsOn?: string | null;
   readonly endsOn?: string | null;
+  readonly startTime?: string | null;
+  readonly endTime?: string | null;
   readonly place?: string | null;
   readonly participants?: number | null;
   readonly seriesId?: Uuid | null;

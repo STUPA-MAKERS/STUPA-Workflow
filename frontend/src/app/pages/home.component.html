@@ -12,7 +12,7 @@
     </app-note>
   }
 
-  <div class="home__choices" [class.home__choices--three]="protocolTotal() > 0">
+  <div class="home__choices home__choices--three">
     <a routerLink="/apply" class="home__choice">
       <app-icon class="home__icon" name="form" [size]="24" />
       <span class="home__choice-title">{{ 'home.choice.apply.title' | t }}</span>
@@ -32,6 +32,15 @@
         </span>
       </a>
     }
+
+    <a routerLink="/public-calendar" class="home__choice">
+      <app-icon class="home__icon" name="cal" [size]="24" />
+      <span class="home__choice-title">{{ 'home.choice.calendar.title' | t }}</span>
+      <span class="home__choice-desc">{{ 'home.choice.calendar.desc' | t }}</span>
+      <span class="home__go" aria-hidden="true">
+        {{ 'home.choice.go' | t }} <app-icon name="arrow" [size]="15" />
+      </span>
+    </a>
 
     <a routerLink="/login" class="home__choice">
       <app-icon class="home__icon" name="user" [size]="24" />

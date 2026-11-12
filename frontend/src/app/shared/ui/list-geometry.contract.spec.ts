@@ -39,8 +39,8 @@ const COLUMN_PAGES = [
   'pages/budget/budget-dashboard.component',
   'pages/admin/admin-frame/admin-frame.component',
 ];
-/** The calendar view of the meetings: no column, but the same header as the list view. */
-const HEADER_ONLY_PAGES = ['features/meetings/meetings-calendar/meetings-calendar.component'];
+/** The Kalender: no list column on a desktop, but the same header as the list pages. */
+const HEADER_ONLY_PAGES = ['features/calendar/calendar.component'];
 
 function files(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>

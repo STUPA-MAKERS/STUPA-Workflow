@@ -36,17 +36,10 @@ import {
   StickyBarComponent,
   PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
-import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { meetingDay, meetingTimeText } from '../meetings-display.util';
-import {
-  type MeetingGroup,
-  type MeetingsView,
-  overviewGroups,
-  topsLabel,
-} from '../meetings-overview.util';
+import { type MeetingGroup, overviewGroups, topsLabel } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
-import { MeetingsViewActionsComponent } from '../meetings-view-actions/meetings-view-actions.component';
 import { weekdayName } from '@shared/date-format';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
@@ -56,8 +49,7 @@ import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pu
  * detail pane, because the meeting page itself is the detail. A row opens the meeting
  * page; an old `?sel=<id>` link opens it as well.
  *
- * The title with the switch "Liste | Kalender" and the calendar subscription, the search
- * and the Gremium chip (they never scroll away), then the groups "Jetzt",
+ * The title, the search and the Gremium chip (they never scroll away), then the groups "Jetzt",
  * "Anstehend · <Monat>" and "Vergangen · <Monat>". A row shows the date, the title, the
  * status, the Gremium, the time and the number of agenda items. "Frühere Sitzungen laden"
  * ends the list; "Neue Sitzung" is the FAB of the list (on a phone the button of the
@@ -72,7 +64,6 @@ import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pu
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     PullRefreshDirective,
-    MeetingsViewActionsComponent,
     RowChevronComponent,
     PageHeaderComponent,
     NgTemplateOutlet,
@@ -91,7 +82,6 @@ import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pu
     StatusTextComponent,
     StickyBarComponent,
     ScrollFadeDirective,
-    CalendarSubscribeComponent,
   ],
   templateUrl: './meetings-list.component.html',
   styleUrl: './meetings-list.component.scss',
@@ -104,10 +94,7 @@ export class MeetingsListComponent {
 
   /** "Neue Sitzung" shows (an admin, or `session.manage` in a Gremium). */
   readonly canCreate = input(false);
-  /** The switch to the calendar shows (not on a phone). */
-  readonly showSwitch = input(true);
 
-  readonly viewChange = output<MeetingsView>();
   readonly create = output<void>();
 
   /** A phone viewport: the header holds one button and one menu. */
@@ -126,14 +113,8 @@ export class MeetingsListComponent {
     this.groups().some((g) => g.kind !== 'past'),
   );
 
-  /** The filter offers a choice only when the user reads more than one Gremium. */
-  /** The ⋮ menu of the phone header: the calendar subscription. */
+  /** The ⋮ menu of the phone header: read the list again. */
   readonly phoneMenu = computed<RowMenuSection[]>(() => [
-    {
-      items: [
-        { id: 'calendar', label: this.i18n.translate('meetings.overview.subscribe'), icon: 'cal' },
-      ],
-    },
     refreshMenuSection((key) => this.i18n.translate(key)),
   ]);
 
@@ -149,10 +130,9 @@ export class MeetingsListComponent {
     void this.router.navigate(['/meetings', id]);
   }
 
-  /** The ⋮ menu of the phone header: "Kalender-Abo" opens the bottom sheet. */
-  onPhoneMenu(item: RowMenuItem, abo: CalendarSubscribeComponent): void {
-    if (isRefreshItem(item)) return reloadLikePull(() => this.timeline.refreshList());
-    if (item.id === 'calendar') abo.open();
+  /** The ⋮ menu of the phone header. */
+  onPhoneMenu(item: RowMenuItem): void {
+    if (isRefreshItem(item)) reloadLikePull(() => this.timeline.refreshList());
   }
 
   status(m: Meeting): StatusView {

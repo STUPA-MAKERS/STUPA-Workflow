@@ -58,6 +58,11 @@
     {
       "count": 3,
       "from": "admin",
+      "to": "calendar"
+    },
+    {
+      "count": 3,
+      "from": "admin",
       "to": "config_revision"
     },
     {
@@ -406,27 +411,42 @@
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 1,
+      "from": "calendar",
+      "to": "applications"
+    },
+    {
+      "count": 10,
       "from": "calendar",
       "to": "auth"
     },
     {
-      "count": 2,
+      "count": 7,
       "from": "calendar",
       "to": "gremien"
     },
     {
-      "count": 1,
+      "count": 8,
       "from": "calendar",
       "to": "meetings"
     },
     {
-      "count": 3,
+      "count": 6,
+      "from": "calendar",
+      "to": "notifications"
+    },
+    {
+      "count": 1,
+      "from": "calendar",
+      "to": "protocol"
+    },
+    {
+      "count": 16,
       "from": "calendar",
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 5,
       "from": "calendar",
       "to": "todos"
     },
@@ -826,6 +846,11 @@
       "to": "auth"
     },
     {
+      "count": 1,
+      "from": "privacy",
+      "to": "calendar"
+    },
+    {
       "count": 3,
       "from": "privacy",
       "to": "files"
@@ -1051,6 +1076,11 @@
       "to": "budget"
     },
     {
+      "count": 4,
+      "from": "todos",
+      "to": "calendar"
+    },
+    {
       "count": 7,
       "from": "todos",
       "to": "files"
@@ -1236,7 +1266,7 @@
     },
     {
       "id": "calendar",
-      "layer": 1,
+      "layer": 2,
       "name": "calendar",
       "path": "backend/app/modules/calendar"
     },

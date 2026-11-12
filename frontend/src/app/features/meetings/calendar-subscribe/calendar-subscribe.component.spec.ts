@@ -62,6 +62,30 @@ describe('CalendarSubscribeComponent', () => {
     expect(api.myCalendar).toHaveBeenCalledTimes(1);
   });
 
+  /** The public calendar has one address without a token: nothing is read and nothing is made new. */
+  it('shows a fixed address with "Kopieren" only and reads nothing', async () => {
+    @Component({
+      standalone: true,
+      imports: [CalendarSubscribeComponent],
+      template: `
+        <button type="button" (click)="abo.toggle($event.currentTarget)">Abo</button>
+        <app-calendar-subscribe #abo fixedUrl="https://x/api/public/calendar.ics" />
+      `,
+    })
+    class FixedHost {}
+    localStorage.setItem('ap.locale', 'de');
+    const api = { myCalendar: jest.fn(), rotateCalendar: jest.fn() };
+    const view = await render(FixedHost, { providers: [{ provide: ApiClient, useValue: api }] });
+    await userEvent.click(screen.getByRole('button', { name: 'Abo' }));
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    const dialog = screen.getByRole('dialog', { name: 'Kalender-Abo' });
+    expect(dialog).toHaveTextContent('https://x/api/public/calendar.ics');
+    expect(screen.getByRole('button', { name: 'Kopieren' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Neue URL erzeugen' })).toBeNull();
+    expect(api.myCalendar).not.toHaveBeenCalled();
+  });
+
   it('copies the URL', async () => {
     const writeText = jest.fn(() => Promise.resolve());
     Object.assign(navigator, { clipboard: { writeText } });
