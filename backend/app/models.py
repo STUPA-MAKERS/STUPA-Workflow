@@ -33,7 +33,12 @@ from app.modules.auth.models import (
 )
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.backup.models import Backup
-from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
+from app.modules.budget.plan_models import (
+    BudgetPlan,
+    BudgetPlanLine,
+    BudgetPlanStep,
+    BudgetPlanVersion,
+)
 from app.modules.budget.tree_models import (
     Budget,
     BudgetAllocation,
@@ -105,6 +110,7 @@ __all__ = [
     "BudgetAllocation",
     "BudgetPlan",
     "BudgetPlanLine",
+    "BudgetPlanStep",
     "BudgetPlanVersion",
     "BudgetExpense",
     "ConfigRevision",

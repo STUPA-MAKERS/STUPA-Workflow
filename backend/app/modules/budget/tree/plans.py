@@ -10,28 +10,39 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import assert_never, cast
+from typing import Any, assert_never, cast
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from app.modules.audit.actions import AuditAction
-from app.modules.budget import plan_rules
-from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
+from app.modules.budget import plan_rules, tree_rules
+from app.modules.budget.plan_models import (
+    BudgetPlan,
+    BudgetPlanLine,
+    BudgetPlanStep,
+    BudgetPlanVersion,
+)
 from app.modules.budget.plan_rules import PlanState, Side
 from app.modules.budget.plan_schemas import (
     PlanCreate,
     PlanLineOut,
     PlanLineSet,
+    PlanNodeCreate,
     PlanOut,
     PlanStateSet,
+    PlanStepOut,
+    PlanStepsOut,
+    PlanStepsSet,
     PlanSwitchOut,
     PlanVersionOut,
     SideOut,
 )
 from app.modules.budget.tree.allocations import AllocationOps
+from app.modules.budget.tree.nodes import NodeOps
 from app.modules.budget.tree.service_base import _ZERO, _subtree_ids
 from app.modules.budget.tree_models import Budget, BudgetAllocation, FiscalYear
+from app.modules.gremien.models import Gremium
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
@@ -54,7 +65,7 @@ def _line_out(line: BudgetPlanLine) -> PlanLineOut:
     )
 
 
-class PlanOps(AllocationOps):
+class PlanOps(NodeOps, AllocationOps):
     """Read and write the Haushaltsplan of a fiscal year."""
 
     async def _subtree(self, top: Budget) -> list[Budget]:
@@ -112,10 +123,62 @@ class PlanOps(AllocationOps):
             raise NotFoundError(f"fiscal year {fiscal_year_id} not found")
         return top, fy
 
+    async def _budget_steps(self, top_id: UUID) -> list[BudgetPlanStep]:
+        """Return the steps of a top-level node in their order."""
+        return list(
+            (
+                await self.session.scalars(
+                    select(BudgetPlanStep)
+                    .where(BudgetPlanStep.budget_id == top_id)
+                    .order_by(BudgetPlanStep.position)
+                )
+            ).all()
+        )
+
+    async def _budget_step_records(self, top_id: UUID) -> list[dict[str, Any]]:
+        """Return the steps of a top-level node as the record a version keeps."""
+        return plan_rules.step_snapshot(
+            [(step.name, step.gremium_id) for step in await self._budget_steps(top_id)]
+        )
+
+    async def _steps_out(
+        self, records: list[list[dict[str, Any]]]
+    ) -> list[tuple[PlanStepOut, ...]]:
+        """Turn step records into DTOs with the name of each Gremium.
+
+        One query resolves the names of all lists, so the page never shows an id.
+        """
+        ids = {
+            UUID(step["gremiumId"])
+            for steps in records
+            for step in steps
+            if step.get("gremiumId")
+        }
+        rows = (
+            await self.session.execute(select(Gremium.id, Gremium.name).where(Gremium.id.in_(ids)))
+        ).all()
+        names = {str(row.id): row.name for row in rows}
+        return [
+            tuple(
+                PlanStepOut(
+                    name=step["name"],
+                    gremiumId=step.get("gremiumId"),
+                    gremiumName=names.get(step.get("gremiumId") or ""),
+                    passedAt=step.get("passedAt"),
+                )
+                for step in steps
+            )
+            for steps in records
+        ]
+
     async def _plan_out(self, plan: BudgetPlan, top_id: UUID) -> PlanOut:
         await self.session.flush()
         versions = await self._versions(plan.id)
         lines = [await self._lines(v.id) for v in versions]
+        of_budget = await self._budget_step_records(top_id)
+        steps = await self._steps_out(
+            [of_budget if v.state == "draft" else list(v.steps or []) for v in versions]
+        )
         return PlanOut(
             id=plan.id,
             budgetId=top_id,
@@ -126,12 +189,11 @@ class PlanOps(AllocationOps):
                     number=v.number,
                     state=cast("PlanState", v.state),
                     createdAt=v.created_at,
-                    resolvedAt=v.resolved_at,
-                    approvedAt=v.approved_at,
                     inForceAt=v.in_force_at,
+                    steps=shown,
                     lines=tuple(_line_out(line) for line in rows),
                 )
-                for v, rows in zip(versions, lines, strict=True)
+                for v, rows, shown in zip(versions, lines, steps, strict=True)
             ),
         )
 
@@ -162,6 +224,76 @@ class PlanOps(AllocationOps):
     async def plan_exists(self, fiscal_year_id: UUID) -> bool:
         """Say if the fiscal year has a Haushaltsplan."""
         return await self._plan_of(fiscal_year_id) is not None
+
+    async def _plan_top(self, budget_id: UUID, what: str) -> Budget:
+        """Return a top-level node.
+
+        Raises:
+            NotFoundError: The node does not exist (404).
+            ValidationProblem: `plan_top_level_only` (422) for a node below the top
+                level.
+        """
+        top = await self._get_node(budget_id)
+        if top.parent_id is not None:
+            raise ValidationProblem(
+                f"{what} to a top-level cost centre.",
+                code="plan_top_level_only",
+                errors=[{"field": "budgetId", "msg": "not a top-level cost centre"}],
+            )
+        return top
+
+    async def get_plan_steps(self, budget_id: UUID) -> PlanStepsOut:
+        """Return the steps of a top-level node."""
+        top = await self._plan_top(budget_id, "The plan steps belong")
+        (steps,) = await self._steps_out([await self._budget_step_records(top.id)])
+        return PlanStepsOut(budgetId=top.id, steps=steps)
+
+    async def set_plan_steps(self, budget_id: UUID, payload: PlanStepsSet) -> PlanStepsOut:
+        """Replace the ordered steps of a top-level node.
+
+        A version that left the draft keeps its own steps, so the change reaches only
+        a draft and each later version.
+
+        Raises:
+            ValidationProblem: `plan_top_level_only` (422), `plan_step_gremium_invalid`
+                (422) for a Gremium that does not exist.
+        """
+        top = await self._plan_top(budget_id, "The plan steps belong")
+        wanted = {step.gremium_id for step in payload.steps if step.gremium_id is not None}
+        known = await self.session.scalars(select(Gremium.id).where(Gremium.id.in_(wanted)))
+        found = set(known.all())
+        if wanted - found:
+            raise ValidationProblem(
+                "A step names a Gremium that does not exist.",
+                code="plan_step_gremium_invalid",
+                errors=[{"field": "steps", "msg": "gremiumId is not the id of a Gremium"}],
+            )
+        before = [step.name for step in await self._budget_steps(top.id)]
+        await self.session.execute(delete(BudgetPlanStep).where(BudgetPlanStep.budget_id == top.id))
+        self.session.add_all(
+            [
+                BudgetPlanStep(
+                    id=uuid.uuid4(),
+                    budget_id=top.id,
+                    position=position,
+                    name=step.name,
+                    gremium_id=step.gremium_id,
+                )
+                for position, step in enumerate(payload.steps)
+            ]
+        )
+        await self._audit(
+            AuditAction.BUDGET_PLAN_STEPS_SET,
+            target_type="budget",
+            target_id=str(top.id),
+            data={
+                "pathKey": top.path_key,
+                "before": before,
+                "after": [step.name for step in payload.steps],
+            },
+        )
+        await self.session.flush()
+        return await self.get_plan_steps(top.id)
 
     async def set_side(self, budget_id: UUID, side: Side) -> SideOut:
         """Set the side of a direct child of a top-level node and of its subtree.
@@ -216,13 +348,7 @@ class PlanOps(AllocationOps):
             ValidationProblem: `plan_top_level_only` (422) for a node below the top
                 level, `plan_side_missing` (422) when a node below it has no side.
         """
-        top = await self._get_node(budget_id)
-        if top.parent_id is not None:
-            raise ValidationProblem(
-                "The plan switch belongs to a top-level cost centre.",
-                code="plan_top_level_only",
-                errors=[{"field": "budgetId", "msg": "not a top-level cost centre"}],
-            )
+        top = await self._plan_top(budget_id, "The plan switch belongs")
         below = [n for n in await self._subtree(top) if n.id != top.id]
         if enabled and any(n.side is None for n in below):
             raise ValidationProblem(
@@ -592,64 +718,125 @@ class PlanOps(AllocationOps):
         )
         return await self._plan_out(plan, top.id)
 
-    async def set_plan_state(self, version_id: UUID, payload: PlanStateSet) -> PlanOut:
-        """Move a version one step forward, or a resolved version back to draft.
+    def _require_balanced(
+        self, top: Budget, nodes: list[Budget], amounts: dict[UUID, Decimal]
+    ) -> None:
+        """Refuse a version whose income Ansätze differ from its expense Ansätze.
 
-        A version that leaves the draft must be balanced. A version that comes into
-        force replaces the earlier version in force and writes the allocations.
+        Raises:
+            ValidationProblem: `plan_not_balanced` (422).
+        """
+        direct = [(n.side, amounts.get(n.id, _ZERO)) for n in nodes if n.parent_id == top.id]
+        if plan_rules.is_balanced(direct):
+            return
+        income, expense = plan_rules.side_sums(direct)
+        raise ValidationProblem(
+            "The plan is not balanced.",
+            code="plan_not_balanced",
+            errors=[{"field": "state", "msg": f"income {income} differs from expenses {expense}"}],
+        )
+
+    @staticmethod
+    def _keep_names(lines: list[BudgetPlanLine], nodes: list[Budget]) -> None:
+        """Write the current name and path key of each cost center into its line."""
+        names = {n.id: (n.name, n.path_key) for n in nodes}
+        for line in lines:
+            _assign(line, name=names[line.budget_id][0], path_key=names[line.budget_id][1])
+
+    async def pass_next_step(self, version_id: UUID, *, by_vote: UUID | None = None) -> PlanOut:
+        """Record the next step of a version as passed.
+
+        The first step takes the version out of the draft: the version must be
+        balanced, it keeps the steps of its budget, and each line keeps the name and
+        the path key of its cost center.
+
+        Raises:
+            NotFoundError: The version does not exist (404).
+            ConflictError: `fiscal_year_closed` (409), `plan_state_invalid` (409) for
+                a version in force or replaced, `plan_no_step_left` (409) when the
+                version has no step that is not passed.
+            ValidationProblem: `plan_not_balanced` (422) at the first step.
+        """
+        version, plan, fy, top = await self._version_context(version_id)
+        if version.state not in plan_rules.OPEN_STATES:
+            raise ConflictError(
+                f"A version in {version.state!r} passes no step.", code="plan_state_invalid"
+            )
+        first = version.state == "draft"
+        steps = await self._budget_step_records(top.id) if first else list(version.steps or [])
+        index = plan_rules.next_step(steps)
+        if index is None:
+            raise ConflictError("The version has no step left.", code="plan_no_step_left")
+        if first:
+            nodes = await self._subtree(top)
+            lines = await self._lines(version.id)
+            self._require_balanced(top, nodes, {line.budget_id: line.amount for line in lines})
+            self._keep_names(lines, nodes)
+        _assign(
+            version,
+            state="in_progress",
+            steps=plan_rules.with_step_passed(steps, index, datetime.now(UTC).isoformat()),
+        )
+        await self._audit(
+            AuditAction.BUDGET_PLAN_STEP,
+            target_type="budget_plan",
+            target_id=str(plan.id),
+            data={
+                "fiscalYearId": str(fy.id),
+                "versionId": str(version.id),
+                "number": version.number,
+                "step": steps[index]["name"],
+                "gremiumId": steps[index]["gremiumId"],
+                "voteId": str(by_vote) if by_vote else None,
+            },
+        )
+        return await self._plan_out(plan, top.id)
+
+    async def set_plan_state(self, version_id: UUID, payload: PlanStateSet) -> PlanOut:
+        """Bring a version into force, or move a version in progress back to draft.
+
+        A version comes into force after its last step, or from the draft when its
+        budget has no steps. It then replaces the earlier version in force and writes
+        the allocations. A version that moves back to draft loses its passed steps.
 
         Raises:
             NotFoundError: The version does not exist (404).
             ConflictError: `fiscal_year_closed` (409), `plan_state_invalid` (409).
-            ValidationProblem: `plan_not_balanced` (422).
+            ValidationProblem: `plan_not_balanced` (422) for a draft that comes into
+                force.
         """
         version, plan, fy, top = await self._version_context(version_id)
         current = version.state
         target = payload.state
-        if not plan_rules.move_allowed(current, target):
-            raise ConflictError(
-                f"A version in {current!r} cannot move to {target!r}.",
-                code="plan_state_invalid",
-            )
-        nodes = await self._subtree(top)
         lines = await self._lines(version.id)
-        amounts = {line.budget_id: line.amount for line in lines}
-        now = datetime.now(UTC)
         match target:
-            case "resolved":
-                direct = [
-                    (n.side, amounts.get(n.id, _ZERO)) for n in nodes if n.parent_id == top.id
-                ]
-                if not plan_rules.is_balanced(direct):
-                    income, expense = plan_rules.side_sums(direct)
-                    raise ValidationProblem(
-                        "The plan is not balanced.",
-                        code="plan_not_balanced",
-                        errors=[
-                            {
-                                "field": "state",
-                                "msg": f"income {income} differs from expenses {expense}",
-                            }
-                        ],
-                    )
-                _assign(version, resolved_at=now)
-                names = {n.id: (n.name, n.path_key) for n in nodes}
-                for line in lines:
-                    _assign(
-                        line, name=names[line.budget_id][0], path_key=names[line.budget_id][1]
-                    )
-            case "approved":
-                _assign(version, approved_at=now)
             case "in_force":
+                steps = (
+                    await self._budget_step_records(top.id)
+                    if current == "draft"
+                    else list(version.steps or [])
+                )
+                if not plan_rules.can_enter_force(current, steps):
+                    raise ConflictError(
+                        "The version has a step that is not passed.", code="plan_state_invalid"
+                    )
+                nodes = await self._subtree(top)
+                amounts = {line.budget_id: line.amount for line in lines}
+                if current == "draft":
+                    self._require_balanced(top, nodes, amounts)
+                    self._keep_names(lines, nodes)
                 await self._replace_in_force(plan.id)
-                _assign(version, in_force_at=now)
+                _assign(version, in_force_at=datetime.now(UTC))
                 await self._write_allocations(fy.id, top, nodes, amounts)
             case "draft":
-                _assign(version, resolved_at=None)
+                if not plan_rules.can_return_to_draft(current):
+                    raise ConflictError(
+                        f"A version in {current!r} cannot move back to draft.",
+                        code="plan_state_invalid",
+                    )
+                _assign(version, steps=[])
                 for line in lines:
                     _assign(line, name=None, path_key=None)
-            case "replaced":  # pragma: no cover - move_allowed refuses this target
-                raise ConflictError("replaced is no target.", code="plan_state_invalid")
             case _:  # pragma: no cover
                 assert_never(target)
         _assign(version, state=target)
@@ -666,6 +853,62 @@ class PlanOps(AllocationOps):
             },
         )
         return await self._plan_out(plan, top.id)
+
+    async def create_plan_node(self, version_id: UUID, payload: PlanNodeCreate) -> PlanOut:
+        """Create a cost center and its line in a draft version, in one transaction.
+
+        Raises:
+            NotFoundError: The version or the parent does not exist (404).
+            ConflictError: `fiscal_year_closed` (409), `plan_version_not_draft` (409),
+                `budget_key_exists` (409).
+            ValidationProblem: `plan_line_node_invalid` (422) for a parent outside
+                the tree of the plan, `plan_side_missing` (422) for a direct child of
+                the budget without a side.
+        """
+        version, _plan, _fy, top = await self._version_context(version_id)
+        if version.state != "draft":
+            raise ConflictError(
+                "A cost centre is created only in a draft version.",
+                code="plan_version_not_draft",
+            )
+        parent = next((n for n in await self._subtree(top) if n.id == payload.parent_id), None)
+        if parent is None:
+            await self._get_node(payload.parent_id)
+            raise ValidationProblem(
+                "The parent is not in the tree of this plan.",
+                code="plan_line_node_invalid",
+                errors=[{"field": "parentId", "msg": "not in the tree of the plan"}],
+            )
+        side = payload.side if parent.id == top.id else parent.side
+        if side is None:
+            raise ValidationProblem(
+                "A cost centre directly below the budget needs a side.",
+                code="plan_side_missing",
+                errors=[{"field": "side", "msg": "the cost centre has no side"}],
+            )
+        if await self._sibling_exists(parent.id, payload.key):
+            raise ConflictError(
+                f"budget key {payload.key!r} already exists under this parent",
+                code="budget_key_exists",
+            )
+        node = Budget(
+            id=uuid.uuid4(),
+            parent_id=parent.id,
+            gremium_id=parent.gremium_id,
+            key=payload.key,
+            path_key=tree_rules.compose_path_key(parent.path_key, payload.key),
+            name=payload.name,
+            side=side,
+        )
+        self.session.add(node)
+        await self._audit(
+            AuditAction.BUDGET_NODE_CREATE,
+            target_type="budget",
+            target_id=str(node.id),
+            data={"pathKey": node.path_key, "gremiumId": None, "decisionGremiumId": None},
+        )
+        await self.session.flush()
+        return await self.set_line(version.id, node.id, PlanLineSet(amount=payload.amount))
 
     async def _replace_in_force(self, plan_id: UUID) -> None:
         """Set the version in force of a plan to replaced, before a new one takes over.

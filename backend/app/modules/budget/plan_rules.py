@@ -11,32 +11,58 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-PlanState = Literal["draft", "resolved", "approved", "in_force", "replaced"]
+PlanState = Literal["draft", "in_progress", "in_force", "replaced"]
+#: The states a person can ask for. The platform sets the other two: `in_progress`
+#: with the first passed step, `replaced` when a later version comes into force.
+PlanTarget = Literal["draft", "in_force"]
 Side = Literal["income", "expense"]
 
 _ZERO = Decimal(0)
 
-#: The moves a person can ask for. ``replaced`` is no target: the platform sets it
-#: when a later version comes into force.
-_MOVES: frozenset[tuple[str, str]] = frozenset(
-    {
-        ("draft", "resolved"),
-        ("resolved", "approved"),
-        ("approved", "in_force"),
-        ("resolved", "draft"),
-    }
-)
-
 #: The states before ``in_force``. A plan has at most one version in them.
-OPEN_STATES: tuple[str, ...] = ("draft", "resolved", "approved")
+OPEN_STATES: tuple[str, ...] = ("draft", "in_progress")
+
+#: The largest number of steps of one budget.
+MAX_STEPS = 10
 
 
-def move_allowed(current: str, target: str) -> bool:
-    """Say if a version can move from `current` to `target`.
+def next_step(steps: Sequence[Mapping[str, Any]]) -> int | None:
+    """Return the index of the first step that is not passed, or `None`."""
+    return next((i for i, step in enumerate(steps) if step.get("passedAt") is None), None)
 
-    A version moves one step forward, and a resolved version can go back to draft.
+
+def can_enter_force(state: str, steps: Sequence[Mapping[str, Any]]) -> bool:
+    """Say if a version can come into force.
+
+    A draft comes into force when its budget has no steps: `steps` then holds the
+    steps of the budget. A version in progress comes into force after its last step.
     """
-    return (current, target) in _MOVES
+    return (state == "draft" and not steps) or (
+        state == "in_progress" and next_step(steps) is None
+    )
+
+
+def can_return_to_draft(state: str) -> bool:
+    """Say if a version can move back to draft: only one that passes its steps."""
+    return state == "in_progress"
+
+
+def step_snapshot(steps: Sequence[tuple[str, UUID | None]]) -> list[dict[str, Any]]:
+    """Return the steps of a budget as the record a version keeps, none passed."""
+    return [
+        {"name": name, "gremiumId": str(gremium_id) if gremium_id else None, "passedAt": None}
+        for name, gremium_id in steps
+    ]
+
+
+def with_step_passed(
+    steps: Sequence[Mapping[str, Any]], index: int, passed_at: str
+) -> list[dict[str, Any]]:
+    """Return `steps` with the step at `index` passed at `passed_at`."""
+    return [
+        {**step, "passedAt": passed_at} if i == index else dict(step)
+        for i, step in enumerate(steps)
+    ]
 
 
 def version_name(number: int) -> str:

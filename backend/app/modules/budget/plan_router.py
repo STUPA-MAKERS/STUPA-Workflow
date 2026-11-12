@@ -17,8 +17,11 @@ from app.deps import Principal, require_principal
 from app.modules.budget.plan_schemas import (
     PlanCreate,
     PlanLineSet,
+    PlanNodeCreate,
     PlanOut,
     PlanStateSet,
+    PlanStepsOut,
+    PlanStepsSet,
     PlanSwitchOut,
     PlanSwitchSet,
     SideOut,
@@ -144,7 +147,66 @@ async def delete_plan_line(version_id: UUID, budget_id: UUID, service: ServiceDe
     responses=_errors(401, 403, 404, 409, 422),
 )
 async def set_plan_state(version_id: UUID, payload: PlanStateSet, service: ServiceDep) -> PlanOut:
-    """Move a version one step forward, or a resolved version back to draft."""
+    """Bring a version into force, or move a version in progress back to draft."""
     out = await service.set_plan_state(version_id, payload)
+    await service.session.commit()
+    return out
+
+
+@router.get(
+    "/budgets/{budget_id}/plan-steps",
+    response_model=PlanStepsOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def get_plan_steps(
+    budget_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> PlanStepsOut:
+    """Return the steps that a plan version of this budget passes."""
+    await _require_node_view(service, principal, budget_id)
+    return await service.get_plan_steps(budget_id)
+
+
+@router.put(
+    "/budgets/{budget_id}/plan-steps",
+    response_model=PlanStepsOut,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 422),
+)
+async def set_plan_steps(
+    budget_id: UUID, payload: PlanStepsSet, service: ServiceDep
+) -> PlanStepsOut:
+    """Replace the ordered steps of a top-level cost center."""
+    out = await service.set_plan_steps(budget_id, payload)
+    await service.session.commit()
+    return out
+
+
+@router.post(
+    "/budget-plan-versions/{version_id}/steps/next",
+    response_model=PlanOut,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def pass_next_plan_step(version_id: UUID, service: ServiceDep) -> PlanOut:
+    """Record the next step of a version as passed."""
+    out = await service.pass_next_step(version_id)
+    await service.session.commit()
+    return out
+
+
+@router.post(
+    "/budget-plan-versions/{version_id}/cost-centres",
+    response_model=PlanOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def create_plan_cost_centre(
+    version_id: UUID, payload: PlanNodeCreate, service: ServiceDep
+) -> PlanOut:
+    """Create a cost center and its line in a draft version."""
+    out = await service.create_plan_node(version_id, payload)
     await service.session.commit()
     return out

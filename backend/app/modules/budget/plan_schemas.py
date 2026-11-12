@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from app.modules.budget.plan_rules import PlanState, Side
+from app.modules.budget.plan_rules import MAX_STEPS, PlanState, PlanTarget, Side
 from app.shared.schemas import FrozenCamelModel
 
 #: The largest value of ``Numeric(12, 2)``: a larger one gives 422, not a 500 from
@@ -65,9 +65,50 @@ class PlanLineSet(FrozenCamelModel, frozen=True):
 
 
 class PlanStateSet(FrozenCamelModel, frozen=True):
-    """Move a version to the next state, or a resolved version back to draft."""
+    """Bring a version into force, or move a version in progress back to draft."""
 
-    state: PlanState
+    state: PlanTarget
+
+
+class PlanStepIn(FrozenCamelModel, frozen=True):
+    """One step of the list a budget gets."""
+
+    name: str = Field(min_length=1, max_length=120)
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+
+
+class PlanStepsSet(FrozenCamelModel, frozen=True):
+    """Set the ordered steps of a top-level cost center. The list can be empty."""
+
+    steps: tuple[PlanStepIn, ...] = Field(default=(), max_length=MAX_STEPS)
+
+
+class PlanStepOut(FrozenCamelModel, frozen=True):
+    """One step with the name of its Gremium, and the time it was passed in a version."""
+
+    name: str
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    gremium_name: str | None = Field(default=None, alias="gremiumName")
+    passed_at: datetime | None = Field(default=None, alias="passedAt")
+
+
+class PlanStepsOut(FrozenCamelModel, frozen=True):
+    """The steps of a top-level cost center."""
+
+    budget_id: UUID = Field(alias="budgetId")
+    steps: tuple[PlanStepOut, ...] = ()
+
+
+class PlanNodeCreate(FrozenCamelModel, frozen=True):
+    """Create a cost center and its line in a draft version."""
+
+    parent_id: UUID = Field(alias="parentId")
+    key: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9]+$")
+    name: str = Field(min_length=1, max_length=200)
+    side: Side | None = None
+    amount: Decimal = Field(
+        default=Decimal(0), ge=0, le=_MAX_AMOUNT, allow_inf_nan=False, decimal_places=2
+    )
 
 
 class PlanLineOut(FrozenCamelModel, frozen=True):
@@ -91,9 +132,9 @@ class PlanVersionOut(FrozenCamelModel, frozen=True):
     number: int
     state: PlanState
     created_at: datetime = Field(alias="createdAt")
-    resolved_at: datetime | None = Field(default=None, alias="resolvedAt")
-    approved_at: datetime | None = Field(default=None, alias="approvedAt")
     in_force_at: datetime | None = Field(default=None, alias="inForceAt")
+    #: The steps of the version. A draft shows the steps of its budget, none passed.
+    steps: tuple[PlanStepOut, ...] = ()
     lines: tuple[PlanLineOut, ...] = ()
 
 

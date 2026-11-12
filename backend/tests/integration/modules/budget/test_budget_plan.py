@@ -22,8 +22,11 @@ from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPla
 from app.modules.budget.plan_schemas import (
     PlanCreate,
     PlanLineSet,
+    PlanNodeCreate,
     PlanOut,
     PlanStateSet,
+    PlanStepIn,
+    PlanStepsSet,
     PlanVersionOut,
 )
 from app.modules.budget.tree.service import BudgetTreeService
@@ -35,6 +38,7 @@ from app.modules.budget.tree_schemas import (
     FiscalYearCreate,
     FiscalYearOut,
 )
+from app.modules.gremien.models import Gremium
 from app.shared.errors import AppError, ConflictError, NotFoundError, ValidationProblem
 
 pytestmark = pytest.mark.integration
@@ -119,10 +123,23 @@ async def _balanced_draft(t: Tree) -> PlanOut:
 async def _in_force(t: Tree) -> PlanOut:
     plan = await _balanced_draft(t)
     vid = _version(plan).id
-    for state in ("resolved", "approved", "in_force"):
-        plan = await t.svc.set_plan_state(vid, PlanStateSet(state=state))
+    plan = await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
     await t.svc.session.commit()
     return plan
+
+
+async def _steps(t: Tree, *names: str, gremium_id: uuid.UUID | None = None) -> None:
+    """Give the budget its plan steps. The first one names the Gremium."""
+    await t.svc.set_plan_steps(
+        t.top.id,
+        PlanStepsSet(
+            steps=tuple(
+                PlanStepIn(name=name, gremiumId=gremium_id if i == 0 else None)
+                for i, name in enumerate(names)
+            )
+        ),
+    )
+    await t.svc.session.commit()
 
 
 async def _allocated(session: AsyncSession, fy_id: uuid.UUID) -> dict[uuid.UUID, Decimal]:
@@ -264,7 +281,7 @@ async def test_create_plan_copies_the_plan_in_force_of_another_year(
     with pytest.raises(ValidationProblem) as exc:
         await t.svc.create_plan(t.top.id, nxt.id, PlanCreate(copyFromFiscalYearId=t.fy.id))
     assert _code(exc) == "plan_copy_source_invalid"
-    for state in ("resolved", "approved", "in_force"):
+    for state in ("in_force",):
         await t.svc.set_plan_state(vid, PlanStateSet(state=state))
     other = await _tree(session)
     for bad in (uuid.uuid4(), other.fy.id, nxt.id):
@@ -348,36 +365,163 @@ async def test_delete_line(session: AsyncSession) -> None:
     assert _code(nf) == "plan_line_not_found"
 
 
-async def test_state_moves_and_balance(session: AsyncSession) -> None:
-    """§000792, §000795: one step at a time, and a version leaves draft only balanced."""
+async def test_plan_steps_of_a_budget(session: AsyncSession) -> None:
+    """§000823: a budget has an ordered list of steps, each with a name and a Gremium."""
     t = await _tree(session)
+    assert (await t.svc.get_plan_steps(t.top.id)).steps == ()
+    gremium = Gremium(id=uuid.uuid4(), slug=f"g{uuid.uuid4().hex[:8]}", name="StuPa")
+    session.add(gremium)
+    await session.commit()
+    await _steps(t, "Beschluss", "Genehmigung", gremium_id=gremium.id)
+    out = await t.svc.get_plan_steps(t.top.id)
+    assert [(s.name, s.gremium_name, s.passed_at) for s in out.steps] == [
+        ("Beschluss", "StuPa", None),
+        ("Genehmigung", None, None),
+    ]
+    await _steps(t, "Genehmigung")
+    assert [s.name for s in (await t.svc.get_plan_steps(t.top.id)).steps] == ["Genehmigung"]
+    with pytest.raises(ValidationProblem) as unknown:
+        await _steps(t, "Beschluss", gremium_id=uuid.uuid4())
+    assert _code(unknown) == "plan_step_gremium_invalid"
+    with pytest.raises(ValidationProblem) as below:
+        await t.svc.set_plan_steps(t.exp.id, PlanStepsSet())
+    assert _code(below) == "plan_top_level_only"
+    entry = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_PLAN_STEPS_SET)
+            .where(AuditEntry.target_id == str(t.top.id))
+            .order_by(AuditEntry.id.desc())
+        )
+    ).first()
+    assert entry is not None
+    assert entry.data["before"] == ["Beschluss", "Genehmigung"]
+    assert entry.data["after"] == ["Genehmigung"]
+
+
+async def test_a_version_passes_the_steps_of_its_budget(session: AsyncSession) -> None:
+    """§000792, §000795, §000824, §000825: steps in order, balance first, own record."""
+    t = await _tree(session)
+    await _steps(t, "Beschluss", "Genehmigung")
     plan = await _balanced_draft(t)
     vid = _version(plan).id
-    for target in ("approved", "in_force", "draft", "replaced"):
+    assert [(s.name, s.passed_at) for s in _version(plan).steps] == [
+        ("Beschluss", None),
+        ("Genehmigung", None),
+    ]
+    for target in ("in_force", "draft"):
         with pytest.raises(ConflictError) as exc:
             await t.svc.set_plan_state(vid, PlanStateSet(state=target))
         assert _code(exc) == "plan_state_invalid"
     await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(99)))
     with pytest.raises(ValidationProblem) as unbalanced:
-        await t.svc.set_plan_state(vid, PlanStateSet(state="resolved"))
+        await t.svc.pass_next_step(vid)
     assert _code(unbalanced) == "plan_not_balanced"
     await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(100)))
 
-    resolved = _version(await t.svc.set_plan_state(vid, PlanStateSet(state="resolved")))
-    assert resolved.state == "resolved"
-    assert resolved.resolved_at is not None
-    names = {line.name for line in resolved.lines}
-    assert names == {"Beiträge", "Zuschüsse", "Fachschaften", "AKs"}
+    first = _version(await t.svc.pass_next_step(vid))
+    assert first.state == "in_progress"
+    assert [s.passed_at is not None for s in first.steps] == [True, False]
+    assert {line.name for line in first.lines} == {"Beiträge", "Zuschüsse", "Fachschaften", "AKs"}
+    await session.commit()
+    await _steps(t, "Anders")
+    kept = _version(await t.svc.get_plan(t.top.id, t.fy.id))
+    assert [s.name for s in kept.steps] == ["Beschluss", "Genehmigung"]
+    with pytest.raises(ConflictError) as early:
+        await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
+    assert _code(early) == "plan_state_invalid"
+
     draft = _version(await t.svc.set_plan_state(vid, PlanStateSet(state="draft")))
-    assert (draft.state, draft.resolved_at) == ("draft", None)
+    assert draft.state == "draft"
+    assert [(s.name, s.passed_at) for s in draft.steps] == [("Anders", None)]
     assert {line.name for line in draft.lines} == {None}
+
+    await t.svc.pass_next_step(vid)
+    with pytest.raises(ConflictError) as none_left:
+        await t.svc.pass_next_step(vid)
+    assert _code(none_left) == "plan_no_step_left"
+    done = _version(await t.svc.set_plan_state(vid, PlanStateSet(state="in_force")))
+    assert (done.state, [s.name for s in done.steps]) == ("in_force", ["Anders"])
+    with pytest.raises(ConflictError) as over:
+        await t.svc.pass_next_step(vid)
+    assert _code(over) == "plan_state_invalid"
+    step = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_PLAN_STEP)
+            .where(AuditEntry.target_id == str(plan.id))
+            .order_by(AuditEntry.id.desc())
+        )
+    ).first()
+    assert step is not None
+    assert (step.data["step"], step.data["gremiumId"]) == ("Anders", None)
+    assert step.data["voteId"] is None
+
+
+async def test_a_budget_without_steps_goes_from_draft_into_force(session: AsyncSession) -> None:
+    """§000792: without steps the draft comes into force, balanced and with its names."""
+    t = await _tree(session)
+    plan = await _balanced_draft(t)
+    vid = _version(plan).id
+    with pytest.raises(ConflictError) as no_step:
+        await t.svc.pass_next_step(vid)
+    assert _code(no_step) == "plan_no_step_left"
+    await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(99)))
+    with pytest.raises(ValidationProblem) as unbalanced:
+        await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
+    assert _code(unbalanced) == "plan_not_balanced"
+    await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(100)))
+    done = _version(await t.svc.set_plan_state(vid, PlanStateSet(state="in_force")))
+    assert (done.state, done.steps) == ("in_force", ())
+    assert {line.name for line in done.lines} == {"Beiträge", "Zuschüsse", "Fachschaften", "AKs"}
+    with pytest.raises(ConflictError) as back:
+        await t.svc.set_plan_state(vid, PlanStateSet(state="draft"))
+    assert _code(back) == "plan_state_invalid"
+
+
+async def test_create_a_cost_centre_in_a_draft(session: AsyncSession) -> None:
+    """§000830: the cost center and its line come in one request, only in a draft."""
+    t = await _tree(session)
+    await _steps(t, "Beschluss")
+    plan = await _balanced_draft(t)
+    vid = _version(plan).id
+    out = await t.svc.create_plan_node(
+        vid, PlanNodeCreate(parentId=t.exp.id, key="3", name="Sport", amount=D(5))
+    )
+    node = await session.scalar(
+        select(Budget).where(Budget.parent_id == t.exp.id, Budget.key == "3")
+    )
+    assert node is not None
+    assert (node.side, node.path_key.endswith("-8-3")) == ("expense", True)
+    assert _amounts(_version(out))[node.id] == D(5)
+    assert _amounts(_version(out))[t.exp.id] == D(105)
+    direct = await t.svc.create_plan_node(
+        vid, PlanNodeCreate(parentId=t.top.id, key="2", name="Spenden", side="income", amount=D(5))
+    )
+    assert len(_version(direct).lines) == 6
+    for payload, error, code in (
+        (PlanNodeCreate(parentId=t.top.id, key="9", name="X"), ValidationProblem, "plan_side_missing"),  # noqa: E501
+        (PlanNodeCreate(parentId=t.exp.id, key="3", name="X"), ConflictError, "budget_key_exists"),
+    ):
+        with pytest.raises(error) as exc:
+            await t.svc.create_plan_node(vid, payload)
+        assert _code(exc) == code
+    other = await t.svc.create_node(BudgetNodeCreate(key=f"O{uuid.uuid4().hex[:8]}", name="QS"))
+    with pytest.raises(ValidationProblem) as foreign:
+        await t.svc.create_plan_node(vid, PlanNodeCreate(parentId=other.id, key="1", name="X"))
+    assert _code(foreign) == "plan_line_node_invalid"
+    await t.svc.pass_next_step(vid)
+    with pytest.raises(ConflictError) as locked:
+        await t.svc.create_plan_node(vid, PlanNodeCreate(parentId=t.exp.id, key="4", name="X"))
+    assert _code(locked) == "plan_version_not_draft"
 
 
 async def test_only_a_draft_can_be_edited(session: AsyncSession) -> None:
     """§000793: a write to a version that is no draft answers 409 plan_version_locked."""
     t = await _tree(session)
+    await _steps(t, "Beschluss")
     vid = _version(await _balanced_draft(t)).id
-    await t.svc.set_plan_state(vid, PlanStateSet(state="resolved"))
+    await t.svc.pass_next_step(vid)
     for write in (
         t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(1))),
         t.svc.delete_line(vid, t.exp_a.id),
@@ -426,8 +570,6 @@ async def test_nachtrag(session: AsyncSession) -> None:
 
 
 async def _in_force_from(t: Tree, version_id: uuid.UUID) -> PlanOut:
-    for state in ("resolved", "approved"):
-        await t.svc.set_plan_state(version_id, PlanStateSet(state=state))
     plan = await t.svc.set_plan_state(version_id, PlanStateSet(state="in_force"))
     await t.svc.session.commit()
     return plan
@@ -463,7 +605,9 @@ async def test_a_closed_year_refuses_plan_writes(session: AsyncSession) -> None:
     for write in (
         t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(1))),
         t.svc.delete_line(vid, t.exp_a.id),
-        t.svc.set_plan_state(vid, PlanStateSet(state="resolved")),
+        t.svc.set_plan_state(vid, PlanStateSet(state="in_force")),
+        t.svc.pass_next_step(vid),
+        t.svc.create_plan_node(vid, PlanNodeCreate(parentId=t.exp.id, key="7", name="X")),
         t.svc.create_nachtrag(t.top.id, t.fy.id),
         t.svc.create_plan(t.top.id, nxt.id, PlanCreate()),
     ):
@@ -517,7 +661,7 @@ async def test_delete_of_a_cost_centre_in_a_decided_plan(session: AsyncSession) 
     assert await session.scalar(
         select(BudgetPlanLine.id).where(BudgetPlanLine.budget_id == leaf.id)
     ) is None
-    await t.svc.set_plan_state(_version(plan).id, PlanStateSet(state="resolved"))
+    await t.svc.set_plan_state(_version(plan).id, PlanStateSet(state="in_force"))
     await session.commit()
     with pytest.raises(ConflictError) as exc:
         await t.svc.delete_node(t.exp_b.id)
@@ -539,11 +683,9 @@ async def test_each_plan_change_is_audited(session: AsyncSession) -> None:
         "budget_plan_line_set",
         "budget_plan_line_set",
         "budget_plan_state",
-        "budget_plan_state",
-        "budget_plan_state",
     ]
     assert {r.actor for r in rows} == {"tester"}
     assert rows[0].data["number"] == 0
     assert rows[2].data["raised"] == {str(t.exp.id): "60"}
-    assert (rows[-1].data["before"], rows[-1].data["after"]) == ("approved", "in_force")
+    assert (rows[-1].data["before"], rows[-1].data["after"]) == ("draft", "in_force")
     assert rows[-1].data["versionId"] == str(plan.versions[0].id)

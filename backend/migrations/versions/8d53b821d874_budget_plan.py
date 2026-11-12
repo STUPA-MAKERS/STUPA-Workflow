@@ -16,7 +16,7 @@ Idempotent. A fresh database already gets the columns and the tables from the
 database gets them through ``IF NOT EXISTS``.
 
 Revision ID: 8d53b821d874
-Revises: 491d6435ea48
+Revises: 3d95c7b1f9e6
 Create Date: 2026-11-12 17:00:00
 """
 
@@ -27,7 +27,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "8d53b821d874"
-down_revision: str | None = "491d6435ea48"
+down_revision: str | None = "3d95c7b1f9e6"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -69,16 +69,15 @@ _UPGRADE: tuple[str, ...] = (
         plan_id uuid NOT NULL,
         number integer NOT NULL,
         state text NOT NULL DEFAULT 'draft',
-        resolved_at timestamptz,
-        approved_at timestamptz,
         in_force_at timestamptz,
+        steps jsonb NOT NULL DEFAULT '[]'::jsonb,
         CONSTRAINT pk_budget_plan_version PRIMARY KEY (id),
         CONSTRAINT fk_budget_plan_version_plan_id_budget_plan
             FOREIGN KEY (plan_id) REFERENCES budget_plan (id) ON DELETE CASCADE,
         CONSTRAINT uq_budget_plan_version_plan_id_number UNIQUE (plan_id, number),
         CONSTRAINT ck_budget_plan_version_budget_plan_version_number CHECK (number >= 0),
         CONSTRAINT ck_budget_plan_version_budget_plan_version_state
-            CHECK (state IN ('draft', 'resolved', 'approved', 'in_force', 'replaced'))
+            CHECK (state IN ('draft', 'in_progress', 'in_force', 'replaced'))
     )
     """,
     """
@@ -87,7 +86,7 @@ _UPGRADE: tuple[str, ...] = (
     """,
     """
     CREATE UNIQUE INDEX IF NOT EXISTS uq_budget_plan_version_open
-        ON budget_plan_version (plan_id) WHERE state IN ('draft', 'resolved', 'approved')
+        ON budget_plan_version (plan_id) WHERE state IN ('draft', 'in_progress')
     """,
     """
     CREATE TABLE IF NOT EXISTS budget_plan_line (
@@ -114,9 +113,27 @@ _UPGRADE: tuple[str, ...] = (
     )
     """,
     "CREATE INDEX IF NOT EXISTS ix_budget_plan_line_budget_id ON budget_plan_line (budget_id)",
+    """
+    CREATE TABLE IF NOT EXISTS budget_plan_step (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        budget_id uuid NOT NULL,
+        position integer NOT NULL,
+        name text NOT NULL,
+        gremium_id uuid,
+        CONSTRAINT pk_budget_plan_step PRIMARY KEY (id),
+        CONSTRAINT fk_budget_plan_step_budget_id_budget
+            FOREIGN KEY (budget_id) REFERENCES budget (id) ON DELETE CASCADE,
+        CONSTRAINT fk_budget_plan_step_gremium_id_gremium
+            FOREIGN KEY (gremium_id) REFERENCES gremium (id) ON DELETE SET NULL,
+        CONSTRAINT uq_budget_plan_step_budget_id_position UNIQUE (budget_id, position),
+        CONSTRAINT ck_budget_plan_step_budget_plan_step_position CHECK (position >= 0)
+    )
+    """,
 )
 
 _DOWNGRADE: tuple[str, ...] = (
+    "DROP TABLE IF EXISTS budget_plan_step",
     "DROP TABLE IF EXISTS budget_plan_line",
     "DROP TABLE IF EXISTS budget_plan_version",
     "DROP TABLE IF EXISTS budget_plan",

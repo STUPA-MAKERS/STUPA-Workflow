@@ -16,23 +16,50 @@ PARENT_OF: dict[uuid.UUID, uuid.UUID | None] = {
 }
 
 
+_OPEN = {"name": "Beschluss", "gremiumId": None, "passedAt": None}
+_DONE = {"name": "Beschluss", "gremiumId": None, "passedAt": "2026-11-12T10:00:00+00:00"}
+
+
+def test_next_step() -> None:
+    assert plan_rules.next_step([]) is None
+    assert plan_rules.next_step([_DONE, _OPEN, _OPEN]) == 1
+    assert plan_rules.next_step([_DONE]) is None
+
+
 @pytest.mark.parametrize(
-    ("current", "target", "allowed"),
+    ("state", "steps", "allowed"),
     [
-        ("draft", "resolved", True),
-        ("resolved", "approved", True),
-        ("approved", "in_force", True),
-        ("resolved", "draft", True),
-        ("draft", "approved", False),
-        ("approved", "draft", False),
-        ("in_force", "replaced", False),
-        ("in_force", "draft", False),
-        ("draft", "draft", False),
+        ("draft", [], True),
+        ("draft", [_OPEN], False),
+        ("in_progress", [_DONE], True),
+        ("in_progress", [_DONE, _OPEN], False),
+        ("in_force", [], False),
+        ("replaced", [_DONE], False),
     ],
 )
-def test_move_allowed(current: str, target: str, allowed: bool) -> None:
-    """§000792: one step forward, and resolved can go back to draft."""
-    assert plan_rules.move_allowed(current, target) is allowed
+def test_can_enter_force(state: str, steps: list[dict[str, object]], allowed: bool) -> None:
+    """§000792: into force after the last step, or from draft without steps."""
+    assert plan_rules.can_enter_force(state, steps) is allowed
+
+
+def test_can_return_to_draft() -> None:
+    """§000792: only a version that passes its steps moves back to draft."""
+    assert [plan_rules.can_return_to_draft(s) for s in ("in_progress", "draft", "in_force")] == [
+        True, False, False,
+    ]
+
+
+def test_step_snapshot_and_pass() -> None:
+    """§000824: a version keeps the steps of its budget and the time of each one."""
+    gremium = uuid.uuid4()
+    steps = plan_rules.step_snapshot([("Beschluss", gremium), ("Genehmigung", None)])
+    assert steps == [
+        {"name": "Beschluss", "gremiumId": str(gremium), "passedAt": None},
+        {"name": "Genehmigung", "gremiumId": None, "passedAt": None},
+    ]
+    passed = plan_rules.with_step_passed(steps, 0, "2026-11-12T10:00:00+00:00")
+    assert [s["passedAt"] for s in passed] == ["2026-11-12T10:00:00+00:00", None]
+    assert steps[0]["passedAt"] is None
 
 
 def test_version_name() -> None:

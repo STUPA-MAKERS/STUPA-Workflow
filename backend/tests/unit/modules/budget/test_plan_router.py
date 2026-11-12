@@ -20,6 +20,7 @@ from app.modules.auth.principal import Principal
 from app.modules.budget.plan_schemas import (
     PlanLineOut,
     PlanOut,
+    PlanStepsOut,
     PlanSwitchOut,
     PlanVersionOut,
     SideOut,
@@ -101,6 +102,23 @@ class _FakePlans:
         return _plan()
 
 
+    async def get_plan_steps(self, budget_id: uuid.UUID) -> PlanStepsOut:
+        self.calls.append(("steps", budget_id))
+        return PlanStepsOut(budgetId=budget_id)
+
+    async def set_plan_steps(self, budget_id: uuid.UUID, payload: Any) -> PlanStepsOut:
+        self.calls.append(("set_steps", tuple(step.name for step in payload.steps)))
+        return PlanStepsOut(budgetId=budget_id)
+
+    async def pass_next_step(self, version_id: uuid.UUID) -> PlanOut:
+        self.calls.append(("next", version_id))
+        return _plan()
+
+    async def create_plan_node(self, version_id: uuid.UUID, payload: Any) -> PlanOut:
+        self.calls.append(("node", payload.key))
+        return _plan()
+
+
 def _client(fake: _FakePlans, *permissions: str) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_budget_tree_service] = lambda: fake
@@ -133,8 +151,13 @@ _WRITES: tuple[tuple[str, str, dict[str, Any] | None, tuple[str, Any]], ...] = (
         ("line", Decimal("10.00")),
     ),
     ("DELETE", f"/api/budget-plan-versions/{_VERSION}/lines/{_NODE}", None, ("delete_line", _NODE)),
-    ("POST", f"/api/budget-plan-versions/{_VERSION}/state", {"state": "resolved"},
-     ("state", "resolved")),
+    ("POST", f"/api/budget-plan-versions/{_VERSION}/state", {"state": "in_force"},
+     ("state", "in_force")),
+    ("PUT", f"/api/budgets/{_TOP}/plan-steps", {"steps": [{"name": "Beschluss"}]},
+     ("set_steps", ("Beschluss",))),
+    ("POST", f"/api/budget-plan-versions/{_VERSION}/steps/next", None, ("next", _VERSION)),
+    ("POST", f"/api/budget-plan-versions/{_VERSION}/cost-centres",
+     {"parentId": str(_TOP), "key": "9", "name": "Sport"}, ("node", "9")),
 )
 
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -23,6 +24,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
@@ -43,9 +45,12 @@ class BudgetPlan(UUIDPkMixin, CreatedAtMixin, Base):
 class BudgetPlanVersion(UUIDPkMixin, CreatedAtMixin, Base):
     """One version of a Haushaltsplan: the Stammplan (0) or a Nachtrag.
 
-    ``state`` is one of ``draft``, ``resolved``, ``approved``, ``in_force`` and
-    ``replaced``. The partial unique indexes keep at most one version in force and at
-    most one version before ``in_force`` per plan, also under concurrent requests.
+    ``state`` is one of ``draft``, ``in_progress``, ``in_force`` and ``replaced``.
+    ``steps`` holds the steps of the budget at the moment the version left the draft,
+    each as ``{"name", "gremiumId", "passedAt"}``, so a later change of the steps of
+    the budget does not change a decided version. It is empty in a draft. The partial
+    unique indexes keep at most one version in force and at most one version before
+    ``in_force`` per plan, also under concurrent requests.
     """
 
     __tablename__ = "budget_plan_version"
@@ -53,15 +58,16 @@ class BudgetPlanVersion(UUIDPkMixin, CreatedAtMixin, Base):
     plan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("budget_plan.id", ondelete="CASCADE"))
     number: Mapped[int] = mapped_column(Integer)
     state: Mapped[str] = mapped_column(Text, server_default="draft")
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    steps: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
     in_force_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("plan_id", "number", name="uq_budget_plan_version_plan_id_number"),
         CheckConstraint("number >= 0", name="budget_plan_version_number"),
         CheckConstraint(
-            "state IN ('draft', 'resolved', 'approved', 'in_force', 'replaced')",
+            "state IN ('draft', 'in_progress', 'in_force', 'replaced')",
             name="budget_plan_version_state",
         ),
         Index(
@@ -74,8 +80,31 @@ class BudgetPlanVersion(UUIDPkMixin, CreatedAtMixin, Base):
             "uq_budget_plan_version_open",
             "plan_id",
             unique=True,
-            postgresql_where=text("state IN ('draft', 'resolved', 'approved')"),
+            postgresql_where=text("state IN ('draft', 'in_progress')"),
         ),
+    )
+
+
+class BudgetPlanStep(UUIDPkMixin, CreatedAtMixin, Base):
+    """One step that a plan version of a budget passes before it comes into force.
+
+    The steps belong to the top-level cost center. ``position`` gives their order.
+    ``gremium_id`` names the Gremium that agrees in the step, or NULL for a step
+    outside the platform.
+    """
+
+    __tablename__ = "budget_plan_step"
+
+    budget_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("budget.id", ondelete="CASCADE"))
+    position: Mapped[int] = mapped_column(Integer)
+    name: Mapped[str] = mapped_column(Text)
+    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint("budget_id", "position", name="uq_budget_plan_step_budget_id_position"),
+        CheckConstraint("position >= 0", name="budget_plan_step_position"),
     )
 
 
