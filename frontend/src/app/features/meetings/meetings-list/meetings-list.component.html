@@ -124,9 +124,9 @@
 </div>
 
 <ng-template #loadPast>
-  <div class="mtl__more mtl__more--start">
+  <div class="mtl__more">
     <app-button variant="text" size="sm" [loading]="timeline.loadingPast()" (click)="timeline.loadMorePast()">
-      <app-icon name="history" />
+      <app-icon name="down" />
       {{ 'meetings.list.loadPast' | t }}
     </app-button>
   </div>

@@ -54,9 +54,9 @@
               <app-skeleton variant="items" [count]="6" [lead]="true" [grouped]="true" [label]="'common.loading' | t" />
             </div>
           } @else {
-          <div class="cal-list__more cal-list__more--start">
+          <div class="cal-list__more">
             <app-button variant="text" size="sm" [loading]="loading()" (click)="loadEarlier()">
-              <app-icon name="history" />
+              <app-icon name="up" />
               {{ 'calendar.list.earlier' | t }}
             </app-button>
           </div>
