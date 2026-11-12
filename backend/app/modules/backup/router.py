@@ -142,7 +142,7 @@ async def get_backup(backup_id: UUID, service: ServiceDep, _admin: AdminDep) -> 
 
 @router.post(
     "",
-    response_model=BackupJobOut,
+    response_model=BackupOut,
     status_code=status.HTTP_202_ACCEPTED,
     responses=_errors(401, 403, 503),
 )
@@ -152,11 +152,13 @@ async def create_backup(
     session: DbSession,
     request: Request,
     admin: AdminDep,
-) -> BackupJobOut:
+) -> BackupOut:
     """Create a catalogue row and enqueue the archive build.
 
     Answers 202. The worker does the dump, so the row starts ``pending``. The enqueue
-    runs after the commit, so the worker always finds the row.
+    runs after the commit, so the worker always finds the row. The answer is the whole
+    row, because the admin page puts it at the top of the list as it arrives: a bare
+    id and status shows no date and an unknown kind until the poll replaces it.
     """
     _require_enabled(service)
     row = await service.create_row(kind="manual", actor=admin.sub, note=body.note)
@@ -164,7 +166,7 @@ async def create_backup(
     queue = backup_queue_from_pool(getattr(request.app.state, "arq_pool", None))
     if queue is not None:
         await queue.enqueue_create(row.id)
-    return BackupJobOut(id=row.id, status=row.status)
+    return BackupOut.model_validate(row)
 
 
 @router.patch("/{backup_id}", response_model=BackupOut, responses=_errors(401, 403, 404))
