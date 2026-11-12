@@ -21,6 +21,7 @@ import {
 import { ApiClient } from '@core/api/api-client.service';
 import { TicketsApiService } from '@core/api/tickets.service';
 import { TodosApiService } from '@core/api/todos.service';
+import { FeatureService } from '@core/features/feature.service';
 import { AuthService } from '@core/auth/auth.service';
 import { WsService } from '@core/ws/ws.service';
 import { NavService } from './nav.service';
@@ -61,6 +62,9 @@ export const LIVE_MAX_PAGES = 4;
  *   service follows `nextCursor` until a live meeting shows up (see
  *   {@link LIVE_PAGE_LIMIT}).
  *
+ * A source of a feature that is off is not asked: the To-Dos count 0, the tickets give no
+ * count, and the meetings entry does not show, so no meeting is live.
+ *
  * Both requests skip the global loading overlay (`skipLoading` in `ApiClient`): a mark in
  * the rail must never cover the page.
  *
@@ -77,6 +81,7 @@ export class RailStatusService {
   private readonly nav = inject(NavService);
   private readonly tickets = inject(TicketsApiService);
   private readonly todos = inject(TodosApiService);
+  private readonly features = inject(FeatureService);
 
   private readonly _taskCount = signal<number | null>(null);
   private readonly _ticketCount = signal<number | null>(null);
@@ -136,15 +141,17 @@ export class RailStatusService {
   }
 
   private load(): Observable<{ tasks: number | null; tickets: number | null; live: boolean }> {
-    const todos = this.todos.mine().pipe(
-      map((m) => m.items.length),
-      catchError(() => of(0)),
-    );
+    const todos = this.features.isOn('todos')
+      ? this.todos.mine().pipe(
+          map((m) => m.items.length),
+          catchError(() => of(0)),
+        )
+      : of(0);
     const tasks = forkJoin({ items: this.api.listTasks(), todos }).pipe(
       map(({ items, todos: open }) => items.length + open),
       catchError(() => of(null)),
     );
-    const tickets = this.auth.can('ticket.manage')
+    const tickets = this.features.isOn('tickets') && this.auth.can('ticket.manage')
       ? this.tickets.counts().pipe(
           map((c) => c.new),
           catchError(() => of(null)),

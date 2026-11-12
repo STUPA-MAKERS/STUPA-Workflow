@@ -5,6 +5,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { BrandingService } from './branding.service';
+import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 
@@ -58,6 +59,31 @@ describe('BrandingService', () => {
     svc.init();
     http.expectOne('/api/site-config').flush({ version: 1, branding: {} });
     expect(svc.appName()).toBe(i18n.translate('app.title'));
+  });
+
+  /** Spec 000758: the public config names the state of each feature. */
+  it('passes the feature states of the config on', async () => {
+    const features = TestBed.inject(FeatureService);
+    svc.init();
+    http.expectOne('/api/site-config').flush({ version: 1, branding: {}, features: { todos: false } });
+    await features.ready;
+    expect(features.isOn('todos')).toBe(false);
+    expect(features.isOn('calendar')).toBe(true);
+  });
+
+  it('lets the route guard go on when the config does not load', async () => {
+    const features = TestBed.inject(FeatureService);
+    svc.init();
+    http.expectOne('/api/site-config').flush(null, { status: 500, statusText: 'x' });
+    await expect(features.ready).resolves.toBeUndefined();
+  });
+
+  it('asks past the HTTP cache after a save of the switches in this browser', () => {
+    TestBed.inject(FeatureService).saved({ todos: false });
+    svc.init();
+    const req = http.expectOne((r) => r.url === '/api/site-config');
+    expect(req.request.params.get('v')).toMatch(/^\d+$/);
+    req.flush({ version: 1, branding: {} });
   });
 
   it('reads the Gravatar switch; a config without it counts as on', () => {

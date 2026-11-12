@@ -85,6 +85,9 @@ Keys that need a note:
   alle" shows the Termin to each signed-in person, "Öffentlich" also to a person without
   a sign-in. It is separate from `calendar.manage`, so no Termin is visible to all by
   accident.
+- `admin.features`: switch the features of the platform on and off (/admin/features).
+  A switch changes the platform for every person, so the key is separate from
+  `admin.site`. No OAuth scope carries it, so an agent token never switches a feature.
 """
 
 from __future__ import annotations
@@ -137,4 +140,5 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "calendar.manage",
     "calendar.publish",
     "admin.calendars",
+    "admin.features",
 )

@@ -1,6 +1,7 @@
 import type { Routes } from '@angular/router';
 import { authGuard } from '@core/auth/auth.guard';
 import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
+import { featureMatch } from '@core/features/feature.guard';
 import { ShellComponent } from './layout/shell.component';
 import {
   ADMIN_AREA_PERMISSIONS,
@@ -27,6 +28,8 @@ import {
  * route data, because route data wins over a `?frame=` query parameter in the input
  * binding. The redirects keep old bookmarks and shared links working. The old German URLs
  * (spec 000592) have no route here: `LegacyUrlSerializer` reads them as their English URLs.
+ * A route of a feature with a switch has `featureMatch`: while the feature is off, the route
+ * does not match and the catch-all route shows "Seite nicht gefunden".
  */
 export const routes: Routes = [
   {
@@ -94,6 +97,7 @@ export const routes: Routes = [
       },
       {
         path: 'protocols',
+        canMatch: [featureMatch('meetings')],
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-protocols.component').then(
@@ -102,6 +106,7 @@ export const routes: Routes = [
       },
       {
         path: 'protocols/:id',
+        canMatch: [featureMatch('meetings')],
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-protocol-detail.component').then(
@@ -110,6 +115,7 @@ export const routes: Routes = [
       },
       {
         path: 'public-calendar',
+        canMatch: [featureMatch('calendar')],
         data: { title: 'calendar.public.title', footer: true, wide: true, public: true },
         loadComponent: () =>
           import('./features/calendar/calendar.component').then((m) => m.CalendarComponent),
@@ -124,6 +130,7 @@ export const routes: Routes = [
       },
       {
         path: 'j/:code',
+        canMatch: [featureMatch('meetings')],
         data: { title: 'guests.page.routeTitle', chrome: false },
         loadComponent: () =>
           import('./features/public-meeting/public-meeting.component').then(
@@ -177,6 +184,7 @@ export const routes: Routes = [
           },
           {
             path: 'todo/:cardId',
+            canMatch: [featureMatch('todos')],
             data: { title: 'todos.card.pageTitle', parent: ['tasks'] },
             loadComponent: () =>
               import('./pages/tasks/task-todo.component').then((m) => m.TaskTodoComponent),
@@ -193,6 +201,7 @@ export const routes: Routes = [
       },
       {
         path: 'voting/projector',
+        canMatch: [featureMatch('meetings', 'voting')],
         data: { title: 'beamer.title', gremiumPermission: 'session.manage', chrome: false },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -200,6 +209,7 @@ export const routes: Routes = [
       },
       {
         path: 'voting/projector/:id',
+        canMatch: [featureMatch('meetings', 'voting')],
         data: { title: 'beamer.title', gremiumPermission: 'session.manage', chrome: false },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -209,6 +219,7 @@ export const routes: Routes = [
       { path: 'voting/meeting/:id', redirectTo: 'voting' },
       {
         path: 'voting',
+        canMatch: [featureMatch('voting')],
         data: { title: 'nav.voting', gremiumPermission: VOTING_GREMIUM_PERMISSIONS, wide: true },
         canActivateChild: [authGuard],
         loadComponent: () =>
@@ -237,6 +248,7 @@ export const routes: Routes = [
       },
       {
         path: 'meetings',
+        canMatch: [featureMatch('meetings')],
         data: {
           title: 'nav.meetings',
           permission: ['meeting.view_all'],
@@ -250,6 +262,7 @@ export const routes: Routes = [
       },
       {
         path: 'meetings/:id',
+        canMatch: [featureMatch('meetings')],
         data: {
           title: 'meetings.detailCrumb',
           parent: ['meetings'],
@@ -300,6 +313,7 @@ export const routes: Routes = [
       },
       {
         path: 'budget',
+        canMatch: [featureMatch('budget')],
         data: { title: 'nav.budget', permission: BUDGET_PERMISSIONS, allowScopedBudgetView: true, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -316,6 +330,7 @@ export const routes: Routes = [
       },
       {
         path: 'expenses',
+        canMatch: [featureMatch('budget')],
         data: { title: 'nav.expenses', permission: BUDGET_PERMISSIONS, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -323,6 +338,7 @@ export const routes: Routes = [
       },
       {
         path: 'invoices',
+        canMatch: [featureMatch('invoices')],
         data: { title: 'nav.invoices', permission: BUDGET_PERMISSIONS, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -330,6 +346,7 @@ export const routes: Routes = [
       },
       {
         path: 'tickets',
+        canMatch: [featureMatch('tickets')],
         data: { title: 'nav.tickets', permission: 'ticket.manage', allowReporter: true, wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/tickets/tickets.component').then((m) => m.TicketsComponent),
@@ -349,6 +366,7 @@ export const routes: Routes = [
       },
       {
         path: 'calendar',
+        canMatch: [featureMatch('calendar')],
         data: { title: 'nav.calendar', wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -356,12 +374,14 @@ export const routes: Routes = [
       },
       {
         path: 'todos',
+        canMatch: [featureMatch('todos')],
         data: { title: 'nav.todos', wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/todos/todos.component').then((m) => m.TodosComponent),
       },
       {
         path: 'todos/:boardId',
+        canMatch: [featureMatch('todos')],
         data: { title: 'nav.todos', wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/todos/todos.component').then((m) => m.TodosComponent),
@@ -377,6 +397,7 @@ export const routes: Routes = [
         children: [
           {
             path: 'cost-centres',
+            canMatch: [featureMatch('budget')],
             data: {
               title: 'budget.tree.title',
               permission: 'budget.structure',
@@ -547,6 +568,7 @@ export const routes: Routes = [
           },
           {
             path: 'calendars',
+            canMatch: [featureMatch('calendar')],
             data: { title: 'admin.calendars.title', permission: 'admin.calendars', parent: ['admin'] },
             canActivate: [authGuard],
             loadComponent: () =>
@@ -560,6 +582,15 @@ export const routes: Routes = [
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/webhooks/webhooks.component').then((m) => m.WebhooksComponent),
+          },
+          {
+            path: 'features',
+            data: { title: 'admin.features.title', permission: ['admin.features'], parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/features/features.component').then(
+                (m) => m.FeaturesComponent,
+              ),
           },
           {
             path: 'help-tickets',
@@ -601,6 +632,7 @@ export const routes: Routes = [
           },
           {
             path: 'delegations',
+            canMatch: [featureMatch('meetings')],
             data: { title: 'admin.deleg.title', permission: 'admin.delegations', parent: ['admin'] },
             canActivate: [authGuard],
             loadComponent: () =>

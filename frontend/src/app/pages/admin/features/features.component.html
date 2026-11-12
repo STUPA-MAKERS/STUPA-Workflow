@@ -1,0 +1,65 @@
+<section class="ft admin-page">
+  <app-page-header [flush]="true" [title]="'admin.features.title' | t">
+    <app-breadcrumbs crumbs />
+    @if (state() === 'ok' && dirty()) {
+      <app-button actions variant="text" [disabled]="saving()" (click)="discard()">
+        {{ 'admin.helpTickets.discard' | t }}
+      </app-button>
+    }
+  </app-page-header>
+
+  <app-load-state
+    [state]="state()"
+    [forbiddenText]="'admin.features.forbidden' | t"
+    [errorText]="'admin.helpTickets.loadError' | t"
+    (retry)="load()"
+  >
+    <ng-template #loading>
+      <div class="rowgroup rowgroup--settings" aria-hidden="true">
+        @for (key of keys; track key) {
+          <div class="ft__row ft__row--skel">
+            <span class="ft__label">{{ labels[key] | t }}</span>
+            <span class="skel-box ft__skelSwitch skel-in"></span>
+          </div>
+        }
+      </div>
+      <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
+    </ng-template>
+    <ng-template #content>
+      @if (uses().length) {
+        <app-note class="ft__uses" kind="error" icon="alert" role="alert">
+          <ul class="ft__useList">
+            @for (use of uses(); track $index) {
+              <li>{{ useText(use) }}</li>
+            }
+          </ul>
+        </app-note>
+      }
+      <form class="rowgroup rowgroup--settings" (submit)="$event.preventDefault(); save()">
+        @for (key of keys; track key) {
+          <app-switch
+            class="ft__row"
+            [checked]="shown(key)"
+            [disabled]="!!lockedBy()[key]"
+            [hint]="hint(key)"
+            (checkedChange)="set(key, $event)"
+            >{{ labels[key] | t }}</app-switch
+          >
+        }
+      </form>
+    </ng-template>
+  </app-load-state>
+
+  @if (state() === 'ok' && dirty()) {
+    <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" (activate)="save()" />
+  }
+</section>
+
+<app-confirm-dialog
+  [open]="confirming()"
+  [title]="'admin.features.confirmTitle' | t"
+  [body]="confirmBody()"
+  [confirmLabel]="'admin.features.confirmAction' | t"
+  (confirm)="confirmed()"
+  (cancel)="confirming.set(false)"
+/>

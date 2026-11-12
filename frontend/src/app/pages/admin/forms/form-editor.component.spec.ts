@@ -197,6 +197,15 @@ describe('FormEditorComponent', () => {
     expect(c.errorsFor(0, 0)).not.toContain('label (de) is required');
   });
 
+  /** Spec 000761: an Antragsart cannot get a budget while Budget is off. */
+  it('has no "Mit Budget" while Budget is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['budget']));
+    const { fixture } = await setup(draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]));
+    localStorage.removeItem('ap.features.off');
+    fixture.detectChanges();
+    expect(screen.queryByText('Mit Budget')).toBeNull();
+  });
+
   /** The saved state is the new baseline, so "Speichern" goes away. */
   it('toggles "Mit Budget" and persists it on the type (budget)', async () => {
     const { fixture, updateApplicationType } = await setup(

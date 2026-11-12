@@ -17,11 +17,12 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from starlette.requests import HTTPConnection
 
 from app.db import dispose_engine, get_sessionmaker
 from app.deps import EmailSessionResolver, get_email_session_resolver
+from app.feature_routes import feature_gate
 from app.logging_config import configure_logging
 from app.middleware import (
     CsrfMiddleware,
@@ -285,7 +286,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
     )
 
-    app.include_router(api_router)
+    app.include_router(api_router, dependencies=[Depends(feature_gate)])
     app.include_router(oauth_well_known_router)
     use_problem_json_contract(app)
     return app

@@ -14,6 +14,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FeatureService } from '@core/features/feature.service';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -105,6 +106,7 @@ let nextId = 0;
 export class HelpMenuComponent {
   private readonly auth = inject(AuthService);
   private readonly help = inject(HelpService);
+  private readonly features = inject(FeatureService);
   readonly branding = inject(BrandingService);
   private readonly theme = inject(ThemeService);
   private readonly display = inject(DisplaySettingsService);
@@ -135,8 +137,15 @@ export class HelpMenuComponent {
     bottom: null,
   });
 
-  /** "Problem melden" shows with a session, or for a visitor while the admin allows it. */
-  readonly canReport = computed(() => this.auth.isAuthenticated() || this.branding.ticketsPublic());
+  /**
+   * "Problem melden" shows with a session, or for a visitor while the admin allows it. It
+   * does not show while `Tickets` is off.
+   */
+  readonly canReport = computed(
+    () =>
+      this.features.isOn('tickets') &&
+      (this.auth.isAuthenticated() || this.branding.ticketsPublic()),
+  );
 
   /** The link without the scheme, as the second line: it wraps, it is never cut. */
   readonly wikiLabel = computed(() => this.branding.wikiUrl().replace(/^https?:\/\//, ''));

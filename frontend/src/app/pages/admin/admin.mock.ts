@@ -18,6 +18,7 @@ import type {
   FormDraft,
   GuestSettings,
   MeetingSettings,
+  FeatureSwitches,
   HelpTicketsSettings,
   LoginSettings,
   MailTemplate,
@@ -388,6 +389,17 @@ export const MOCK_HELP_TICKETS: HelpTicketsSettings = {
   publicEnabled: true,
   notifyNew: true,
   retentionMonths: 12,
+};
+
+/** The feature switches of the mock: every feature on, as the backend defaults them. */
+export const MOCK_FEATURES: FeatureSwitches = {
+  todos: true,
+  calendar: true,
+  meetings: true,
+  voting: true,
+  budget: true,
+  invoices: true,
+  tickets: true,
 };
 
 /** The SSO login lifetimes of the mock: the defaults of the server. */

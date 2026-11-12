@@ -30,6 +30,7 @@ from app.modules.calendar.schemas import EntryOut
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.rules import MeetingRules
+from app.modules.site_config.features import Feature, feature_on
 from app.modules.todos.models import TodoBoard, TodoCard, TodoCardEvent
 from app.modules.todos.service import TodoService
 from app.shared.search import escape_like
@@ -159,6 +160,9 @@ class CalendarEntries:
         newest: bool,
         limit: int | None,
     ) -> list[EntryOut]:
+        """The meetings the principal may read; none while `Sitzungen` is off."""
+        if not await feature_on(self.session, Feature.MEETINGS):
+            return []
         visible, delegated = await MeetingRules(self.session).meeting_read_scope(principal)
         scope = (
             ()
@@ -185,17 +189,28 @@ class CalendarEntries:
     async def between(
         self, principal: Principal, start: date, end: date, *, only_mine: bool = False
     ) -> tuple[EntryOut, ...]:
-        """The entries with a day in the span, both ends included, sorted by day."""
+        """The entries with a day in the span, both ends included, sorted by day.
+
+        The meetings stay out while `Sitzungen` is off, the cards and the Events while
+        `Boards` is off.
+        """
         viewer = await self.appointments.viewer(principal)
         todos = TodoService(self.session)
+        boards_on = await feature_on(self.session, Feature.TODOS)
         meetings = await self._meetings(
             principal, Meeting.date >= start, Meeting.date <= end, newest=False, limit=None
         )
-        cards = await todos.calendar_due_between(
-            principal, start=start, end=end, only_mine=only_mine
+        cards = (
+            await todos.calendar_due_between(principal, start=start, end=end, only_mine=only_mine)
+            if boards_on
+            else []
         )
-        events = await todos.calendar_events_between(
-            principal, start=start, end=end, only_mine=only_mine
+        events = (
+            await todos.calendar_events_between(
+                principal, start=start, end=end, only_mine=only_mine
+            )
+            if boards_on
+            else []
         )
         termine = await self.appointments.between(viewer, start, end, only_mine=only_mine)
         external = await ExternalCalendarService(self.session).between(principal, start, end)
@@ -224,8 +239,17 @@ class CalendarEntries:
         meetings = await self._meetings(
             principal, Meeting.title.ilike(pattern, escape="\\"), newest=True, limit=PER_KIND
         )
-        cards = await todos.calendar_due_between(principal, pattern=pattern, limit=PER_KIND)
-        events = await todos.calendar_events_between(principal, pattern=pattern, limit=PER_KIND)
+        boards_on = await feature_on(self.session, Feature.TODOS)
+        cards = (
+            await todos.calendar_due_between(principal, pattern=pattern, limit=PER_KIND)
+            if boards_on
+            else []
+        )
+        events = (
+            await todos.calendar_events_between(principal, pattern=pattern, limit=PER_KIND)
+            if boards_on
+            else []
+        )
         termine = await self.appointments.matching(viewer, pattern, PER_KIND)
         external = await ExternalCalendarService(self.session).matching(
             principal, pattern, PER_KIND

@@ -120,6 +120,7 @@ from app.modules.gremien.role_schemas import (
 from app.modules.livevote.open_window import MeetingSettingsService
 from app.modules.site_config.branding import Branding
 from app.modules.site_config.cd_logos import LogoSlot
+from app.modules.site_config.features import FeatureSwitches
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
@@ -205,6 +206,8 @@ TypesAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
 #: Deleting an application type is destructive, so it has its own permission.
 TypesDeleteAdmin = Annotated[Principal, Depends(require_principal("admin.types_delete"))]
 SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
+#: The feature switches change the platform for every person, so they have their own key.
+FeaturesAdmin = Annotated[Principal, Depends(require_principal("admin.features"))]
 RolesAdmin = Annotated[Principal, Depends(require_principal("admin.roles"))]
 WebhookAdmin = Annotated[Principal, Depends(require_principal("webhook.manage"))]
 UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
@@ -1440,6 +1443,36 @@ async def put_help_tickets(
     422. An open branding draft keeps its other changes and takes the new values.
     """
     return await service.put_help_tickets(payload, principal.sub)
+
+
+@router.get(
+    "/features",
+    response_model=FeatureSwitches,
+    dependencies=[Depends(require_principal("admin.features"))],
+    responses=_errors(401, 403),
+)
+async def get_features(service: SiteServiceDep) -> FeatureSwitches:
+    """Read the stored feature switches of the active site configuration."""
+    return await service.features()
+
+
+@router.put(
+    "/features",
+    response_model=FeatureSwitches,
+    responses=_errors(401, 403, 409, 422),
+)
+async def put_features(
+    payload: FeatureSwitches, service: SiteServiceDep, principal: FeaturesAdmin
+) -> FeatureSwitches:
+    """Save the feature switches as a new active site-config version.
+
+    A switch that goes off while the active flow or an Antragsart uses the feature
+    gives 409 ``feature_in_use``; ``errors`` names each use. An unknown feature key
+    gives 422.
+    """
+    saved = await service.put_features(payload, principal.sub)
+    await service.session.commit()
+    return saved
 
 
 @public_router.get("/site-config", response_model=PublicSiteConfigOut)

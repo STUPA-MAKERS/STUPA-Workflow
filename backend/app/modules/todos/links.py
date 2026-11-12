@@ -64,6 +64,7 @@ from app.modules.calendar.models import Appointment
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.site_config.features import Feature, active_features
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import Ticket
 from app.modules.tickets.service import format_number
@@ -97,6 +98,17 @@ LinkRef = tuple[str, uuid.UUID]
 #: which holds the report of a person outside the team, the gremium, and the cost centre,
 #: which every reader of the card sees anyway.
 GRANT_KINDS: frozenset[str] = frozenset(LINK_KINDS) - {"ticket", "gremium", "budget"}
+#: The feature that a link kind belongs to; a kind without an entry has no switch.
+LINK_FEATURE: dict[str, Feature] = {
+    "meeting": Feature.MEETINGS,
+    "agenda_item": Feature.MEETINGS,
+    "vote": Feature.VOTING,
+    "appointment": Feature.CALENDAR,
+    "invoice": Feature.INVOICES,
+    "expense": Feature.BUDGET,
+    "budget": Feature.BUDGET,
+    "ticket": Feature.TICKETS,
+}
 #: No id passes the gate of its kind without the rule.
 NONE: frozenset[uuid.UUID] = frozenset()
 
@@ -203,6 +215,12 @@ def card_url(card_id: uuid.UUID) -> str:
     return f"/todos?card={card_id}"
 
 
+async def link_kinds_on(session: AsyncSession) -> tuple[str, ...]:
+    """Return the link kinds whose feature is on, in the order of the link picker."""
+    on = await active_features(session)
+    return tuple(k for k in LINK_KINDS if k not in LINK_FEATURE or LINK_FEATURE[k] in on)
+
+
 class LinkResolver:
     """Resolve and search link targets for one principal."""
 
@@ -303,7 +321,11 @@ class LinkResolver:
         principal: Principal,
         opened: Mapping[str, AbstractSet[uuid.UUID]] | None,
     ) -> dict[LinkRef, Resolved]:
-        """Run the handler of each kind; ``opened`` ids pass the gate of their kind."""
+        """Run the handler of each kind; ``opened`` ids pass the gate of their kind.
+
+        A target of a feature that is off is not accessible
+        (§F/administration/admin/000758).
+        """
         handlers = {
             "application": self._applications,
             "meeting": self._meetings,
@@ -323,13 +345,13 @@ class LinkResolver:
                 principal,
                 frozenset(opened.get(kind, ())) if opened is not None else NONE,
             )
-            for kind in LINK_KINDS
+            for kind in await link_kinds_on(self.session)
             if by_kind.get(kind)
         }
         return {
-            (kind, target_id): hits.get(target_id, HIDDEN)
-            for kind, hits in found.items()
-            for target_id in by_kind[kind]
+            (kind, target_id): found.get(kind, {}).get(target_id, HIDDEN)
+            for kind, ids in by_kind.items()
+            for target_id in ids
         }
 
     async def readable(self, kind: str, target_id: uuid.UUID, principal: Principal) -> bool:
@@ -694,12 +716,14 @@ class LinkResolver:
         """Search the link targets that the principal may read, ``PER_KIND`` per kind.
 
         A term below ``MIN_TERM`` characters finds the newest cards for the kind ``todo``
-        (``recent_cards``) and nothing for any other kind.
+        (``recent_cards``) and nothing for any other kind. A kind of a feature that is
+        off finds nothing (§F/administration/admin/000758).
         """
         term = q.strip()
         if len(term) < MIN_TERM:
             return await self.recent_cards(principal) if kind == "todo" else []
-        kinds: Sequence[str] = LINK_KINDS if kind == "all" else (kind,)
+        on = await link_kinds_on(self.session)
+        kinds: Sequence[str] = on if kind == "all" else tuple(k for k in on if k == kind)
         per_kind = [
             await self._kind_targets(current, term, principal, exclude_card_id) for current in kinds
         ]

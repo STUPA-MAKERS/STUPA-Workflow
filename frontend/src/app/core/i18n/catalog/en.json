@@ -4222,5 +4222,17 @@
   "admin.audit.action.budget_plan_switch": "Budget plan of a cost centre switched",
   "admin.audit.action.budget_plan_version_create": "Version of a budget plan created",
   "admin.audit.action.budget_plan_state": "State of a plan version changed",
-  "admin.audit.action.budget_plan_line_set": "Plan line changed"
+  "admin.audit.action.budget_plan_line_set": "Plan line changed",
+  "admin.nav.features": "Features",
+  "admin.nav.featuresDesc": "Switch parts of the platform on and off",
+  "admin.features.title": "Features",
+  "admin.features.forbidden": "You do not have the right to switch features.",
+  "admin.features.needs": "Needs {name}",
+  "admin.features.confirmTitle": "Switch features off",
+  "admin.features.confirm": "Hidden and closed for everyone: {names}. The data stays.",
+  "admin.features.confirmAction": "Switch off",
+  "admin.features.inUse": "Cannot switch off: the application flow or an application type still uses the feature.",
+  "admin.features.use.state": "{feature}: state “{name}” in the application flow",
+  "admin.features.use.transition": "{feature}: transition “{name}” in the application flow",
+  "admin.features.use.type": "{feature}: application type “{name}”"
 }

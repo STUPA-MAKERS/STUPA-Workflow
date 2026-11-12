@@ -86,6 +86,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('admin/calendars'),
   fixed('admin/webhooks'),
   fixed('admin/help-tickets'),
+  fixed('admin/features'),
   fixed('admin/oauth-grants'),
   fixed('admin/audit'),
   fixed('admin/delegations'),

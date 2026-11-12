@@ -1,3 +1,4 @@
+import { FeatureService } from '@core/features/feature.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -58,6 +59,16 @@ describe('BudgetTreeApi', () => {
       expect(req.request.method).toBe('GET');
       expect(req.request.params.has('gremium')).toBe(false);
       req.flush([]);
+    });
+
+    /** Spec 000758: no cost centre shows on another page while Budget is off. */
+    it('gives an empty tree without a request while Budget is off', () => {
+      TestBed.inject(FeatureService).apply({ budget: false });
+      const trees: unknown[] = [];
+      api.tree().subscribe((tree) => trees.push(tree));
+      localStorage.clear();
+      expect(trees).toEqual([[]]);
+      http.expectNone(`${BASE}/budgets`);
     });
 
     it('GETs /budgets with the gremium param when provided', () => {

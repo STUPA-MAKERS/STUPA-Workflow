@@ -42,6 +42,7 @@
   <app-breadcrumbs crumbs />
 </app-page-header>
 
+@if (todayShown()) {
 <aside
   class="dash__today"
   [attr.aria-labelledby]="hasToday() ? 'dash-today-h' : null"
@@ -161,6 +162,7 @@
 
   </div>
 </aside>
+}
 
 <section class="dash__work" [attr.aria-label]="'dashboard.work.label' | t">
   @if (phone()) {

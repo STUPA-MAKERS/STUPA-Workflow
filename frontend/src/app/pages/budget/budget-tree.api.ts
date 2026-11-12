@@ -2,7 +2,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { skipLoading } from '@stupa-makers/ui-kit';
 import { cached, detailContext, listContext } from '@core/cache/cache.interceptor';
-import type { Observable } from 'rxjs';
+import { of, type Observable } from 'rxjs';
+import { FeatureService } from '@core/features/feature.service';
 import { map } from 'rxjs/operators';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
@@ -495,13 +496,17 @@ function queryParams(query: object): Readonly<Record<string, string>> {
 export class BudgetTreeApi {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
+  private readonly features = inject(FeatureService);
 
   /**
    * The budget and dashboard pages have their own loading indicator; every other call only fills
    * the nav or a dropdown, so it suppresses the global overlay. It is cached, because five pages
-   * ask for the whole tree and a mutation under `/budgets` drops every entry there.
+   * ask for the whole tree and a mutation under `/budgets` drops every entry there. While
+   * `Budget` is off the tree is empty without a request (spec 000758), so a filter or a
+   * choice of cost centres on another page has nothing to show.
    */
   tree(gremiumId?: string): Observable<BudgetTreeNode[]> {
+    if (!this.features.isOn('budget')) return of([]);
     const params = gremiumId ? { gremium: gremiumId } : undefined;
     return this.http.get<BudgetTreeNode[]>(`${this.base}/budgets`, {
       params,

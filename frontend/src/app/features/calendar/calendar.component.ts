@@ -1,3 +1,4 @@
+import { FeatureService } from '@core/features/feature.service';
 import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -162,6 +163,7 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
 })
 export class CalendarComponent implements OnDestroy {
   private readonly api = inject(CalendarApiService);
+  private readonly features = inject(FeatureService);
   private readonly publicApi = inject(PublicCalendarApiService);
   private readonly client = inject(ApiClient);
   private readonly i18n = inject(I18nService);
@@ -222,7 +224,11 @@ export class CalendarComponent implements OnDestroy {
   readonly gremium = signal('');
   readonly mine = signal('');
   readonly kindOptions = computed(() =>
-    FILTER_KINDS.map((kind) => ({ value: kind, label: this.i18n.translate(`calendar.kind.${kind}`) })),
+    FILTER_KINDS.filter(
+      (kind) =>
+        (kind !== 'meeting' || this.features.isOn('meetings')) &&
+        (kind !== 'card' || this.features.isOn('todos')),
+    ).map((kind) => ({ value: kind, label: this.i18n.translate(`calendar.kind.${kind}`) })),
   );
   readonly mineOptions = computed(() => [
     { value: '', label: this.i18n.translate('calendar.filter.all') },
