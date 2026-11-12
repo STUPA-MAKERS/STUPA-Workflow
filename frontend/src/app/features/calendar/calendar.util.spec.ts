@@ -258,11 +258,11 @@ describe('calendar.util', () => {
       ]);
     });
 
-    /** § 000745: a block that starts half an hour later lies on the earlier block. */
+    /** § 000745: a block that starts 45 minutes later lies on the earlier block. */
     it('lays a later entry on the earlier one', () => {
-      const other = entry('other', { startTime: '14:30:00', endTime: '15:00:00' });
+      const other = entry('other', { startTime: '14:45:00', endTime: '15:15:00' });
       const [first, second] = dayBlocks([other, timed], '2026-11-11', 8, 21);
-      expect(first).toMatchObject({ left: 0, width: 85, lane: 0, over: false });
+      expect(first).toMatchObject({ left: 0, width: 100, lane: 0, over: false });
       expect(second).toMatchObject({ left: 50, width: 50, lane: 1, over: true });
     });
 

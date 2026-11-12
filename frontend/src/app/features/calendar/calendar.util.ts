@@ -150,9 +150,7 @@ export const SHORT_BLOCK = 0.75;
  * A block that starts this many hours after the block to its left may cover it: the time
  * and the first line of the title of the earlier block stay free (§ 000745).
  */
-export const OVERLAP_HEAD = 0.5;
-/** The part of the next lane that a covered block takes below the block above it. */
-export const OVERLAP_SHARE = 0.7;
+export const OVERLAP_HEAD = 0.75;
 /** The height of an hour in the week view, in rem. It matches `--cw-hour` of the styles. */
 export const HOUR_REM = 3.5;
 
@@ -189,8 +187,8 @@ function partEnd(e: CalendarEntry, iso: string, from: number, lastHour: number):
  * (§ 000744). Entries that overlap take lanes: each takes the first lane that is free at
  * its start, and a chain of overlapping blocks divides the column by its number of lanes.
  * A block grows to the right over the lanes that are free. A block whose neighbour to the
- * right starts `OVERLAP_HEAD` later also reaches below that neighbour, so the later block
- * lies on the earlier one (§ 000745). Two blocks that start together stay side by side,
+ * right starts `OVERLAP_HEAD` later reaches to the end of the column below that neighbour,
+ * so the later block lies on the earlier one (§ 000745). Two blocks that start together stay side by side,
  * because the one above would hide the title of the other.
  */
 export function dayBlocks(
@@ -226,7 +224,7 @@ export function dayBlocks(
     const next = Math.min(lanes, ...right.map((o) => o.lane));
     const under = right.length > 0 && right.every((o) => o.lane > next || o.from >= item.from + OVERLAP_HEAD);
     const left = (item.lane / lanes) * 100;
-    return { item, left, width: Math.min(100 - left, ((next - item.lane + (under ? OVERLAP_SHARE : 0)) * 100) / lanes) };
+    return { item, left, width: under ? 100 - left : ((next - item.lane) * 100) / lanes };
   });
   return boxes.map(({ item, left, width }) => {
     const height = Math.max(item.real, MIN_BLOCK);
