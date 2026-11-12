@@ -681,7 +681,7 @@
       "to": "shared"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "gremien_overview",
       "to": "site_config"
     },
@@ -799,6 +799,11 @@
       "count": 6,
       "from": "meetings",
       "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "meetings",
+      "to": "site_config"
     },
     {
       "count": 4,
@@ -1129,6 +1134,11 @@
       "count": 16,
       "from": "todos",
       "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "todos",
+      "to": "site_config"
     },
     {
       "count": 5,
