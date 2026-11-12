@@ -80,7 +80,8 @@
   // or with the focus has a yellow edge.
   .bp__pop {
     border: var(--vh-edge) !important;
-    outline: none !important;
+    // The edge of the frosted pop is an outline (`--pop-edge`); the border replaces it.
+    --pop-edge: none !important;
   }
   .bp__row {
     @include vh.text;
