@@ -1,5 +1,5 @@
 ---
-id: "000744"
+id: "000747"
 title: An observer does not see personal fields
 kind: functional
 status: draft

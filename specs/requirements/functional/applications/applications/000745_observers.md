@@ -1,5 +1,5 @@
 ---
-id: "000742"
+id: "000745"
 title: An Antrag can have observers
 kind: functional
 status: draft

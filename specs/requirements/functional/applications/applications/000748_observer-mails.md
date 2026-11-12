@@ -1,5 +1,5 @@
 ---
-id: "000745"
+id: "000748"
 title: An observer gets the status mails
 kind: functional
 status: draft
