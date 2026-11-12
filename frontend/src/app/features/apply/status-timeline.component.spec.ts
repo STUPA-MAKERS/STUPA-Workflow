@@ -640,13 +640,46 @@ describe('StatusTimelineComponent', () => {
     expect(fire).toHaveBeenCalledTimes(1);
   });
 
+  it('shows an observer the Antrag read-only, with the name of the applicant', async () => {
+    const observed: Application = { ...app(true), canEdit: false, isOwner: false, observer: true, submittedBy: 'Luis Meyer' };
+    const fire = { id: 't9', label: 'Zurückziehen' } as never;
+    const { comp, fixture } = await setup(
+      fakeApi({ application: observed, applicantTransitions: () => of([fire]) }),
+    );
+    await screen.findByRole('heading', { level: 1 });
+    fixture.detectChanges();
+    expect(screen.getByText('Eingereicht von Luis Meyer')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).not.toBeInTheDocument();
+    expect(comp.menu()).toEqual([]);
+    expect(comp.actions()).toEqual([]);
+    expect(comp.canEdit()).toBe(false);
+    expect(comp.canUploadAttachments()).toBe(false);
+    expect(comp.lockReason()).toBeNull();
+    expect(comp.historyEntries()[0].actor).toBe('Luis Meyer');
+    expect(comp.authorName({ ...COMMENTS[1], isOwn: false })).toBe('Luis Meyer');
+  });
+
+  it('opens the observers dialog from the menu of the applicant', async () => {
+    const applicationObservers = jest.fn(() => of([]));
+    const { comp, fixture } = await setup({ ...fakeApi(), applicationObservers } as Partial<ApiClient>);
+    await screen.findByRole('heading', { level: 1 });
+    const item = comp.menu()[0].items[0];
+    expect(item.id).toBe('observers');
+    comp.onMenu(item);
+    fixture.detectChanges();
+    expect(comp.observersOpen()).toBe(true);
+    expect(await screen.findByRole('dialog', { name: 'Beobachter:innen' })).toBeInTheDocument();
+    expect(applicationObservers).toHaveBeenCalledWith(ID);
+  });
+
   it('requests the anonymization from the menu after a confirmation', async () => {
     const requestErasure = jest.fn(() => of(undefined));
     const { comp, toast, fixture } = await setup(fakeApi({ requestErasure }));
     await screen.findByRole('heading', { level: 1 });
     comp.onMenu({ id: 'other', label: 'x' });
     expect(comp.confirmErase()).toBe(false);
-    comp.onMenu(comp.menu()[0].items[0]);
+    const erase = comp.menu().flatMap((sec) => sec.items).find((i) => i.id === 'erase');
+    comp.onMenu(erase!);
     fixture.detectChanges();
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anonymisierung beantragen' }));

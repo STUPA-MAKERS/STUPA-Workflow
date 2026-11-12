@@ -82,7 +82,9 @@
                   (click)="startEdit()"
                 ><app-icon name="edit" /></app-button>
               }
-              <app-row-menu [sections]="menu()" [label]="'status.menu' | t" (selected)="onMenu($event)" />
+              @if (menu().length) {
+                <app-row-menu [sections]="menu()" [label]="'status.menu' | t" (selected)="onMenu($event)" />
+              }
             </app-sheet-bar>
 
             <p class="sheet-line ad__line ad__seps">
@@ -97,6 +99,9 @@
                 }
                 @if (app.amount !== null) {
                   <span class="ad__part"><app-amount [amount]="amount(app)" [approved]="approvedAmount(app)" /></span>
+                }
+                @if (app.submittedBy) {
+                  <span class="ad__part ell">{{ 'observers.submittedBy' | t: { name: app.submittedBy } }}</span>
                 }
               </span>
             </p>
@@ -211,6 +216,7 @@
           [draftKey]="'status.' + app.id"
           [messages]="chatMessages()"
           [canAttach]="!app.applicant?.anonymized"
+          [canPost]="!observer()"
           placeholder="status.comments.placeholder"
           (send)="sendComment($event)"
           (retry)="retryComment($event)"
@@ -220,6 +226,14 @@
           (refresh)="refreshComments(app.id)"
         />
       </app-side-sheet>
+
+      @if (!observer()) {
+        <app-observers-dialog
+          [applicationId]="app.id"
+          [open]="observersOpen()"
+          (closed)="observersOpen.set(false)"
+        />
+      }
 
       <app-confirm-dialog
         [open]="confirmErase()"

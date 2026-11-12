@@ -105,6 +105,8 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     capture: wire.capture ?? null,
     approvedAmount: wire.approvedAmount ?? null,
     decision: wire.decision ?? null,
+    observer: wire.observer ?? false,
+    submittedBy: wire.submittedBy ?? null,
   };
 }
 
@@ -125,6 +127,7 @@ export function mapApplicationListItem(
     updatedAt: wire.updatedAt,
     archivedAt: wire.archivedAt ?? null,
     stateSince: wire.stateSince ?? null,
+    observed: wire.observed ?? false,
   };
 }
 

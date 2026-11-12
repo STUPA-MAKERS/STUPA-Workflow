@@ -37,6 +37,43 @@ describe('mockApiInterceptor', () => {
     http.expectNone((r) => r.url === '/api/application-types');
   });
 
+  it('serves the observers of an application and the observer demo', async () => {
+    const { api } = setup(true);
+    const app = 'a1000000-0000-0000-0000-000000000002';
+    const [first] = await firstValueFrom(api.applicationObservers(app));
+    expect(first.email).toBe('adrian.becker@example.org');
+    const added = await firstValueFrom(api.addApplicationObserver(app, 'mara@example.org'));
+    expect((await firstValueFrom(api.applicationObservers(app))).map((o) => o.email)).toEqual([
+      'adrian.becker@example.org',
+      'mara@example.org',
+    ]);
+    await expect(firstValueFrom(api.addApplicationObserver(app, 'MARA@example.org'))).rejects.toMatchObject({
+      status: 409,
+      error: { code: 'observer_exists' },
+    });
+    await firstValueFrom(api.removeApplicationObserver(app, added.id));
+    expect(await firstValueFrom(api.applicationObservers(app))).toHaveLength(1);
+    await expect(firstValueFrom(api.endObservation('o1.sig'))).resolves.toBeNull();
+    await expect(firstValueFrom(api.endObservation('cut'))).rejects.toMatchObject({ status: 404 });
+    const observed = await firstValueFrom(api.getApplication('4f8a03b6-0000-4000-8000-000000000002'));
+    expect([observed.observer, observed.submittedBy]).toEqual([true, 'Luis Meyer']);
+    const items = (await firstValueFrom(api.applicantApplications())).items;
+    expect(items.filter((i) => i.observed).map((i) => i.title)).toEqual(['Technik für das Sommerfest']);
+  });
+
+  it('marks the second demo row observed with mockObserver', async () => {
+    const { api } = setup(true);
+    localStorage.setItem('mockObserver', '1');
+    try {
+      const page = await firstValueFrom(api.listApplications({}));
+      expect(page.items.filter((i) => i.observed).length).toBe(1);
+      const detail = await firstValueFrom(api.getApplication('a1000000-0000-0000-0000-000000000002'));
+      expect([detail.observer, detail.applicant, detail.canEdit]).toEqual([true, null, false]);
+    } finally {
+      localStorage.removeItem('mockObserver');
+    }
+  });
+
   it('passes through when the mock is disabled', () => {
     const { api, http } = setup(false);
     api.applicationTypes().subscribe();

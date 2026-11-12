@@ -85,6 +85,14 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'stop-observing',
+        data: { title: 'observers.end.title', footer: true },
+        loadComponent: () =>
+          import('./features/apply/stop-observing/stop-observing.component').then(
+            (m) => m.StopObservingComponent,
+          ),
+      },
+      {
         path: 'protocols',
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>

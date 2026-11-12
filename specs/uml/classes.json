@@ -134,6 +134,13 @@
       "to": "Application"
     },
     {
+      "column": "application_id",
+      "from": "ApplicationObserver",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
       "column": "active_form_version_id",
       "from": "ApplicationType",
       "multiplicity": "*",
@@ -1528,6 +1535,45 @@
       "name": "ApplicationLinkEvent",
       "path": "backend/app/modules/applications/models.py",
       "table": "application_link_event"
+    },
+    {
+      "attributes": [
+        {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "email",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "added_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "added_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "ApplicationObserver",
+      "module": "applications",
+      "name": "ApplicationObserver",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "application_observer"
     },
     {
       "attributes": [

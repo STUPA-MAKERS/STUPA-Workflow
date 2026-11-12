@@ -115,7 +115,15 @@ describe('mapApplication', () => {
       capture: null,
       approvedAmount: null,
       decision: null,
+      observer: false,
+      submittedBy: null,
     });
+  });
+
+  it('passes the observer flag and the applicant name of an observer through', () => {
+    const view = mapApplication({ ...wire, observer: true, submittedBy: 'Luis Meyer' }, 'de');
+    expect(view.observer).toBe(true);
+    expect(view.submittedBy).toBe('Luis Meyer');
   });
 
   it('passes the decision and the approved amount through', () => {

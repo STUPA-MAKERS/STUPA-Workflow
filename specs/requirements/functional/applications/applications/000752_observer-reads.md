@@ -7,6 +7,8 @@ owner: frederikbeimgraben
 updated: 2026-11-12
 implementation:
   - backend/app/modules/applications
+  - frontend/src/app/features/apply
+  - frontend/src/app/pages/applications
 scope:
   - backend/app/modules/applications
   - frontend/src/app/features/apply

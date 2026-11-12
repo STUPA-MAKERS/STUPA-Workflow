@@ -192,6 +192,14 @@
                             <app-icon name="archive" [size]="13" />{{ 'applications.list.archivedRow' | t }}
                           </span>
                         }
+                        @if (row.item.observed) {
+                          @if (row.stateLabel || row.typeLabel || row.item.archivedAt) {
+                            <span class="apps__dot" aria-hidden="true">·</span>
+                          }
+                          <span class="apps__archived">
+                            <app-icon name="eye" [size]="13" />{{ 'observers.observed' | t }}
+                          </span>
+                        }
                       </span>
                       <span trail class="apps__trail">
                         <app-amount [amount]="row.amount" [approved]="row.approved" layout="stack" />

@@ -154,6 +154,8 @@ const BACKEND_AUDIT_ACTIONS = [
   'application_decision',
   'application_link_set',
   'application_link_remove',
+  'application_observer_add',
+  'application_observer_remove',
   'webhook_config',
   'attachment_upload',
   'attachment_quarantine',

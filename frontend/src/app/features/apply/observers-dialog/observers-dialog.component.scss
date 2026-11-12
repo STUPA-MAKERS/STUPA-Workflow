@@ -1,0 +1,46 @@
+.od {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+}
+
+.od__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.od__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.od__mail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od__skel {
+  width: 60%;
+}
+
+.od__add {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.od__input {
+  flex: 1;
+  min-width: 0;
+}
