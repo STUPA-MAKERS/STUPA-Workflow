@@ -1414,6 +1414,14 @@ export class AdminApiService {
   getBackup(id: Uuid): Observable<Backup> {
     if (this.mock) {
       const row = this.store.backups.find((b) => b.id === id);
+      if (row && (row.status === 'pending' || row.status === 'running')) {
+        Object.assign(row, {
+          status: 'done',
+          finishedAt: new Date().toISOString(),
+          sizeBytes: 12_582_912,
+          objectCount: 8,
+        });
+      }
       return of(structuredCopy(row ?? ({ id } as Backup)));
     }
     return this.http.get<Backup>(`${this.base}/admin/backups/${id}`, {
@@ -1421,17 +1429,22 @@ export class AdminApiService {
     });
   }
 
-  /** POST /admin/backups — 202. The worker builds the archive. */
+  /**
+   * POST /admin/backups — 202 with the whole pending row. The worker builds the archive.
+   *
+   * The mock answers `pending` like the API, and the next poll finishes the row, so the
+   * mock shows the same row the page shows against the real API.
+   */
   createBackup(note?: string | null): Observable<Backup> {
     if (this.mock) {
       const row: Backup = {
         id: `b-${this.store.backups.length + 1}`,
         kind: 'manual',
-        status: 'done',
+        status: 'pending',
         createdAt: new Date().toISOString(),
-        finishedAt: new Date().toISOString(),
-        sizeBytes: 12_582_912,
-        objectCount: 8,
+        finishedAt: null,
+        sizeBytes: null,
+        objectCount: null,
         note: note ?? null,
         pinned: false,
       };
@@ -1466,7 +1479,22 @@ export class AdminApiService {
 
   /** POST /admin/backups/import — take an uploaded archive into the catalogue. */
   importBackup(file: File): Observable<Backup> {
-    if (this.mock) return this.createBackup(file.name);
+    if (this.mock) {
+      const now = new Date().toISOString();
+      const row: Backup = {
+        id: `b-${this.store.backups.length + 1}`,
+        kind: 'imported',
+        status: 'done',
+        createdAt: now,
+        finishedAt: now,
+        sizeBytes: file.size,
+        objectCount: 8,
+        note: null,
+        pinned: false,
+      };
+      this.store.backups.unshift(row);
+      return of(structuredCopy(row));
+    }
     const body = new FormData();
     body.append('file', file);
     return this.http.post<Backup>(`${this.base}/admin/backups/import`, body);
