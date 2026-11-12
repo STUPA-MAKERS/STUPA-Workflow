@@ -127,9 +127,9 @@ export function laneCount(bars: readonly Bar[]): number {
   return bars.reduce((max, b) => Math.max(max, b.lane + 1), 0);
 }
 
-/** The entry is a block in the hour grid: one day and a start time. */
+/** The entry is a block in the hour grid: it has a start time (§ 000744). */
 export function isTimed(e: CalendarEntry): boolean {
-  return !isSpan(e) && e.startTime !== null;
+  return e.startTime !== null;
 }
 
 /** The entries of a day for the row above the hours (§ 000728). */
@@ -149,7 +149,7 @@ export const SHORT_BLOCK = 0.75;
 /** The height of an hour in the week view, in rem. It matches `--cw-hour` of the styles. */
 export const HOUR_REM = 3.5;
 
-/** A timed entry as a block of the week view. `top` and `height` are hours. */
+/** A timed entry on one day as a block of the week view. `top` and `height` are hours. */
 export interface Block {
   readonly entry: CalendarEntry;
   readonly top: number;
@@ -160,20 +160,37 @@ export interface Block {
   readonly short: boolean;
   /** The lines of the title that fit below the time. */
   readonly lines: number;
+  /** The clock time where the entry starts or ends on this day, or null where it goes on. */
+  readonly start: string | null;
+  readonly end: string | null;
+}
+
+/** The hour where the part of an entry on the day `iso` ends. */
+function partEnd(e: CalendarEntry, iso: string, from: number, lastHour: number): number {
+  if (e.endsOn !== iso) return lastHour;
+  if (e.endTime) return Math.max(hoursOf(e.endTime), from);
+  return isSpan(e) ? lastHour : from + 1;
 }
 
 /**
- * The blocks of a day. Entries that overlap share the width of the column: each takes
- * the first lane that is free at its start, and a group of overlapping blocks divides
- * the column by its number of lanes.
+ * The blocks of a day. An entry over several days has one block on each of its days: from
+ * its start time to the last hour, the whole day, and from the first hour to its end time
+ * (§ 000744). Entries that overlap share the width of the column: each takes the first
+ * lane that is free at its start, and a group of overlapping blocks divides the column by
+ * its number of lanes.
  */
-export function dayBlocks(entries: readonly CalendarEntry[], iso: string, firstHour: number): readonly Block[] {
+export function dayBlocks(
+  entries: readonly CalendarEntry[],
+  iso: string,
+  firstHour: number,
+  lastHour: number,
+): readonly Block[] {
   const items = [
-    ...entries
-      .filter((e) => e.startsOn === iso && isTimed(e))
+    ...onDay(entries, iso)
+      .filter(isTimed)
       .map((e) => {
-        const from = hoursOf(e.startTime ?? '');
-        const real = e.endTime ? Math.max(hoursOf(e.endTime) - from, 0) : 1;
+        const from = e.startsOn === iso ? hoursOf(e.startTime ?? '') : firstHour;
+        const real = partEnd(e, iso, from, lastHour) - from;
         return { entry: e, from, real, to: from + Math.max(real, MIN_BLOCK) };
       }),
   ].sort((a, b) => a.from - b.from || b.to - a.to);
@@ -194,6 +211,8 @@ export function dayBlocks(entries: readonly CalendarEntry[], iso: string, firstH
       width: 100 / lanes,
       short: item.real < SHORT_BLOCK,
       lines: Math.max(1, Math.floor((height * HOUR_REM * 16 - 28) / 16)),
+      start: item.entry.startsOn === iso ? item.entry.startTime : null,
+      end: item.entry.endsOn === iso ? item.entry.endTime : null,
     };
   });
 }

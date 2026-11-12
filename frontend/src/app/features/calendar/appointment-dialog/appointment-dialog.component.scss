@@ -41,6 +41,19 @@
   align-items: center;
   gap: var(--space-2);
 }
+.apd__search {
+  display: block;
+  min-width: 0;
+}
+.apd__hits {
+  --li-hover: var(--color-selected);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.apd__hits > li {
+  overflow: hidden;
+}
 .apd__chips:empty {
   display: none;
 }

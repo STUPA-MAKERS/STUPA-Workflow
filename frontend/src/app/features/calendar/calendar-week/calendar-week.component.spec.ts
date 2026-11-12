@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { calendarEntry } from '../../../../testing/calendar-fixtures';
@@ -94,5 +96,48 @@ describe('CalendarWeekComponent', () => {
     expect(view.on.openEntry).toHaveBeenCalledWith(TIMED);
     await userEvent.click(screen.getByRole('button', { name: /Angebot einholen/ }));
     expect(view.on.openEntry).toHaveBeenCalledWith(CARD);
+  });
+});
+
+describe('spanBlocks (§000744)', () => {
+  const SPAN = calendarEntry('span', {
+    title: 'Klausur',
+    startsOn: '2026-11-10',
+    endsOn: '2026-11-12',
+    startTime: '14:00:00',
+    endTime: '12:00:00',
+  });
+
+  it('shows a timed entry over several days as a block on each of its days', async () => {
+    const openEntry = jest.fn();
+    const { container } = await render(CalendarWeekComponent, {
+      inputs: { days: DAYS, entries: [SPAN], selectedDay: '2026-11-11', label: 'Woche' },
+      on: { openEntry },
+    });
+    const blocks = screen.getAllByRole('button', { name: /Klausur/ });
+    expect(blocks).toHaveLength(3);
+    expect(blocks.map((b) => b.closest('.cw__col'))).toEqual([...container.querySelectorAll('.cw__col')].slice(1, 4));
+    expect(blocks[0]).toHaveAccessibleName('Di, 10.11.2026, 14:00 – Do, 12.11.2026, 12:00 Klausur');
+    expect(blocks[0]).toHaveClass('cw__block--goesOn');
+    expect(blocks[0]).not.toHaveClass('cw__block--fromBefore');
+    expect(blocks[1]).toHaveClass('cw__block--fromBefore', 'cw__block--goesOn');
+    expect(blocks[2]).toHaveClass('cw__block--fromBefore');
+    expect(blocks[2]).not.toHaveClass('cw__block--goesOn');
+    expect(blocks[2].querySelector('.cw__time')?.textContent).toBe('–12:00');
+    expect(blocks[1].querySelector('.cw__time')?.textContent).toBe('');
+    expect(container.querySelector('.cw__chip')).toBeNull();
+    await userEvent.click(blocks[1]);
+    expect(openEntry).toHaveBeenCalledWith(SPAN);
+  });
+});
+
+describe('dayLinesOnPull (§000743)', () => {
+  const scss = readFileSync(join(__dirname, 'calendar-week.component.scss'), 'utf8');
+  const scroll = /\.cw__scroll\s*\{[^}]*\}/.exec(scss)?.[0] ?? '';
+
+  it('draws the day lines on the scroll area, under the columns', () => {
+    expect(scroll).toContain('repeating-linear-gradient(');
+    expect(scroll).toContain('var(--color-border)');
+    expect(scroll).toContain('var(--cw-gutter)');
   });
 });

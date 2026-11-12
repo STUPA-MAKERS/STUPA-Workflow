@@ -44,6 +44,8 @@
               [class.cw__block--short]="b.short"
               [class.cw__block--narrow]="b.width < 100"
               [class.cw__block--tight]="b.width < 40"
+              [class.cw__block--fromBefore]="b.start === null"
+              [class.cw__block--goesOn]="b.end === null && b.entry.endsOn !== col.day.iso"
               [attr.title]="blockLabel(b.entry)"
               [attr.aria-label]="blockLabel(b.entry)"
               [style.top.rem]="b.top * 3.5"
@@ -55,7 +57,7 @@
             >
               <span class="cw__time">
                 <app-icon [name]="icon(b.entry.kind)" [size]="12" />
-                <span class="mono">{{ time(b.entry.startTime) }}@if (!b.short && b.width === 100 && b.entry.endTime) {<span class="cw__end">–{{ time(b.entry.endTime) }}</span>}</span>
+                <span class="mono">{{ time(b.start) }}@if (b.start === null && b.end) {–{{ time(b.end) }}} @else if (!b.short && b.width === 100 && b.end) {<span class="cw__end">–{{ time(b.end) }}</span>}</span>
               </span>
               <span class="cw__title">{{ b.entry.title }}</span>
             </button>

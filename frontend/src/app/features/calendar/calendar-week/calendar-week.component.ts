@@ -5,7 +5,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { longDate, shortTime, weekdayName } from '@shared/date-format';
 import { IconComponent, ScrollFadeDirective } from '@stupa-makers/ui-kit';
 import type { CalendarDay } from '../calendar-grid.util';
-import { type Block, allDayOf, dayBlocks, entryIcon, hourRange } from '../calendar.util';
+import { type Block, allDayOf, dayBlocks, entryIcon, hourRange, isSpan, spanText } from '../calendar.util';
 
 /** One day column of the week view. */
 interface WeekColumn {
@@ -19,9 +19,9 @@ interface WeekColumn {
 
 /**
  * The week view of the desktop Kalender (§ 000728): the seven days from Monday to Sunday
- * as columns with an hour axis. A timed entry of one day is a block from its start to
- * its end. An all-day entry, an entry over several days and a due card are in the row
- * above the hours.
+ * as columns with an hour axis. A timed entry is a block from its start to its end, and
+ * a timed entry over several days has one block on each of its days (§ 000744). An
+ * all-day entry and a due card are in the row above the hours.
  *
  * The axis shows 08:00 to 21:00 and widens for an earlier or a later entry. A press on
  * the head of a day picks the day, a press on an entry opens it.
@@ -58,15 +58,19 @@ export class CalendarWeekComponent {
       weekday: weekdayName(day.iso, this.i18n.formatLocale()),
       label: longDate(day.iso, this.i18n.formatLocale()),
       allDay: allDayOf(this.entries(), day.iso),
-      blocks: dayBlocks(this.entries(), day.iso, this.range().from),
+      blocks: dayBlocks(this.entries(), day.iso, this.range().from, this.range().to),
     })),
   );
 
   readonly icon = entryIcon;
   readonly time = shortTime;
 
-  /** "14:00 – 15:30 Jour fixe": the whole entry for the tooltip and a screen reader. */
+  /**
+   * "14:00 – 15:30 Jour fixe": the whole entry for the tooltip and a screen reader. An
+   * entry over several days names its days too.
+   */
   blockLabel(e: CalendarEntry): string {
+    if (isSpan(e)) return `${spanText(e, this.i18n.formatLocale())} ${e.title}`;
     const end = e.endTime ? ` – ${shortTime(e.endTime)}` : '';
     return `${shortTime(e.startTime)}${end} ${e.title}`;
   }

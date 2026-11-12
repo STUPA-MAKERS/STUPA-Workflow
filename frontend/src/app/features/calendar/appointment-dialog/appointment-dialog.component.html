@@ -108,18 +108,28 @@
           />
         }
       </div>
-      <app-autocomplete
-        inputId="apd-person"
-        name="person"
-        [label]="'calendar.dialog.addPerson' | t"
-        [placeholder]="'calendar.dialog.personPlaceholder' | t"
-        [query]="personQuery()"
-        [options]="personHits()"
-        [open]="personHits().length > 0"
-        [optionLabel]="personLabel"
-        (queryChange)="onPersonQuery($event)"
-        (choose)="addPerson($event)"
+      <app-search-pill
+        class="apd__search"
+        size="md"
+        [clearable]="true"
+        [placeholder]="'calendar.dialog.addPerson' | t"
+        [busy]="personSearch.pending()"
+        [value]="personQuery()"
+        (valueChange)="onPersonQuery($event)"
+        (commit)="personSearch.flush()"
       />
+      @if (personHits().length) {
+        <ul class="rowgroup apd__hits" [attr.aria-label]="'calendar.dialog.personHits' | t">
+          @for (p of personHits(); track p.id) {
+            <li>
+              <app-list-item [title]="p.name" (activate)="addPerson(p)">
+                <app-avatar lead size="sm" [name]="p.name" [principalId]="p.id" [decorative]="true" />
+                <app-icon trail name="plus" [size]="18" />
+              </app-list-item>
+            </li>
+          }
+        </ul>
+      }
     </div>
     @if (canPublish()) {
       <app-switch [id]="'apd-forall'" [checked]="form().forAll" (checkedChange)="patch({ forAll: $event })">
