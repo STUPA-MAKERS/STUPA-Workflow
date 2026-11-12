@@ -19,6 +19,8 @@ import { HelpService } from '../help/help.service';
  * Below the text, "Barriere melden" opens the report dialog with the kind `barrier`. The
  * button shows for every visitor: the server takes a barrier report without a login even
  * while the reports of visitors are off, because the law requires the feedback route.
+ * While `Tickets` is off the section does not show, because the report is a ticket (spec
+ * 000758).
  */
 @Component({
   selector: 'app-accessibility-statement',

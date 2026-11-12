@@ -34,7 +34,8 @@ page `Seite nicht gefunden`. The global search must not return hits of the featu
 Another page must leave out the parts that belong to the feature and must not show an empty
 section or a dead link in their place. Examples: the Kalender omits the meetings while `Sitzungen`
 is off and the due cards while `Boards` is off. The Antrag omits the Kostenstelle while `Budget` is
-off. The start page omits the tiles of a feature that is off.
+off. The start page omits the tiles of a feature that is off. The accessibility statement omits
+`Barriere melden` while `Tickets` is off, because the report of a barrier is a ticket.
 
 The public site configuration must name the state of each feature, so that the public pages follow
 the switches without a session.
