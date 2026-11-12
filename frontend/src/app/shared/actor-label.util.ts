@@ -38,6 +38,8 @@ const ID_LIKE = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 export interface ActorLabelOptions {
   /** The label of the applicant. Default "Antragsteller:in"; the status page uses "Du". */
   readonly applicantKey?: TranslationKey;
+  /** The name of the applicant. It wins over `applicantKey`; an observer sees it. */
+  readonly applicantName?: string | null;
 }
 
 /** The label of a system key; an unknown key gives the plain "System". */
@@ -75,7 +77,7 @@ export function actorLabel(
     case 'principal':
       return actor.displayName || t('actor.deleted');
     case 'applicant':
-      return t(options.applicantKey ?? 'applications.comments.author.applicant');
+      return options.applicantName || t(options.applicantKey ?? 'applications.comments.author.applicant');
     case 'system':
       return systemActorLabel(actor.key, t);
     case 'gremium':

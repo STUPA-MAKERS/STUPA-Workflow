@@ -2,7 +2,8 @@
 
 The flow engine calls `ActionDispatcher.dispatch(actions)` after commit. This
 dispatcher renders the mails and puts them on the mail queue. The worker sends
-them. Every other action type only gets a log line here. This dispatcher does
+them. A `notify` to the applicant also mails each observer of the application.
+Every other action type only gets a log line here. This dispatcher does
 not drop such an action and does not enqueue it.
 
 `DispatchedAction.idempotency_key` is stable over the application, the status
@@ -27,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.modules.applications.decision import amount_deviates
 from app.modules.applications.mail_data import application_specs, resolve_application_lang
 from app.modules.applications.models import Application, ApplicationDecision
+from app.modules.applications.observer_mails import send_observer_status_mails
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import State
 from app.modules.notifications.links import application_link, task_link
@@ -55,6 +57,17 @@ def _applicant_only(raw: object) -> bool:
         return False
     specs = [r for r in raw if isinstance(r, dict)]
     return bool(specs) and all(s.get("kind") == "applicant" for s in specs)
+
+
+def _has_applicant(raw: object) -> bool:
+    """Tell whether a `notify` action mails the applicant.
+
+    The observers of the application get a status mail exactly when the applicant
+    gets one.
+    """
+    if not isinstance(raw, list):
+        return False
+    return any(isinstance(r, dict) and r.get("kind") == "applicant" for r in raw)
 
 
 async def _decision_context(
@@ -242,6 +255,15 @@ class NotificationActionDispatcher:
                 ),
                 team_link=application_link(self.settings, action.application_id),
             )
+            if _has_applicant(action.params.get("recipients")):
+                await send_observer_status_mails(
+                    session,
+                    queue=self.queue,
+                    settings=self.settings,
+                    application_id=action.application_id,
+                    context=context,
+                    idempotency_base=action.idempotency_key,
+                )
 
     async def _dispatch_task(self, action: DispatchedAction) -> None:
         """Send a task mail because the application reached an actionable state.

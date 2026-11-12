@@ -46,6 +46,8 @@ interface MyRow {
   readonly typeLabel: string;
   readonly amount: string | null;
   readonly approved: string | null;
+  /** The address only observes this Antrag (spec 000752). */
+  readonly observed: boolean;
 }
 
 /**
@@ -123,6 +125,7 @@ export class MyApplicationsComponent implements MyApplicationsPage {
           item.approvedAmount !== null && item.amount !== null && Number(item.approvedAmount) !== Number(item.amount)
             ? this.money(item.approvedAmount, item.currency)
             : null,
+        observed: item.observed ?? false,
       }))
       .filter((row) => !needle || row.title.toLocaleLowerCase().includes(needle));
   });

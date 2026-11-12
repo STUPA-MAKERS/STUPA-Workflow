@@ -18,6 +18,7 @@ import { FormGroup, FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
+import { ObserversDialogComponent } from '../../features/apply/observers-dialog/observers-dialog.component';
 import { API_BASE_URL } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -173,6 +174,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ObserversDialogComponent,
     LoadErrorComponent,
     SectionComponent,
     AmountComponent,
@@ -667,9 +669,12 @@ export class ApplicationsDetailComponent {
     ];
   }
 
-  /** The label of an actor: a name, "Antragsteller:in", "System · Fristen", …. */
+  /** The label of an actor: a name, "Antragsteller:in", "System · Fristen", …. An observer
+   *  reads the name of the applicant instead of "Antragsteller:in". */
   private actor(info: ActorInfo | null | undefined, legacy: string | null): string | null {
-    return actorLabel(info, legacy, (key, params) => this.i18n.translate(key, params));
+    return actorLabel(info, legacy, (key, params) => this.i18n.translate(key, params), {
+      applicantName: this.app()?.submittedBy ?? null,
+    });
   }
 
   /**
@@ -795,6 +800,17 @@ export class ApplicationsDetailComponent {
     return !!app?.canEdit && unlocked && this.sections().length > 0;
   });
 
+  /** The reader only observes the application (spec 000752): no action shows. */
+  readonly observer = computed(() => !!this.app()?.observer);
+
+  /** The creator and a holder of `application.manage` manage the observers (spec 000751). */
+  readonly canManageObservers = computed(() => {
+    const app = this.app();
+    return !!app && !app.observer && !app.applicant?.anonymized && (app.isOwner || this.canManage());
+  });
+  /** The dialog "Beobachter:innen" is open. */
+  readonly observersOpen = signal(false);
+
   /** The owner may ask for the anonymization of their data (GDPR Art. 17). */
   readonly canRequestErasure = computed(() => {
     const app = this.app();
@@ -828,6 +844,11 @@ export class ApplicationsDetailComponent {
         id: 'force',
         label: t('applications.detail.forceStatus'),
         icon: 'flow',
+      }),
+      ...when(this.canManageObservers(), {
+        id: 'observers',
+        label: t('observers.title'),
+        icon: 'eye',
       }),
       ...when(this.versions().length > 1, {
         id: 'versions',
@@ -932,6 +953,9 @@ export class ApplicationsDetailComponent {
         break;
       case 'erase':
         this.confirmErase.set(true);
+        break;
+      case 'observers':
+        this.observersOpen.set(true);
         break;
     }
   }

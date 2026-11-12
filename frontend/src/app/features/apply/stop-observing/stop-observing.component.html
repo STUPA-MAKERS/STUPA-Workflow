@@ -1,0 +1,33 @@
+<section class="done">
+  <article class="done__card" aria-labelledby="so-title" aria-live="polite">
+    @switch (phase()) {
+      @case ('done') {
+        <app-icon class="done__icon done__icon--ok" name="check" [size]="32" [strokeWidth]="2" />
+        <h1 class="done__title" id="so-title">{{ 'observers.end.doneTitle' | t }}</h1>
+        <p class="done__text">{{ 'observers.end.doneText' | t }}</p>
+        <div class="done__actions">
+          <a appButton="outlined" routerLink="/">{{ 'observers.end.home' | t }}</a>
+        </div>
+      }
+      @case ('invalid') {
+        <app-icon class="done__icon done__icon--warn" name="eyeslash" [size]="32" [strokeWidth]="1.6" />
+        <h1 class="done__title" id="so-title">{{ 'observers.end.invalidTitle' | t }}</h1>
+        <p class="done__text">{{ 'observers.end.invalidText' | t }}</p>
+        <div class="done__actions">
+          <a appButton="outlined" routerLink="/">{{ 'observers.end.home' | t }}</a>
+        </div>
+      }
+      @default {
+        <app-icon class="done__icon done__icon--warn" name="eyeslash" [size]="32" [strokeWidth]="1.6" />
+        <h1 class="done__title" id="so-title">{{ 'observers.end.title' | t }}</h1>
+        <p class="done__text">{{ 'observers.end.text' | t }}</p>
+        <div class="done__actions">
+          <app-button variant="danger" [loading]="phase() === 'busy'" (click)="end()">
+            {{ 'observers.end.action' | t }}
+          </app-button>
+          <a appButton="text" routerLink="/">{{ 'observers.end.home' | t }}</a>
+        </div>
+      }
+    }
+  </article>
+</section>

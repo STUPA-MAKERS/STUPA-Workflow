@@ -335,7 +335,7 @@ describe('ApplicationsDetailComponent — header', () => {
       const { detectChanges } = await setup();
       await openMenu(detectChanges);
       const items = screen.getAllByRole('menuitem').map((el) => el.textContent?.trim());
-      expect(items).toEqual(['Status setzen', 'Versionen vergleichen', 'Löschen']);
+      expect(items).toEqual(['Status setzen', 'Beobachter:innen', 'Versionen vergleichen', 'Löschen']);
       expect(screen.getByRole('menuitem', { name: 'Löschen' })).toHaveClass('rm__item--danger');
     });
 
@@ -343,6 +343,7 @@ describe('ApplicationsDetailComponent — header', () => {
       const owner = await setup({ perms: ['application.read'], app: { isOwner: true } });
       await openMenu(owner.detectChanges);
       expect(screen.getAllByRole('menuitem').map((el) => el.textContent?.trim())).toEqual([
+        'Beobachter:innen',
         'Versionen vergleichen',
         'Anonymisierung beantragen',
       ]);
@@ -352,9 +353,33 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(owner.cmp.canRequestErasure()).toBe(false);
     });
 
+    it('opens the observers dialog for the owner', async () => {
+      const owner = await setup({ perms: ['application.read'], app: { isOwner: true } });
+      await openMenu(owner.detectChanges);
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Beobachter:innen' }));
+      owner.detectChanges();
+      owner.http
+        .expectOne((r) => r.url === '/api/applications/app-1/observers')
+        .flush([{ id: 'o1', email: 'adrian@example.org', addedAt: '2026-11-10T09:00:00Z' }]);
+      owner.detectChanges();
+      expect(await screen.findByText('adrian@example.org')).toBeInTheDocument();
+    });
+
+    it('shows an observer no action, and the name of the applicant', async () => {
+      const { cmp } = await setup({
+        perms: ['application.read', 'application.transition'],
+        app: { observer: true, submittedBy: 'Luis Meyer', canEdit: false, applicant: null },
+      });
+      expect(screen.getByText('Eingereicht von Luis Meyer')).toBeInTheDocument();
+      expect(cmp.canManageObservers()).toBe(false);
+      expect(cmp.menuSections().flatMap((sec) => sec.items.map((i) => i.id))).toEqual(['versions']);
+      expect(screen.queryByRole('group', { name: 'Übergänge' })).not.toBeInTheDocument();
+      expect(cmp.historyEntries().some((e) => e.actor === 'Luis Meyer')).toBe(true);
+    });
+
     it('leaves "Versionen vergleichen" out with only one version', async () => {
       const { cmp } = await setup({ versions: [VERSIONS[0]] });
-      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['force', 'delete']);
+      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['force', 'observers', 'delete']);
     });
 
     it('opens the force dialog, confirms the delete, and reloads after a forced state', async () => {

@@ -17,6 +17,19 @@ from tests._support.notifications_fakes import FakeSession
 SETTINGS = load_settings()
 
 
+@pytest.fixture(autouse=True)
+def _observer_mails(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Record the observer status mails instead of reading the observers."""
+    calls: list[dict[str, Any]] = []
+
+    async def fake(_session: object, **kw: Any) -> int:
+        calls.append(kw)
+        return 0
+
+    monkeypatch.setattr(mod, "send_observer_status_mails", fake)
+    return calls
+
+
 def _sessionmaker(session: FakeSession) -> async_sessionmaker[AsyncSession]:
     class _CM:
         async def __aenter__(self) -> FakeSession:
@@ -473,3 +486,42 @@ async def test_dispatch_task_notify_skips_a_state_nobody_can_act_on(
     await disp.dispatch([_action("taskNotify")])
 
     assert made == []
+
+
+@pytest.mark.parametrize(
+    ("recipients", "mailed"),
+    [
+        ([{"kind": "applicant"}], True),
+        ([{"kind": "gremium", "ref": "x"}, {"kind": "applicant"}], True),
+        ([{"kind": "gremium", "ref": "x"}, "applicant"], False),
+        ("applicant", False),
+        (None, False),
+    ],
+)
+async def test_observers_get_the_status_mail_with_the_applicant(
+    monkeypatch: pytest.MonkeyPatch,
+    _observer_mails: list[dict[str, Any]],
+    recipients: object,
+    mailed: bool,
+) -> None:
+    """§ F/applications/applications/000754: a notify to the applicant mails the observers."""
+
+    class FakeService:
+        def __init__(self, *a: object, **k: object) -> None:
+            pass
+
+        async def handle_notify_action(self, *a: object, **k: object) -> int:
+            return 1
+
+    monkeypatch.setattr(mod, "NotificationService", FakeService)
+    session = FakeSession(executes=[[(None, None, {"title": "Beamer"}, True, None)]])
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    params = {"lang": "de"} if recipients is None else {"recipients": recipients, "lang": "de"}
+    action = _action("notify", params)
+    await disp.dispatch([action])
+    assert bool(_observer_mails) is mailed
+    if mailed:
+        (call,) = _observer_mails
+        assert call["application_id"] == action.application_id
+        assert call["idempotency_base"] == action.idempotency_key
+        assert call["context"]["applicationTitle"] == "Beamer"

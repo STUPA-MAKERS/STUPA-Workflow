@@ -77,6 +77,12 @@ class AuditAction(StrEnum):
             create or later. ``data`` carries the new and the old Vorgänger id.
         APPLICATION_LINK_REMOVE: The Vorgänger of an application removed. ``data``
             carries the removed Vorgänger id.
+        APPLICATION_OBSERVER_ADD: An observer added to an application. ``data``
+            carries the observer id, never the e-mail address, because the chain
+            cannot delete a value and an address is personal data.
+        APPLICATION_OBSERVER_REMOVE: An observer removed, by the applicant or by the
+            observer through the end link of a status mail (``via: endLink``).
+            ``data`` carries the observer id, never the e-mail address.
         ATTACHMENT_UPLOAD: ``data`` names the application, or carries ``draft: true``
             for a draft upload of the wizard, plus whether a field key is set, the
             MIME type and the size. It never carries the file name, because a file
@@ -175,6 +181,8 @@ class AuditAction(StrEnum):
     APPLICATION_DECISION = "application_decision"
     APPLICATION_LINK_SET = "application_link_set"
     APPLICATION_LINK_REMOVE = "application_link_remove"
+    APPLICATION_OBSERVER_ADD = "application_observer_add"
+    APPLICATION_OBSERVER_REMOVE = "application_observer_remove"
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_UPLOAD = "attachment_upload"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"

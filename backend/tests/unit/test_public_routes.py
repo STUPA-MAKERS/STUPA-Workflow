@@ -46,12 +46,14 @@ Groups of ``PUBLIC_ROUTES`` and why each one is public:
 - Apply: the public wizard lists the application types, uploads and removes draft
   files with its draft token (ALTCHA when signed out) and submits the application.
 - Tickets: the one-way public report of the help menu (ALTCHA when signed out).
+- Observers: the end link of a status mail ends an observation by its secret token,
+  because the observer may have no account.
 - Share page: ``/s/<token>`` serves the link preview by the secret share token.
 
 Groups of ``OPTIONAL_PRINCIPAL_ROUTES`` and who checks the caller:
 
 - Application, its form, timeline, versions, comments, transitions, erasure request,
-  attachments, links, Vorgänger and prefill: a staff session or the magic-link session
+  attachments, links, Vorgänger, prefill and observers: a staff session or the magic-link session
   of the applicant; the applications and files services refuse a caller with neither.
   The prefill also refuses the magic-link session, and a Vorgänger change needs the
   edit right on both applications.
@@ -147,6 +149,7 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("POST", "/api/apply/attachments"),
         ("DELETE", "/api/apply/attachments/{attachment_id}"),
         ("POST", "/api/tickets"),
+        ("POST", "/api/observers/end"),
     }
 )
 
@@ -170,6 +173,9 @@ OPTIONAL_PRINCIPAL_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("PUT", "/api/applications/{application_id}/predecessor"),
         ("DELETE", "/api/applications/{application_id}/predecessor"),
         ("GET", "/api/applications/{application_id}/prefill"),
+        ("GET", "/api/applications/{application_id}/observers"),
+        ("POST", "/api/applications/{application_id}/observers"),
+        ("DELETE", "/api/applications/{application_id}/observers/{observer_id}"),
         ("POST", "/api/applications/{application_id}/attachments"),
         ("GET", "/api/attachments/{attachment_id}"),
         ("GET", "/api/attachments/{attachment_id}/download"),

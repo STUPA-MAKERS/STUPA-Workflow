@@ -135,6 +135,7 @@ class _FakeService:
         strip_pii_fields=False,
         applicant_view=False,
         magic_link_view=False,
+        observer=False,
     ):
         self.last_requester_edits_any = requester_edits_any
         self.last_applicant_view = applicant_view

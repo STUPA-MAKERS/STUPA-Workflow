@@ -395,7 +395,7 @@ async def test_a_comment_file_follows_the_comment(monkeypatch: pytest.MonkeyPatc
     """
     answers: list[object] = []
 
-    async def _resolve(_db: object, _app: object, _p: object, _a: object) -> object:
+    async def _resolve(_db: object, _app: object, _p: object, _a: object, **_kw: object) -> object:
         answer = answers.pop(0)
         if isinstance(answer, Exception):
             raise answer

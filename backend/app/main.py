@@ -40,6 +40,7 @@ from app.modules.application_types.router import router as application_types_rou
 from app.modules.applications.email_login import resolve_session as resolve_email_session
 from app.modules.applications.links_router import router as application_links_router
 from app.modules.applications.login_router import router as applicant_login_router
+from app.modules.applications.observers_router import router as application_observers_router
 from app.modules.applications.router import router as applications_router
 from app.modules.attachments.router import router as files_router
 from app.modules.audit_log.router import router as audit_router
@@ -116,6 +117,7 @@ api_router.include_router(form_versions_router)
 api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
 api_router.include_router(application_links_router)
+api_router.include_router(application_observers_router)
 api_router.include_router(flow_router)
 api_router.include_router(voting_router)
 api_router.include_router(vote_open_router)

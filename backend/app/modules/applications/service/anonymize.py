@@ -13,6 +13,7 @@ from sqlalchemy import delete, or_, select, update
 
 from app.modules.applications.models import (
     Applicant,
+    ApplicationObserver,
     Comment,
     MagicLink,
     SubmissionVersion,
@@ -69,7 +70,8 @@ class AnonymizeOps(ApplicationsServiceBase):
           Staff still reads the comments through the timeline and the comments API.
 
         It deletes every magic link, because a link is a direct access path to the PII and can
-        live without an expiry; a delete is stronger than an expiry. It revokes the active
+        live without an expiry; a delete is stronger than an expiry. It deletes every observer,
+        because an observer address is personal data and an access path. It revokes the active
         applicant sessions, so no open magic-link token may read or write. It removes the
         attachments, because a receipt or a file name may hold PII. At the end it reloads the
         row, because the UPDATE expires the onupdate columns and a lazy load would do IO.
@@ -114,6 +116,9 @@ class AnonymizeOps(ApplicationsServiceBase):
         )
         await self.session.execute(
             delete(MagicLink).where(MagicLink.application_id == application_id)
+        )
+        await self.session.execute(
+            delete(ApplicationObserver).where(ApplicationObserver.application_id == application_id)
         )
         await auth_sessions.revoke_applicant_sessions(
             self.session, application_id, now=datetime.now(UTC)

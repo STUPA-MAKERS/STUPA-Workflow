@@ -96,6 +96,14 @@ describe('MyApplicationsComponent', () => {
     );
   });
 
+  it('marks an Antrag that the address only observes', async () => {
+    const watched = { ...LIST.items[0], id: 'a4', observed: true };
+    const bare = { ...LIST.items[1], id: 'a5', typeId: 'unknown', observed: true };
+    await setup({ list: () => of({ ...LIST, items: [watched, bare] }) });
+    expect(await screen.findAllByText('Beobachtet')).toHaveLength(2);
+    expect(document.querySelectorAll('.ma__dot')).toHaveLength(2);
+  });
+
   it('names an Antrag without a title and keeps an amount that is no number', async () => {
     const odd = { ...LIST.items[0], id: 'a3', title: '  ', amount: 'k. A.', currency: null };
     const { fixture } = await setup({ list: () => of({ ...LIST, items: [odd] } as ApplicantApplications) });
