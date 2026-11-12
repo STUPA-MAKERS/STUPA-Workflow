@@ -131,6 +131,28 @@ describe('spanBlocks (§000744)', () => {
   });
 });
 
+describe('overlap (§000745)', () => {
+  it('lays a later entry on the earlier one and keeps the earlier one at the width of the day', async () => {
+    await render(CalendarWeekComponent, {
+      inputs: {
+        days: DAYS,
+        entries: [
+          calendarEntry('a', { title: 'Jour fixe', startTime: '14:00:00', endTime: '15:30:00' }),
+          calendarEntry('b', { title: 'Abgleich', startTime: '14:45:00', endTime: '15:15:00' }),
+        ],
+        selectedDay: '2026-11-11',
+        label: 'Woche',
+      },
+    });
+    const under = screen.getByRole('button', { name: /Jour fixe/ });
+    const over = screen.getByRole('button', { name: /Abgleich/ });
+    expect([under.style.left, under.style.width, under.style.zIndex]).toEqual(['0%', '100%', '1']);
+    expect([over.style.left, over.style.width, over.style.zIndex]).toEqual(['20%', '80%', '2']);
+    expect(over).toHaveClass('cw__block--over');
+    expect(under).not.toHaveClass('cw__block--over');
+  });
+});
+
 describe('dayLinesOnPull (§000743)', () => {
   const scss = readFileSync(join(__dirname, 'calendar-week.component.scss'), 'utf8');
   const scroll = /\.cw__scroll\s*\{[^}]*\}/.exec(scss)?.[0] ?? '';

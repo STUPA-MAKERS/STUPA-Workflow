@@ -5,6 +5,8 @@ import {
   provideHttpClientTesting,
   type TestRequest,
 } from '@angular/common/http/testing';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { DashboardComponent, dueCards } from './dashboard.component';
@@ -250,6 +252,24 @@ describe('DashboardComponent', () => {
       screen.getByRole('button', { name: /Suche/ }).click();
       expect(palette.isOpen()).toBe(true);
       http.verify();
+    });
+
+    /**
+     * § F/applications/dashboard/000750: the link of the tab has the size of "Antrag stellen".
+     * jsdom applies no component styles, so the test reads the stylesheet.
+     */
+    it('gives the link in the tab line the size of "Antrag stellen"', () => {
+      const css = readFileSync(join(__dirname, 'dashboard.component.scss'), 'utf8');
+      const body = (sel: string): string =>
+        new RegExp(`\\n${sel.replace(/[.]/g, '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+      const size = (decls: string): string[] =>
+        decls
+          .split(';')
+          .map((d) => d.trim())
+          .filter((d) => /^(height|margin-bottom):/.test(d));
+      expect(size(body('.dash__new'))).toHaveLength(2);
+      expect(size(body('.dash__tabbar .dash__all'))).toEqual(size(body('.dash__new')));
+      expect(body('.dash__tabbar .dash__all')).toMatch(/font-size: var\(--fs-body\)/);
     });
 
     it('keeps every request off the global overlay', async () => {
