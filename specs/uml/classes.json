@@ -288,6 +288,34 @@
       "to": "Invoice"
     },
     {
+      "column": "fiscal_year_id",
+      "from": "BudgetPlan",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "FiscalYear"
+    },
+    {
+      "column": "budget_id",
+      "from": "BudgetPlanLine",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Budget"
+    },
+    {
+      "column": "version_id",
+      "from": "BudgetPlanLine",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "BudgetPlanVersion"
+    },
+    {
+      "column": "plan_id",
+      "from": "BudgetPlanVersion",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "BudgetPlan"
+    },
+    {
       "column": "variant_id",
       "from": "CdVariantLogo",
       "multiplicity": "*",
@@ -2247,6 +2275,22 @@
           "type": "SMALLINT"
         },
         {
+          "name": "side",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "income",
+            "expense"
+          ]
+        },
+        {
+          "name": "plan_enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,
@@ -2436,6 +2480,172 @@
       "name": "BudgetExpense",
       "path": "backend/app/modules/budget/tree_models.py",
       "table": "budget_expense"
+    },
+    {
+      "attributes": [
+        {
+          "name": "fiscal_year_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetPlan",
+      "module": "budget",
+      "name": "BudgetPlan",
+      "path": "backend/app/modules/budget/plan_models.py",
+      "table": "budget_plan"
+    },
+    {
+      "attributes": [
+        {
+          "name": "version_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "budget_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "amount",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "note",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "path_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "transferable",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "coverable",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "blocked",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetPlanLine",
+      "module": "budget",
+      "name": "BudgetPlanLine",
+      "path": "backend/app/modules/budget/plan_models.py",
+      "table": "budget_plan_line"
+    },
+    {
+      "attributes": [
+        {
+          "name": "plan_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "number",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "state",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "draft",
+            "resolved",
+            "approved",
+            "in_force",
+            "replaced"
+          ]
+        },
+        {
+          "name": "resolved_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "approved_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "in_force_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetPlanVersion",
+      "module": "budget",
+      "name": "BudgetPlanVersion",
+      "path": "backend/app/modules/budget/plan_models.py",
+      "table": "budget_plan_version"
     },
     {
       "attributes": [

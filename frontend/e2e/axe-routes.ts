@@ -57,6 +57,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('committees'),
   { path: 'committees/:id', url: (ids) => `/committees/${ids.gremium}` },
   fixed('budget'),
+  fixed('budget/plan'),
   fixed('expenses'),
   fixed('invoices'),
   fixed('tickets'),

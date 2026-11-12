@@ -17,11 +17,6 @@
 .bp__plan {
   font-weight: var(--fw-semibold);
 }
-.bp__marks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
 .bp__sheet {
   display: flex;
   flex-direction: column;
@@ -32,19 +27,6 @@
   margin: 0;
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
-}
-.bp__facts {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-3);
-  margin: 0;
-}
-.bp__facts dt {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-.bp__facts dd {
-  margin: 0;
 }
 .bp__switches {
   display: flex;

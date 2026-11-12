@@ -276,7 +276,7 @@
 </ng-template>
 
 <ng-template #table let-rows let-nested="nested">
-  <app-data-table class="bp__table" surface="rowgroup" [columns]="columns()" [rows]="rows" [rowKey]="rowId" [clickable]="true" (rowClick)="select($event)">
+  <app-data-table class="bp__table" surface="rowgroup" [loading]="load().kind === 'loading'" [columns]="columns()" [rows]="rows" [rowKey]="rowId" [clickable]="true" (rowClick)="select($event)">
     <ng-template appCell="node" let-row>
       <span class="bp__node" [style.--bp-depth]="nested ? $any(row).depth : 0">
         <span class="bp__name">{{ $any(row).name }}</span>
