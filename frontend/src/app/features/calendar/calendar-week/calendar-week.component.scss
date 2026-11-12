@@ -169,6 +169,22 @@
 .cw__block--over {
   border-color: var(--color-surface-1);
 }
+// The time and the title stay in view while their block goes on above the scroll area
+// (§ 000746): a block from midnight has its head far above 08:00. `overflow: clip` cuts
+// the block as `hidden` does, but makes no scroll container, so the head sticks to the
+// scroll area of the grid.
+.cw__block:not(.cw__block--short) {
+  overflow: clip;
+
+  .cw__time {
+    position: sticky;
+    top: 4px;
+  }
+  .cw__title {
+    position: sticky;
+    top: calc(5px + 1rem);
+  }
+}
 // A block of an entry over several days is cut straight where the entry goes on.
 .cw__block--fromBefore {
   border-start-start-radius: 0;
