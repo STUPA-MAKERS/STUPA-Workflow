@@ -256,22 +256,21 @@ export function dayBlocks(
   });
 }
 
-/** The hours that the week view shows by default: 08:00 to 21:00. */
-export const DAY_START = 8;
-export const DAY_END = 21;
+/** The week view shows the whole day, 00:00 to 24:00 (§ 000746). */
+export const DAY_HOURS = 24;
+/** The hour at the top of the week view when it opens. */
+export const OPEN_HOUR = 8;
 
 /**
- * The first and the last hour of the week view. An entry before 08:00 or after 21:00
- * widens the axis, so no block is cut.
+ * The hour at the top of the week view when it opens: 08:00, or the hour of the first
+ * timed entry that starts on one of the days when that is earlier, so no entry of the
+ * week hides above the view.
  */
-export function hourRange(entries: readonly CalendarEntry[]): { readonly from: number; readonly to: number } {
-  const timed = entries.filter(isTimed);
-  const starts = timed.map((e) => Math.floor(hoursOf(e.startTime ?? '')));
-  const ends = timed.map((e) => Math.ceil(hoursOf(e.endTime ?? e.startTime ?? '') + (e.endTime ? 0 : 1)));
-  return {
-    from: Math.max(0, Math.min(DAY_START, ...starts)),
-    to: Math.min(24, Math.max(DAY_END, ...ends)),
-  };
+export function openHour(entries: readonly CalendarEntry[], days: readonly string[]): number {
+  const starts = entries
+    .filter((e) => isTimed(e) && days.includes(e.startsOn))
+    .map((e) => Math.floor(hoursOf(e.startTime ?? '')));
+  return Math.min(OPEN_HOUR, ...starts);
 }
 
 /**

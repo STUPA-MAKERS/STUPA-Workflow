@@ -414,7 +414,7 @@ describe('CalendarComponent (desktop)', () => {
     const view = await setup({ view: 'week' });
     load(view);
     const column = () => view.container.querySelectorAll<HTMLElement>('.cw__col')[4];
-    expect(within(column()).getByRole('button', { name: '19:00 – 20:30 Infoabend' }).style.top).toBe('38.5rem');
+    expect(within(column()).getByRole('button', { name: '19:00 – 20:30 Infoabend' }).style.top).toBe('66.5rem');
     view.cmp.kinds.set(['appointment']);
     view.fixture.detectChanges();
     expect(within(column()).getByRole('button', { name: '19:00 – 20:30 Infoabend' })).toBeInTheDocument();

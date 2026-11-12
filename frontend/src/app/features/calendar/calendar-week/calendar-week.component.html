@@ -1,4 +1,4 @@
-<div class="cw" role="group" [attr.aria-label]="label()" [style.--cw-hours]="hours().length">
+<div class="cw" role="group" [attr.aria-label]="label()" [style.--cw-hours]="hours.length">
   <div class="cw__head">
     <span></span>
     @for (col of columns(); track col.day.iso) {
@@ -28,10 +28,10 @@
       </div>
     }
   </div>
-  <div class="cw__scroll" appScrollFade="y">
+  <div #scroll class="cw__scroll" appScrollFade="y">
     <div class="cw__body">
       <div class="cw__hours" aria-hidden="true">
-        @for (h of hours(); track h) {
+        @for (h of hours; track h) {
           <span class="cw__hour mono">{{ hourLabel(h) }}</span>
         }
       </div>

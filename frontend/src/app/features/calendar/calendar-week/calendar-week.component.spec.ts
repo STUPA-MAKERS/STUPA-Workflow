@@ -42,9 +42,9 @@ describe('CalendarWeekComponent', () => {
     expect(heads[2]).toHaveAttribute('aria-current', 'date');
     expect(heads[2].querySelector('.cw__num')).toHaveClass('cw__num--today');
     const hours = Array.from(view.container.querySelectorAll('.cw__hours .cw__hour')).map((h) => h.textContent);
-    expect(hours[0]).toBe('08:00');
-    expect(hours).toHaveLength(13);
-    expect(hours.at(-1)).toBe('20:00');
+    expect(hours[0]).toBe('00:00');
+    expect(hours).toHaveLength(24);
+    expect(hours.at(-1)).toBe('23:00');
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
 
@@ -52,7 +52,7 @@ describe('CalendarWeekComponent', () => {
   it('draws a timed Termin as a block at its time and a due card in the all-day row', async () => {
     const view = await setup();
     const block = within(view.column(2)).getByRole('button', { name: '14:00 – 15:30 Jour fixe' });
-    expect(block.style.top).toBe('21rem');
+    expect(block.style.top).toBe('49rem');
     expect(block.style.height).toBe('5.25rem');
     expect(block.style.width).toBe('50%');
     expect(block).toHaveClass('cw__block--narrow');
@@ -65,7 +65,7 @@ describe('CalendarWeekComponent', () => {
   it('draws a timed Event as a block at its time', async () => {
     const view = await setup();
     const block = within(view.column(4)).getByRole('button', { name: '19:00 Infoabend' });
-    expect(block.style.top).toBe('38.5rem');
+    expect(block.style.top).toBe('66.5rem');
     expect(block.style.height).toBe('3.5rem');
     expect(block.style.width).toBe('100%');
     expect(block).not.toHaveClass('cw__block--narrow');
@@ -82,10 +82,9 @@ describe('CalendarWeekComponent', () => {
     expect(block.querySelector('.cw__end')?.textContent).toBe('–15:30');
   });
 
-  it('widens the axis for an early entry', async () => {
+  it('places an early entry on the whole-day axis', async () => {
     const view = await setup([calendarEntry('early', { startTime: '06:00:00', endTime: '07:00:00' })]);
-    expect(view.container.querySelector('.cw__hours .cw__hour')?.textContent).toBe('06:00');
-    expect(within(view.column(2)).getByRole('button', { name: /06:00/ }).style.top).toBe('0rem');
+    expect(within(view.column(2)).getByRole('button', { name: /06:00/ }).style.top).toBe('21rem');
   });
 
   it('picks a day on its head and opens an entry on a press', async () => {
@@ -150,6 +149,57 @@ describe('overlap (§000745)', () => {
     expect([over.style.left, over.style.width, over.style.zIndex]).toEqual(['20%', '80%', '2']);
     expect(over).toHaveClass('cw__block--over');
     expect(under).not.toHaveClass('cw__block--over');
+  });
+});
+
+describe('wholeDay (§000746)', () => {
+  const height = jest.spyOn(HTMLElement.prototype, 'scrollHeight', 'get');
+
+  beforeEach(() => height.mockReturnValue(2400));
+  afterAll(() => height.mockRestore());
+
+  const open = async (entries: readonly ReturnType<typeof calendarEntry>[]) => {
+    const view = await render(CalendarWeekComponent, {
+      inputs: { days: DAYS, entries, selectedDay: '2026-11-11', label: 'Woche' },
+    });
+    await view.fixture.whenStable();
+    return view.container.querySelector<HTMLElement>('.cw__scroll');
+  };
+
+  it('shows the 24 hours of the day and opens at 08:00', async () => {
+    const area = await open([TIMED]);
+    expect(area?.querySelectorAll('.cw__hours .cw__hour')).toHaveLength(24);
+    expect(area?.scrollTop).toBe(800);
+  });
+
+  it('opens at an entry of the week before 08:00', async () => {
+    const area = await open([calendarEntry('early', { startTime: '06:30:00', endTime: '07:00:00' })]);
+    expect(area?.scrollTop).toBe(600);
+  });
+
+  it('ends the block of a day between at midnight', async () => {
+    await open([
+      calendarEntry('span', {
+        title: 'Klausur',
+        startsOn: '2026-11-10',
+        endsOn: '2026-11-12',
+        startTime: '14:00:00',
+        endTime: '12:00:00',
+      }),
+    ]);
+    const [first, between, last] = screen.getAllByRole('button', { name: /Klausur/ });
+    expect([first.style.top, first.style.height]).toEqual(['49rem', '35rem']);
+    expect([between.style.top, between.style.height]).toEqual(['0rem', '84rem']);
+    expect([last.style.top, last.style.height]).toEqual(['0rem', '42rem']);
+  });
+});
+
+describe('wholeDay head (§000746)', () => {
+  it('keeps the time and the title of a long block in view', () => {
+    const scss = readFileSync(join(__dirname, 'calendar-week.component.scss'), 'utf8');
+    const rule = /\.cw__block:not\(\.cw__block--short\)\s*\{[\s\S]*?\n\}/.exec(scss)?.[0] ?? '';
+    expect(rule).toContain('overflow: clip');
+    expect(rule.match(/position: sticky/g)).toHaveLength(2);
   });
 });
 
