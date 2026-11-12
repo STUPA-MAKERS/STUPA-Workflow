@@ -67,6 +67,16 @@ describe('CostCentreCreateComponent', () => {
     expect(view.c.valid()).toBe(true);
   });
 
+  it('the button of the dialog creates the Kostenstelle', async () => {
+    const view = await setup({ top: QSM, parents: [] });
+    view.c.key.set('810');
+    view.c.name.set('Exkursionen');
+    view.fixture.detectChanges();
+    const scope = screen.getByRole('dialog', { name: 'Kostenstelle anlegen' });
+    [...scope.querySelectorAll('button')].find((x) => x.textContent?.trim() === 'Anlegen')?.click();
+    expect(view.api.createNode).toHaveBeenCalledTimes(1);
+  });
+
   it('creates the Kostenstelle and tells its id', async () => {
     const { c, api, created, toast } = await setup({ top: QSM, parents: [] });
     const success = jest.spyOn(toast, 'success');

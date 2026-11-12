@@ -472,6 +472,16 @@ describe('BudgetPlanComponent', () => {
       expect(view.c.versionOptions()).toEqual([]);
     });
 
+    it('the button of the add dialog takes the Kostenstelle into the draft', async () => {
+      const view = await setup({ query: { costCentre: 'wages' } });
+      view.c.onAction('add');
+      view.c.addId.set('other');
+      view.fixture.detectChanges();
+      const scope = screen.getAllByRole('dialog').at(-1) as HTMLElement;
+      [...scope.querySelectorAll('button')].find((x) => x.textContent?.trim() === 'Kostenstelle aufnehmen')?.click();
+      expect(view.api.setLine).toHaveBeenCalledTimes(1);
+    });
+
     it('§000819: takes a Kostenstelle into the draft and removes a line', async () => {
       const view = await setup({ query: { costCentre: 'wages' } });
       expect(view.c.addOptions().map((o: { value: string }) => o.value)).toEqual(['other', 'fees2']);

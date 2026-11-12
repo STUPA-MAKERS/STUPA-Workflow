@@ -345,10 +345,11 @@
 <app-dialog [open]="addOpen()" [title]="'budget.plan.action.add' | t" [closeLabel]="'action.close' | t" (closed)="addOpen.set(false)">
   <form id="bp-add-form" class="bp__addForm" (submit)="addLine($event)">
     <app-select name="add" [label]="'budget.plan.col.node' | t" [required]="true" [options]="addOptions()" [ngModel]="addId()" (ngModelChange)="addId.set($event)" />
+    <button type="submit" hidden></button>
   </form>
   <div dialog-footer class="bp__foot">
     <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" type="submit" form="bp-add-form" [disabled]="!addId()">{{ 'budget.plan.action.add' | t }}</app-button>
+    <app-button variant="fill" (click)="addLine($event)" [disabled]="!addId()">{{ 'budget.plan.action.add' | t }}</app-button>
   </div>
 </app-dialog>
 

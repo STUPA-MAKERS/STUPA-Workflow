@@ -65,10 +65,11 @@
       <app-input [label]="'budget.tree.name' | t" [ngModel]="newTop().name" (ngModelChange)="patchTop('name', $event)" name="topName" />
     </div>
     <ng-container *ngTemplateOutlet="cutoff; context: { day: newTop().day, month: newTop().month, top: true }" />
+    <button type="submit" hidden></button>
   </form>
   <div dialog-footer class="ab__foot">
     <app-button variant="text" (click)="topOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" type="submit" form="ab-top-form" [disabled]="!newTop().key.trim() || !newTop().name.trim()">{{
+    <app-button variant="fill" (click)="createTop($event)" [disabled]="!newTop().key.trim() || !newTop().name.trim()">{{
       'budget.tree.create' | t
     }}</app-button>
   </div>
@@ -184,11 +185,12 @@
           }
         </app-section>
       }
+      <button type="submit" hidden></button>
     </form>
   }
   <div dialog-footer class="ab__foot">
     <app-button variant="text" (click)="closeEdit()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" type="submit" form="ab-edit-form" [disabled]="!formValid() || busy()">{{ 'budget.tree.save' | t }}</app-button>
+    <app-button variant="fill" (click)="saveEdit()" [disabled]="!formValid() || busy()">{{ 'budget.tree.save' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -261,11 +263,12 @@
     <form id="ab-fy-edit-form" class="ab__form" (submit)="$event.preventDefault(); saveFyEdit()">
       <app-input type="number" [label]="'budget.tree.fyYear' | t" [ngModel]="fyEditYear()" (ngModelChange)="patchFyEditYear($event)" [disabled]="!!fy.closedAt" name="fyEditYear" />
       <app-switch [checked]="fyEditActive()" (checkedChange)="fyEditActive.set($event)">{{ 'budget.tree.fyActive' | t }}</app-switch>
+      <button type="submit" hidden></button>
     </form>
   }
   <div dialog-footer class="ab__foot">
     <app-button variant="text" (click)="backToYears()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" type="submit" form="ab-fy-edit-form" [disabled]="!fyEditYear()">{{ 'budget.tree.save' | t }}</app-button>
+    <app-button variant="fill" (click)="saveFyEdit()" [disabled]="!fyEditYear()">{{ 'budget.tree.save' | t }}</app-button>
   </div>
 </app-dialog>
 
