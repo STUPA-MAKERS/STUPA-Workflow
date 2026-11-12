@@ -36,7 +36,6 @@ const LEAF = (id: string, name: string, key: string, available: string): BudgetT
   currency: 'EUR',
   active: true,
   color: null,
-  hiddenInBudget: false,
   viewGremiumId: null,
   fiscalStartMonth: 1,
   fiscalStartDay: 1,

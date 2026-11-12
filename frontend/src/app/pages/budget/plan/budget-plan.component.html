@@ -227,6 +227,13 @@
 </ng-template>
 
 <ng-template #lineForm let-row let-cols="cols">
+  @if (canWrite()) {
+    @if (nodeOf(row.id); as node) {
+      <app-section class="bd__sec" size="lg" [heading]="'budget.cc.heading' | t">
+        <app-cost-centre-settings [node]="node" [sided]="sided(node)" [gremiumOptions]="gremiumOptions()" (saved)="reloadTree()" />
+      </app-section>
+    }
+  }
   <div [class.bd__cols]="cols" [class.bd__cols--single]="cols && row.side === 'income'">
     <app-section class="bd__sec" size="lg" [heading]="'budget.plan.line.heading' | t">
       <div class="bp__form">
@@ -342,3 +349,22 @@
     <app-button variant="fill" type="submit" form="bp-add-form" [disabled]="!addId()">{{ 'budget.plan.action.add' | t }}</app-button>
   </div>
 </app-dialog>
+
+<app-cost-centre-create
+  [open]="createOpen()"
+  [top]="top()"
+  [parents]="parents()"
+  [parent]="selId()"
+  [versionId]="version()?.id ?? null"
+  [amountLabel]="columns()[1].label"
+  (created)="onCreated($event)"
+  (closed)="createOpen.set(false)"
+/>
+
+<app-confirm-dialog
+  [open]="!!deleteRow()"
+  [title]="'budget.tree.deleteTitle' | t"
+  [body]="deleteRow() ? ('budget.tree.deleteConfirm' | t: { name: deleteRow()!.name, path: deleteRow()!.pathKey }) : ''"
+  (confirm)="deleteNode()"
+  (cancel)="deleteRow.set(null)"
+/>

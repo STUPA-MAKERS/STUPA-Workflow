@@ -36,11 +36,26 @@ describe('BudgetPlanApi', () => {
     expectCall('PUT', '/api/budget-plan-versions/v/lines/b', line);
     api.deleteLine('v', 'b').subscribe();
     expectCall('DELETE', '/api/budget-plan-versions/v/lines/b');
-    api.setState('v', 'resolved').subscribe();
-    expectCall('POST', '/api/budget-plan-versions/v/state', { state: 'resolved' });
+    api.setState('v', 'in_force').subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/state', { state: 'in_force' });
+  });
+
+  it('calls the routes of the steps', () => {
+    api.passNextStep('v').subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/steps/next', {});
+    api.createStepVote('v').subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/steps/next/vote', {});
+    api.steps('t').subscribe();
+    expectCall('GET', '/api/budgets/t/plan-steps');
+    const steps = [{ name: 'Beschluss', gremiumId: 'g' }];
+    api.setSteps('t', steps).subscribe();
+    expectCall('PUT', '/api/budgets/t/plan-steps', { steps });
   });
 
   it('calls the routes of the Kostenstelle', () => {
+    const body = { parentId: 't', key: '1', name: 'A', side: null, amount: '0' };
+    api.createNode('v', body).subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/cost-centres', body);
     api.setSide('b', 'income').subscribe();
     expectCall('PUT', '/api/budgets/b/side', { side: 'income' });
     api.setPlanSwitch('t', true).subscribe();

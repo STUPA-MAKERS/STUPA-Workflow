@@ -5,6 +5,8 @@ import { render, screen } from '@testing-library/angular';
 import { axe } from 'jest-axe';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
+import { FeatureService } from '@core/features/feature.service';
+import { AdminApiService } from '../../admin/admin-api.service';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../budget-tree.api';
 import { BudgetPlanApi, type BudgetPlan } from './budget-plan.api';
 import { BudgetPlanComponent } from './budget-plan.component';
@@ -37,6 +39,10 @@ interface Opts {
   wide?: boolean;
   phone?: boolean;
   query?: Record<string, string>;
+  /** The feature Abstimmungen is off. */
+  votingOff?: boolean;
+  /** The read of the Gremien fails. */
+  gremienFail?: boolean;
 }
 
 async function setup(opts: Opts = {}) {
@@ -52,25 +58,38 @@ async function setup(opts: Opts = {}) {
     setLine: jest.fn(() => answer()),
     deleteLine: jest.fn(() => answer()),
     setState: jest.fn(() => answer()),
+    passNextStep: jest.fn(() => answer()),
+    createStepVote: jest.fn(() => answer()),
   };
   const treeApi = {
     tree: jest.fn(() => of(opts.tree ?? [TOP, QSM])),
     listFiscalYears: jest.fn(() => of(opts.years ?? [FY25, FY26])),
+    deleteNode: jest.fn(() => of(undefined)),
   };
+  const gremien = jest.fn(() => (opts.gremienFail ? throwError(() => problem(500)) : of([{ id: 'g1', name: 'StuPa' }])));
   const view = await render(BudgetPlanComponent, {
     providers: [
       provideRouter([]),
       { provide: BudgetPlanApi, useValue: api },
       { provide: BudgetTreeApi, useValue: treeApi },
       { provide: AuthService, useValue: { can: (p: string) => perms.includes(p) } },
+      { provide: FeatureService, useValue: { isOn: () => !opts.votingOff } },
+      { provide: AdminApiService, useValue: { listGremienOptions: gremien } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.query ?? {}) } } },
     ],
   });
   const router = TestBed.inject(Router);
   const toast = TestBed.inject(ToastService);
   const c = view.fixture.componentInstance as unknown as Inst;
-  return { ...view, api, treeApi, router, toast, c };
+  return { ...view, api, treeApi, gremien, router, toast, c };
 }
+
+/** The steps of a version: the Beschluss of the StuPa, then the Genehmigung without a Gremium. */
+const STEPS = [
+  { name: 'Beschluss', gremiumId: 'g1', gremiumName: 'StuPa', passedAt: null },
+  { name: 'Genehmigung', gremiumId: null, passedAt: null },
+];
+const passed = (count: number) => STEPS.map((s, i) => (i < count ? { ...s, passedAt: `2026-01-${14 + i}T00:00:00Z` } : s));
 
 const rowOf = (c: Inst, id: string) => c.rows().find((r: { id: string }) => r.id === id);
 
@@ -106,8 +125,8 @@ describe('BudgetPlanComponent', () => {
     });
 
     it('§000806 §000807: shows the steps, the sums and the balance', async () => {
-      const view = await setup();
-      expect(view.c.steps().map((s: { label: string }) => s.label)).toEqual(['Entwurf', 'Beschlossen', 'Genehmigt', 'In Kraft']);
+      const view = await setup({ plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
+      expect(view.c.steps().map((s: { label: string }) => s.label)).toEqual(['Entwurf', 'Beschluss', 'Genehmigung', 'In Kraft']);
       expect(view.c.stepAt()).toBe(0);
       expect(screen.getByText('Ausgeglichen')).toBeInTheDocument();
       expect(view.container.querySelector('app-note')).toBeNull();
@@ -118,7 +137,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ plans: { 'fy-26': plan([draft]) } });
       expect(screen.getByText('Nicht ausgeglichen')).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveTextContent('Die Ausgaben liegen 30,50 € über den Einnahmen.');
-      expect(view.c.primary()).toMatchObject({ id: 'resolved', disabled: true });
+      expect(view.c.primary()).toMatchObject({ id: 'in_force', disabled: true });
       const more = version({ lines: [line('fees', '200'), line('grants', '130')] });
       view.c.load.set({ kind: 'plan', plan: plan([more]) });
       view.fixture.detectChanges();
@@ -149,7 +168,7 @@ describe('BudgetPlanComponent', () => {
     });
 
     it('§000809: shows a Nachtrag beside the version in force', async () => {
-      const stamm = version({ state: 'in_force', inForceAt: '2026-03-01T00:00:00Z', resolvedAt: '2026-01-14T00:00:00Z', approvedAt: '2026-01-27T00:00:00Z' });
+      const stamm = version({ state: 'in_force', inForceAt: '2026-03-01T00:00:00Z', steps: passed(2) });
       const nachtrag = version({ id: 'v1', number: 1, lines: [line('fees', '100'), line('grants', '45'), line('other', '15')] });
       const view = await setup({ plans: { 'fy-26': plan([stamm, nachtrag]) } });
       expect(view.c.version().id).toBe('v1');
@@ -220,6 +239,7 @@ describe('BudgetPlanComponent', () => {
           { provide: BudgetPlanApi, useValue: {} },
           { provide: BudgetTreeApi, useValue: { tree: () => throwError(() => problem(500)) } },
           { provide: AuthService, useValue: { can: () => true } },
+          { provide: AdminApiService, useValue: { listGremienOptions: () => of([]) } },
         ],
       });
       expect((view.fixture.componentInstance as unknown as Inst).error()).toBe(true);
@@ -297,7 +317,7 @@ describe('BudgetPlanComponent', () => {
       phone.fixture.detectChanges();
       expect(phone.c.sheetRow().id).toBe('grants');
       expect(phone.c.selId()).toBe('');
-      expect(phone.c.menu()[0].items[0]).toMatchObject({ id: 'resolved', disabledReason: null });
+      expect(phone.c.menu()[0].items[0]).toMatchObject({ id: 'in_force', disabledReason: null });
     });
 
     it('names the cause of a disabled decision in the phone menu', async () => {
@@ -347,7 +367,7 @@ describe('BudgetPlanComponent', () => {
     });
 
     it('§000793: writes nothing for a version that is not a draft or without the permission', async () => {
-      const decided = await setup({ plans: { 'fy-26': plan([version({ state: 'resolved' })]) } });
+      const decided = await setup({ plans: { 'fy-26': plan([version({ state: 'in_progress' })]) } });
       decided.c.saveLine(rowOf(decided.c, 'grants'), { amount: '1' });
       expect(decided.api.setLine).not.toHaveBeenCalled();
       expect(decided.c.menu()[0].items.map((i: { id: string }) => i.id)).toEqual(['draft']);
@@ -357,26 +377,69 @@ describe('BudgetPlanComponent', () => {
       expect(reader.c.editable()).toBe(false);
     });
 
-    it('§000792: moves the version through the steps', async () => {
-      const view = await setup();
+    it('§000792: passes the steps of the version one by one, then sets it in force', async () => {
+      const view = await setup({ plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
       const success = jest.spyOn(view.toast, 'success');
       view.fixture.detectChanges();
+      expect(view.c.primary()).toMatchObject({ id: 'step', label: 'Schritt abschließen: Beschluss', disabled: false });
       (view.container.querySelector('[data-testid=bp-primary] button, [data-testid=bp-primary]') as HTMLElement).click();
-      expect(view.api.setState).toHaveBeenLastCalledWith('v0', 'resolved');
-      expect(success).toHaveBeenCalledWith('Stand der Version geändert.');
-      view.c.load.set({ kind: 'plan', plan: plan([version({ state: 'resolved' })]) });
-      expect(view.c.primary()).toMatchObject({ id: 'approved' });
+      expect(view.api.passNextStep).toHaveBeenLastCalledWith('v0');
+      expect(success).toHaveBeenCalledWith('Schritt abgeschlossen.');
+      view.c.load.set({ kind: 'plan', plan: plan([version({ state: 'in_progress', steps: passed(1) })]) });
+      expect(view.c.primary()).toMatchObject({ id: 'step', label: 'Schritt abschließen: Genehmigung' });
+      expect(view.c.stepAt()).toBe(2);
+      expect(view.c.steps()[1].hint).toBe('14.01.2026');
       view.c.onAction('draft');
       expect(view.api.setState).toHaveBeenLastCalledWith('v0', 'draft');
-      view.c.load.set({ kind: 'plan', plan: plan([version({ state: 'approved' })]) });
+      view.c.load.set({ kind: 'plan', plan: plan([version({ state: 'in_progress', steps: passed(2) })]) });
       expect(view.c.primary()).toMatchObject({ id: 'in_force' });
       view.c.onAction('in_force');
       expect(view.c.confirmInForce()).toBe(true);
-      expect(view.api.setState).toHaveBeenCalledTimes(2);
+      expect(view.api.setState).toHaveBeenCalledTimes(1);
       view.c.setInForce();
       expect(view.api.setState).toHaveBeenLastCalledWith('v0', 'in_force');
       expect(view.treeApi.tree).toHaveBeenCalledTimes(2);
       expect(view.c.confirmInForce()).toBe(false);
+    });
+
+    it('§000811: an unbalanced draft cannot pass its first step', async () => {
+      const draft = version({ steps: STEPS, lines: [line('fees', '100'), line('grants', '130')] });
+      const view = await setup({ plans: { 'fy-26': plan([draft]) } });
+      expect(view.c.primary()).toMatchObject({ id: 'step', disabled: true });
+      view.c.load.set({ kind: 'plan', plan: plan([{ ...draft, state: 'in_progress' }]) });
+      expect(view.c.primary()).toMatchObject({ id: 'step', disabled: false });
+    });
+
+    it('§000826: offers the vote of the Gremium of the next step', async () => {
+      const view = await setup({ plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
+      const success = jest.spyOn(view.toast, 'success');
+      const ids = () => view.c.menu()[0].items.map((i: { id: string }) => i.id);
+      expect(ids()).toEqual(['vote', 'new', 'add']);
+      view.c.onAction('vote');
+      expect(view.api.createStepVote).toHaveBeenCalledWith('v0');
+      expect(success).toHaveBeenCalledWith('Abstimmung angelegt.');
+      const withVote = (voteStatus: string) =>
+        plan([version({ state: 'in_progress', steps: [{ ...STEPS[0], voteId: 'vote-1', voteStatus: voteStatus as 'open' }, STEPS[1]] })]);
+      view.c.load.set({ kind: 'plan', plan: withVote('draft') });
+      expect(ids()).toEqual(['openVote', 'draft']);
+      expect(view.c.steps()[1].hint).toBe('Abstimmung vorbereitet');
+      view.c.load.set({ kind: 'plan', plan: withVote('open') });
+      expect(view.c.steps()[1].hint).toBe('Abstimmung läuft');
+      view.c.load.set({ kind: 'plan', plan: withVote('closed') });
+      expect(view.c.steps()[1].hint).toBe('Abgelehnt');
+      expect(ids()).toEqual(['vote', 'openVote', 'draft']);
+      view.c.load.set({ kind: 'plan', plan: withVote('cancelled') });
+      expect(view.c.steps()[1].hint).toBeNull();
+      const navigate = jest.spyOn(view.router, 'navigate').mockResolvedValue(true);
+      view.c.onAction('openVote');
+      expect(navigate).toHaveBeenCalledWith(['/voting', 'vote-1']);
+    });
+
+    it('§000826: offers no vote for a step without a Gremium or with Abstimmungen off', async () => {
+      const second = await setup({ plans: { 'fy-26': plan([version({ state: 'in_progress', steps: passed(1) })]) } });
+      expect(second.c.menu()[0].items.map((i: { id: string }) => i.id)).toEqual(['draft']);
+      const off = await setup({ votingOff: true, plans: { 'fy-26': plan([version({ steps: [{ ...STEPS[0], voteId: 'v', voteStatus: 'open' }] })]) } });
+      expect(off.c.menu()[0].items.map((i: { id: string }) => i.id)).toEqual(['new', 'add']);
     });
 
     it('§000799: creates a Nachtrag from the version in force', async () => {
@@ -400,7 +463,8 @@ describe('BudgetPlanComponent', () => {
     it('§000819: takes a Kostenstelle into the draft and removes a line', async () => {
       const view = await setup({ query: { costCentre: 'wages' } });
       expect(view.c.addOptions().map((o: { value: string }) => o.value)).toEqual(['other', 'fees2']);
-      expect(view.c.menu()[0].items.map((i: { id: string }) => i.id)).toEqual(['add', 'remove']);
+      expect(view.c.menu()[0].items.map((i: { id: string }) => i.id)).toEqual(['new', 'add', 'remove']);
+      expect(view.c.menu()[1].items.map((i: { id: string }) => i.id)).toEqual(['delete']);
       view.c.onAction('add');
       expect(view.c.addOpen()).toBe(true);
       view.c.addLine(new Event('submit'));
@@ -425,6 +489,79 @@ describe('BudgetPlanComponent', () => {
       expect(error).toHaveBeenCalledWith('Der Ansatz liegt unter der Summe der untergeordneten Kostenstellen.');
       expect(view.api.plan).toHaveBeenCalledTimes(4);
       expect(view.c.busy()).toBe(false);
+    });
+
+    it('§000829: creates a Kostenstelle in the draft and shows the plan with its line', async () => {
+      const view = await setup();
+      expect(view.c.parents().map((o: { value: string }) => o.value)).toEqual(['vsm', 'fees', 'staff', 'wages', 'grants']);
+      view.c.onAction('new');
+      expect(view.c.createOpen()).toBe(true);
+      const withLine = plan([version({ lines: [line('fees', '100'), line('grants', '100')] })]);
+      view.c.onCreated({ id: null, plan: withLine });
+      expect(view.c.createOpen()).toBe(false);
+      expect(view.treeApi.tree).toHaveBeenCalledTimes(2);
+      expect(view.c.plan()).toBe(withLine);
+    });
+
+    it('§000831: reads the tree again after a setting of a Kostenstelle changed', async () => {
+      const view = await setup({ query: { costCentre: 'fees' } });
+      expect(view.gremien).toHaveBeenCalledTimes(1);
+      expect(view.c.gremiumOptions()).toEqual([{ value: 'g1', label: 'StuPa' }]);
+      expect(view.c.nodeOf('fees').name).toBe('Beiträge');
+      expect(view.c.nodeOf('nope')).toBeNull();
+      expect(view.c.sided(view.c.nodeOf('fees'))).toBe(true);
+      expect(view.c.sided(view.c.nodeOf('wages'))).toBe(false);
+      const before = view.c.plan();
+      view.c.reloadTree();
+      expect(view.treeApi.tree).toHaveBeenCalledTimes(2);
+      expect(view.c.plan()).toBe(before);
+      view.treeApi.tree.mockReturnValueOnce(throwError(() => problem(500)));
+      view.c.reloadTree();
+      expect(view.api.plan).toHaveBeenCalledTimes(4);
+    });
+
+    it('has no Gremien to choose when their read fails, and reads none without the permission', async () => {
+      const failed = await setup({ gremienFail: true });
+      expect(failed.c.gremiumOptions()).toEqual([]);
+      const reader = await setup({ perms: ['budget.view'] });
+      expect(reader.gremien).not.toHaveBeenCalled();
+      expect(reader.c.parents()).toHaveLength(5);
+    });
+
+    it('§000832: deletes a Kostenstelle after the confirmation', async () => {
+      const view = await setup({ query: { costCentre: 'wages' } });
+      const success = jest.spyOn(view.toast, 'success');
+      view.c.deleteNode();
+      expect(view.treeApi.deleteNode).not.toHaveBeenCalled();
+      view.c.onAction('delete');
+      expect(view.c.deleteRow().id).toBe('wages');
+      view.c.deleteNode();
+      expect(view.treeApi.deleteNode).toHaveBeenCalledWith('wages');
+      expect(success).toHaveBeenCalledWith('Kostenstelle gelöscht.');
+      expect(view.c.selId()).toBe('staff');
+      expect(view.c.deleteRow()).toBeNull();
+      view.c.onAction('delete');
+      view.c.deleteNode();
+      expect(view.c.selId()).toBe('');
+    });
+
+    it('§000832: names the cause of a refused delete', async () => {
+      const view = await setup({ query: { costCentre: 'grants' } });
+      const error = jest.spyOn(view.toast, 'error');
+      view.treeApi.deleteNode.mockReturnValueOnce(throwError(() => problem(409, 'budget_has_bookings')));
+      view.c.onAction('delete');
+      view.c.deleteNode();
+      expect(error).toHaveBeenCalledWith(view.c.i18n.translate('budget.cc.error.hasBookings'));
+      expect(view.c.selId()).toBe('grants');
+      expect(view.c.busy()).toBe(false);
+    });
+
+    it('does nothing for an action without a version', async () => {
+      const view = await setup({ plans: {} });
+      view.c.onAction('step');
+      expect(view.api.passNextStep).not.toHaveBeenCalled();
+      expect(view.c.stepAt()).toBe(0);
+      expect(view.c.next()).toBeNull();
     });
   });
 });

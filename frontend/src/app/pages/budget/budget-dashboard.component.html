@@ -83,7 +83,7 @@
       [body]="'budget.empty.noFiscalYear.body' | t"
     >
       @if (canManageStructure()) {
-        <a class="bd__emptyLink" [routerLink]="['/admin/cost-centres']">
+        <a class="bd__emptyLink" [routerLink]="['/admin/budgets']">
           {{ 'budget.empty.noFiscalYear.action' | t }}
         </a>
       }
@@ -184,6 +184,28 @@
             </div>
           }
         </dl>
+
+        @if (current(); as ks) {
+          @if (editable() || allocatable()) {
+            <app-section class="bd__sec" size="lg" [heading]="(ks.parentId ? 'budget.cc.heading' : 'budget.cc.budget') | t">
+              <div class="bd__settings">
+                @if (allocatable()) {
+                  <app-currency-input
+                    class="bd__allocation"
+                    [name]="'allocation-' + ks.id"
+                    [label]="'budget.cc.allocation' | t: { year: selectedYear()?.display ?? '' }"
+                    [ngModel]="figures().allocated"
+                    (ngModelChange)="editAllocation($event)"
+                    (focusout)="saveAllocation()"
+                  />
+                }
+                @if (editable()) {
+                  <app-cost-centre-settings [node]="ks" [sided]="sided()" [gremiumOptions]="gremiumOptions()" (saved)="refreshTree()" />
+                }
+              </div>
+            </app-section>
+          }
+        }
 
         <div class="bd__cols" [class.bd__cols--single]="!hasChildren()">
           @if (hasChildren()) {
@@ -333,6 +355,9 @@
                   <span class="tn__swatch" [style.background]="row.color" aria-hidden="true"></span>
                 }
                 <span class="tn__name ell" [class.tn__name--root]="row.depth === 0">{{ row.node.name }}</span>
+                @if (!row.node.active) {
+                  <app-badge>{{ 'budget.cc.inactive' | t }}</app-badge>
+                }
                 <span class="tn__amt mono">{{ moneyShort(row.allocated, row.node.currency) }}</span>
               </span>
               <app-seg-bar
@@ -352,7 +377,7 @@
 
   <ng-template #actions>
     @if (phone()) {
-      @if (actionSections()[0].items.length) {
+      @if (actionSections()[0].items.length || actionSections().length > 1) {
         <app-row-menu class="bd__more" [sections]="actionSections()" (selected)="onAction($event)" />
       }
     } @else {
@@ -371,7 +396,7 @@
             <app-icon name="download" />
           </app-button>
         }
-        @if (canSeeBookings()) {
+        @if (moreSections().length) {
           <app-row-menu class="bd__more" [sections]="moreSections()" (selected)="onAction($event)" />
         }
       </div>
@@ -444,3 +469,20 @@
     />
   </app-dialog>
 }
+
+<app-cost-centre-create
+  [open]="createOpen()"
+  [top]="createTop()"
+  [parents]="parents()"
+  [parent]="selectedKsId()"
+  (created)="onCreated($event)"
+  (closed)="createOpen.set(false)"
+/>
+
+<app-confirm-dialog
+  [open]="!!deleteTarget()"
+  [title]="'budget.tree.deleteTitle' | t"
+  [body]="deleteTarget() ? ('budget.tree.deleteConfirm' | t: { name: deleteTarget()!.name, path: deleteTarget()!.pathKey }) : ''"
+  (confirm)="deleteNode()"
+  (cancel)="deleteTarget.set(null)"
+/>

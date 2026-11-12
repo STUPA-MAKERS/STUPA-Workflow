@@ -9,7 +9,37 @@ import type { Uuid } from '@core/api/models';
 export type Side = 'income' | 'expense';
 
 /** The state of a plan version, in the order a version passes them. */
-export type PlanState = 'draft' | 'resolved' | 'approved' | 'in_force' | 'replaced';
+export type PlanState = 'draft' | 'in_progress' | 'in_force' | 'replaced';
+
+/** A state a person asks for: into force, or back to the draft. */
+export type PlanTarget = 'draft' | 'in_force';
+
+/** One step of a budget or of a version. A version keeps the time it passed the step. */
+export interface PlanStep {
+  readonly name: string;
+  readonly gremiumId: Uuid | null;
+  readonly gremiumName?: string | null;
+  readonly passedAt?: string | null;
+  /** The vote of the Gremium on this step. A deleted vote leaves the id without a status. */
+  readonly voteId?: Uuid | null;
+  readonly voteStatus?: 'draft' | 'open' | 'closed' | 'cancelled' | null;
+  readonly voteResult?: string | null;
+}
+
+/** The steps of a top-level Kostenstelle. */
+export interface PlanSteps {
+  readonly budgetId: Uuid;
+  readonly steps: readonly PlanStep[];
+}
+
+/** The body that creates a Kostenstelle and its line in a draft. */
+export interface PlanNodeCreate {
+  readonly parentId: Uuid;
+  readonly key: string;
+  readonly name: string;
+  readonly side: Side | null;
+  readonly amount: string;
+}
 
 /** One line of a plan version. Money is a string (Decimal). */
 export interface PlanLine {
@@ -30,9 +60,9 @@ export interface PlanVersion {
   readonly number: number;
   readonly state: PlanState;
   readonly createdAt: string;
-  readonly resolvedAt: string | null;
-  readonly approvedAt: string | null;
   readonly inForceAt: string | null;
+  /** The steps of the version. A draft shows the steps of its budget. */
+  readonly steps: readonly PlanStep[];
   readonly lines: readonly PlanLine[];
 }
 
@@ -85,8 +115,31 @@ export class BudgetPlanApi {
     return this.http.delete<BudgetPlan>(this.lineUrl(versionId, budgetId));
   }
 
-  setState(versionId: Uuid, state: PlanState): Observable<BudgetPlan> {
-    return this.http.post<BudgetPlan>(`${this.base}/budget-plan-versions/${versionId}/state`, { state });
+  setState(versionId: Uuid, state: PlanTarget): Observable<BudgetPlan> {
+    return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/state`, { state });
+  }
+
+  /** Record the next step of a version as passed. */
+  passNextStep(versionId: Uuid): Observable<BudgetPlan> {
+    return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/steps/next`, {});
+  }
+
+  /** Create the draft vote of the Gremium of the next step. */
+  createStepVote(versionId: Uuid): Observable<BudgetPlan> {
+    return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/steps/next/vote`, {});
+  }
+
+  /** Create a Kostenstelle and its line in a draft version. */
+  createNode(versionId: Uuid, body: PlanNodeCreate): Observable<BudgetPlan> {
+    return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/cost-centres`, body);
+  }
+
+  steps(topId: Uuid): Observable<PlanSteps> {
+    return this.http.get<PlanSteps>(`${this.base}/budgets/${topId}/plan-steps`, { context: skipLoading() });
+  }
+
+  setSteps(topId: Uuid, steps: readonly Pick<PlanStep, 'name' | 'gremiumId'>[]): Observable<PlanSteps> {
+    return this.http.put<PlanSteps>(`${this.base}/budgets/${topId}/plan-steps`, { steps });
   }
 
   setSide(budgetId: Uuid, side: Side): Observable<unknown> {
@@ -101,7 +154,11 @@ export class BudgetPlanApi {
     return `${this.base}/budgets/${topId}/fiscal-years/${fiscalYearId}/plan`;
   }
 
+  private versionUrl(versionId: Uuid): string {
+    return `${this.base}/budget-plan-versions/${versionId}`;
+  }
+
   private lineUrl(versionId: Uuid, budgetId: Uuid): string {
-    return `${this.base}/budget-plan-versions/${versionId}/lines/${budgetId}`;
+    return `${this.versionUrl(versionId)}/lines/${budgetId}`;
   }
 }

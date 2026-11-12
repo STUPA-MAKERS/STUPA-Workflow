@@ -42,6 +42,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
+import { FeatureService } from '@core/features/feature.service';
 import { errorStatus, problemCode } from '@core/api/problem';
 import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -50,24 +51,30 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { formatMoney } from '@shared/format-money';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { AdminApiService } from '../../admin/admin-api.service';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../budget-tree.api';
+import { CostCentreCreateComponent, type CostCentreCreated } from '../cost-centre/cost-centre-create.component';
+import { CostCentreSettingsComponent } from '../cost-centre/cost-centre-settings.component';
+import { costCentreError, findNode, hasSide, parentOptions } from '../cost-centre/cost-centre.util';
 import {
   BudgetPlanApi,
   type BudgetPlan,
   type PlanLineSet,
   type PlanState,
+  type PlanStep,
   type PlanVersion,
 } from './budget-plan.api';
 import {
-  PLAN_STEPS,
   type PlanRow,
   addable,
   cents,
   currentVersion,
   inForce,
+  nextStep,
   planRows,
   sideSum,
   stepIndex,
+  voteRuns,
 } from './budget-plan.util';
 
 /** The plan of the selected year: not loaded yet, failed, absent or present. */
@@ -92,6 +99,10 @@ const WRITE_ERRORS: Readonly<Record<string, TranslationKey>> = {
   plan_line_has_children: 'budget.plan.error.hasChildren',
   plan_not_balanced: 'budget.plan.error.notBalanced',
   plan_version_locked: 'budget.plan.error.locked',
+  plan_state_invalid: 'budget.plan.error.stateInvalid',
+  plan_no_step_left: 'budget.plan.error.stateInvalid',
+  plan_step_no_gremium: 'budget.plan.error.stepNoGremium',
+  plan_step_vote_runs: 'budget.plan.error.stepVoteRuns',
   fiscal_year_closed: 'budget.fy.closedError',
 };
 
@@ -118,13 +129,15 @@ const FIELD_COL = '10rem';
     ButtonComponent,
     CellDirective,
     ConfirmDialogComponent,
+    CostCentreCreateComponent,
+    CostCentreSettingsComponent,
     CurrencyInputComponent,
     DataTableComponent,
     DialogComponent,
     EmptyStateComponent,
     FilterSelectComponent,
     IconComponent,
-      NoteComponent,
+    NoteComponent,
     PageHeaderComponent,
     RowMenuComponent,
     ScrollFadeDirective,
@@ -151,6 +164,8 @@ export class BudgetPlanComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly features = inject(FeatureService);
+  private readonly adminApi = inject(AdminApiService);
 
   readonly wide = mediaQuery(MEDIA.wide);
   readonly phone = mediaQuery(MEDIA.phone);
@@ -175,6 +190,10 @@ export class BudgetPlanComponent {
   readonly confirmInForce = signal(false);
   readonly addOpen = signal(false);
   readonly addId = signal('');
+  readonly createOpen = signal(false);
+  /** The Kostenstelle that waits for the confirmation of its delete. */
+  readonly deleteRow = signal<PlanRow | null>(null);
+  readonly gremiumOptions = signal<readonly SelectOption[]>([]);
   /** The amounts a person typed and did not leave yet, by row id and field. */
   private readonly edits = signal<Readonly<Record<string, string>>>({});
 
@@ -266,15 +285,38 @@ export class BudgetPlanComponent {
   /** The direct child rows of the selected Kostenstelle. */
   readonly childRows = computed(() => this.rows().filter((r) => r.parentId === this.selId()));
 
+  /** The step display: "Entwurf", each step of the version by its name, "In Kraft". */
   readonly steps = computed<Step[]>(() => {
     const version = this.version();
-    const dates = [null, version?.resolvedAt, version?.approvedAt, version?.inForceAt];
-    return PLAN_STEPS.map((state, i) => ({
-      label: this.stateLabel(state),
-      hint: dates[i] ? this.date(dates[i]) : null,
-    }));
+    return [
+      { label: this.stateLabel('draft'), hint: null },
+      ...(version?.steps ?? []).map((step) => ({ label: step.name, hint: this.stepHint(step) })),
+      { label: this.stateLabel('in_force'), hint: version?.inForceAt ? this.date(version.inForceAt) : null },
+    ];
   });
-  readonly stepAt = computed(() => stepIndex(this.version()?.state ?? 'draft'));
+  readonly stepAt = computed(() => {
+    const version = this.version();
+    return version ? stepIndex(version) : 0;
+  });
+  /** The step the version passes next, while the version is not in force. */
+  readonly next = computed<PlanStep | null>(() => {
+    const version = this.version();
+    return version && (version.state === 'draft' || version.state === 'in_progress') ? nextStep(version) : null;
+  });
+
+  /** The tree node of a row, for the settings of the Kostenstelle. */
+  nodeOf(id: string): BudgetTreeNode | null {
+    return findNode(this.tree(), id);
+  }
+  /** The row is a direct child of the budget, so it has a side. */
+  sided(node: BudgetTreeNode): boolean {
+    return hasSide(node, this.top());
+  }
+  /** The parents of a new Kostenstelle: the budget and each Kostenstelle of the version. */
+  readonly parents = computed<SelectOption[]>(() => {
+    const top = this.top();
+    return top ? parentOptions(top, this.rows(), this.i18n.translate('budget.cc.budget')) : [];
+  });
 
   /** The Kostenstellen that can enter the draft. */
   readonly addOptions = computed<SelectOption[]>(() => {
@@ -320,13 +362,18 @@ export class BudgetPlanComponent {
       icon,
       disabled,
     });
+    const next = this.next();
     switch (version.state) {
       case 'draft':
-        return action('resolved', 'budget.plan.action.resolve', !this.balanced());
-      case 'resolved':
-        return action('approved', 'budget.plan.action.approve');
-      case 'approved':
-        return action('in_force', 'budget.plan.action.inForce');
+      case 'in_progress':
+        return next
+          ? {
+              id: 'step',
+              label: this.i18n.translate('budget.plan.action.step', { name: next.name }),
+              icon: 'check',
+              disabled: version.state === 'draft' && !this.balanced(),
+            }
+          : action('in_force', 'budget.plan.action.inForce', !this.balanced());
       case 'in_force':
         return currentVersion(this.versions())?.id === version.id
           ? action('nachtrag', 'budget.plan.action.nachtrag', false, 'fileplus')
@@ -352,11 +399,25 @@ export class BudgetPlanComponent {
             },
           ]
         : []),
-      ...item('draft', 'budget.plan.action.backToDraft', 'undo', this.canWrite() && state === 'resolved'),
-      ...item('add', 'budget.plan.action.add', 'plus', this.editable() && this.addOptions().length > 0),
-      ...item('remove', 'budget.plan.action.remove', 'trash', this.editable() && !!this.sel()),
+      ...item('vote', 'budget.plan.action.vote', 'vote', this.canVote()),
+      ...item('openVote', 'budget.plan.action.openVote', 'link', this.voting() && !!this.next()?.voteStatus),
+      ...item('draft', 'budget.plan.action.backToDraft', 'undo', !!primary && state === 'in_progress'),
+      ...item('new', 'budget.cc.create', 'plus', this.editable()),
+      ...item('add', 'budget.plan.action.add', 'fileplus', this.editable() && this.addOptions().length > 0),
+      ...item('remove', 'budget.plan.action.remove', 'x', this.editable() && !!this.sel()),
     ];
-    return items.length ? [{ items }] : [];
+    const remove: RowMenuItem[] =
+      this.canWrite() && this.sel()
+        ? [{ id: 'delete', label: this.i18n.translate('budget.cc.delete'), icon: 'trash', danger: true }]
+        : [];
+    return [...(items.length ? [{ items }] : []), ...(remove.length ? [{ items: remove }] : [])];
+  });
+
+  private readonly voting = computed(() => this.features.isOn('voting'));
+  /** The next step names a Gremium and has no vote that waits for its result. */
+  private readonly canVote = computed(() => {
+    const next = this.next();
+    return !!this.primary() && this.voting() && !!next?.gremiumId && !voteRuns(next);
   });
 
   constructor() {
@@ -377,6 +438,11 @@ export class BudgetPlanComponent {
         this.loading.set(false);
       },
     });
+    if (this.canWrite())
+      this.adminApi.listGremienOptions().subscribe({
+        next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
+        error: () => this.gremiumOptions.set([]),
+      });
   }
 
   /** Select a top-level Kostenstelle and load its fiscal years. */
@@ -491,9 +557,62 @@ export class BudgetPlanComponent {
       case 'remove':
         this.removeLine();
         return;
+      case 'new':
+        this.createOpen.set(true);
+        return;
+      case 'delete':
+        this.deleteRow.set(this.sel());
+        return;
+      case 'step':
+        this.write(this.api.passNextStep(version.id), 'budget.plan.toast.step');
+        return;
+      case 'vote':
+        this.write(this.api.createStepVote(version.id), 'budget.plan.toast.vote');
+        return;
+      case 'openVote':
+        void this.router.navigate(['/voting', this.next()?.voteId]);
+        return;
       default:
-        this.write(this.api.setState(version.id, id as PlanState), 'budget.plan.toast.state');
+        this.write(this.api.setState(version.id, 'draft'), 'budget.plan.toast.state');
     }
+  }
+
+  /** The dialog created a Kostenstelle with its line: read the tree, then show the plan. */
+  onCreated(created: CostCentreCreated): void {
+    this.createOpen.set(false);
+    this.reloadTree(created.plan);
+  }
+
+  /** A setting of a Kostenstelle changed: the names and sides of the rows come from the tree. */
+  reloadTree(plan: BudgetPlan | null = null): void {
+    this.treeApi.tree().subscribe({
+      next: (tree) => {
+        this.tree.set(tree);
+        if (plan) this.load.set({ kind: 'plan', plan });
+      },
+      error: () => this.reloadPlan(),
+    });
+  }
+
+  /** Delete the Kostenstelle after the confirmation. A refusal shows its reason. */
+  deleteNode(): void {
+    const row = this.deleteRow();
+    this.deleteRow.set(null);
+    if (!row) return;
+    this.busy.set(true);
+    this.treeApi.deleteNode(row.id).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.toast.success(this.i18n.translate('budget.tree.toast.deleted'));
+        this.selId.set(row.parentId ?? '');
+        this.reloadTree();
+        this.reloadPlan();
+      },
+      error: (err: unknown) => {
+        this.busy.set(false);
+        this.toast.error(this.i18n.translate(costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed')));
+      },
+    });
   }
 
   setInForce(): void {
@@ -568,7 +687,7 @@ export class BudgetPlanComponent {
     request.subscribe({
       next: (plan) => {
         this.busy.set(false);
-            this.versionId.set('');
+        this.versionId.set('');
         this.load.set({ kind: 'plan', plan });
         if (toast) this.toast.success(this.i18n.translate(toast));
         if (allocations) this.treeApi.tree().subscribe((tree) => this.tree.set(tree));
@@ -613,6 +732,21 @@ export class BudgetPlanComponent {
     const change = against === null ? 0 : cents(row.amount) - cents(against);
     if (change === 0) return '–';
     return (change > 0 ? '+' : '−') + this.money(Math.abs(change) / 100);
+  }
+
+  /** Under a step: the date it was passed, else the state of the vote of its Gremium. */
+  private stepHint(step: PlanStep): string | null {
+    if (step.passedAt) return this.date(step.passedAt);
+    switch (step.voteStatus) {
+      case 'draft':
+        return this.i18n.translate('budget.plan.vote.draft');
+      case 'open':
+        return this.i18n.translate('budget.plan.vote.open');
+      case 'closed':
+        return this.i18n.translate('budget.plan.vote.refused');
+      default:
+        return null;
+    }
   }
 
   private date(iso: string | null | undefined): string {

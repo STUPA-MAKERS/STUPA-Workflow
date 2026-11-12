@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
+implementation:
+  - frontend/src/app/pages/budget/budget-dashboard.component.ts
 scope:
   - frontend/src/app/pages/budget
 ---

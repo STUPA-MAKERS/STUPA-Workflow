@@ -65,7 +65,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('todos'),
   { path: 'todos/:boardId', url: (ids) => `/todos/${ids.board}` },
   fixed('admin'),
-  fixed('admin/cost-centres'),
+  fixed('admin/budgets'),
   fixed('admin/users'),
   fixed('admin/roles'),
   fixed('admin/group-mappings'),

@@ -397,19 +397,20 @@ export const routes: Routes = [
           ),
         children: [
           {
-            path: 'cost-centres',
+            path: 'budgets',
             canMatch: [featureMatch('budget')],
             data: {
-              title: 'budget.tree.title',
+              title: 'admin.budgets.title',
               permission: 'budget.structure',
               parent: ['admin'],
               wide: true,
             },
             canActivate: [authGuard],
             loadComponent: () =>
-              import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
+              import('./pages/admin/budgets/admin-budgets.component').then((m) => m.AdminBudgetsComponent),
           },
-          { path: 'budget-pots', redirectTo: 'cost-centres', pathMatch: 'full' },
+          { path: 'cost-centres', redirectTo: 'budgets', pathMatch: 'full' },
+          { path: 'budget-pots', redirectTo: 'budgets', pathMatch: 'full' },
           {
             path: '',
             pathMatch: 'full',

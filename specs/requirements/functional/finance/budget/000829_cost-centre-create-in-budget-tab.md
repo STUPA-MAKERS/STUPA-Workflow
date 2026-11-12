@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "frontend/src/app/pages/budget/cost-centre/cost-centre-create.component.spec.ts:CostCentreCreateComponent"
+  - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
+  - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
+implementation:
+  - frontend/src/app/pages/budget/cost-centre/cost-centre-create.component.ts
+  - frontend/src/app/pages/budget/budget-dashboard.component.ts
+  - frontend/src/app/pages/budget/plan/budget-plan.component.ts
 scope:
   - frontend/src/app/pages/budget
   - backend/app/modules/budget

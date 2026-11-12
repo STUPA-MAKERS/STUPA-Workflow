@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Subject, forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -9,7 +10,10 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
 import {
+  BadgeComponent,
   ButtonComponent,
+  ConfirmDialogComponent,
+  CurrencyInputComponent,
   DialogComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -24,6 +28,7 @@ import {
   SegmentedComponent,
   type Seg,
   SegBarComponent,
+  type SelectOption,
   SheetBarComponent,
   SheetBarTitleDirective,
   SideSheetComponent,
@@ -47,6 +52,13 @@ import {
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
+import { CostCentreCreateComponent, type CostCentreCreated } from './cost-centre/cost-centre-create.component';
+import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
+import { activeOnly, costCentreError, hasSide, parentOptions, withDescendants } from './cost-centre/cost-centre.util';
+import { BudgetPlanApi, type BudgetPlan } from './plan/budget-plan.api';
+import { inForce, memberIds, yearMembers } from './plan/budget-plan.util';
+import { AdminApiService } from '../admin/admin-api.service';
+import { problemCode } from '@core/api/problem';
 import { toggled } from '@shared/util/immutable';
 import { formatMoney } from '@shared/format-money';
 import { BudgetItemListComponent } from './budget-items/budget-item-list.component';
@@ -146,6 +158,12 @@ export const APPS_SHOWN = 5;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TodoLinkedListComponent,
+    BadgeComponent,
+    ConfirmDialogComponent,
+    CostCentreCreateComponent,
+    CostCentreSettingsComponent,
+    CurrencyInputComponent,
+    FormsModule,
     SectionComponent,
     LoadErrorComponent,
     PageHeaderComponent,
@@ -182,6 +200,8 @@ export class BudgetDashboardComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly planApi = inject(BudgetPlanApi);
+  private readonly adminApi = inject(AdminApiService);
 
   /** The pane sits beside the sheet only on a wide viewport. */
   readonly wide = mediaQuery(MEDIA.wide);
@@ -214,7 +234,7 @@ export class BudgetDashboardComponent {
   readonly canExport = computed(() => this.auth.can('budget.export'));
   /** The bookings page needs a global budget permission; a gremium scope alone has none. */
   readonly canSeeBookings = computed(() => this.auth.canAny(...BUDGET_PERMISSIONS));
-  /** Only a reader with `budget.structure` can open /admin/cost-centres and add a year. */
+  /** Only a reader with `budget.structure` can open /admin/budgets and add a year. */
   readonly canManageStructure = computed(() => this.auth.can('budget.structure'));
   readonly exporting = signal(false);
 
@@ -245,12 +265,52 @@ export class BudgetDashboardComponent {
     'available',
   ];
 
-  /** Tree without the hidden cost centres. `hiddenInBudget` removes the node and its
-   *  subtree from the budget tab. This changes the display only: the values still count
-   *  in the parent rollups. */
-  private readonly visibleTree = computed<readonly BudgetTreeNode[]>(() =>
-    pruneHidden(this.tree()),
+  /** The tree without the inactive Kostenstellen and their subtrees. This changes the
+   *  display only: the values still count in the parent rollups. A person with
+   *  `budget.structure` sees them, marked "inaktiv", to set them active again. */
+  private readonly visibleTree = computed<readonly BudgetTreeNode[]>(() => {
+    const shown = this.canManageStructure() ? this.tree() : activeOnly(this.tree());
+    const members = memberIds(inForce(this.yearPlan()?.versions ?? []));
+    return members
+      ? shown.map((n) => (n.id === this.selectedBudgetId() ? yearMembers(n, members, this.selectedFyId()) : n))
+      : shown;
+  });
+
+  /**
+   * The Haushaltsplan of the selected year: `undefined` while it is not read, `null` for a
+   * year without a plan. A year with a version in force shows only its Kostenstellen.
+   */
+  readonly yearPlan = signal<BudgetPlan | null | undefined>(undefined);
+  /** The selected root is a budget and its selected year has no plan, so its
+   *  Kostenstellen and allocations are set here by hand. */
+  readonly byHand = computed(
+    () => this.canManageStructure() && this.yearPlan() === null && !!this.selectedTop() && !!this.selectedFyId(),
   );
+  private readonly selectedTop = computed(
+    () => this.tree().find((n) => n.id === this.selectedBudgetId() && !n.parentId) ?? null,
+  );
+  readonly createTop = this.selectedTop;
+  readonly createOpen = signal(false);
+  /** The Kostenstelle that waits for the confirmation of its delete. */
+  readonly deleteTarget = signal<BudgetTreeNode | null>(null);
+  readonly gremiumOptions = signal<readonly SelectOption[]>([]);
+  /** The allocation a person typed and did not leave yet. */
+  private readonly allocationDraft = signal<string | null>(null);
+  /** The parents of a new Kostenstelle: the budget and each Kostenstelle below it. */
+  readonly parents = computed<SelectOption[]>(() => {
+    const top = this.selectedTop();
+    return top
+      ? parentOptions(top, withDescendants(top).slice(1), this.i18n.translate('budget.cc.budget'))
+      : [];
+  });
+  /** The selected Kostenstelle is below a budget, so the page edits and deletes it. */
+  readonly editable = computed(() => this.canManageStructure() && !!this.current()?.parentId);
+  /** The allocation of the selected year is set by hand and the year is open. */
+  readonly allocatable = computed(() => this.byHand() && !this.selectedYear()?.closedAt);
+  readonly sided = computed(() => {
+    const ks = this.current();
+    return !!ks && hasSide(ks, this.selectedTop());
+  });
 
   /** Roots of the tree: the forest roots of the server response that HAVE a fiscal year.
    *  The full view gives the top budgets; a gremium scope gives the assigned sub cost
@@ -613,6 +673,11 @@ export class BudgetDashboardComponent {
       });
 
     this.load();
+    if (this.canManageStructure())
+      this.adminApi.listGremienOptions().subscribe({
+        next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
+        error: () => this.gremiumOptions.set([]),
+      });
 
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       this.urlParams = qp;
@@ -644,7 +709,7 @@ export class BudgetDashboardComponent {
       next: (tree) => {
         this.tree.set(tree);
         this.loading.set(false);
-        const tops = tree.filter((n) => !n.hiddenInBudget);
+        const tops = this.shownTops(tree);
         const round = ++this.fyRound;
         this.pendingFiscalYears.set(tops.length);
         for (const top of tops) {
@@ -675,6 +740,11 @@ export class BudgetDashboardComponent {
     });
   }
 
+  /** The roots the reader sees: an inactive one only with `budget.structure`. */
+  private shownTops(tree: readonly BudgetTreeNode[]): readonly BudgetTreeNode[] {
+    return this.canManageStructure() ? tree : tree.filter((n) => n.active);
+  }
+
   /** Restore the first selection from the query params. Else take the first root and
    *  its newest fiscal year. */
   private restored = false;
@@ -696,7 +766,7 @@ export class BudgetDashboardComponent {
    * while the tree and the fiscal years trickle in.
    */
   private applyUrlSelection(): void {
-    const tops = this.tree().filter((n) => !n.hiddenInBudget);
+    const tops = this.shownTops(this.tree());
     const next = this.resolveSelection(tops);
     if (next === null) return;
     if (
@@ -757,11 +827,90 @@ export class BudgetDashboardComponent {
    *  the applications of the new cost centre and year. */
   private setSelection(budgetId: string, ksId: string, fyId: string): void {
     const changed = ksId !== this.selectedKsId() || fyId !== this.selectedFyId();
+    const yearChanged = budgetId !== this.selectedBudgetId() || fyId !== this.selectedFyId();
     this.selectedBudgetId.set(budgetId);
     this.selectedKsId.set(ksId);
     this.selectedFyId.set(fyId);
+    this.allocationDraft.set(null);
+    if (yearChanged) this.loadYearPlan();
     if (ksId) this.expandPath(ksId);
     if (changed || this.apps() === null) this.loadApps();
+  }
+
+  /** Read the plan of the selected year. Only a budget with the plan switch on has one. */
+  private loadYearPlan(): void {
+    const top = this.selectedTop();
+    const fy = this.selectedFyId();
+    if (!top?.planEnabled || !fy) {
+      this.yearPlan.set(top ? null : undefined);
+      return;
+    }
+    this.yearPlan.set(undefined);
+    this.planApi.plan(top.id, fy as Uuid).subscribe({
+      next: (plan) => {
+        if (fy !== this.selectedFyId()) return;
+        this.yearPlan.set(plan);
+        if (!this.selectedKs()) this.setSelection(top.id, top.id, fy);
+      },
+      error: () => this.yearPlan.set(fy === this.selectedFyId() ? null : this.yearPlan()),
+    });
+  }
+
+  /** Read the tree again after a write, without the skeleton of the first load. */
+  refreshTree(): void {
+    this.api.tree().subscribe({
+      next: (tree) => {
+        this.tree.set(tree);
+        if (!this.selectedKs()) this.selectKs(this.selectedBudgetId());
+      },
+      error: () => this.toast.error(this.i18n.translate('budget.error')),
+    });
+  }
+
+  onCreated(created: CostCentreCreated): void {
+    this.createOpen.set(false);
+    if (created.id) this.selectedKsId.set(created.id);
+    this.refreshTree();
+    this.syncUrl();
+  }
+
+  /** Delete the Kostenstelle after the confirmation. A refusal shows its reason. */
+  deleteNode(): void {
+    const node = this.deleteTarget();
+    this.deleteTarget.set(null);
+    if (!node) return;
+    this.api.deleteNode(node.id).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.tree.toast.deleted'));
+        this.selectedKsId.set(node.parentId ?? this.selectedBudgetId());
+        this.refreshTree();
+        this.syncUrl();
+      },
+      error: (err: unknown) =>
+        this.toast.error(this.i18n.translate(costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed'))),
+    });
+  }
+
+  editAllocation(value: string): void {
+    this.allocationDraft.set(value);
+  }
+
+  /** The allocation field lost the focus: save the typed amount. An empty field saves nothing. */
+  saveAllocation(): void {
+    const ks = this.current();
+    const value = this.allocationDraft();
+    this.allocationDraft.set(null);
+    if (!ks || value === null || value === '' || Number(value) === this.figures().allocated) return;
+    this.api.setAllocation(ks.id, this.selectedFyId() as Uuid, value).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.cc.toast.allocated'));
+        this.refreshTree();
+      },
+      error: (err: unknown) => {
+        this.toast.error(this.i18n.translate(costCentreError(problemCode(err), 'budget.cc.error.allocation')));
+        this.refreshTree();
+      },
+    });
   }
 
   protected loadApps(): void {
@@ -827,6 +976,17 @@ export class BudgetDashboardComponent {
     this.itemsOpen.set(true);
   }
 
+  /** The actions on the structure: a new Kostenstelle, and the delete of the selected one. */
+  private structureItems(): RowMenuSection[] {
+    const create: RowMenuItem[] = this.byHand()
+      ? [{ id: 'new', label: this.i18n.translate('budget.cc.create'), icon: 'plus' }]
+      : [];
+    const remove: RowMenuItem[] = this.editable()
+      ? [{ id: 'delete', label: this.i18n.translate('budget.cc.delete'), icon: 'trash', danger: true }]
+      : [];
+    return [create, remove].filter((items) => items.length).map((items) => ({ items }));
+  }
+
   /** The actions of the page, as the "more" menu of a phone. */
   actionSections(): RowMenuSection[] {
     const exportItem: RowMenuItem = {
@@ -843,27 +1003,22 @@ export class BudgetDashboardComponent {
       ...(this.canExport() ? [exportItem] : []),
       ...(this.canSeeBookings() ? [bookingsItem] : []),
     ];
-    return [{ items }];
+    return [{ items }, ...this.structureItems()];
   }
 
   /** The ⋮ menu of the head on a wide screen (§ 000670): what is no icon button. */
   moreSections(): RowMenuSection[] {
-    return [
-      {
-        items: [
-          {
-            id: 'bookings',
-            label: this.i18n.translate('budget.usage.viewExpenses'),
-            icon: 'receipt',
-          },
-        ],
-      },
-    ];
+    const bookings: RowMenuSection[] = this.canSeeBookings()
+      ? [{ items: [{ id: 'bookings', label: this.i18n.translate('budget.usage.viewExpenses'), icon: 'receipt' }] }]
+      : [];
+    return [...bookings, ...this.structureItems()];
   }
 
   onAction(item: RowMenuItem): void {
     if (item.id === 'export') this.onExport();
     else if (item.id === 'bookings') this.openBookings();
+    else if (item.id === 'new') this.createOpen.set(true);
+    else if (item.id === 'delete') this.deleteTarget.set(this.current());
   }
 
   openBookings(): void {
@@ -908,13 +1063,6 @@ export function utilisation(f: Figures): number | null {
 function newestFyId(fys: readonly FiscalYear[]): string {
   const newest = fys.reduce<FiscalYear | null>((n, f) => (!n || f.year > n.year ? f : n), null);
   return newest?.id ?? '';
-}
-
-/** Remove the cost centres hidden in the budget tab, and their subtrees. */
-function pruneHidden(nodes: readonly BudgetTreeNode[]): readonly BudgetTreeNode[] {
-  return nodes
-    .filter((n) => !n.hiddenInBudget)
-    .map((n) => ({ ...n, children: pruneHidden(n.children) }));
 }
 
 /** Every node of a forest, each before its subtree. */

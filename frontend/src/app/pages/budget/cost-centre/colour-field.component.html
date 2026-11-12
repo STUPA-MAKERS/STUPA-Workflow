@@ -1,0 +1,39 @@
+<fieldset class="cf" [disabled]="disabled()">
+  <legend class="cf__legend">{{ 'budget.tree.col.color' | t }}</legend>
+  <div class="cf__row">
+    @for (c of palette; track c) {
+      <button
+        type="button"
+        class="cf__pick"
+        [class.cf__pick--on]="value() === c"
+        [style.background]="c"
+        [attr.aria-pressed]="value() === c"
+        [attr.aria-label]="'budget.tree.colorPick' | t: { color: c }"
+        [title]="c"
+        (click)="pick(c)"
+      ></button>
+    }
+    <input
+      class="cf__native"
+      type="color"
+      [value]="value() || '#72a384'"
+      [attr.aria-label]="'budget.tree.colorCustom' | t"
+      [title]="'budget.tree.colorCustom' | t"
+      (input)="pick($any($event.target).value)"
+    />
+    <app-input
+      class="cf__hex"
+      [ariaLabel]="'budget.tree.colorHex' | t"
+      placeholder="#rrggbb"
+      [error]="invalid() ? ('budget.tree.colorInvalid' | t) : ''"
+      [ngModel]="value()"
+      (ngModelChange)="value.set($event.trim())"
+      (focusout)="commit()"
+      [name]="name()"
+      [disabled]="disabled()"
+    />
+    @if (value() && !disabled()) {
+      <app-button variant="text" size="sm" (click)="pick('')">{{ 'budget.tree.colorClear' | t }}</app-button>
+    }
+  </div>
+</fieldset>

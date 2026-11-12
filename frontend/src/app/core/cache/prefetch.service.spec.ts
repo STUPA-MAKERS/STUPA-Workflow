@@ -38,9 +38,9 @@ describe('PrefetchService', () => {
   it('warms the fiscal years of every root the budget page shows', () => {
     const { cachedFiscalYears } = setup({
       roots: [
-        { id: 'a', hiddenInBudget: false },
-        { id: 'b', hiddenInBudget: true },
-        { id: 'c', hiddenInBudget: false },
+        { id: 'a', active: true },
+        { id: 'b', active: false },
+        { id: 'c', active: true },
       ],
     });
     TestBed.inject(PrefetchService);
@@ -49,7 +49,7 @@ describe('PrefetchService', () => {
   });
 
   it('stays silent when a fiscal-year prefetch fails', () => {
-    const { cachedFiscalYears } = setup({ roots: [{ id: 'a', hiddenInBudget: false }] });
+    const { cachedFiscalYears } = setup({ roots: [{ id: 'a', active: true }] });
     cachedFiscalYears.mockReturnValue(throwError(() => new Error('down')));
     expect(() => {
       TestBed.inject(PrefetchService);

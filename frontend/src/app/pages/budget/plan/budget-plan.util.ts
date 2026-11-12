@@ -1,6 +1,6 @@
 import type { Uuid } from '@core/api/models';
 import type { BudgetTreeNode } from '../budget-tree.api';
-import type { PlanLine, PlanState, PlanVersion, Side } from './budget-plan.api';
+import type { PlanLine, PlanState, PlanStep, PlanVersion, Side } from './budget-plan.api';
 
 /** One Kostenstelle of a plan version, ready for the list and the tables. */
 export interface PlanRow {
@@ -38,11 +38,8 @@ export interface PlanRowSource {
   readonly prevFiscalYearId: Uuid | null;
 }
 
-/** The states a version passes, in the order of the steps of the plan page. */
-export const PLAN_STEPS: readonly PlanState[] = ['draft', 'resolved', 'approved', 'in_force'];
-
 /** The states of a version that is not yet in force. */
-const OPEN_STATES: readonly PlanState[] = ['draft', 'resolved', 'approved'];
+const OPEN_STATES: readonly PlanState[] = ['draft', 'in_progress'];
 
 const lineMap = (version: PlanVersion | null): ReadonlyMap<Uuid, PlanLine> =>
   new Map((version?.lines ?? []).map((l) => [l.budgetId, l] as const));
@@ -108,6 +105,21 @@ export function memberIds(version: PlanVersion | null): ReadonlySet<Uuid> | null
   return version ? new Set(version.lines.map((l) => l.budgetId)) : null;
 }
 
+/**
+ * A budget as a year with a plan in force shows it: only a Kostenstelle with a line in
+ * that version (`ids`), or with a booking or an Antrag in the year. The budget itself
+ * always shows.
+ */
+export function yearMembers(top: BudgetTreeNode, ids: ReadonlySet<Uuid>, fiscalYearId: string): BudgetTreeNode {
+  const used = (node: BudgetTreeNode): boolean => {
+    const view = node.byFiscalYear.find((a) => a.fiscalYearId === fiscalYearId);
+    return !!view && [view.bound, view.requested, view.expended, view.income].some((v) => Number(v) !== 0);
+  };
+  const members = (nodes: readonly BudgetTreeNode[]): readonly BudgetTreeNode[] =>
+    nodes.filter((n) => ids.has(n.id) || used(n)).map((n) => ({ ...n, children: members(n.children) }));
+  return { ...top, children: members(top.children) };
+}
+
 /** The version in force of a plan, or `null`. */
 export function inForce(versions: readonly PlanVersion[]): PlanVersion | null {
   return versions.find((v) => v.state === 'in_force') ?? null;
@@ -118,7 +130,28 @@ export function currentVersion(versions: readonly PlanVersion[]): PlanVersion | 
   return versions.find((v) => OPEN_STATES.includes(v.state)) ?? inForce(versions) ?? versions.at(-1) ?? null;
 }
 
-/** The index of the active step of a version. A version that is or was in force has passed each step. */
-export function stepIndex(state: PlanState): number {
-  return state === 'in_force' || state === 'replaced' ? PLAN_STEPS.length : PLAN_STEPS.indexOf(state);
+/** The next step of a version that is not passed, or `null`. */
+export function nextStep(version: PlanVersion): PlanStep | null {
+  return version.steps.find((s) => !s.passedAt) ?? null;
+}
+
+/**
+ * The index of the active entry of the step display: "Entwurf", each step, "In Kraft". A
+ * version that is or was in force has passed each entry.
+ */
+export function stepIndex(version: PlanVersion): number {
+  switch (version.state) {
+    case 'draft':
+      return 0;
+    case 'in_progress':
+      return 1 + version.steps.filter((s) => !!s.passedAt).length;
+    case 'in_force':
+    case 'replaced':
+      return version.steps.length + 2;
+  }
+}
+
+/** The vote of a step waits for its result: the step takes no second vote. */
+export function voteRuns(step: PlanStep): boolean {
+  return step.voteStatus === 'draft' || step.voteStatus === 'open';
 }

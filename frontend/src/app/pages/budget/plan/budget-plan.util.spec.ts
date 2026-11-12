@@ -5,10 +5,13 @@ import {
   inForce,
   memberIds,
   planRows,
+  nextStep,
   sideSum,
   stepIndex,
+  voteRuns,
+  yearMembers,
 } from './budget-plan.util';
-import { TOP, line, version } from './budget-plan.fixtures';
+import { TOP, line, node, version } from './budget-plan.fixtures';
 
 describe('budget plan rules', () => {
   const source = { top: TOP, version: version(), base: null, prev: null, prevFiscalYearId: null };
@@ -25,7 +28,7 @@ describe('budget plan rules', () => {
   });
 
   it('§000821: shows the name and the key that a decided line keeps', () => {
-    const decided = version({ state: 'resolved', lines: [line('fees', '1', { name: 'Alt', pathKey: 'OLD-1', note: 'n' })] });
+    const decided = version({ state: 'in_progress', lines: [line('fees', '1', { name: 'Alt', pathKey: 'OLD-1', note: 'n' })] });
     expect(planRows({ ...source, version: decided })[0]).toMatchObject({ name: 'Alt', pathKey: 'OLD-1', note: 'n' });
   });
 
@@ -68,7 +71,40 @@ describe('budget plan rules', () => {
     expect(memberIds(null)).toBeNull();
   });
 
-  it('§000806: places a version on its step', () => {
-    expect((['draft', 'resolved', 'approved', 'in_force', 'replaced'] as const).map(stepIndex)).toEqual([0, 1, 2, 4, 4]);
+  it('§000806: places a version on its entry of the step display', () => {
+    const steps = [
+      { name: 'Beschluss', gremiumId: 'g1', passedAt: '2026-02-01T10:00:00Z' },
+      { name: 'Genehmigung', gremiumId: null, passedAt: null },
+    ];
+    expect(stepIndex(version({ steps }))).toBe(0);
+    expect(stepIndex(version({ steps, state: 'in_progress' }))).toBe(2);
+    expect(stepIndex(version({ steps, state: 'in_force' }))).toBe(4);
+    expect(stepIndex(version({ state: 'replaced' }))).toBe(2);
+    expect(nextStep(version({ steps }))?.name).toBe('Genehmigung');
+    expect(nextStep(version())).toBeNull();
+  });
+
+  it('§000826: a vote runs while it is a draft or open', () => {
+    const step = { name: 'Beschluss', gremiumId: 'g1' };
+    expect(voteRuns({ ...step, voteStatus: 'draft' })).toBe(true);
+    expect(voteRuns({ ...step, voteStatus: 'open' })).toBe(true);
+    expect(voteRuns({ ...step, voteStatus: 'closed' })).toBe(false);
+    expect(voteRuns(step)).toBe(false);
+  });
+
+  it('shows in a year with a plan in force only its Kostenstellen and the used ones', () => {
+    const used = { fiscalYearId: 'fy-1', allocated: '5', bound: '0', expended: '0', income: '1', committed: '0', requested: '0', available: '0' };
+    const top = node({
+      id: 't',
+      children: [
+        node({ id: 'in', children: [node({ id: 'in-out' }), node({ id: 'in-in' })] }),
+        node({ id: 'used', byFiscalYear: [used] }),
+        node({ id: 'other-year', byFiscalYear: [{ ...used, fiscalYearId: 'fy-0' }] }),
+        node({ id: 'only-allocated', byFiscalYear: [{ ...used, income: '0' }] }),
+      ],
+    });
+    const shown = yearMembers(top, new Set(['in', 'in-in']), 'fy-1');
+    expect(shown.children.map((n) => n.id)).toEqual(['in', 'used']);
+    expect(shown.children[0].children.map((n) => n.id)).toEqual(['in-in']);
   });
 });

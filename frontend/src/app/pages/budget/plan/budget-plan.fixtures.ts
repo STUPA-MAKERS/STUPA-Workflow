@@ -12,7 +12,6 @@ export function node(over: Partial<BudgetTreeNode> & { readonly id: string }): B
     currency: 'EUR',
     active: true,
     color: null,
-    hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 3,
     fiscalStartDay: 1,
@@ -92,9 +91,8 @@ export const version = (over: Partial<PlanVersion> = {}): PlanVersion => ({
   number: 0,
   state: 'draft',
   createdAt: '2026-01-02T10:00:00Z',
-  resolvedAt: null,
-  approvedAt: null,
   inForceAt: null,
+  steps: [],
   lines: [line('fees', '100'), line('staff', '70'), line('wages', '60'), line('grants', '30')],
   ...over,
 });

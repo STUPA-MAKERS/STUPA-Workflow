@@ -60,7 +60,7 @@ async function setup(perms: string[], url = '/admin/users', wide = true, phone =
             { path: '', component: StubPageComponent, pathMatch: 'full' },
             { path: 'flow', component: StubPageComponent, data: { adminNav: false, adminPane: true } },
             { path: 'plain', component: StubPageComponent, data: { adminNav: false } },
-            { path: 'cost-centres', component: StubPageComponent },
+            { path: 'budgets', component: StubPageComponent },
             { path: 'committees/g1/members', component: StubPageComponent, data: { parent: ['admin', 'admin/committees'] } },
             { path: 'users', component: StubPageComponent, data: { parent: ['admin'] } },
             {
@@ -168,7 +168,7 @@ describe('AdminFrameComponent', () => {
     ]) {
       expect(screen.getByRole('heading', { name: group, level: 2 })).toBeInTheDocument();
     }
-    expect(hrefs).toContain('/admin/cost-centres');
+    expect(hrefs).toContain('/admin/budgets');
   });
 
   /** Spec 000758: an admin page of a feature that is off has no entry. */
@@ -177,7 +177,7 @@ describe('AdminFrameComponent', () => {
     await setup(ALL);
     localStorage.removeItem('ap.features.off');
     const hrefs = navLinks().map((a) => a.getAttribute('href'));
-    expect(hrefs).not.toContain('/admin/cost-centres');
+    expect(hrefs).not.toContain('/admin/budgets');
     expect(hrefs).not.toContain('/admin/calendars');
     expect(hrefs).not.toContain('/admin/delegations');
     expect(hrefs).toContain('/admin/features');
@@ -270,7 +270,7 @@ describe('AdminFrameComponent', () => {
   });
 
   it('keeps the navigation beside the cost centres at every wide size', async () => {
-    const view = await setup(ALL, '/admin/cost-centres', true);
+    const view = await setup(ALL, '/admin/budgets', true);
     expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
     expect(view.container.querySelector('.af')).toHaveClass('af--split');
   });

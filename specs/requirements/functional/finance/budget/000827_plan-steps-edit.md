@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-12
-implementation: null
+tests:
+  - "frontend/src/app/pages/admin/budgets/admin-budgets.component.spec.ts:AdminBudgetsComponent"
+  - "frontend/src/app/pages/admin/budgets/admin-budgets.util.spec.ts:movedStep"
+implementation:
+  - frontend/src/app/pages/admin/budgets/admin-budgets.component.ts
+  - frontend/src/app/pages/admin/budgets/admin-budgets.util.ts
 scope:
   - frontend/src/app/pages/budget
 ---
