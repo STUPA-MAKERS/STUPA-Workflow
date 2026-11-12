@@ -3599,7 +3599,7 @@
   "calendar.dialog.remove": "Remove {name}",
   "calendar.dialog.addGremium": "Committee",
   "calendar.dialog.addPerson": "Invite a person",
-  "calendar.dialog.personPlaceholder": "Search a name …",
+  "calendar.dialog.personHits": "Hits",
   "calendar.field.title": "Title",
   "calendar.field.start": "Start",
   "calendar.field.startTime": "Start time",

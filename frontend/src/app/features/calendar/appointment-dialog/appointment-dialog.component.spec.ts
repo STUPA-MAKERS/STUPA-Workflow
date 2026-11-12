@@ -135,8 +135,9 @@ describe('AppointmentDialogComponent', () => {
         { id: 'p-3', name: 'Lea Schmid' },
       ]);
       expect(view.cmp.personHits()).toEqual([{ id: 'p-3', name: 'Lea Schmid' }]);
-      expect(view.cmp.personLabel(view.cmp.personHits()[0])).toBe('Lea Schmid');
-      view.cmp.addPerson({ id: 'p-3', name: 'Lea Schmid' });
+      view.fixture.detectChanges();
+      const hits = within(dialog).getByRole('list', { name: 'Treffer' });
+      fireEvent.click(within(hits).getByRole('button', { name: /Lea Schmid/ }));
       view.fixture.detectChanges();
       expect(view.cmp.personQuery()).toBe('');
       expect(view.cmp.personHits()).toEqual([]);
