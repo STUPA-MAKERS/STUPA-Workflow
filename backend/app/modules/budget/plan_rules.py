@@ -139,28 +139,33 @@ def children_sum(
     )
 
 
-def raised_ancestors(
+def summed_ancestors(
     node_id: UUID,
     parent_of: Mapping[UUID, UUID | None],
     amounts: Mapping[UUID, Decimal],
     top_id: UUID,
 ) -> dict[UUID, Decimal]:
-    """Return the ancestors of `node_id` whose Ansatz must rise, with the new Ansatz.
+    """Return the Ansatz of each ancestor of `node_id` after a change of its line.
 
-    `amounts` already holds the new Ansatz of `node_id`. An ancestor rises to the sum
-    of its children when that sum exceeds its Ansatz. The walk goes up to the node
-    below `top_id`, because the top level has no line. A raised parent can raise its
-    own parent, so each step sees the Ansätze of the steps before.
+    `amounts` holds the Ansatz of each cost center with a line, the change of
+    `node_id` included. An ancestor with a child that has a line holds the sum of the
+    Ansätze of those children, so it rises and falls with them. The walk goes up to
+    the node below `top_id`, because the top level has no line, and each step sees
+    the sums of the steps before. It stops at an ancestor without such a child: that
+    cost center keeps the Ansatz a person typed.
     """
     parent = parent_of.get(node_id)
     if parent is None or parent == top_id:
         return {}
-    needed = children_sum(parent, parent_of, amounts)
-    if needed <= amounts.get(parent, _ZERO):
+    children = tuple(
+        amounts[node] for node, above in parent_of.items() if above == parent and node in amounts
+    )
+    if not children:
         return {}
+    total = sum(children, _ZERO)
     return {
-        parent: needed,
-        **raised_ancestors(parent, parent_of, {**amounts, parent: needed}, top_id),
+        parent: total,
+        **summed_ancestors(parent, parent_of, {**amounts, parent: total}, top_id),
     }
 
 

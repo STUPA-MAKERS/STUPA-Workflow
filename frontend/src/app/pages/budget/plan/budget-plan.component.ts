@@ -94,7 +94,6 @@ interface PrimaryAction {
 
 /** The problem codes of a plan write that have their own message. */
 const WRITE_ERRORS: Readonly<Record<string, TranslationKey>> = {
-  plan_line_below_children: 'budget.plan.error.belowChildren',
   plan_blocked_above_amount: 'budget.plan.error.blockedAbove',
   plan_line_has_children: 'budget.plan.error.hasChildren',
   plan_not_balanced: 'budget.plan.error.notBalanced',

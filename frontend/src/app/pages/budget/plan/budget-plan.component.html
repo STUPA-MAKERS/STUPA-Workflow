@@ -235,17 +235,19 @@
     }
   }
   <div [class.bd__cols]="cols" [class.bd__cols--single]="cols && row.side === 'income'">
-    <app-section class="bd__sec" size="lg" [heading]="'budget.plan.line.heading' | t">
+    <app-section class="bd__sec" size="lg" [heading]="(row.hasChildren ? 'budget.plan.line.note' : 'budget.plan.line.heading') | t">
       <div class="bp__form">
-        <app-currency-input
-          class="bp__ansatz"
-          [name]="'line-amount-' + row.id"
-          [label]="columns()[1].label"
-          [ngModel]="row.amount"
-          (ngModelChange)="edit(row, 'amount', $event)"
-          (focusout)="saveAmount(row)"
-          [disabled]="!editable()"
-        />
+        @if (!row.hasChildren) {
+          <app-currency-input
+            class="bp__ansatz"
+            [name]="'line-amount-' + row.id"
+            [label]="columns()[1].label"
+            [ngModel]="row.amount"
+            (ngModelChange)="edit(row, 'amount', $event)"
+            (focusout)="saveAmount(row)"
+            [disabled]="!editable()"
+          />
+        }
         <app-textarea [label]="'budget.plan.line.note' | t" [grow]="true">
           <textarea
             rows="3"

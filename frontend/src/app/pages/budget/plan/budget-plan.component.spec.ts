@@ -320,6 +320,18 @@ describe('BudgetPlanComponent', () => {
       expect(phone.c.menu()[0].items[0]).toMatchObject({ id: 'in_force', disabledReason: null });
     });
 
+    it('§000794 a Kostenstelle with children has no Ansatz field', async () => {
+      const view = await setup();
+      view.c.select(rowOf(view.c, 'grants'));
+      view.fixture.detectChanges();
+      expect(view.container.querySelector('.bp__ansatz')).not.toBeNull();
+      view.c.select(rowOf(view.c, 'staff'));
+      view.fixture.detectChanges();
+      expect(rowOf(view.c, 'staff').hasChildren).toBe(true);
+      expect(view.container.querySelector('.bp__ansatz')).toBeNull();
+      expect(view.container.querySelector('[name=line-note-staff]')).not.toBeNull();
+    });
+
     it('names the cause of a disabled decision in the phone menu', async () => {
       const draft = version({ lines: [line('fees', '1')] });
       const view = await setup({ wide: false, phone: true, plans: { 'fy-26': plan([draft]) } });
@@ -484,9 +496,9 @@ describe('BudgetPlanComponent', () => {
     it('names the cause of a refused write and shows the saved plan again', async () => {
       const view = await setup();
       const error = jest.spyOn(view.toast, 'error');
-      view.api.setLine.mockReturnValueOnce(throwError(() => problem(422, 'plan_line_below_children')));
+      view.api.setLine.mockReturnValueOnce(throwError(() => problem(422, 'plan_blocked_above_amount')));
       view.c.saveLine(rowOf(view.c, 'staff'), { amount: '1' });
-      expect(error).toHaveBeenCalledWith('Der Ansatz liegt unter der Summe der untergeordneten Kostenstellen.');
+      expect(error).toHaveBeenCalledWith('Der gesperrte Betrag liegt über dem Ansatz.');
       expect(view.api.plan).toHaveBeenCalledTimes(4);
       expect(view.c.busy()).toBe(false);
     });
