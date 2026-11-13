@@ -52,5 +52,5 @@ above or below the sum of its children. The first child takes the Ansatz of its 
 the split of a Kostenstelle loses no planned amount.
 
 Test: The tests change, remove and copy lines of children on two levels and read the Ansatz of
-each parent. One test gives a side a sum above the largest amount at a line and at the state
-change. The plan page shows no Ansatz field for a parent.
+each parent. One test gives the expense side and the income side a sum above the largest amount at a
+line, and a balanced plan such sums at the state change. The plan page shows no Ansatz field for a parent.

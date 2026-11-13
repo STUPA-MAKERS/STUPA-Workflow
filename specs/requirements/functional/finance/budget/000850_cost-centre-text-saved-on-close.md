@@ -22,7 +22,8 @@ scope:
 A key or a name that the person typed in the section "Kostenstelle" (000831) and did not
 leave must be saved when the section goes off the page, for example by Back on a phone or
 by Back to the other tab of the budget. The budget page that shows when this save ends, the
-tab Bewirtschaftung or the tab Planung, must then read the tree again.
+tab Bewirtschaftung or the tab Planung, must then read the tree again. This read must leave the URL as it is, also when the page
+has not taken its budget, Kostenstelle and year from the URL yet.
 
 Reason: A press that closes the detail does not always take the focus out of the field, and
 the typed text would else be lost without a message. The page that opens reads its tree in
@@ -30,4 +31,5 @@ the moment in which the save goes out, so its first tree can hold the text befor
 
 Test: The component tests take the section off the page with a typed name and with a typed
 key and read the request and the message for the page that shows. One test of each page
-reads the tree after that message.
+reads the tree after that message. One test of the tab Bewirtschaftung sends the message
+before the fiscal years arrive and reads that the page writes no URL.
