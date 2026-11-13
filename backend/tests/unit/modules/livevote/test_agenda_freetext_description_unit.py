@@ -50,7 +50,8 @@ def _service(session: ScriptedSession) -> AgendaService:
     async def _next(_mid: uuid.UUID) -> int:
         return 0
 
-    async def _audit(_action: Any, **_kw: Any) -> None:
+    async def _audit(action: Any, **kw: Any) -> None:
+        del action, kw
         return None
 
     service._meeting = _meeting  # type: ignore[method-assign]
