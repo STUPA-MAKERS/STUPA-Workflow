@@ -36,9 +36,11 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date as _date
+from datetime import datetime
 from datetime import time as _time
 from functools import partial, reduce
 from itertools import accumulate
+from zoneinfo import ZoneInfo
 
 from app.modules.media.refs import is_image_path
 
@@ -785,3 +787,13 @@ def _yaml_scalar(value: str) -> str:
 def _md_escape(text: str) -> str:
     """Minimal escape for inline Markdown text (newline → space)."""
     return text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+
+
+def top_time_note(started_at: datetime | None, tz: ZoneInfo) -> str:
+    """Return the empty time note in front of a TOP heading, or "" without a time.
+
+    The note `> [!anmerkung HH:MM]` shows the local time at which the meeting
+    moved to the TOP. The typst template draws it grey and centered above the
+    heading.
+    """
+    return f"> [!anmerkung {started_at.astimezone(tz):%H:%M}]" if started_at is not None else ""

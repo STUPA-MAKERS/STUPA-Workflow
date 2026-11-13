@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "backend/tests/integration/modules/livevote/test_started_at.py:test_a_move_to_a_top_records_its_time_once"
+  - "backend/tests/integration/modules/livevote/test_started_at.py:test_a_planned_meeting_stamps_its_current_top_at_the_start"
+implementation:
+  - backend/app/modules/livevote/service/lifecycle.py
+  - backend/app/modules/meetings/models.py
+  - backend/migrations/versions/20642e3b60c4_agenda_item_started_at.py
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/livevote

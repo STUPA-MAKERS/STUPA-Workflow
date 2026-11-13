@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "typst/tests/test_markdown.py:test_time_note_keeps_inline_markdown_and_the_blackout"
+  - "typst/tests/test_integration.py:test_time_notes_print_centered_above_the_top"
+  - "frontend/src/app/shared/markdown/markdown.util.spec.ts:markdownToSafeHtml"
+implementation:
+  - typst/typst_service/markdown.py
+  - typst/template/protocol.typ
+  - frontend/src/app/shared/markdown/markdown.util.ts
+  - frontend/vendor/ui-kit/markdown-editor/src/time-note.extension.ts
 scope:
   - typst/
   - backend/app/modules/protocol

@@ -17,6 +17,9 @@ builder (`backend/app/modules/protocol/markdown.py`):
   `ja: 12, nein: 3, enthaltung: 2`. A vote callout without a tally line can
   hold a personnel election or a poll (Umfrage), which the template draws as a
   ranking.
+* A time note `> [!anmerkung HH:MM] text` is one grey, centered line with its
+  time. The backend puts an empty one in front of the heading of each TOP
+  that the Sitzung reached, with the time of the move to that TOP.
 * Inline shortcodes: `{{time 18:30}}`, `{{vote ja=1 nein=2 enthaltung=0}}`,
   `{{count anwesend}}` and a bare frontmatter field such as `{{anwesend}}`.
 * Blackout marks: the empty marker `%%%%` is a black bar of one fixed width.
@@ -68,6 +71,12 @@ class ConversionError(ValueError):
 # -- callouts ---------------------------------------------------------------
 
 CALLOUT_RE: Final[re.Pattern[str]] = re.compile(r"^\s*\[!(\w+)\]\s*", re.IGNORECASE)
+
+# The marker of a time note: `[!anmerkung HH:MM]`. The time is part of the marker,
+# so the generic callout pattern does not match it.
+TIME_NOTE_RE: Final[re.Pattern[str]] = re.compile(
+    r"^\s*\[!anmerkung\s+([01]?\d|2[0-3]):([0-5]\d)\]\s*", re.IGNORECASE
+)
 
 # Marker -> (box kind, bold label). The label opens the box body.
 _LABELLED: Final[dict[str, tuple[str, str | None]]] = {
@@ -808,6 +817,9 @@ class _Converter:
 
     def _quote(self, node: object) -> list[Node]:
         kids = _children(node)
+        note = self._time_note(kids)
+        if note is not None:
+            return [note, *self.blocks(kids[1:])]
         match self._marker(kids):
             case None:
                 return [{"t": "quote", "c": self.blocks(kids)}]
@@ -817,6 +829,28 @@ class _Converter:
                 return [self._signature_callout(kids)]
             case (name, rest):
                 return [self._labelled(kids, name, rest)]
+
+    def _time_note(self, kids: list[object]) -> Node | None:
+        """Build a time note from `> [!anmerkung HH:MM] text`, or None for another quote.
+
+        The note is the first paragraph of the quote. Its text keeps the inline Markdown,
+        the shortcodes and the blackout marks. The hour gets two digits.
+        """
+        if not kids or _kind(kids[0]) != "Paragraph":
+            return None
+        inner = _children(kids[0])
+        first = _leaf(inner[0]) if inner else None
+        match = TIME_NOTE_RE.match(first) if first is not None else None
+        if match is None or _kind(inner[0]) != "RawText":
+            return None
+        return {
+            "t": "timenote",
+            "time": f"{int(match.group(1)):02d}:{match.group(2)}",
+            "c": [
+                *_inline_text(cast("str", first)[match.end() :], self.meta),
+                *self._inline_nodes(inner[1:]),
+            ],
+        }
 
     def _labelled(self, kids: list[object], name: str, rest: str) -> Node:
         """Build a callout box. Its bold label and the rest of the marker line open the body."""

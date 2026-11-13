@@ -83,6 +83,8 @@
           [ariaLabel]="'participant.top.protocol' | t"
           [placeholder]="'participant.top.empty' | t"
             [blackoutTitle]="'markdown.blackout.mark' | t"
+            [timeNoteSuffix]="'meetings.editor.timeNoteSuffix' | t"
+            [timeNoteLabel]="'meetings.editor.timeNoteTime' | t"
         />
       } @placeholder {
         <div class="ts__editor ts__editor--wait" aria-hidden="true">
@@ -129,6 +131,16 @@
               (click)="insertImage()"
             >
               <app-icon name="image" [size]="20" />
+            </button>
+            <button
+              type="button"
+              class="ts__tool"
+              [attr.aria-label]="'meetings.editor.timeNote' | t"
+              [title]="'meetings.editor.timeNote' | t"
+              (mousedown)="$event.preventDefault()"
+              (click)="insertTimeNote()"
+            >
+              <app-icon name="clock" [size]="20" />
             </button>
           </div>
         }
@@ -194,6 +206,8 @@
             [ariaLabel]="'participant.top.protocol' | t"
             [placeholder]="'meetings.protocol.placeholder' | t"
             [blackoutTitle]="'markdown.blackout.mark' | t"
+            [timeNoteSuffix]="'meetings.editor.timeNoteSuffix' | t"
+            [timeNoteLabel]="'meetings.editor.timeNoteTime' | t"
             (valueChange)="onEditorChange(t, $event)"
           />
         } @placeholder {

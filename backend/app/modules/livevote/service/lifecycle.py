@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -328,6 +328,7 @@ class LifecycleOps(HandoverOps):
         all_guest_events = _merged(guest_events, closed_events)
         if payload.status is not None:
             meeting.status = payload.status
+        await self._stamp_current(meeting, now)
         kept_keeper = (
             {"protokollantId": before["protokollantId"]}
             if moved_keeper or switched_keeper
@@ -372,6 +373,25 @@ class LifecycleOps(HandoverOps):
         meeting.current_agenda_item_id = item_id
         return meeting.status == "live" and await self.activate_planned(
             meeting, old_item, item_id, principal.sub, now
+        )
+
+    async def _stamp_current(self, meeting: Meeting, now: datetime) -> None:
+        """Record the start time of the current agenda item of a live meeting.
+
+        Only the first time counts: an item that has a time keeps it, so a move back
+        does not change the time of a TOP. A planned meeting records nothing, so the
+        time is the one at which the meeting really reached the item. The start of the
+        meeting stamps the item that was current before the start.
+        """
+        if meeting.status != "live" or meeting.current_agenda_item_id is None:
+            return
+        await self.session.execute(
+            update(MeetingAgendaItem)
+            .where(
+                MeetingAgendaItem.id == meeting.current_agenda_item_id,
+                MeetingAgendaItem.started_at.is_(None),
+            )
+            .values(started_at=now)
         )
 
     async def _change_protokollant(

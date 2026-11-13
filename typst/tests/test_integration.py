@@ -239,3 +239,23 @@ def test_skipped_heading_level_keeps_the_top_numbers(tmp_path: Path) -> None:
     lines = _lines(_render(source, None), tmp_path)
     assert any(line[3].startswith("TOP 1.1") and "Zwei" in line[3] for line in lines)
     assert not any(line[3].startswith("TOP") and "Unter" in line[3] for line in lines)
+
+
+def test_time_notes_print_centered_above_the_top(tmp_path: Path) -> None:
+    """§000871 and §000872: the time of a TOP is a centered line right above its heading."""
+    source = (
+        "---\ntitle: T\n---\n\n"
+        "> [!anmerkung 18:30]\n\n# Begrüßung\n\nText.\n\n"
+        "> [!anmerkung 18:47] %%Max%% verlässt die Sitzung.\n\n"
+        "> [!anmerkung 18:52]\n\n# Haushalt\n\nText.\n"
+    )
+    lines = _lines(_render(source, None), tmp_path)
+    time_page, time_x, time_y = _find(lines, "18:30 Uhr")
+    top_page, _, top_y = _find(lines, "TOP 1")
+    assert time_page == top_page
+    assert 0 < top_y - time_y < 30
+    assert time_x > 250
+    assert any(line[3] == "18:47 Uhr · Max verlässt die Sitzung." for line in lines)
+    _, _, second_y = _find(lines, "18:52 Uhr")
+    _, _, top2_y = _find(lines, "TOP 2")
+    assert 0 < top2_y - second_y < 30

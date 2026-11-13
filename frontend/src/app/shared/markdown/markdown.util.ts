@@ -242,7 +242,9 @@ function renderTable(
 }
 
 /**
- * A group of consecutive `>` lines: a callout or otherwise a plain blockquote. A plain
+ * A group of consecutive `>` lines: a time note, a callout or otherwise a plain
+ * blockquote. A time note `[!anmerkung HH:MM] text` is one grey, centered line, as in the
+ * protocol PDF. A plain
  * blockquote holds blocks of its own (paragraphs, headings, lists, a nested quote), so
  * a quoted mail keeps its paragraphs. `blocks` renders lines that are escaped already.
  */
@@ -251,6 +253,16 @@ function renderQuote(
   inline: Inline,
   blocks: (lines: readonly string[]) => string,
 ): string {
+  const note = /^\[!anmerkung\s+([01]?\d|2[0-3]):([0-5]\d)\]\s*(.*)$/i.exec(lines[0].trim());
+  if (note) {
+    const time = `${note[1].padStart(2, '0')}:${note[2]}`;
+    const text = note[3].trim();
+    const rest = lines.slice(1);
+    return (
+      `<p class="mdv__time-note">${time} Uhr${text ? ` · ${inline(text)}` : ''}</p>` +
+      (rest.length ? `<blockquote>${blocks(rest)}</blockquote>` : '')
+    );
+  }
   const marker = /^\[!(\w+)\]\s*(.*)$/.exec(lines[0].trim());
   const kind = marker ? marker[1].toLowerCase() : '';
   if (marker && kind in CALLOUT_TITLES) {

@@ -418,6 +418,8 @@
     "math"
   } else if n.t == "signatures" {
     "sig"
+  } else if n.t == "timenote" {
+    "note"
   } else {
     n.t
   }
@@ -440,6 +442,7 @@
   rule: 16.04pt,
   math: 22.64pt,
   sig: 56.13pt,
+  note: 8.78pt,
 )
 // The gaps that differ after a particular kind of block.
 #let gap-after = (
@@ -454,6 +457,8 @@
   code: (par: 10.95pt, runin: 10.95pt, box: 29.75pt, h1: 39.26pt, h2: 31.7pt, h3: 23.3pt),
   rule: (par: 8.25pt, runin: 8.25pt, box: 26.48pt),
   math: (par: 14.37pt, runin: 14.37pt, box: 33.03pt),
+  // A time note in front of a heading sits close to it, as the line above the TOP.
+  notehead: (h1: 3pt, h2: 3pt, h3: 3pt),
 )
 
 #let gap(prev, cur) = {
@@ -588,6 +593,15 @@
   }
 }
 
+// A time note: one grey, small, centered line "HH:MM Uhr", with its text after a
+// dot. It sticks to the next block, so the time of a TOP never stays alone at the
+// foot of a page.
+#let time-note(n) = block(sticky: true, width: 100%, align(center, par(justify: false, text(
+  size: size.small,
+  fill: palette.gray,
+  [#n.time Uhr] + if n.c.len() > 0 { [ · ] + inline(n.c) },
+))))
+
 #let blocks(nodes, in-item: false) = {
   let prev = none
   let i = 0
@@ -595,7 +609,10 @@
     let n = nodes.at(i)
     let k = kind(n)
     let runin = n.t == "heading" and n.level >= 4
-    let kk = if runin { "runin" } else { k }
+    // A time note right in front of a heading takes the gap of that heading.
+    let next = if i + 1 < nodes.len() { nodes.at(i + 1) } else { none }
+    let note-head = n.t == "timenote" and next != none and next.t == "heading" and next.level <= 3
+    let kk = if runin { "runin" } else if note-head { "h" + str(next.level) } else { k }
     if prev != none {
       let g = if in-item != false and prev == "par" and k == "list" { 8.45pt } else { gap(prev, kk) }
       v(g, weak: true)
@@ -652,8 +669,10 @@
       }
     } else if n.t == "signatures" {
       signatures(n.signers)
+    } else if n.t == "timenote" {
+      time-note(n)
     }
-    prev = kk
+    prev = if note-head { "notehead" } else { kk }
     i += 1
   }
 }

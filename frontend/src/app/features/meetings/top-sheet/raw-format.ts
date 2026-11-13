@@ -88,3 +88,32 @@ export function insertRawTable({ text, end }: RawText, rows = 3, cols = 3): RawT
   const cell = before.length + lead.length + 2;
   return { text: next, start: cell, end: cell };
 }
+
+/** The time zone of a protocol: the times in the PDF and in the notes are local times. */
+export const PROTOCOL_TZ = 'Europe/Berlin';
+
+/** The current time of the protocol time zone as `HH:MM`. */
+export function protocolNow(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('de-DE', {
+    timeZone: PROTOCOL_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(now);
+}
+
+/**
+ * Insert a time note `> [!anmerkung HH:MM] ` as a block of its own after the line of the
+ * caret. The caret goes to the end of the new line, where the text of the note starts.
+ */
+export function insertRawTimeNote({ text, end }: RawText, time: string): RawText {
+  const lineEnd = text.indexOf('\n', end);
+  const cut = lineEnd < 0 ? text.length : lineEnd;
+  const before = text.slice(0, cut);
+  const after = text.slice(cut);
+  const line = `> [!anmerkung ${time}] `;
+  const lead = !before ? '' : before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+  const tail = !after ? '' : after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n';
+  const caret = before.length + lead.length + line.length;
+  return { text: before + lead + line + tail + after, start: caret, end: caret };
+}

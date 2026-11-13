@@ -48,7 +48,7 @@ import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { hasOpenBlackout } from '../../../shared/markdown/markdown.util';
-import { applyRawFormat, insertRawTable } from './raw-format';
+import { applyRawFormat, insertRawTable, insertRawTimeNote, protocolNow } from './raw-format';
 import { topApplicationLead } from '../top-application-lead.util';
 
 /** The autosave state of the text of the open item. */
@@ -333,6 +333,26 @@ export class TopSheetComponent {
     const t = this.top();
     if (!area || !t || area.readOnly) return;
     const next = insertRawTable({ text: area.value, start: area.selectionStart, end: area.selectionEnd });
+    area.value = next.text;
+    area.focus();
+    area.setSelectionRange(next.start, next.end);
+    this.bodyChange.emit({ itemId: t.id, body: next.text });
+  }
+
+  /**
+   * "Anmerkung": a time note with the current local time after the line of the cursor,
+   * in the editor or in the Markdown source. The cursor goes to the text of the note.
+   */
+  insertTimeNote(): void {
+    const time = protocolNow();
+    if (this.mode() !== 'raw') {
+      this.editor()?.insertTimeNote(time);
+      return;
+    }
+    const area = this.rawArea()?.nativeElement;
+    const t = this.top();
+    if (!area || !t || area.readOnly) return;
+    const next = insertRawTimeNote({ text: area.value, start: area.selectionStart, end: area.selectionEnd }, time);
     area.value = next.text;
     area.focus();
     area.setSelectionRange(next.start, next.end);

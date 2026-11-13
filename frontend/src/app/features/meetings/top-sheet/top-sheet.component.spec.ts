@@ -166,6 +166,13 @@ describe('TopSheetComponent', () => {
     expect(pick).toHaveBeenCalled();
   });
 
+  it('inserts a time note with the current time from the bar (000873)', async () => {
+    const view = await setup();
+    const note = jest.spyOn(editorOf(view), 'insertTimeNote').mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Anmerkung mit Uhrzeit einfügen' }));
+    expect(note).toHaveBeenCalledWith(expect.stringMatching(/^\d{2}:\d{2}$/));
+  });
+
   it('uploads an image of the editor through the media service and reports an error', async () => {
     const upload = jest
       .fn()
@@ -248,6 +255,10 @@ describe('TopSheetComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Bild einfügen' }));
       expect(pick).toHaveBeenCalled();
       expect(screen.queryByRole('button', { name: 'Tabelle bearbeiten' })).toBeNull();
+      area.setSelectionRange(0, 0);
+      await userEvent.click(screen.getByRole('button', { name: 'Anmerkung mit Uhrzeit einfügen' }));
+      expect(area.value).toMatch(/^Text\n\n> \[!anmerkung \d{2}:\d{2}\] \n\n\|/);
+      expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
     });
 
     it('keeps the Markdown source of a reader read only', async () => {
@@ -260,6 +271,7 @@ describe('TopSheetComponent', () => {
       };
       cmp.toggleFormat('bold');
       (cmp as unknown as { insertTable(): void }).insertTable();
+      (cmp as unknown as { insertTimeNote(): void }).insertTimeNote();
       area.dispatchEvent(new Event('input'));
       expect(area.value).toBe('Text');
       expect(view.bodyChange).not.toHaveBeenCalled();

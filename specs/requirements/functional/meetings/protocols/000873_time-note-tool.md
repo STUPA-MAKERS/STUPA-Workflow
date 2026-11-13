@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "frontend/src/app/features/meetings/top-sheet/top-sheet.component.spec.ts:TopSheetComponent"
+  - "frontend/src/app/features/meetings/top-sheet/raw-format.spec.ts:insertRawTimeNote"
+implementation:
+  - frontend/vendor/ui-kit/markdown-editor/src/time-note.extension.ts
+  - frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.component.ts
+  - frontend/src/app/features/meetings/top-sheet/top-sheet.component.ts
+  - frontend/src/app/features/meetings/top-sheet/raw-format.ts
+  - frontend/src/app/features/meetings/meeting-page/meeting-page.component.html
 scope:
   - frontend/vendor/ui-kit/markdown-editor
   - frontend/src/app/features/meetings

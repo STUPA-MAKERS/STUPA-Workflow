@@ -190,3 +190,10 @@
   border-radius: 2px;
   background: var(--color-text);
 }
+
+/* A time note of a protocol: one grey, centered line with its time, as in the PDF. */
+.mdv .mdv__time-note {
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

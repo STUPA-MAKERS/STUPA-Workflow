@@ -244,6 +244,9 @@
     <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.image' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertImage()">
       <app-icon name="image" [size]="20" />
     </button>
+    <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.timeNote' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertTimeNote()">
+      <app-icon name="clock" [size]="20" />
+    </button>
   }
 </ng-template>
 

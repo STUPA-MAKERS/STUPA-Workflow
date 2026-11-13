@@ -94,6 +94,7 @@ from app.modules.protocol.markdown import (
     mark_vote_blocks,
     protocol_variant_for,
     replace_vote_blocks,
+    top_time_note,
     votes_in_body,
 )
 from app.modules.protocol.public import (
@@ -1254,16 +1255,20 @@ class ProtocolService:
         """Build the Markdown block and the public TOP of one agenda item.
 
         A non-public item of the public variant gets the neutral heading and the
-        placeholder, and its TOP keeps the number only.
+        placeholder, and its TOP keeps the number only. An item that the meeting
+        reached gets an empty time note in front of its heading, also when it is
+        non-public, because the time tells nothing about the subject.
         """
         app_id = getattr(item, "application_id", None)
         own = item.title or (app_titles.get(app_id) if app_id is not None else None)
         heading = (own or "Tagesordnungspunkt").strip()
-        return (
+        block, top = (
             _redacted_item(number)
             if public and item.non_public
             else await self._item_with_votes(number, item, heading, voting, public=public)
         )
+        note = top_time_note(getattr(item, "started_at", None), self._tz())
+        return (f"{note}\n\n{block}" if note else block), top
 
     async def _item_with_votes(
         self,

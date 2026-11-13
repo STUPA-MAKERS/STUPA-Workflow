@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "backend/tests/unit/modules/protocol/test_public_service_unit.py:test_assemble_puts_the_time_of_a_reached_top_above_its_heading"
+  - "typst/tests/test_integration.py:test_time_notes_print_centered_above_the_top"
+  - "typst/tests/test_markdown.py:test_time_note_without_text_and_a_bad_time"
+implementation:
+  - backend/app/modules/protocol/markdown.py
+  - backend/app/modules/protocol/service.py
+  - typst/template/protocol.typ
 scope:
   - backend/app/modules/protocol
   - typst/

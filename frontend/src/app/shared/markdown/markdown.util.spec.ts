@@ -166,6 +166,17 @@ describe('markdownToSafeHtml', () => {
     expect(markdownToSafeHtml('> [!FOO] bar')).toBe('<blockquote><p>[!FOO] bar</p></blockquote>');
   });
 
+  it('renders a time note as one line with its time (000872)', () => {
+    expect(markdownToSafeHtml('> [!anmerkung 8:05] **Anna** geht')).toBe(
+      '<p class="mdv__time-note">08:05 Uhr · <strong>Anna</strong> geht</p>',
+    );
+    expect(markdownToSafeHtml('> [!anmerkung 18:42]')).toBe('<p class="mdv__time-note">18:42 Uhr</p>');
+    expect(markdownToSafeHtml('> [!anmerkung 25:00] x')).toBe('<blockquote><p>[!anmerkung 25:00] x</p></blockquote>');
+    expect(markdownToSafeHtml('> [!anmerkung 9:00] a\n> b')).toBe(
+      '<p class="mdv__time-note">09:00 Uhr · a</p><blockquote><p>b</p></blockquote>',
+    );
+  });
+
   it('honours headingOffset', () => {
     expect(markdownToSafeHtml('# Titel', { headingOffset: 0 })).toBe('<h1>Titel</h1>');
     expect(markdownToSafeHtml('###### Tief', { headingOffset: 3 })).toBe('<h6>Tief</h6>');
