@@ -128,22 +128,22 @@ def test_document_has_the_parts_in_order() -> None:
     assert head.lstrip().startswith(row("Gremium", "Studierendenparlament"))
     assert row("Antragsart", "Finanzantrag") in md
     assert row("Status", "Bewilligt") in md
-    assert row("Eingang", "10.11.2026") in md
+    assert row("Eingang", "`10.11.2026`") in md
     assert row("Antragsteller", "Max Muster \\(max@example\\.org\\)") in md
-    assert row("Version", "3") in md
-    assert row("Anhänge", "- Angebot\\.pdf") in md
+    assert row("Version", "`3`") in md
+    assert row("Anhänge", "`Angebot.pdf`") in md
 
 
 def test_answers_are_formatted_and_escaped() -> None:
     md = build_application_document(_doc())
     assert row("Organisation", "Fachschaft \\[Informatik\\]") in md
     assert row("Art", "Exkursion") in md
-    assert row("Förderung", "1\\.000,00 €") in md
-    assert row("Zeitraum", "01\\.12\\.2026 – 03\\.12\\.2026") in md
+    assert row("Förderung", "`1.000,00 €`") in md
+    assert row("Zeitraum", "`01.12.2026 – 03.12.2026`") in md
     assert row("Bestätigt", "Nein") in md
-    assert "> | Bus | Müller (bevorzugt) | 1.200,00 € |" in md
+    assert "> | Bus | Müller (bevorzugt) | `1.200,00 €` |" in md
     assert "> | | Keine Vergleichsangebote: einzig | |" in md
-    assert "> | **Summe** | | **1.200,00 €** |" in md
+    assert "> | **Summe** | | **`1.200,00 €`** |" in md
     assert "> | Name | Rolle |" in md and "> | Anna | Leitung |" in md
     assert row("alt", "aus alter Version") in md
 
@@ -194,15 +194,15 @@ def test_decision_as_requested_without_conditions() -> None:
     decision = DecisionView(None, (), datetime(2026, 11, 12, 19, 0))
     md = build_application_document(_doc(decision=decision, files=()))
     assert row("Bewilligter Betrag", "wie beantragt") in md
-    assert row("Beschlossen am", "12.11.2026") in md
+    assert row("Beschlossen am", "`12.11.2026`") in md
     assert "Auflagen" not in md
     assert "Anhänge" not in md
 
 
 def test_the_decision_lists_its_conditions() -> None:
     md = build_application_document(_doc())
-    assert row("Beschlossen am", "12.11.2026 (StuPa)") in md
-    assert row("Bewilligter Betrag", "900,00 €") in md
+    assert row("Beschlossen am", "`12.11.2026` (StuPa)") in md
+    assert row("Bewilligter Betrag", "`900,00 €`") in md
     assert row("Auflagen", "1. Belege einreichen") in md
 
 
@@ -212,7 +212,12 @@ def test_an_empty_antrag_has_only_the_head() -> None:
     )
     assert 'title: "Antrag"' in md
     assert "Antragsteller" not in md and "Status" not in md
-    assert md.rstrip().endswith(row("Version", "3").rstrip())
+    assert md.rstrip().endswith(row("Version", "`3`").rstrip())
+
+
+def test_several_files_stand_one_per_line_in_code() -> None:
+    md = build_application_document(_doc(files=("a.pdf", "b `c`.pdf")))
+    assert row("Anhänge", "`a.pdf`\\", "`b 'c'.pdf`") in md
 
 
 def test_helpers() -> None:
@@ -272,13 +277,13 @@ def test_more_field_types() -> None:
         "cond": "sichtbar",
     }
     md = build_application_document(_doc(sections=sections, data=data, decision=None))
-    assert row("Tag", "04\\.03\\.2026") in md
-    assert row("Tag2", "5") in md
+    assert row("Tag", "`04.03.2026`") in md
+    assert row("Tag2", "`5`") in md
     assert row("Multi", "Alpha, z") in md
-    assert row("Betrag", "abc") in md
+    assert row("Betrag", "`abc`") in md
     assert row("Summe", "3") in md
     assert "Kaputt" not in md
     assert row("Tab", "kein Tabellenwert") in md
     assert row("Obj", "x: 1, Ja") in md
-    assert row("Rng", "frei") in md
+    assert row("Rng", "`frei`") in md
     assert row("Cond", "sichtbar") in md

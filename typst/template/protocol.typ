@@ -463,7 +463,7 @@
   box: (par: 3.61pt, runin: 3.61pt, list: 6.57pt, quote: 6.75pt, box: 14.62pt, table: 17.5pt, code: 3.1pt, rule: 6.5pt, math: 12.74pt, h1: 28.74pt, h2: 23.59pt, h3: 15.68pt, sig: 50pt),
   list: (par: 8.78pt, runin: 8.78pt, box: 27.52pt),
   quote: (par: 8.78pt, runin: 8.78pt, box: 27.58pt),
-  table: (par: 14.3pt, runin: 14.3pt, list: 8.98pt, quote: 8.98pt, box: 25.41pt, h1: 31.4pt, h2: 23.89pt, h3: 15.5pt),
+  table: (par: 14.3pt, runin: 14.3pt, list: 8.98pt, quote: 8.98pt, box: 25.41pt, table: 22pt, h1: 31.4pt, h2: 23.89pt, h3: 15.5pt),
   figure: (par: 14.3pt, runin: 14.3pt, list: 8.98pt, quote: 8.98pt, box: 25.41pt, h1: 31.4pt, h2: 23.89pt, h3: 15.5pt),
   code: (par: 10.95pt, runin: 10.95pt, box: 29.75pt, h1: 39.26pt, h2: 31.7pt, h3: 23.3pt),
   rule: (par: 8.25pt, runin: 8.25pt, box: 26.48pt),
@@ -520,7 +520,81 @@
 // \leftmargini ... \leftmarginiv
 #let list-indents = (2.5em, 2.2em, 1.87em, 1.7em)
 
-#let table-block(n) = {
+// -- cut at a number of lines (000881) -----------------------------------------
+
+// The number of words of inline nodes. A node without text counts as one word.
+#let inline-size(nodes) = nodes.fold(0, (acc, n) => acc + if n.t == "text" {
+  n.v.split(" ").len()
+} else if "c" in n and type(n.c) == array {
+  inline-size(n.c)
+} else { 1 })
+
+// The first `k` words of inline nodes, with their formatting.
+#let inline-take(nodes, k) = {
+  let out = ()
+  let left = k
+  for n in nodes {
+    if left <= 0 { break }
+    if n.t == "text" {
+      let words = n.v.split(" ")
+      out.push(if words.len() <= left { n } else { (t: "text", v: words.slice(0, left).join(" ")) })
+      left -= words.len()
+    } else if "c" in n and type(n.c) == array {
+      let part = n
+      part.insert("c", inline-take(n.c, left))
+      out.push(part)
+      left -= inline-size(n.c)
+    } else {
+      out.push(n)
+      left -= 1
+    }
+  }
+  out
+}
+
+// The largest `k` in 0..total for which `fits(k)` holds; `fits` is monotonic.
+#let largest(total, fits) = {
+  let (low, high) = (0, total)
+  while low < high {
+    let mid = calc.ceil((low + high) / 2)
+    if fits(mid) { low = mid } else { high = mid - 1 }
+  }
+  low
+}
+
+// Cut nodes at a number of lines: nodes that would take `lines` lines or more
+// show `lines - 1` lines and a line "…". The cut drops the rest of the nodes, so
+// the PDF holds no hidden text. `render` draws a list of nodes; with `inline-mode`
+// the nodes are inline nodes, else blocks, of which the last kept paragraph is cut
+// by words.
+#let clamp(nodes, lines, render, inline-mode: false) = layout(region => {
+  let keep = measure(block(width: region.width, range(lines - 1).map(_ => [x]).join(linebreak()))).height
+  let fits(body) = measure(block(width: region.width, body)).height <= keep + 0.5pt
+  if fits(render(nodes)) {
+    render(nodes)
+  } else if inline-mode {
+    let k = largest(inline-size(nodes), k => fits(render(inline-take(nodes, k))))
+    render(inline-take(nodes, k))
+    linebreak()
+    […]
+  } else {
+    let m = largest(nodes.len(), m => fits(render(nodes.slice(0, m))))
+    let kept = nodes.slice(0, m)
+    let next = nodes.at(m)
+    if next.t == "par" {
+      let part(k) = kept + ((t: "par", c: inline-take(next.c, k)),)
+      let k = largest(inline-size(next.c), k => fits(render(part(k))))
+      if k > 0 { kept = part(k) }
+    }
+    render(kept)
+    v(3pt)
+    block(par[…])
+  }
+})
+
+// A GFM table. Nested in a field row (an Antrag, `nested: true`), it has no top
+// and no bottom rule, and each cell is cut at three lines (000881).
+#let table-block(n, nested: false) = {
   let aligns = n.align.map(a => if a == "center" { center } else if a == "right" { right } else { left })
   let cols = n.head.len()
   let row(cells) = grid(
@@ -529,15 +603,18 @@
     inset: (x: 6pt),
     ..range(cols).map(k => {
       set par(justify: false)
-      inline(cells.at(k, default: ()))
+      let cell = cells.at(k, default: ())
+      if nested { clamp(cell, 3, inline, inline-mode: true) } else { inline(cell) }
     }),
   )
   let rule(w) = rect(width: 100%, height: w, fill: black, stroke: none)
   // booktabs at \arraystretch 1.5: \toprule .08em, \midrule .05em,
   // \bottomrule .08em, 20.33pt from row to row.
   block(width: 100%, breakable: false, {
-    rule(0.876pt)
-    v(6.45pt)
+    if not nested {
+      rule(0.876pt)
+      v(6.45pt)
+    }
     row(n.head)
     v(5.6pt)
     rule(0.548pt)
@@ -546,8 +623,10 @@
       if i > 0 { v(20.33pt - 1.211 * size.normal) }
       row(r)
     }
-    v(5.46pt)
-    rule(0.876pt)
+    if not nested {
+      v(5.46pt)
+      rule(0.876pt)
+    }
   })
 }
 
@@ -613,7 +692,7 @@
   [#n.time Uhr] + if n.c.len() > 0 { [ · ] + inline(n.c) },
 ))))
 
-#let blocks(nodes, in-item: false) = {
+#let blocks(nodes, in-item: false, in-field: false) = {
   let prev = none
   let i = 0
   while i < nodes.len() {
@@ -670,21 +749,36 @@
     } else if n.t == "rule" {
       rect(width: 100%, height: 0.4pt, fill: black, stroke: none)
     } else if n.t == "table" {
-      table-block(n)
+      table-block(n, nested: in-field)
     } else if n.t == "fields" {
-      // Field rows (an Antrag): label and value, the value as block Markdown. Every
-      // field table has the same label column, so the tables of one document line
-      // up; a longer label wraps. The table breaks between rows. It is a grid, as the
-      // Markdown tables: PDF/UA-1 asks a tagged table for a header row, and a field
-      // table has none, so a screen reader reads label, then value.
+      // Field rows (an Antrag), drawn as the table of the Haushaltsplan PDF: a thick
+      // rule above and below, no rule between the rows, and the section name on a
+      // grey band across the table. Every field table has the same label column, so
+      // the tables of one document line up; a longer label wraps. The table breaks
+      // between rows. It is a grid, as the Markdown tables: PDF/UA-1 asks a tagged
+      // table for a header row, and a field table has none, so a screen reader reads
+      // label, then value. A value is cut at 30 lines (000881).
       {
         set par(justify: false)
+        let title = n.at("title", default: none)
+        let band = if title != none {
+          (
+            grid.cell(colspan: 2, fill: tint(palette.gray, 18%), inset: (x: 6pt, y: 5pt), {
+              show heading: it => block(text(font: head-font, weight: "bold", size: size.normal, it.body))
+              tagged-heading(1, inline(title))
+            }),
+          )
+        } else { () }
         grid(
           columns: (45mm, 1fr),
-          stroke: (x, y) => (top: if y == 0 { 0.876pt } else { 0.3pt + palette.gray }),
-          inset: (x: 6pt, y: 6pt),
+          inset: (x: 6pt, y: 4pt),
           align: left + top,
-          ..n.rows.map(r => (strong(text(hyphenate: false, inline(r.label))), blocks(r.c))).flatten(),
+          grid.hline(stroke: 0.876pt),
+          ..band,
+          ..n.rows.map(r => (
+            strong(text(hyphenate: false, inline(r.label))),
+            clamp(r.c, 30, nodes => blocks(nodes, in-field: true)),
+          )).flatten(),
           grid.hline(stroke: 0.876pt),
         )
       }
@@ -792,12 +886,10 @@
 )
 
 // The head of the first page of a document without a title page (an Antrag): the
-// logos, the title and the rule of the title page, in less room.
+// title and the rule of the title page, without the logos (the footer has them).
+// Page 1 has no running head, so the title moves up into its room.
 #let title-block(doc) = {
-  if doc.logos.len() > 0 {
-    logo-row(doc.logos, 1.1cm, 0.4cm)
-    v(14pt)
-  }
+  v(-12mm)
   block(below: 0pt, par(justify: false, text(
     font: head-font,
     size: size.huge,
@@ -807,7 +899,7 @@
   )))
   v(5pt)
   rect(width: 100%, height: 0.5mm, fill: black, stroke: none)
-  v(18pt)
+  v(14pt)
 }
 
 #let protocol(doc) = {

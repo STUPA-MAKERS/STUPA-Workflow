@@ -19,12 +19,23 @@ scope:
 
 The Antrag PDF must use the design of the protocol PDF from the typst service, with the fonts
 Blender for headings and DIN for text, and must be tagged as PDF/UA-1 (000524). It must have no
-title page: the first page starts with the title of the Antrag. The whole Antrag must be in
-tables of two columns, label and value. Each value cell must render its Markdown (paragraphs,
-lists, emphasis, links, tables). The PDF must hold, in this order:
+title page: the first page starts with the title of the Antrag at the top of the page, with no
+logo above it. The whole Antrag must be in tables of two columns, label and value, drawn like
+the table of the Haushaltsplan PDF: a thick rule above and below, no rule between the rows, and
+the section name on a grey band across the table. Each value cell must render its Markdown
+(paragraphs, lists, emphasis, links, tables).
 
-1. The head data in one table: Antragsart, Gremium, status, date of receipt, applicant and
-   the version number.
+A value that would take 30 lines or more must show 29 lines and a line "…". A cell of the
+Kostenaufstellung (a position or an offer) that would take 3 lines or more must show 2 lines
+and a line "…". The Kostenaufstellung must have no rule above and no rule below.
+
+The version, each date, an IBAN and each amount must print in the monospace font. The names of
+the attached files must print in the monospace font, one name per line, without list markers.
+
+The PDF must hold, in this order:
+
+1. The head data in one table: Gremium, Antragsart, status, date of receipt, applicant, the
+   version number and the names of the attached files (item 4).
 2. The answers of the form, one table per section of the form with the section name as its
    heading, one row per field, in the order of the form. A text answer (for example the
    description) is Markdown and renders in its cell. A field that is not visible
@@ -41,4 +52,5 @@ personal data that the platform cannot black out, so only their names go into th
 
 Test: Unit test of the Markdown builder: a fixture Antrag gives the five parts in order, as
 field rows, and a hidden field does not show. Unit test of the typst converter: a field row
-keeps the block Markdown of its value. Integration test of the render: no title page.
+keeps the block Markdown of its value. Integration tests of the render: no title page, and
+the cut of a long value and of a long cell.

@@ -484,3 +484,14 @@ def test_field_rows_inside_a_quote_form_a_table_there() -> None:
     blocks = conv("> > [!feld] A\n> >\n> > x\n")
     inner = cast("list[Node]", blocks[0]["c"])
     assert inner[0]["t"] == "fields"
+
+
+def test_a_section_heading_in_front_of_field_rows_is_the_title_of_the_table() -> None:
+    """§000881: the section name prints on the band of its table, not as a heading."""
+    blocks = conv(
+        "# Antrag\n\n> [!feld] A\n>\n> x\n\n# Ohne Zeilen\n\nText\n\n"
+        "## Klein\n\n> [!feld] B\n>\n> y\n"
+    )
+    assert [b["t"] for b in blocks] == ["fields", "heading", "par", "heading", "fields"]
+    assert texts(blocks[0]["title"]) == "Antrag"
+    assert "title" not in blocks[4]

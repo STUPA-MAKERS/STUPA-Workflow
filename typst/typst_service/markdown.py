@@ -994,13 +994,38 @@ class _Converter:
 
 
 def _field_tables(nodes: list[Node]) -> list[Node]:
-    """Join the field rows that follow each other into one table node."""
-    runs = itertools.groupby(nodes, key=lambda node: node.get("t") == "field")
+    """Join the field rows that follow each other into one table node.
+
+    A level-1 heading right in front of the rows is the title of the table: the
+    template prints it on a band across the table, so the heading node drops.
+    """
+    runs = [
+        (is_field, list(run))
+        for is_field, run in itertools.groupby(nodes, key=lambda node: node.get("t") == "field")
+    ]
+    titled = [
+        not is_field and bool(run) and _is_section(run[-1]) and index + 1 < len(runs)
+        for index, (is_field, run) in enumerate(runs)
+    ]
     return [
         out
-        for is_field, run in runs
-        for out in ([{"t": "fields", "rows": list(run)}] if is_field else list(run))
+        for index, (is_field, run) in enumerate(runs)
+        for out in (
+            [_fields(run, runs[index - 1][1][-1] if index and titled[index - 1] else None)]
+            if is_field
+            else run[:-1]
+            if titled[index]
+            else run
+        )
     ]
+
+
+def _is_section(node: Node) -> bool:
+    return node.get("t") == "heading" and node.get("level") == 1
+
+
+def _fields(rows: list[Node], heading: Node | None) -> Node:
+    return {"t": "fields", "rows": rows, **({"title": heading["c"]} if heading else {})}
 
 
 def _split_at_breaks(inlines: list[object]) -> list[list[object]]:

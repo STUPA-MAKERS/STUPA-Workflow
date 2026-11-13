@@ -5,7 +5,9 @@ the Markdown with a YAML frontmatter that the render service prints in the proto
 design. The frontmatter key `typ: antrag` tells the render service that the document has
 no title page and that the headings are form sections, so they get no "TOP n" number.
 
-The whole Antrag is tables of two columns, label and value (spec 000881). Each row is a
+The whole Antrag is tables of two columns, label and value (spec 000881). Dates, the
+version, an IBAN, amounts and the file names (one per line) are inline code, so they
+print in the monospace font. Each row is a
 field row of the render service, `> [!feld] Label` with the value as block Markdown in the
 same quote; rows that follow each other form one table. The document holds, in this
 order: the head data, one table per form section with the answers, the answers without
@@ -162,6 +164,16 @@ def _bold_heading(match: re.Match[str]) -> str:
     """Write a heading line as a bold line; an empty heading drops."""
     title = (match[1] or "").strip()
     return f"**{title}**" if title else ""
+
+
+def code(text: str) -> str:
+    """Write a value as inline code, in the monospace font: one line, no backtick."""
+    return _unbar("`" + " ".join(text.replace("`", "'").split()) + "`")
+
+
+def _lines(values: Sequence[str]) -> list[str]:
+    """Join values one per line: each line but the last ends with a hard break."""
+    return [f"{value}\\" for value in values[:-1]] + list(values[-1:])
 
 
 def markdown_text(text: str) -> str:
@@ -325,7 +337,7 @@ def _position_rows(index: int, position: Mapping[str, object], currency: str) ->
             pos=label if n == 0 else "",
             name=escape(_plain(o.get("label")) or "—"),
             pref=" (bevorzugt)" if o.get("preferred") is True else "",
-            amount=_money(o.get("value"), currency) or "",
+            amount=code(money) if (money := _money(o.get("value"), currency)) else "",
         )
         for n, o in enumerate(offers)
     ]
@@ -345,7 +357,7 @@ def positions_block(value: object, currency: str) -> list[str]:
         "| Position | Angebot | Betrag |",
         "|---|---|---:|",
         *(row for n, p in enumerate(positions, start=1) for row in _position_rows(n, p, currency)),
-        f"| **Summe** | | **{format_money(total, currency, LANG)}** |",
+        f"| **Summe** | | **{code(format_money(total, currency, LANG))}** |",
     ]
 
 
@@ -358,6 +370,8 @@ def _answer_value(doc: ApplicationDoc, fdef: FormFieldDef, value: object) -> lis
             return _table(value)
         case "textarea":
             return markdown_text(_plain(value)).splitlines()
+        case "date" | "daterange" | "iban" | "currency" | "funding":
+            return [code(format_answer(fdef, value, doc.currency))]
         case _:
             return [escape(format_answer(fdef, value, doc.currency))]
 
@@ -411,14 +425,14 @@ def _decision_lines(doc: ApplicationDoc) -> list[str]:
     amount = (
         "wie beantragt"
         if decision.approved_amount is None
-        else format_money(decision.approved_amount, doc.currency, LANG)
+        else code(format_money(decision.approved_amount, doc.currency, LANG))
     )
     by = f" ({escape(decision.gremium_name)})" if decision.gremium_name else ""
     conditions = [f"{n}. {escape(text)}" for n, text in enumerate(decision.conditions, start=1)]
     return [
         "# Beschluss",
         "",
-        *field_row("Beschlossen am", [f"{format_day(decision.decided_at.date())}{by}"]),
+        *field_row("Beschlossen am", [f"{code(format_day(decision.decided_at.date()))}{by}"]),
         *field_row("Bewilligter Betrag", [amount]),
         *(field_row("Auflagen", conditions) if conditions else []),
     ]
@@ -431,11 +445,11 @@ def _head_lines(doc: ApplicationDoc) -> list[str]:
         ("Gremium", escape(doc.gremium_name) if doc.gremium_name else None),
         ("Antragsart", escape(doc.type_name) if doc.type_name else None),
         ("Status", escape(doc.state_label) if doc.state_label else None),
-        ("Eingang", format_day(doc.received_on) if doc.received_on else None),
+        ("Eingang", code(format_day(doc.received_on)) if doc.received_on else None),
         ("Antragsteller", applicant),
-        ("Version", str(doc.version)),
+        ("Version", code(str(doc.version))),
     )
-    files = [f"- {escape(name)}" for name in doc.files]
+    files = _lines([code(name) for name in doc.files])
     return [
         *(line for label, value in rows if value for line in field_row(label, [value])),
         *(field_row("Anhänge", files) if files else []),

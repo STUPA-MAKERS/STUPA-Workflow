@@ -322,6 +322,24 @@ def test_an_antrag_starts_with_its_title_and_draws_field_tables(tmp_path: Path) 
     label_page, label_x, label_y = _find(lines, "Antragsart")
     value_page, value_x, value_y = _find(lines, "Finanzantrag")
     assert title_page == label_page == value_page == 1
-    assert title_y < label_y and abs(label_y - value_y) < 2 and value_x > label_x + 100
+    assert title_y < 60 and title_y < label_y
+    assert abs(label_y - value_y) < 2 and value_x > label_x + 100
     assert not any(line[3].startswith("TOP") for line in lines)
     assert any(line[3].endswith("Firma A") for line in lines)
+
+
+def test_an_antrag_cuts_long_values_and_long_table_cells(tmp_path: Path) -> None:
+    """§000881: a value of 30 lines or more and a nested cell of 3 lines or more end in "…"."""
+    long_value = "".join(f"> Zeile {n}\\\n" for n in range(1, 41))
+    cell = "Angebot " * 30
+    source = (
+        '---\ntitle: "A"\ntyp: antrag\n---\n\n'
+        f"> [!feld] Lang\n>\n{long_value}\n"
+        f"> [!feld] Kosten\n>\n> | Position | Angebot |\n> |---|---|\n> | Bus | {cell} |\n\n"
+        "> [!feld] Kurz\n>\n> eins\n"
+    )
+    lines = _lines(_render(source, "protocol-stupa"), tmp_path)
+    words = [line[3] for line in lines]
+    assert "Zeile 29" in words and "Zeile 30" not in words
+    assert words.count("…") == 2
+    assert sum(1 for w in words if "Angebot Angebot" in w) == 2

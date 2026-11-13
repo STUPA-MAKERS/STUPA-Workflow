@@ -211,7 +211,7 @@ async def test_the_protocol_appends_the_antrag_as_it_was_at_the_close_of_the_top
     internal_antrag = internal_assets[f"doc-{anlage_id(open_item.id, public=False)}.pdf"].decode()
     public_antrag = public_assets[f"doc-{anlage_id(open_item.id, public=True)}.pdf"].decode()
     assert "alte Fassung" in internal_antrag and "neue Fassung" not in internal_antrag
-    assert "\n".join(field_row("Version", ["1"])) in internal_antrag
+    assert "\n".join(field_row("Version", ["`1`"])) in internal_antrag
     assert _IBAN in internal_antrag and "Luis Meyer" in internal_antrag
     assert "[!feld] Status" not in internal_antrag and "# Beschluss" not in internal_antrag
     assert _IBAN not in public_antrag and "Luis Meyer" not in public_antrag
