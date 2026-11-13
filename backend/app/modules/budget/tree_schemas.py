@@ -53,6 +53,8 @@ _REQUIRED_NODE_FIELDS = frozenset(
         "fiscal_start_month",
         "fiscalStartDay",
         "fiscal_start_day",
+        "planCoverableDefault",
+        "plan_coverable_default",
     }
 )
 

@@ -377,6 +377,7 @@ def test_the_node_schemas_refuse_what_they_cannot_store() -> None:
         {"active": None},
         {"key": None},
         {"fiscalStartDay": None},
+        {"planCoverableDefault": None},
         {"name": "   "},
         {"name": "x", "unknown": 1},
     ):
