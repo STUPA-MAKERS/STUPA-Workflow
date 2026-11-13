@@ -205,7 +205,7 @@
                     >
                       <app-file-picker #logo [accept]="acceptOf(slot).join(',')" (picked)="onLogoSelected(slot, $event)" />
                       @if (d.logos[slot]; as asset) {
-                        <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark'"><img [src]="asset.url" alt="" /></span>
+                        <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark' || slot === 'export'"><img [src]="asset.url" alt="" /></span>
                         <span class="br__logoText">
                           <span class="br__logoName">{{ slotLabel(slot) }}</span>
                           <span class="br__logoFile mono">{{ asset.filename }} · {{ size(asset.size) }}</span>
