@@ -196,6 +196,24 @@ describe('CostCentreSettingsComponent', () => {
     await waitFor(() => expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('Ohne Gremium'));
   });
 
+  it('§F/finance/budget/000831: a refused deciding Gremium shows the saved one again', async () => {
+    const view = await setup();
+    const pending = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(pending);
+    await pick(/Entscheidendes Gremium/, 'StuPa');
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Entscheidendes Gremium/ })).toHaveTextContent('StuPa'));
+    pending.error({ status: 409, error: { code: 'x' } });
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Entscheidendes Gremium/ })).toHaveTextContent('Wie übergeordnet'));
+  });
+
+  it('§F/finance/budget/000849: a refused name shows the name of the save before it', async () => {
+    const view = await setup();
+    await retype(view.field('Name'), 'Erst');
+    view.api.updateNode.mockReturnValueOnce(throwError(() => ({ status: 409, error: { code: 'x' } })));
+    await retype(view.field('Name'), 'Zweit');
+    await waitFor(() => expect(view.field('Name').value).toBe('Erst'));
+  });
+
   it('§F/finance/budget/000849: a refused key keeps the text that the person types in the name', async () => {
     const view = await setup();
     const pending = new Subject<object>();

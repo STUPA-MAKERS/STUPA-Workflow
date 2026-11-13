@@ -739,6 +739,13 @@ describe('BudgetPlanComponent', () => {
       expect(input(view, 'amount-grants').value).toBe('75,00');
     });
 
+    it('§F/finance/budget/000812: a typed Sperrvermerk is saved when the person selects another line', async () => {
+      const view = await setup({ query: { costCentre: 'grants' } });
+      await userEvent.type(input(view, 'line-blocked-grants'), '5');
+      view.fixture.componentInstance.selectId('wages');
+      expect(view.api.setLine).toHaveBeenLastCalledWith('v0', 'grants', { blocked: '5' });
+    });
+
     it('§F/finance/budget/000809: the change of a line shows its sign, and no change shows a dash', async () => {
       const view = await setup();
       const page = view.fixture.componentInstance;
