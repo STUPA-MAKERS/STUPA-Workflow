@@ -36,6 +36,7 @@
   normal: 10.95pt,
   large: 12pt,
   Large: 14.4pt,
+  huge: 20.74pt,
   Huge: 24.88pt,
 )
 // \baselineskip of \normalsize.
@@ -155,6 +156,9 @@
     } else if t == "strike" {
       strike(inline(n.c))
     } else if t == "code" {
+      // The strut gives the line the height of the body font, so a line that holds
+      // only code has its baseline where a line of text has it.
+      box(width: 0pt, hide[x])
       text(font: mono-font, n.v)
     } else if t == "link" {
       link(n.url, text(fill: palette.hsrturl, inline(n.c)))
@@ -422,6 +426,8 @@
     if n.level >= 4 { "par" } else { "h" + str(n.level) }
   } else if n.t in ("callout", "tally") {
     "box"
+  } else if n.t == "fields" {
+    "table"
   } else if n.t == "codeblock" {
     "code"
   } else if n.t == "mathblock" {
@@ -504,6 +510,26 @@
   })
 }
 
+// The value of a signature row (an Antrag, 000888): room to sign by hand, then a
+// short line for the date and a long line for the signature, each with its caption.
+#let sign-area(role) = {
+  let slot(caption) = {
+    rect(width: 100%, height: 0.4pt, fill: black, stroke: none)
+    v(3pt)
+    block(text(size: size.small, caption))
+  }
+  block(breakable: false, width: 100%, {
+    v(16mm)
+    grid(
+      columns: (32mm, 1fr),
+      column-gutter: 8mm,
+      slot[Datum],
+      slot(if role != "" { [Unterschrift #role] } else { [Unterschrift] }),
+    )
+    v(1pt)
+  })
+}
+
 // -- blocks -------------------------------------------------------------------
 
 #let bullet-markers = ([•], [–], [∗], [·])
@@ -519,35 +545,155 @@
 // \leftmargini ... \leftmarginiv
 #let list-indents = (2.5em, 2.2em, 1.87em, 1.7em)
 
-#let table-block(n) = {
+// -- cut at a number of lines (000881) -----------------------------------------
+
+// The number of words of inline nodes. A node without text counts as one word.
+#let inline-size(nodes) = nodes.fold(0, (acc, n) => acc + if n.t == "text" {
+  n.v.split(" ").len()
+} else if "c" in n and type(n.c) == array {
+  inline-size(n.c)
+} else { 1 })
+
+// The first `k` words of inline nodes, with their formatting.
+#let inline-take(nodes, k) = {
+  let out = ()
+  let left = k
+  for n in nodes {
+    if left <= 0 { break }
+    if n.t == "text" {
+      let words = n.v.split(" ")
+      out.push(if words.len() <= left { n } else { (t: "text", v: words.slice(0, left).join(" ")) })
+      left -= words.len()
+    } else if "c" in n and type(n.c) == array {
+      let part = n
+      part.insert("c", inline-take(n.c, left))
+      out.push(part)
+      left -= inline-size(n.c)
+    } else {
+      out.push(n)
+      left -= 1
+    }
+  }
+  out
+}
+
+// The largest `k` in 0..total for which `fits(k)` holds; `fits` is monotonic.
+#let largest(total, fits) = {
+  let (low, high) = (0, total)
+  while low < high {
+    let mid = calc.ceil((low + high) / 2)
+    if fits(mid) { low = mid } else { high = mid - 1 }
+  }
+  low
+}
+
+// Cut nodes at a number of lines: nodes that would take `lines` lines or more
+// show `lines - 1` lines and a line "…". The cut drops the rest of the nodes, so
+// the PDF holds no hidden text. `render` draws a list of nodes; with `inline-mode`
+// the nodes are inline nodes, else blocks, of which the last kept paragraph is cut
+// by words.
+#let clamp(nodes, lines, render, inline-mode: false) = layout(region => {
+  let keep = measure(block(width: region.width, range(lines - 1).map(_ => [x]).join(linebreak()))).height
+  let fits(body) = measure(block(width: region.width, body)).height <= keep + 0.5pt
+  if fits(render(nodes)) {
+    render(nodes)
+  } else if inline-mode {
+    let k = largest(inline-size(nodes), k => fits(render(inline-take(nodes, k))))
+    render(inline-take(nodes, k))
+    linebreak()
+    […]
+  } else {
+    let m = largest(nodes.len(), m => fits(render(nodes.slice(0, m))))
+    let kept = nodes.slice(0, m)
+    let next = nodes.at(m)
+    if next.t == "par" {
+      let part(k) = kept + ((t: "par", c: inline-take(next.c, k)),)
+      let k = largest(inline-size(next.c), k => fits(render(part(k))))
+      if k > 0 { kept = part(k) }
+    }
+    render(kept)
+    v(3pt)
+    block(par[…])
+  }
+})
+
+// The side inset of the cells of a field table.
+#let field-inset = 6pt
+
+// A GFM table. Nested in a field row (an Antrag, `nested: true`), it has no top
+// and no bottom rule, a dashed rule between its rows, each cell is cut at three
+// lines, and it has no inset at its sides: it starts at the text of the other values and ends at the right edge of
+// the field table (000881).
+#let table-block(n, nested: false) = {
   let aligns = n.align.map(a => if a == "center" { center } else if a == "right" { right } else { left })
   let cols = n.head.len()
   let row(cells) = grid(
     columns: (1fr,) * cols,
     align: aligns,
-    inset: (x: 6pt),
-    ..range(cols).map(k => {
-      set par(justify: false)
-      inline(cells.at(k, default: ()))
-    }),
+    inset: if nested { 0pt } else { (x: 6pt) },
+    column-gutter: if nested { 12pt } else { 0pt },
+    ..if nested {
+      // The last cell with text takes the empty cells after it, so a note in a row
+      // (the reason for no offers) can use the room up to the right edge. Such a
+      // cell may take five lines (000881).
+      let filled = range(cols).filter(k => cells.at(k, default: ()).len() > 0)
+      let last = if filled.len() > 0 { filled.last() } else { cols - 1 }
+      range(last + 1).map(k => {
+        let cell = cells.at(k, default: ())
+        let wide = k == last and last < cols - 1
+        grid.cell(colspan: if wide { cols - last } else { 1 }, {
+          set par(justify: false)
+          clamp(cell, if wide { 6 } else { 3 }, inline, inline-mode: true)
+        })
+      })
+    } else {
+      range(cols).map(k => {
+        set par(justify: false)
+        inline(cells.at(k, default: ()))
+      })
+    },
   )
   let rule(w) = rect(width: 100%, height: w, fill: black, stroke: none)
+  let row-gap = 20.33pt - 1.211 * size.normal
+  // The dashed rule above a row of a nested table. It starts at the first column
+  // that has text, so a row that continues the entry above it (an offer of the
+  // same position) keeps the first column free of rules, and it ends at the right
+  // edge (000881).
+  let row-rule(cells) = {
+    let filled = range(cols).filter(k => cells.at(k, default: ()).len() > 0)
+    let start = if filled.len() > 0 { filled.first() } else { 0 }
+    grid(
+      columns: (1fr,) * cols,
+      column-gutter: 12pt,
+      grid.cell(x: start, colspan: cols - start, line(length: 100%, stroke: (paint: palette.gray, thickness: 0.4pt, dash: "dashed"))),
+    )
+  }
   // booktabs at \arraystretch 1.5: \toprule .08em, \midrule .05em,
   // \bottomrule .08em, 20.33pt from row to row.
-  block(width: 100%, breakable: false, {
-    rule(0.876pt)
-    v(6.45pt)
+  pad(right: if nested { -field-inset } else { 0pt }, block(width: 100%, breakable: false, {
+    if not nested {
+      rule(0.876pt)
+      v(6.45pt)
+    }
     row(n.head)
     v(5.6pt)
     rule(0.548pt)
     v(6.5pt)
     for (i, r) in n.rows.enumerate() {
-      if i > 0 { v(20.33pt - 1.211 * size.normal) }
+      if i > 0 and nested {
+        v(row-gap / 2)
+        row-rule(r)
+        v(row-gap / 2)
+      } else if i > 0 {
+        v(row-gap)
+      }
       row(r)
     }
-    v(5.46pt)
-    rule(0.876pt)
-  })
+    if not nested {
+      v(5.46pt)
+      rule(0.876pt)
+    }
+  }))
 }
 
 // A paragraph of one uploaded image: centered, at most the text width and
@@ -612,7 +758,7 @@
   [#n.time Uhr] + if n.c.len() > 0 { [ · ] + inline(n.c) },
 ))))
 
-#let blocks(nodes, in-item: false) = {
+#let blocks(nodes, in-item: false, in-field: false) = {
   let prev = none
   let i = 0
   while i < nodes.len() {
@@ -623,8 +769,12 @@
     let next = if i + 1 < nodes.len() { nodes.at(i + 1) } else { none }
     let note-head = n.t == "timenote" and next != none and next.t == "heading" and next.level <= 3
     let kk = if runin { "runin" } else if note-head { "h" + str(next.level) } else { k }
+    // Field tables that follow each other join into one table (000881).
+    let joined = n.t == "fields" and i > 0 and nodes.at(i - 1).t == "fields"
     if prev != none {
-      let g = if in-item != false and prev == "par" and k == "list" { 8.45pt } else { gap(prev, kk) }
+      // In a field value a rule only separates two entries, so it sits close.
+      let entry-rule = in-field and (k == "rule" or prev == "rule")
+      let g = if joined { 0pt } else if entry-rule { 4pt } else if in-item != false and prev == "par" and k == "list" { 8.45pt } else { gap(prev, kk) }
       v(g, weak: true)
     }
     if runin {
@@ -666,10 +816,46 @@
       tally(n)
     } else if n.t == "codeblock" {
       code-block(n)
+    } else if n.t == "rule" and in-field {
+      // The rule between two entries of a field value: the dashed rule of the rows.
+      line(length: 100%, stroke: (paint: palette.gray, thickness: 0.4pt, dash: "dashed"))
     } else if n.t == "rule" {
       rect(width: 100%, height: 0.4pt, fill: black, stroke: none)
     } else if n.t == "table" {
-      table-block(n)
+      table-block(n, nested: in-field)
+    } else if n.t == "fields" {
+      // Field rows (an Antrag), drawn as the table of the Haushaltsplan PDF: a thick
+      // rule above and below, a dashed grey rule between the rows, and the section name
+      // on a grey band across the table. Every field table has the same label column, so
+      // the tables of one document line up; a longer label wraps. The table breaks
+      // between rows. It is a grid, as the Markdown tables: PDF/UA-1 asks a tagged
+      // table for a header row, and a field table has none, so a screen reader reads
+      // label, then value. A value is cut at 30 lines (000881).
+      {
+        set par(justify: false)
+        let title = n.at("title", default: none)
+        let band = if title != none {
+          (
+            grid.cell(colspan: 2, fill: tint(palette.gray, 18%), inset: (x: 6pt, y: 5pt), {
+              show heading: it => block(text(font: head-font, weight: "bold", size: size.Large, it.body))
+              tagged-heading(1, inline(title))
+            }),
+          )
+        } else { () }
+        grid(
+          columns: (45mm, 1fr),
+          inset: (x: field-inset, y: 4pt),
+          align: left + top,
+          ..if not joined { (grid.hline(stroke: 0.876pt),) },
+          ..band,
+          ..n.rows.enumerate().map(((i, r)) => (
+            ..if i > 0 { (grid.hline(stroke: (paint: palette.gray, thickness: 0.4pt, dash: "dashed")),) },
+            strong(text(hyphenate: false, inline(r.label))),
+            if r.at("sign", default: none) != none { sign-area(r.sign) } else { clamp(r.c, 30, nodes => blocks(nodes, in-field: true)) },
+          )).flatten(),
+          grid.hline(stroke: 0.876pt),
+        )
+      }
     } else if n.t == "figure" {
       figure-block(n)
     } else if n.t == "mathblock" {
@@ -765,12 +951,33 @@
       grid(
         columns: (label-width, 1fr),
         row-gutter: 20.33pt - 1.211 * size.normal,
-        ..doc.data.map(r => (strong(r.at(0)), r.at(1))).flatten(),
+        // The empty blackout marker prints as the black bar of the text.
+        ..doc.data.map(r => (strong(r.at(0)), if r.at(1) == "%%%%" { inline(((t: "bar"),)) } else { r.at(1) })).flatten(),
       )
     }
     v(-6.6pt)
   },
 )
+
+// The head of each page of a document without a title page (an Antrag): the
+// title and the rule of the title page, without the logos (the footer has them).
+// It is the page header, so every page starts with it, and it stands where the
+// running head of a protocol stands.
+#let title-block(doc) = {
+  block(below: 0pt, par(justify: false, text(
+    font: head-font,
+    size: size.huge,
+    weight: "bold",
+    hyphenate: false,
+    doc.title,
+  )))
+  v(5pt)
+  rect(width: 100%, height: 0.5mm, fill: black, stroke: none)
+  v(14pt)
+}
+
+// Where the title of a document without a title page starts, from the top edge.
+#let title-top = 2cm + 5.18pt - 12mm
 
 #let protocol(doc) = {
   set document(title: doc.title)
@@ -790,11 +997,14 @@
   show math.equation: set text(font: math-font)
   show math.equation.where(block: true): set block(above: 0pt, below: 0pt)
 
-  // Section headings: Blender bold, "TOP n" and "TOP n.m", then \enskip.
-  set heading(numbering: (..n) => {
-    let n = n.pos()
-    if n.len() == 1 { [TOP #n.at(0)] } else if n.len() == 2 { [TOP #n.at(0).#n.at(1)] }
-  })
+  // Section headings: Blender bold, "TOP n" and "TOP n.m", then \enskip. An
+  // Antrag has form sections as headings, so they get no number.
+  set heading(numbering: if doc.at("numbered", default: true) {
+    (..n) => {
+      let n = n.pos()
+      if n.len() == 1 { [TOP #n.at(0)] } else if n.len() == 2 { [TOP #n.at(0).#n.at(1)] }
+    }
+  } else { none })
   show heading: it => {
     let sz = if it.level == 1 { size.Large } else { size.large }
     set text(font: head-font, weight: "bold", size: sz)
@@ -814,7 +1024,10 @@
     let page-no = counter(page).get().first()
     let last = counter(page).final().first()
     set text(font: head-font, size: size.normal, fill: palette.gray)
-    place(top + left, dx: 2cm, dy: 29.09pt, doc.title)
+    // Without a title page each page carries the title as its header.
+    if doc.at("cover", default: true) {
+      place(top + left, dx: 2cm, dy: 29.09pt, doc.title)
+    }
     place(top + center, dy: 798.53pt, [Seite~#page-no~von~#text(fill: palette.hsrtlink, str(last))])
   }
   let footer-logos = if doc.footer_logos.len() > 0 {
@@ -830,8 +1043,19 @@
     foreground: frame,
   )
 
-  title-page(doc)
-  counter(page).update(1)
-  blocks(doc.body)
-  appendix-pages(doc.at("appendix", default: ()))
+  if doc.at("cover", default: true) {
+    title-page(doc)
+    counter(page).update(1)
+    blocks(doc.body)
+    appendix-pages(doc.at("appendix", default: ()))
+  } else {
+    // The title can take several lines, so the top margin follows its height.
+    context {
+      let head = title-block(doc)
+      let height = measure(width: page.width - 4cm, head).height
+      set page(margin: (top: title-top + height, rest: 2cm), header: head, header-ascent: 0pt)
+      blocks(doc.body)
+      appendix-pages(doc.at("appendix", default: ()))
+    }
+  }
 }

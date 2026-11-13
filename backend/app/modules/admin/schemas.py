@@ -313,6 +313,7 @@ class ApplicationTypeOut(FrozenCamelModel, frozen=True):
     key: str
     name_i18n: I18nMap = Field(serialization_alias="nameI18n")
     has_budget: bool = Field(serialization_alias="hasBudget")
+    pdf_signatures: bool = Field(default=False, serialization_alias="pdfSignatures")
     comparison_offers: dict[Any, Any] | None = Field(serialization_alias="comparisonOffers")
     retention_months: int | None = Field(default=None, serialization_alias="retentionMonths")
     active_form_version_id: UUID | None = Field(
@@ -331,6 +332,7 @@ class ApplicationTypeCreate(FrozenCamelModel, frozen=True):
     name_i18n: I18nMap = Field(alias="nameI18n")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool = Field(default=False, alias="hasBudget")
+    pdf_signatures: bool = Field(default=False, alias="pdfSignatures")
     comparison_offers: ComparisonOffers | None = Field(
         default=None, alias="comparisonOffers"
     )
@@ -345,6 +347,7 @@ class ApplicationTypeUpdate(FrozenCamelModel, frozen=True):
     name_i18n: I18nMap | None = Field(default=None, alias="nameI18n")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool | None = Field(default=None, alias="hasBudget")
+    pdf_signatures: bool | None = Field(default=None, alias="pdfSignatures")
     comparison_offers: ComparisonOffers | None = Field(
         default=None, alias="comparisonOffers"
     )

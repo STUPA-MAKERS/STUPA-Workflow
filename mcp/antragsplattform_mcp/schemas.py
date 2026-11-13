@@ -363,6 +363,7 @@ class ApplicationTypeCreate(WireModel, frozen=True):
     nameI18n: I18nMap
     gremiumId: str | None = None
     hasBudget: bool = False
+    pdfSignatures: bool = False
     comparisonOffers: dict[str, Any] | None = None
 
 
@@ -370,6 +371,7 @@ class ApplicationTypeUpdate(WireModel, frozen=True):
     nameI18n: I18nMap | None = None
     gremiumId: str | None = None
     hasBudget: bool | None = None
+    pdfSignatures: bool | None = None
     comparisonOffers: dict[str, Any] | None = None
 
 

@@ -160,6 +160,7 @@ OPTIONAL_PRINCIPAL_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("GET", "/api/applications/{application_id}"),
         ("PATCH", "/api/applications/{application_id}"),
         ("GET", "/api/applications/{application_id}/form"),
+        ("GET", "/api/applications/{application_id}/pdf"),
         ("GET", "/api/applications/{application_id}/timeline"),
         ("GET", "/api/applications/{application_id}/versions"),
         ("GET", "/api/applications/{application_id}/mentionable"),

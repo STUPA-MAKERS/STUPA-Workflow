@@ -18,6 +18,7 @@ import { FormGroup, FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
+import { filenameFromDisposition } from '@shared/download.util';
 import { ObserversDialogComponent } from '../../features/apply/observers-dialog/observers-dialog.component';
 import { API_BASE_URL } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
@@ -87,6 +88,7 @@ import {
   TabsComponent,
   ToastService,
   scrollBehavior,
+  downloadBlob,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -843,6 +845,7 @@ export class ApplicationsDetailComponent {
         icon: 'archive',
       }),
     ];
+    const pdf: RowMenuItem = { id: 'pdf', label: t('applications.detail.downloadPdf'), icon: 'download' };
     const more = [
       ...when(this.canForceStatus(), {
         id: 'force',
@@ -859,6 +862,7 @@ export class ApplicationsDetailComponent {
         label: t('applications.detail.compareVersions'),
         icon: 'history',
       }),
+      pdf,
     ];
     const danger = [
       ...when(this.canDelete(), {
@@ -961,7 +965,34 @@ export class ApplicationsDetailComponent {
       case 'observers':
         this.observersOpen.set(true);
         break;
+      case 'pdf':
+        this.downloadPdf(app.id);
+        break;
     }
+  }
+
+  /** A PDF download that runs: a second click waits for it. */
+  readonly pdfBusy = signal(false);
+
+  /**
+   * "Als PDF herunterladen": the server renders the Antrag as the reader sees it and
+   * names the file (`Antrag_<Titel>_<Datum>.pdf`). The PDF streams through the API.
+   */
+  downloadPdf(id: string): void {
+    if (this.pdfBusy()) return;
+    this.pdfBusy.set(true);
+    this.api.applicationPdf(id).subscribe({
+      next: (res) => {
+        this.pdfBusy.set(false);
+        if (!res.body) return;
+        const name = filenameFromDisposition(res.headers.get('Content-Disposition'), 'Antrag.pdf');
+        downloadBlob(res.body, name);
+      },
+      error: () => {
+        this.pdfBusy.set(false);
+        this.toast.error(this.i18n.translate('applications.detail.pdfError'));
+      },
+    });
   }
 
   /**

@@ -4,6 +4,12 @@
  *
  * Its own file, like the comments spec: the base spec is large already.
  */
+/** A plain copy of the kit module lets a test spy on `downloadBlob`. */
+jest.mock('@stupa-makers/ui-kit', () => ({
+  __esModule: true,
+  ...jest.requireActual('@stupa-makers/ui-kit'),
+}));
+import * as kit from '@stupa-makers/ui-kit';
 import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import {
@@ -278,14 +284,14 @@ describe('ApplicationsDetailComponent — header', () => {
     expect(screen.getByRole('button', { name: 'Archivieren' })).toBeInTheDocument();
   });
 
-  it('offers no edit in a locked state and no actions without rights', async () => {
-    const { http } = await setup({
+  it('offers no edit in a locked state and only the PDF without rights', async () => {
+    const { http, cmp } = await setup({
       perms: ['application.read'],
       app: { state: { ...SUBMITTED, editAllowed: false } },
       versions: [VERSIONS[0]],
     });
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).not.toBeInTheDocument();
+    expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['pdf']);
     expect(screen.queryByRole('group', { name: 'Übergänge' })).not.toBeInTheDocument();
     http.verify();
   });
@@ -335,7 +341,7 @@ describe('ApplicationsDetailComponent — header', () => {
       const { detectChanges } = await setup();
       await openMenu(detectChanges);
       const items = screen.getAllByRole('menuitem').map((el) => el.textContent?.trim());
-      expect(items).toEqual(['Status setzen', 'Beobachter:innen', 'Versionen vergleichen', 'Löschen']);
+      expect(items).toEqual(['Status setzen', 'Beobachter:innen', 'Versionen vergleichen', 'Als PDF herunterladen', 'Löschen']);
       expect(screen.getByRole('menuitem', { name: 'Löschen' })).toHaveClass('rm__item--danger');
     });
 
@@ -345,6 +351,7 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(screen.getAllByRole('menuitem').map((el) => el.textContent?.trim())).toEqual([
         'Beobachter:innen',
         'Versionen vergleichen',
+        'Als PDF herunterladen',
         'Anonymisierung beantragen',
       ]);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Anonymisierung beantragen' }));
@@ -372,14 +379,14 @@ describe('ApplicationsDetailComponent — header', () => {
       });
       expect(screen.getByText('Eingereicht von Luis Meyer')).toBeInTheDocument();
       expect(cmp.canManageObservers()).toBe(false);
-      expect(cmp.menuSections().flatMap((sec) => sec.items.map((i) => i.id))).toEqual(['versions']);
+      expect(cmp.menuSections().flatMap((sec) => sec.items.map((i) => i.id))).toEqual(['versions', 'pdf']);
       expect(screen.queryByRole('group', { name: 'Übergänge' })).not.toBeInTheDocument();
       expect(cmp.historyEntries().some((e) => e.actor === 'Luis Meyer')).toBe(true);
     });
 
     it('leaves "Versionen vergleichen" out with only one version', async () => {
       const { cmp } = await setup({ versions: [VERSIONS[0]] });
-      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['force', 'observers', 'delete']);
+      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['force', 'observers', 'pdf', 'delete']);
     });
 
     it('opens the force dialog, confirms the delete, and reloads after a forced state', async () => {
@@ -419,7 +426,45 @@ describe('ApplicationsDetailComponent — header', () => {
 
     it('holds only the rights the reader has on a phone', async () => {
       const { cmp } = await setup({ phone: true, perms: ['application.read'], versions: [VERSIONS[0]], app: { state: { ...SUBMITTED, editAllowed: false } } });
-      expect(cmp.menuSections()).toEqual([]);
+      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['pdf']);
+    });
+
+    it('downloads the PDF under the name of the server, once at a time', async () => {
+      const dl = jest.spyOn(kit, 'downloadBlob').mockImplementation(() => undefined);
+      const { cmp, http } = await setup();
+      cmp.onMenu({ id: 'pdf', label: '' });
+      cmp.onMenu({ id: 'pdf', label: '' });
+      const req = http.expectOne((r) => r.url === '/api/applications/app-1/pdf');
+      expect(req.request.responseType).toBe('blob');
+      req.flush(new Blob(['%PDF']), {
+        headers: {
+          'Content-Disposition':
+            "attachment; filename=\"Antrag_Plakate_2026-11-10.pdf\"; filename*=UTF-8''Antrag_Pl%C3%A4kate_2026-11-10.pdf",
+        },
+      });
+      expect(dl).toHaveBeenCalledWith(expect.any(Blob), 'Antrag_Pläkate_2026-11-10.pdf');
+      expect(cmp.pdfBusy()).toBe(false);
+      dl.mockRestore();
+    });
+
+    it('tells a failed PDF in a toast', async () => {
+      const { cmp, http, toast } = await setup();
+      const error = jest.spyOn(toast, 'error');
+      cmp.downloadPdf('app-1');
+      http
+        .expectOne((r) => r.url === '/api/applications/app-1/pdf')
+        .flush(new Blob(['x']), { status: 503, statusText: 'Unavailable' });
+      expect(error).toHaveBeenCalledWith('Das PDF konnte nicht erstellt werden.');
+      expect(cmp.pdfBusy()).toBe(false);
+    });
+
+    it('saves nothing for an empty PDF response', async () => {
+      const dl = jest.spyOn(kit, 'downloadBlob').mockImplementation(() => undefined);
+      const { cmp, http } = await setup();
+      cmp.downloadPdf('app-1');
+      http.expectOne((r) => r.url === '/api/applications/app-1/pdf').flush(null);
+      expect(dl).not.toHaveBeenCalled();
+      dl.mockRestore();
     });
 
     /** The edit form needs structuredClone, which jsdom lacks. */

@@ -60,6 +60,7 @@ from app.modules.calendar.router import admin_router as calendar_admin_router
 from app.modules.calendar.router import router as calendar_router
 from app.modules.config_revision.router import router as config_revision_router
 from app.modules.delegations.router import router as delegations_router
+from app.modules.documents.router import router as application_pdf_router
 from app.modules.files.storage import build_object_storage
 from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
 from app.modules.flow.router import get_action_dispatcher
@@ -121,6 +122,7 @@ api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
 api_router.include_router(application_links_router)
 api_router.include_router(application_observers_router)
+api_router.include_router(application_pdf_router)
 api_router.include_router(flow_router)
 api_router.include_router(voting_router)
 api_router.include_router(vote_open_router)

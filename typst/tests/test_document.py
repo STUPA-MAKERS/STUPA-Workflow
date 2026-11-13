@@ -160,3 +160,11 @@ def test_fixture_converts() -> None:
         "rule",
         "signatures",
     }
+
+
+def test_an_antrag_has_no_title_page_and_no_top_numbers() -> None:
+    """§000881: `typ: antrag` drops the title page and the "TOP n" numbers."""
+    doc = build_document('---\ntitle: "A"\ntyp: antrag\n---\n\n# Teil\n', variant=None)
+    assert doc["cover"] is False and doc["numbered"] is False
+    protocol = build_document('---\ntitle: "P"\n---\n\n# TOP\n', variant=None)
+    assert protocol["cover"] is True and protocol["numbered"] is True

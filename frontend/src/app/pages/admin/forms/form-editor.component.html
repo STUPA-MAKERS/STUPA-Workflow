@@ -424,6 +424,10 @@
             >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
           }
           <app-checkbox
+            [ngModel]="pdfSignatures()"
+            (ngModelChange)="pdfSignatures.set($event)"
+          >{{ 'admin.forms.pdfSignatures' | t }}</app-checkbox>
+          <app-checkbox
             [ngModel]="cmpRequired()"
             (ngModelChange)="cmpRequired.set($event)"
           >{{ 'admin.forms.cmpRequired' | t }}</app-checkbox>

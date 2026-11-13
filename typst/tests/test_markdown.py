@@ -457,3 +457,55 @@ def test_time_note_without_text_and_a_bad_time() -> None:
     assert heading["t"] == "heading"
     assert bad["t"] == "quote"
     assert other["t"] == "quote"
+
+
+def test_field_rows_form_one_table_and_keep_block_markdown() -> None:
+    """§000881: a field row keeps the block Markdown of its value; rows in a row join."""
+    md = (
+        "> [!feld] Titel *kurz*\n>\n> Eins\n\n"
+        "> [!feld] Beschreibung\n>\n> Text **fett**.\n>\n> - a\n> - b\n\n"
+        "> [!FIELD] Kosten\n>\n> | A | B |\n> |---|---|\n> | 1 | 2 |\n\n"
+        "Zwischentext\n\n"
+        "> [!feld] Allein\n> erste Zeile\n"
+    )
+    blocks = conv(md)
+    assert [b["t"] for b in blocks] == ["fields", "par", "fields"]
+    rows = cast("list[Node]", blocks[0]["rows"])
+    assert [texts(r["label"]) for r in rows] == ["Titel kurz", "Beschreibung", "Kosten"]
+    assert {"t": "emph", "c": [{"t": "text", "v": "kurz"}]} in cast("list[Node]", rows[0]["label"])
+    assert [b["t"] for b in cast("list[Node]", rows[1]["c"])] == ["par", "list"]
+    assert [b["t"] for b in cast("list[Node]", rows[2]["c"])] == ["table"]
+    alone = cast("list[Node]", blocks[2]["rows"])[0]
+    assert texts(alone["label"]) == "Allein"
+    assert texts(alone["c"]) == "erste Zeile"
+
+
+def test_field_rows_inside_a_quote_form_a_table_there() -> None:
+    blocks = conv("> > [!feld] A\n> >\n> > x\n")
+    inner = cast("list[Node]", blocks[0]["c"])
+    assert inner[0]["t"] == "fields"
+
+
+def test_a_section_heading_in_front_of_field_rows_is_the_title_of_the_table() -> None:
+    """§000881: the section name prints on the band of its table, not as a heading."""
+    blocks = conv(
+        "# Antrag\n\n> [!feld] A\n>\n> x\n\n# Ohne Zeilen\n\nText\n\n"
+        "## Klein\n\n> [!feld] B\n>\n> y\n"
+    )
+    assert [b["t"] for b in blocks] == ["fields", "heading", "par", "heading", "fields"]
+    assert texts(blocks[0]["title"]) == "Antrag"
+    assert "title" not in blocks[4]
+
+
+def test_a_signature_row_is_a_field_row_with_its_signer() -> None:
+    """§000888: a signature row joins the field table and names the signer."""
+    blocks = conv(
+        "# Unterschriften\n\n"
+        "> [!unterschrift] Sachlich richtig\n>\n> Finanzreferent:in\n\n"
+        "> [!SIGNATURE] Ohne Rolle\n"
+    )
+    assert [b["t"] for b in blocks] == ["fields"]
+    rows = cast("list[Node]", blocks[0]["rows"])
+    assert [texts(r["label"]) for r in rows] == ["Sachlich richtig", "Ohne Rolle"]
+    assert [r["sign"] for r in rows] == ["Finanzreferent:in", ""]
+    assert [r["c"] for r in rows] == [[], []]
