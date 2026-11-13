@@ -1557,6 +1557,14 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(error).toHaveBeenCalledWith('Die Budget-Statistik konnte nicht geladen werden.');
     });
 
+    it('§F/finance/budget/000831: a failed tree read after a refused save of the section says nothing', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-800' } });
+      const error = jest.spyOn(TestBed.inject(ToastService), 'error');
+      view.c.refreshTree(null, true);
+      view.http.expectOne(treeUrl).flush({}, { status: 500, statusText: 'Error' });
+      expect(error).not.toHaveBeenCalled();
+    });
+
     it('§F/finance/budget/000850: reads the tree after a save of a section that went off a page before', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
       TestBed.inject(BudgetTreeApi).changed.next();

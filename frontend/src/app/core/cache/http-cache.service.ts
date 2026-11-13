@@ -34,6 +34,27 @@ export class HttpCacheService {
     return this.writes;
   }
 
+  private running = 0;
+
+  /** A write is on its way. */
+  writeStarts(): void {
+    this.running += 1;
+  }
+
+  /** A write ended: answered, failed or given up by its caller. */
+  writeEnds(): void {
+    this.running -= 1;
+  }
+
+  /**
+   * A write runs. The server may answer a read before the write that runs beside it, so the
+   * interceptor does not store the answer of a read that arrives while a write runs,
+   * whatever the paths of the two are.
+   */
+  get writing(): boolean {
+    return this.running > 0;
+  }
+
   /**
    * Read a fresh entry, or `undefined` when it is missing or older than `ttlMs`.
    *

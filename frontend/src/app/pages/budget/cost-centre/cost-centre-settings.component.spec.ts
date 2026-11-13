@@ -142,6 +142,15 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.api.updateNode).toHaveBeenCalledTimes(4);
   });
 
+  it('§F/finance/budget/000831: a save tells the page whether the server took it', async () => {
+    const taken = await setup();
+    await userEvent.click(screen.getByRole('switch', { name: 'Aktiv' }));
+    expect(taken.saved).toHaveBeenCalledWith(true);
+    const refused = await setup({}, 'key_taken');
+    await userEvent.click(screen.getByRole('switch', { name: 'Aktiv' }));
+    expect(refused.saved).toHaveBeenCalledWith(false);
+  });
+
   it('§F/finance/budget/000831: a refused switch shows the saved state again', async () => {
     const view = await setup();
     const pending = new Subject<object>();

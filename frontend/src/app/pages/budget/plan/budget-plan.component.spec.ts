@@ -1296,12 +1296,12 @@ describe('BudgetPlanComponent', () => {
       expect(settings.sided()).toBe(true);
       expect(settings.gremiumOptions()).toEqual([{ value: 'g1', label: 'StuPa' }]);
       const before = view.api.plan.mock.calls.length;
-      settings.saved.emit();
+      settings.saved.emit(true);
       expect(view.treeApi.tree).toHaveBeenCalledTimes(2);
       expect(view.api.plan.mock.calls.length).toBe(before);
       view.treeApi.tree.mockReturnValueOnce(throwError(() => problem(500)));
       const reads = view.api.plan.mock.calls.length;
-      settings.saved.emit();
+      settings.saved.emit(true);
       expect(view.api.plan.mock.calls.length).toBeGreaterThan(reads);
       await userEvent.click(treeRow(view, 'Löhne'));
       const child = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent)).componentInstance as CostCentreSettingsComponent;
@@ -1325,6 +1325,20 @@ describe('BudgetPlanComponent', () => {
       const reads = view.treeApi.tree.mock.calls.length;
       view.treeApi.changed.next();
       expect(view.treeApi.tree.mock.calls.length).toBe(reads + 1);
+    });
+
+    it('§F/finance/budget/000850: a failed tree read before the page took its budget from the URL leaves the URL', async () => {
+      const view = await setup({ query: { budget: 'top', fy: 'fy-25', costCentre: 'fees' } });
+      const page = view.fixture.componentInstance as unknown as { topId: { set(id: string): void } };
+      page.topId.set('');
+      view.navigate.mockClear();
+      view.treeApi.tree.mockReturnValueOnce(throwError(() => problem(0)));
+      view.treeApi.changed.next();
+      expect(view.navigate).not.toHaveBeenCalled();
+      page.topId.set(TOP.id);
+      view.treeApi.tree.mockReturnValueOnce(throwError(() => problem(0)));
+      view.treeApi.changed.next();
+      expect(view.navigate).toHaveBeenCalled();
     });
 
     it('§F/finance/budget/000851: the first tree read does not replace the tree of a later read', async () => {

@@ -62,6 +62,23 @@ describe('cacheInterceptor', () => {
     mock.expectOne('/api/things').flush(['new']);
   });
 
+  it('§NF/performance/loading/000847: the answer of a read of another path that comes while a write runs is not stored', () => {
+    const seen: unknown[] = [];
+    http.post('/api/expenses', {}).subscribe();
+    http.get('/api/budgets', { context: cached(60_000) }).subscribe();
+    mock.expectOne('/api/budgets').flush(['old']);
+    mock.expectOne('/api/expenses').flush({});
+    http.get('/api/budgets', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    mock.expectOne('/api/budgets').flush(['new']);
+    expect(seen).toEqual([['new']]);
+  });
+
+  it('a write that its caller gives up counts as ended', () => {
+    http.post('/api/expenses', {}).subscribe().unsubscribe();
+    mock.expectOne('/api/expenses');
+    expect(cache.writing).toBe(false);
+  });
+
   describe('listContext', () => {
     /**
      * A page switch shows the list at once, and the list corrects itself a moment later, instead of

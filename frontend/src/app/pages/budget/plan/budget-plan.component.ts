@@ -1044,7 +1044,11 @@ export class BudgetPlanComponent {
     this.reloadTree(created.plan);
   }
 
-  /** A setting of a Kostenstelle changed: the names and sides of the rows come from the tree. */
+  /**
+   * A setting of a Kostenstelle changed: the names and sides of the rows come from the tree.
+   * A failed read reads the plan again, but not on a page that has not taken its budget from
+   * the URL yet, because that would write the URL without its budget and year.
+   */
   reloadTree(plan: BudgetPlan | null = null): void {
     const place = this.place();
     const sent = plan ? this.send() : 0;
@@ -1056,7 +1060,7 @@ export class BudgetPlanComponent {
         this.treeShown = Math.max(read, this.treeShown);
         if (plan && this.place() === place && this.newest(sent)) this.load.set({ kind: 'plan', plan });
       },
-      error: () => this.reloadPlan(),
+      error: () => this.topId() && this.reloadPlan(),
     });
   }
 

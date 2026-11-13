@@ -888,9 +888,11 @@ export class BudgetDashboardComponent {
    * names the Kostenstelle that the page then shows. The answer of a read that went out
    * before the read on the page is dropped, because it can hold the state before a save.
    * A page that has not taken its budget from the URL yet selects nothing here, because a
-   * selection would write the URL without its budget, Kostenstelle and year.
+   * selection would write the URL without its budget, Kostenstelle and year. A failed read
+   * after a refused save says nothing (`quiet`), because the person must read the cause of
+   * the refusal, and a phone shows one message at a time.
    */
-  refreshTree(select: string | null = null): void {
+  refreshTree(select: string | null = null, quiet = false): void {
     this.treeSent += 1;
     const sent = this.treeSent;
     this.api.tree().subscribe({
@@ -901,7 +903,7 @@ export class BudgetDashboardComponent {
         if (select && this.nodeById().get(select)) this.selectKs(select);
         else if (!this.selectedKs() && this.selectedBudgetId()) this.selectKs(this.selectedBudgetId());
       },
-      error: () => this.toast.error(this.i18n.translate('budget.error')),
+      error: () => quiet || this.toast.error(this.i18n.translate('budget.error')),
     });
   }
 

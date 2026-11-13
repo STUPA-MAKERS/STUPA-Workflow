@@ -100,7 +100,8 @@ export class CostCentreSettingsComponent {
   /** The Kostenstelle is a direct child of a budget with a Haushaltsplan, so it has a side. */
   readonly sided = input(false);
   readonly gremiumOptions = input<readonly SelectOption[]>([]);
-  readonly saved = output<void>();
+  /** A save ended. The value says whether the server took it: the page reads the tree in both cases. */
+  readonly saved = output<boolean>();
   /** The side changed, so the lines of a plan can differ: the plan page reads its plan again. */
   readonly sideSaved = output<void>();
   /** The section went off the page: a component that is gone cannot emit. */
@@ -128,9 +129,9 @@ export class CostCentreSettingsComponent {
   }
 
   /** Tell the page that a save ended, or the page that shows after this one. */
-  private tell(side: boolean): void {
+  private tell(side: boolean, taken = true): void {
     if (this.gone) return this.api.changed.next();
-    this.saved.emit();
+    this.saved.emit(taken);
     if (side) this.sideSaved.emit();
   }
 
@@ -350,7 +351,7 @@ export class CostCentreSettingsComponent {
           const known = this.known(id, field);
           const waits = this.waiting().some((c) => c.id === id && c.field === field);
           if (this.node().id === id && known !== undefined && !waits) this.show(field, known);
-          this.tell(false);
+          this.tell(false, false);
         },
       });
   }
