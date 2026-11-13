@@ -1346,36 +1346,44 @@ async def test_the_open_of_a_vote_keeps_the_file_of_the_plan(session: AsyncSessi
 
 
 async def test_a_reader_gets_the_drafts_for_a_reading(session: AsyncSession) -> None:
-    """An agenda offers the drafts of the budgets that the person can read.
+    """An agenda offers the drafts that its Gremium decides and that the person can read.
 
     Rule: §F/finance/budget/000876.
     """
     t = await _tree(session)
     other = await _tree(session)
+    foreign = await _tree(session)
     gremium = await _gremium(session)
+    await _steps(t, "Beschluss", gremium_id=gremium)
+    await _steps(other, "Beschluss", gremium_id=gremium)
     top = await session.get(Budget, t.top.id)
     assert top is not None
     top.view_gremium_id = gremium
     await session.commit()
     vid = _version(await t.svc.get_plan(t.top.id, t.fy.id)).id
     other_vid = _version(await other.svc.get_plan(other.top.id, other.fy.id)).id
+    foreign_vid = _version(await foreign.svc.get_plan(foreign.top.id, foreign.fy.id)).id
 
-    every = {p.plan_version_id: p for p in await t.svc.reading_plans(None)}
-    assert {vid, other_vid} <= set(every)
+    assert await t.svc.plan_budget_ids(gremium) == {t.top.id, other.top.id}
+    assert await t.svc.plan_budget_ids(uuid.uuid4()) == frozenset()
+    every = {p.plan_version_id: p for p in await t.svc.reading_plans(gremium, None)}
+    assert set(every) == {vid, other_vid}
     assert (every[vid].reading, every[vid].step, every[vid].title) == (
         True, "Lesung", "Haushaltsplan VS-Mittel 2026: Lesung",
     )
-    assert [p.plan_version_id for p in await t.svc.reading_plans({gremium})] == [vid]
-    assert await t.svc.reading_plans(set()) == []
+    assert [p.plan_version_id for p in await t.svc.reading_plans(gremium, {gremium})] == [vid]
+    assert await t.svc.reading_plans(gremium, set()) == []
+    assert await t.svc.reading_plans(uuid.uuid4(), None) == []
 
-    mine = await t.svc.reading_plan(vid, {gremium})
+    mine = await t.svc.reading_plan(vid, gremium, {gremium})
     assert mine is not None and mine.plan_version_id == vid
-    assert (await t.svc.reading_plan(other_vid, None)) is not None
+    assert (await t.svc.reading_plan(other_vid, gremium, None)) is not None
+    assert await t.svc.reading_plan(foreign_vid, gremium, None) is None
     with pytest.raises(ForbiddenError):
-        await t.svc.reading_plan(other_vid, {gremium})
-    forced = _version(await _in_force(t)).id
-    assert await t.svc.reading_plan(forced, None) is None
-    assert await t.svc.reading_plan(uuid.uuid4(), None) is None
+        await t.svc.reading_plan(other_vid, gremium, {gremium})
+    forced = _version(await _in_force(foreign)).id
+    assert await t.svc.reading_plan(forced, gremium, None) is None
+    assert await t.svc.reading_plan(uuid.uuid4(), gremium, None) is None
 
 
 async def test_a_step_waits_for_its_gremium_after_the_request(session: AsyncSession) -> None:

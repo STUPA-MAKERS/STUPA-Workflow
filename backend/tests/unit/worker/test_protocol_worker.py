@@ -77,13 +77,14 @@ async def test_render_protocol_transient_retries() -> None:
 async def test_render_protocol_exhausted_reverts_to_draft() -> None:
     """Revert the protocol to draft when the tries are exhausted.
 
-    The execute calls run ``_get`` for finalize, ``_assemble``, then ``_get`` for
-    revert_to_draft. The protocol is ready for a new finalize and never stays in rendering.
+    The execute calls run ``_get`` for finalize, the items of ``attach_plans``,
+    ``_assemble``, then ``_get`` for revert_to_draft. The protocol is ready for a new
+    finalize and never stays in rendering.
     """
     proto = _protocol()
     typst = FakeTypst(error=TypstError("5xx", status=503, retryable=True))
     session = FakeSession(
-        store={}, results=[result(proto), result(), result(proto)]
+        store={}, results=[result(proto), result(), result(), result(proto)]
     )
     ctx = _ctx(session, typst=typst, storage=FakeStorage(), job_try=3)
     assert await render_protocol(ctx, str(PID)) == "dead"
@@ -95,7 +96,7 @@ async def test_render_protocol_permanent_error_reverts_to_draft() -> None:
     proto = _protocol()
     typst = FakeTypst(error=TypstError("bad markup", status=400, retryable=False))
     session = FakeSession(
-        store={}, results=[result(proto), result(), result(proto)]
+        store={}, results=[result(proto), result(), result(), result(proto)]
     )
     ctx = _ctx(session, typst=typst, storage=FakeStorage(), job_try=1)
     assert await render_protocol(ctx, str(PID)) == "failed"

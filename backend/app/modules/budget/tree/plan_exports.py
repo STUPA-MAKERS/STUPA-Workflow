@@ -17,7 +17,12 @@ from app.modules.budget.plan_export import (
     plan_file,
     plan_file_of,
 )
-from app.modules.budget.plan_models import BudgetPlan, BudgetPlanVersion, BudgetPlanVoteSnapshot
+from app.modules.budget.plan_models import (
+    BudgetPlan,
+    BudgetPlanStep,
+    BudgetPlanVersion,
+    BudgetPlanVoteSnapshot,
+)
 from app.modules.budget.plan_schemas import (
     PlanLineOut,
     PlanOut,
@@ -194,13 +199,27 @@ class PlanExportOps(PlanOps, TreeViewOps):
         ).all()
         return [(version, fy, top) for version, fy, top in rows]
 
-    async def reading_plans(self, member_gremium_ids: set[UUID] | None) -> list[WaitingPlanOut]:
-        """List the drafts that an agenda can take for a reading (spec 000876).
+    async def plan_budget_ids(self, gremium_id: UUID) -> frozenset[UUID]:
+        """Return the budgets with a plan that this Gremium decides in a step (spec 000876)."""
+        return frozenset(
+            await self.session.scalars(
+                select(BudgetPlanStep.budget_id)
+                .join(Budget, Budget.id == BudgetPlanStep.budget_id)
+                .where(BudgetPlanStep.gremium_id == gremium_id, Budget.plan_enabled.is_(True))
+            )
+        )
 
+    async def reading_plans(
+        self, gremium_id: UUID, member_gremium_ids: set[UUID] | None
+    ) -> list[WaitingPlanOut]:
+        """List the drafts that an agenda of this Gremium can take for a reading (spec 000876).
+
+        These are the drafts of the budgets whose plan the Gremium decides in a step.
         ``member_gremium_ids`` is ``None`` for a person with the full view of the
         budgets. Any other person gets the drafts of the budgets that the Gremien give
         a view of.
         """
+        decided = await self.plan_budget_ids(gremium_id)
         visible = (
             None
             if member_gremium_ids is None
@@ -209,16 +228,17 @@ class PlanExportOps(PlanOps, TreeViewOps):
         return [
             self._reading_out(version, fy, top)
             for version, fy, top in await self._drafts()
-            if visible is None or top.id in visible
+            if top.id in decided and (visible is None or top.id in visible)
         ]
 
     async def reading_plan(
-        self, version_id: UUID, member_gremium_ids: set[UUID] | None
+        self, version_id: UUID, gremium_id: UUID, member_gremium_ids: set[UUID] | None
     ) -> WaitingPlanOut | None:
-        """Return a draft that this person can put on an agenda for a reading.
+        """Return a draft that this person can put on an agenda of this Gremium for a reading.
 
         Returns:
-            The draft, or ``None`` when the version is no draft of an open year.
+            The draft, or ``None`` when the version is no draft of an open year, or the
+            Gremium decides the plan of its budget in no step.
 
         Raises:
             ForbiddenError: The person cannot read the budget of the draft (403).
@@ -227,6 +247,8 @@ class PlanExportOps(PlanOps, TreeViewOps):
         if not found:
             return None
         version, fy, top = found[0]
+        if top.id not in await self.plan_budget_ids(gremium_id):
+            return None
         if member_gremium_ids is not None and top.id not in await self.visible_budget_ids(
             member_gremium_ids
         ):

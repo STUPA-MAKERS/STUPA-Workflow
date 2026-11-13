@@ -931,7 +931,7 @@ describe('ApiClient', () => {
     api.listAssignablePlans('m-1').subscribe();
     const list = http.expectOne('/api/meetings/m-1/agenda/assignable-plans');
     expect(list.request.method).toBe('GET');
-    list.flush([]);
+    list.flush({ decides: false, plans: [] });
     api.addAgendaPlan('m-1', 'pv-1', true).subscribe();
     const add = http.expectOne('/api/meetings/m-1/agenda');
     expect(add.request.body).toEqual({ planVersionId: 'pv-1', nonPublic: true });

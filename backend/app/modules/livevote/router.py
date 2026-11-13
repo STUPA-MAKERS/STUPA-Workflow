@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
 from app.modules.budget.access import has_budget_read
-from app.modules.budget.plan_schemas import WaitingPlanOut
+from app.modules.budget.plan_schemas import AssignablePlansOut
 from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
@@ -856,16 +856,18 @@ async def _budget_scope(session: AsyncSession, principal: Principal) -> set[UUID
 
 @router.get(
     "/meetings/{meeting_id}/agenda/assignable-plans",
-    response_model=list[WaitingPlanOut],
+    response_model=AssignablePlansOut,
     responses=_errors(401, 403, 404),
 )
 async def list_assignable_plans(
     meeting_id: UUID, agenda: AgendaDep, service: ServiceDep, principal: ReaderDep
-) -> list[WaitingPlanOut]:
+) -> AssignablePlansOut:
     """The plan versions that the agenda can take and that are not yet on it.
 
     These are the versions that wait for this Gremium, and the drafts of the budgets
-    that the person can read, for a reading without a decision (spec 000876).
+    whose plan the Gremium decides in a step and that the person can read, for a
+    reading without a decision. ``decides`` says if the Gremium decides a plan at all,
+    so the dialog shows the plans only there (spec 000876).
 
     Only a person who can edit the agenda reads them (403), because the list names
     plans that the Gremium did not see yet.
@@ -876,8 +878,15 @@ async def list_assignable_plans(
     on_agenda = {item.plan_version_id for item in await agenda.list(meeting_id)}
     budget = BudgetTreeService(agenda.session, actor=principal.sub)
     waiting = await budget.waiting_plans(meeting.gremium_id)
-    drafts = await budget.reading_plans(await _budget_scope(agenda.session, principal))
-    return [plan for plan in (*waiting, *drafts) if plan.plan_version_id not in on_agenda]
+    drafts = await budget.reading_plans(
+        meeting.gremium_id, await _budget_scope(agenda.session, principal)
+    )
+    return AssignablePlansOut(
+        decides=bool(waiting) or bool(await budget.plan_budget_ids(meeting.gremium_id)),
+        plans=tuple(
+            plan for plan in (*waiting, *drafts) if plan.plan_version_id not in on_agenda
+        ),
+    )
 
 
 @router.post(
@@ -931,7 +940,9 @@ async def add_agenda_item(
     if payload.plan_version_id is not None:
         budget = BudgetTreeService(agenda.session, actor=principal.sub)
         plan = await budget.reading_plan(
-            payload.plan_version_id, await _budget_scope(agenda.session, principal)
+            payload.plan_version_id,
+            meeting.gremium_id,
+            await _budget_scope(agenda.session, principal),
         ) or await budget.waiting_plan(payload.plan_version_id, meeting.gremium_id)
         await agenda.add_plan_in_tx(
             meeting_id,

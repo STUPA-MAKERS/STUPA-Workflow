@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
 from io import BytesIO
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -66,6 +66,12 @@ async def _state(maker: async_sessionmaker[AsyncSession], vid: uuid.UUID) -> str
         return (await session.get_one(BudgetPlanVersion, vid)).state
 
 
+def _offered(client: TestClient, s: Seed) -> dict[str, Any]:
+    resp = client.get(f"/api/meetings/{s.meeting_id}/agenda/assignable-plans")
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
 def _add(client: TestClient, s: Seed, vid: uuid.UUID) -> dict[str, object]:
     resp = client.post(f"/api/meetings/{s.meeting_id}/agenda", json={"planVersionId": str(vid)})
     assert resp.status_code == 200, resp.text
@@ -82,19 +88,20 @@ async def test_the_agenda_offers_the_waiting_plans_of_its_gremium(
     vid = await _waiting(maker, s.gremium_id)
     draft = await _waiting(maker, s.gremium_id, ask=False)
     with TestClient(api) as client:
-        offered = client.get(f"/api/meetings/{s.meeting_id}/agenda/assignable-plans").json()
+        offered = _offered(client, s)["plans"]
         waiting = [p for p in offered if not p["reading"]]
         assert [(p["planVersionId"], p["title"]) for p in waiting] == [(str(vid), _TITLE)]
         assert str(draft) in {p["planVersionId"] for p in offered if p["reading"]}
         offered = waiting
         assert (offered[0]["budgetName"], offered[0]["fiscalYear"]) == ("VS-Mittel", "2026")
         assert (offered[0]["number"], offered[0]["step"]) == (0, "Beschluss")
-        elsewhere = client.get(f"/api/meetings/{other.meeting_id}/agenda/assignable-plans").json()
-        assert [p for p in elsewhere if not p["reading"]] == []
+        elsewhere = _offered(client, other)["plans"]
+        assert elsewhere == []
+        assert (_offered(client, s)["decides"], _offered(client, other)["decides"]) == (True, False)
 
         item = _add(client, s, vid)
         assert (item["title"], item["applicationId"]) == (_TITLE, None)
-        left = client.get(f"/api/meetings/{s.meeting_id}/agenda/assignable-plans").json()
+        left = _offered(client, s)["plans"]
         assert str(vid) not in {p["planVersionId"] for p in left}
 
         twice = client.post(
@@ -253,7 +260,7 @@ async def test_a_draft_is_an_agenda_item_for_a_reading(
     s = await seed(maker, status="planned", items=0)
     draft = await _waiting(maker, s.gremium_id, ask=False)
     with TestClient(api) as client:
-        offered = client.get(f"/api/meetings/{s.meeting_id}/agenda/assignable-plans").json()
+        offered = _offered(client, s)["plans"]
         [row] = [p for p in offered if p["planVersionId"] == str(draft)]
         assert (row["reading"], row["step"]) == (True, "Lesung")
         assert row["title"] == "Haushaltsplan VS-Mittel 2026: Lesung"
@@ -261,7 +268,7 @@ async def test_a_draft_is_an_agenda_item_for_a_reading(
         item = _add(client, s, draft)
         assert (item["title"], item["planReading"]) == (row["title"], True)
         assert await _state(maker, draft) == "draft"
-        left = client.get(f"/api/meetings/{s.meeting_id}/agenda/assignable-plans").json()
+        left = _offered(client, s)["plans"]
         assert str(draft) not in {p["planVersionId"] for p in left}
         twice = client.post(
             f"/api/meetings/{s.meeting_id}/agenda", json={"planVersionId": str(draft)}
@@ -272,6 +279,11 @@ async def test_a_draft_is_an_agenda_item_for_a_reading(
             json={"agendaItemId": item["id"], "question": "Plan?", "draft": True},
         )
         assert (vote.status_code, vote.json()["code"]) == (409, "plan_step_not_waiting")
+        other = await seed(maker, status="planned", items=0)
+        elsewhere = client.post(
+            f"/api/meetings/{other.meeting_id}/agenda", json={"planVersionId": str(draft)}
+        )
+        assert (elsewhere.status_code, elsewhere.json()["code"]) == (409, "plan_step_not_waiting")
 
         async with maker() as session:
             await BudgetTreeService(session, actor="tester").request_step(draft)

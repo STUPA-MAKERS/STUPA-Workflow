@@ -475,6 +475,13 @@ export interface WaitingPlan {
   readonly reading?: boolean;
 }
 
+/** `AssignablePlansOut`. The plan versions that the agenda of a meeting can take. */
+export interface AssignablePlans {
+  /** The Gremium of the meeting decides the plan of a Haushalt in a step. */
+  readonly decides: boolean;
+  readonly plans: readonly WaitingPlan[];
+}
+
 /** `AltchaChallengeOut`. A server-signed proof-of-work challenge. GET /altcha/challenge. */
 export interface AltchaChallenge {
   readonly algorithm: string;

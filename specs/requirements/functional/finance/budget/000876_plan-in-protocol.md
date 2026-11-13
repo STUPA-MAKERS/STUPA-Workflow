@@ -30,9 +30,15 @@ scope:
 # A plan on the agenda is an Anlage of the protocol
 
 A draft of a Haushaltsplan can be a TOP of a meeting for a reading, without a request
-for a decision. The person who edits the agenda picks it from the drafts of the Haushalte
-that this person can read. Such a TOP has no motion and no vote, and the version stays a
-draft. A plan is at most one TOP of a meeting (000838).
+for a decision. The meeting must be one of a Gremium that decides the plan of the
+Haushalt in a step (000826). The person who edits the agenda picks the draft from the
+drafts of these Haushalte that this person can read. Such a TOP has no motion and no
+vote, and the version stays a draft. A plan is at most one TOP of a meeting (000838).
+
+The dialog "TOP hinzufügen" must list the plans under their own kind "Haushaltsplan",
+beside "Antrag", "To-Do" and "Freitext": the versions that wait for the decision of the
+Gremium, and the drafts for a reading. The kind must show only in a meeting of a Gremium
+that decides the plan of a Haushalt in a step.
 
 The protocol of a meeting must append the PDF (000875) of each plan on its agenda as an
 Anlage (000864) and must reference it in the TOP of the plan:
@@ -48,4 +54,6 @@ that the Gremium decided on. For a reading it shows the result of the reading.
 
 Test: Integration tests: a draft is a TOP without a vote, changes before the protocol is
 finalized, and the Anlage holds the changed amounts. A plan is voted on and refused, the
-draft changes, and the Anlage holds the amounts of the vote.
+draft changes, and the Anlage holds the amounts of the vote. A meeting of another Gremium
+does not get the draft. Component test: the kind "Haushaltsplan" lists the plans and is
+absent in a Gremium that decides no plan.

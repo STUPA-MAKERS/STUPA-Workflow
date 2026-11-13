@@ -202,6 +202,14 @@ class WaitingPlanOut(FrozenCamelModel, frozen=True):
     reading: bool = False
 
 
+class AssignablePlansOut(FrozenCamelModel, frozen=True):
+    """The plan versions that the agenda of a meeting can take (spec 000876)."""
+
+    #: The Gremium of the meeting decides the plan of a budget in a step.
+    decides: bool
+    plans: tuple[WaitingPlanOut, ...]
+
+
 class PlanVersionOut(FrozenCamelModel, frozen=True):
     """One version of a Haushaltsplan with its lines."""
 

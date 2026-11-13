@@ -16,10 +16,10 @@
     />
 
     <div class="aid__area" [attr.data-kind]="kind()">
-      @if (kind() === 'application') {
+      @if (kind() === 'application' || kind() === 'plan') {
         <app-search-pill
           size="md"
-          [placeholder]="'meetings.agenda.searchApplication' | t"
+          [placeholder]="listText().search | t"
           [value]="query()"
           (valueChange)="query.set($event)"
         />
@@ -27,7 +27,7 @@
           @if (loading()) {
             <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
           } @else if (shown().length) {
-            <div class="aid__list" appScrollFade="y" role="radiogroup" [attr.aria-label]="'meetings.agenda.assignableLabel' | t">
+            <div class="aid__list" appScrollFade="y" role="radiogroup" [attr.aria-label]="listText().label | t">
               @for (a of shown(); track a.id) {
                 @let on = pick() === a.id;
                 <label class="aid__row" [class.aid__row--on]="on">
@@ -124,13 +124,13 @@
   <ng-template #empty>
     @if (emptyCase() === 'noMatch') {
       <app-empty-state shape="choice"
-        [heading]="(kind() === 'todo' ? 'meetings.agenda.noTodoMatch' : 'meetings.agenda.noMatch') | t: { q: activeQuery() }"
+        [heading]="listText().noMatch | t: { q: activeQuery() }"
       >
         <app-button variant="text" size="sm" (click)="clearSearch()">{{ 'invoices.filter.reset' | t }}</app-button>
       </app-empty-state>
     } @else {
       <app-empty-state shape="choice"
-        [heading]="(kind() === 'todo' ? 'meetings.agenda.noTodos' : 'meetings.agenda.noAssignable') | t"
+        [heading]="listText().none | t"
       >
         <app-button variant="tonal" size="sm" (click)="asFreetext()">{{ 'meetings.agenda.asFreetext' | t }}</app-button>
       </app-empty-state>
