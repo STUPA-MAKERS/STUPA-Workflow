@@ -763,7 +763,8 @@
       grid(
         columns: (label-width, 1fr),
         row-gutter: 20.33pt - 1.211 * size.normal,
-        ..doc.data.map(r => (strong(r.at(0)), r.at(1))).flatten(),
+        // The empty blackout marker prints as the black bar of the text.
+        ..doc.data.map(r => (strong(r.at(0)), if r.at(1) == "%%%%" { inline(((t: "bar"),)) } else { r.at(1) })).flatten(),
       )
     }
     v(-6.6pt)
@@ -788,11 +789,14 @@
   show math.equation: set text(font: math-font)
   show math.equation.where(block: true): set block(above: 0pt, below: 0pt)
 
-  // Section headings: Blender bold, "TOP n" and "TOP n.m", then \enskip.
-  set heading(numbering: (..n) => {
-    let n = n.pos()
-    if n.len() == 1 { [TOP #n.at(0)] } else if n.len() == 2 { [TOP #n.at(0).#n.at(1)] }
-  })
+  // Section headings: Blender bold, "TOP n" and "TOP n.m", then \enskip. An
+  // Antrag has form sections as headings, so they get no number.
+  set heading(numbering: if doc.at("numbered", default: true) {
+    (..n) => {
+      let n = n.pos()
+      if n.len() == 1 { [TOP #n.at(0)] } else if n.len() == 2 { [TOP #n.at(0).#n.at(1)] }
+    }
+  } else { none })
   show heading: it => {
     let sz = if it.level == 1 { size.Large } else { size.large }
     set text(font: head-font, weight: "bold", size: sz)

@@ -35,7 +35,7 @@ from app.modules.admin.service.cd_variants import SquareLogoRef
 from app.modules.auth import policy
 from app.modules.auth.policy import GREMIUM_VIEW_ALL, can_view_gremium
 from app.modules.gremien import gremium_roles
-from app.modules.protocol.cd_resolver import resolve_cd_variant_by_key
+from app.modules.documents.cd_resolver import resolve_cd_variant_by_key
 from app.modules.site_config.cd_logos import (
     MAX_CD_LOGO_BYTES,
     SQUARE_LOGO_MAX_PX,

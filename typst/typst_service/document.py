@@ -20,6 +20,8 @@ pages. The rules here follow the pytex protocol variant (`protocol-stupa`,
   starts. Without `keepers` the `protokoll` name stays in use.
 * `started_at` (`YYYY-MM-DD HH:MM`) is the real start. It fills the date and the
   start time when `datum` or `beginn` is missing.
+* `typ: antrag` marks an Antrag. Its headings are the sections of the form, so they
+  get no "TOP n" number.
 """
 
 from __future__ import annotations
@@ -83,6 +85,9 @@ _SIGNER_KEYS: Final[dict[str, tuple[str, ...]]] = {
 }
 
 _DATE_RE: Final[re.Pattern[str]] = re.compile(r"(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}:\d{2}))?")
+# The document types whose headings are sections, not agenda items: they get no
+# "TOP n" number.
+_UNNUMBERED_TYPES: Final[frozenset[str]] = frozenset({"antrag"})
 # The signature roles that the protocol keepers sign.
 _KEEPER_ROLES: Final[frozenset[str]] = frozenset({"schriftführung", "schriftfuehrung", "protokoll"})
 
@@ -399,4 +404,5 @@ def build_document(
         "footer_logos": [_logo(n, assets) for n in footer_names],
         "data": _data_lines(options, keepers),
         "body": blocks,
+        "numbered": _scalar(options, "typ").lower() not in _UNNUMBERED_TYPES,
     }

@@ -38,7 +38,7 @@ from app.modules.files import scanner as scanner_mod
 from app.modules.files.scanner import ScanVerdict
 from app.modules.files.storage import StorageError
 from app.modules.gremien.models import Gremium
-from app.modules.protocol.cd_resolver import cd_variant_key_for_gremium, resolve_cd_variant_by_key
+from app.modules.documents.cd_resolver import cd_variant_key_for_gremium, resolve_cd_variant_by_key
 from app.modules.site_config.cd_logos import (
     ALLOWED_CD_LOGO_MIME,
     MAX_CD_LOGO_BYTES,
