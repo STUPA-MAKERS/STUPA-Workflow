@@ -9,10 +9,13 @@
 .bp__name {
   overflow-wrap: anywhere;
 }
-// A Vermerk of a line breaks between its words. A text that cannot break sets the least
+// A Vermerk of a line breaks between its words, and inside a word when the column has no
+// room for the word, as the name above it does. A text that cannot break sets the least
 // width of the name column, and the five columns of a draft then do not fit the table area.
 .bp__node app-status-text {
   flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
   white-space: normal;
 }
 .bp__path {

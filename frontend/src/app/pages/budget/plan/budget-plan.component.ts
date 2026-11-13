@@ -4,7 +4,7 @@ import { Location, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { type Observable, forkJoin, of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { catchError, finalize, tap } from 'rxjs/operators';
 import {
   ButtonComponent,
   CellDirective,
@@ -1135,7 +1135,17 @@ export class BudgetPlanComponent {
       this.lineRuns = Object.fromEntries(Object.entries(this.lineRuns).filter(([, n]) => n));
       ended?.();
     };
-    this.write(this.api.setLine(version.id, row.id, change).pipe(finalize(done)), null, null, false);
+    const refused = (): void =>
+      this.lineSent.update((sent) => ({
+        ...sent,
+        [key]: Object.fromEntries(
+          Object.entries(sent[key] ?? {}).map(([field, value]) => [
+            field,
+            field in change && value === change[field as keyof PlanLineSet] ? known[field as keyof PlanLineSet] : value,
+          ]),
+        ),
+      }));
+    this.write(this.api.setLine(version.id, row.id, change).pipe(tap({ error: refused }), finalize(done)), null, null, false);
   }
 
   /**
@@ -1143,7 +1153,8 @@ export class BudgetPlanComponent {
    * and then with the plan on the page, because the plan on the page is the plan before
    * these saves: a field that the person sets back while its save runs must be saved again.
    * An amount field shows its amount of these saves, because the answer of an earlier save
-   * of the field holds the amount before.
+   * of the field holds the amount before. A refused save gives its fields the value of the
+   * save before it again, when that save still runs.
    */
   private readonly lineSent = signal<Readonly<Record<string, PlanLineSet>>>({});
   /**

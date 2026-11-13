@@ -263,6 +263,8 @@ describe('CostCentreSettingsComponent', () => {
       { viewGremiumId: null },
       { name: 'Kultur neu' },
     ]);
+    await new Promise((done) => setTimeout(done, 50));
+    view.fixture.detectChanges();
     expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('Ohne Gremium');
     view.fixture.componentRef.setInput('node', { ...KS, name: 'Kultur neu' });
     view.fixture.detectChanges();
@@ -277,10 +279,44 @@ describe('CostCentreSettingsComponent', () => {
     await retype(view.field('Name'), 'Kultur b');
     view.fixture.componentRef.setInput('node', { ...KS, name: 'Kultur a' });
     view.fixture.detectChanges();
+    await view.fixture.whenStable();
     expect(view.field('Name').value).toBe('Kultur b');
     view.fixture.componentRef.setInput('node', { ...KS, name: 'Kultur b' });
     view.fixture.detectChanges();
+    await view.fixture.whenStable();
     expect(view.field('Name').value).toBe('Kultur b');
+  });
+
+  it('§F/finance/budget/000849: a value of another person that no tree of the own save came before shows with the second tree', async () => {
+    const view = await setup();
+    await retype(view.field('Name'), 'Neu');
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Fremd' });
+    view.fixture.detectChanges();
+    await new Promise((done) => setTimeout(done, 50));
+    expect(view.field('Name').value).toBe('Neu');
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Fremd' });
+    view.fixture.detectChanges();
+    await waitFor(() => expect(view.field('Name').value).toBe('Fremd'));
+    await retype(view.field('Name'), 'Neu');
+    expect(view.api.updateNode.mock.calls.map((call) => call[1])).toEqual([{ name: 'Neu' }, { name: 'Neu' }]);
+  });
+
+  it('§F/finance/budget/000849: a Kostenstelle that the person selects again during its save shows the text of that save and sends nothing more', async () => {
+    const view = await setup();
+    const save = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(save);
+    await retype(view.field('Name'), 'Neu');
+    view.fixture.componentRef.setInput('node', { ...KS, id: 'other', name: 'B' });
+    view.fixture.detectChanges();
+    await view.fixture.whenStable();
+    view.fixture.componentRef.setInput('node', { ...KS });
+    view.fixture.detectChanges();
+    await waitFor(() => expect(view.field('Name').value).toBe('Neu'));
+    await userEvent.click(view.field('Name'));
+    await userEvent.tab();
+    save.next({});
+    save.complete();
+    expect(view.api.updateNode.mock.calls).toEqual([['ks', { name: 'Neu' }]]);
   });
 
   it('§F/finance/budget/000849: the third press is saved while the tree holds the state of the first', async () => {

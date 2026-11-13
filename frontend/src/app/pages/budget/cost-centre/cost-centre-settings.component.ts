@@ -112,13 +112,15 @@ export class CostCentreSettingsComponent {
       const node = this.node();
       const own = `${node.id}:`;
       const running = this.current ? `${this.current.id}:${this.current.field}` : '';
+      const before = this.sent;
       this.sent = Object.fromEntries(
         Object.entries(this.sent).flatMap(([key, last]) => {
           if (!key.startsWith(own) || key === running) return [[key, last]];
           if (savedValue(node, key.slice(own.length) as Field) === last.value) return [[key, { ...last, seen: true }]];
-          return last.seen ? [] : [[key, last]];
+          return last.seen || last.late ? [] : [[key, { ...last, late: true }]];
         }),
       );
+      untracked(() => this.follow(node, before));
       untracked(() => this.forget());
     });
     inject(DestroyRef).onDestroy(() => {
@@ -126,6 +128,20 @@ export class CostCentreSettingsComponent {
       this.saveText('key');
       this.saveText('name');
     });
+  }
+
+  /**
+   * Show the tree value in each control whose last request left `sent` without a tree that
+   * held its value, unless a change of that field waits. Such a control did not follow the
+   * tree, and the tree that ends the wait can hold the same value as the tree before it.
+   */
+  private follow(node: BudgetTreeNode, before: typeof this.sent): void {
+    const own = `${node.id}:`;
+    const fields = Object.keys(before)
+      .filter((key) => key.startsWith(own) && !(key in this.sent) && !before[key].seen)
+      .map((key) => key.slice(own.length) as Field)
+      .filter((field) => !this.waiting().some((c) => c.id === node.id && c.field === field));
+    fields.forEach((field) => this.show(field, savedValue(node, field)));
   }
 
   /** Tell the page that a save ended, or the page that shows after this one. */
@@ -150,8 +166,21 @@ export class CostCentreSettingsComponent {
   private field<T>(name: Field, value: (node: BudgetTreeNode) => T): WritableSignal<T> {
     return linkedSignal<Saved<T>, T>({
       source: this.stored(value),
-      computation: (saved, last) => (last && last.source.id === saved.id && this.ahead(saved.id, name) ? last.value : saved.value),
+      computation: (saved, last) => this.kept(name, saved, last, false),
     });
+  }
+  /**
+   * The value of a control when its saved value or its Kostenstelle changes: what the control
+   * shows, while a save runs (`busy`) or the last request is ahead of the tree. A control
+   * of a Kostenstelle that the person selects again during its save shows the value of that
+   * request, because the tree holds the value before, and a leave of the field would save
+   * that value again.
+   */
+  private kept<T>(name: Field, saved: Saved<T>, last: { readonly source: Saved<T>; readonly value: T } | undefined, busy: boolean): T {
+    const ahead = this.ahead(saved.id, name);
+    if (last && last.source.id === saved.id) return busy || ahead ? last.value : saved.value;
+    const value = this.sent[`${saved.id}:${name}`]?.value;
+    return ahead ? ((name === 'viewGremiumId' || name === 'decisionGremiumId' ? (value ?? '') : value) as T) : saved.value;
   }
   /**
    * The last request of a field holds a value that no tree held yet. A tree that comes then
@@ -169,8 +198,7 @@ export class CostCentreSettingsComponent {
   private choice<T>(name: Field, value: (node: BudgetTreeNode) => T): WritableSignal<T> {
     return linkedSignal<Saved<T>, T>({
       source: this.stored(value),
-      computation: (saved, last) =>
-        last && last.source.id === saved.id && (untracked(this.running) || this.ahead(saved.id, name)) ? last.value : saved.value,
+      computation: (saved, last) => this.kept(name, saved, last, untracked(this.running)),
     });
   }
 
@@ -241,10 +269,12 @@ export class CostCentreSettingsComponent {
    * for the saved value from its request on, because the tree that the page reads after an
    * earlier save of the field is older than this request. `seen` says that a tree held the
    * value. A tree that holds another value after that holds it from another person, so the
-   * entry then goes and the tree counts again. A tree that comes while the request runs says
+   * entry then goes and the tree counts again. Without `seen`, the first tree with another
+   * value after the request can be the tree of the save before (`late`), and the second one
+   * holds the value of another person, so the entry goes then too. A tree that comes while the request runs says
    * nothing about it, because the page read that tree before the request ended.
    */
-  private sent: Readonly<Record<string, { readonly value: Value; readonly seen: boolean }>> = {};
+  private sent: Readonly<Record<string, { readonly value: Value; readonly seen: boolean; readonly late?: boolean }>> = {};
 
   /**
    * Take a change of a field. The changes are saved one after the other, so two writes

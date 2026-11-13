@@ -13,6 +13,8 @@ import { AdminApiService } from '../admin/admin-api.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { BudgetDashboardComponent, utilisation } from './budget-dashboard.component';
 import { BudgetTreeApi } from './budget-tree.api';
+import { By } from '@angular/platform-browser';
+import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
 import type {
   BudgetAllocationView,
   BudgetApplication,
@@ -1560,9 +1562,13 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
     it('§F/finance/budget/000831: a failed tree read after a refused save of the section says nothing', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
       const error = jest.spyOn(TestBed.inject(ToastService), 'error');
-      view.c.refreshTree(null, true);
+      const section = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent)).componentInstance as CostCentreSettingsComponent;
+      section.saved.emit(false);
       view.http.expectOne(treeUrl).flush({}, { status: 500, statusText: 'Error' });
       expect(error).not.toHaveBeenCalled();
+      section.saved.emit(true);
+      view.http.expectOne(treeUrl).flush({}, { status: 500, statusText: 'Error' });
+      expect(error).toHaveBeenCalledTimes(1);
     });
 
     it('§F/finance/budget/000850: reads the tree after a save of a section that went off a page before', async () => {

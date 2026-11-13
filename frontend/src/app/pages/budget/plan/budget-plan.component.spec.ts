@@ -711,6 +711,20 @@ describe('BudgetPlanComponent', () => {
       expect(field.value).toBe('90,00');
     });
 
+    it('§F/finance/budget/000812: a refused amount gives the field the amount of the save that still runs', async () => {
+      const view = await setup();
+      const first = new Subject<BudgetPlan>();
+      const second = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(first).mockReturnValueOnce(second);
+      const field = input(view, 'amount-grants');
+      await typeAmount(field, '80');
+      await typeAmount(field, '75');
+      second.error(problem(409, 'plan_blocked_above_amount'));
+      await waitFor(() => expect(input(view, 'amount-grants').value).toBe('80,00'));
+      first.next(plan([version({ lines: [line('fees', '100'), line('staff', '70'), line('wages', '60'), line('grants', '80')] })]));
+      first.complete();
+    });
+
     it('§F/finance/budget/000809: the change of a line shows its sign, and no change shows a dash', async () => {
       const view = await setup();
       const page = view.fixture.componentInstance;
