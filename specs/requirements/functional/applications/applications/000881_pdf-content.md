@@ -22,7 +22,8 @@ Blender for headings and DIN for text, and must be tagged as PDF/UA-1 (000524). 
 title page: the first page starts with the title of the Antrag at the top of the page, with no
 logo above it. The whole Antrag must be in tables of two columns, label and value, drawn like
 the table of the Haushaltsplan PDF: a thick rule above and below, a dashed rule between the rows, and
-the section name on a grey band across the table. Each value cell must render its Markdown
+the section name on a grey band across the table. The tables follow each other with no gap, so
+the Antrag reads as one table. Each value cell must render its Markdown
 (paragraphs, lists, emphasis, links, tables).
 
 A value that would take 30 lines or more must show 29 lines and a line "…". A cell of the

@@ -463,7 +463,7 @@
   box: (par: 3.61pt, runin: 3.61pt, list: 6.57pt, quote: 6.75pt, box: 14.62pt, table: 17.5pt, code: 3.1pt, rule: 6.5pt, math: 12.74pt, h1: 28.74pt, h2: 23.59pt, h3: 15.68pt, sig: 50pt),
   list: (par: 8.78pt, runin: 8.78pt, box: 27.52pt),
   quote: (par: 8.78pt, runin: 8.78pt, box: 27.58pt),
-  table: (par: 14.3pt, runin: 14.3pt, list: 8.98pt, quote: 8.98pt, box: 25.41pt, table: 22pt, h1: 31.4pt, h2: 23.89pt, h3: 15.5pt),
+  table: (par: 14.3pt, runin: 14.3pt, list: 8.98pt, quote: 8.98pt, box: 25.41pt, h1: 31.4pt, h2: 23.89pt, h3: 15.5pt),
   figure: (par: 14.3pt, runin: 14.3pt, list: 8.98pt, quote: 8.98pt, box: 25.41pt, h1: 31.4pt, h2: 23.89pt, h3: 15.5pt),
   code: (par: 10.95pt, runin: 10.95pt, box: 29.75pt, h1: 39.26pt, h2: 31.7pt, h3: 23.3pt),
   rule: (par: 8.25pt, runin: 8.25pt, box: 26.48pt),
@@ -703,8 +703,10 @@
     let next = if i + 1 < nodes.len() { nodes.at(i + 1) } else { none }
     let note-head = n.t == "timenote" and next != none and next.t == "heading" and next.level <= 3
     let kk = if runin { "runin" } else if note-head { "h" + str(next.level) } else { k }
+    // Field tables that follow each other join into one table (000881).
+    let joined = n.t == "fields" and i > 0 and nodes.at(i - 1).t == "fields"
     if prev != none {
-      let g = if in-item != false and prev == "par" and k == "list" { 8.45pt } else { gap(prev, kk) }
+      let g = if joined { 0pt } else if in-item != false and prev == "par" and k == "list" { 8.45pt } else { gap(prev, kk) }
       v(g, weak: true)
     }
     if runin {
@@ -773,7 +775,7 @@
           columns: (45mm, 1fr),
           inset: (x: 6pt, y: 4pt),
           align: left + top,
-          grid.hline(stroke: 0.876pt),
+          ..if not joined { (grid.hline(stroke: 0.876pt),) },
           ..band,
           ..n.rows.enumerate().map(((i, r)) => (
             ..if i > 0 { (grid.hline(stroke: (paint: palette.gray, thickness: 0.4pt, dash: "dashed")),) },
