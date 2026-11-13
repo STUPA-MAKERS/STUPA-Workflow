@@ -189,6 +189,14 @@
       let dot = math.equation(block: false, alt: "·", sym.dot.c)
       strong[Abstimmung: ]
       text(fill: vote-color(n.yes, n.no))[Ja #n.yes #dot Nein #n.no #dot Enthaltung #n.abstain]
+    } else if t == "docref" {
+      // The reference to an Anlage (000866): its number, its name and the page of
+      // its first page, as a link to that page.
+      let target = label("anlage-" + str(n.n))
+      link(target, text(fill: palette.hsrturl, [Anlage #n.n: #n.name (Seite #context counter(page).at(locate(target)).first())]))
+    } else if t == "docmiss" {
+      // A PDF that is missing or past the budget (000868).
+      emph[Anlage nicht eingebunden: #n.name]
     } else if t == "image" {
       if "asset" in n {
         // An uploaded image inside a line: two lines high, aspect kept.
@@ -677,6 +685,51 @@
   }
 }
 
+// -- Anlagen -------------------------------------------------------------------
+
+// The watermark of an Anlage page (000865): one grey, transparent line along the
+// diagonal. The font size makes the line about 80 % of the diagonal long. It is
+// an artifact, so a screen reader skips it.
+#let watermark(text-of, w, h) = {
+  let diag = calc.sqrt(w * w + h * h)
+  let sz = calc.min(0.8 * diag / (0.6 * text-of.clusters().len()), 0.06 * diag)
+  pdf.artifact(place(center + horizon, rotate(
+    -calc.atan2(w, h),
+    reflow: false,
+    box(width: diag * 1pt, align(center, text(
+      font: head-font,
+      weight: "bold",
+      size: sz * 1pt,
+      fill: rgb(128, 128, 128, 80),
+      text-of,
+    ))),
+  )))
+}
+
+// One empty page per page of each Anlage (000864), in the size of that page and
+// at the end of the PDF. The service puts the page of the PDF under it after the
+// compile (`typst_service/appendix.py`), so the watermark lies on top. The first
+// page of an Anlage carries the label that its references link to.
+#let appendix-pages(appendix) = {
+  for a in appendix {
+    for (k, size) in a.pages.enumerate() {
+      let (w, h) = size
+      page(
+        width: w * 1pt,
+        height: h * 1pt,
+        margin: 0pt,
+        header: none,
+        footer: none,
+        background: none,
+        foreground: watermark(a.watermark, w, h),
+      )[
+        #if k == 0 [#metadata(a.n)#label("anlage-" + str(a.n))]
+        #image(bytes("<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/>"), format: "svg", width: 100%, height: 100%, fit: "stretch", alt: "Anlage " + str(a.n) + ": " + a.name + ", Seite " + str(k + 1) + " von " + str(a.pages.len()))
+      ]
+    }
+  }
+}
+
 // -- pages --------------------------------------------------------------------
 
 #let skyline = place(bottom + left, pdf.artifact(image(vendored-logos.Skyline, width: 1.5 * 210mm)))
@@ -778,4 +831,5 @@
   title-page(doc)
   counter(page).update(1)
   blocks(doc.body)
+  appendix-pages(doc.at("appendix", default: ()))
 }

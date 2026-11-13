@@ -26,9 +26,10 @@ from __future__ import annotations
 
 import itertools
 import re
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from typing import Final, cast
 
+from .appendix import Appendix, Size, number_documents
 from .frontmatter import Meta, Records, parse_frontmatter
 from .markdown import ConversionError, Node, convert_body
 
@@ -317,12 +318,42 @@ def _default_logos(variant: str | None, options: Mapping[str, object]) -> tuple[
     )
 
 
+def _watermark(options: Mapping[str, object], number: int) -> str:
+    """The watermark of an Anlage: `Anlage <N> zum Protokoll <Sitzungstitel> vom <Datum>`."""
+    title = _scalar(options, "title", "titel") or _scalar(options, "gremium")
+    started_date, _ = _started(options)
+    datum = (_scalar(options, "datum", "date") or started_date).split(" ")[0]
+    return " ".join(
+        part
+        for part in (
+            f"Anlage {number} zum Protokoll",
+            title,
+            f"vom {format_date(datum)}" if datum else "",
+        )
+        if part
+    )
+
+
+def _appendix_data(options: Mapping[str, object], appendix: Sequence[Appendix]) -> list[Node]:
+    return [
+        {
+            "n": item.number,
+            "doc": item.doc,
+            "name": item.name,
+            "pages": [[w, h] for w, h in item.pages],
+            "watermark": _watermark(options, item.number),
+        }
+        for item in appendix
+    ]
+
+
 def build_document(
     source: str,
     *,
     variant: str | None,
     config: Mapping[str, object] | None = None,
     assets: Collection[str] = (),
+    documents: Mapping[str, tuple[Size, ...]] | None = None,
 ) -> dict[str, object]:
     """Turn protocol Markdown into the document data of the template.
 
@@ -332,6 +363,8 @@ def build_document(
             last two read the default logos from the `gremium` key.
         config: Keys that override the frontmatter, for example `logos`.
         assets: The file names of the uploaded assets.
+        documents: The page sizes of each uploaded PDF, by uuid (`appendix.page_sizes`).
+            Only a PDF with sizes becomes an Anlage.
 
     Raises:
         ConversionError: The variant or a logo is unknown, or the Markdown
@@ -357,8 +390,10 @@ def build_document(
     )
     converted = _handover_lines(convert_body(body, meta, assets), keepers)
     signers = _signers(options, keepers)
-    blocks = [*converted, {"t": "signatures", "signers": signers}] if signers else converted
+    signed = [*converted, {"t": "signatures", "signers": signers}] if signers else converted
+    blocks, appendix = number_documents(signed, documents or {})
     return {
+        "appendix": _appendix_data(options, appendix),
         "title": _title(options),
         "logos": [_logo(n, assets) for n in title_names],
         "footer_logos": [_logo(n, assets) for n in footer_names],

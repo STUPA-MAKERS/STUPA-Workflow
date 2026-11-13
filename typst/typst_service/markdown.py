@@ -36,6 +36,10 @@ builder (`backend/app/modules/protocol/markdown.py`):
   (a URL, a relative path, a missing asset) keeps its alt text. The node names
   the asset only; the template loads it from `/assets/`. A paragraph that holds
   only an image becomes a block image (`figure`).
+* PDFs: a link to the canonical path of an uploaded PDF,
+  `[name](/api/media/documents/<uuid>)`, becomes a `docref` node when the caller
+  uploaded its bytes as `doc-<uuid>.pdf`, else a `docmiss` node. The module
+  `appendix` numbers the references and makes the PDFs Anlagen.
 """
 
 from __future__ import annotations
@@ -47,6 +51,8 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Final, cast
 
 import marko
+
+from .appendix import DOCUMENT_ASSET_RE, DOCUMENT_PATH_RE
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Iterator, Mapping, Sequence
@@ -576,6 +582,8 @@ class _Converter:
     meta: Meta
     # uuid -> asset name of the uploaded images.
     images: Mapping[str, str]
+    # The uuids of the uploaded PDFs whose bytes came with the request.
+    documents: Collection[str] = ()
     depth: int = 0
     ul: int = 0
     ol: int = 0
@@ -617,6 +625,8 @@ class _Converter:
                 return [{"t": "emph", "c": self.inlines(node)}]
             case "Strikethrough":
                 return [{"t": "strike", "c": self.inlines(node)}]
+            case "Link" if DOCUMENT_PATH_RE.fullmatch(str(getattr(node, "dest", ""))):
+                return [self._document(node)]
             case "Link" | "AutoLink" | "Url":
                 dest = str(getattr(node, "dest", ""))
                 external = EXTERNAL_URL_RE.match(dest)
@@ -629,6 +639,19 @@ class _Converter:
                 return [self._image(node)]
             case _:
                 return self.inlines(node)
+
+    def _document(self, node: object) -> Node:
+        """Build the reference to an uploaded PDF: a `docref`, or a `docmiss` without bytes.
+
+        `appendix.number_documents` numbers the references later and turns the ones
+        past the budget into `docmiss`.
+        """
+        name = "".join(_plain(c) for c in _children(node)).strip() or "PDF"
+        match = DOCUMENT_PATH_RE.fullmatch(str(getattr(node, "dest", "")))
+        doc = match.group(1) if match is not None else ""
+        if doc not in self.documents:
+            return {"t": "docmiss", "name": name}
+        return {"t": "docref", "doc": doc, "name": name}
 
     def _image(self, node: object) -> Node:
         """Build an image node: the uploaded asset, else the alt text only.
@@ -994,13 +1017,17 @@ def convert_body(markdown: str, meta: Meta, assets: Collection[str] = ()) -> lis
     """Convert the Markdown body of a protocol into block nodes.
 
     `assets` holds the names of the uploaded assets. An `img-<uuid>.<ext>` among
-    them lets the image `/api/media/images/<uuid>` show.
+    them lets the image `/api/media/images/<uuid>` show. A `doc-<uuid>.pdf` among
+    them makes the link `/api/media/documents/<uuid>` a `docref` node.
 
     Raises:
         ConversionError: The Markdown nests too deep.
     """
     tree = _PARSER.parse(strip_antrag_fences(markdown))
-    converter = _Converter(meta=meta, images=image_assets(assets))
+    documents = frozenset(
+        match.group(1) for name in assets if (match := DOCUMENT_ASSET_RE.fullmatch(name))
+    )
+    converter = _Converter(meta=meta, images=image_assets(assets), documents=documents)
     try:
         blocks = converter.blocks(_children(tree))
     except RecursionError:
