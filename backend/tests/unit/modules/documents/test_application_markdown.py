@@ -205,7 +205,13 @@ def test_the_decision_lists_its_conditions() -> None:
     md = build_application_document(_doc())
     assert row("Gremium", "StuPa") + "\n" + row("Beschlossen am", "`12.11.2026`") in md
     assert row("Bewilligter Betrag", "`900,00 €`") in md
-    assert row("Auflagen", "1. Belege einreichen") in md
+    assert row("Auflagen", "Belege einreichen") in md
+
+
+def test_several_conditions_are_paragraphs_with_a_rule_between() -> None:
+    decision = DecisionView(None, ("Erste *Auflage*", "Zweite"), datetime(2026, 11, 12, 19, 0))
+    md = build_application_document(_doc(decision=decision))
+    assert row("Auflagen", "Erste \\*Auflage\\*", "", "---", "", "Zweite") in md
 
 
 def test_an_empty_antrag_has_only_the_head() -> None:

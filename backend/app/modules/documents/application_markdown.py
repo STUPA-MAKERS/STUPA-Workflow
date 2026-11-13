@@ -429,7 +429,13 @@ def _decision_lines(doc: ApplicationDoc) -> list[str]:
         if decision.approved_amount is None
         else code(format_money(decision.approved_amount, doc.currency, LANG))
     )
-    conditions = [f"{n}. {escape(text)}" for n, text in enumerate(decision.conditions, start=1)]
+    # One paragraph per condition, with a rule between two: the render service draws
+    # it as the dashed rule of the table rows.
+    conditions = [
+        line
+        for n, text in enumerate(decision.conditions)
+        for line in ([*(["", "---", ""] if n else []), escape(text)])
+    ]
     return [
         "# Beschluss",
         "",

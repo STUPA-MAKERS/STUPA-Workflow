@@ -44,7 +44,9 @@ The PDF must hold, in this order:
 3. The Kostenaufstellung as a table with the total, in the row of its field, if the form has
    one.
 4. The names of the attached files, without the files.
-5. The valid decision with the approved amount and the conditions, if the Antrag has one. A decision by
+5. The valid decision with the approved amount and the conditions, if the Antrag has one. The
+   conditions must stand in one cell, one below the other, with a dashed rule between two,
+   and not as a list. A decision by
    a vote must name the Gremium that ran the vote. A decision without a vote must name no
    Gremium.
 

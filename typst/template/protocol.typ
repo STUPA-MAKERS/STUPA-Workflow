@@ -709,7 +709,9 @@
     // Field tables that follow each other join into one table (000881).
     let joined = n.t == "fields" and i > 0 and nodes.at(i - 1).t == "fields"
     if prev != none {
-      let g = if joined { 0pt } else if in-item != false and prev == "par" and k == "list" { 8.45pt } else { gap(prev, kk) }
+      // In a field value a rule only separates two entries, so it sits close.
+      let entry-rule = in-field and (k == "rule" or prev == "rule")
+      let g = if joined { 0pt } else if entry-rule { 4pt } else if in-item != false and prev == "par" and k == "list" { 8.45pt } else { gap(prev, kk) }
       v(g, weak: true)
     }
     if runin {
@@ -751,6 +753,9 @@
       tally(n)
     } else if n.t == "codeblock" {
       code-block(n)
+    } else if n.t == "rule" and in-field {
+      // The rule between two entries of a field value: the dashed rule of the rows.
+      line(length: 100%, stroke: (paint: palette.gray, thickness: 0.4pt, dash: "dashed"))
     } else if n.t == "rule" {
       rect(width: 100%, height: 0.4pt, fill: black, stroke: none)
     } else if n.t == "table" {
