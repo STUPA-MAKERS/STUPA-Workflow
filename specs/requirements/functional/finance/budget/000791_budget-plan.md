@@ -21,3 +21,5 @@ versions with the numbers 0, 1, 2 and so on. Version 0 is the Stammplan. Each la
 is a Nachtrag.
 
 Reason: LHO § 33 lets a Nachtrag change the plan, and the earlier plan must stay readable.
+
+Test: The test creates the plan of a year twice and reads the version numbers.

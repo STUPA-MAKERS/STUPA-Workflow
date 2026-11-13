@@ -25,3 +25,6 @@ the title. The view Planung must have the route `/budget/plan`. The switch must 
 when a top-level Kostenstelle has the plan switch on (000814).
 
 Reason: A person must see how to go from the budget to its plan and back.
+
+Test: The component tests read the switch with and without a budget that has the plan switch on
+and change the view.

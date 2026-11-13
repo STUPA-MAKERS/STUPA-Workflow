@@ -15,7 +15,12 @@ scope:
 
 # An unbalanced draft cannot go to the vote
 
-The button "Zur Abstimmung geben" must be disabled while the draft is not balanced. The
-plan page must then show a warning note with the difference.
+The actions that take a draft out of the draft must be disabled while the draft has no
+line or is not balanced: "Schritt abschließen", "Abstimmung anlegen" and "In Kraft setzen".
+Each disabled action must name the cause. The plan page must show a warning note with the
+difference while the draft is not balanced.
 
 Reason: The backend refuses an unbalanced version, and the person must see the cause first.
+
+Test: The component test opens an unbalanced draft and reads the state of each action and the
+note.

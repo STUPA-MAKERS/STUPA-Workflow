@@ -24,3 +24,5 @@ Ansätze of its direct children.
 
 Reason: The allocation and the approved plan must show the same amounts. An allocation is
 money to spend, so an income Ansatz is no allocation.
+
+Test: The tests bring a version into force and read the allocation of each Kostenstelle.

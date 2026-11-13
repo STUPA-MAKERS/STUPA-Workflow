@@ -20,3 +20,5 @@ A Haushaltsplan must have at most one version in the state `in_force`. When a ve
 comes into force, the platform must set the earlier version in force to `replaced`.
 
 Reason: Only one plan applies at one time.
+
+Test: The test brings a Nachtrag into force and reads the state of the version before it.

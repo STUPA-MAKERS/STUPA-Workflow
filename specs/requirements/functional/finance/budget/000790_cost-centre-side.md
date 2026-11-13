@@ -7,6 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-12
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_side_goes_to_the_subtree_and_to_a_new_child"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_side_is_refused_off_the_first_level"
 implementation:
   - backend/app/modules/budget/tree/plans.py
   - backend/app/modules/budget/tree/nodes.py
@@ -21,3 +22,5 @@ side `income` or `expense`. A child must
 have the side of its parent. A top-level Kostenstelle must not have a side.
 
 Reason: LHO § 15 tells the Studierendenschaft to plan income and expenses apart and in full.
+
+Test: The test places a Kostenstelle at each level and reads its side.

@@ -22,3 +22,6 @@ chip must name the Stammplan and each Nachtrag.
 
 Reason: The view keeps the list and detail geometry of the Budget tab, and one plan belongs
 to one fiscal year and one version.
+
+Test: The component test reads the groups, the rows, the sums and the two filter chips of the
+list.

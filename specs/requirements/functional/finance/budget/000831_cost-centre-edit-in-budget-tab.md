@@ -23,9 +23,15 @@ The detail of a selected Kostenstelle in the Budget tab must show the section
 "Kostenstelle" with its key, its name, its colour, the switch "Aktiv", the Gremium that
 sees it and the Gremium that decides. For a direct child of a budget with the plan switch
 on, the section must also show the side (000817). A person with `budget.structure` must
-change each field there, and the platform must save a field when the person leaves it. A
-person without `budget.structure` must not see the section. The state of the plan version
-must not lock these fields, because a decided version keeps its own name and key (000821).
+change each field there, and the platform must save a field when the person leaves it. An
+empty key or name must show the saved text again and save nothing. A key or a name that the
+rules of the path key refuse (000246) must show the cause below the field and save nothing.
+A refused save must show its cause and the saved values again. A person without
+`budget.structure` must not see the section. The state of the plan version must not lock
+these fields, because a decided version keeps its own name and key (000821).
 
 Reason: The settings of a Kostenstelle stand beside its amounts, so one place holds all
 that a person sets on it.
+
+Test: The component tests change each field and leave it, type a key and a name that the rules
+refuse, and read the fields after a refused save.

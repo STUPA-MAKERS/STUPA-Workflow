@@ -21,3 +21,6 @@ plan must not offer the field (000798).
 
 Reason: A budget without a Haushaltsplan has no Ansatz. Its allocation is set by hand, and
 Verwaltung no longer lists its Kostenstellen (000828).
+
+Test: The component tests set the allocation in a year without a plan, read a refused save and
+open a year with a plan.

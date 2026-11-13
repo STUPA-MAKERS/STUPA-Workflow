@@ -7,17 +7,25 @@ owner: frederikbeimgraben
 updated: 2026-11-12
 tests:
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_line_request_changes_only_the_fields_it_names"
 implementation:
   - frontend/src/app/pages/budget/plan/budget-plan.component.ts
+  - backend/app/modules/budget/tree/plans.py
 scope:
   - frontend/src/app/pages/budget
+  - backend/app/modules/budget
 ---
 
 # An amount field of a draft saves when the person leaves it
 
-An amount field in the table of a draft must save its value when the person leaves the field.
-The plan page must then show the new sums and the new balance. The table must not have a
-save button.
+A field of a draft line must save its value when the person leaves the field: the Ansatz,
+the Erläuterung, the gesperrt amount and each Vermerk. The request must hold only the
+changed field, and the platform must keep each field of the line that a request does not
+name. The plan page must then show the new sums and the new balance. A refused save must
+show its cause and the saved value again. The table must not have a save button.
 
 Reason: A draft does not bind, and a value that is saved at once is not lost when the tab
-closes.
+closes. Two fields that save one after the other must not overwrite each other.
+
+Test: The component tests leave a changed field and read the request, and a refused save shows
+the saved value again. The backend test sends two requests that each name one field.

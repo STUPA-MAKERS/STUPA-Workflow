@@ -23,3 +23,6 @@ of a Kostenstelle that is in use (000254) or in a plan (000820) as a message.
 
 Reason: Verwaltung does not list a Kostenstelle below a budget (000828), so the Budget tab
 is the only place for the action.
+
+Test: The page tests delete a Kostenstelle after the confirmation and read the message of a
+refused delete.

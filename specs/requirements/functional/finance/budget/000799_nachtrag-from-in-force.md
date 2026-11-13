@@ -21,3 +21,6 @@ Haushaltsplan must have at most one version before `in_force` at one time, else 
 `plan_draft_exists`.
 
 Reason: Two open versions make it unclear which one the STUPA decides.
+
+Test: The tests create a Nachtrag with a plan in force, without one and beside a second open
+version.

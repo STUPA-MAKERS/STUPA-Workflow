@@ -23,3 +23,6 @@ version. A later change of the steps of the budget must not change a version tha
 step, and for a `draft` the steps of the budget.
 
 Reason: A decided plan is a record of the steps that applied when it was decided.
+
+Test: The tests change the steps of the budget after a version left the draft and read the steps
+of the version.

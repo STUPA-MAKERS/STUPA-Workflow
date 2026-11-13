@@ -23,3 +23,6 @@ version is not in `draft`.
 
 Reason: A plan has many lines, and one sheet for each amount costs too many steps. The
 Ansatz of a parent is the sum of its children.
+
+Test: The component tests press a row on a wide screen and on a phone and read the fields of a
+draft and of a decided version.

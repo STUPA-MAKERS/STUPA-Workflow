@@ -22,3 +22,5 @@ table of its child Kostenstellen. The head of the detail must follow 000670.
 
 Reason: The detail pane uses the full width for the plan, and a line needs room for its
 Erläuterung.
+
+Test: The component tests select the budget and a Kostenstelle below it and read the detail.

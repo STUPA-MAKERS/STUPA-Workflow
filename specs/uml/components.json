@@ -286,7 +286,7 @@
       "to": "auth"
     },
     {
-      "count": 1,
+      "count": 5,
       "from": "audit_log",
       "to": "budget"
     },
@@ -1001,7 +1001,7 @@
       "to": "auth"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "search",
       "to": "budget"
     },
