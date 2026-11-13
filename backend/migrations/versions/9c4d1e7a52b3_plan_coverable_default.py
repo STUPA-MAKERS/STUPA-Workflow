@@ -6,7 +6,7 @@ Idempotent. A fresh database already has the column from the ``create_all`` base
 (0001), because the model sits in ``app.models``.
 
 Revision ID: 9c4d1e7a52b3
-Revises: 31e525795fd9
+Revises: 5b1e0c7d9a24
 Create Date: 2026-11-13 21:00:00
 """
 
@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "9c4d1e7a52b3"
-down_revision: str | None = "31e525795fd9"
+down_revision: str | None = "5b1e0c7d9a24"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
