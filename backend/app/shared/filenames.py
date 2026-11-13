@@ -24,7 +24,9 @@ and holds no quote, backslash, CR or LF, so it cannot inject a header.
 from __future__ import annotations
 
 import os
+import re
 import unicodedata
+from itertools import accumulate
 from typing import Literal
 from urllib.parse import quote
 
@@ -203,3 +205,31 @@ def content_disposition(
         f'{kind}; filename="{_ascii_fallback(name)}"; '
         f"filename*=UTF-8''{quote(name, safe='')}"
     )
+
+
+TITLE_MAX = 80
+"""The longest title part of a generated file name. A longer title is cut at a word."""
+
+_TITLE_UNSAFE = frozenset('/\\:*?"<>|')
+"""Characters that Windows forbids in a file name. `/` and the backslash split paths."""
+
+
+def title_token(title: str | None) -> str:
+    """Return a title as one `_`-joined token of a generated file name.
+
+    The token keeps the Unicode letters, so `Ökonomie` keeps its umlaut. It removes the
+    characters that a file system or a header cannot take and joins the words with `_`,
+    so the name survives a mail client, a shell and Windows. The protocol PDF and the
+    Antrag PDF name their files with it.
+    """
+    raw = unicodedata.normalize("NFC", title or "")
+    kept = "".join(
+        " " if c.isspace() or c in _TITLE_UNSAFE else c
+        for c in raw
+        if c.isspace() or unicodedata.category(c) not in {"Cc", "Cf", "Cs", "Co", "Cn"}
+    )
+    words = kept.split()
+    joined = tuple(accumulate(words, lambda out, word: f"{out}_{word}"))
+    fitting = [part for part in joined if len(part) <= TITLE_MAX]
+    out = fitting[-1] if fitting else (words[0][:TITLE_MAX] if words else "")
+    return re.sub(r"_+", "_", out).strip("._-")

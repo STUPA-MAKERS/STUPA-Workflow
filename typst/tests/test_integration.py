@@ -307,6 +307,69 @@ def test_embedded_pdfs_become_watermarked_anlagen_with_linked_references(tmp_pat
     assert targets == [pages - 3, pages - 1]
 
 
+def test_an_antrag_starts_with_its_title_and_draws_field_tables(tmp_path: Path) -> None:
+    """§000881: no title page; the field rows print label and value side by side."""
+    source = (
+        '---\ntitle: "Exkursion Stuttgart"\ntyp: antrag\n---\n\n'
+        "> [!feld] Antragsart\n>\n> Finanzantrag\n\n"
+        "# Antrag\n\n"
+        "> [!feld] Beschreibung\n>\n> Wir fahren **los**.\n>\n> - Firma A\n"
+    )
+    pdf = _render(source, "protocol-stupa")
+    lines = _lines(pdf, tmp_path)
+    assert {line[0] for line in lines} == {1}
+    title_page, _, title_y = _find(lines, "Exkursion Stuttgart")
+    label_page, label_x, label_y = _find(lines, "Antragsart")
+    value_page, value_x, value_y = _find(lines, "Finanzantrag")
+    assert title_page == label_page == value_page == 1
+    assert title_y < 60 and title_y < label_y
+    assert abs(label_y - value_y) < 2 and value_x > label_x + 100
+    assert not any(line[3].startswith("TOP") for line in lines)
+    assert any(line[3].endswith("Firma A") for line in lines)
+
+
+def test_an_antrag_cuts_long_values_and_long_table_cells(tmp_path: Path) -> None:
+    """§000881: a value of 30 lines or more and a nested cell of 3 lines or more end in "…"."""
+    long_value = "".join(f"> Zeile {n}\\\n" for n in range(1, 41))
+    cell = "Angebot " * 30
+    source = (
+        '---\ntitle: "A"\ntyp: antrag\n---\n\n'
+        f"> [!feld] Lang\n>\n{long_value}\n"
+        f"> [!feld] Kosten\n>\n> | Position | Angebot |\n> |---|---|\n> | Bus | {cell} |\n\n"
+        "> [!feld] Kurz\n>\n> eins\n"
+    )
+    lines = _lines(_render(source, "protocol-stupa"), tmp_path)
+    words = [line[3] for line in lines]
+    assert "Zeile 29" in words and "Zeile 30" not in words
+    assert words.count("…") == 2
+    assert sum(1 for w in words if "Angebot Angebot" in w) == 2
+
+
+def test_an_antrag_draws_signature_rows_and_rules_in_a_nested_table(tmp_path: Path) -> None:
+    """§000888: a signature row prints its two captions. §000881: a nested table renders."""
+    source = (
+        '---\ntitle: "A"\ntyp: antrag\n---\n\n'
+        "> [!feld] Kosten\n>\n> | Position | Angebot |\n> |---|---|\n"
+        "> | Bus | Eins |\n> | | Zwei |\n> | **Summe** | |\n\n"
+        "# Unterschriften\n\n"
+        "> [!unterschrift] Sachlich richtig\n>\n> Finanzreferent:in\n"
+    )
+    words = [line[3] for line in _lines(_render(source, "protocol-stupa"), tmp_path)]
+    assert "Unterschriften" in words and "Sachlich richtig" in words
+    assert "Datum" in words and "Unterschrift Finanzreferent:in" in words
+    assert "Zwei" in words and "Summe" in words
+
+
+def test_an_antrag_starts_every_page_with_its_title(tmp_path: Path) -> None:
+    """§000881: the title heads each page in the same form, at the same place."""
+    rows = "".join(f"> [!feld] Feld {n}\n>\n> Wert {n}\n\n" for n in range(60))
+    source = f'---\ntitle: "Exkursion Stuttgart"\ntyp: antrag\n---\n\n{rows}'
+    lines = _lines(_render(source, "protocol-stupa"), tmp_path)
+    titles = [line for line in lines if line[3] == "Exkursion Stuttgart"]
+    assert [line[0] for line in titles] == [1, 2]
+    assert titles[0][1:3] == titles[1][1:3]
+
+
 def _gray_page(pdf: bytes, tmp_path: Path, page: int, dpi: int) -> tuple[int, bytes]:
     """Render one page as an 8-bit gray PGM and return its width and pixels."""
     path = tmp_path / "bar.pdf"
@@ -342,3 +405,18 @@ def test_a_black_bar_sits_on_the_baseline(tmp_path: Path) -> None:
     baseline, cap = letters[-1], letters[0]
     assert round(0.5 * scale) <= bar[-1] - baseline <= round(2 * scale)
     assert round(1 * scale) <= cap - bar[0] <= round(3 * scale)
+
+
+def test_a_note_in_a_nested_table_takes_the_empty_cells_after_it(tmp_path: Path) -> None:
+    """§000881: the note uses the columns to its right and may take five lines."""
+    note = "Hinweis " * 80
+    source = (
+        '---\ntitle: "A"\ntyp: antrag\n---\n\n'
+        "> [!feld] Kosten\n>\n> | Position | Angebot | Betrag |\n> |---|---|---:|\n"
+        f"> | Bus | Eins | 1 |\n> | | {note} | |\n\n"
+    )
+    lines = _lines(_render(source, "protocol-stupa"), tmp_path)
+    notes = [line for line in lines if "Hinweis Hinweis" in line[3]]
+    assert len(notes) == 5
+    assert [line[3] for line in lines].count("…") == 1
+    assert len(notes[0][3].split()) >= 5

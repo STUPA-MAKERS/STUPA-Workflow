@@ -1,19 +1,19 @@
 ---
 name: be-pdf
-description: The HTTP client to the internal typst render service — TypstClient.render_pdf, TypstError, build_typst_client, variants and the multipart logo channel. The callers are the protocols and the export of a Haushaltsplan; applications no longer render a PDF. Use when working on the render call, its error and retry discipline, or the render settings in backend/app/modules/pdf.
+description: The HTTP client to the internal typst render service — TypstClient.render_pdf, TypstError, build_typst_client, variants and the multipart logo channel. The callers are the protocols, the export of a Haushaltsplan and the Antrag PDF (documents module, also the Antrag Anlage of a protocol). Use when working on the render call, its error and retry discipline, or the render settings in backend/app/modules/pdf.
 ---
 
 # typst client — `backend/app/modules/pdf`
 
 **Does:** Holds the HTTP client to the internal typst `/render` service. Nothing else. The
-callers are `be-protocol`, which renders a meeting protocol to PDF and stores it in
-MinIO itself, and `be-budget`, which renders a version of a Haushaltsplan with the variant
-`plan` and answers the bytes (spec 000875).
+callers are `be-protocol`, which renders a meeting protocol to PDF and stores it in MinIO
+itself, `be-budget`, which renders a version of a Haushaltsplan with the variant `plan` and
+answers the bytes (spec 000875), and `app/modules/documents`, which renders an Antrag
+synchronously (`GET /api/applications/{id}/pdf`, specs 000880-000883, signature section
+000888) and as the Anlage of a protocol (000884-000886). The Antrag PDF is never stored.
 
-> **Applications no longer render a PDF.** The route, the `render_job` table, the arq
-> `render_pdf` task, the `exportPdf` flow action and the application Markdown builder were
-> all removed. If you are looking for any of those, they are gone on purpose — do not
-> reintroduce them without asking.
+> The old async application render (`render_job` table, arq `render_pdf` task, `exportPdf`
+> flow action) stays removed. Do not reintroduce it: the Antrag PDF renders on request.
 
 **Key files:**
 - `typst_client.py` — `TypstClient.render_pdf`, `TypstError`, and the

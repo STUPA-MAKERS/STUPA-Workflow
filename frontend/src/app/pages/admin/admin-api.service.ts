@@ -140,6 +140,7 @@ interface ApplicationTypeOutWire {
   readonly nameI18n?: Record<string, string> | null;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
+  readonly pdfSignatures?: boolean;
   readonly retentionMonths?: number | null;
   readonly activeFormVersionId?: Uuid | null;
   readonly activeFormVersion?: number | null;
@@ -801,6 +802,7 @@ export class AdminApiService {
             name: (t.nameI18n ?? {}) as I18nMap,
             gremiumId: t.gremiumId ?? null,
             hasBudget: t.hasBudget ?? false,
+            pdfSignatures: t.pdfSignatures ?? false,
             retentionMonths: t.retentionMonths ?? null,
             activeFormVersionId: t.activeFormVersionId ?? null,
             activeFormVersion: t.activeFormVersion ?? null,
@@ -835,6 +837,7 @@ export class AdminApiService {
           name: (t.nameI18n ?? {}) as I18nMap,
           gremiumId: t.gremiumId ?? null,
           hasBudget: t.hasBudget ?? false,
+          pdfSignatures: t.pdfSignatures ?? false,
           retentionMonths: t.retentionMonths ?? null,
           activeFormVersionId: t.activeFormVersionId ?? null,
         })),
@@ -856,6 +859,7 @@ export class AdminApiService {
       ...(body.name ? { nameI18n: body.name } : {}),
       ...(body.gremiumId !== undefined ? { gremiumId: body.gremiumId } : {}),
       ...(body.hasBudget !== undefined ? { hasBudget: body.hasBudget } : {}),
+      ...(body.pdfSignatures !== undefined ? { pdfSignatures: body.pdfSignatures } : {}),
     };
     return this.http
       .patch<unknown>(`${this.base}/admin/application-types/${id}`, payload)

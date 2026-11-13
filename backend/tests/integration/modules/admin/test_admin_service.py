@@ -315,6 +315,13 @@ async def test_application_type_crud_and_conflict(session: AsyncSession) -> None
     )
     assert updated.has_budget is False
     assert updated.active_form_version is None
+    assert updated.pdf_signatures is False
+    signed = await svc.update_application_type(
+        created.id, ApplicationTypeUpdate(pdfSignatures=True), _ACTOR
+    )
+    assert signed.pdf_signatures is True
+    listed = {t.id: t for t in await svc.list_application_types()}
+    assert listed[created.id].pdf_signatures is True
 
 
 async def test_application_type_list_gives_the_active_form_version(
