@@ -313,6 +313,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000846](requirements/functional/finance/budget/000846_allocation-two-decimal-places.md) | An allocation by hand has at most two decimal places | draft |
 | [F/finance/budget/000848](requirements/functional/finance/budget/000848_plan-page-other-budget.md) | Another budget takes the budget before off the plan page | draft |
 | [F/finance/budget/000849](requirements/functional/finance/budget/000849_cost-centre-settings-save-order.md) | The settings of a Kostenstelle save one change after the other | draft |
+| [F/finance/budget/000850](requirements/functional/finance/budget/000850_cost-centre-text-saved-on-close.md) | A typed text of a Kostenstelle is saved when its section goes off the page | draft |
+| [F/finance/budget/000851](requirements/functional/finance/budget/000851_tree-read-order.md) | A budget page drops the answer of an older tree read | draft |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | approved |

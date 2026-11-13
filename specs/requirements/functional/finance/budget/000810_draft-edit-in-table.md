@@ -19,10 +19,14 @@ On a wide screen, the column Ansatz of a draft must show one amount field in eac
 has no child. A press on a row must select its Kostenstelle, and the detail must show the
 fields Ansatz and Erläuterung. On a phone a press on a row must open a bottom sheet with
 these fields and the table must not show fields. Each field must be read-only when the
-version is not in `draft`.
+version is not in `draft`. The five columns of a draft with a year before must fit the
+table area from a window width of 1280 px. The amount field of a table must show each
+Ansatz of the plan and each typed amount in full: it takes a wider form when the plan holds
+an Ansatz from 10 million euro.
 
 Reason: A plan has many lines, and one sheet for each amount costs too many steps. The
 Ansatz of a parent is the sum of its children.
 
 Test: The component tests press a row on a wide screen and on a phone and read the fields of a
-draft and of a decided version.
+draft and of a decided version. One test types an Ansatz of 10 million euro and reads the
+wide form of the fields.
