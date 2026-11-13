@@ -35,7 +35,7 @@ Haushalt in a step (000826). The person who edits the agenda picks the draft fro
 drafts of these Haushalte that this person can read. Such a TOP has no motion and no
 vote, and the version stays a draft. A plan is at most one TOP of a meeting (000838).
 
-The dialog "TOP hinzufügen" must list the plans under their own kind "Haushaltsplan",
+The dialog "TOP hinzufügen" must list the plans under their own kind "Haushalt",
 beside "Antrag", "To-Do" and "Freitext": the versions that wait for the decision of the
 Gremium, and the drafts for a reading. The kind must show only in a meeting of a Gremium
 that decides the plan of a Haushalt in a step.
@@ -55,5 +55,5 @@ that the Gremium decided on. For a reading it shows the result of the reading.
 Test: Integration tests: a draft is a TOP without a vote, changes before the protocol is
 finalized, and the Anlage holds the changed amounts. A plan is voted on and refused, the
 draft changes, and the Anlage holds the amounts of the vote. A meeting of another Gremium
-does not get the draft. Component test: the kind "Haushaltsplan" lists the plans and is
+does not get the draft. Component test: the kind "Haushalt" lists the plans and is
 absent in a Gremium that decides no plan.

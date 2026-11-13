@@ -52,7 +52,7 @@ export type AgendaItemKind = 'application' | 'plan' | 'todo' | 'freetext';
  */
 export type AgendaEmptyCase = 'none' | 'noMatch';
 
-/** A row of the list "Antrag" or "Haushaltsplan": an application in a vote state, or a plan version. */
+/** A row of the list "Antrag" or "Haushalt": an application in a vote state, or a plan version. */
 export interface AgendaDecisionOption {
   readonly id: Uuid;
   readonly title: string;
@@ -74,7 +74,7 @@ export interface AgendaTodoOption {
  * free-text item.
  *
  * The application list is `GET …/agenda/assignable`: the applications of the meeting
- * Gremium in a vote state that are not on an agenda yet. The kind "Haushaltsplan" lists
+ * Gremium in a vote state that are not on an agenda yet. The kind "Haushalt" lists
  * the versions of a Haushaltsplan that wait for the decision of the Gremium and the
  * drafts for a reading (`GET …/agenda/assignable-plans`). It shows only in a Gremium
  * that decides the plan of a Haushalt in a step (spec 000876). The to-do list is the gremium
@@ -182,7 +182,7 @@ export class AgendaItemDialogComponent {
     return pick !== null && this.shownTodos().some((c) => c.id === pick) ? pick : null;
   });
 
-  /** The rows of the current list: the plans under "Haushaltsplan", else the applications. */
+  /** The rows of the current list: the plans under "Haushalt", else the applications. */
   private readonly decisions = computed<AgendaDecisionOption[]>(() =>
     this.kind() === 'plan'
       ? this.plans().map((p) => ({

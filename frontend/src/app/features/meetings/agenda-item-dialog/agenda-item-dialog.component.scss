@@ -15,11 +15,6 @@
 .aid__kind {
   width: 100%;
 }
-// Four kinds on a phone: each segment is as wide as its label needs and the rest of the
-// width is shared, so "Haushaltsplan" stays on one line beside the short labels.
-app-segmented.aid__kind ::ng-deep .seg.seg {
-  grid-auto-columns: auto;
-}
 
 // One height for every kind and state, so the dialog keeps its height while it is open.
 // ~3/4 of a 900px screen, and it still fits a 720px one.

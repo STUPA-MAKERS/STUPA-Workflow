@@ -150,7 +150,7 @@ describe('AgendaItemDialogComponent', () => {
     flushApps(http, fixture);
     const apps = within(screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ })).getAllByRole('radio');
     expect(apps).toHaveLength(3);
-    await userEvent.click(screen.getByRole('radio', { name: 'Haushaltsplan' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Haushalt' }));
     expect(screen.getByPlaceholderText('Haushaltsplan suchen')).toBeInTheDocument();
     const rows = within(screen.getByRole('radiogroup', { name: 'Haushaltspläne' })).getAllByRole('radio');
     expect(rows).toHaveLength(1);
@@ -183,7 +183,7 @@ describe('AgendaItemDialogComponent', () => {
       ],
     });
     flushApps(http, fixture);
-    await userEvent.click(screen.getByRole('radio', { name: 'Haushaltsplan' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Haushalt' }));
     const rows = within(screen.getByRole('radiogroup', { name: 'Haushaltspläne' })).getAllByRole('radio');
     expect(rows[0]).toHaveAccessibleName(/Haushaltsplan VS-Mittel 2027: Lesung/);
     expect(screen.getByText('Entwurf zur Lesung')).toBeInTheDocument();
@@ -200,7 +200,7 @@ describe('AgendaItemDialogComponent', () => {
     const { http, fixture } = await setup();
     http.expectOne('/api/meetings/m-1/agenda/assignable-plans').flush({ decides: true, plans: [] });
     flushApps(http, fixture);
-    await userEvent.click(screen.getByRole('radio', { name: 'Haushaltsplan' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Haushalt' }));
     expect(screen.getByText('Kein Haushaltsplan steht an')).toBeInTheDocument();
   });
 
@@ -213,22 +213,22 @@ describe('AgendaItemDialogComponent', () => {
       ],
     });
     flushApps(http, fixture);
-    await userEvent.click(screen.getByRole('radio', { name: 'Haushaltsplan' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Haushalt' }));
     await userEvent.type(screen.getByPlaceholderText('Haushaltsplan suchen'), 'xyz');
     expect(screen.getByText('Kein Haushaltsplan passt zu „xyz“')).toBeInTheDocument();
   });
 
-  /** §F/finance/budget/000876: a Gremium that decides no plan has no kind "Haushaltsplan". */
-  it('hides the kind Haushaltsplan in a Gremium that decides no plan', async () => {
+  /** §F/finance/budget/000876: a Gremium that decides no plan has no kind "Haushalt". */
+  it('hides the kind Haushalt in a Gremium that decides no plan', async () => {
     const { http, fixture, cmp } = await setup();
     http.expectOne('/api/meetings/m-1/agenda/assignable-plans').flush({ decides: false, plans: [] });
     flushApps(http, fixture);
-    expect(screen.queryByRole('radio', { name: 'Haushaltsplan' })).toBeNull();
+    expect(screen.queryByRole('radio', { name: 'Haushalt' })).toBeNull();
     cmp.setKind('plan');
     expect(cmp.kind()).toBe('application');
   });
 
-  it('hides the kind Haushaltsplan when the plans cannot be read', async () => {
+  it('hides the kind Haushalt when the plans cannot be read', async () => {
     const { http, fixture } = await setup();
     http
       .expectOne('/api/meetings/m-1/agenda/assignable-plans')
@@ -236,7 +236,7 @@ describe('AgendaItemDialogComponent', () => {
     flushApps(http, fixture);
     const group = screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ });
     expect(within(group).getAllByRole('radio')).toHaveLength(3);
-    expect(screen.queryByRole('radio', { name: 'Haushaltsplan' })).toBeNull();
+    expect(screen.queryByRole('radio', { name: 'Haushalt' })).toBeNull();
   });
 
   /** The dialog sends one request at a time. */
