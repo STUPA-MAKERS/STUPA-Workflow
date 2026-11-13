@@ -73,6 +73,10 @@ _NEUTRAL: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
     (re.compile(r"\{\{"), "{\u2060{"),
     (re.compile(r"/api/media/documents/"), "/api/media/documents\u2060/"),
 )
+#: A web address that can stand as a Markdown link target as it is.
+_URL: Final[re.Pattern[str]] = re.compile(r"https?://[^\s()<>\[\]`\\]+")
+#: The longest link text of a web address.
+_URL_TEXT: Final = 40
 _MAIL: Final[re.Pattern[str]] = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+")
 _ISO_DAY: Final[re.Pattern[str]] = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 
@@ -337,6 +341,21 @@ def _table(value: object) -> list[str]:
     ]
 
 
+def offer_name(label: str) -> str:
+    """Write the name of an offer. A web address is a link with a short text.
+
+    The link text drops the scheme, a leading `www.` and a closing slash, and it is cut at
+    `_URL_TEXT` characters, so the address stays on one or two lines of its column. The link
+    leads to the whole address.
+    """
+    plain = label.strip()
+    if not _URL.fullmatch(plain):
+        return escape(plain or "—")
+    short = re.sub(r"^https?://(www\.)?", "", plain).rstrip("/")
+    text = short if len(short) <= _URL_TEXT else short[: _URL_TEXT - 1] + "…"
+    return f"[{escape(text)}]({plain})"
+
+
 def _offers(position: Mapping[str, object]) -> list[Mapping[str, object]]:
     raw = position.get("offers")
     return [o for o in raw if isinstance(o, Mapping)] if isinstance(raw, list) else []
@@ -359,7 +378,7 @@ def _position_rows(index: int, position: Mapping[str, object], currency: str) ->
     offer_rows = [
         "| {pos} | {name}{pref} | {amount} |".format(
             pos=label if n == 0 else "",
-            name=escape(_plain(o.get("label")) or "—"),
+            name=offer_name(_plain(o.get("label"))),
             pref=" (bevorzugt)" if o.get("preferred") is True else "",
             amount=code(money) if (money := _money(o.get("value"), currency)) else "",
         )
