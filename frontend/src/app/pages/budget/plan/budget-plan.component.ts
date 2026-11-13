@@ -166,6 +166,9 @@ const FIELD_COL = '10rem';
  * the detail shows the plan or one line. A draft is edited in the tables, and each field saves
  * when the person leaves it.
  */
+/** The first Ansatz that the narrow amount field of a table cuts. */
+const WIDE_FROM = 10_000_000;
+
 @Component({
   selector: 'app-budget-plan',
   standalone: true,
@@ -1150,11 +1153,37 @@ export class BudgetPlanComponent {
    */
   saveMark(row: PlanRow, field: 'transferable' | 'coverable', value: boolean): void {
     const key = this.kept(row, field);
-    const ended = (): void =>
-      this.marks.update((m) => Object.fromEntries(Object.entries(m).filter(([k, v]) => k !== key || v !== value)));
+    const ended = (): void => {
+      if (this.savesEnded(key)) this.marks.update((m) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== key)));
+    };
     this.marks.update((m) => ({ ...m, [key]: value }));
+    this.saves = { ...this.saves, [key]: (this.saves[key] ?? 0) + 1 };
     this.saveLine(row, { [field]: value }, ended);
   }
+
+  /**
+   * The number of the saves that run for a kept press or text, by its key. The page keeps
+   * the press or the text until the last of them ended, because the answer of an older save
+   * holds an older value.
+   */
+  private saves: Readonly<Record<string, number>> = {};
+
+  /** One save of a kept press or text ended. Say if it was the last one that ran. */
+  private savesEnded(key: string): boolean {
+    const left = (this.saves[key] ?? 1) - 1;
+    this.saves = { ...Object.fromEntries(Object.entries(this.saves).filter(([k]) => k !== key)), ...(left ? { [key]: left } : {}) };
+    return left === 0;
+  }
+
+  /**
+   * The amount fields of the tables take the wide form: an Ansatz of the version or a typed
+   * amount has more digits than the narrow field shows.
+   */
+  readonly wideFields = computed(
+    () =>
+      (this.version()?.lines ?? []).some((line) => Number(line.amount) >= WIDE_FROM) ||
+      Object.entries(this.edits()).some(([key, text]) => !key.includes(':note:') && Number(text) >= WIDE_FROM),
+  );
 
   /** The amount a field shows: the text a person types, else the saved amount. */
   fieldValue(row: PlanRow, field: 'amount' | 'blocked'): string | number {
@@ -1218,17 +1247,20 @@ export class BudgetPlanComponent {
     const key = this.kept(row, 'note');
     const text = this.edits()[key];
     if (text === undefined || this.noteSent[key] === text) return;
-    const without = (texts: Readonly<Record<string, string>>): Readonly<Record<string, string>> =>
-      Object.fromEntries(Object.entries(texts).filter(([k, v]) => k !== key || v !== text));
+    const without = (texts: Readonly<Record<string, string>>, sent: string | undefined): Readonly<Record<string, string>> =>
+      Object.fromEntries(Object.entries(texts).filter(([k, v]) => k !== key || v !== sent));
     const ended = (): void => {
-      this.noteSent = without(this.noteSent);
-      this.edits.update(without);
+      if (!this.savesEnded(key)) return;
+      const last = this.noteSent[key];
+      this.noteSent = without(this.noteSent, last);
+      this.edits.update((e) => without(e, last));
     };
     this.noteSent = { ...this.noteSent, [key]: text };
+    this.saves = { ...this.saves, [key]: (this.saves[key] ?? 0) + 1 };
     this.saveLine(row, { note: text.trim() || null }, ended);
   }
 
-  /** The Erläuterung whose save runs, by line, so a second leave of the field sends no second request. */
+  /** The Erläuterung of the last save that runs, by line, so a second leave of the field sends no second request. */
   private noteSent: Readonly<Record<string, string>> = {};
 
   /**

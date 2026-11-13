@@ -257,7 +257,82 @@ describe('CostCentreSettingsComponent', () => {
     await waitFor(() => expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('StuPa'));
   });
 
-  it('§F/finance/budget/000849: a typed text is saved when the section goes off the page', async () => {
+  it('§F/finance/budget/000849: a value that another person set back is saved again', async () => {
+    const view = await setup();
+    await retype(view.field('Name'), 'Neu');
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Neu' });
+    view.fixture.detectChanges();
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Kultur' });
+    view.fixture.detectChanges();
+    await waitFor(() => expect(view.field('Name').value).toBe('Kultur'));
+    await retype(view.field('Name'), 'Neu');
+    expect(view.api.updateNode.mock.calls).toEqual([
+      ['ks', { name: 'Neu' }],
+      ['ks', { name: 'Neu' }],
+    ]);
+  });
+
+  it('§F/finance/budget/000849: a refused save leaves the choice that waits in its switch', async () => {
+    const view = await setup();
+    const first = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(first).mockReturnValueOnce(new Subject<object>());
+    const active = screen.getByRole('switch', { name: 'Aktiv' });
+    await userEvent.click(active);
+    await userEvent.click(active);
+    await userEvent.click(active);
+    first.error({ status: 409, error: { code: 'x' } });
+    view.fixture.detectChanges();
+    expect(active).toHaveAttribute('aria-checked', 'false');
+    expect(view.api.updateNode.mock.calls.map((call) => call[1])).toEqual([{ active: false }, { active: false }]);
+  });
+
+  it('§F/finance/budget/000849: a choice that is back at the saved value sends nothing for a Kostenstelle that the person left', async () => {
+    const view = await setup();
+    const first = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(first);
+    await retype(view.field('Name'), 'Neu');
+    const active = screen.getByRole('switch', { name: 'Aktiv' });
+    await userEvent.click(active);
+    await userEvent.click(active);
+    view.fixture.componentRef.setInput('node', { ...KS, id: 'other' });
+    view.fixture.detectChanges();
+    first.next({});
+    first.complete();
+    expect(view.api.updateNode).toHaveBeenCalledTimes(1);
+  });
+
+  it('§F/finance/budget/000831: a refused text that the section takes again at its close shows its cause once', async () => {
+    const view = await setup();
+    const first = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(first);
+    await retype(view.field('Name'), 'Neu');
+    view.fixture.destroy();
+    first.error({ status: 409, error: { code: 'x' } });
+    expect(view.api.updateNode).toHaveBeenCalledTimes(1);
+  });
+
+  it('§F/finance/budget/000849: a field that the person left without a change sends nothing after another Kostenstelle is selected', async () => {
+    const view = await setup();
+    const first = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(first);
+    await userEvent.click(screen.getByRole('switch', { name: 'Aktiv' }));
+    await userEvent.click(view.field('Name'));
+    await userEvent.tab();
+    view.fixture.componentRef.setInput('node', { ...KS, id: 'other' });
+    view.fixture.detectChanges();
+    first.next({});
+    first.complete();
+    expect(view.api.updateNode).toHaveBeenCalledTimes(1);
+  });
+
+  it('§F/finance/budget/000850: a typed key is saved when the section goes off the page', async () => {
+    const view = await setup();
+    await userEvent.type(view.field('Schlüssel'), '9');
+    view.fixture.destroy();
+    expect(view.api.updateNode).toHaveBeenCalledWith('ks', { key: `${KS.key}9` });
+  });
+
+  it('§F/finance/budget/000850: a typed text is saved when the section goes off the page', async () => {
     const view = await setup();
     const reread = jest.fn();
     view.fixture.componentRef.setInput('whenGone', reread);

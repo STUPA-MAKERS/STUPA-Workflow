@@ -337,6 +337,7 @@
       @if (tableFields() && !$any(row).hasChildren) {
         <app-currency-input
           class="bp__field"
+          [class.bp__field--wide]="wideFields()"
           [name]="'amount-' + $any(row).id"
           [ariaLabel]="'budget.plan.amountOf' | t: { name: $any(row).name }"
           [ngModel]="fieldValue($any(row), 'amount')"

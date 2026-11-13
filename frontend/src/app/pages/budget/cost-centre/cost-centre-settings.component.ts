@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
   input,
   linkedSignal,
@@ -38,6 +39,8 @@ interface Change {
   readonly id: Uuid;
   readonly field: Field;
   readonly value: Value;
+  /** The saved value of the field when the person made the change. */
+  readonly saved: Value;
 }
 
 /** The saved value of a field, in the form that a request holds. */
@@ -109,6 +112,14 @@ export class CostCentreSettingsComponent {
   private gone: (() => void) | null = null;
 
   constructor() {
+    effect(() => {
+      const node = this.node();
+      this.sent = Object.fromEntries(
+        Object.entries(this.sent).filter(
+          ([key, last]) => !key.startsWith(`${node.id}:`) || last.base === savedValue(node, key.slice(node.id.length + 1) as Field),
+        ),
+      );
+    });
     inject(DestroyRef).onDestroy(() => {
       this.gone = this.whenGone() ?? ((): void => undefined);
       this.saveText('key');
@@ -216,7 +227,9 @@ export class CostCentreSettingsComponent {
   /**
    * The value that the last request for a field holds, by Kostenstelle and field, with the
    * saved value of that moment (`base`). It stands for the saved value until the tree that
-   * the page reads after the save holds another value than `base`.
+   * the page reads after the save holds another value than `base`. The entry then goes,
+   * because a tree that holds `base` again later holds it from another person, and the
+   * value of the request is no longer the saved one.
    */
   private sent: Readonly<Record<string, { readonly value: Value; readonly base: Value | undefined }>> = {};
 
@@ -224,18 +237,27 @@ export class CostCentreSettingsComponent {
    * Take a change of a field. The changes are saved one after the other, so two writes
    * never race, and the tree that the page reads after a save is not older than that save.
    * A change that comes while a save runs waits for it, and a later change of the same
-   * field takes its place: the last value of the person is the one that counts.
+   * field takes its place: the last value of the person is the one that counts. The value
+   * of the save that runs is no new change when nothing waits for its field: the leave of a
+   * field and then the close of the section give the same text twice, and a refusal must
+   * show its cause once.
    */
   private change(field: Field, value: Value): void {
-    const id = this.node().id;
-    this.waiting.update((list) => [...list.filter((c) => c.id !== id || c.field !== field), { id, field, value }]);
+    const node = this.node();
+    const id = node.id;
+    const saved = savedValue(node, field);
+    const same = (c: Change): boolean => c.id === id && c.field === field;
+    const runs = this.current;
+    if (runs && same(runs) && runs.value === value && !this.waiting().some(same)) return;
+    this.waiting.update((list) => [...list.filter((c) => c.id !== id || c.field !== field), { id, field, value, saved }]);
     this.next();
   }
 
   /**
    * The value that the server holds for a field as far as the page knows: the value of the
    * last request, else the saved value of the tree. For a Kostenstelle that is not the
-   * selected one the page knows only its own last request.
+   * selected one the page knows only its own last request, and a change then counts against
+   * the saved value of the moment when the person made it.
    */
   private known(id: Uuid, field: Field): Value | undefined {
     const last = this.sent[`${id}:${field}`];
@@ -244,12 +266,15 @@ export class CostCentreSettingsComponent {
     return last && last.base === savedValue(node, field) ? last.value : savedValue(node, field);
   }
 
+  /** The change whose save runs. */
+  private current: Change | null = null;
+
   /** Send the first change that waits, when no save runs. A change to the known value needs no request. */
   private next(): void {
     const [change, ...rest] = this.waiting();
     if (this.running() || !change) return;
     this.waiting.set(rest);
-    if (change.value === this.known(change.id, change.field)) return this.next();
+    if (change.value === (this.known(change.id, change.field) ?? change.saved)) return this.next();
     this.send(change);
   }
 
@@ -275,13 +300,15 @@ export class CostCentreSettingsComponent {
 
   /**
    * Run the save of one change. A refused save shows its cause and the known value of its
-   * field again. The other fields keep the text that the person types in them, and so do
+   * field again, unless a later change of that field waits: the control then keeps that choice. The other fields keep the text that the person types in them, and so do
    * the fields of another Kostenstelle that the person selected in the meantime.
    *
    * The choices are read before the save counts as ended, because a linked signal computes
    * when it is read, and a tree that came during the save must not replace them.
    */
-  private send({ id, field, value }: Change): void {
+  private send(change: Change): void {
+    const { id, field, value } = change;
+    this.current = change;
     const key = `${id}:${field}`;
     const before = this.sent[key];
     const node = this.node();
@@ -295,6 +322,7 @@ export class CostCentreSettingsComponent {
         finalize(() => {
           void [this.side(), this.viewGremium(), this.decisionGremium(), this.active()];
           this.running.set(false);
+          this.current = null;
           this.next();
         }),
       )
@@ -307,7 +335,8 @@ export class CostCentreSettingsComponent {
           this.toast.error(this.i18n.translate(costCentreError(problemCode(err))));
           this.sent = Object.fromEntries([...Object.entries(this.sent).filter(([k]) => k !== key), ...(before ? [[key, before]] : [])]);
           const known = this.known(id, field);
-          if (this.node().id === id && known !== undefined) this.show(field, known);
+          const waits = this.waiting().some((c) => c.id === id && c.field === field);
+          if (this.node().id === id && known !== undefined && !waits) this.show(field, known);
           this.tell(false);
         },
       });

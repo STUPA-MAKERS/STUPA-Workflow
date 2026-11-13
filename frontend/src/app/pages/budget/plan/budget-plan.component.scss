@@ -51,12 +51,17 @@
 }
 
 
-/* Wide enough for the largest Ansatz that a plan takes (9.999.999.999,99 €), so the field
-   never shows a part of an amount that reads as another amount. */
+/* Wide enough for an Ansatz below 10 million euro, so the five columns of a draft fit a
+   laptop window. A plan that holds a larger Ansatz takes the width of the largest one that a
+   plan takes (9.999.999.999,99 €), so the field never shows a part of an amount that reads
+   as another amount. */
 .bp__field {
   display: block;
-  width: 12rem;
+  width: 9.5rem;
   margin-inline-start: auto;
+}
+.bp__field--wide {
+  width: 12rem;
 }
 
 /* The Erläuterung of a version that takes no change shows the disabled state of the amount

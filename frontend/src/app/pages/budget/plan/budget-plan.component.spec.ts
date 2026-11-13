@@ -931,6 +931,58 @@ describe('BudgetPlanComponent', () => {
       expect(view.api.setLine).toHaveBeenCalledTimes(3);
     });
 
+    it('§F/finance/budget/000810: the amount fields of a table are wide only for a plan with an Ansatz from 10 million euro', async () => {
+      const view = await setup();
+      const field = () => view.container.querySelector('app-currency-input.bp__field') as HTMLElement;
+      expect(field()).not.toHaveClass('bp__field--wide');
+      await typeAmount(input(view, 'amount-fees'), '10000000', '0');
+      view.fixture.detectChanges();
+      expect(field()).toHaveClass('bp__field--wide');
+    });
+
+    it('§F/finance/budget/000812: a Vermerk keeps the last press until its last save ended', async () => {
+      const view = await setup({ query: { costCentre: 'grants' } });
+      const on = plan([version({ lines: [line('fees', '100'), line('staff', '70'), line('wages', '60'), line('grants', '30', { transferable: true })] })]);
+      const first = new Subject<BudgetPlan>();
+      const second = new Subject<BudgetPlan>();
+      const third = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(first).mockReturnValueOnce(second).mockReturnValueOnce(third);
+      const mark = screen.getByRole('switch', { name: 'Übertragbar' });
+      await userEvent.click(mark);
+      await userEvent.click(mark);
+      await userEvent.click(mark);
+      first.next(on);
+      first.complete();
+      second.next(plan());
+      second.complete();
+      view.fixture.detectChanges();
+      expect(mark).toHaveAttribute('aria-checked', 'true');
+      third.error(problem(409, 'plan_state_invalid'));
+      view.fixture.detectChanges();
+      expect(mark).toHaveAttribute('aria-checked', 'false');
+    });
+
+    it('§F/finance/budget/000812: an Erläuterung keeps the last text until its last save ended', async () => {
+      const view = await setup({ query: { costCentre: 'grants' } });
+      const note = () => view.container.querySelector<HTMLTextAreaElement>('[name="line-note-grants"]') as HTMLTextAreaElement;
+      const first = new Subject<BudgetPlan>();
+      const second = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(first).mockReturnValueOnce(second).mockReturnValueOnce(new Subject<BudgetPlan>());
+      await userEvent.type(note(), 'a');
+      await userEvent.tab();
+      await userEvent.clear(note());
+      await userEvent.tab();
+      await userEvent.type(note(), 'a');
+      await userEvent.tab();
+      expect(view.api.setLine).toHaveBeenCalledTimes(3);
+      first.next(plan());
+      first.complete();
+      second.next(plan());
+      second.complete();
+      view.fixture.detectChanges();
+      expect(note().value).toBe('a');
+    });
+
     it('§F/finance/budget/000812: the read after mixed answers waits for a page that loads another budget', async () => {
       const view = await setup({ tree: [TOP, node({ id: 'two', name: 'Zweiter', planEnabled: true })], query: { costCentre: 'fees' } });
       const first = new Subject<BudgetPlan>();
@@ -1234,6 +1286,26 @@ describe('BudgetPlanComponent', () => {
       await userEvent.click(treeRow(view, 'Löhne'));
       const child = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent)).componentInstance as CostCentreSettingsComponent;
       expect(child.sided()).toBe(false);
+    });
+
+    it('§F/finance/budget/000851: drops the answer of a tree read that went out before the read on the page', async () => {
+      const view = await setup({ query: { costCentre: 'fees' } });
+      const older = new Subject<BudgetTreeNode[]>();
+      const newer = new Subject<BudgetTreeNode[]>();
+      view.treeApi.tree.mockReturnValueOnce(older).mockReturnValueOnce(newer);
+      view.fixture.componentInstance.reloadTree();
+      view.fixture.componentInstance.reloadTree();
+      newer.next([{ ...TOP, name: 'Neu' }, QSM]);
+      older.next([{ ...TOP, name: 'Alt' }, QSM]);
+      expect((view.fixture.componentInstance as unknown as { tree(): BudgetTreeNode[] }).tree()[0].name).toBe('Neu');
+    });
+
+    it('§F/finance/budget/000850: reads the tree after a save of a section that went off the page', async () => {
+      const view = await setup({ query: { costCentre: 'fees' } });
+      const settings = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent)).componentInstance as CostCentreSettingsComponent;
+      const reads = view.treeApi.tree.mock.calls.length;
+      settings.whenGone()?.();
+      expect(view.treeApi.tree.mock.calls.length).toBe(reads + 1);
     });
 
     it('has no Gremien to choose when their read fails', async () => {

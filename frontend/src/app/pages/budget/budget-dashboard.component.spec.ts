@@ -21,6 +21,8 @@ import type {
   FiscalYear,
 } from './budget-tree.api';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { By } from '@angular/platform-browser';
+import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
 import { TodosApiService } from '@core/api/todos.service';
 import { PALETTE, shadeColor } from './budget-color.util';
 import { itemApp, itemBooking } from './budget-items/budget-items.fixtures';
@@ -1556,7 +1558,14 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(error).toHaveBeenCalledWith('Die Budget-Statistik konnte nicht geladen werden.');
     });
 
-    it('§F/finance/budget/000849: drops the answer of a tree read that went out before the read on the page', async () => {
+    it('§F/finance/budget/000850: reads the tree after a save of a section that went off the page', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-800' } });
+      const settings = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent)).componentInstance as CostCentreSettingsComponent;
+      settings.whenGone()?.();
+      expect(view.http.match(treeUrl)).toHaveLength(1);
+    });
+
+    it('§F/finance/budget/000851: drops the answer of a tree read that went out before the read on the page', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
       view.c.refreshTree();
       TestBed.inject(HttpCacheService).invalidate('/api/budgets');
