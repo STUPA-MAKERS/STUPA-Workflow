@@ -166,6 +166,10 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     #: item sets it for the item that the room leaves. NULL means "not done". The audit
     #: entry `agenda_item_done` records the person who set it.
     done_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: The time at which the live meeting first moved to this item. A move back keeps
+    #: the first time. NULL means that the meeting never reached the item. The protocol
+    #: PDF shows the time above the TOP.
+    started_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("meeting_id", "application_id", name="uq_agenda_meeting_application"),

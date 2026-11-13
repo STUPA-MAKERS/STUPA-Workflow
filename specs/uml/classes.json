@@ -4065,6 +4065,51 @@
           "type": "TEXT"
         },
         {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "size",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "pages",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "MarkdownDocument",
+      "module": "media",
+      "name": "MarkdownDocument",
+      "path": "backend/app/modules/media/models.py",
+      "table": "markdown_document"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "storage_key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
           "name": "mime",
           "nullable": false,
           "primaryKey": false,
@@ -4279,6 +4324,12 @@
         },
         {
           "name": "done_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "started_at",
           "nullable": true,
           "primaryKey": false,
           "type": "DATETIME"

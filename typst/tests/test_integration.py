@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+import io
 import re
 import shutil
 import struct
@@ -239,3 +240,68 @@ def test_skipped_heading_level_keeps_the_top_numbers(tmp_path: Path) -> None:
     lines = _lines(_render(source, None), tmp_path)
     assert any(line[3].startswith("TOP 1.1") and "Zwei" in line[3] for line in lines)
     assert not any(line[3].startswith("TOP") and "Unter" in line[3] for line in lines)
+
+
+def test_time_notes_print_centered_above_the_top(tmp_path: Path) -> None:
+    """§000871 and §000872: the time of a TOP is a centered line right above its heading."""
+    source = (
+        "---\ntitle: T\n---\n\n"
+        "> [!anmerkung 18:30]\n\n# Begrüßung\n\nText.\n\n"
+        "> [!anmerkung 18:47] %%Max%% verlässt die Sitzung.\n\n"
+        "> [!anmerkung 18:52]\n\n# Haushalt\n\nText.\n"
+    )
+    lines = _lines(_render(source, None), tmp_path)
+    time_page, time_x, time_y = _find(lines, "18:30 Uhr")
+    top_page, _, top_y = _find(lines, "TOP 1")
+    assert time_page == top_page
+    assert 0 < top_y - time_y < 30
+    assert time_x > 250
+    assert any(line[3] == "18:47 Uhr · Max verlässt die Sitzung." for line in lines)
+    _, _, second_y = _find(lines, "18:52 Uhr")
+    _, _, top2_y = _find(lines, "TOP 2")
+    assert 0 < top2_y - second_y < 30
+
+
+def test_embedded_pdfs_become_watermarked_anlagen_with_linked_references(tmp_path: Path) -> None:
+    """§000864, §000865 and §000866: the Anlagen follow the protocol, each page has the
+    watermark, and the reference prints the page of the Anlage and links to it."""
+    from pypdf import PdfReader
+
+    from typst_service.app import _appendix_of, _document_sizes
+    from typst_service.appendix import document_assets, merge_appendix
+
+    from .test_appendix import A, B, make_pdf
+
+    source = (
+        '---\ntitle: "GV"\ndatum: "2026-06-15"\n---\n\n# Haushalt\n\n'
+        f"Siehe [Haushaltsplan.pdf](/api/media/documents/{A}) und "
+        f"[Angebot.pdf](/api/media/documents/{B}).\n"
+    )
+    assets = {
+        f"doc-{A}.pdf": make_pdf((595, 842), (595, 842)),
+        f"doc-{B}.pdf": make_pdf((842, 595)),
+    }
+    documents = document_assets(assets)
+    sizes = _document_sizes(documents)
+    doc = build_document(source, variant=None, assets=assets.keys(), documents=sizes)
+    compiled = asyncio.run(default_compiler().compile(doc, assets))
+    pdf = merge_appendix(compiled, _appendix_of(doc, sizes), documents)
+    reader = PdfReader(io.BytesIO(pdf))
+    pages = len(reader.pages)
+    lines = _lines(pdf, tmp_path)
+    text = " ".join(line[3] for line in lines)
+    assert "Anlage 1: Haushaltsplan.pdf (Seite 2)" in text
+    assert "Anlage 2: Angebot.pdf (Seite 4)" in text
+    tail = [reader.pages[i] for i in range(pages - 3, pages)]
+    assert [round(float(p.mediabox.width)) for p in tail] == [595, 595, 842]
+    marks = [p.extract_text() for p in tail]
+    assert all("zum Protokoll GV vom 15.06.2026" in m for m in marks)
+    assert "Anlage 1" in marks[0] and "Quelle 1" in marks[0]
+    assert "Anlage 2" in marks[2] and "Quelle 1" in marks[2]
+    index = {page.indirect_reference.idnum: i for i, page in enumerate(reader.pages)}  # pyright: ignore[reportOptionalMemberAccess]
+    targets = [
+        index[annot.get_object()["/Dest"][0].idnum]
+        for annot in reader.pages[1].get("/Annots", [])
+        if "/Dest" in annot.get_object()
+    ]
+    assert targets == [pages - 3, pages - 1]

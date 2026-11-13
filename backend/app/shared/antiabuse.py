@@ -166,6 +166,18 @@ def enforce_media_body_cap(request: Request, settings: SettingsDep) -> None:
         raise PayloadTooLargeError(f"Request body exceeds {limit} bytes.")
 
 
+def enforce_document_body_cap(request: Request, settings: SettingsDep) -> None:
+    """Answer 413 when the ``Content-Length`` of an embedded PDF is clearly too large.
+
+    The limit is ``markdown_document_max_bytes`` plus room for the multipart frame.
+    The route reads the file under the authoritative cap, also for a chunked body.
+    """
+    limit = settings.markdown_document_max_bytes + _MULTIPART_OVERHEAD_BYTES
+    raw = request.headers.get("content-length")
+    if raw is not None and raw.isdigit() and int(raw) > limit:
+        raise PayloadTooLargeError(f"Request body exceeds {limit} bytes.")
+
+
 async def _enforce(limiter: RateLimiter, key: str, *, limit: int, window: int, detail: str) -> None:
     result = await limiter.hit(key, limit=limit, window_seconds=window)
     if not result.allowed:
@@ -365,6 +377,27 @@ async def rate_limit_media_images(
         limiter,
         f"media-images:principal:{principal.sub}",
         limit=settings.rl_media_images_per_hour,
+        window=_HOUR,
+        detail="Too many uploads. Try again later.",
+    )
+
+
+async def rate_limit_media_documents(
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+) -> None:
+    """``POST /media/documents``: ``rl_media_documents_per_hour`` per principal.
+
+    Like the images, the key is the ``sub`` and the limit applies to an OAuth token
+    too: every upload costs a virus scan and a pypdf read of up to 20 MiB.
+    """
+    if principal is None:
+        return
+    await _enforce(
+        limiter,
+        f"media-documents:principal:{principal.sub}",
+        limit=settings.rl_media_documents_per_hour,
         window=_HOUR,
         detail="Too many uploads. Try again later.",
     )

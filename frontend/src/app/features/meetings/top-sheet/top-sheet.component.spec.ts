@@ -13,7 +13,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem, Meeting, Protocol } from '@core/api/models';
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
 import { AGENDA, meeting, protocol } from '../../../../testing/meeting-fixtures';
-import { type SaveState, TopSheetComponent } from './top-sheet.component';
+import { type SaveState, TopSheetComponent, documentUploadErrorKey } from './top-sheet.component';
 import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
 
 interface Inputs {
@@ -178,6 +178,13 @@ describe('TopSheetComponent', () => {
     expect(pick).toHaveBeenCalled();
   });
 
+  it('inserts a time note with the current time from the bar (000873)', async () => {
+    const view = await setup();
+    const note = jest.spyOn(editorOf(view), 'insertTimeNote').mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Anmerkung mit Uhrzeit einfügen' }));
+    expect(note).toHaveBeenCalledWith(expect.stringMatching(/^\d{2}:\d{2}$/));
+  });
+
   it('uploads an image of the editor through the media service and reports an error', async () => {
     const upload = jest
       .fn()
@@ -199,6 +206,101 @@ describe('TopSheetComponent', () => {
     const error = jest.spyOn(toast, 'error');
     await expect(uploader!(png)).rejects.toEqual({ status: 413 });
     expect(error).toHaveBeenCalled();
+  });
+
+  it('uploads a PDF to the protocol of the meeting and opens a badge in the overlay (000862, 000863)', async () => {
+    const doc = { id: ID, url: `/api/media/documents/${ID}`, name: 'Angebot.pdf', size: 9, pages: 3 };
+    const uploadDocument = jest
+      .fn()
+      .mockReturnValueOnce(of(doc))
+      .mockReturnValueOnce(throwError(() => ({ status: 415 })));
+    const documentInfo = jest.fn(() => of(doc));
+    const view = await setup({}, [{ provide: MediaApiService, useValue: { uploadDocument, documentInfo } }]);
+    const editor = editorOf(view);
+    const pick = jest.spyOn(editor, 'pickDocument').mockImplementation(() => undefined);
+    await userEvent.click(screen.getByRole('button', { name: 'PDF einfügen' }));
+    expect(pick).toHaveBeenCalled();
+    const uploader = editor.documentUpload();
+    const pdf = new File(['x'], 'Angebot.pdf', { type: 'application/pdf' });
+    await expect(uploader!(pdf)).resolves.toEqual({ src: doc.url, name: 'Angebot.pdf' });
+    expect(uploadDocument).toHaveBeenCalledWith(view.fixture.componentInstance.meeting().id, pdf);
+    const error = jest.spyOn(TestBed.inject(ToastService), 'error');
+    await expect(uploader!(pdf)).rejects.toEqual({ status: 415 });
+    expect(error).toHaveBeenCalledWith('Nur PDF-Dateien ohne Passwort.');
+    await expect(editor.documentInfo()!(doc.url)).resolves.toBe(3);
+    await expect(editor.documentInfo()!(doc.url)).resolves.toBe(3);
+    expect(documentInfo).toHaveBeenCalledTimes(1);
+    editor.documentOpen.emit({ src: doc.url, name: 'Angebot.pdf' });
+    view.fixture.detectChanges();
+    expect(await screen.findByTitle('Angebot.pdf')).toHaveAttribute('src', `${doc.url}?inline=true`);
+  });
+
+  it('puts an uploaded PDF at the caret of the Markdown source', async () => {
+    const doc = { id: ID, url: `/api/media/documents/${ID}`, name: 'Plan.pdf', size: 9, pages: 1 };
+    const view = await setup({ top: { ...AGENDA[0], body: 'Siehe' } }, [
+      { provide: MediaApiService, useValue: { uploadDocument: () => of(doc), documentInfo: () => of(doc) } },
+    ]);
+    await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+    const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+    area.setSelectionRange(5, 5);
+    const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(event, 'clipboardData', {
+      value: { files: [new File(['x'], 'Plan.pdf', { type: 'application/pdf' })], getData: () => '' },
+    });
+    area.dispatchEvent(event);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(event.defaultPrevented).toBe(true);
+    expect(area.value).toBe(`Siehe [Plan.pdf](/api/media/documents/${ID}) `);
+    expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
+  });
+
+  it('maps each upload status to its message key (000869)', () => {
+    expect([403, 413, 415, 429, 503, 500, undefined].map((s) => documentUploadErrorKey(s))).toEqual([
+      'markdown.document.error.forbidden',
+      'markdown.document.error.tooLarge',
+      'markdown.document.error.type',
+      'markdown.image.error.rate',
+      'markdown.image.error.storage',
+      'markdown.document.error.upload',
+      'markdown.document.error.upload',
+    ]);
+  });
+
+  it('picks and drops PDFs into the Markdown source, and leaves other files alone', async () => {
+    const doc = { id: ID, url: `/api/media/documents/${ID}`, name: 'Plan.pdf', size: 9, pages: 1 };
+    const documentInfo = jest.fn(() => throwError(() => new Error('404')));
+    const view = await setup({ top: { ...AGENDA[0], body: '' } }, [
+      { provide: MediaApiService, useValue: { uploadDocument: () => of(doc), documentInfo } },
+    ]);
+    await expect(editorOf(view).documentInfo()!(doc.url)).resolves.toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+    const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+    const pdf = new File(['x'], 'Plan.pdf', { type: 'application/pdf' });
+    const click = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      Object.defineProperty(this, 'files', { value: [pdf] });
+      this.dispatchEvent(new Event('change'));
+    });
+    view.fixture.componentInstance.insertDocument();
+    await new Promise((r) => setTimeout(r, 0));
+    click.mockRestore();
+    expect(area.value).toBe(`[Plan.pdf](/api/media/documents/${ID}) `);
+    const drop = (files: File[]): Event => {
+      const event = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'dataTransfer', { value: { files } });
+      area.dispatchEvent(event);
+      return event;
+    };
+    expect(drop([new File(['x'], 'a.txt', { type: 'text/plain' })]).defaultPrevented).toBe(false);
+    expect(drop([pdf]).defaultPrevented).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(area.value.match(/Plan\.pdf\]/g)).toHaveLength(2);
+  });
+
+  it('gives a reader no PDF upload', async () => {
+    const view = await setup({ editable: false });
+    expect(editorOf(view).documentUpload()).toBeNull();
   });
 
   it('gives a reader no image upload', async () => {
@@ -260,6 +362,10 @@ describe('TopSheetComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Bild einfügen' }));
       expect(pick).toHaveBeenCalled();
       expect(screen.queryByRole('button', { name: 'Tabelle bearbeiten' })).toBeNull();
+      area.setSelectionRange(0, 0);
+      await userEvent.click(screen.getByRole('button', { name: 'Anmerkung mit Uhrzeit einfügen' }));
+      expect(area.value).toMatch(/^Text\n\n> \[!anmerkung \d{2}:\d{2}\] \n\n\|/);
+      expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
     });
 
     it('keeps the Markdown source of a reader read only', async () => {
@@ -272,6 +378,7 @@ describe('TopSheetComponent', () => {
       };
       cmp.toggleFormat('bold');
       (cmp as unknown as { insertTable(): void }).insertTable();
+      (cmp as unknown as { insertTimeNote(): void }).insertTimeNote();
       area.dispatchEvent(new Event('input'));
       expect(area.value).toBe('Text');
       expect(view.bodyChange).not.toHaveBeenCalled();

@@ -466,3 +466,31 @@ async def test_to_out_reads_the_gremium_flag() -> None:
     assert out.gremium_protocols_public is True
     out = await _service(FakeSession())._to_out(proto)
     assert out.gremium_protocols_public is False
+
+
+async def test_assemble_puts_the_time_of_a_reached_top_above_its_heading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """§000871: a TOP with a time gets an empty time note in front of its heading.
+
+    The note uses the local time zone, also for a non-public TOP of the public text.
+    """
+    items = [
+        SimpleNamespace(
+            id=uuid4(), title="Haushalt", body="", non_public=False, started_at=NOW
+        ),
+        SimpleNamespace(
+            id=uuid4(), title="Personal", body="Geheim", non_public=True, started_at=NOW
+        ),
+        SimpleNamespace(id=uuid4(), title="Rest", body="", non_public=False, started_at=None),
+    ]
+    _Voting.views = {}
+    monkeypatch.setattr(protocol_service_mod, "VotingService", _Voting)
+    session = FakeSession(results=[result(*items), result(), result()])
+    md = await _service(session)._assemble_from_agenda(MID, public=True)
+    blocks = md.strip().split("\n\n")
+    assert blocks[0] == "> [!anmerkung 14:00]"
+    assert blocks[1] == "# Haushalt"
+    assert blocks[2] == "> [!anmerkung 14:00]"
+    assert "# Rest" in blocks
+    assert blocks[blocks.index("# Rest") - 1] != "> [!anmerkung 14:00]"

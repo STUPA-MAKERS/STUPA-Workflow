@@ -17,6 +17,9 @@ builder (`backend/app/modules/protocol/markdown.py`):
   `ja: 12, nein: 3, enthaltung: 2`. A vote callout without a tally line can
   hold a personnel election or a poll (Umfrage), which the template draws as a
   ranking.
+* A time note `> [!anmerkung HH:MM] text` is one grey, centered line with its
+  time. The backend puts an empty one in front of the heading of each TOP
+  that the Sitzung reached, with the time of the move to that TOP.
 * Inline shortcodes: `{{time 18:30}}`, `{{vote ja=1 nein=2 enthaltung=0}}`,
   `{{count anwesend}}` and a bare frontmatter field such as `{{anwesend}}`.
 * Blackout marks: the empty marker `%%%%` is a black bar of one fixed width.
@@ -33,6 +36,10 @@ builder (`backend/app/modules/protocol/markdown.py`):
   (a URL, a relative path, a missing asset) keeps its alt text. The node names
   the asset only; the template loads it from `/assets/`. A paragraph that holds
   only an image becomes a block image (`figure`).
+* PDFs: a link to the canonical path of an uploaded PDF,
+  `[name](/api/media/documents/<uuid>)`, becomes a `docref` node when the caller
+  uploaded its bytes as `doc-<uuid>.pdf`, else a `docmiss` node. The module
+  `appendix` numbers the references and makes the PDFs Anlagen.
 """
 
 from __future__ import annotations
@@ -44,6 +51,8 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Final, cast
 
 import marko
+
+from .appendix import DOCUMENT_ASSET_RE, DOCUMENT_PATH_RE
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Iterator, Mapping, Sequence
@@ -68,6 +77,12 @@ class ConversionError(ValueError):
 # -- callouts ---------------------------------------------------------------
 
 CALLOUT_RE: Final[re.Pattern[str]] = re.compile(r"^\s*\[!(\w+)\]\s*", re.IGNORECASE)
+
+# The marker of a time note: `[!anmerkung HH:MM]`. The time is part of the marker,
+# so the generic callout pattern does not match it.
+TIME_NOTE_RE: Final[re.Pattern[str]] = re.compile(
+    r"^\s*\[!anmerkung\s+([01]?\d|2[0-3]):([0-5]\d)\]\s*", re.IGNORECASE
+)
 
 # Marker -> (box kind, bold label). The label opens the box body.
 _LABELLED: Final[dict[str, tuple[str, str | None]]] = {
@@ -567,6 +582,8 @@ class _Converter:
     meta: Meta
     # uuid -> asset name of the uploaded images.
     images: Mapping[str, str]
+    # The uuids of the uploaded PDFs whose bytes came with the request.
+    documents: Collection[str] = ()
     depth: int = 0
     ul: int = 0
     ol: int = 0
@@ -608,6 +625,8 @@ class _Converter:
                 return [{"t": "emph", "c": self.inlines(node)}]
             case "Strikethrough":
                 return [{"t": "strike", "c": self.inlines(node)}]
+            case "Link" if DOCUMENT_PATH_RE.fullmatch(str(getattr(node, "dest", ""))):
+                return [self._document(node)]
             case "Link" | "AutoLink" | "Url":
                 dest = str(getattr(node, "dest", ""))
                 external = EXTERNAL_URL_RE.match(dest)
@@ -620,6 +639,19 @@ class _Converter:
                 return [self._image(node)]
             case _:
                 return self.inlines(node)
+
+    def _document(self, node: object) -> Node:
+        """Build the reference to an uploaded PDF: a `docref`, or a `docmiss` without bytes.
+
+        `appendix.number_documents` numbers the references later and turns the ones
+        past the budget into `docmiss`.
+        """
+        name = "".join(_plain(c) for c in _children(node)).strip() or "PDF"
+        match = DOCUMENT_PATH_RE.fullmatch(str(getattr(node, "dest", "")))
+        doc = match.group(1) if match is not None else ""
+        if doc not in self.documents:
+            return {"t": "docmiss", "name": name}
+        return {"t": "docref", "doc": doc, "name": name}
 
     def _image(self, node: object) -> Node:
         """Build an image node: the uploaded asset, else the alt text only.
@@ -808,6 +840,9 @@ class _Converter:
 
     def _quote(self, node: object) -> list[Node]:
         kids = _children(node)
+        note = self._time_note(kids)
+        if note is not None:
+            return [note, *self.blocks(kids[1:])]
         match self._marker(kids):
             case None:
                 return [{"t": "quote", "c": self.blocks(kids)}]
@@ -817,6 +852,28 @@ class _Converter:
                 return [self._signature_callout(kids)]
             case (name, rest):
                 return [self._labelled(kids, name, rest)]
+
+    def _time_note(self, kids: list[object]) -> Node | None:
+        """Build a time note from `> [!anmerkung HH:MM] text`, or None for another quote.
+
+        The note is the first paragraph of the quote. Its text keeps the inline Markdown,
+        the shortcodes and the blackout marks. The hour gets two digits.
+        """
+        if not kids or _kind(kids[0]) != "Paragraph":
+            return None
+        inner = _children(kids[0])
+        first = _leaf(inner[0]) if inner else None
+        match = TIME_NOTE_RE.match(first) if first is not None else None
+        if match is None or _kind(inner[0]) != "RawText":
+            return None
+        return {
+            "t": "timenote",
+            "time": f"{int(match.group(1)):02d}:{match.group(2)}",
+            "c": [
+                *_inline_text(cast("str", first)[match.end() :], self.meta),
+                *self._inline_nodes(inner[1:]),
+            ],
+        }
 
     def _labelled(self, kids: list[object], name: str, rest: str) -> Node:
         """Build a callout box. Its bold label and the rest of the marker line open the body."""
@@ -960,13 +1017,17 @@ def convert_body(markdown: str, meta: Meta, assets: Collection[str] = ()) -> lis
     """Convert the Markdown body of a protocol into block nodes.
 
     `assets` holds the names of the uploaded assets. An `img-<uuid>.<ext>` among
-    them lets the image `/api/media/images/<uuid>` show.
+    them lets the image `/api/media/images/<uuid>` show. A `doc-<uuid>.pdf` among
+    them makes the link `/api/media/documents/<uuid>` a `docref` node.
 
     Raises:
         ConversionError: The Markdown nests too deep.
     """
     tree = _PARSER.parse(strip_antrag_fences(markdown))
-    converter = _Converter(meta=meta, images=image_assets(assets))
+    documents = frozenset(
+        match.group(1) for name in assets if (match := DOCUMENT_ASSET_RE.fullmatch(name))
+    )
+    converter = _Converter(meta=meta, images=image_assets(assets), documents=documents)
     try:
         blocks = converter.blocks(_children(tree))
     except RecursionError:

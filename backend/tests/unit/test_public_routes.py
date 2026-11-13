@@ -133,6 +133,8 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("GET", "/api/public/protocols/{protocol_id}"),
         ("GET", "/api/public/protocols/{protocol_id}/pdf"),
         ("GET", "/api/public/protocols/{protocol_id}/images/{image_id}"),
+        ("GET", "/api/public/protocols/{protocol_id}/documents/{document_id}"),
+        ("GET", "/api/public/protocols/{protocol_id}/documents/{document_id}/info"),
         ("GET", "/api/public/calendar/committees"),
         ("GET", "/api/public/calendar/entries"),
         ("GET", "/api/public/calendar/search"),
@@ -182,6 +184,8 @@ OPTIONAL_PRINCIPAL_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("DELETE", "/api/attachments/{attachment_id}"),
         ("POST", "/api/media/images"),
         ("GET", "/api/media/images/{image_id}"),
+        ("GET", "/api/media/documents/{document_id}"),
+        ("GET", "/api/media/documents/{document_id}/info"),
         ("GET", "/api/search"),
     }
 )

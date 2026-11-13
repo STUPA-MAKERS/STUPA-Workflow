@@ -73,4 +73,12 @@ export class PublicProtocolsService {
   imageUrl(protocolId: string, imageId: string): string {
     return `${this.base}/public/protocols/${encodeURIComponent(protocolId)}/images/${imageId}`;
   }
+
+  /**
+   * The URL of an embedded PDF in the public Markdown of a protocol (no login, spec
+   * 000867). Its info route is `<url>/info`.
+   */
+  documentUrl(protocolId: string, documentId: string): string {
+    return `${this.base}/public/protocols/${encodeURIComponent(protocolId)}/documents/${documentId}`;
+  }
 }

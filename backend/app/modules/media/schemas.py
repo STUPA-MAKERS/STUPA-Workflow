@@ -20,3 +20,18 @@ class MarkdownImageOut(FrozenModel, frozen=True):
     width: int
     height: int
     size: int
+
+
+class MarkdownDocumentOut(FrozenModel, frozen=True):
+    """201 response of ``POST /media/documents`` and answer of its info route.
+
+    ``url`` is the canonical Markdown path of the PDF, ``/api/media/documents/<id>``.
+    The editor puts it into the text as ``[<name>](<url>)``. ``pages`` is the page
+    count of the file badge.
+    """
+
+    id: UUID
+    url: str
+    name: str
+    size: int
+    pages: int

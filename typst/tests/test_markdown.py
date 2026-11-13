@@ -435,3 +435,25 @@ def test_blackout_keeps_shortcodes_beside_a_mark() -> None:
     inline = block["c"]
     assert inline[0] == {"t": "bar"}  # pyright: ignore[reportIndexIssue]
     assert {"t": "time", "v": "18:00"} in inline  # pyright: ignore[reportOperatorIssue]
+
+
+def test_time_note_keeps_inline_markdown_and_the_blackout() -> None:
+    """§000872: `> [!anmerkung HH:MM] text` is a time note with a two-digit hour."""
+    (note,) = conv("> [!anmerkung 8:05] %%%% verlässt **die** Sitzung")
+    assert note["t"] == "timenote"
+    assert note["time"] == "08:05"
+    inline = cast("list[Node]", note["c"])
+    assert inline[0] == {"t": "bar"}
+    assert {"t": "strong", "c": [{"t": "text", "v": "die"}]} in inline
+    assert texts(note) == " verlässt die Sitzung"
+
+
+def test_time_note_without_text_and_a_bad_time() -> None:
+    """§000871: an empty note holds the time only; a bad time keeps the quote."""
+    empty, heading, bad, other = conv(
+        "> [!anmerkung 18:42]\n\n# TOP\n\n> [!anmerkung 25:00] x\n\n> [!anmerkung] y"
+    )
+    assert empty == {"t": "timenote", "time": "18:42", "c": []}
+    assert heading["t"] == "heading"
+    assert bad["t"] == "quote"
+    assert other["t"] == "quote"

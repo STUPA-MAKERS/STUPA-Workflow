@@ -1,4 +1,4 @@
-import { applyRawFormat, insertRawTable } from './raw-format';
+import { applyRawFormat, insertRawInline, insertRawTable, insertRawTimeNote, protocolNow } from './raw-format';
 
 describe('applyRawFormat', () => {
   it('puts the blackout marks around the selection and takes them away again (000690)', () => {
@@ -63,5 +63,41 @@ describe('insertRawTable', () => {
     expect(next.text).toBe('a\n\n|  |\n| --- |\n\nb');
     expect(insertRawTable({ text: 'a\n', start: 2, end: 2 }, 1, 1).text).toBe('a\n\n|  |\n| --- |\n');
     expect(insertRawTable({ text: 'a\nb', start: 1, end: 1 }, 1, 1).text).toBe('a\n\n|  |\n| --- |\n\nb');
+  });
+});
+
+describe('insertRawTimeNote', () => {
+  it('puts the note after the line of the caret and the caret at its end', () => {
+    const text = 'Eins\nZwei\n\nDrei';
+    const next = insertRawTimeNote({ text, start: 2, end: 2 }, '18:42');
+    expect(next.text).toBe('Eins\n\n> [!anmerkung 18:42] \n\nZwei\n\nDrei');
+    expect(next.text.slice(0, next.start).endsWith('18:42] ')).toBe(true);
+  });
+
+  it('writes the note alone into an empty text and at the end of a text', () => {
+    expect(insertRawTimeNote({ text: '', start: 0, end: 0 }, '09:00').text).toBe('> [!anmerkung 09:00] ');
+    expect(insertRawTimeNote({ text: 'A\n', start: 2, end: 2 }, '09:00').text).toBe('A\n\n> [!anmerkung 09:00] ');
+    expect(insertRawTimeNote({ text: 'A\n\nB', start: 0, end: 0 }, '09:00').text).toBe(
+      'A\n\n> [!anmerkung 09:00] \n\nB',
+    );
+  });
+});
+
+describe('protocolNow', () => {
+  it('gives the time of Berlin with two digits', () => {
+    expect(protocolNow(new Date('2026-11-13T08:05:00Z'))).toBe('09:05');
+    expect(protocolNow(new Date('2026-07-01T22:30:00Z'))).toBe('00:30');
+  });
+});
+
+describe('insertRawInline', () => {
+  it('puts the reference at the caret with a space around it', () => {
+    expect(insertRawInline({ text: 'Siehe Text', start: 5, end: 5 }, '[a](x)')).toEqual({
+      text: 'Siehe [a](x) Text',
+      start: 12,
+      end: 12,
+    });
+    expect(insertRawInline({ text: '', start: 0, end: 0 }, '[a](x)').text).toBe('[a](x) ');
+    expect(insertRawInline({ text: 'A weg B', start: 2, end: 5 }, '[a](x)').text).toBe('A [a](x) B');
   });
 });

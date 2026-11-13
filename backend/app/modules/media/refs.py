@@ -1,9 +1,11 @@
-"""The canonical Markdown reference of an image and the helpers that find it.
+"""The canonical Markdown references of an image and a PDF and the helpers that find them.
 
 A Markdown text refers to an uploaded image only as ``![alt](/api/media/images/<id>)``
 with the lowercase canonical uuid. Every renderer (the SPA, the typst service) shows
 this path only. Every other image destination renders as its alt text, so no
 renderer loads an external image and the PDF renderer never fetches a file.
+
+An embedded PDF is a link, ``[name](/api/media/documents/<id>)`` (spec 000862).
 """
 
 from __future__ import annotations
@@ -22,6 +24,11 @@ IMAGE_PATH_RE: Final[re.Pattern[str]] = re.compile(rf"^/api/media/images/({_UUID
 #: brackets is no reference here either.
 _REF_RE: Final[re.Pattern[str]] = re.compile(rf"\]\(/api/media/images/({_UUID})\)")
 
+#: The whole canonical path of an embedded PDF (spec 000862).
+DOCUMENT_PATH_RE: Final[re.Pattern[str]] = re.compile(rf"^/api/media/documents/({_UUID})$")
+#: The destination of a Markdown link to an embedded PDF, in the same plain form.
+_DOC_REF_RE: Final[re.Pattern[str]] = re.compile(rf"\]\(/api/media/documents/({_UUID})\)")
+
 
 def image_path(image_id: UUID) -> str:
     """Return the canonical Markdown path of an image."""
@@ -39,4 +46,20 @@ def image_ids_in(*texts: str | None) -> list[UUID]:
     The order is the order of the first appearance, and every id comes once.
     """
     found = (UUID(match.group(1)) for text in texts if text for match in _REF_RE.finditer(text))
+    return list(dict.fromkeys(found))
+
+
+def document_path(document_id: UUID) -> str:
+    """Return the canonical Markdown path of an embedded PDF."""
+    return f"/api/media/documents/{document_id}"
+
+
+def document_ids_in(*texts: str | None) -> list[UUID]:
+    """Return the ids of the embedded PDFs that the texts refer to.
+
+    The order is the order of the first appearance, and every id comes once.
+    """
+    found = (
+        UUID(match.group(1)) for text in texts if text for match in _DOC_REF_RE.finditer(text)
+    )
     return list(dict.fromkeys(found))

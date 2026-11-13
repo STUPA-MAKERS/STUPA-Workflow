@@ -56,7 +56,7 @@ from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.gremien.models import DelegationSubstitute, Gremium
-from app.modules.media.models import MarkdownImage
+from app.modules.media.models import MarkdownDocument, MarkdownImage
 from app.modules.meetings.models import (
     Meeting,
     MeetingAgendaItem,
@@ -126,6 +126,7 @@ __all__ = [
     "GuestApplicationSettings",
     "MagicLink",
     "MailTemplate",
+    "MarkdownDocument",
     "MarkdownImage",
     "NotificationPreference",
     "NotificationSettings",

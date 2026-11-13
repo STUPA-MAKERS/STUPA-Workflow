@@ -441,6 +441,17 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000689](requirements/functional/meetings/protocols/000689_blackout-internal.md) | Internal views show a marked segment as marked | approved |
 | [F/meetings/protocols/000690](requirements/functional/meetings/protocols/000690_blackout-format-bar.md) | The format bar marks a segment for blackout | approved |
 | [F/meetings/protocols/000691](requirements/functional/meetings/protocols/000691_blackout-mail.md) | A marked segment sends the public PDF to the mailing list | approved |
+| [F/meetings/protocols/000862](requirements/functional/meetings/protocols/000862_pdf-embed.md) | A protocol text embeds a PDF | approved |
+| [F/meetings/protocols/000863](requirements/functional/meetings/protocols/000863_pdf-file-badge.md) | An embedded PDF shows as a file badge | approved |
+| [F/meetings/protocols/000864](requirements/functional/meetings/protocols/000864_pdf-appendix.md) | The protocol PDF appends each embedded PDF as an Anlage | approved |
+| [F/meetings/protocols/000865](requirements/functional/meetings/protocols/000865_pdf-watermark.md) | Each page of an Anlage has a watermark | approved |
+| [F/meetings/protocols/000866](requirements/functional/meetings/protocols/000866_pdf-reference-link.md) | The place of an embedded PDF links to its Anlage | approved |
+| [F/meetings/protocols/000867](requirements/functional/meetings/protocols/000867_pdf-public-variant.md) | The PDF of a non-public TOP stays internal | approved |
+| [F/meetings/protocols/000868](requirements/functional/meetings/protocols/000868_pdf-budget.md) | A protocol holds at most 20 Anlagen | approved |
+| [F/meetings/protocols/000870](requirements/functional/meetings/protocols/000870_top-time-recorded.md) | The move to a TOP records its time | approved |
+| [F/meetings/protocols/000871](requirements/functional/meetings/protocols/000871_top-time-in-pdf.md) | The protocol PDF shows the time above each TOP | approved |
+| [F/meetings/protocols/000872](requirements/functional/meetings/protocols/000872_time-note-syntax.md) | A protocol text marks a time note | approved |
+| [F/meetings/protocols/000873](requirements/functional/meetings/protocols/000873_time-note-tool.md) | A toolbar tool inserts a time note | approved |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |
@@ -568,6 +579,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/files/000373](requirements/non-functional/security/files/000373_cd-logo-download.md) | A CD logo is served as a download | approved |
 | [NF/security/files/000388](requirements/non-functional/security/files/000388_token-file.md) | The MCP token file is private | approved |
 | [NF/security/files/000469](requirements/non-functional/security/files/000469_invoice-xml-no-entities.md) | The ZUGFeRD XML parser resolves no entities | approved |
+| [NF/security/files/000869](requirements/non-functional/security/files/000869_pdf-upload.md) | An embedded PDF is checked on upload | approved |
 | [NF/security/integrity/000183](requirements/non-functional/security/integrity/000183_audit-chain.md) | The audit log is append-only | approved |
 | [NF/security/integrity/000184](requirements/non-functional/security/integrity/000184_sandboxed-mail.md) | Mail templates run sandboxed | approved |
 | [NF/security/integrity/000295](requirements/non-functional/security/integrity/000295_canonical-hash.md) | The hash input is canonical | approved |
