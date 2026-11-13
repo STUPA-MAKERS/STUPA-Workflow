@@ -286,7 +286,7 @@ async def test_a_titel_without_a_side_keeps_the_version_in_the_draft(
     with pytest.raises(ValidationProblem) as exc:
         await t.svc.pass_next_step(vid)
     assert _code(exc) == "plan_side_missing"
-    assert [e.msg for e in exc.value.errors] == sorted([t.inc.path_key, t.exp.path_key])
+    assert [e.msg for e in exc.value.errors or ()] == sorted([t.inc.path_key, t.exp.path_key])
     await _steps(t)
     with pytest.raises(ValidationProblem) as force:
         await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
