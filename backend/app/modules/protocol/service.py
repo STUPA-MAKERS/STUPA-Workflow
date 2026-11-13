@@ -43,6 +43,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application
+from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
@@ -52,6 +53,7 @@ from app.modules.documents.cd_resolver import (
     cd_variant_key_for_gremium,
     resolve_cd_variant_by_key,
 )
+from app.modules.documents.service import ANLAGE_MARK, ApplicationPdfService, anlage_reference
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.service import MeetingService
@@ -1319,13 +1321,46 @@ class ProtocolService:
             for view, in_text in zip(views, found, strict=True)
             if getattr(view, "status", None) == "closed" and getattr(view, "kind", None) != "poll"
         ]
+        anlage = (
+            [anlage_reference(item.id, heading, public=public)]
+            if getattr(item, "application_id", None) is not None
+            else []
+        )
         block = [
             f"# {heading}",
+            *anlage,
             *([demote_headings(marked)] if marked else []),
             *(snippet for snippet, in_text in zip(snippets, found, strict=True) if not in_text),
         ]
         top = PublicTop(number=number, title=heading, markdown=marked or None, decisions=decisions)
         return "\n\n".join(block), top
+
+    async def _anlage_assets(self, protocol: Protocol, *, public: bool) -> dict[str, bytes]:
+        """Render the Antrag Anlagen of the TOPs of the meeting (spec 000884).
+
+        Each TOP of an Antrag appends the Antrag PDF in the version that the Sitzung
+        treated. The public variant blacks out the personal data and leaves out the
+        Anlage of a non-public TOP.
+        """
+        items = list(
+            (
+                await self.session.scalars(
+                    select(MeetingAgendaItem).where(
+                        MeetingAgendaItem.meeting_id == protocol.meeting_id,
+                        MeetingAgendaItem.application_id.is_not(None),
+                    )
+                )
+            ).all()
+        )
+        if not items:
+            return {}
+        pdfs = ApplicationPdfService(
+            self.session,
+            storage=self.storage,
+            typst=self.typst,
+            settings=self.settings or get_settings(),
+        )
+        return await pdfs.anlage_assets(ApplicationsService(self.session), items, public=public)
 
     async def _render_pdf(
         self, protocol: Protocol, markdown: str, *, public: bool = False
@@ -1371,7 +1406,12 @@ class ProtocolService:
             media = MediaService(self.session, storage=self.storage)
             images = await media.render_assets(markdown)
             documents = await media.render_documents(markdown)
-            assets = {**(cd.assets if cd else {}), **images, **documents} or None
+            anlagen = (
+                await self._anlage_assets(protocol, public=public)
+                if ANLAGE_MARK in markdown
+                else {}
+            )
+            assets = {**(cd.assets if cd else {}), **images, **documents, **anlagen} or None
             pdf = await self.typst.render_pdf(
                 markdown, variant=variant, config=config, assets=assets
             )

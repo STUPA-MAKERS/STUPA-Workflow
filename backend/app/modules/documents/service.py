@@ -15,6 +15,7 @@ Antrag. Two callers use it:
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Mapping
 from dataclasses import KW_ONLY, dataclass
@@ -35,6 +36,7 @@ from app.modules.documents.application_markdown import (
     ApplicationDoc,
     DecisionView,
     FormSection,
+    anlage_link,
     build_application_document,
 )
 from app.modules.documents.cd_resolver import (
@@ -46,13 +48,42 @@ from app.modules.files.models import Attachment
 from app.modules.files.storage import ObjectStorage
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.gremien.models import Gremium
+from app.modules.media.refs import document_path
+from app.modules.meetings.models import MeetingAgendaItem
 from app.modules.pdf.typst_client import TypstClient, TypstError
+from app.modules.voting.models import Vote
 from app.settings import Settings
 from app.shared.errors import BadRequestError, NotFoundError, ServiceUnavailableError
 from app.shared.i18n import resolve_i18n
 
 LANG = "de"
 """The language of the PDF."""
+
+logger = logging.getLogger("app.documents")
+
+_ANLAGE_NAMESPACE = uuid.UUID("6f1c4d1e-9a51-4c43-8f0e-2b7d3c9a8e15")
+"""The namespace of the ids of the Antrag Anlagen. An id is no row: it only joins the
+reference in the protocol text to its render asset."""
+
+
+def anlage_id(item_id: uuid.UUID, *, public: bool) -> uuid.UUID:
+    """Return the id of the Antrag Anlage of one agenda item and one protocol variant.
+
+    The id is stable, so the reference in the text and the asset of the render meet
+    without state between the two steps. The variants get two ids, because their PDFs
+    differ.
+    """
+    return uuid.uuid5(_ANLAGE_NAMESPACE, f"{item_id}:{'public' if public else 'internal'}")
+
+
+ANLAGE_MARK = "[Antrag "
+"""The start of the reference of an Antrag Anlage. The protocol render looks for the
+Anlagen only in a text that holds it."""
+
+
+def anlage_reference(item_id: uuid.UUID, title: str, *, public: bool) -> str:
+    """Write the reference line of the Antrag Anlage of one agenda item (spec 000884)."""
+    return anlage_link(title, document_path(anlage_id(item_id, public=public)))
 
 
 def _answer_refs(answer: object) -> tuple[str, ...]:
@@ -256,6 +287,75 @@ class ApplicationPdfService:
             redact_applicant=public,
             files=await self._file_names(app.id, data, pii),
         )
+
+    async def frozen_version(self, item: MeetingAgendaItem) -> int | None:
+        """Return the version of the Antrag that the Sitzung treated (spec 000885).
+
+        That is the version that was current when the last vote of the TOP opened, else
+        the one that was current when the TOP closed. A TOP without both gives `None`,
+        which means the current version at the finalize. A cancelled vote does not
+        count, because the Gremium did not decide on it.
+        """
+        if item.application_id is None:
+            return None
+        opened = await self.session.scalar(
+            select(func.max(Vote.opens_at)).where(
+                Vote.agenda_item_id == item.id, Vote.status != "cancelled"
+            )
+        )
+        moment = opened or item.done_at
+        if moment is None:
+            return None
+        return await self.session.scalar(
+            select(func.max(SubmissionVersion.version)).where(
+                SubmissionVersion.application_id == item.application_id,
+                SubmissionVersion.at <= moment,
+            )
+        )
+
+    async def anlage_assets(
+        self, apps: ApplicationsService, items: list[MeetingAgendaItem], *, public: bool
+    ) -> dict[str, bytes]:
+        """Render the Antrag Anlagen of the agenda items as typst assets.
+
+        An item without an Antrag gets none, and so does a non-public item of the public
+        variant (spec 000867). An Antrag that is gone or that does not render is left
+        out; typst then prints "Anlage nicht eingebunden" at its reference, so an Anlage
+        never makes the protocol render fail (spec 000868).
+
+        Returns:
+            ``{"doc-<id>.pdf": bytes}`` with the ids of `anlage_id`.
+        """
+        wanted = [
+            item
+            for item in items
+            if item.application_id is not None and not (public and item.non_public)
+        ]
+        rendered = [(item, await self._anlage_pdf(apps, item, public=public)) for item in wanted]
+        return {
+            f"doc-{anlage_id(item.id, public=public)}.pdf": pdf
+            for item, pdf in rendered
+            if pdf is not None
+        }
+
+    async def _anlage_pdf(
+        self, apps: ApplicationsService, item: MeetingAgendaItem, *, public: bool
+    ) -> bytes | None:
+        """Render the Anlage of one item, or `None` when it cannot be rendered."""
+        if item.application_id is None:  # pragma: no cover - the caller filters
+            return None
+        doc = await self.version_doc(
+            apps, item.application_id, await self.frozen_version(item), public=public
+        )
+        if doc is None:
+            return None
+        try:
+            return await self.render(doc)
+        except (BadRequestError, ServiceUnavailableError):
+            logger.warning(
+                "antrag anlage not rendered", extra={"application_id": str(item.application_id)}
+            )
+            return None
 
     async def render(self, doc: ApplicationDoc) -> bytes:
         """Render a document in the design of its Gremium.

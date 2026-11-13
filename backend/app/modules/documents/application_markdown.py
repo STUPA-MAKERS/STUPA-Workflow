@@ -436,3 +436,12 @@ def build_application_document(doc: ApplicationDoc) -> str:
         *_decision_lines(doc),
     ]
     return "\n".join([*_frontmatter(doc), "", *body]).rstrip() + "\n"
+
+
+def anlage_link(title: str, document_path: str) -> str:
+    """Write the reference of an Antrag Anlage below its TOP heading.
+
+    The render service turns a link to an embedded PDF with its asset into
+    `Anlage <N>: Antrag <Titel> (Seite <P>)` and appends the PDF as an Anlage.
+    """
+    return f"[Antrag {escape(title or 'ohne Titel')}]({document_path})"
