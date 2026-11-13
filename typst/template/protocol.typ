@@ -36,6 +36,7 @@
   normal: 10.95pt,
   large: 12pt,
   Large: 14.4pt,
+  huge: 20.74pt,
   Huge: 24.88pt,
 )
 // \baselineskip of \normalsize.
@@ -420,6 +421,8 @@
     if n.level >= 4 { "par" } else { "h" + str(n.level) }
   } else if n.t in ("callout", "tally") {
     "box"
+  } else if n.t == "fields" {
+    "table"
   } else if n.t == "codeblock" {
     "code"
   } else if n.t == "mathblock" {
@@ -668,6 +671,23 @@
       rect(width: 100%, height: 0.4pt, fill: black, stroke: none)
     } else if n.t == "table" {
       table-block(n)
+    } else if n.t == "fields" {
+      // Field rows (an Antrag): label and value, the value as block Markdown. Every
+      // field table has the same label column, so the tables of one document line
+      // up; a longer label wraps. The table breaks between rows. It is a grid, as the
+      // Markdown tables: PDF/UA-1 asks a tagged table for a header row, and a field
+      // table has none, so a screen reader reads label, then value.
+      {
+        set par(justify: false)
+        grid(
+          columns: (45mm, 1fr),
+          stroke: (x, y) => (top: if y == 0 { 0.876pt } else { 0.3pt + palette.gray }),
+          inset: (x: 6pt, y: 6pt),
+          align: left + top,
+          ..n.rows.map(r => (strong(text(hyphenate: false, inline(r.label))), blocks(r.c))).flatten(),
+          grid.hline(stroke: 0.876pt),
+        )
+      }
     } else if n.t == "figure" {
       figure-block(n)
     } else if n.t == "mathblock" {
@@ -771,6 +791,25 @@
   },
 )
 
+// The head of the first page of a document without a title page (an Antrag): the
+// logos, the title and the rule of the title page, in less room.
+#let title-block(doc) = {
+  if doc.logos.len() > 0 {
+    logo-row(doc.logos, 1.1cm, 0.4cm)
+    v(14pt)
+  }
+  block(below: 0pt, par(justify: false, text(
+    font: head-font,
+    size: size.huge,
+    weight: "bold",
+    hyphenate: false,
+    doc.title,
+  )))
+  v(5pt)
+  rect(width: 100%, height: 0.5mm, fill: black, stroke: none)
+  v(18pt)
+}
+
 #let protocol(doc) = {
   set document(title: doc.title)
   set text(
@@ -816,7 +855,10 @@
     let page-no = counter(page).get().first()
     let last = counter(page).final().first()
     set text(font: head-font, size: size.normal, fill: palette.gray)
-    place(top + left, dx: 2cm, dy: 29.09pt, doc.title)
+    // Without a title page the first page carries the title itself.
+    if doc.at("cover", default: true) or page-no > 1 {
+      place(top + left, dx: 2cm, dy: 29.09pt, doc.title)
+    }
     place(top + center, dy: 798.53pt, [Seite~#page-no~von~#text(fill: palette.hsrtlink, str(last))])
   }
   let footer-logos = if doc.footer_logos.len() > 0 {
@@ -832,8 +874,12 @@
     foreground: frame,
   )
 
-  title-page(doc)
-  counter(page).update(1)
+  if doc.at("cover", default: true) {
+    title-page(doc)
+    counter(page).update(1)
+  } else {
+    title-block(doc)
+  }
   blocks(doc.body)
   appendix-pages(doc.at("appendix", default: ()))
 }

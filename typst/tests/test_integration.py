@@ -305,3 +305,23 @@ def test_embedded_pdfs_become_watermarked_anlagen_with_linked_references(tmp_pat
         if "/Dest" in annot.get_object()
     ]
     assert targets == [pages - 3, pages - 1]
+
+
+def test_an_antrag_starts_with_its_title_and_draws_field_tables(tmp_path: Path) -> None:
+    """§000881: no title page; the field rows print label and value side by side."""
+    source = (
+        '---\ntitle: "Exkursion Stuttgart"\ntyp: antrag\n---\n\n'
+        "> [!feld] Antragsart\n>\n> Finanzantrag\n\n"
+        "# Antrag\n\n"
+        "> [!feld] Beschreibung\n>\n> Wir fahren **los**.\n>\n> - Firma A\n"
+    )
+    pdf = _render(source, "protocol-stupa")
+    lines = _lines(pdf, tmp_path)
+    assert {line[0] for line in lines} == {1}
+    title_page, _, title_y = _find(lines, "Exkursion Stuttgart")
+    label_page, label_x, label_y = _find(lines, "Antragsart")
+    value_page, value_x, value_y = _find(lines, "Finanzantrag")
+    assert title_page == label_page == value_page == 1
+    assert title_y < label_y and abs(label_y - value_y) < 2 and value_x > label_x + 100
+    assert not any(line[3].startswith("TOP") for line in lines)
+    assert any(line[3].endswith("Firma A") for line in lines)

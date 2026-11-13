@@ -22,6 +22,7 @@ from app.modules.applications.router import get_comment_mail_sender, get_magic_l
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth.principal import Applicant, Principal
+from app.modules.documents.application_markdown import field_row
 from app.modules.documents.router import get_pdf_service
 from app.modules.documents.service import ApplicationPdfService
 from app.modules.forms.schemas import FormVersionCreate
@@ -161,9 +162,9 @@ async def test_a_reader_downloads_the_antrag_with_every_field(
     assert "Antrag_Druckauftrag_Plakate_" in disposition
     source = typst.sources[0]
     assert "typ: antrag" in source
-    assert "**Zweck:** Werbung" in source
+    assert "\n".join(field_row("Zweck", ["Werbung"])) in source
     assert "DE02120300000000202051" in source
-    assert "Luis Meyer (luis@example.org)" in source
+    assert "Luis Meyer \\(luis@example\\.org\\)" in source
 
 
 async def test_a_stranger_gets_the_gate_of_the_detail_page(
@@ -200,9 +201,9 @@ async def test_an_observer_gets_no_pii_and_no_applicant_mail(
     assert response.status_code == 200, response.text
     source = typst.sources[-1]
     assert "DE02120300000000202051" not in source
-    assert "**IBAN:** (nicht sichtbar)" in source
+    assert "\n".join(field_row("IBAN", ["(nicht sichtbar)"])) in source
     assert "luis@example.org" not in source
-    assert "Antragsteller: Luis Meyer" in source
+    assert "\n".join(field_row("Antragsteller", ["Luis Meyer"])) in source
 
 
 @pytest.mark.parametrize(

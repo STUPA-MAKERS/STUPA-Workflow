@@ -17,6 +17,9 @@ builder (`backend/app/modules/protocol/markdown.py`):
   `ja: 12, nein: 3, enthaltung: 2`. A vote callout without a tally line can
   hold a personnel election or a poll (Umfrage), which the template draws as a
   ranking.
+* A field row `> [!feld] Label`, with the value as block Markdown below it in
+  the same quote. Rows that follow each other form one table of two columns
+  (an Antrag is such tables).
 * A time note `> [!anmerkung HH:MM] text` is one grey, centered line with its
   time. The backend puts an empty one in front of the heading of each TOP
   that the Sitzung reached, with the time of the move to that TOP.
@@ -106,6 +109,9 @@ _LABELLED: Final[dict[str, tuple[str, str | None]]] = {
 }
 _VOTE_MARKERS: Final[frozenset[str]] = frozenset({"ABSTIMMUNG", "VOTE"})
 _SIGNATURE_MARKERS: Final[frozenset[str]] = frozenset({"UNTERSCHRIFTEN", "SIGNATURES"})
+# A field row: `> [!feld] Label` and the value below it as block Markdown. The rows
+# that follow each other form one table of two columns, label and value.
+_FIELD_MARKERS: Final[frozenset[str]] = frozenset({"FELD", "FIELD"})
 
 _TALLY_RE: Final[dict[str, re.Pattern[str]]] = {
     "yes": re.compile(r"(?:ja|yes)\s*[:=]?\s*(\d+)", re.IGNORECASE),
@@ -803,7 +809,7 @@ class _Converter:
         return {"t": "codeblock", "v": (text or "").rstrip("\n")}
 
     def blocks(self, nodes: list[object]) -> list[Node]:
-        return [out for node in nodes for out in self.block(node)]
+        return _field_tables([out for node in nodes for out in self.block(node)])
 
     def _display_math(self, node: object) -> Node | None:
         parts = [_source_text(c) for c in _children(node)]
@@ -848,6 +854,8 @@ class _Converter:
                 return [{"t": "quote", "c": self.blocks(kids)}]
             case (name, _) if name in _VOTE_MARKERS:
                 return [self._vote(kids)]
+            case (name, rest) if name in _FIELD_MARKERS:
+                return [self._field(kids, rest)]
             case (name, _) if name in _SIGNATURE_MARKERS:
                 return [self._signature_callout(kids)]
             case (name, rest):
@@ -886,6 +894,18 @@ class _Converter:
         ]
         return {"t": "callout", "kind": box, "c": [{"t": "par", "c": head}, *self.blocks(kids[1:])]}
 
+    def _field(self, kids: list[object], rest: str) -> Node:
+        """Build a field row: the first line is the label, the rest is the value.
+
+        The value keeps its block Markdown: paragraphs, lists, quotes and tables.
+        A line of the first paragraph after the label opens the value.
+        """
+        head, *more = _split_at_breaks(_children(kids[0]))
+        text = rest if head[1:] else rest.rstrip()
+        label = [*_inline_text(text, self.meta), *self._inline_nodes(head[1:])]
+        lead = [{"t": "par", "c": self._inline_nodes(line)} for line in more if line]
+        return {"t": "field", "label": label, "c": [*lead, *self.blocks(kids[1:])]}
+
     def _marker(self, kids: list[object]) -> tuple[str, str] | None:
         """Read the callout marker of a quote: `(NAME, rest of the first text)`."""
         if not kids or _kind(kids[0]) != "Paragraph":
@@ -898,7 +918,8 @@ class _Converter:
         if match is None:
             return None
         name = match.group(1).upper()
-        if name not in _LABELLED and name not in _VOTE_MARKERS and name not in _SIGNATURE_MARKERS:
+        known = _LABELLED.keys() | _VOTE_MARKERS | _SIGNATURE_MARKERS | _FIELD_MARKERS
+        if name not in known:
             return None
         return name, first[match.end() :]
 
@@ -970,6 +991,16 @@ class _Converter:
             "t": "signatures",
             "signers": [[role.strip(), person.strip()] for role, _, person in parts],
         }
+
+
+def _field_tables(nodes: list[Node]) -> list[Node]:
+    """Join the field rows that follow each other into one table node."""
+    runs = itertools.groupby(nodes, key=lambda node: node.get("t") == "field")
+    return [
+        out
+        for is_field, run in runs
+        for out in ([{"t": "fields", "rows": list(run)}] if is_field else list(run))
+    ]
 
 
 def _split_at_breaks(inlines: list[object]) -> list[list[object]]:

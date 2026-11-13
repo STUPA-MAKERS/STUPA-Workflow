@@ -1,4 +1,8 @@
-"""Unit tests of the Markdown of the Antrag PDF (specs 000881, 000882, 000886)."""
+"""Unit tests of the Markdown of the Antrag PDF (specs 000881, 000882, 000886).
+
+The Antrag is field rows (`> [!feld] Label` and the value below it) that the render
+service draws as tables of two columns.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +18,7 @@ from app.modules.documents.application_markdown import (
     FormSection,
     build_application_document,
     escape,
+    field_row,
     format_day,
     is_empty,
 )
@@ -87,6 +92,11 @@ DATA: dict[str, object] = {
 }
 
 
+def row(label: str, *value: str) -> str:
+    """The Markdown of one field row, as the builder writes it."""
+    return "\n".join(field_row(label, value))
+
+
 def _doc(**kwargs: Any) -> ApplicationDoc:
     base: dict[str, Any] = {
         "title": "Exkursion *Stuttgart*",
@@ -109,50 +119,64 @@ def _doc(**kwargs: Any) -> ApplicationDoc:
 
 def test_document_has_the_parts_in_order() -> None:
     md = build_application_document(_doc())
-    order = ["# Antrag", "# Kosten", "# Weitere Angaben", "# Anhänge", "# Beschluss"]
-    assert [md.index(h + "\n") for h in order] == sorted(md.index(h + "\n") for h in order)
+    head = md.split("---\n", 2)[2]
+    order = [row("Gremium", "Studierendenparlament"), "# Antrag", "# Kosten"]
+    order += ["# Weitere Angaben", "# Beschluss"]
+    assert [md.index(h) for h in order] == sorted(md.index(h) for h in order)
     assert "typ: antrag" in md
-    assert '  - "Antragsart: Finanzantrag"' in md
-    assert '  - "Status: Bewilligt"' in md
-    assert '  - "Eingang: 10.11.2026"' in md
-    assert '  - "Antragsteller: Max Muster (max@example.org)"' in md
-    assert '  - "Version: 3"' in md
+    assert "datalines" not in md
+    assert head.lstrip().startswith(row("Gremium", "Studierendenparlament"))
+    assert row("Antragsart", "Finanzantrag") in md
+    assert row("Status", "Bewilligt") in md
+    assert row("Eingang", "10.11.2026") in md
+    assert row("Antragsteller", "Max Muster \\(max@example\\.org\\)") in md
+    assert row("Version", "3") in md
+    assert row("Anhänge", "- Angebot\\.pdf") in md
 
 
 def test_answers_are_formatted_and_escaped() -> None:
     md = build_application_document(_doc())
-    assert "**Organisation:** Fachschaft \\[Informatik\\]" in md
-    assert "**Art:** Exkursion" in md
-    assert "**Förderung:** 1\\.000,00 €" in md
-    assert "**Zeitraum:** 01\\.12\\.2026 – 03\\.12\\.2026" in md
-    assert "**Bestätigt:** Nein" in md
-    assert "| Bus | Müller (bevorzugt) | 1.200,00 € |" in md
-    assert "| Keine Vergleichsangebote: einzig |" in md
-    assert "| **Summe** | | **1.200,00 €** |" in md
-    assert "| Name | Rolle |" in md and "| Anna | Leitung |" in md
-    assert "**alt:** aus alter Version" in md
+    assert row("Organisation", "Fachschaft \\[Informatik\\]") in md
+    assert row("Art", "Exkursion") in md
+    assert row("Förderung", "1\\.000,00 €") in md
+    assert row("Zeitraum", "01\\.12\\.2026 – 03\\.12\\.2026") in md
+    assert row("Bestätigt", "Nein") in md
+    assert "> | Bus | Müller (bevorzugt) | 1.200,00 € |" in md
+    assert "> | | Keine Vergleichsangebote: einzig | |" in md
+    assert "> | **Summe** | | **1.200,00 €** |" in md
+    assert "> | Name | Rolle |" in md and "> | Anna | Leitung |" in md
+    assert row("alt", "aus alter Version") in md
 
 
 def test_hidden_fields_files_and_head_keys_are_left_out() -> None:
     md = build_application_document(_doc())
     assert "versteckt" not in md
-    assert "**Leer" not in md
-    assert "**Beleg" not in md
-    assert "**Titel" not in md
-    assert "- Angebot\\.pdf" in md
+    assert "[!feld] Leer" not in md
+    assert "[!feld] Beleg" not in md
+    assert "[!feld] Titel" not in md
 
 
-def test_textarea_stays_markdown_without_headings_images_and_bars() -> None:
-    md = build_application_document(_doc())
-    assert "\\# Programm" in md
-    assert "\\![x]" in md
-    assert "%%" not in md.split("# Kosten", 1)[1]
+def test_textarea_renders_markdown_and_neutralizes_document_constructs() -> None:
+    sections = (FormSection("Text", (_field(key="t", type="textarea", label={"de": "T"}),)),)
+    text = (
+        "Wir *fahren*.\n## Programm\n- A\n\n![x](http://evil/x.png) 50%%rabatt%%\n"
+        "> [!abstimmung]\n{{title}} $x$ [d](/api/media/documents/1)\n#\n"
+    )
+    md = build_application_document(_doc(sections=sections, data={"t": text}, decision=None))
+    body = md.split("[!feld] T", 1)[1]
+    assert "> Wir *fahren*." in body
+    assert "> **Programm**" in body and "#" not in body.split("\n\n", 1)[0]
+    assert "> - A" in body
+    assert "\\![x]" in body and "\\[!abstimmung]" in body
+    assert "{\u2060{title}}" in body and "\\$x\\$" in body
+    assert "/api/media/documents\u2060/1" in body
+    assert "%%" not in body
 
 
 def test_a_field_the_reader_may_not_read_shows_not_visible() -> None:
     data = {k: v for k, v in DATA.items() if k != "iban"}
     md = build_application_document(_doc(data=data, hidden_keys=frozenset({"iban"})))
-    assert f"**IBAN:** {NOT_VISIBLE}" in md
+    assert row("IBAN", NOT_VISIBLE) in md
 
 
 def test_public_variant_blacks_out_pii_and_applicant() -> None:
@@ -160,18 +184,26 @@ def test_public_variant_blacks_out_pii_and_applicant() -> None:
         _doc(redacted_keys=frozenset({"iban", "alt"}), redact_applicant=True, decision=None)
     )
     assert "DE02" not in md and "Max Muster" not in md
-    assert f"**IBAN:** {BAR}" in md
-    assert f"**alt:** {BAR}" in md
-    assert f'  - "Antragsteller: {BAR}"' in md
+    assert row("IBAN", BAR) in md
+    assert row("alt", BAR) in md
+    assert row("Antragsteller", BAR) in md
     assert "# Beschluss" not in md
 
 
 def test_decision_as_requested_without_conditions() -> None:
     decision = DecisionView(None, (), datetime(2026, 11, 12, 19, 0))
     md = build_application_document(_doc(decision=decision, files=()))
-    assert "**Bewilligter Betrag:** wie beantragt" in md
+    assert row("Bewilligter Betrag", "wie beantragt") in md
+    assert row("Beschlossen am", "12.11.2026") in md
     assert "Auflagen" not in md
-    assert "# Anhänge" not in md
+    assert "Anhänge" not in md
+
+
+def test_the_decision_lists_its_conditions() -> None:
+    md = build_application_document(_doc())
+    assert row("Beschlossen am", "12.11.2026 (StuPa)") in md
+    assert row("Bewilligter Betrag", "900,00 €") in md
+    assert row("Auflagen", "1. Belege einreichen") in md
 
 
 def test_an_empty_antrag_has_only_the_head() -> None:
@@ -180,7 +212,7 @@ def test_an_empty_antrag_has_only_the_head() -> None:
     )
     assert 'title: "Antrag"' in md
     assert "Antragsteller" not in md and "Status" not in md
-    assert md.rstrip().endswith("---")
+    assert md.rstrip().endswith(row("Version", "3").rstrip())
 
 
 def test_helpers() -> None:
@@ -240,13 +272,13 @@ def test_more_field_types() -> None:
         "cond": "sichtbar",
     }
     md = build_application_document(_doc(sections=sections, data=data, decision=None))
-    assert "**Tag:** 04\\.03\\.2026" in md
-    assert "**Tag2:** 5" in md
-    assert "**Multi:** Alpha, z" in md
-    assert "**Betrag:** abc" in md
-    assert "**Summe:** 3" in md
+    assert row("Tag", "04\\.03\\.2026") in md
+    assert row("Tag2", "5") in md
+    assert row("Multi", "Alpha, z") in md
+    assert row("Betrag", "abc") in md
+    assert row("Summe", "3") in md
     assert "Kaputt" not in md
-    assert "**Tab:** kein Tabellenwert" in md
-    assert "**Obj:** x: 1, Ja" in md
-    assert "**Rng:** frei" in md
-    assert "**Cond:** sichtbar" in md
+    assert row("Tab", "kein Tabellenwert") in md
+    assert row("Obj", "x: 1, Ja") in md
+    assert row("Rng", "frei") in md
+    assert row("Cond", "sichtbar") in md

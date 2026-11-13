@@ -23,6 +23,7 @@ from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.applications.models import Application, SubmissionVersion
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
+from app.modules.documents.application_markdown import BAR, field_row
 from app.modules.documents.service import ApplicationPdfService, anlage_id
 from app.modules.files.storage import ObjectStorage
 from app.modules.forms.schemas import FormVersionCreate
@@ -210,12 +211,12 @@ async def test_the_protocol_appends_the_antrag_as_it_was_at_the_close_of_the_top
     internal_antrag = internal_assets[f"doc-{anlage_id(open_item.id, public=False)}.pdf"].decode()
     public_antrag = public_assets[f"doc-{anlage_id(open_item.id, public=True)}.pdf"].decode()
     assert "alte Fassung" in internal_antrag and "neue Fassung" not in internal_antrag
-    assert '"Version: 1"' in internal_antrag
+    assert "\n".join(field_row("Version", ["1"])) in internal_antrag
     assert _IBAN in internal_antrag and "Luis Meyer" in internal_antrag
-    assert "Status:" not in internal_antrag and "# Beschluss" not in internal_antrag
+    assert "[!feld] Status" not in internal_antrag and "# Beschluss" not in internal_antrag
     assert _IBAN not in public_antrag and "Luis Meyer" not in public_antrag
-    assert "**IBAN:** %%%%" in public_antrag
-    assert '"Antragsteller: %%%%"' in public_antrag
+    assert "\n".join(field_row("IBAN", [BAR])) in public_antrag
+    assert "\n".join(field_row("Antragsteller", [BAR])) in public_antrag
 
 
 async def test_the_vote_opening_fixes_the_version(

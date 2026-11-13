@@ -2,13 +2,15 @@
 
 The function here is pure: the service collects the data, and this module turns it into
 the Markdown with a YAML frontmatter that the render service prints in the protocol
-design. The frontmatter key `typ: antrag` tells the render service that the headings
-are form sections, so they get no "TOP n" number.
+design. The frontmatter key `typ: antrag` tells the render service that the document has
+no title page and that the headings are form sections, so they get no "TOP n" number.
 
-The document holds, in this order: the head data on the title page, the answers of the
-form with one heading per section, the Kostenaufstellung, the names of the attached
-files and the valid decision. It never holds comments or the status history, because
-the PDF shows the Antrag as the Gremium reads it.
+The whole Antrag is tables of two columns, label and value (spec 000881). Each row is a
+field row of the render service, `> [!feld] Label` with the value as block Markdown in the
+same quote; rows that follow each other form one table. The document holds, in this
+order: the head data, one table per form section with the answers, the answers without
+a field, the names of the attached files and the valid decision. It never holds comments
+or the status history, because the PDF shows the Antrag as the Gremium reads it.
 
 Three markers change an answer:
 
@@ -18,14 +20,18 @@ Three markers change an answer:
   personal data. The PDF prints the black bar `%%%%` of the render service instead.
 * `redact_applicant` prints the black bar instead of the applicant.
 
-Every answer is user text. The module escapes it, so a `*`, a `#` or a `[` prints as
-text, and it breaks every `%%`, so an answer never turns into a black bar or hides
-text. A `textarea` answer stays Markdown, as on the detail page, but its headings and
-images print as text, because they would break the section structure.
+Every answer is user text. A one-line answer is escaped, so a `*`, a `#` or a `[` prints
+as text. A `textarea` answer stays Markdown and renders in its cell, as on the detail
+page. Only the constructs that would act on the document are neutralized: a heading
+prints as a bold line, because a heading inside a cell would break the section
+structure; an image, a callout marker, a shortcode, a formula and a link to an embedded
+PDF print as text. Every `%%` is broken, so an answer never turns into a black bar or
+hides text.
 """
 
 from __future__ import annotations
 
+import functools
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -54,9 +60,17 @@ _NOT_SHOWN: Final[frozenset[str]] = frozenset({"markdown", "section", "file"})
 #: The keys that the head shows, so the answers leave them out.
 _HEAD_KEYS: Final[frozenset[str]] = frozenset({"title"})
 
-_ESCAPED: Final[re.Pattern[str]] = re.compile(r"([\\`*_\[\]{}()#+\-.!|<>~])")
-_LINE_START: Final[re.Pattern[str]] = re.compile(r"^(\s{0,3})(#|!\[)", re.MULTILINE)
-_IMAGE: Final[re.Pattern[str]] = re.compile(r"!\[")
+_ESCAPED: Final[re.Pattern[str]] = re.compile(r"([\\`*_\[\]{}()#+\-.!|<>~$])")
+_HEADING: Final[re.Pattern[str]] = re.compile(
+    r"^ {0,3}#{1,6}(?:[ \t]+(.*?))?[ \t#]*$", re.MULTILINE
+)
+_NEUTRAL: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
+    (re.compile(r"!\["), r"\\!["),
+    (re.compile(r"\[!"), r"\\[!"),
+    (re.compile(r"\$"), r"\\$"),
+    (re.compile(r"\{\{"), "{\u2060{"),
+    (re.compile(r"/api/media/documents/"), "/api/media/documents\u2060/"),
+)
 _ISO_DAY: Final[re.Pattern[str]] = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 
 
@@ -144,9 +158,20 @@ def escape(text: str) -> str:
     return _unbar(_ESCAPED.sub(r"\\\1", " ".join(text.split())))
 
 
-def _markdown_text(text: str) -> str:
-    """Keep a textarea answer as Markdown, with its headings and images as text."""
-    return _unbar(_IMAGE.sub(r"\\![", _LINE_START.sub(r"\1\\\2", text.strip())))
+def _bold_heading(match: re.Match[str]) -> str:
+    """Write a heading line as a bold line; an empty heading drops."""
+    title = (match[1] or "").strip()
+    return f"**{title}**" if title else ""
+
+
+def markdown_text(text: str) -> str:
+    """Keep a textarea answer as Markdown, without the constructs that act on the document.
+
+    A heading turns into a bold line; an image, a callout marker, a shortcode, a formula
+    and a link to an embedded PDF print as text.
+    """
+    bold = _HEADING.sub(_bold_heading, text.strip())
+    return _unbar(functools.reduce(lambda acc, rule: rule[0].sub(rule[1], acc), _NEUTRAL, bold))
 
 
 def format_day(value: date | str) -> str:
@@ -173,6 +198,8 @@ def _plain(value: object) -> str:
     match value:
         case bool():
             return "Ja" if value else "Nein"
+        case float() if value.is_integer():
+            return str(int(value))
         case str() | int() | float() | Decimal():
             return str(value)
         case list() | tuple():
@@ -254,20 +281,23 @@ def _visible(fdef: FormFieldDef, ctx: dict[str, object]) -> bool:
         return True
 
 
-def _table(label: str, value: object) -> list[str]:
+def field_row(label: str, value: Sequence[str]) -> list[str]:
+    """Write one table row: the escaped label and the value lines as block Markdown."""
+    quoted = [f"> {line}" if line else ">" for line in value]
+    return [f"> [!feld] {escape(label)}", ">", *quoted, ""]
+
+
+def _table(value: object) -> list[str]:
     """Write a table answer as a GFM table, or as text when it is no list of rows."""
     rows = value if isinstance(value, list) else []
     objects = [r for r in rows if isinstance(r, Mapping)]
     if not objects or len(objects) != len(rows):
-        return [f"**{escape(label)}:** {escape(_plain(value))}", ""]
+        return [escape(_plain(value))]
     columns = list(dict.fromkeys(str(k) for r in objects for k in r))
     return [
-        f"**{escape(label)}**",
-        "",
         "| " + " | ".join(escape(c) for c in columns) + " |",
         "|" + "---|" * len(columns),
         *("| " + " | ".join(escape(_plain(r.get(c))) for c in columns) + " |" for r in objects),
-        "",
     ]
 
 
@@ -307,41 +337,42 @@ def _position_rows(index: int, position: Mapping[str, object], currency: str) ->
     return [*(offer_rows or [f"| {label} | — | |"]), *no_offers]
 
 
-def positions_block(label: str, value: object, currency: str) -> list[str]:
+def positions_block(value: object, currency: str) -> list[str]:
     """Write the Kostenaufstellung as a table with the total of the preferred offers."""
     positions = [p for p in value if isinstance(p, Mapping)] if isinstance(value, list) else []
     total = sum((_preferred_value(p) for p in positions), Decimal(0))
     return [
-        f"## {escape(label)}",
-        "",
         "| Position | Angebot | Betrag |",
         "|---|---|---:|",
         *(row for n, p in enumerate(positions, start=1) for row in _position_rows(n, p, currency)),
         f"| **Summe** | | **{format_money(total, currency, LANG)}** |",
-        "",
     ]
 
 
+def _answer_value(doc: ApplicationDoc, fdef: FormFieldDef, value: object) -> list[str]:
+    """Write the value lines of one given answer."""
+    match fdef.type:
+        case "positions":
+            return positions_block(value, doc.currency)
+        case "table":
+            return _table(value)
+        case "textarea":
+            return markdown_text(_plain(value)).splitlines()
+        case _:
+            return [escape(format_answer(fdef, value, doc.currency))]
+
+
 def _answer_lines(doc: ApplicationDoc, fdef: FormFieldDef, ctx: dict[str, object]) -> list[str]:
-    """Write the lines of one shown field, or nothing for an empty answer."""
+    """Write the row of one shown field, or nothing for an empty answer."""
     label = resolve_i18n(fdef.label, LANG) or fdef.key
     value = _computed(fdef, doc.data, ctx) if fdef.type == "computed" else doc.data.get(fdef.key)
-    head = f"**{escape(label)}:**"
     if fdef.key in doc.hidden_keys:
-        return [f"{head} {NOT_VISIBLE}", ""]
+        return field_row(label, [NOT_VISIBLE])
     if is_empty(value):
         return []
     if fdef.key in doc.redacted_keys:
-        return [f"{head} {BAR}", ""]
-    match fdef.type:
-        case "positions":
-            return positions_block(label, value, doc.currency)
-        case "table":
-            return _table(label, value)
-        case "textarea":
-            return [f"**{escape(label)}**", "", _markdown_text(_plain(value)), ""]
-        case _:
-            return [f"{head} {escape(format_answer(fdef, value, doc.currency))}", ""]
+        return field_row(label, [BAR])
+    return field_row(label, _answer_value(doc, fdef, value))
 
 
 def _shown(fdef: FormFieldDef, ctx: dict[str, object]) -> bool:
@@ -349,7 +380,7 @@ def _shown(fdef: FormFieldDef, ctx: dict[str, object]) -> bool:
 
 
 def _section_lines(doc: ApplicationDoc, section: FormSection, ctx: dict[str, object]) -> list[str]:
-    """Write one section: its heading and its answers, or nothing without an answer."""
+    """Write one section: its heading and its table, or nothing without an answer."""
     body = [
         line
         for fdef in section.fields
@@ -364,17 +395,12 @@ def _other_lines(doc: ApplicationDoc) -> list[str]:
     known = {f.key for s in doc.sections for f in s.fields}
     skipped = known | _HEAD_KEYS | doc.hidden_keys
     rows = [
-        f"**{escape(key)}:** {BAR if key in doc.redacted_keys else escape(_plain(value))}"
+        line
         for key, value in doc.data.items()
         if key not in skipped and not is_empty(value)
+        for line in field_row(key, [BAR if key in doc.redacted_keys else escape(_plain(value))])
     ]
-    return ["# Weitere Angaben", "", *(line for row in rows for line in (row, ""))] if rows else []
-
-
-def _file_lines(doc: ApplicationDoc) -> list[str]:
-    """List the names of the attached files, never the files."""
-    names = [f"- {escape(name)}" for name in doc.files]
-    return ["# Anhänge", "", *names, ""] if names else []
+    return ["# Weitere Angaben", "", *rows] if rows else []
 
 
 def _decision_lines(doc: ApplicationDoc) -> list[str]:
@@ -392,25 +418,28 @@ def _decision_lines(doc: ApplicationDoc) -> list[str]:
     return [
         "# Beschluss",
         "",
-        f"**Beschlossen am:** {format_day(decision.decided_at.date())}{by}",
-        "",
-        f"**Bewilligter Betrag:** {amount}",
-        "",
-        *(["**Auflagen:**", "", *conditions, ""] if conditions else []),
+        *field_row("Beschlossen am", [f"{format_day(decision.decided_at.date())}{by}"]),
+        *field_row("Bewilligter Betrag", [amount]),
+        *(field_row("Auflagen", conditions) if conditions else []),
     ]
 
 
-def _datalines(doc: ApplicationDoc) -> list[str]:
-    """The `Label: Wert` lines of the title page, in the order of the head."""
-    applicant = BAR if doc.redact_applicant else doc.applicant
+def _head_lines(doc: ApplicationDoc) -> list[str]:
+    """Write the head data as the first table, the file names last."""
+    applicant = BAR if doc.redact_applicant else (escape(doc.applicant) if doc.applicant else None)
     rows = (
-        ("Antragsart", doc.type_name),
-        ("Status", doc.state_label),
+        ("Gremium", escape(doc.gremium_name) if doc.gremium_name else None),
+        ("Antragsart", escape(doc.type_name) if doc.type_name else None),
+        ("Status", escape(doc.state_label) if doc.state_label else None),
         ("Eingang", format_day(doc.received_on) if doc.received_on else None),
         ("Antragsteller", applicant),
         ("Version", str(doc.version)),
     )
-    return [f"{label}: {_unbar(value) if value != BAR else BAR}" for label, value in rows if value]
+    files = [f"- {escape(name)}" for name in doc.files]
+    return [
+        *(line for label, value in rows if value for line in field_row(label, [value])),
+        *(field_row("Anhänge", files) if files else []),
+    ]
 
 
 def _frontmatter(doc: ApplicationDoc) -> list[str]:
@@ -420,8 +449,6 @@ def _frontmatter(doc: ApplicationDoc) -> list[str]:
         "typ: antrag",
         *([f"gremium: {_yaml_scalar(doc.gremium_name)}"] if doc.gremium_name else []),
         *([f"cd: {_yaml_scalar(doc.cd_variant)}"] if doc.cd_variant else []),
-        "datalines:",
-        *(f"  - {_yaml_scalar(line)}" for line in _datalines(doc)),
         "---",
     ]
 
@@ -430,9 +457,9 @@ def build_application_document(doc: ApplicationDoc) -> str:
     """Build the Markdown of the Antrag PDF: the frontmatter and the body."""
     ctx: dict[str, object] = {**doc.context, **doc.data}
     body = [
+        *_head_lines(doc),
         *(line for section in doc.sections for line in _section_lines(doc, section, ctx)),
         *_other_lines(doc),
-        *_file_lines(doc),
         *_decision_lines(doc),
     ]
     return "\n".join([*_frontmatter(doc), "", *body]).rstrip() + "\n"
