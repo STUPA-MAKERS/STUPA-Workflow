@@ -690,6 +690,27 @@ describe('BudgetPlanComponent', () => {
       expect(screen.queryByRole('heading', { level: 2, name: 'Zuschüsse' })).toBeNull();
     });
 
+    it('§F/finance/budget/000812: an amount field shows the last amount while the answer of the save before holds another', async () => {
+      const view = await setup();
+      const first = new Subject<BudgetPlan>();
+      const second = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(first).mockReturnValueOnce(second);
+      const field = input(view, 'amount-grants');
+      const lines = (grants: string) => [line('fees', '100'), line('staff', '70'), line('wages', '60'), line('grants', grants)];
+      await typeAmount(field, '80');
+      await typeAmount(field, '90');
+      expect(view.api.setLine.mock.calls.map((call) => call[2])).toEqual([{ amount: '80' }, { amount: '90' }]);
+      expect(field.value).toBe('90,00');
+      first.next(plan([version({ lines: lines('80') })]));
+      first.complete();
+      view.fixture.detectChanges();
+      expect(field.value).toBe('90,00');
+      second.next(plan([version({ lines: lines('90') })]));
+      second.complete();
+      view.fixture.detectChanges();
+      expect(field.value).toBe('90,00');
+    });
+
     it('§F/finance/budget/000809: the change of a line shows its sign, and no change shows a dash', async () => {
       const view = await setup();
       const page = view.fixture.componentInstance;

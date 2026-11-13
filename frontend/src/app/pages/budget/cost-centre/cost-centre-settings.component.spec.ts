@@ -263,7 +263,24 @@ describe('CostCentreSettingsComponent', () => {
       { viewGremiumId: null },
       { name: 'Kultur neu' },
     ]);
+    expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('Ohne Gremium');
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Kultur neu' });
+    view.fixture.detectChanges();
+    view.fixture.componentRef.setInput('node', { ...KS, viewGremiumId: 'g1', name: 'Kultur neu' });
+    view.fixture.detectChanges();
     await waitFor(() => expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('StuPa'));
+  });
+
+  it('§F/finance/budget/000849: a name keeps the last text when the tree of the save before comes after the last save', async () => {
+    const view = await setup();
+    await retype(view.field('Name'), 'Kultur a');
+    await retype(view.field('Name'), 'Kultur b');
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Kultur a' });
+    view.fixture.detectChanges();
+    expect(view.field('Name').value).toBe('Kultur b');
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Kultur b' });
+    view.fixture.detectChanges();
+    expect(view.field('Name').value).toBe('Kultur b');
   });
 
   it('§F/finance/budget/000849: the third press is saved while the tree holds the state of the first', async () => {

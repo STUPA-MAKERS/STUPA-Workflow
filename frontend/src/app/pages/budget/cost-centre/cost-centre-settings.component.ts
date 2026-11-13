@@ -147,33 +147,44 @@ export class CostCentreSettingsComponent {
       equal: (a, b) => a.id === b.id && a.value === b.value,
     });
   }
-  private field<T>(value: (node: BudgetTreeNode) => T): WritableSignal<T> {
-    return linkedSignal({ source: this.stored(value), computation: (saved) => saved.value });
+  private field<T>(name: Field, value: (node: BudgetTreeNode) => T): WritableSignal<T> {
+    return linkedSignal<Saved<T>, T>({
+      source: this.stored(value),
+      computation: (saved, last) => (last && last.source.id === saved.id && this.ahead(saved.id, name) ? last.value : saved.value),
+    });
+  }
+  /**
+   * The last request of a field holds a value that no tree held yet. A tree that comes then
+   * can be the tree of the save before, which the page reads beside this request, so the
+   * control keeps what it shows and does not go back to the value of that tree.
+   */
+  private ahead(id: string, name: Field): boolean {
+    return this.sent[`${id}:${name}`]?.seen === false;
   }
   /**
    * A switch or a select. While a save runs it keeps the choice of the person, because the
    * tree that the page reads after the first of two saves holds the first choice and not
    * the one that is on its way.
    */
-  private choice<T>(value: (node: BudgetTreeNode) => T): WritableSignal<T> {
+  private choice<T>(name: Field, value: (node: BudgetTreeNode) => T): WritableSignal<T> {
     return linkedSignal<Saved<T>, T>({
       source: this.stored(value),
       computation: (saved, last) =>
-        last && last.source.id === saved.id && untracked(this.running) ? last.value : saved.value,
+        last && last.source.id === saved.id && (untracked(this.running) || this.ahead(saved.id, name)) ? last.value : saved.value,
     });
   }
 
   /** A save runs. */
   private readonly running = signal(false);
   readonly saving = this.running.asReadonly();
-  readonly key = this.field((node) => node.key);
-  readonly name = this.field((node) => node.name);
-  readonly colour = this.field((node) => node.color?.trim() ?? '');
-  readonly side = this.choice<Side | null>((node) => node.side ?? null);
-  readonly viewGremium = this.choice((node) => node.viewGremiumId ?? '');
-  readonly decisionGremium = this.choice((node) => node.decisionGremiumId ?? '');
+  readonly key = this.field('key', (node) => node.key);
+  readonly name = this.field('name', (node) => node.name);
+  readonly colour = this.field('color', (node) => node.color?.trim() ?? '');
+  readonly side = this.choice<Side | null>('side', (node) => node.side ?? null);
+  readonly viewGremium = this.choice('viewGremiumId', (node) => node.viewGremiumId ?? '');
+  readonly decisionGremium = this.choice('decisionGremiumId', (node) => node.decisionGremiumId ?? '');
   /** The state that the switch shows: the last press, else the saved state. */
-  readonly active = this.choice((node) => node.active);
+  readonly active = this.choice('active', (node) => node.active);
   readonly gremien = computed<SelectOption[]>(() => [...this.gremiumOptions()]);
   /** The error under the key: only letters and digits, at most 64 characters. */
   readonly keyError = computed(() =>

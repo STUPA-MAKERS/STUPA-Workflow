@@ -1113,7 +1113,7 @@ export class BudgetPlanComponent {
   ): void {
     const version = this.version();
     const key = `${version?.id}:${row.id}`;
-    const known = { ...row, ...this.lineSent[key] };
+    const known = { ...row, ...this.lineSent()[key] };
     const same =
       (change.amount === undefined || Number(change.amount) === Number(known.amount)) &&
       (change.blocked === undefined || Number(change.blocked) === Number(known.blocked)) &&
@@ -1126,12 +1126,12 @@ export class BudgetPlanComponent {
       ...runs,
       ...Object.fromEntries(fields.map((field) => [field, (runs[field] ?? 0) + by])),
     });
-    this.lineSent = { ...this.lineSent, [key]: { ...this.lineSent[key], ...change } };
+    this.lineSent.update((sent) => ({ ...sent, [key]: { ...sent[key], ...change } }));
     this.lineRuns = count(1)(this.lineRuns);
     const done = (): void => {
       this.lineRuns = count(-1)(this.lineRuns);
-      const left = Object.fromEntries(Object.entries(this.lineSent[key] ?? {}).filter(([field]) => this.lineRuns[`${key}:${field}`]));
-      this.lineSent = { ...Object.fromEntries(Object.entries(this.lineSent).filter(([k]) => k !== key)), ...(Object.keys(left).length ? { [key]: left } : {}) };
+      const left = Object.fromEntries(Object.entries(this.lineSent()[key] ?? {}).filter(([field]) => this.lineRuns[`${key}:${field}`]));
+      this.lineSent.update((sent) => ({ ...Object.fromEntries(Object.entries(sent).filter(([k]) => k !== key)), ...(Object.keys(left).length ? { [key]: left } : {}) }));
       this.lineRuns = Object.fromEntries(Object.entries(this.lineRuns).filter(([, n]) => n));
       ended?.();
     };
@@ -1142,8 +1142,10 @@ export class BudgetPlanComponent {
    * The fields of the saves that run, by version and line. A change is compared with them
    * and then with the plan on the page, because the plan on the page is the plan before
    * these saves: a field that the person sets back while its save runs must be saved again.
+   * An amount field shows its amount of these saves, because the answer of an earlier save
+   * of the field holds the amount before.
    */
-  private lineSent: Readonly<Record<string, PlanLineSet>> = {};
+  private readonly lineSent = signal<Readonly<Record<string, PlanLineSet>>>({});
   /**
    * The number of the saves that run for a field of a line. A field leaves `lineSent` when
    * its last save ended, and not with the end of a save of another field of its line.
@@ -1210,9 +1212,9 @@ export class BudgetPlanComponent {
   /** The version in which the person typed an amount that needs the wide form. */
   private readonly wideFor = signal<string | null>(null);
 
-  /** The amount a field shows: the text a person types, else the saved amount. */
+  /** The amount a field shows: the text a person types, else the amount of the save that runs, else the saved amount. */
   fieldValue(row: PlanRow, field: 'amount' | 'blocked'): string | number {
-    return this.edits()[`${row.id}:${field}`] ?? row[field];
+    return this.edits()[`${row.id}:${field}`] ?? this.lineSent()[`${this.version()?.id}:${row.id}`]?.[field] ?? row[field];
   }
 
   /** Keep the amount a person types, as the canonical decimal string of the field. */
