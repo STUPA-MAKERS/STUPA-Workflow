@@ -13,6 +13,8 @@ tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_key_taken_at_the_same_moment_is_a_conflict"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_close_of_a_step_vote_locks_the_plan_before_the_audit_entry"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_kostenstelle_that_went_while_a_write_waited_is_not_found"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_gremium_that_went_while_a_write_waited_is_not_valid"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_budget_for_a_gremium_that_goes_beside_the_create_is_not_found"
 implementation:
   - backend/app/modules/budget/tree/service_base.py
   - backend/app/modules/budget/tree/plans.py

@@ -392,6 +392,31 @@ describe('BudgetPlanComponent', () => {
       expect(texts(view, '.bp__name').length).toBeGreaterThan(0);
     });
 
+    it('the retry after a failed read of the years of a newly chosen budget reads that budget', async () => {
+      const view = await setup({ tree: [TOP, { ...QSM, planEnabled: true }] });
+      view.treeApi.listFiscalYears.mockReturnValueOnce(throwError(() => problem(500)));
+      view.fixture.componentInstance.pickTop(QSM.id);
+      view.fixture.detectChanges();
+      expect(view.container.querySelector('app-load-error')).not.toBeNull();
+      view.fixture.componentInstance.retry();
+      expect(view.treeApi.listFiscalYears).toHaveBeenLastCalledWith(QSM.id);
+    });
+
+    it('drops a Kostenstelle of the URL that is not in the tree of the budget', async () => {
+      const view = await setup({ query: { costCentre: 'qsm-child' } });
+      view.fixture.componentInstance.pickYear('fy-26');
+      expect(view.navigate).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({ queryParams: expect.objectContaining({ costCentre: null }) }),
+      );
+      const inTree = await setup({ query: { costCentre: 'fees' } });
+      inTree.fixture.componentInstance.pickYear('fy-26');
+      expect(inTree.navigate).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({ queryParams: expect.objectContaining({ costCentre: 'fees' }) }),
+      );
+    });
+
     it('takes the budget and the year of the URL and names the budget on its chip', async () => {
       const second = node({ id: 'two', name: 'Zweiter', planEnabled: true });
       const view = await setup({ tree: [TOP, second], query: { budget: 'two', fy: 'fy-25' } });
