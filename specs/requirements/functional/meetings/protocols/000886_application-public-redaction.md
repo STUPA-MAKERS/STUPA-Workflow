@@ -2,7 +2,7 @@
 id: "000886"
 title: The public Anlage blacks out the personal data
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation:

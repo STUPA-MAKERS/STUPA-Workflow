@@ -2,7 +2,7 @@
 id: "000885"
 title: The Anlage holds the Antrag as the Sitzung treated it
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation:

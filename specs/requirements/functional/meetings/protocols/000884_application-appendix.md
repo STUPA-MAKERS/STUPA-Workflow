@@ -2,7 +2,7 @@
 id: "000884"
 title: An Antrag on the agenda is an Anlage of the protocol
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation:

@@ -2,7 +2,7 @@
 id: "000881"
 title: The Antrag PDF shows the Antrag like the detail page
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation:
