@@ -2,9 +2,9 @@
 id: "000794"
 title: A plan line holds the Ansatz of one Kostenstelle
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_parent_holds_the_sum_of_its_children"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_delete_line_lowers_the_parent"

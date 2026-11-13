@@ -2,9 +2,9 @@
 id: "000818"
 title: A plan line makes a Kostenstelle part of the year
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_tree_names_the_years_that_plan_a_cost_centre"
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_with_plan_fields"

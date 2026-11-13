@@ -2,9 +2,9 @@
 id: "000814"
 title: A top-level Kostenstelle has a plan switch
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_plan_switch_needs_a_top_level_node_with_sides"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_plan_switch_gives_open_years_a_stammplan"

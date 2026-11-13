@@ -2,9 +2,9 @@
 id: "000827"
 title: The steps of a budget are edited in its edit form
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "frontend/src/app/pages/admin/budgets/admin-budgets.component.spec.ts:AdminBudgetsComponent"
   - "frontend/src/app/pages/admin/budgets/admin-budgets.util.spec.ts:AdminBudgetsUtil"
@@ -13,7 +13,6 @@ implementation:
   - frontend/src/app/pages/admin/budgets/admin-budgets.util.ts
 scope:
   - frontend/src/app/pages/admin/budgets
-  - backend/app/modules/budget
 ---
 
 # The steps of a budget are edited in its edit form

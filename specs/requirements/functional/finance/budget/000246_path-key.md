@@ -2,9 +2,12 @@
 id: "000246"
 title: A cost centre has a stable path key
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
+tests:
+  - "backend/tests/integration/modules/budget/test_budget_tree_service.py:test_rename_key_recomputes_descendant_paths"
+  - "backend/tests/unit/modules/budget/test_plan_router.py:test_the_node_schemas_refuse_what_they_cannot_store"
 implementation:
   - backend/app/modules/budget/tree_rules.py
   - backend/app/modules/budget/tree/nodes.py

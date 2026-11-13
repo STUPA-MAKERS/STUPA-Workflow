@@ -2,9 +2,9 @@
 id: "000790"
 title: A Kostenstelle below the top level has a side
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_side_goes_to_the_subtree_and_to_a_new_child"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_side_is_refused_off_the_first_level"

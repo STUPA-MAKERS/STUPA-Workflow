@@ -2,9 +2,9 @@
 id: "000812"
 title: An amount field of a draft saves when the person leaves it
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_line_request_changes_only_the_fields_it_names"

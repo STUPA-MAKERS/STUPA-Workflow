@@ -2,9 +2,9 @@
 id: "000791"
 title: A fiscal year has one Haushaltsplan with versions
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_create_plan"
 implementation:

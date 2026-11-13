@@ -24,5 +24,5 @@ runs.
 Reason: A version in force sets the allocations of the year, and a deleted draft is gone.
 One press must not do that by mistake.
 
-Test: The component tests press each of these actions, read the dialog, cancel it and confirm
-it.
+Test: The component tests press each of these actions, read the dialog and confirm it, and
+cancel the dialogs of "Schritt abschließen" and "Kostenstelle löschen".

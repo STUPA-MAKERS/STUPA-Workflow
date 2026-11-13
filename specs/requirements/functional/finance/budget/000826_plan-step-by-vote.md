@@ -2,9 +2,9 @@
 id: "000826"
 title: An accepted vote of the Gremium passes its step
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_an_accepted_vote_of_the_gremium_passes_its_step"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_refused_vote_leaves_the_step_open"

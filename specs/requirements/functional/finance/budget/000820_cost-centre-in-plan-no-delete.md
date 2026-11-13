@@ -2,9 +2,9 @@
 id: "000820"
 title: A Kostenstelle of a decided plan cannot be deleted
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_delete_of_a_cost_centre_in_a_decided_plan"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_delete_node_lowers_the_parent_of_a_draft"

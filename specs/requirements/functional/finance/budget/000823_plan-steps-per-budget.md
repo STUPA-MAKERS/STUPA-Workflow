@@ -2,9 +2,9 @@
 id: "000823"
 title: A budget holds the steps of its Haushaltsplan
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_plan_steps_of_a_budget"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_plan_write_needs_the_switch"

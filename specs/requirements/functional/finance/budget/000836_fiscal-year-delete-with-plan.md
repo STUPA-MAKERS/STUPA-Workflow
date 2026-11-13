@@ -12,6 +12,7 @@ tests:
   - "backend/tests/unit/modules/budget/test_tree_service_cov.py:test_delete_fiscal_year_with_applications_409"
   - "frontend/src/app/pages/admin/budgets/admin-budgets.component.spec.ts:AdminBudgetsComponent"
   - "frontend/src/app/pages/admin/budgets/admin-budgets.util.spec.ts:AdminBudgetsUtil"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_year_of_a_decided_plan_is_fixed"
 implementation:
   - backend/app/modules/budget/tree/fiscal_years.py
   - backend/app/modules/budget/tree_rules.py
@@ -28,11 +29,15 @@ The delete of a fiscal year must answer 409 `fiscal_year_has_plan` when its Haus
 has a version that left `draft`. A plan that holds only a draft must go with the fiscal
 year, and the audit entry of the delete must say so. A fiscal year in use must answer 409
 with the code of its cause: `fiscal_year_has_bookings`, `fiscal_year_has_allocations` or
-`fiscal_year_has_applications`. The page "Budgets" must name the cause from the code.
+`fiscal_year_has_applications`. A change of the year of a fiscal year whose Haushaltsplan
+has a version that left `draft` must answer 409 `fiscal_year_has_plan`. The page "Budgets"
+must name the cause from the code. The page must not offer the delete for a year with a
+decided plan, and it must name the cause at the menu item. The dialog of the delete must
+name the draft only when the plan holds only a draft.
 
 Reason: A conditional delete must never remove a record without a word (000161). A decided
 plan is a record, and a draft binds nobody.
 
 Test: The backend tests delete a fiscal year with a draft plan, with a decided plan, with
-bookings, with allocations and with Anträge. The component tests read the message of each
-refusal.
+bookings, with allocations and with Anträge, and change the year of a decided plan. The
+component tests read the message of each refusal, the dialog and the menu item.
