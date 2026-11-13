@@ -355,8 +355,8 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't1', nameI18n: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' },
       { id: 't2' },
     ]);
-    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null });
-    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null });
+    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null });
+    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null });
   });
 
   it('maps the number of the active form version', () => {
@@ -449,7 +449,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ key: 'k', nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: true });
     req.flush({ id: 'new-1' });
-    expect(created).toEqual({ id: 'new-1', name: {}, gremiumId: null, hasBudget: false, retentionMonths: null, activeFormVersionId: null });
+    expect(created).toEqual({ id: 'new-1', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null });
   });
 
   it('POSTs an application type with default gremium/budget when omitted', () => {
@@ -462,12 +462,12 @@ describe('AdminApiService — real mode (contract)', () => {
   /** An empty body sets no keys. */
   it('PATCHes only the supplied application-type fields and DELETEs', () => {
     let done = false;
-    s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false }).subscribe(
+    s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false, pdfSignatures: true }).subscribe(
       () => (done = true),
     );
     const req = http.expectOne('/api/admin/application-types/t1');
     expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: false });
+    expect(req.request.body).toEqual({ nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: false, pdfSignatures: true });
     req.flush({});
     expect(done).toBe(true);
 

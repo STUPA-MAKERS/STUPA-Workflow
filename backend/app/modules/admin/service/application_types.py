@@ -27,6 +27,7 @@ def _type_out(row: ApplicationType, version: int | None = None) -> ApplicationTy
         key=row.key,
         name_i18n=row.name_i18n,
         has_budget=row.has_budget,
+        pdf_signatures=row.pdf_signatures,
         comparison_offers=row.comparison_offers,
         retention_months=row.retention_months,
         active_form_version_id=row.active_form_version_id,
@@ -76,6 +77,7 @@ class ApplicationTypeOps(ConfigServiceBase):
             name_i18n=payload.name_i18n,
             gremium_id=payload.gremium_id,
             has_budget=payload.has_budget,
+            pdf_signatures=payload.pdf_signatures,
             comparison_offers=(
                 payload.comparison_offers.model_dump(by_alias=True)
                 if payload.comparison_offers is not None
@@ -117,6 +119,8 @@ class ApplicationTypeOps(ConfigServiceBase):
             row.gremium_id = payload.gremium_id
         if payload.has_budget is not None:
             row.has_budget = payload.has_budget
+        if payload.pdf_signatures is not None:
+            row.pdf_signatures = payload.pdf_signatures
         if payload.comparison_offers is not None:
             row.comparison_offers = payload.comparison_offers.model_dump(by_alias=True)
         if "retention_months" in payload.model_fields_set:

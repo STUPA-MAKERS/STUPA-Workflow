@@ -112,6 +112,10 @@ _SIGNATURE_MARKERS: Final[frozenset[str]] = frozenset({"UNTERSCHRIFTEN", "SIGNAT
 # A field row: `> [!feld] Label` and the value below it as block Markdown. The rows
 # that follow each other form one table of two columns, label and value.
 _FIELD_MARKERS: Final[frozenset[str]] = frozenset({"FELD", "FIELD"})
+# A signature row: `> [!unterschrift] Label` and the role of the signer below it. It is
+# a field row whose value is a blank area with a line for the date and a line for the
+# signature, to fill in by hand.
+_SIGN_MARKERS: Final[frozenset[str]] = frozenset({"UNTERSCHRIFT", "SIGNATURE"})
 
 _TALLY_RE: Final[dict[str, re.Pattern[str]]] = {
     "yes": re.compile(r"(?:ja|yes)\s*[:=]?\s*(\d+)", re.IGNORECASE),
@@ -856,6 +860,8 @@ class _Converter:
                 return [self._vote(kids)]
             case (name, rest) if name in _FIELD_MARKERS:
                 return [self._field(kids, rest)]
+            case (name, rest) if name in _SIGN_MARKERS:
+                return [self._sign_row(kids, rest)]
             case (name, _) if name in _SIGNATURE_MARKERS:
                 return [self._signature_callout(kids)]
             case (name, rest):
@@ -906,6 +912,13 @@ class _Converter:
         lead = [{"t": "par", "c": self._inline_nodes(line)} for line in more if line]
         return {"t": "field", "label": label, "c": [*lead, *self.blocks(kids[1:])]}
 
+    def _sign_row(self, kids: list[object], rest: str) -> Node:
+        """Build a signature row: the first line is the label, the rest names the signer."""
+        lines = ["".join(_plain(n) for n in line).strip() for line in self._callout_lines(kids)]
+        role = " ".join(line for line in lines[1:] if line)
+        label = [*_inline_text(rest.strip(), self.meta)]
+        return {"t": "field", "label": label, "c": [], "sign": role}
+
     def _marker(self, kids: list[object]) -> tuple[str, str] | None:
         """Read the callout marker of a quote: `(NAME, rest of the first text)`."""
         if not kids or _kind(kids[0]) != "Paragraph":
@@ -918,7 +931,9 @@ class _Converter:
         if match is None:
             return None
         name = match.group(1).upper()
-        known = _LABELLED.keys() | _VOTE_MARKERS | _SIGNATURE_MARKERS | _FIELD_MARKERS
+        known = (
+            _LABELLED.keys() | _VOTE_MARKERS | _SIGNATURE_MARKERS | _FIELD_MARKERS | _SIGN_MARKERS
+        )
         if name not in known:
             return None
         return name, first[match.end() :]

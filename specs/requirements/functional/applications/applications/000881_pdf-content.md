@@ -19,8 +19,8 @@ scope:
 
 The Antrag PDF must use the design of the protocol PDF from the typst service, with the fonts
 Blender for headings and DIN for text, and must be tagged as PDF/UA-1 (000524). It must have no
-title page: the first page starts with the title of the Antrag at the top of the page, with no
-logo above it. The whole Antrag must be in tables of two columns, label and value, drawn like
+title page: each page starts with the title of the Antrag at the top of the page, in the same
+form on every page, with no logo above it and with no other running head. The whole Antrag must be in tables of two columns, label and value, drawn like
 the table of the Haushaltsplan PDF: a thick rule above and below, a dashed rule between the rows, and
 the section name on a grey band across the table. The tables follow each other with no gap, so
 the Antrag reads as one table. Each value cell must render its Markdown
@@ -30,6 +30,9 @@ A value that would take 30 lines or more must show 29 lines and a line "…". A 
 Kostenaufstellung (a position or an offer) that would take 3 lines or more must show 2 lines
 and a line "…". The Kostenaufstellung must have no rule above and no rule below, and no inset at
 its sides: it starts at the text of the other values and ends at the right edge of the table.
+A dashed rule must stand between two rows of the Kostenaufstellung. The rule between two positions
+goes from the position column to the right edge, and so does the rule above the total. The rule between two offers of one position
+starts at the offer column and goes to the right edge.
 
 The version, each date, an IBAN and each amount must print in the monospace font. The e-mail of the
 applicant must stand on its own line below the name, in the monospace font, as a `mailto:` link.

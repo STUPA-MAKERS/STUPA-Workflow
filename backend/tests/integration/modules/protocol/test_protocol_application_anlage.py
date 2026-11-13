@@ -20,6 +20,7 @@ from sqlalchemy import Engine, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin.service.forms import FormVersionWriter
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application, SubmissionVersion
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
@@ -179,6 +180,11 @@ async def test_the_protocol_appends_the_antrag_as_it_was_at_the_close_of_the_top
     """§ 000884 + § 000885 + § 000886: reference, asset, frozen version, public black bar."""
     start = datetime.now(UTC) - timedelta(hours=2)
     async with maker() as session:
+        await session.execute(
+            update(ApplicationType)
+            .where(ApplicationType.id == seed.type_id)
+            .values(pdf_signatures=True)
+        )
         open_id = await _application(session, seed, zweck="alte Fassung")
         secret_id = await _application(session, seed, zweck="geheim")
         await _versions_at(session, open_id, start)
@@ -214,6 +220,7 @@ async def test_the_protocol_appends_the_antrag_as_it_was_at_the_close_of_the_top
     assert "\n".join(field_row("Version", ["`1`"])) in internal_antrag
     assert _IBAN in internal_antrag and "Luis Meyer" in internal_antrag
     assert "[!feld] Status" not in internal_antrag and "# Beschluss" not in internal_antrag
+    assert "[!unterschrift]" not in internal_antrag  # § 000887
     assert _IBAN not in public_antrag and "Luis Meyer" not in public_antrag
     assert "\n".join(field_row("IBAN", [BAR])) in public_antrag
     assert "\n".join(field_row("Antragsteller", [BAR])) in public_antrag
@@ -246,6 +253,13 @@ async def test_the_vote_opening_fixes_the_version(
         )
         await session.commit()
         assert await pdfs.frozen_version(item) == 1
+
+        # A repeated vote on the newer version: the Anlage follows the newest vote.
+        session.add(
+            Vote(**common, status="closed", opens_at=start + timedelta(hours=2, minutes=30))
+        )
+        await session.commit()
+        assert await pdfs.frozen_version(item) == 2
 
         no_app = MeetingAgendaItem(meeting_id=item.meeting_id, title="Frei", position=9)
         assert await pdfs.frozen_version(no_app) is None

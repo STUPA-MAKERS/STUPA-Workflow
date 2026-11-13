@@ -1658,6 +1658,12 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "pdf_signatures",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "comparison_offers",
           "nullable": true,
           "primaryKey": false,

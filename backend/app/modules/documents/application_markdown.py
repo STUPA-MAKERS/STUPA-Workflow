@@ -129,6 +129,7 @@ class ApplicationDoc:
         redact_applicant: The applicant prints as a black bar.
         files: The names of the attached files.
         decision: The valid decision, or `None`.
+        signatures: The PDF ends with the signature section (spec 000887).
     """
 
     title: str
@@ -149,6 +150,7 @@ class ApplicationDoc:
     redact_applicant: bool = False
     files: Sequence[str] = ()
     decision: DecisionView | None = None
+    signatures: bool = False
 
 
 def _yaml_scalar(value: str) -> str:
@@ -433,6 +435,24 @@ def _other_lines(doc: ApplicationDoc) -> list[str]:
     return ["# Weitere Angaben", "", *rows] if rows else []
 
 
+#: The signature rows of the Antrag PDF: the label and the signer (spec 000887).
+SIGNATURES: Final[tuple[tuple[str, str], ...]] = (
+    ("Sachlich richtig", "Finanzreferent:in"),
+    ("Ausführungsermächtigt", "Haushaltsbeauftragte:r"),
+)
+
+
+def signature_row(label: str, signer: str) -> list[str]:
+    """Write one signature row of the render service: room to sign by hand."""
+    return [f"> [!unterschrift] {escape(label)}", ">", f"> {escape(signer)}", ""]
+
+
+def signature_lines() -> list[str]:
+    """Write the signature section: one row per signer, to fill in by hand."""
+    rows = [line for label, signer in SIGNATURES for line in signature_row(label, signer)]
+    return ["# Unterschriften", "", *rows]
+
+
 def _decision_lines(doc: ApplicationDoc) -> list[str]:
     """Write the valid decision: the approved amount and the conditions."""
     decision = doc.decision
@@ -500,6 +520,7 @@ def build_application_document(doc: ApplicationDoc) -> str:
         *(line for section in doc.sections for line in _section_lines(doc, section, ctx)),
         *_other_lines(doc),
         *_decision_lines(doc),
+        *(signature_lines() if doc.signatures else []),
     ]
     return "\n".join([*_frontmatter(doc), "", *body]).rstrip() + "\n"
 

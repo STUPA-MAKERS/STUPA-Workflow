@@ -88,7 +88,7 @@ _DATE_RE: Final[re.Pattern[str]] = re.compile(r"(\d{4})-(\d{2})-(\d{2})(?:[ T](\
 # The document types whose headings are sections, not agenda items: they get no
 # "TOP n" number.
 _UNNUMBERED_TYPES: Final[frozenset[str]] = frozenset({"antrag"})
-# The document types without a title page: the first page starts with the title.
+# The document types without a title page: each page starts with the title.
 _COVERLESS_TYPES: Final[frozenset[str]] = frozenset({"antrag"})
 # The signature roles that the protocol keepers sign.
 _KEEPER_ROLES: Final[frozenset[str]] = frozenset({"schriftführung", "schriftfuehrung", "protokoll"})

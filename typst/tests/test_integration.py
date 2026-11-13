@@ -343,3 +343,28 @@ def test_an_antrag_cuts_long_values_and_long_table_cells(tmp_path: Path) -> None
     assert "Zeile 29" in words and "Zeile 30" not in words
     assert words.count("…") == 2
     assert sum(1 for w in words if "Angebot Angebot" in w) == 2
+
+
+def test_an_antrag_draws_signature_rows_and_rules_in_a_nested_table(tmp_path: Path) -> None:
+    """§000887: a signature row prints its two captions. §000881: a nested table renders."""
+    source = (
+        '---\ntitle: "A"\ntyp: antrag\n---\n\n'
+        "> [!feld] Kosten\n>\n> | Position | Angebot |\n> |---|---|\n"
+        "> | Bus | Eins |\n> | | Zwei |\n> | **Summe** | |\n\n"
+        "# Unterschriften\n\n"
+        "> [!unterschrift] Sachlich richtig\n>\n> Finanzreferent:in\n"
+    )
+    words = [line[3] for line in _lines(_render(source, "protocol-stupa"), tmp_path)]
+    assert "Unterschriften" in words and "Sachlich richtig" in words
+    assert "Datum" in words and "Unterschrift Finanzreferent:in" in words
+    assert "Zwei" in words and "Summe" in words
+
+
+def test_an_antrag_starts_every_page_with_its_title(tmp_path: Path) -> None:
+    """§000881: the title heads each page in the same form, at the same place."""
+    rows = "".join(f"> [!feld] Feld {n}\n>\n> Wert {n}\n\n" for n in range(60))
+    source = f'---\ntitle: "Exkursion Stuttgart"\ntyp: antrag\n---\n\n{rows}'
+    lines = _lines(_render(source, "protocol-stupa"), tmp_path)
+    titles = [line for line in lines if line[3] == "Exkursion Stuttgart"]
+    assert [line[0] for line in titles] == [1, 2]
+    assert titles[0][1:3] == titles[1][1:3]

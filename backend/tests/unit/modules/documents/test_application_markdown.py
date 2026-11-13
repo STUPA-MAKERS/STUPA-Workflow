@@ -137,6 +137,16 @@ def test_document_has_the_parts_in_order() -> None:
     assert row("Anhänge", "`Angebot.pdf`") in md
 
 
+def test_the_signature_section_ends_the_document_only_with_the_switch() -> None:
+    """§000887: two rows to sign by hand, after the decision."""
+    assert "[!unterschrift]" not in build_application_document(_doc())
+    md = build_application_document(_doc(signatures=True))
+    first = "> [!unterschrift] Sachlich richtig\n>\n> Finanzreferent:in\n"
+    second = "> [!unterschrift] Ausführungsermächtigt\n>\n> Haushaltsbeauftragte:r\n"
+    assert md.index("# Beschluss") < md.index("# Unterschriften") < md.index(first)
+    assert md.endswith(second)
+
+
 def test_answers_are_formatted_and_escaped() -> None:
     md = build_application_document(_doc())
     assert row("Organisation", "Fachschaft \\[Informatik\\]") in md

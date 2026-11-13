@@ -2554,6 +2554,7 @@
   "admin.forms.descPlaceholder": "Markdown is supported …",
   "admin.forms.help": "Help text",
   "admin.forms.hasBudget": "With budget",
+  "admin.forms.pdfSignatures": "Signatures in the PDF",
   "admin.forms.cmpRequired": "Comparison offers required",
   "admin.forms.cmpMinCount": "Minimum count",
   "admin.forms.col.budget": "Budget",

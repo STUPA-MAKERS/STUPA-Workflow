@@ -138,6 +138,14 @@ class ApplicationPdfService:
         )
         return resolve_i18n(names, LANG) if isinstance(names, dict) else None
 
+    async def _signs(self, type_id: uuid.UUID) -> bool:
+        """Tell whether the Antrag PDF of the type ends with the signature section."""
+        return bool(
+            await self.session.scalar(
+                select(ApplicationType.pdf_signatures).where(ApplicationType.id == type_id)
+            )
+        )
+
     async def _gremium(self, gremium_id: uuid.UUID | None) -> Gremium | None:
         return await self.session.get(Gremium, gremium_id) if gremium_id is not None else None
 
@@ -208,6 +216,7 @@ class ApplicationPdfService:
             hidden_keys=hidden,
             files=await self._file_names(app.id, app.data, hidden),
             decision=decision,
+            signatures=await self._signs(app.type_id),
         )
 
     async def version_doc(

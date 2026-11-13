@@ -508,6 +508,26 @@
   })
 }
 
+// The value of a signature row (an Antrag, 000887): room to sign by hand, then a
+// short line for the date and a long line for the signature, each with its caption.
+#let sign-area(role) = {
+  let slot(caption) = {
+    rect(width: 100%, height: 0.4pt, fill: black, stroke: none)
+    v(3pt)
+    block(text(size: size.small, caption))
+  }
+  block(breakable: false, width: 100%, {
+    v(16mm)
+    grid(
+      columns: (32mm, 1fr),
+      column-gutter: 8mm,
+      slot[Datum],
+      slot(if role != "" { [Unterschrift #role] } else { [Unterschrift] }),
+    )
+    v(1pt)
+  })
+}
+
 // -- blocks -------------------------------------------------------------------
 
 #let bullet-markers = ([•], [–], [∗], [·])
@@ -599,8 +619,8 @@
 #let field-inset = 6pt
 
 // A GFM table. Nested in a field row (an Antrag, `nested: true`), it has no top
-// and no bottom rule, each cell is cut at three lines, and it has no inset at its
-// sides: it starts at the text of the other values and ends at the right edge of
+// and no bottom rule, a dashed rule between its rows, each cell is cut at three
+// lines, and it has no inset at its sides: it starts at the text of the other values and ends at the right edge of
 // the field table (000881).
 #let table-block(n, nested: false) = {
   let aligns = n.align.map(a => if a == "center" { center } else if a == "right" { right } else { left })
@@ -617,6 +637,20 @@
     }),
   )
   let rule(w) = rect(width: 100%, height: w, fill: black, stroke: none)
+  let row-gap = 20.33pt - 1.211 * size.normal
+  // The dashed rule above a row of a nested table. It starts at the first column
+  // that has text, so a row that continues the entry above it (an offer of the
+  // same position) keeps the first column free of rules, and it ends at the right
+  // edge (000881).
+  let row-rule(cells) = {
+    let filled = range(cols).filter(k => cells.at(k, default: ()).len() > 0)
+    let start = if filled.len() > 0 { filled.first() } else { 0 }
+    grid(
+      columns: (1fr,) * cols,
+      column-gutter: 12pt,
+      grid.cell(x: start, colspan: cols - start, line(length: 100%, stroke: (paint: palette.gray, thickness: 0.4pt, dash: "dashed"))),
+    )
+  }
   // booktabs at \arraystretch 1.5: \toprule .08em, \midrule .05em,
   // \bottomrule .08em, 20.33pt from row to row.
   pad(right: if nested { -field-inset } else { 0pt }, block(width: 100%, breakable: false, {
@@ -629,7 +663,13 @@
     rule(0.548pt)
     v(6.5pt)
     for (i, r) in n.rows.enumerate() {
-      if i > 0 { v(20.33pt - 1.211 * size.normal) }
+      if i > 0 and nested {
+        v(row-gap / 2)
+        row-rule(r)
+        v(row-gap / 2)
+      } else if i > 0 {
+        v(row-gap)
+      }
       row(r)
     }
     if not nested {
@@ -794,7 +834,7 @@
           ..n.rows.enumerate().map(((i, r)) => (
             ..if i > 0 { (grid.hline(stroke: (paint: palette.gray, thickness: 0.4pt, dash: "dashed")),) },
             strong(text(hyphenate: false, inline(r.label))),
-            clamp(r.c, 30, nodes => blocks(nodes, in-field: true)),
+            if r.at("sign", default: none) != none { sign-area(r.sign) } else { clamp(r.c, 30, nodes => blocks(nodes, in-field: true)) },
           )).flatten(),
           grid.hline(stroke: 0.876pt),
         )
@@ -902,11 +942,11 @@
   },
 )
 
-// The head of the first page of a document without a title page (an Antrag): the
+// The head of each page of a document without a title page (an Antrag): the
 // title and the rule of the title page, without the logos (the footer has them).
-// Page 1 has no running head, so the title moves up into its room.
+// It is the page header, so every page starts with it, and it stands where the
+// running head of a protocol stands.
 #let title-block(doc) = {
-  v(-12mm)
   block(below: 0pt, par(justify: false, text(
     font: head-font,
     size: size.huge,
@@ -918,6 +958,9 @@
   rect(width: 100%, height: 0.5mm, fill: black, stroke: none)
   v(14pt)
 }
+
+// Where the title of a document without a title page starts, from the top edge.
+#let title-top = 2cm + 5.18pt - 12mm
 
 #let protocol(doc) = {
   set document(title: doc.title)
@@ -964,8 +1007,8 @@
     let page-no = counter(page).get().first()
     let last = counter(page).final().first()
     set text(font: head-font, size: size.normal, fill: palette.gray)
-    // Without a title page the first page carries the title itself.
-    if doc.at("cover", default: true) or page-no > 1 {
+    // Without a title page each page carries the title as its header.
+    if doc.at("cover", default: true) {
       place(top + left, dx: 2cm, dy: 29.09pt, doc.title)
     }
     place(top + center, dy: 798.53pt, [Seite~#page-no~von~#text(fill: palette.hsrtlink, str(last))])
@@ -986,9 +1029,16 @@
   if doc.at("cover", default: true) {
     title-page(doc)
     counter(page).update(1)
+    blocks(doc.body)
+    appendix-pages(doc.at("appendix", default: ()))
   } else {
-    title-block(doc)
+    // The title can take several lines, so the top margin follows its height.
+    context {
+      let head = title-block(doc)
+      let height = measure(width: page.width - 4cm, head).height
+      set page(margin: (top: title-top + height, rest: 2cm), header: head, header-ascent: 0pt)
+      blocks(doc.body)
+      appendix-pages(doc.at("appendix", default: ()))
+    }
   }
-  blocks(doc.body)
-  appendix-pages(doc.at("appendix", default: ()))
 }

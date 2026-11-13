@@ -14,11 +14,12 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import get_current_applicant, get_current_principal, get_session
 from app.modules.admin.service.forms import FormVersionWriter
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import ApplicationDecision
 from app.modules.applications.router import get_comment_mail_sender, get_magic_link_sender
 from app.modules.applications.schemas import ApplicationCreate
@@ -208,6 +209,30 @@ async def test_the_decision_names_only_the_gremium_of_its_vote(
     source = typst.sources[-1]
     assert source.count("[!feld] Gremium") == 1
     assert source.index("# Beschluss") < source.index(gremium)
+
+
+async def test_the_switch_of_the_antragsart_adds_the_signature_section(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§000887: no signature section without the switch, two rows with it."""
+    app_id = await _create(maker, seed)
+    typst = FakeTypst()
+    reader = _client(migrated, settings, monkeypatch, typst, _READER)
+    assert reader.get(f"/api/applications/{app_id}/pdf").status_code == 200
+    assert "[!unterschrift]" not in typst.sources[-1]
+    async with maker() as session:
+        await session.execute(
+            update(ApplicationType)
+            .where(ApplicationType.id == seed.type_id)
+            .values(pdf_signatures=True)
+        )
+        await session.commit()
+    assert reader.get(f"/api/applications/{app_id}/pdf").status_code == 200
+    assert typst.sources[-1].count("[!unterschrift]") == 2
 
 
 async def test_a_stranger_gets_the_gate_of_the_detail_page(

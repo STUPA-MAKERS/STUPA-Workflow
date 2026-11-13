@@ -556,7 +556,7 @@
       "to": "application_types"
     },
     {
-      "count": 7,
+      "count": 8,
       "from": "documents",
       "to": "applications"
     },
