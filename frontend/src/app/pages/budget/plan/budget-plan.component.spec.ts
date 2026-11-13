@@ -725,6 +725,20 @@ describe('BudgetPlanComponent', () => {
       first.complete();
     });
 
+    it('§F/finance/budget/000812: a refused amount leaves the amount of the later save in the field', async () => {
+      const view = await setup();
+      const first = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(first).mockReturnValueOnce(new Subject<BudgetPlan>());
+      await typeAmount(input(view, 'amount-grants'), '80');
+      await typeAmount(input(view, 'amount-grants'), '75');
+      first.error(problem(409, 'plan_blocked_above_amount'));
+      view.fixture.detectChanges();
+      await new Promise((done) => setTimeout(done, 50));
+      const page = view.fixture.componentInstance;
+      expect(page.fieldValue(page.rows().find((row) => row.id === 'grants')!, 'amount')).toBe('75');
+      expect(input(view, 'amount-grants').value).toBe('75,00');
+    });
+
     it('§F/finance/budget/000809: the change of a line shows its sign, and no change shows a dash', async () => {
       const view = await setup();
       const page = view.fixture.componentInstance;

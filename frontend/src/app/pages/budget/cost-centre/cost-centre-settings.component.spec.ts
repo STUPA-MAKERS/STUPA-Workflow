@@ -319,6 +319,57 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.api.updateNode.mock.calls).toEqual([['ks', { name: 'Neu' }]]);
   });
 
+  it('§F/finance/budget/000849: a Kostenstelle that the person selects again during a save shows the text that waits, and the text is saved', async () => {
+    const view = await setup();
+    const first = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(first);
+    await userEvent.click(screen.getByRole('switch', { name: 'Aktiv' }));
+    await retype(view.field('Name'), 'Neu');
+    view.fixture.componentRef.setInput('node', { ...KS, id: 'other', name: 'B' });
+    view.fixture.detectChanges();
+    await waitFor(() => expect(view.field('Name').value).toBe('B'));
+    view.fixture.componentRef.setInput('node', { ...KS });
+    view.fixture.detectChanges();
+    await waitFor(() => expect(view.field('Name').value).toBe('Neu'));
+    first.next({});
+    first.complete();
+    expect(view.api.updateNode.mock.calls).toEqual([
+      ['ks', { active: false }],
+      ['ks', { name: 'Neu' }],
+    ]);
+  });
+
+  it('§F/finance/budget/000849: a Kostenstelle that the person selects again shows no Gremium while the save that removes it runs', async () => {
+    const view = await setup({ viewGremiumId: 'g1' });
+    const box = () => screen.getByRole('combobox', { name: /Sichtbar für Gremium/ });
+    await waitFor(() => expect(box()).toHaveTextContent('StuPa'));
+    view.api.updateNode.mockReturnValueOnce(new Subject<object>());
+    await pick(/Sichtbar für Gremium/, 'Ohne Gremium');
+    view.fixture.componentRef.setInput('node', { ...KS, id: 'other', viewGremiumId: 'g1' });
+    view.fixture.detectChanges();
+    await waitFor(() => expect(box()).toHaveTextContent('StuPa'));
+    view.fixture.componentRef.setInput('node', { ...KS, viewGremiumId: 'g1' });
+    view.fixture.detectChanges();
+    await waitFor(() => expect(box()).not.toHaveTextContent('StuPa'));
+  });
+
+  it('§F/finance/budget/000849: a text that waits stays when the value of another person takes the place of the save before', async () => {
+    const view = await setup();
+    await retype(view.field('Name'), 'Erst');
+    view.api.updateNode.mockReturnValueOnce(new Subject<object>());
+    await userEvent.click(screen.getByRole('switch', { name: 'Aktiv' }));
+    await retype(view.field('Name'), 'Neu');
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Fremd' });
+    view.fixture.detectChanges();
+    await new Promise((done) => setTimeout(done, 50));
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Fremd' });
+    view.fixture.detectChanges();
+    await new Promise((done) => setTimeout(done, 50));
+    view.fixture.detectChanges();
+    await new Promise((done) => setTimeout(done, 50));
+    expect(view.field('Name').value).toBe('Neu');
+  });
+
   it('§F/finance/budget/000849: the third press is saved while the tree holds the state of the first', async () => {
     const view = await setup();
     const first = new Subject<object>();

@@ -174,13 +174,15 @@ export class CostCentreSettingsComponent {
    * shows, while a save runs (`busy`) or the last request is ahead of the tree. A control
    * of a Kostenstelle that the person selects again during its save shows the value of that
    * request, because the tree holds the value before, and a leave of the field would save
-   * that value again.
+   * that value again. A change of the field that waits for the save counts before that
+   * request, because it is the last value of the person.
    */
   private kept<T>(name: Field, saved: Saved<T>, last: { readonly source: Saved<T>; readonly value: T } | undefined, busy: boolean): T {
     const ahead = this.ahead(saved.id, name);
     if (last && last.source.id === saved.id) return busy || ahead ? last.value : saved.value;
-    const value = this.sent[`${saved.id}:${name}`]?.value;
-    return ahead ? ((name === 'viewGremiumId' || name === 'decisionGremiumId' ? (value ?? '') : value) as T) : saved.value;
+    const waits = untracked(this.waiting).find((c) => c.id === saved.id && c.field === name);
+    const value = waits ? waits.value : this.sent[`${saved.id}:${name}`]?.value;
+    return waits || ahead ? ((name === 'viewGremiumId' || name === 'decisionGremiumId' ? (value ?? '') : value) as T) : saved.value;
   }
   /**
    * The last request of a field holds a value that no tree held yet. A tree that comes then
