@@ -27,7 +27,9 @@ later save of the field runs. A save, refused or not, must not change
 the text that the person types in another field or in a field of another Kostenstelle, and
 a refused save must not change a control whose later choice waits. The switch "Aktiv" must
 stay enabled and keep the keyboard focus while a save runs, and a switch or a select must
-show the last choice of the person until its save ends.
+show the last choice of the person until its save ends. A field must keep the last text or
+choice of the person until a tree holds the value of its last save, because the tree of the
+save before can arrive after the answer of the last save.
 
 Reason: Two writes that run at the same moment can reach the server in the other order, and
 the tree that the page reads after the first one is older than the second one. The last
@@ -41,6 +43,6 @@ Kostenstelle before, set a select back while its save runs, save a name again th
 took back, refuse a save while a later press of the switch waits, and select another
 Kostenstelle while a press that is back at the saved state and a field without a change
 wait. One test leaves a Kostenstelle after a save, selects it again with another saved
-value and saves the first value again. One test presses the switch a third time while the tree holds the state of the first
+value and saves the first value again. One test answers the tree of the save before after the last save of a name and of a select and reads the last text and choice. One test presses the switch a third time while the tree holds the state of the first
 press, one removes a Gremium and sets it again during the save, and one presses the switch
 a fourth time after the trees of the first two saves came during the third.
