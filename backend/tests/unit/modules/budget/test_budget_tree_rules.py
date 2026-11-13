@@ -215,7 +215,7 @@ def test_scope_forest_picks_assigned_subtrees_as_roots() -> None:
         _node("other", "top", None, "900", "VS-900"),
     ]
     forest = r.build_forest(nodes, [], [])
-    scoped = r.scope_forest(forest, {g})
+    scoped = r.scope_forest(forest, {"mid"})
     assert [n["id"] for n in scoped] == ["mid"]
     assert [c["id"] for c in scoped[0]["children"]] == ["leaf"]
 
@@ -228,7 +228,7 @@ def test_scope_forest_outer_assignment_wins_and_empty_scope() -> None:
         _node("mid", "top", None, "800", "VS-800", view_gremium_id=g),
     ]
     forest = r.build_forest(nodes, [], [])
-    scoped = r.scope_forest(forest, {g})
+    scoped = r.scope_forest(forest, {"top", "mid"})
     assert [n["id"] for n in scoped] == ["top"]
     assert r.scope_forest(forest, set()) == []
     assert r.scope_forest(forest, {uuid.uuid4()}) == []

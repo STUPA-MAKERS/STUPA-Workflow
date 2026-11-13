@@ -37,6 +37,7 @@ from app.modules.applications.service.service_base import (
     state_since_subquery,
 )
 from app.modules.auth.principal import Principal
+from app.modules.budget.access import viewed_by
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
@@ -347,7 +348,7 @@ class ListingOps(ApplicationsServiceBase):
             return []
         root_paths = (
             await self.session.scalars(
-                select(Budget.path_key).where(Budget.view_gremium_id.in_(member_ids))
+                select(Budget.path_key).where(viewed_by(member_ids))
             )
         ).all()
         budget_scope = (_view_subtrees(root_paths),) if root_paths else ()

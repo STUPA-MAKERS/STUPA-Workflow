@@ -126,6 +126,7 @@ async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
 
     The frontend uses the flag to show the budget tab.
     """
+    from app.modules.budget.access import viewed_by
     from app.modules.budget.tree_models import Budget
     from app.modules.gremien.gremium_roles import gremium_reader_ids
 
@@ -133,7 +134,7 @@ async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
     if not member:
         return False
     hit = await db.scalar(
-        select(Budget.id).where(Budget.view_gremium_id.in_(member)).limit(1)
+        select(Budget.id).where(viewed_by(member)).limit(1)
     )
     return hit is not None
 

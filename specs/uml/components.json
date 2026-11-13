@@ -6,7 +6,7 @@
       "to": "auth"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "account",
       "to": "budget"
     },
@@ -176,7 +176,7 @@
       "to": "auth"
     },
     {
-      "count": 8,
+      "count": 10,
       "from": "applications",
       "to": "budget"
     },
