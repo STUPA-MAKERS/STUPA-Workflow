@@ -167,7 +167,8 @@ async def test_a_reader_downloads_the_antrag_with_every_field(
     assert "typ: antrag" in source
     assert "\n".join(field_row("Zweck", ["Werbung"])) in source
     assert "DE02120300000000202051" in source
-    assert "Luis Meyer \\(luis@example\\.org\\)" in source
+    mail = "[`luis@example.org`](mailto:luis@example.org)"
+    assert "\n".join(field_row("Antragsteller", ["Luis Meyer\\", mail])) in source
 
 
 async def test_the_decision_names_only_the_gremium_of_its_vote(

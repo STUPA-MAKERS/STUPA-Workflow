@@ -73,6 +73,7 @@ _NEUTRAL: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
     (re.compile(r"\{\{"), "{\u2060{"),
     (re.compile(r"/api/media/documents/"), "/api/media/documents\u2060/"),
 )
+_MAIL: Final[re.Pattern[str]] = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+")
 _ISO_DAY: Final[re.Pattern[str]] = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 
 
@@ -114,7 +115,10 @@ class ApplicationDoc:
         cd_variant: The design key of the Gremium, for the logos.
         state_label: The current status, or `None` to leave it out (the protocol Anlage).
         received_on: The date of receipt.
-        applicant: The applicant line, or `None` when the reader may not see it.
+        applicant: The name of the applicant, or `None` when it is unknown or the reader
+            may not see it.
+        applicant_email: The e-mail of the applicant, or `None` likewise. It prints on
+            its own line below the name, in the monospace font.
         version: The version number of the answers.
         sections: The form sections with their fields.
         data: The answers.
@@ -139,6 +143,7 @@ class ApplicationDoc:
     data: Mapping[str, object]
     context: Mapping[str, object] = field(default_factory=dict[str, object])
     currency: str = "EUR"
+    applicant_email: str | None = None
     hidden_keys: frozenset[str] = frozenset()
     redacted_keys: frozenset[str] = frozenset()
     redact_applicant: bool = False
@@ -171,6 +176,15 @@ def _bold_heading(match: re.Match[str]) -> str:
 def code(text: str) -> str:
     """Write a value as inline code, in the monospace font: one line, no backtick."""
     return _unbar("`" + " ".join(text.replace("`", "'").split()) + "`")
+
+
+def mail_link(address: str) -> str:
+    """Write an e-mail address in the monospace font, as a `mailto:` link.
+
+    An address with a character that could end the link target prints without the link.
+    """
+    plain = address.strip()
+    return f"[{code(plain)}](mailto:{plain})" if _MAIL.fullmatch(plain) else code(plain)
 
 
 def _lines(values: Sequence[str]) -> list[str]:
@@ -448,17 +462,21 @@ def _decision_lines(doc: ApplicationDoc) -> list[str]:
 
 def _head_lines(doc: ApplicationDoc) -> list[str]:
     """Write the head data as the first table, the file names last."""
-    applicant = BAR if doc.redact_applicant else (escape(doc.applicant) if doc.applicant else None)
+    known = [
+        *([escape(doc.applicant)] if doc.applicant else []),
+        *([mail_link(doc.applicant_email)] if doc.applicant_email else []),
+    ]
+    applicant = [BAR] if doc.redact_applicant else _lines(known)
     rows = (
-        ("Antragsart", escape(doc.type_name) if doc.type_name else None),
-        ("Status", escape(doc.state_label) if doc.state_label else None),
-        ("Eingang", code(format_day(doc.received_on)) if doc.received_on else None),
+        ("Antragsart", [escape(doc.type_name)] if doc.type_name else []),
+        ("Status", [escape(doc.state_label)] if doc.state_label else []),
+        ("Eingang", [code(format_day(doc.received_on))] if doc.received_on else []),
         ("Antragsteller", applicant),
-        ("Version", code(str(doc.version))),
+        ("Version", [code(str(doc.version))]),
     )
     files = _lines([code(name) for name in doc.files])
     return [
-        *(line for label, value in rows if value for line in field_row(label, [value])),
+        *(line for label, value in rows if value for line in field_row(label, value)),
         *(field_row("Anhänge", files) if files else []),
     ]
 

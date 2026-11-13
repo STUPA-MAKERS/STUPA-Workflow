@@ -31,7 +31,9 @@ Kostenaufstellung (a position or an offer) that would take 3 lines or more must 
 and a line "…". The Kostenaufstellung must have no rule above and no rule below, and no inset at
 its sides: it starts at the text of the other values and ends at the right edge of the table.
 
-The version, each date, an IBAN and each amount must print in the monospace font. The names of
+The version, each date, an IBAN and each amount must print in the monospace font. The e-mail of the
+applicant must stand on its own line below the name, in the monospace font, as a `mailto:` link.
+The names of
 the attached files must print in the monospace font, one name per line, without list markers.
 
 The PDF must hold, in this order:

@@ -105,7 +105,8 @@ def _doc(**kwargs: Any) -> ApplicationDoc:
         "cd_variant": "stupa",
         "state_label": "Bewilligt",
         "received_on": date(2026, 11, 10),
-        "applicant": "Max Muster (max@example.org)",
+        "applicant": "Max Muster",
+        "applicant_email": "max@example.org",
         "version": 3,
         "sections": SECTIONS,
         "data": DATA,
@@ -130,7 +131,8 @@ def test_document_has_the_parts_in_order() -> None:
     assert row("Antragsart", "Finanzantrag") in md
     assert row("Status", "Bewilligt") in md
     assert row("Eingang", "`10.11.2026`") in md
-    assert row("Antragsteller", "Max Muster \\(max@example\\.org\\)") in md
+    mail = "[`max@example.org`](mailto:max@example.org)"
+    assert row("Antragsteller", "Max Muster\\", mail) in md
     assert row("Version", "`3`") in md
     assert row("Anhänge", "`Angebot.pdf`") in md
 
@@ -216,7 +218,15 @@ def test_several_conditions_are_paragraphs_with_a_rule_between() -> None:
 
 def test_an_empty_antrag_has_only_the_head() -> None:
     md = build_application_document(
-        _doc(data={}, decision=None, files=(), title="", applicant=None, state_label=None)
+        _doc(
+            data={},
+            decision=None,
+            files=(),
+            title="",
+            applicant=None,
+            applicant_email=None,
+            state_label=None,
+        )
     )
     assert 'title: "Antrag"' in md
     assert "Antragsteller" not in md and "Status" not in md
@@ -226,6 +236,15 @@ def test_an_empty_antrag_has_only_the_head() -> None:
 def test_several_files_stand_one_per_line_in_code() -> None:
     md = build_application_document(_doc(files=("a.pdf", "b `c`.pdf")))
     assert row("Anhänge", "`a.pdf`\\", "`b 'c'.pdf`") in md
+
+
+def test_the_applicant_shows_what_is_known() -> None:
+    only_mail = build_application_document(_doc(applicant=None))
+    assert row("Antragsteller", "[`max@example.org`](mailto:max@example.org)") in only_mail
+    only_name = build_application_document(_doc(applicant_email=None))
+    assert row("Antragsteller", "Max Muster") in only_name
+    odd = build_application_document(_doc(applicant_email="a)b@x.org"))
+    assert row("Antragsteller", "Max Muster\\", "`a)b@x.org`") in odd
 
 
 def test_helpers() -> None:

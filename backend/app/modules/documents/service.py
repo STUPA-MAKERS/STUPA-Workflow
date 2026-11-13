@@ -110,19 +110,6 @@ def _title(data: Mapping[str, Any]) -> str:
     return title.strip() if isinstance(title, str) and title.strip() else "Antrag"
 
 
-def _applicant_line(name: str | None, email: str | None) -> str | None:
-    """Write the applicant as `Name (E-Mail)`, the part that is known, or nothing."""
-    match (name or None, email or None):
-        case (None, None):
-            return None
-        case (str() as n, None):
-            return n
-        case (None, str() as e):
-            return e
-        case (n, e):
-            return f"{n} ({e})"
-
-
 @dataclass(frozen=True, slots=True)
 class ApplicationPdfService:
     """Build and render the PDF of one Antrag.
@@ -188,11 +175,8 @@ class ApplicationPdfService:
         )
         gremium = await self._gremium(app.gremium_id)
         hidden = frozenset(out.hidden_keys)
-        applicant = (
-            _applicant_line(out.applicant.name, out.applicant.email)
-            if out.applicant is not None
-            else out.submitted_by
-        )
+        applicant = (out.applicant.name or None) if out.applicant is not None else out.submitted_by
+        applicant_email = (out.applicant.email or None) if out.applicant is not None else None
         # The PDF names a Gremium only for a decision by a vote: the Gremium that ran
         # the vote. The applicant view hides the vote id, so the row tells it.
         row = await valid_decision(self.session, app.id) if out.decision is not None else None
@@ -215,6 +199,7 @@ class ApplicationPdfService:
             state_label=resolve_i18n(out.state.label, LANG) if out.state is not None else None,
             received_on=self._received_on(app),
             applicant=applicant,
+            applicant_email=applicant_email,
             version=out.version,
             sections=_sections(form),
             data=out.data,
@@ -280,9 +265,8 @@ class ApplicationPdfService:
             cd_variant=await cd_variant_key_for_gremium(self.session, gremium),
             state_label=None,
             received_on=self._received_on(app),
-            applicant=(
-                _applicant_line(applicant.name, applicant.email) if applicant is not None else None
-            ),
+            applicant=(applicant.name or None) if applicant is not None else None,
+            applicant_email=(applicant.email or None) if applicant is not None else None,
             version=int(number or 1),
             sections=_sections(form),
             data=data,
