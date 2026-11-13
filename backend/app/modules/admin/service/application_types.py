@@ -19,6 +19,12 @@ from app.modules.site_config.features import Feature, feature_on
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
+def _set_pdf_signatures(row: ApplicationType, wanted: bool | None) -> None:
+    """Set the switch for the signature section of the Antrag PDF; ``None`` keeps it."""
+    if wanted is not None:
+        row.pdf_signatures = wanted
+
+
 def _type_out(row: ApplicationType, version: int | None = None) -> ApplicationTypeOut:
     """Map a type row to its DTO. ``version`` is the number of the active form version."""
     return ApplicationTypeOut(
@@ -119,8 +125,7 @@ class ApplicationTypeOps(ConfigServiceBase):
             row.gremium_id = payload.gremium_id
         if payload.has_budget is not None:
             row.has_budget = payload.has_budget
-        if payload.pdf_signatures is not None:
-            row.pdf_signatures = payload.pdf_signatures
+        _set_pdf_signatures(row, payload.pdf_signatures)
         if payload.comparison_offers is not None:
             row.comparison_offers = payload.comparison_offers.model_dump(by_alias=True)
         if "retention_months" in payload.model_fields_set:
