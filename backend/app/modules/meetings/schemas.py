@@ -84,6 +84,8 @@ class AgendaItemOut(FrozenCamelModel, frozen=True):
     todo_id: UUID | None = Field(default=None, alias="todoId")
     #: The version of a Haushaltsplan that an item of kind plan decides.
     plan_version_id: UUID | None = Field(default=None, alias="planVersionId")
+    #: The version of the plan is a draft: the item reads it and takes no vote.
+    plan_reading: bool = Field(default=False, alias="planReading")
     #: The title of the item: its own title, else the title of its application.
     title: str | None = None
     #: The title of the application. None for a free-text item.

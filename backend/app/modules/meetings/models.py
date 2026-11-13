@@ -156,6 +156,11 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     plan_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget_plan_version.id", ondelete="SET NULL"), nullable=True
     )
+    #: The PDF of the plan that the protocol of the meeting appends as its Anlage
+    #: (spec 000876). The finalize of the protocol sets it.
+    plan_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("markdown_document.id", ondelete="SET NULL"), nullable=True
+    )
     #: Markdown body of this agenda item. It flows into the final protocol.
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, server_default="0")

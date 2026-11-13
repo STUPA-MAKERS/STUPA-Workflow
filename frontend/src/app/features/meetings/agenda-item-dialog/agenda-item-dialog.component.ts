@@ -43,8 +43,8 @@ import { problemDetail } from '@core/api/problem';
 import { cardsOf, sortedColumns } from '../../todos/todos.util';
 import { isoDay, shortDay } from '@shared/date-format';
 
-/** What the new agenda item is: an application of the Gremium, a to-do, or a free text. */
-export type AgendaItemKind = 'application' | 'todo' | 'freetext';
+/** What the new agenda item is: an application of the Gremium, a Haushaltsplan, a to-do, or a free text. */
+export type AgendaItemKind = 'application' | 'plan' | 'todo' | 'freetext';
 
 /**
  * The empty list of the area: `none` when the kind has nothing to offer at all, `noMatch`
@@ -52,11 +52,11 @@ export type AgendaItemKind = 'application' | 'todo' | 'freetext';
  */
 export type AgendaEmptyCase = 'none' | 'noMatch';
 
-/** A row of the list "Antrag": an application in a vote state, or a Haushaltsplan that waits. */
+/** A row of the list "Antrag" or "Haushalt": an application in a vote state, or a plan version. */
 export interface AgendaDecisionOption {
   readonly id: Uuid;
   readonly title: string;
-  /** The flow state of the application, or "Haushaltsplan". */
+  /** The flow state of the application, or what the agenda takes the plan for. */
   readonly sub: string;
   readonly plan: boolean;
 }
@@ -74,9 +74,10 @@ export interface AgendaTodoOption {
  * free-text item.
  *
  * The application list is `GET …/agenda/assignable`: the applications of the meeting
- * Gremium in a vote state that are not on an agenda yet. The same list offers the
- * versions of a Haushaltsplan that wait for the decision of the Gremium
- * (`GET …/agenda/assignable-plans`), before the applications. The to-do list is the gremium
+ * Gremium in a vote state that are not on an agenda yet. The kind "Haushalt" lists
+ * the versions of a Haushaltsplan that wait for the decision of the Gremium and the
+ * drafts for a reading (`GET …/agenda/assignable-plans`). It shows only in a Gremium
+ * that decides the plan of a Haushalt in a step (spec 000876). The to-do list is the gremium
  * board of the meeting (`GET /todos/boards?gremiumId=` and the board read): its cards
  * outside the done column that are not on this agenda yet. It loads on the first switch
  * to "To-Do", and the kind shows only with `todo.write` in the gremium. The server makes
@@ -128,8 +129,10 @@ export class AgendaItemDialogComponent {
 
   readonly kind = signal<AgendaItemKind>('freetext');
   readonly assignable = signal<AssignableApplication[]>([]);
-  /** The versions of a Haushaltsplan that wait for the Gremium of the meeting. */
-  readonly plans = signal<WaitingPlan[]>([]);
+  /** The versions of a Haushaltsplan that the agenda can take. */
+  readonly plans = signal<readonly WaitingPlan[]>([]);
+  /** The Gremium of the meeting decides the plan of a Haushalt in a step. */
+  readonly decidesPlans = signal(false);
   readonly loading = signal(false);
   readonly todosLoading = signal(false);
   readonly query = signal('');
@@ -158,6 +161,7 @@ export class AgendaItemDialogComponent {
     const t = (key: TranslationKey): string => this.i18n.translate(key);
     return [
       { value: 'application', label: t('meetings.agenda.kindApplication') },
+      ...(this.decidesPlans() ? [{ value: 'plan', label: t('meetings.agenda.kindPlan') }] : []),
       ...(this.canTodo() ? [{ value: 'todo', label: t('meetings.agenda.kindTodo') }] : []),
       { value: 'freetext', label: t('meetings.agenda.kindFreetext') },
     ];
@@ -178,23 +182,51 @@ export class AgendaItemDialogComponent {
     return pick !== null && this.shownTodos().some((c) => c.id === pick) ? pick : null;
   });
 
-  /** The waiting plans, then the applications, each as a row of the list. */
-  private readonly decisions = computed<AgendaDecisionOption[]>(() => [
-    ...this.plans().map((p) => ({
-      id: p.planVersionId,
-      title: p.title,
-      sub: this.i18n.translate('meetings.agenda.planSub'),
-      plan: true,
-    })),
-    ...this.assignable().map((a) => ({
-      id: a.applicationId,
-      title: a.title ?? '',
-      sub: resolveI18n(a.stateLabel, this.i18n.uiLocale()),
-      plan: false,
-    })),
-  ]);
+  /** The rows of the current list: the plans under "Haushalt", else the applications. */
+  private readonly decisions = computed<AgendaDecisionOption[]>(() =>
+    this.kind() === 'plan'
+      ? this.plans().map((p) => ({
+          id: p.planVersionId,
+          title: p.title,
+          sub: this.i18n.translate(p.reading ? 'meetings.agenda.planReadingSub' : 'meetings.agenda.planDecisionSub'),
+          plan: true,
+        }))
+      : this.assignable().map((a) => ({
+          id: a.applicationId,
+          title: a.title ?? '',
+          sub: resolveI18n(a.stateLabel, this.i18n.uiLocale()),
+          plan: false,
+        })),
+  );
 
-  /** The plans and the applications whose title holds the search text. */
+  /** The texts of the current list: search, label and the two empty headings. */
+  readonly listText = computed<Record<'search' | 'label' | 'none' | 'noMatch', TranslationKey>>(() => {
+    switch (this.kind()) {
+      case 'plan':
+        return {
+          search: 'meetings.agenda.searchPlan',
+          label: 'meetings.agenda.plansLabel',
+          none: 'meetings.agenda.noPlans',
+          noMatch: 'meetings.agenda.noPlanMatch',
+        };
+      case 'todo':
+        return {
+          search: 'meetings.agenda.searchTodo',
+          label: 'meetings.agenda.openTodosLabel',
+          none: 'meetings.agenda.noTodos',
+          noMatch: 'meetings.agenda.noTodoMatch',
+        };
+      default:
+        return {
+          search: 'meetings.agenda.searchApplication',
+          label: 'meetings.agenda.assignableLabel',
+          none: 'meetings.agenda.noAssignable',
+          noMatch: 'meetings.agenda.noMatch',
+        };
+    }
+  });
+
+  /** The rows of the current list whose title holds the search text. */
   readonly shown = computed<AgendaDecisionOption[]>(() => {
     const needle = this.query().trim().toLocaleLowerCase();
     const rows = this.decisions();
@@ -227,6 +259,7 @@ export class AgendaItemDialogComponent {
   readonly valid = computed(() => {
     switch (this.kind()) {
       case 'application':
+      case 'plan':
         return this.visiblePick() !== null;
       case 'todo':
         return this.visibleTodoPick() !== null;
@@ -254,9 +287,13 @@ export class AgendaItemDialogComponent {
     this.todoPick.set(null);
     this.assignable.set([]);
     this.plans.set([]);
+    this.decidesPlans.set(false);
     this.loading.set(true);
     this.api.listAssignablePlans(this.meeting().id).subscribe({
-      next: (rows) => this.plans.set(rows),
+      next: (out) => {
+        this.plans.set(out.plans);
+        this.decidesPlans.set(out.decides);
+      },
       error: () => this.plans.set([]),
     });
     this.api.listAssignableApplications(this.meeting().id).subscribe({
@@ -273,6 +310,7 @@ export class AgendaItemDialogComponent {
 
   setKind(value: string | null): void {
     if (value === 'application' || value === 'freetext') this.kind.set(value);
+    if (value === 'plan' && this.decidesPlans()) this.kind.set('plan');
     if (value === 'todo' && this.canTodo()) {
       this.kind.set('todo');
       if (this.todos() === null) this.loadTodos();
@@ -368,7 +406,7 @@ export class AgendaItemDialogComponent {
     const todo = this.visibleTodoPick();
     const kind = this.kind();
     const req =
-      kind === 'application' && pick !== null
+      (kind === 'application' || kind === 'plan') && pick !== null
         ? pick.plan
           ? this.api.addAgendaPlan(meetingId, pick.id, this.nonPublic())
           : this.api.addAgendaItem(meetingId, pick.id, this.nonPublic())

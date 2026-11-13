@@ -437,6 +437,8 @@ export interface AgendaItem {
   readonly todoId?: Uuid | null;
   /** The version of a Haushaltsplan that the item decides, or `null`. */
   readonly planVersionId?: Uuid | null;
+  /** The plan of the item is a draft: the meeting reads it and takes no vote on it. */
+  readonly planReading?: boolean;
   /** The own title of the item, else the title of its application. */
   readonly title: string | null;
   /** The title of the application. `null` for a free-text item. */
@@ -460,7 +462,7 @@ export interface AssignableApplication {
   readonly stateLabel?: I18nMap | null;
 }
 
-/** `WaitingPlanOut`. A version of a Haushaltsplan that waits for the decision of the Gremium. */
+/** `WaitingPlanOut`. A version of a Haushaltsplan that an agenda can take: one that waits for the decision of the Gremium, or a draft for a reading. */
 export interface WaitingPlan {
   readonly planVersionId: Uuid;
   readonly budgetName: string;
@@ -469,6 +471,15 @@ export interface WaitingPlan {
   readonly step: string;
   /** The title that the agenda item of the plan takes. */
   readonly title: string;
+  /** A draft that the agenda takes for a reading, without a decision. */
+  readonly reading?: boolean;
+}
+
+/** `AssignablePlansOut`. The plan versions that the agenda of a meeting can take. */
+export interface AssignablePlans {
+  /** The Gremium of the meeting decides the plan of a Haushalt in a step. */
+  readonly decides: boolean;
+  readonly plans: readonly WaitingPlan[];
 }
 
 /** `AltchaChallengeOut`. A server-signed proof-of-work challenge. GET /altcha/challenge. */

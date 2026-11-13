@@ -220,7 +220,8 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
 
     The fake session serves, in order:
 
-    - execute: ``_get``, the internal items (empty), the public items (empty), the members of
+    - execute: ``_get``, the items of ``attach_plans`` (none), the internal items (empty),
+      the public items (empty), the members of
       ``_recipients`` and its mail list;
     - scalar: ``_has_non_public`` (1), the internal protokollant, the internal member count,
       the public protokollant, the public member count, the gremium name for ``_send``.
@@ -232,7 +233,7 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),
+            result(proto), result(),
             result(),
             result(),
             result("m@x.de"),
@@ -307,7 +308,8 @@ async def test_assemble_from_agenda_builds_blocks_with_votes() -> None:
 
     The fake session serves, in order:
 
-    - execute: ``_get``, the items, the votes of the first item, ``voting._get_vote``, the
+    - execute: ``_get``, the items of ``attach_plans`` (none), the items, the votes of the
+      first item, ``voting._get_vote``, the
       ballots for ``voting._aggregate``, the votes of the second item (empty), the members
       and the mail list of ``_recipients`` (empty);
     - scalar: ``has_non_public`` (0), the protokollant, the member count.
@@ -323,7 +325,7 @@ async def test_assemble_from_agenda_builds_blocks_with_votes() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium(), vote.id: vote},
         results=[
-            result(proto),
+            result(proto), result(),
             result(item_with_vote, item_empty),
             result(vote),
             result(vote),
@@ -366,7 +368,7 @@ async def test_assemble_public_redacts_non_public_top() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),
+            result(proto), result(),
             result(np_item, pub_item),
             result(),
             result(),
@@ -405,7 +407,7 @@ async def test_assemble_skips_cancelled_votes_in_query() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),
+            result(proto), result(),
             result(item),
             result(),
             result(),
@@ -593,7 +595,7 @@ async def test_send_subject_and_body_include_gremium_and_date() -> None:
     session = FakeSession(
         store={MID: meeting, GID: _gremium()},
         results=[
-            result(proto),
+            result(proto), result(),
             result(),
             result("a@x.de"),
             result(),

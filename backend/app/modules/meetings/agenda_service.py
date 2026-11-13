@@ -32,6 +32,7 @@ edit after the close is a correction of the minutes and is audited, without the 
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -42,6 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.budget.plan_models import BudgetPlanVersion
 from app.modules.flow.models import State
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.meetings.protocol_models import Protocol
@@ -255,7 +257,35 @@ class AgendaService:
             if state_ids
             else {}
         )
-        return [_item_out(r, apps, states) for r in rows]
+        drafts = await self._draft_plans(rows)
+        return [
+            _item_out(r, apps, states).model_copy(
+                update={"plan_reading": getattr(r, "plan_version_id", None) in drafts}
+            )
+            for r in rows
+        ]
+
+    async def _draft_plans(self, rows: Sequence[MeetingAgendaItem]) -> frozenset[UUID]:
+        """Return the plan versions of the items that are a draft, so the item reads them."""
+        plan_ids = [
+            plan_id
+            for r in rows
+            if (plan_id := getattr(r, "plan_version_id", None)) is not None
+        ]
+        return (
+            frozenset(
+                (
+                    await self.session.scalars(
+                        select(BudgetPlanVersion.id).where(
+                            BudgetPlanVersion.id.in_(plan_ids),
+                            BudgetPlanVersion.state == "draft",
+                        )
+                    )
+                ).all()
+            )
+            if plan_ids
+            else frozenset()
+        )
 
     async def set_body(
         self,
