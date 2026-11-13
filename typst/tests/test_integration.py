@@ -328,7 +328,7 @@ def _dark_rows(pixels: bytes, width: int, x0: int, x1: int) -> list[int]:
 
 
 def test_a_black_bar_sits_on_the_baseline(tmp_path: Path) -> None:
-    """§000887: the bar reaches from the descender to just above the cap height."""
+    """§000887: the bar reaches from just under the baseline to above the cap height."""
     pdf = _render("---\ntitle: T\n---\n\nHalli %%%% HHH\n", None)
     lines = _lines(pdf, tmp_path)
     page, x, y = _find(lines, "Halli")
@@ -340,5 +340,5 @@ def test_a_black_bar_sits_on_the_baseline(tmp_path: Path) -> None:
     letters = _dark_rows(band, width, round(x * scale), round((x + 4) * scale))
     bar = _dark_rows(band, width, round((x + 40) * scale), round((x + 50) * scale))
     baseline, cap = letters[-1], letters[0]
-    assert round(1.5 * scale) <= bar[-1] - baseline <= round(3.5 * scale)
-    assert 0 <= cap - bar[0] <= round(2 * scale)
+    assert round(0.5 * scale) <= bar[-1] - baseline <= round(2 * scale)
+    assert round(1 * scale) <= cap - bar[0] <= round(3 * scale)
