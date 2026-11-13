@@ -307,7 +307,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000839](requirements/functional/finance/budget/000839_plan-back-to-draft-ends-votes.md) | A version back in draft ends the votes of its steps | draft |
 | [F/finance/budget/000840](requirements/functional/finance/budget/000840_plan-page-confirmations.md) | The plan page asks before an action that binds or deletes | draft |
 | [F/finance/budget/000841](requirements/functional/finance/budget/000841_plan-step-named.md) | A request that records a step names the step | draft |
-| [F/finance/budget/000842](requirements/functional/finance/budget/000842_plan-write-lock.md) | A write beside a Haushaltsplan takes the lock of its budget | draft |
+| [F/finance/budget/000842](requirements/functional/finance/budget/000842_plan-write-lock.md) | A write in the tree of a budget takes the lock of the budget | draft |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | approved |
@@ -731,6 +731,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/api/000468](style/shared/api/000468_specific-conflict-code.md) | A conflict names a specific code | approved |
 | [S/shared/api/000475](style/shared/api/000475_oauth-error-shape.md) | The OAuth token endpoint uses the RFC 6749 error shape | approved |
 | [S/shared/api/000591](style/shared/api/000591_english-urls.md) | Every URL is in English | approved |
+| [S/shared/api/000843](style/shared/api/000843_unstorable-text.md) | A text that the database cannot store answers 422 | draft |
 | [S/shared/functional/000081](style/shared/functional/000081_body-shape.md) | A function body has one shape | approved |
 | [S/shared/functional/000082](style/shared/functional/000082_readability-limit.md) | Readability limits the single expression | approved |
 | [S/shared/functional/000083](style/shared/functional/000083_bind-once.md) | A local is bound once | approved |

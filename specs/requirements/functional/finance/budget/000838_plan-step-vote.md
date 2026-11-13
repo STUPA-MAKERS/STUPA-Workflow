@@ -4,7 +4,7 @@ title: The vote of a plan step is a vote of its Gremium
 kind: functional
 status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_an_accepted_vote_of_the_gremium_passes_its_step"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_step_of_a_deleted_gremium_takes_no_vote"
@@ -36,7 +36,8 @@ leave the draft with this request (000792). A step without a Gremium must answer
 `plan_step_vote_runs`.
 
 The vote must open and close only through the vote routes, with the right of that Gremium
-to manage votes. The plan page must link to the vote. The vote page must show a link to
+to manage votes. The plan page must link to the vote, for a person who cannot move the version as the
+action of its head. The vote page must show a link to
 the plan to a person who can read the plan (000800), and to no other person.
 
 Reason: The person who manages the plan asks the body for its decision, and the body

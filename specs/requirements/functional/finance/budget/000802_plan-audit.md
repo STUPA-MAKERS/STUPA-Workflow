@@ -10,6 +10,7 @@ tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_deletes_name_the_plan_data_that_goes_with_them"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_delete_of_a_budget_names_its_plans"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_plan_entries_keep_the_names_of_what_they_change"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_audit_log_names_a_plan_and_a_budget"
 implementation:
   - backend/app/modules/budget/tree/plans.py
   - backend/app/modules/audit/actions.py
@@ -32,7 +33,11 @@ a Kostenstelle its draft lines with the Ansatz of each, and the plan switch that
 its deleted versions, and the delete of a top-level Kostenstelle its plans with the
 year and the versions of each. The entry of a version must name the budget by its path key
 and the year, and the entry of a line the path key and the name of its Kostenstelle. The
-entry of a side that takes Vermerke off draft lines (000816) must name those lines. A plan action must not be revertable from the audit log.
+entry of a step, of a vote of a step and of a state change must name the budget and the
+year too, and the plan switch that goes off the year of each deleted plan. The entry of a
+side that takes Vermerke off draft lines (000816) must name those lines with the path key
+and the name of their Kostenstelle. The audit log must show a plan as its budget and its
+year and a Kostenstelle by its name. A plan action must not be revertable from the audit log.
 
 Reason: An entry that holds only an id cannot be read after the plan is gone. An examiner must be able to see who changed the plan and when. The plan changes
 again by a later version or a Nachtrag, so a revert would make a second way around the

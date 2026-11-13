@@ -22,7 +22,9 @@ A plan line of an expense Kostenstelle must hold the Vermerke "übertragbar" and
 `plan_blocked_above_amount`. A line of an income Kostenstelle must not hold a Vermerk, else
 422 `plan_marks_income`. When a Kostenstelle gets the side income (000817), the platform
 must take the Vermerke and the gesperrt amount off its lines in each draft. A Kostenstelle with a Vermerk or a gesperrt amount in a version
-that left `draft` must keep its side: 409 `side_in_plan`.
+that left `draft` must keep its side: 409 `side_in_plan`, and the page must name the Ansatz
+or the Vermerk as the cause. The plan page must read the plan again after a change of a
+side, so it shows no Vermerk that the platform took off.
 
 Reason: A decided version is a record, so a side must not make its Vermerke wrong. LHO § 19, § 20 and § 22 name these Vermerke as a part of the plan. The plan shows them
 before the platform applies them.

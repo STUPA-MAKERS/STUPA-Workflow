@@ -1186,7 +1186,7 @@
       "to": "auth"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "voting",
       "to": "budget"
     },
