@@ -34,6 +34,20 @@ export function costCentreError(code: string, fallback: TranslationKey = 'budget
   return ERRORS[code] ?? fallback;
 }
 
+/**
+ * The name of the level of a node: the top level is a Haushalt, a node directly below it is
+ * a Titel, and a node below a Titel is a Kostenstelle.
+ */
+export function levelKey(node: Pick<BudgetTreeNode, 'id' | 'parentId'>, top: Pick<BudgetTreeNode, 'id'> | null): TranslationKey {
+  if (!node.parentId) return 'budget.cc.budget';
+  return node.parentId === top?.id ? 'budget.cc.headingTitle' : 'budget.cc.heading';
+}
+
+/** The label of the action that creates a node below `parentId`: a Titel directly below the Haushalt. */
+export function createKey(parentId: string, top: Pick<BudgetTreeNode, 'id'> | null): TranslationKey {
+  return !parentId || parentId === top?.id ? 'budget.cc.createTitle' : 'budget.cc.create';
+}
+
 /** A Kostenstelle is a direct child of a budget that has the plan switch on, so it has a side. */
 export function hasSide(node: Pick<BudgetTreeNode, 'parentId'>, top: BudgetTreeNode | null): boolean {
   return !!top?.planEnabled && node.parentId === top.id;

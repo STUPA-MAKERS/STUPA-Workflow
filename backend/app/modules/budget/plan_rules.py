@@ -103,14 +103,18 @@ def step_vote_config(quorum_percent: int | None) -> dict[str, Any]:
     }
 
 
-def step_vote_question(budget: str, year: str, version: str, step: str) -> str:
-    """Return the question of the vote of a step, such as `Haushaltsplan VS 2026 ...`."""
-    return f"Haushaltsplan {budget} {year}, {version}: {step}"
+def step_vote_question(budget: str, year: str, number: int, step: str) -> str:
+    """Return the question of the vote of a step, such as `Haushaltsplan VS 2026: ...`.
+
+    The first version is the Haushaltsplan itself, so only a Nachtrag is named.
+    """
+    version = "" if number == 0 else f", {version_name(number)}"
+    return f"Haushaltsplan {budget} {year}{version}: {step}"
 
 
 def version_name(number: int) -> str:
-    """Name a version for a message: the Stammplan, or the Nachtrag with its number."""
-    return "Stammplan" if number == 0 else f"{number}. Nachtrag"
+    """Name a version for a message: the Haushaltsplan, or the Nachtrag with its number."""
+    return "Haushaltsplan" if number == 0 else f"{number}. Nachtrag"
 
 
 def side_sums(lines: Sequence[tuple[str | None, Decimal]]) -> tuple[Decimal, Decimal]:

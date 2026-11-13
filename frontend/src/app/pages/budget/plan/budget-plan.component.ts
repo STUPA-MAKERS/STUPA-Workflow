@@ -58,7 +58,7 @@ import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../budget-t
 import { CostCentreCreateComponent, type CostCentreCreated } from '../cost-centre/cost-centre-create.component';
 import { CostCentreSettingsComponent } from '../cost-centre/cost-centre-settings.component';
 import { CostCentreSelectComponent } from '../cost-centre-select/cost-centre-select.component';
-import { costCentreError, findNode, hasSide } from '../cost-centre/cost-centre.util';
+import { costCentreError, createKey, findNode, hasSide, levelKey } from '../cost-centre/cost-centre.util';
 import { defaultFiscalYearId } from '../fiscal-year.util';
 import {
   BudgetPlanApi,
@@ -384,6 +384,10 @@ export class BudgetPlanComponent {
   nodeOf(id: string): BudgetTreeNode | null {
     return findNode(this.tree(), id);
   }
+  /** The heading of the section of a node: Titel directly below the Haushalt, else Kostenstelle. */
+  levelKey(node: BudgetTreeNode): TranslationKey {
+    return levelKey(node, this.top());
+  }
   /** The row is a direct child of the budget, so it has a side. */
   sided(node: BudgetTreeNode): boolean {
     return hasSide(node, this.top());
@@ -426,7 +430,7 @@ export class BudgetPlanComponent {
           ]
         : [];
     return [
-      { key: 'node', label: this.i18n.translate('budget.plan.col.node'), card: 'title' },
+      { key: 'node', label: this.i18n.translate('budget.plan.col.title'), card: 'title' },
       own,
       ...rest,
       money('change', this.i18n.translate('budget.plan.col.change')),
@@ -634,7 +638,7 @@ export class BudgetPlanComponent {
 
   /** The floating button: a new Kostenstelle in a draft, the plan of a year without one. */
   readonly fab = computed<{ readonly id: 'new' | 'createPlan'; readonly label: string } | null>(() => {
-    if (this.editable()) return { id: 'new', label: this.i18n.translate('budget.cc.create') };
+    if (this.editable()) return { id: 'new', label: this.i18n.translate(createKey(this.selId(), this.top())) };
     return this.load().kind === 'none' && this.canWrite() && !!this.year() && !this.year()?.closedAt
       ? { id: 'createPlan', label: this.i18n.translate('budget.plan.none.create') }
       : null;

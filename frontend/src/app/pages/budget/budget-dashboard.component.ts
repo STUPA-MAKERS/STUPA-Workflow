@@ -56,7 +56,7 @@ import { nodeColors, resolveNodeColors } from './budget-color.util';
 import { defaultFiscalYearId } from './fiscal-year.util';
 import { CostCentreCreateComponent, type CostCentreCreated } from './cost-centre/cost-centre-create.component';
 import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
-import { activeOnly, costCentreError, hasSide } from './cost-centre/cost-centre.util';
+import { activeOnly, costCentreError, createKey, hasSide, levelKey } from './cost-centre/cost-centre.util';
 import { pageItemTitle } from '../../layout/page-title.service';
 import { BudgetPlanApi, type BudgetPlan } from './plan/budget-plan.api';
 import { amountProblem, inForce, memberIds, yearMembers } from './plan/budget-plan.util';
@@ -475,9 +475,18 @@ export class BudgetDashboardComponent {
     return keys.map((k) => ({ key: k, label: this.figureLabel(k), value: f[k] }));
   });
 
+  /** The amount of a year is the Ansatz when the Haushalt has a Haushaltsplan, else the Zuteilung. */
   figureLabel(key: FigureKey): string {
-    return this.i18n.translate(`budget.dash.fig.${key}` as TranslationKey);
+    const planned = key === 'allocated' && !!this.selectedTop()?.planEnabled;
+    return this.i18n.translate(planned ? 'budget.dash.fig.planned' : (`budget.dash.fig.${key}` as TranslationKey));
   }
+
+  /** The heading of the section of a node: Haushalt, Titel or Kostenstelle. */
+  levelKey(node: BudgetTreeNode): TranslationKey {
+    return levelKey(node, this.selectedTop());
+  }
+  /** The floating button creates a Titel below the Haushalt, a Kostenstelle below a node. */
+  readonly createKey = computed(() => createKey(this.selectedKsId(), this.selectedTop()));
 
   /** The selected cost centre has sub cost centres to distribute over. */
   readonly hasChildren = computed(() => (this.selectedKs()?.children.length ?? 0) > 0);

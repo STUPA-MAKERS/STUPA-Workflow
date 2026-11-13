@@ -4,7 +4,7 @@ title: A fiscal year with a decided plan cannot be deleted
 kind: functional
 status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_fiscal_year_with_a_decided_plan_is_not_deleted"
   - "backend/tests/unit/modules/budget/test_tree_service_cov.py:test_delete_fiscal_year_with_bookings_409"
@@ -30,7 +30,7 @@ has a version that left `draft`. A plan that holds only a draft must go with the
 year, and the audit entry of the delete must say so. A fiscal year in use must answer 409
 with the code of its cause: `fiscal_year_has_bookings`, `fiscal_year_has_allocations` or
 `fiscal_year_has_applications`. A change of the year of a fiscal year whose Haushaltsplan
-has a version that left `draft` must answer 409 `fiscal_year_has_plan`. The page "Budgets"
+has a version that left `draft` must answer 409 `fiscal_year_has_plan`. The page "Haushalte"
 must name the cause from the code. The page must not offer the delete for a year with a
 decided plan, and it must name the cause at the menu item. The dialog of the delete must
 name the draft only when the plan holds only a draft.

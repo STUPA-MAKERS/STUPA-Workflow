@@ -6,9 +6,15 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-13
 tests:
+  - "frontend/src/app/core/i18n/translations.spec.ts:BudgetTerms"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
-implementation: null
+  - "frontend/src/app/pages/budget/cost-centre/cost-centre-create.component.spec.ts:CostCentreCreateComponent"
+  - "backend/tests/unit/modules/budget/test_plan_rules.py:test_version_name"
+implementation:
+  - frontend/src/app/core/i18n/catalog/de.json
+  - frontend/src/app/pages/budget/cost-centre/cost-centre.util.ts
+  - backend/app/modules/budget/plan_rules.py
 scope:
   - frontend/src/app/core/i18n/catalog
   - frontend/src/app/pages/budget
@@ -26,14 +32,16 @@ The German texts of the platform must name the parts of the budget tree as follo
    or without a Haushaltsplan.
 2. A Kostenstelle directly below a Haushalt is a "Titel". A text that names this level
    alone must say "Titel": the heading of the section of such a node, the dialog that
-   creates a node below a Haushalt, the column heading of the tree and of the plan, and the
-   error texts about the side. A node below a Titel stays a "Kostenstelle", and a text that
+   creates a node below a Haushalt, the column heading of the plan, and the error texts
+   about the side. A node below a Titel stays a "Kostenstelle", and a text that
    holds for a node of any level keeps "Kostenstelle".
 3. The amount of a node for a fiscal year is its "Ansatz" when the Haushalt has a
    Haushaltsplan, in the tree and in the section of the node as in the plan. For a Haushalt
    without a Haushaltsplan it stays the "Zuteilung".
 4. The first version of a plan is the "Haushaltsplan". The word "Stammplan" must not show,
-   also not in the names that the server writes.
+   also not in the names that the server writes. The question of the vote of a step
+   names a Nachtrag and leaves the first version out, because the question starts with
+   "Haushaltsplan".
 
 Every other word stays: "Ist", "Ausgegeben", "Gebunden", "Gesperrt", "Nachtrag", "Seite",
 "Schlüssel", "Haushaltsjahr". The texts of other areas stay too: "Mit Budget" and "Ohne

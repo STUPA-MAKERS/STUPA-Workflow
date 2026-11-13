@@ -24,7 +24,7 @@ async function setup(inputs: Record<string, unknown> = {}, fail = '') {
     ],
   });
   const toast = TestBed.inject(ToastService);
-  const dialog = screen.getByRole('dialog', { name: 'Kostenstelle anlegen' });
+  const dialog = screen.getByRole('dialog', { name: /^(Titel|Kostenstelle) anlegen$/ });
   return {
     ...view,
     api,
@@ -58,8 +58,9 @@ async function pickParent(view: View, name: RegExp): Promise<void> {
 describe('CostCentreCreateComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('starts each opening with an empty form under the given parent', async () => {
+  it('§F/finance/budget/000852: starts each opening with an empty form under the given parent, a Titel below the Haushalt and a Kostenstelle below a Titel', async () => {
     const view = await setup();
+    expect(screen.getByRole('dialog', { name: 'Titel anlegen' })).toBe(view.dialog);
     expect(view.parent()).toHaveTextContent('VS-Mittel');
     expect(view.submit).toBeDisabled();
     await fill(view, 'X', 'Y');
@@ -120,7 +121,7 @@ describe('CostCentreCreateComponent', () => {
     await userEvent.keyboard('{Enter}');
     expect(view.api.createNode).toHaveBeenCalledWith({ parentId: 'qsm', key: '810', name: 'Werkstatt', side: null, currency: 'EUR' });
     expect(view.created).toHaveBeenCalledWith({ id: 'new', plan: null });
-    expect(view.success).toHaveBeenCalledWith('Kostenstelle angelegt.');
+    expect(view.success).toHaveBeenCalledWith('Titel angelegt.');
     expect(view.dialog.querySelector('[name="ccAmount"]')).toBeNull();
   });
 

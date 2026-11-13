@@ -101,7 +101,7 @@ async function pick(scope: HTMLElement, label: string | RegExp, option: string):
 /** Open the edit form of a budget with a press on its row. */
 async function openEdit(name: string): Promise<HTMLElement> {
   await userEvent.click(screen.getByText(name));
-  return screen.findByRole('dialog', { name: 'Budget bearbeiten' });
+  return screen.findByRole('dialog', { name: 'Haushalt bearbeiten' });
 }
 /** Press an item of the menu of a row. */
 async function rowMenu(row: string, item: string): Promise<void> {
@@ -149,7 +149,7 @@ describe('AdminBudgetsComponent', () => {
       expect(screen.getByText('Ohne Haushaltsplan')).toBeInTheDocument();
       expect(screen.getByText('Inaktiv')).toBeInTheDocument();
       expect(screen.getAllByRole('columnheader').map((h) => h.textContent?.trim())).toEqual([
-        'Budget',
+        'Haushalt',
         'Beginn des Haushaltsjahrs',
         'Haushaltsplan',
         'Aktionen',
@@ -171,15 +171,15 @@ describe('AdminBudgetsComponent', () => {
 
     it('shows the empty state without a budget', async () => {
       await setup({ tree: of([]) });
-      expect(screen.getByText('Noch keine Budgets angelegt.')).toBeInTheDocument();
+      expect(screen.getByText('Noch keine Haushalte angelegt.')).toBeInTheDocument();
     });
   });
 
   describe('create', () => {
     it('creates a budget with the start of its fiscal year', async () => {
       const view = await setup();
-      await userEvent.click(screen.getByRole('button', { name: 'Budget anlegen' }));
-      const dialog = await screen.findByRole('dialog', { name: 'Budget anlegen' });
+      await userEvent.click(screen.getByRole('button', { name: 'Haushalt anlegen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Haushalt anlegen' });
       const create = button(dialog, 'Anlegen');
       expect(create).toBeDisabled();
       await userEvent.type(field(dialog, 'topKey'), 'Q-S');
@@ -194,29 +194,29 @@ describe('AdminBudgetsComponent', () => {
       await retype(labelled(dialog, 'Tag'), '28');
       await userEvent.click(create);
       expect(view.api.createNode).toHaveBeenCalledWith({ key: 'QS', name: 'QS-Mittel', fiscalStartDay: 28, fiscalStartMonth: 10 });
-      expect(view.success).toHaveBeenCalledWith('Budget angelegt.');
+      expect(view.success).toHaveBeenCalledWith('Haushalt angelegt.');
       expect(view.api.tree).toHaveBeenCalledTimes(2);
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget anlegen' })).toBeNull());
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt anlegen' })).toBeNull());
     });
 
     it('names the cause of a refused create, keeps the dialog and creates with Enter', async () => {
       const view = await setup();
       view.api.createNode.mockReturnValueOnce(refuse(409, 'budget_key_exists'));
-      await userEvent.click(screen.getByRole('button', { name: 'Budget anlegen' }));
-      const dialog = await screen.findByRole('dialog', { name: 'Budget anlegen' });
+      await userEvent.click(screen.getByRole('button', { name: 'Haushalt anlegen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Haushalt anlegen' });
       await userEvent.type(field(dialog, 'topKey'), 'VS');
       await userEvent.type(field(dialog, 'topName'), 'X{Enter}');
       expect(view.error).toHaveBeenCalledWith('Diesen Schlüssel gibt es an dieser Stelle schon.');
-      expect(screen.getByRole('dialog', { name: 'Budget anlegen' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Haushalt anlegen' })).toBeInTheDocument();
       await userEvent.click(button(dialog, 'Abbrechen'));
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget anlegen' })).toBeNull());
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt anlegen' })).toBeNull());
     });
 
     it('creates nothing a second time while the create runs', async () => {
       const view = await setup();
       view.api.createNode.mockReturnValueOnce(new Subject<unknown>());
-      await userEvent.click(screen.getByRole('button', { name: 'Budget anlegen' }));
-      const dialog = await screen.findByRole('dialog', { name: 'Budget anlegen' });
+      await userEvent.click(screen.getByRole('button', { name: 'Haushalt anlegen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Haushalt anlegen' });
       await userEvent.type(field(dialog, 'topKey'), 'VS');
       await userEvent.type(field(dialog, 'topName'), 'X{Enter}');
       await userEvent.type(field(dialog, 'topName'), '{Enter}');
@@ -237,7 +237,7 @@ describe('AdminBudgetsComponent', () => {
       expect(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' })).toBeChecked();
       expect(within(dialog).getByRole('combobox', { name: 'Sichtbar für Gremium' })).toHaveTextContent('StuPa');
       expect(within(dialog).getByRole('combobox', { name: 'Entscheidendes Gremium' })).toHaveTextContent('StuPa');
-      for (const heading of ['Budget', 'Beginn des Haushaltsjahrs', 'Gremien', 'Haushaltsplan', 'Seite der Kostenstellen', 'Schritte bis zum Inkrafttreten'])
+      for (const heading of ['Haushalt', 'Beginn des Haushaltsjahrs', 'Gremien', 'Haushaltsplan', 'Seite der Titel', 'Schritte bis zum Inkrafttreten'])
         expect(within(dialog).getByRole('heading', { name: heading })).toBeInTheDocument();
       expect(within(dialog).getByRole('combobox', { name: /Beiträge/ })).toHaveTextContent('Einnahme');
       expect(within(dialog).getByRole('combobox', { name: /Zuschüsse/ })).toHaveTextContent('Ausgabe');
@@ -252,9 +252,9 @@ describe('AdminBudgetsComponent', () => {
       const dialog = await openEdit('QS-Mittel');
       expect(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' })).not.toBeChecked();
       expect(within(dialog).queryByRole('heading', { name: 'Schritte bis zum Inkrafttreten' })).toBeNull();
-      expect(within(dialog).queryByRole('heading', { name: 'Seite der Kostenstellen' })).toBeNull();
+      expect(within(dialog).queryByRole('heading', { name: 'Seite der Titel' })).toBeNull();
       await userEvent.click(button(dialog, 'Abbrechen'));
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull());
       expect(view.api.updateNode).not.toHaveBeenCalled();
     });
 
@@ -293,12 +293,12 @@ describe('AdminBudgetsComponent', () => {
       const first2 = again;
       await userEvent.click(button(first2, 'Abbrechen'));
       view.fixture.componentInstance.loadSteps();
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull());
       const late = new Subject<PlanSteps>();
       view.planApi.steps.mockReturnValueOnce(late);
       const second = await openEdit('VS-Mittel');
       await userEvent.click(button(second, 'Abbrechen'));
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull());
       const third = await openEdit('Kultur');
       await userEvent.click(within(third).getByRole('switch', { name: 'Haushaltsplan führen' }));
       late.next({ budgetId: 'vsm', steps: [{ name: 'Alt', gremiumId: null }] });
@@ -338,7 +338,7 @@ describe('AdminBudgetsComponent', () => {
       await userEvent.click(button(dialog, 'Speichern'));
       expect(within(dialog).getByText('Pflichtfeld')).toBeInTheDocument();
       expect(view.api.updateNode).not.toHaveBeenCalled();
-      expect(screen.getByRole('dialog', { name: 'Budget bearbeiten' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeInTheDocument();
     });
 
     it('"Speichern" names an empty or wrong key, name and colour and saves nothing', async () => {
@@ -375,7 +375,7 @@ describe('AdminBudgetsComponent', () => {
       expect(view.planApi.switchPreview).not.toHaveBeenCalled();
       expect(view.success).toHaveBeenCalledWith('Gespeichert.');
       expect(view.api.tree).toHaveBeenCalledTimes(2);
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull());
     });
 
     it('saves the colour, the switch "Aktiv", the Gremien and the start of the fiscal year', async () => {
@@ -443,10 +443,10 @@ describe('AdminBudgetsComponent', () => {
       const confirm = await screen.findByRole('dialog', { name: 'Zuteilungen ändern?' });
       expect(confirm).toHaveTextContent('Feste · 2026/27');
       expect(confirm).toHaveTextContent('100 € → 0 €');
-      expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull();
       expect(view.planApi.setPlanSwitch).not.toHaveBeenCalled();
       await userEvent.click(button(confirm, 'Abbrechen'));
-      const again = await screen.findByRole('dialog', { name: 'Budget bearbeiten' });
+      const again = await screen.findByRole('dialog', { name: 'Haushalt bearbeiten' });
       await waitFor(() => expect(labelled(again, 'Name von Schritt 1').value).toBe('Beschluss'));
       await userEvent.click(button(again, 'Speichern'));
       expect(view.planApi.setSide).not.toHaveBeenCalled();
@@ -461,14 +461,14 @@ describe('AdminBudgetsComponent', () => {
       expect(order).toEqual([...order].sort((a, b) => a - b));
       expect(view.success).toHaveBeenCalledWith('Gespeichert.');
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Zuteilungen ändern?' })).toBeNull());
-      expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull();
     });
 
     it('§F/finance/budget/000803: turning the plan on without a changed allocation saves at once', async () => {
       const view = await setup();
       const dialog = await openEdit('QS-Mittel');
       await userEvent.click(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' }));
-      expect(within(dialog).queryByRole('heading', { name: 'Seite der Kostenstellen' })).toBeNull();
+      expect(within(dialog).queryByRole('heading', { name: 'Seite der Titel' })).toBeNull();
       await userEvent.click(button(dialog, 'Speichern'));
       expect(view.planApi.switchPreview).toHaveBeenCalledWith('qsm', {});
       expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('qsm', true, true);
@@ -497,7 +497,7 @@ describe('AdminBudgetsComponent', () => {
       expect(view.error).toHaveBeenCalledWith('Der Haushaltsplan lässt sich nicht ausschalten, weil ein Plan beschlossen oder in Arbeit ist.');
       expect(view.api.updateNode).not.toHaveBeenCalled();
       expect(view.api.tree).toHaveBeenCalledTimes(2);
-      expect(screen.getByRole('dialog', { name: 'Budget bearbeiten' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeInTheDocument();
     });
 
     it('names the cause of a refused save and of a failed preview', async () => {
@@ -509,19 +509,19 @@ describe('AdminBudgetsComponent', () => {
       view.api.updateNode.mockReturnValueOnce(refuse(500));
       view.api.tree.mockReturnValueOnce(refuse(500));
       await userEvent.click(button(dialog, 'Speichern'));
-      expect(view.error).toHaveBeenLastCalledWith('Das Budget konnte nicht gespeichert werden.');
+      expect(view.error).toHaveBeenLastCalledWith('Der Haushalt konnte nicht gespeichert werden.');
       view.planApi.setSteps.mockReturnValueOnce(refuse(422, 'plan_step_limit'));
       await userEvent.click(button(dialog, 'Schritt hinzufügen'));
       await userEvent.type(labelled(dialog, 'Name von Schritt 3'), 'X');
       await userEvent.click(button(dialog, 'Speichern'));
-      expect(view.error).toHaveBeenLastCalledWith('Ein Budget hat höchstens 10 Schritte.');
+      expect(view.error).toHaveBeenLastCalledWith('Ein Haushalt hat höchstens 10 Schritte.');
       await userEvent.click(button(dialog, 'Abbrechen'));
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull());
       view.planApi.switchPreview.mockReturnValueOnce(refuse(500));
       const other = await openEdit('QS-Mittel');
       await userEvent.click(within(other).getByRole('switch', { name: 'Haushaltsplan führen' }));
       await userEvent.click(button(other, 'Speichern'));
-      expect(view.error).toHaveBeenLastCalledWith('Das Budget konnte nicht gespeichert werden.');
+      expect(view.error).toHaveBeenLastCalledWith('Der Haushalt konnte nicht gespeichert werden.');
       expect(view.planApi.setPlanSwitch).not.toHaveBeenCalled();
     });
 
@@ -540,14 +540,14 @@ describe('AdminBudgetsComponent', () => {
     it('deletes a budget after the confirmation', async () => {
       const view = await setup();
       await rowMenu('QS-Mittel', 'Löschen');
-      const dialog = await screen.findByRole('dialog', { name: 'Budget löschen?' });
+      const dialog = await screen.findByRole('dialog', { name: 'Haushalt löschen?' });
       expect(dialog).toHaveTextContent('„QS-Mittel“ (QSM) wird gelöscht. Das lässt sich nicht rückgängig machen.');
       await userEvent.click(button(dialog, 'Abbrechen'));
       expect(view.api.deleteNode).not.toHaveBeenCalled();
       await rowMenu('QS-Mittel', 'Löschen');
-      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Budget löschen?' }), 'Löschen'));
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushalt löschen?' }), 'Löschen'));
       expect(view.api.deleteNode).toHaveBeenCalledWith('qsm');
-      expect(view.success).toHaveBeenCalledWith('Budget gelöscht.');
+      expect(view.success).toHaveBeenCalledWith('Haushalt gelöscht.');
       expect(view.api.tree).toHaveBeenCalledTimes(2);
     });
 
@@ -555,12 +555,12 @@ describe('AdminBudgetsComponent', () => {
       const view = await setup();
       view.api.deleteNode.mockReturnValueOnce(refuse(409, 'budget_has_children'));
       await rowMenu('VS-Mittel', 'Löschen');
-      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Budget löschen?' }), 'Löschen'));
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushalt löschen?' }), 'Löschen'));
       expect(view.error).toHaveBeenCalledWith('Lösche zuerst die untergeordneten Kostenstellen.');
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget löschen?' })).toBeNull());
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt löschen?' })).toBeNull());
       view.api.deleteNode.mockReturnValueOnce(refuse(500));
       await rowMenu('VS-Mittel', 'Löschen');
-      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Budget löschen?' }), 'Löschen'));
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushalt löschen?' }), 'Löschen'));
       expect(view.error).toHaveBeenLastCalledWith('Löschen fehlgeschlagen (nur ohne Unter-Kostenstellen, Buchungen oder zugewiesene Anträge).');
     });
   });
@@ -582,13 +582,13 @@ describe('AdminBudgetsComponent', () => {
     it('starts with this year for a budget without a year, and shows no year when the read fails', async () => {
       const view = await setup({ years: [] });
       const dialog = await openYears();
-      expect(within(dialog).getByText('Noch keine Haushaltsjahre in diesem Budget.')).toBeInTheDocument();
+      expect(within(dialog).getByText('Noch keine Haushaltsjahre in diesem Haushalt.')).toBeInTheDocument();
       await waitFor(() => expect(field(dialog, 'fyYear').value).toBe('2026'));
       await userEvent.click(button(dialog, 'Fertig'));
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' })).toBeNull());
       view.api.listFiscalYears.mockReturnValueOnce(refuse(500));
       const failed = await openYears('QS-Mittel');
-      expect(within(failed).getByText('Noch keine Haushaltsjahre in diesem Budget.')).toBeInTheDocument();
+      expect(within(failed).getByText('Noch keine Haushaltsjahre in diesem Haushalt.')).toBeInTheDocument();
     });
 
     it('a reader sees the years without a form and without actions', async () => {
@@ -610,7 +610,7 @@ describe('AdminBudgetsComponent', () => {
       const second = await openYears('QS-Mittel');
       late.next([FY25]);
       view.fixture.detectChanges();
-      expect(within(second).getByText('Noch keine Haushaltsjahre in diesem Budget.')).toBeInTheDocument();
+      expect(within(second).getByText('Noch keine Haushaltsjahre in diesem Haushalt.')).toBeInTheDocument();
     });
 
     it('creates a fiscal year and names a year that is no year', async () => {
@@ -633,7 +633,7 @@ describe('AdminBudgetsComponent', () => {
       const dialog = await openYears();
       view.api.createFiscalYear.mockReturnValueOnce(refuse(409, 'fiscal_year_exists'));
       await userEvent.click(button(dialog, 'Anlegen'));
-      expect(view.error).toHaveBeenLastCalledWith('Dieses Jahr gibt es in diesem Budget bereits.');
+      expect(view.error).toHaveBeenLastCalledWith('Dieses Jahr gibt es in diesem Haushalt bereits.');
       view.api.createFiscalYear.mockReturnValueOnce(refuse(422));
       await userEvent.click(button(dialog, 'Anlegen'));
       expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr konnte nicht gespeichert werden.');

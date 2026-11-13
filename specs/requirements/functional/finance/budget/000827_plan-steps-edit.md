@@ -17,7 +17,7 @@ scope:
 
 # The steps of a budget are edited in its edit form
 
-The edit form of a budget on the page "Budgets" of Verwaltung (000828) must show the
+The edit form of a budget on the page "Haushalte" of Verwaltung (000828) must show the
 switch "Haushaltsplan führen" (000814) and, while the switch is on, the list of plan steps.
 A person must add a step, name it, choose its Gremium or none, move it and remove it. While
 the switch is on, the form must also show each direct child Kostenstelle of the budget

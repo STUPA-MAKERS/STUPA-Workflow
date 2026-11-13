@@ -30,7 +30,7 @@ scope:
 A person with `budget.structure` must create the vote of the next step of a version
 (`POST /budget-plan-versions/{id}/steps/next/vote`). The vote must start as a draft vote of
 the Gremium of the step, without a meeting and without an Antrag. Its question must name
-the budget, the fiscal year, the version and the step. It must be secret, use the simple
+the budget, the fiscal year, the step and, for a Nachtrag, the version (000852). It must be secret, use the simple
 majority, count a tie as refused and use the quorum of the Gremium. A draft version must
 leave the draft with this request (000792). A step without a Gremium must answer 422
 `plan_step_no_gremium`, and a step whose vote is a draft or open must answer 409
