@@ -123,6 +123,18 @@ describe('CostCentreSettingsComponent', () => {
     ]);
   });
 
+  it('saves no side and no Gremium that did not change', async () => {
+    const view = await setup({ viewGremiumId: 'g1' });
+    const settings = view.fixture.componentInstance;
+    settings.saveSide(null);
+    settings.saveSide(settings.node().side ?? null);
+    settings.saveGremium('viewGremiumId', 'g1');
+    settings.saveGremium('decisionGremiumId', null);
+    settings.saveGremium('decisionGremiumId', '');
+    expect(view.planApi.setSide).not.toHaveBeenCalled();
+    expect(view.api.updateNode).not.toHaveBeenCalled();
+  });
+
   it('saves no colour that did not change', async () => {
     const view = await setup({ color: null });
     expect(view.field('Farbe als Hex-Wert').value).toBe('');

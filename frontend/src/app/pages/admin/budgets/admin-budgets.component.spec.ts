@@ -258,6 +258,15 @@ describe('AdminBudgetsComponent', () => {
       expect(view.api.updateNode).not.toHaveBeenCalled();
     });
 
+    it('without an open form the form has no steps, no sides and no error', async () => {
+      const view = await setup();
+      const page = view.fixture.componentInstance;
+      expect(page.canAddStep()).toBe(true);
+      expect(page.sideNodes()).toEqual([]);
+      expect(page.keyError()).toBe('');
+      expect(page.nameError()).toBe('');
+    });
+
     it('§F/finance/budget/000827: a failed read of the steps shows the error, offers no step and keeps the stored steps', async () => {
       const view = await setup();
       view.planApi.steps.mockReturnValueOnce(refuse(500));

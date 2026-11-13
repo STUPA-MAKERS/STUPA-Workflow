@@ -1584,6 +1584,13 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       view.http.expectNone((r) => r.method === 'DELETE');
     });
 
+    it('§F/finance/budget/000833: a field without a value saves nothing', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-800' } });
+      view.fixture.componentInstance.editAllocation(null);
+      view.fixture.componentInstance.saveAllocation();
+      view.http.expectNone((r) => r.method === 'PUT');
+    });
+
     it('§F/finance/budget/000833: saves the allocation when the field loses the focus', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
       const toast = TestBed.inject(ToastService);

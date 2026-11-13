@@ -565,6 +565,16 @@ describe('BudgetPlanComponent', () => {
       expect(screen.queryByRole('heading', { level: 2, name: 'Zuschüsse' })).toBeNull();
     });
 
+    it('§F/finance/budget/000809: the change of a line shows its sign, and no change shows a dash', async () => {
+      const view = await setup();
+      const page = view.fixture.componentInstance;
+      const row = page.rows()[0];
+      expect(page.changeText({ ...row, amount: 30, prev: 10 })).toMatch(/^\+20\s€$/);
+      expect(page.changeText({ ...row, amount: 10, prev: 30 })).toMatch(/^−20\s€$/);
+      expect(page.changeText({ ...row, amount: 10, prev: 10 })).toBe('–');
+      expect(page.changeText({ ...row, amount: 10, prev: null })).toBe('–');
+    });
+
     it('§F/finance/budget/000812: a save that answers after the person left writes no URL of the plan page', async () => {
       const view = await setup();
       const answers: Subject<BudgetPlan>[] = [new Subject(), new Subject(), new Subject()];
