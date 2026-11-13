@@ -25,4 +25,5 @@ again after its save would then show the state before the save, for example a sw
 state that the save just changed.
 
 Test: The test of the cache interceptor starts a read, a write and a second read, reads two
-requests and reads that the answer of the first read is not the stored one.
+requests and reads that the answer of the first read is not the stored one. It does the same
+for a read that starts with a stored answer.

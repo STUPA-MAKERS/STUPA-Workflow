@@ -31,7 +31,9 @@ not come onto the page, so a field never changes a version that the page does no
 no longer the saved one. The server can take two requests in another order than the page sent
 them, so after answers in another order than their requests the page must read the plan once
 more. A text that the person types in a field must stay in that field of that line: the answer
-of a save must not replace it, and another line must not show it.
+of a save must not replace it, and another line must not show it, also the line of the same
+Kostenstelle in another year. The same holds for the press of a Vermerk. A field that the person sets back to the value
+before while its save runs must be saved again.
 
 Reason: A draft does not bind, and a value that is saved at once is not lost when the tab
 closes. Two fields that save one after the other must not overwrite each other.
@@ -39,4 +41,4 @@ closes. Two fields that save one after the other must not overwrite each other.
 Test: The component tests leave a changed field and read the request, and a refused save shows
 the saved value again, and a saved field shows no toast. A test answers a save
 while a navigation to another page runs and after the page is gone, and reads that no URL is
-written. A test answers a read and a save after the person chose another year and reads that the page shows the chosen year. A test does the same for the answer of a new Kostenstelle. One test answers two requests in the other order and reads the newer plan. One test types an Erläuterung while its save runs and then selects another line, and one answers two saves in the other order and reads the plan that the page reads then. One test presses a Vermerk whose save is refused and reads the saved state of the switch. The backend test sends two requests that each name one field.
+written. A test answers a read and a save after the person chose another year and reads that the page shows the chosen year. A test does the same for the answer of a new Kostenstelle. One test answers two requests in the other order and reads the newer plan. One test types an Erläuterung while its save runs and then selects another line, and one answers two saves in the other order and reads the plan that the page reads then. One test presses a Vermerk and types an Erläuterung, chooses another year before the answers and reads both lines. One test presses a Vermerk twice while the first save runs and reads two requests. One test presses a Vermerk whose save is refused and reads the saved state of the switch. The backend test sends two requests that each name one field.
