@@ -52,11 +52,14 @@ The PDF must hold, in this order:
 3. The Kostenaufstellung as a table with the total, in the row of its field, if the form has
    one.
 4. The names of the attached files, without the files.
-5. The valid decision with the approved amount and the conditions, if the Antrag has one. The
-   conditions must stand in one cell, one below the other, with a dashed rule between two,
-   and not as a list. A decision by
-   a vote must name the Gremium that ran the vote. A decision without a vote must name no
-   Gremium.
+5. The decision, if the Antrag has one. It is the valid decision with the approved amount and
+   the conditions. If the Antrag has no valid decision, it is the newest closed vote on the
+   Antrag that has a result: a vote that passed "as requested" and a vote that was rejected
+   write no decision, and the PDF must still show them. The section must name the day and, for
+   a decision by a vote, the Gremium that ran the vote and the result ("Angenommen",
+   "Abgelehnt" or "Stimmengleichheit"). A decision without a vote must name no Gremium. A vote
+   that did not pass must show no approved amount. The conditions must stand in one cell, one
+   below the other, with a dashed rule between two, and not as a list.
 
 The PDF must not show comments and must not show the status history.
 
@@ -66,4 +69,5 @@ personal data that the platform cannot black out, so only their names go into th
 Test: Unit test of the Markdown builder: a fixture Antrag gives the five parts in order, as
 field rows, and a hidden field does not show. Unit test of the typst converter: a field row
 keeps the block Markdown of its value. Integration tests of the render: no title page, and
-the cut of a long value and of a long cell.
+the cut of a long value and of a long cell. Integration test of the route: a passed vote without
+a decision row gives the section with Gremium and result, and a rejected vote gives no amount.

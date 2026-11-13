@@ -50,7 +50,7 @@ from app.modules.files.storage import ObjectStorage
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.gremien.models import Gremium
 from app.modules.media.refs import document_path
-from app.modules.meetings.models import MeetingAgendaItem
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.pdf.typst_client import TypstClient, TypstError
 from app.modules.voting.models import Vote
 from app.settings import Settings
@@ -61,6 +61,13 @@ LANG = "de"
 """The language of the PDF."""
 
 logger = logging.getLogger("app.documents")
+
+#: The results of a motion vote as the Antrag PDF prints them.
+_RESULTS: dict[str, str] = {
+    "passed": "Angenommen",
+    "rejected": "Abgelehnt",
+    "tie": "Stimmengleichheit",
+}
 
 _ANLAGE_NAMESPACE = uuid.UUID("6f1c4d1e-9a51-4c43-8f0e-2b7d3c9a8e15")
 """The namespace of the ids of the Antrag Anlagen. An id is no row: it only joins the
@@ -85,6 +92,14 @@ Anlagen only in a text that holds it."""
 def anlage_reference(item_id: uuid.UUID, title: str, *, public: bool) -> str:
     """Write the reference line of the Antrag Anlage of one agenda item (spec 000884)."""
     return anlage_link(title, document_path(anlage_id(item_id, public=public)))
+
+
+def _uuid_or_none(value: str) -> uuid.UUID | None:
+    """Parse a stored voter group as a Gremium id; another value gives `None`."""
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        return None
 
 
 def _answer_refs(answer: object) -> tuple[str, ...]:
@@ -172,6 +187,42 @@ class ApplicationPdfService:
             if a.field_key not in hidden and str(a.id) not in refs and a.filename
         )
 
+    async def _vote_decision(self, application_id: uuid.UUID) -> DecisionView | None:
+        """Build the decision of an Antrag from its newest closed vote (spec 000881).
+
+        A passed vote without a deviation writes no decision row, and a rejected vote
+        writes none either. The PDF still names the Gremium, the day and the result.
+        """
+        vote = await self.session.scalar(
+            select(Vote)
+            .where(
+                Vote.application_id == application_id,
+                Vote.status == "closed",
+                Vote.result.in_(tuple(_RESULTS)),
+            )
+            .order_by(func.coalesce(Vote.closed_at, Vote.closes_at, Vote.opens_at).desc())
+            .limit(1)
+        )
+        moment = (vote.closed_at or vote.closes_at or vote.opens_at) if vote is not None else None
+        if vote is None or moment is None:
+            return None
+        meeting = (
+            await self.session.get(Meeting, vote.meeting_id)
+            if vote.meeting_id is not None
+            else None
+        )
+        gremium = await self._gremium(
+            meeting.gremium_id if meeting is not None else _uuid_or_none(vote.eligible_group)
+        )
+        return DecisionView(
+            approved_amount=None,
+            conditions=(),
+            decided_at=moment,
+            gremium_name=gremium.name if gremium is not None else None,
+            result=_RESULTS[vote.result or ""],
+            approved=vote.result == "passed",
+        )
+
     async def reader_doc(self, apps: ApplicationsService, access: Access) -> ApplicationDoc:
         """Build the document of the current version as the reader of `access` sees it."""
         out: ApplicationOut = await apps.get_for(access)
@@ -195,9 +246,10 @@ class ApplicationPdfService:
                 conditions=tuple(out.decision.conditions),
                 decided_at=out.decision.decided_at,
                 gremium_name=out.decision.gremium_name if voted else None,
+                result=_RESULTS["passed"] if voted else None,
             )
             if out.decision is not None
-            else None
+            else await self._vote_decision(app.id)
         )
         return ApplicationDoc(
             title=_title(out.data),

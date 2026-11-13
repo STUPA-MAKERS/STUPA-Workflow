@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -208,7 +208,48 @@ async def test_the_decision_names_only_the_gremium_of_its_vote(
     assert reader.get(f"/api/applications/{app_id}/pdf").status_code == 200
     source = typst.sources[-1]
     assert source.count("[!feld] Gremium") == 1
+    assert "\n".join(field_row("Ergebnis", ["Angenommen"])) in source
     assert source.index("# Beschluss") < source.index(gremium)
+
+
+async def test_a_vote_without_a_decision_row_still_gives_the_beschluss(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 000881: the newest closed vote is the decision when no decision row exists."""
+    app_id = await _create(maker, seed)
+    typst = FakeTypst()
+    reader = _client(migrated, settings, monkeypatch, typst, _READER)
+    assert reader.get(f"/api/applications/{app_id}/pdf").status_code == 200
+    assert "# Beschluss" not in typst.sources[-1]
+
+    start = datetime.now(UTC)
+    common = {"application_id": app_id, "eligible_group": str(seed.gremium_id), "config": {}}
+    async with maker() as session:
+        session.add_all(
+            [
+                Vote(**common, status="closed", result="passed", closed_at=start),
+                Vote(**common, status="cancelled", closed_at=start + timedelta(minutes=5)),
+            ]
+        )
+        await session.commit()
+    assert reader.get(f"/api/applications/{app_id}/pdf").status_code == 200
+    source = typst.sources[-1]
+    assert "\n".join(field_row("Gremium", ["G"])) in source
+    assert "\n".join(field_row("Ergebnis", ["Angenommen"])) in source
+    assert "\n".join(field_row("Bewilligter Betrag", ["wie beantragt"])) in source
+
+    async with maker() as session:
+        later = start + timedelta(minutes=10)
+        session.add(Vote(**common, status="closed", result="rejected", closed_at=later))
+        await session.commit()
+    assert reader.get(f"/api/applications/{app_id}/pdf").status_code == 200
+    source = typst.sources[-1]
+    assert "\n".join(field_row("Ergebnis", ["Abgelehnt"])) in source
+    assert "[!feld] Bewilligter Betrag" not in source
 
 
 async def test_the_switch_of_the_antragsart_adds_the_signature_section(

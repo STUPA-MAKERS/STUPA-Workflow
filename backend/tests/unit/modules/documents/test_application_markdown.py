@@ -213,6 +213,19 @@ def test_decision_as_requested_without_conditions() -> None:
     assert "Anhänge" not in md
 
 
+def test_a_vote_decision_names_its_result_and_a_rejected_one_has_no_amount() -> None:
+    """§000881: the result of the vote prints; a vote that did not pass approves nothing."""
+    when = datetime(2026, 11, 12, 19, 0)
+    passed = DecisionView(None, (), when, "StuPa", result="Angenommen")
+    md = build_application_document(_doc(decision=passed))
+    assert row("Ergebnis", "Angenommen") in md
+    assert row("Bewilligter Betrag", "wie beantragt") in md
+    rejected = DecisionView(None, (), when, "StuPa", result="Abgelehnt", approved=False)
+    md = build_application_document(_doc(decision=rejected))
+    assert row("Ergebnis", "Abgelehnt") in md
+    assert "[!feld] Bewilligter Betrag" not in md
+
+
 def test_the_decision_lists_its_conditions() -> None:
     md = build_application_document(_doc())
     assert row("Gremium", "StuPa") + "\n" + row("Beschlossen am", "`12.11.2026`") in md

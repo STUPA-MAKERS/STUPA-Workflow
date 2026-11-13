@@ -95,12 +95,18 @@ class DecisionView:
         decided_at: When the decision was made.
         gremium_name: The Gremium whose vote made the decision. `None` for a decision
             without a vote. It is the only place where the PDF names a Gremium.
+        result: The result of the vote as text ("Angenommen", "Abgelehnt"), or `None`
+            for a decision without a vote.
+        approved: The decision approves the Antrag, so it has an approved amount. A
+            rejected vote has none.
     """
 
     approved_amount: Decimal | None
     conditions: Sequence[str]
     decided_at: datetime
     gremium_name: str | None = None
+    result: str | None = None
+    approved: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -475,7 +481,8 @@ def _decision_lines(doc: ApplicationDoc) -> list[str]:
         "",
         *(field_row("Gremium", [escape(decision.gremium_name)]) if decision.gremium_name else []),
         *field_row("Beschlossen am", [code(format_day(decision.decided_at.date()))]),
-        *field_row("Bewilligter Betrag", [amount]),
+        *(field_row("Ergebnis", [escape(decision.result)]) if decision.result else []),
+        *(field_row("Bewilligter Betrag", [amount]) if decision.approved else []),
         *(field_row("Auflagen", conditions) if conditions else []),
     ]
 
