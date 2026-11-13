@@ -48,6 +48,8 @@ export class CostCentreSettingsComponent {
   readonly sided = input(false);
   readonly gremiumOptions = input<readonly SelectOption[]>([]);
   readonly saved = output<void>();
+  /** The side changed, so the lines of a plan can differ: the plan page reads its plan again. */
+  readonly sideSaved = output<void>();
 
   readonly key = linkedSignal(() => this.node().key);
   readonly name = linkedSignal(() => this.node().name);
@@ -93,7 +95,7 @@ export class CostCentreSettingsComponent {
   saveSide(side: string | null): void {
     if (!side || side === this.node().side) return;
     this.side.set(side as Side);
-    this.run(this.planApi.setSide(this.node().id, side as Side));
+    this.run(this.planApi.setSide(this.node().id, side as Side), true);
   }
 
   save(patch: BudgetNodeUpdate): void {
@@ -104,12 +106,13 @@ export class CostCentreSettingsComponent {
    *  never race and the last press is the one that counts. */
   readonly saving = signal(false);
 
-  private run(request: Observable<unknown>): void {
+  private run(request: Observable<unknown>, side = false): void {
     this.saving.set(true);
     request.pipe(finalize(() => this.saving.set(false))).subscribe({
       next: () => {
         this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
         this.saved.emit();
+        if (side) this.sideSaved.emit();
       },
       error: (err: unknown) => {
         this.toast.error(this.i18n.translate(costCentreError(problemCode(err))));

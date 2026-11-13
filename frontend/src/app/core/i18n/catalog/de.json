@@ -1489,6 +1489,7 @@
   "admin.gremien.deleteFailed": "Das Gremium konnte nicht gelöscht werden.",
   "admin.gremien.deleteOpenVote": "Eine Abstimmung des Gremiums ist noch offen. Schließe sie oder brich sie zuerst ab.",
   "admin.gremien.deleteFinalized": "Eine Sitzung des Gremiums hat ein finales Protokoll. Zum Löschen fehlt dir das Recht „meeting.delete_finalized“.",
+  "admin.gremien.deleteHasBudget": "Dem Gremium gehört ein Budget. Lösche zuerst das Budget.",
   "admin.gremien.unknownMember": "(ohne Namen)",
   "admin.gremien.showAll": "Alle {count} anzeigen",
   "admin.gremien.showLess": "Weniger anzeigen",

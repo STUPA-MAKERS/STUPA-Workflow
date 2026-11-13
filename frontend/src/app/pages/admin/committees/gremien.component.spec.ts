@@ -320,7 +320,11 @@ describe('AdminGremienComponent', () => {
       { status: 403, error: { code: 'meeting_finalized' } },
       'Eine Sitzung des Gremiums hat ein finales Protokoll. Zum Löschen fehlt dir das Recht „meeting.delete_finalized“.',
     ],
-  ])('names the reason of a refused delete (%o)', async (err, message) => {
+    [
+      { status: 409, error: { code: 'gremium_has_budget' } },
+      'Dem Gremium gehört ein Budget. Lösche zuerst das Budget.',
+    ],
+  ])('§F/finance/budget/000844: names the reason of a refused delete (%o)', async (err, message) => {
     const api = makeApi({ deleteGremium: jest.fn(() => throwError(() => err)) });
     const { toast } = await setup({ api });
     await pick('AStA', 'Löschen');

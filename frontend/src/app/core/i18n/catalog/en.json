@@ -1489,6 +1489,7 @@
   "admin.gremien.deleteFailed": "Could not delete the committee.",
   "admin.gremien.deleteOpenVote": "A vote of this committee is still open. Close or cancel it first.",
   "admin.gremien.deleteFinalized": "A meeting of this committee has a final protocol. You need the permission “meeting.delete_finalized” to delete it.",
+  "admin.gremien.deleteHasBudget": "A budget belongs to this committee. Delete the budget first.",
   "admin.gremien.unknownMember": "(no name)",
   "admin.gremien.showAll": "Show all {count}",
   "admin.gremien.showLess": "Show less",

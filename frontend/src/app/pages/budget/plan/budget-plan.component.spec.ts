@@ -424,6 +424,79 @@ describe('BudgetPlanComponent', () => {
       expect(failed.api.plan).toHaveBeenCalledWith('vsm', 'fy-26');
     });
 
+    it('§F/finance/budget/000816: a changed side reads the plan again and keeps the line open', async () => {
+      const view = await setup({ query: { costCentre: 'fees' } });
+      const settings = () =>
+        view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent))?.componentInstance as CostCentreSettingsComponent;
+      const first = settings();
+      const late = new Subject<BudgetPlan>();
+      view.api.plan.mockReturnValueOnce(late);
+      first.sideSaved.emit();
+      view.fixture.detectChanges();
+      expect(settings()).toBe(first);
+      expect(view.container.querySelector('app-skeleton')).toBeNull();
+      late.next(plan([version({ lines: [line('fees', '77')] })]));
+      view.fixture.detectChanges();
+      expect(settings()).toBe(first);
+      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('77 €');
+      view.api.plan.mockReturnValueOnce(throwError(() => problem(500)));
+      first.sideSaved.emit();
+      view.api.plan.mockReturnValueOnce(throwError(() => problem(404, 'plan_not_found')));
+      first.sideSaved.emit();
+      view.fixture.detectChanges();
+      expect(settings()).toBe(first);
+      const other = new Subject<BudgetPlan>();
+      view.api.plan.mockReturnValueOnce(other);
+      first.sideSaved.emit();
+      await pickChip(/Haushaltsjahr/, 'HHJ 2025/26');
+      other.next(plan([version({ lines: [line('fees', '55')] })]));
+      view.fixture.detectChanges();
+      expect(view.container.textContent).not.toContain('55 €');
+    });
+
+    it('§F/finance/budget/000812: an answer for another year does not come onto the page', async () => {
+      const view = await setup({ plans: { 'fy-25': plan([version({ state: 'in_force' })], 'fy-25'), 'fy-26': plan() } });
+      const read = new Subject<BudgetPlan>();
+      view.api.plan.mockReturnValueOnce(read);
+      await pickChip(/Haushaltsjahr/, 'HHJ 2025/26');
+      await pickChip(/Haushaltsjahr/, 'HHJ 2026/27');
+      read.next(plan([version({ id: 'late', number: 3 })], 'fy-25'));
+      view.fixture.detectChanges();
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+      const failed = new Subject<BudgetPlan>();
+      view.api.plan.mockReturnValueOnce(failed);
+      await pickChip(/Haushaltsjahr/, 'HHJ 2025/26');
+      await pickChip(/Haushaltsjahr/, 'HHJ 2026/27');
+      failed.error(problem(500));
+      view.fixture.detectChanges();
+      expect(view.container.querySelector('.bd__sheetBody app-load-error')).toBeNull();
+      const saved = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(saved);
+      await typeAmount(input(view, 'amount-fees'), '12');
+      await pickChip(/Haushaltsjahr/, 'HHJ 2025/26');
+      saved.next(plan([version({ id: 'late', number: 3 })]));
+      view.fixture.detectChanges();
+      expect(screen.getByRole('button', { name: /Haushaltsjahr/ })).toHaveTextContent('HHJ 2025/26');
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+    });
+
+    it('§F/finance/budget/000812: a late answer keeps the version that the person chose, and a new read keeps it in the URL', async () => {
+      const both = plan([version({ state: 'in_force' }), version({ id: 'v1', number: 1 })]);
+      const view = await setup({ plans: { 'fy-26': both } });
+      const saved = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(saved);
+      await typeAmount(input(view, 'amount-fees'), '12');
+      await pickChip(/^Version/, 'Stammplan');
+      saved.next(both);
+      view.fixture.detectChanges();
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+      view.fixture.componentInstance.reloadPlan();
+      expect(view.navigate).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({ queryParams: expect.objectContaining({ fy: 'fy-26', version: 0 }) }),
+      );
+    });
+
     it('shows the plan read error with a retry', async () => {
       const view = await setup({ tree: [TOP, node({ id: 'two', name: 'Zweiter', planEnabled: true })] });
       view.api.plan.mockReturnValueOnce(throwError(() => problem(500)));
@@ -793,6 +866,15 @@ describe('BudgetPlanComponent', () => {
       expect(view.navigate).toHaveBeenCalledWith(['/voting', 'vote-1']);
     });
 
+    it('§F/finance/budget/000838: a reader gets no action that moves the version', async () => {
+      await setup({ plans: { 'fy-26': withVote('open') }, perms: ['budget.view'] });
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      await setup({ plans: { 'fy-26': withVote('closed') }, perms: ['budget.view'] });
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      await setup({ plans: { 'fy-26': withVote('open') }, perms: ['budget.view'], wide: false, phone: true });
+      expect(await openMenu()).toEqual(['Zur Abstimmung']);
+    });
+
     it('§F/finance/budget/000826: after a refused vote the next action is a new vote, and the menu opens the old one', async () => {
       const view = await setup({ plans: { 'fy-26': withVote('closed') } });
       expect(text(view.container.querySelector('.bp__stepper'))).toContain('Abgelehnt');
@@ -912,8 +994,10 @@ describe('BudgetPlanComponent', () => {
       expect(settings.node().name).toBe('Beiträge');
       expect(settings.sided()).toBe(true);
       expect(settings.gremiumOptions()).toEqual([{ value: 'g1', label: 'StuPa' }]);
+      const before = view.api.plan.mock.calls.length;
       settings.saved.emit();
       expect(view.treeApi.tree).toHaveBeenCalledTimes(2);
+      expect(view.api.plan.mock.calls.length).toBe(before);
       view.treeApi.tree.mockReturnValueOnce(throwError(() => problem(500)));
       const reads = view.api.plan.mock.calls.length;
       settings.saved.emit();

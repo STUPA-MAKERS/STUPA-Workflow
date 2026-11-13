@@ -538,7 +538,7 @@ export class BudgetPlanComponent {
         : []),
       ...item('vote', 'budget.plan.action.vote', 'vote', this.canVote(), state === 'draft' ? blocked : null),
       ...item('openVote', 'budget.plan.action.openVote', 'link', !!this.linkedVote()),
-      ...item('backToDraft', 'budget.plan.action.backToDraft', 'undo', !!primary && state === 'in_progress'),
+      ...item('backToDraft', 'budget.plan.action.backToDraft', 'undo', this.moves() && state === 'in_progress'),
       ...item('add', 'budget.plan.action.add', 'fileplus', this.editable() && this.addableNodes().length > 0),
     ];
     const draft: RowMenuItem[] =
@@ -567,8 +567,11 @@ export class BudgetPlanComponent {
   /** The next step names a Gremium and has no vote that waits for its result. */
   private readonly canVote = computed(() => {
     const next = this.next();
-    return !!this.primary() && this.voting() && !!next?.gremiumId && !voteRuns(next);
+    return this.moves() && this.voting() && !!next?.gremiumId && !voteRuns(next);
   });
+
+  /** The person can move the shown version: the write right, an open year and a version. */
+  private readonly moves = computed(() => this.canWrite() && !this.year()?.closedAt && !!this.version());
 
   /** The vote of the next step is a draft or open, so "back to draft" ends it. */
   private readonly voteWaits = computed(() => {
@@ -733,18 +736,45 @@ export class BudgetPlanComponent {
     this.load.set({ kind: 'loading' });
     const top = this.topId() as Uuid;
     const prev = this.prevYear();
+    const place = this.place();
     forkJoin({
       plan: this.readPlan(top, id as Uuid),
       prev: prev ? this.readPlan(top, prev.id) : of(null),
     }).subscribe({
       next: ({ plan, prev: before }) => {
+        if (this.place() !== place) return;
         this.prevPlan.set(before);
         this.load.set(plan ? { kind: 'plan', plan } : { kind: 'none' });
         const wanted = plan?.versions.find((v) => v.number === this.wantedVersion);
         this.wantedVersion = null;
         if (wanted) this.pickVersion(wanted.id);
       },
-      error: () => this.load.set({ kind: 'error' }),
+      error: () => {
+        if (this.place() === place) this.load.set({ kind: 'error' });
+      },
+    });
+  }
+
+  /**
+   * The budget and the year that the page names. An answer belongs to the place of its
+   * request: a late answer for another year must not come onto the page, because the next
+   * edit would then change a version that the page does not name.
+   */
+  private place(): string {
+    return `${this.topId()}|${this.fyId()}`;
+  }
+
+  /**
+   * Read the plan again without the loading state, so an open line stays open and keeps
+   * its scroll position and its focus.
+   */
+  refreshPlan(): void {
+    const place = this.place();
+    this.readPlan(this.topId() as Uuid, this.fyId() as Uuid).subscribe({
+      next: (plan) => {
+        if (plan && this.place() === place) this.load.set({ kind: 'plan', plan });
+      },
+      error: () => undefined,
     });
   }
 
@@ -1052,10 +1082,13 @@ export class BudgetPlanComponent {
   ): void {
     if (locks && this.busy()) return;
     if (locks) this.busy.set(true);
+    const place = this.place();
+    const shown = this.versionId();
     request.subscribe({
       next: (plan) => {
         if (locks) this.busy.set(false);
-        this.versionId.set('');
+        if (this.place() !== place) return;
+        if (this.versionId() === shown) this.versionId.set('');
         this.load.set({ kind: 'plan', plan });
         if (toast) this.toast.success(this.i18n.translate(toast));
         after?.();
@@ -1075,6 +1108,7 @@ export class BudgetPlanComponent {
     const version = this.versionId();
     this.pickYear(this.fyId());
     this.versionId.set(version);
+    this.syncUrl();
   }
 
   versionName(version: PlanVersion): string {

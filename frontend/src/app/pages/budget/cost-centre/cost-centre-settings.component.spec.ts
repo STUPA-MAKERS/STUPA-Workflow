@@ -17,9 +17,10 @@ async function setup(over: Partial<BudgetTreeNode> = {}, fail = '', sided = true
   const api = { updateNode: jest.fn((_id: string, _patch: object) => answer()) };
   const planApi = { setSide: jest.fn((_id: string, _side: string) => answer()) };
   const saved = jest.fn();
+  const sideSaved = jest.fn();
   const view = await render(CostCentreSettingsComponent, {
     inputs: { node: { ...KS, ...over }, sided, gremiumOptions: [{ value: 'g1', label: 'StuPa' }] },
-    on: { saved },
+    on: { saved, sideSaved },
     providers: [
       { provide: BudgetTreeApi, useValue: api },
       { provide: BudgetPlanApi, useValue: planApi },
@@ -27,7 +28,7 @@ async function setup(over: Partial<BudgetTreeNode> = {}, fail = '', sided = true
   });
   const toast = TestBed.inject(ToastService);
   const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
-  return { ...view, api, planApi, saved, field, success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
+  return { ...view, api, planApi, saved, sideSaved, field, success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
 }
 
 /** Replace the text of a field and leave the field. */
@@ -62,6 +63,7 @@ describe('CostCentreSettingsComponent', () => {
     await retype(view.field('Name'), ' Kultur und Sport ');
     expect(view.api.updateNode).toHaveBeenCalledWith('ks', { name: 'Kultur und Sport' });
     expect(view.saved).toHaveBeenCalledTimes(1);
+    expect(view.sideSaved).not.toHaveBeenCalled();
     expect(view.success).toHaveBeenCalledWith('Gespeichert.');
     await retype(view.field('Schlüssel'), '800');
     expect(view.api.updateNode).toHaveBeenCalledTimes(1);
@@ -159,10 +161,11 @@ describe('CostCentreSettingsComponent', () => {
     await pick(/Seite/, 'Ausgabe');
     expect(view.planApi.setSide).toHaveBeenCalledWith('ks', 'expense');
     expect(view.saved).toHaveBeenCalledTimes(1);
+    expect(view.sideSaved).toHaveBeenCalledTimes(1);
     expect(view.success).toHaveBeenCalledWith('Gespeichert.');
   });
 
-  it('§F/finance/budget/000795: a refused side shows its reason and the saved side again', async () => {
+  it('§F/finance/budget/000795 §F/finance/budget/000816: a refused side shows its reason and the saved side again', async () => {
     const view = await setup();
     const pending = new Subject<object>();
     view.planApi.setSide.mockReturnValueOnce(pending);
@@ -171,6 +174,7 @@ describe('CostCentreSettingsComponent', () => {
     pending.error({ status: 409, error: { code: 'side_in_plan' } });
     expect(view.error).toHaveBeenCalledWith('Die Seite lässt sich nicht ändern, weil die Kostenstelle einen Ansatz oder einen Vermerk in einem Plan hat.');
     await waitFor(() => expect(screen.getByRole('combobox', { name: /Seite/ })).toHaveTextContent('Einnahme'));
+    expect(view.sideSaved).not.toHaveBeenCalled();
   });
 
   it('shows the reason of a refused save and takes the saved values again', async () => {
