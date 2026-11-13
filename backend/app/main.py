@@ -85,6 +85,7 @@ from app.modules.notifications.router import (
 )
 from app.modules.privacy.request_router import router as erasure_request_router
 from app.modules.privacy.router import router as privacy_router
+from app.modules.protocol.documents_router import router as protocol_documents_router
 from app.modules.protocol.public_images_router import router as public_media_router
 from app.modules.protocol.public_router import router as public_protocol_router
 from app.modules.protocol.router import router as protocol_router
@@ -126,6 +127,7 @@ api_router.include_router(vote_open_router)
 api_router.include_router(livevote_router)
 api_router.include_router(public_meeting_router)
 api_router.include_router(protocol_router)
+api_router.include_router(protocol_documents_router)
 api_router.include_router(public_protocol_router)
 api_router.include_router(notifications_router)
 api_router.include_router(notification_settings_router)

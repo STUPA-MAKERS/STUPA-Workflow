@@ -33,7 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.gremien.models import Gremium
-from app.modules.media.refs import image_ids_in
+from app.modules.media.refs import document_ids_in, image_ids_in
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.filename import protocol_pdf_filename
@@ -523,6 +523,20 @@ class PublicProtocolService:
         snap = self._snapshot(protocol)
         texts = [snap.markdown, *(t.markdown for t in snap.tops if not t.non_public)]
         return set(image_ids_in(*texts))
+
+    async def public_document_ids(self, protocol_id: UUID) -> set[UUID]:
+        """Return the ids of the embedded PDFs that the public version shows.
+
+        Like the images, the ids come from the public Markdown only, so a PDF of a
+        non-public TOP stays out (spec 000867).
+
+        Raises:
+            NotFoundError: The protocol is not visible.
+        """
+        protocol = (await self._visible(protocol_id))[0]
+        snap = self._snapshot(protocol)
+        texts = [snap.markdown, *(t.markdown for t in snap.tops if not t.non_public)]
+        return set(document_ids_in(*texts))
 
     async def get_pdf(self, protocol_id: UUID) -> tuple[bytes, str]:
         """Return the public PDF bytes and the download file name, else 404.

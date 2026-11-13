@@ -131,6 +131,8 @@ class Settings(BaseSettings):
         one token holds at most `attachment_draft_max_files` files and
         `attachment_draft_max_bytes` bytes. `markdown_image_max_bytes` caps the
         uploaded image and the encoded result (413 beyond).
+        `markdown_document_max_bytes` caps an embedded PDF of a protocol (413
+        beyond); the typst service takes an asset of at most 20 MiB.
 
     Backups:
         An archive holds the pg_dump and a mirror of the attachment bucket,
@@ -187,6 +189,7 @@ class Settings(BaseSettings):
         becoming a flood of mails. `rl_attachments_per_hour` counts per applicant.
         `rl_media_images_per_hour` counts per principal and is higher than the
         attachment limit, because a protocol can hold many pasted screenshots.
+        `rl_media_documents_per_hour` counts the embedded PDFs per principal.
         `rl_default_write_per_hour` keys on the IP and catches an endpoint without
         its own limit (defense in depth). `rl_default_write_session_per_hour` keys
         on a signed principal session instead, because a campus NAT puts all users
@@ -334,6 +337,7 @@ class Settings(BaseSettings):
     attachment_draft_max_files: int = Field(default=20, ge=1)
     attachment_draft_max_bytes: int = Field(default=50 * 1024 * 1024, ge=1)
     markdown_image_max_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
+    markdown_document_max_bytes: int = Field(default=20 * 1024 * 1024, ge=1, le=20 * 1024 * 1024)
 
     backup_bucket: str = "backups"
     backup_age_recipient: str | None = None
@@ -408,6 +412,7 @@ class Settings(BaseSettings):
     rl_ticket_messages_per_hour: int = 60
     rl_attachments_per_hour: int = 30
     rl_media_images_per_hour: int = 120
+    rl_media_documents_per_hour: int = 60
     rl_default_write_per_hour: int = 100
     rl_default_write_session_per_hour: int = 3000
     rl_avatar_per_hour: int = 1200

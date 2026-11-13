@@ -97,4 +97,26 @@ images of a protocol for the typst render.
 - Tests: `tests/unit/modules/media/`, `tests/unit/modules/protocol/test_protocol_images.py`,
   fakes in `tests/_support/media_fakes.py` (`MediaSession`, `MediaStorage`, `add_image`).
 
+**Embedded PDFs (specs 000862-000869):**
+- Reference `[<name>](/api/media/documents/<uuid>)` (`refs.document_path`,
+  `document_ids_in`), table `markdown_document` (id, storage_key
+  `media/documents/<id>`, name, size, pages; no uploader column).
+- Upload `POST /api/meetings/{meeting_id}/documents` lives in
+  `protocol/documents_router.py`, because only a person who can write the protocol
+  (`ProtocolService.authorize_write_meeting`) may upload. `enforce_document_body_cap`,
+  `rate_limit_media_documents`, capped read, then `MediaService.upload_document`:
+  scan first, then `documents.check_pdf` (libmagic `application/pdf`, pypdf readable,
+  not encrypted, 1-100 pages). The stored bytes are the client's: a PDF has no clean
+  re-encode. 415 no PDF / unreadable / encrypted / infected, 413 over 20 MiB or 100 pages.
+- `GET /api/media/documents/{id}` (download, `?inline=true` framable preview with
+  `DOCUMENT_PREVIEW_CSP` + `X-Frame-Options: SAMEORIGIN`) and `/info` (name, pages).
+  Public twins under `/api/public/protocols/{pid}/documents/{did}` answer 404 unless
+  `public_document_ids` holds the id, so a PDF of a non-public TOP stays internal.
+  nginx routes both download paths through the attachment-download location (frame
+  headers) and gives the upload a 21m body limit.
+- Render: `render_documents(markdown)` sends `doc-<uuid>.pdf` assets within
+  `RENDER_MAX_DOCUMENTS` 20, `RENDER_MAX_DOCUMENT_PAGES` 300 and 48 MiB; a missing or
+  skipped PDF prints "Anlage nicht eingebunden" in typst and never fails the render.
+  The typst side is `typst/typst_service/appendix.py`.
+
 **Related:** be-files, be-protocol, typst, be-antiabuse, deploy, frontend

@@ -1368,10 +1368,10 @@ class ProtocolService:
             )
             variant = protocol_variant_for(protocol.cd_variant)
             config = cd_render_config(cd) if cd else None
-            images = await MediaService(self.session, storage=self.storage).render_assets(
-                markdown
-            )
-            assets = {**(cd.assets if cd else {}), **images} or None
+            media = MediaService(self.session, storage=self.storage)
+            images = await media.render_assets(markdown)
+            documents = await media.render_documents(markdown)
+            assets = {**(cd.assets if cd else {}), **images, **documents} or None
             pdf = await self.typst.render_pdf(
                 markdown, variant=variant, config=config, assets=assets
             )
