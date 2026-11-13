@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.access import Access
+from app.modules.applications.decision import valid_decision
 from app.modules.applications.models import Applicant, Application, SubmissionVersion
 from app.modules.applications.schemas import ApplicationOut
 from app.modules.applications.service import ApplicationsService
@@ -192,12 +193,16 @@ class ApplicationPdfService:
             if out.applicant is not None
             else out.submitted_by
         )
+        # The PDF names a Gremium only for a decision by a vote: the Gremium that ran
+        # the vote. The applicant view hides the vote id, so the row tells it.
+        row = await valid_decision(self.session, app.id) if out.decision is not None else None
+        voted = row is not None and row.vote_id is not None
         decision = (
             DecisionView(
                 approved_amount=out.decision.approved_amount,
                 conditions=tuple(out.decision.conditions),
                 decided_at=out.decision.decided_at,
-                gremium_name=out.decision.gremium_name,
+                gremium_name=out.decision.gremium_name if voted else None,
             )
             if out.decision is not None
             else None

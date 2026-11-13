@@ -120,12 +120,13 @@ def _doc(**kwargs: Any) -> ApplicationDoc:
 def test_document_has_the_parts_in_order() -> None:
     md = build_application_document(_doc())
     head = md.split("---\n", 2)[2]
-    order = [row("Gremium", "Studierendenparlament"), "# Antrag", "# Kosten"]
+    order = [row("Antragsart", "Finanzantrag"), "# Antrag", "# Kosten"]
     order += ["# Weitere Angaben", "# Beschluss"]
     assert [md.index(h) for h in order] == sorted(md.index(h) for h in order)
     assert "typ: antrag" in md
     assert "datalines" not in md
-    assert head.lstrip().startswith(row("Gremium", "Studierendenparlament"))
+    assert head.lstrip().startswith(row("Antragsart", "Finanzantrag"))
+    assert "[!feld] Gremium" not in md.split("# Beschluss")[0]
     assert row("Antragsart", "Finanzantrag") in md
     assert row("Status", "Bewilligt") in md
     assert row("Eingang", "`10.11.2026`") in md
@@ -195,13 +196,14 @@ def test_decision_as_requested_without_conditions() -> None:
     md = build_application_document(_doc(decision=decision, files=()))
     assert row("Bewilligter Betrag", "wie beantragt") in md
     assert row("Beschlossen am", "`12.11.2026`") in md
+    assert "[!feld] Gremium" not in md
     assert "Auflagen" not in md
     assert "Anhänge" not in md
 
 
 def test_the_decision_lists_its_conditions() -> None:
     md = build_application_document(_doc())
-    assert row("Beschlossen am", "`12.11.2026` (StuPa)") in md
+    assert row("Gremium", "StuPa") + "\n" + row("Beschlossen am", "`12.11.2026`") in md
     assert row("Bewilligter Betrag", "`900,00 €`") in md
     assert row("Auflagen", "1. Belege einreichen") in md
 

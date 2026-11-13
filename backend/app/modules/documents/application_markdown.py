@@ -92,7 +92,8 @@ class DecisionView:
         approved_amount: The approved amount, or `None` for "as requested".
         conditions: The conditions of the decision, in order.
         decided_at: When the decision was made.
-        gremium_name: The Gremium that decided, if known.
+        gremium_name: The Gremium whose vote made the decision. `None` for a decision
+            without a vote. It is the only place where the PDF names a Gremium.
     """
 
     approved_amount: Decimal | None
@@ -108,7 +109,8 @@ class ApplicationDoc:
     Attributes:
         title: The title of the Antrag (the system title of the form).
         type_name: The name of the Antragsart.
-        gremium_name: The Gremium of the Antrag.
+        gremium_name: The Gremium of the Antrag, for the design of the PDF. The PDF does
+            not print it.
         cd_variant: The design key of the Gremium, for the logos.
         state_label: The current status, or `None` to leave it out (the protocol Anlage).
         received_on: The date of receipt.
@@ -427,12 +429,12 @@ def _decision_lines(doc: ApplicationDoc) -> list[str]:
         if decision.approved_amount is None
         else code(format_money(decision.approved_amount, doc.currency, LANG))
     )
-    by = f" ({escape(decision.gremium_name)})" if decision.gremium_name else ""
     conditions = [f"{n}. {escape(text)}" for n, text in enumerate(decision.conditions, start=1)]
     return [
         "# Beschluss",
         "",
-        *field_row("Beschlossen am", [f"{code(format_day(decision.decided_at.date()))}{by}"]),
+        *(field_row("Gremium", [escape(decision.gremium_name)]) if decision.gremium_name else []),
+        *field_row("Beschlossen am", [code(format_day(decision.decided_at.date()))]),
         *field_row("Bewilligter Betrag", [amount]),
         *(field_row("Auflagen", conditions) if conditions else []),
     ]
@@ -442,7 +444,6 @@ def _head_lines(doc: ApplicationDoc) -> list[str]:
     """Write the head data as the first table, the file names last."""
     applicant = BAR if doc.redact_applicant else (escape(doc.applicant) if doc.applicant else None)
     rows = (
-        ("Gremium", escape(doc.gremium_name) if doc.gremium_name else None),
         ("Antragsart", escape(doc.type_name) if doc.type_name else None),
         ("Status", escape(doc.state_label) if doc.state_label else None),
         ("Eingang", code(format_day(doc.received_on)) if doc.received_on else None),

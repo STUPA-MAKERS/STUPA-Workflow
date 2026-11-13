@@ -156,6 +156,9 @@
     } else if t == "strike" {
       strike(inline(n.c))
     } else if t == "code" {
+      // The strut gives the line the height of the body font, so a line that holds
+      // only code has its baseline where a line of text has it.
+      box(width: 0pt, hide[x])
       text(font: mono-font, n.v)
     } else if t == "link" {
       link(n.url, text(fill: palette.hsrturl, inline(n.c)))
@@ -766,7 +769,7 @@
         let band = if title != none {
           (
             grid.cell(colspan: 2, fill: tint(palette.gray, 18%), inset: (x: 6pt, y: 5pt), {
-              show heading: it => block(text(font: head-font, weight: "bold", size: size.normal, it.body))
+              show heading: it => block(text(font: head-font, weight: "bold", size: size.Large, it.body))
               tagged-heading(1, inline(title))
             }),
           )

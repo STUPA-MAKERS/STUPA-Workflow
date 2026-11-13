@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.deps import get_current_applicant, get_current_principal, get_session
 from app.modules.admin.service.forms import FormVersionWriter
+from app.modules.applications.models import ApplicationDecision
 from app.modules.applications.router import get_comment_mail_sender, get_magic_link_sender
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
@@ -27,6 +29,7 @@ from app.modules.documents.router import get_pdf_service
 from app.modules.documents.service import ApplicationPdfService
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.pdf.typst_client import TypstError
+from app.modules.voting.models import Vote
 from app.settings import Settings
 from app.shared.config_schemas import FormFieldDef
 from tests._support.guest_apps import GuestSeed, build_api, guest_settings, seed_guest_flow
@@ -165,6 +168,45 @@ async def test_a_reader_downloads_the_antrag_with_every_field(
     assert "\n".join(field_row("Zweck", ["Werbung"])) in source
     assert "DE02120300000000202051" in source
     assert "Luis Meyer \\(luis@example\\.org\\)" in source
+
+
+async def test_the_decision_names_only_the_gremium_of_its_vote(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 000881: no Gremium in the head; the Beschluss names the Gremium of its vote."""
+    app_id = await _create(maker, seed)
+    typst = FakeTypst()
+    reader = _client(migrated, settings, monkeypatch, typst, _READER)
+    gremium = "\n".join(field_row("Gremium", ["G"]))
+
+    async with maker() as session:
+        manual = ApplicationDecision(application_id=app_id, decided_by="someone")
+        session.add(manual)
+        await session.commit()
+    assert reader.get(f"/api/applications/{app_id}/pdf").status_code == 200
+    assert "# Beschluss" in typst.sources[-1]
+    assert "[!feld] Gremium" not in typst.sources[-1]
+
+    async with maker() as session:
+        vote = Vote(
+            application_id=app_id, eligible_group=str(seed.gremium_id), config={}, status="closed"
+        )
+        session.add(vote)
+        await session.flush()
+        old = await session.get(ApplicationDecision, manual.id)
+        assert old is not None
+        old.superseded_at = datetime.now(UTC)
+        await session.flush()
+        session.add(ApplicationDecision(application_id=app_id, vote_id=vote.id))
+        await session.commit()
+    assert reader.get(f"/api/applications/{app_id}/pdf").status_code == 200
+    source = typst.sources[-1]
+    assert source.count("[!feld] Gremium") == 1
+    assert source.index("# Beschluss") < source.index(gremium)
 
 
 async def test_a_stranger_gets_the_gate_of_the_detail_page(

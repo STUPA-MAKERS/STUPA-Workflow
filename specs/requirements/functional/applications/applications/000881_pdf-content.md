@@ -35,8 +35,8 @@ the attached files must print in the monospace font, one name per line, without 
 
 The PDF must hold, in this order:
 
-1. The head data in one table: Gremium, Antragsart, status, date of receipt, applicant, the
-   version number and the names of the attached files (item 4).
+1. The head data in one table: Antragsart, status, date of receipt, applicant, the version
+   number and the names of the attached files (item 4). The head must not name a Gremium.
 2. The answers of the form, one table per section of the form with the section name as its
    heading, one row per field, in the order of the form. A text answer (for example the
    description) is Markdown and renders in its cell. A field that is not visible
@@ -44,7 +44,9 @@ The PDF must hold, in this order:
 3. The Kostenaufstellung as a table with the total, in the row of its field, if the form has
    one.
 4. The names of the attached files, without the files.
-5. The valid decision with the approved amount and the conditions, if the Antrag has one.
+5. The valid decision with the approved amount and the conditions, if the Antrag has one. A decision by
+   a vote must name the Gremium that ran the vote. A decision without a vote must name no
+   Gremium.
 
 The PDF must not show comments and must not show the status history.
 
