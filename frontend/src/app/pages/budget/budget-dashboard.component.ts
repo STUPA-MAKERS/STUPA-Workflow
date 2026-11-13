@@ -654,6 +654,7 @@ export class BudgetDashboardComponent {
    * another.
    */
   constructor() {
+    this.api.changed.pipe(takeUntilDestroyed()).subscribe(() => this.refreshTree());
     pageItemTitle(() => {
       const ks = this.current();
       return ks?.parentId ? ks.name : null;
@@ -874,8 +875,6 @@ export class BudgetDashboardComponent {
 
   private treeSent = 0;
   private treeShown = 0;
-  /** The tree read for a section "Kostenstelle" that went off the page while its save ran. */
-  readonly rereadTree = (): void => this.refreshTree();
 
   /**
    * Read the tree again after a write, without the skeleton of the first load. `select`

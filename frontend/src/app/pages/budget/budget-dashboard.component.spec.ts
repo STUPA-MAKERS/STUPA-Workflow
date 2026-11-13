@@ -21,8 +21,6 @@ import type {
   FiscalYear,
 } from './budget-tree.api';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
-import { By } from '@angular/platform-browser';
-import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
 import { TodosApiService } from '@core/api/todos.service';
 import { PALETTE, shadeColor } from './budget-color.util';
 import { itemApp, itemBooking } from './budget-items/budget-items.fixtures';
@@ -1157,6 +1155,7 @@ describe('BudgetDashboardComponent', () => {
     const tree$ = new Subject<BudgetTreeNode[]>();
     const years = new Map<string, Subject<FiscalYear[]>[]>();
     const api = {
+      changed: new Subject<void>(),
       tree: () => tree$,
       cachedFiscalYears: (id: string) => {
         const s = new Subject<FiscalYear[]>();
@@ -1558,10 +1557,9 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(error).toHaveBeenCalledWith('Die Budget-Statistik konnte nicht geladen werden.');
     });
 
-    it('§F/finance/budget/000850: reads the tree after a save of a section that went off the page', async () => {
+    it('§F/finance/budget/000850: reads the tree after a save of a section that went off a page before', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
-      const settings = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent)).componentInstance as CostCentreSettingsComponent;
-      settings.whenGone()?.();
+      TestBed.inject(BudgetTreeApi).changed.next();
       expect(view.http.match(treeUrl)).toHaveLength(1);
     });
 

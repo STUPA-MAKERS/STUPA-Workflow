@@ -103,33 +103,31 @@ export class CostCentreSettingsComponent {
   readonly saved = output<void>();
   /** The side changed, so the lines of a plan can differ: the plan page reads its plan again. */
   readonly sideSaved = output<void>();
-  /**
-   * Runs in place of `saved` after the section went off the page, because a component that
-   * is gone cannot emit. A text that the person typed and did not leave is saved when the
-   * section goes, for example by Back on a phone, and its answer arrives after that.
-   */
-  readonly whenGone = input<(() => void) | null>(null);
-  private gone: (() => void) | null = null;
+  /** The section went off the page: a component that is gone cannot emit. */
+  private gone = false;
 
   constructor() {
     effect(() => {
       const node = this.node();
+      const own = `${node.id}:`;
       this.sent = Object.fromEntries(
-        Object.entries(this.sent).filter(
-          ([key, last]) => !key.startsWith(`${node.id}:`) || last.base === savedValue(node, key.slice(node.id.length + 1) as Field),
-        ),
+        Object.entries(this.sent).flatMap(([key, last]) => {
+          if (!key.startsWith(own)) return [[key, last]];
+          if (savedValue(node, key.slice(own.length) as Field) === last.value) return [[key, { ...last, seen: true }]];
+          return last.seen ? [] : [[key, last]];
+        }),
       );
     });
     inject(DestroyRef).onDestroy(() => {
-      this.gone = this.whenGone() ?? ((): void => undefined);
+      this.gone = true;
       this.saveText('key');
       this.saveText('name');
     });
   }
 
-  /** Tell the page that a save ended. */
+  /** Tell the page that a save ended, or the page that shows after this one. */
   private tell(side: boolean): void {
-    if (this.gone) return this.gone();
+    if (this.gone) return this.api.changed.next();
     this.saved.emit();
     if (side) this.sideSaved.emit();
   }
@@ -225,13 +223,13 @@ export class CostCentreSettingsComponent {
   /** The changes that wait for the save that runs, at most one for each field of a Kostenstelle. */
   private readonly waiting = signal<readonly Change[]>([]);
   /**
-   * The value that the last request for a field holds, by Kostenstelle and field, with the
-   * saved value of that moment (`base`). It stands for the saved value until the tree that
-   * the page reads after the save holds another value than `base`. The entry then goes,
-   * because a tree that holds `base` again later holds it from another person, and the
-   * value of the request is no longer the saved one.
+   * The value that the last request for a field holds, by Kostenstelle and field. It stands
+   * for the saved value from its request on, because the tree that the page reads after an
+   * earlier save of the field is older than this request. `seen` says that a tree held the
+   * value. A tree that holds another value after that holds it from another person, so the
+   * entry then goes and the tree counts again.
    */
-  private sent: Readonly<Record<string, { readonly value: Value; readonly base: Value | undefined }>> = {};
+  private sent: Readonly<Record<string, { readonly value: Value; readonly seen: boolean }>> = {};
 
   /**
    * Take a change of a field. The changes are saved one after the other, so two writes
@@ -262,8 +260,8 @@ export class CostCentreSettingsComponent {
   private known(id: Uuid, field: Field): Value | undefined {
     const last = this.sent[`${id}:${field}`];
     const node = this.node();
-    if (node.id !== id) return last?.value;
-    return last && last.base === savedValue(node, field) ? last.value : savedValue(node, field);
+    if (last) return last.value;
+    return node.id === id ? savedValue(node, field) : undefined;
   }
 
   /** The change whose save runs. */
@@ -311,9 +309,7 @@ export class CostCentreSettingsComponent {
     this.current = change;
     const key = `${id}:${field}`;
     const before = this.sent[key];
-    const node = this.node();
-    const base = node.id === id ? savedValue(node, field) : undefined;
-    this.sent = { ...this.sent, [key]: { value, base } };
+    this.sent = { ...this.sent, [key]: { value, seen: false } };
     this.running.set(true);
     const request: Observable<unknown> =
       field === 'side' ? this.planApi.setSide(id, value as Side) : this.api.updateNode(id, { [field]: value });

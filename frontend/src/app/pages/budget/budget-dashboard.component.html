@@ -200,7 +200,7 @@
           }
           @if (editable()) {
             <app-section class="bd__sec" size="lg" [heading]="'budget.cc.heading' | t">
-              <app-cost-centre-settings [node]="ks" [sided]="sided()" [gremiumOptions]="gremiumOptions()" [whenGone]="rereadTree" (saved)="refreshTree()" />
+              <app-cost-centre-settings [node]="ks" [sided]="sided()" [gremiumOptions]="gremiumOptions()" (saved)="refreshTree()" />
             </app-section>
           }
         }

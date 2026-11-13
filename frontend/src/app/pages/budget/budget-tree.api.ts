@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { skipLoading } from '@stupa-makers/ui-kit';
 import { cached, detailContext, listContext } from '@core/cache/cache.interceptor';
-import { of, type Observable } from 'rxjs';
+import { of, Subject, type Observable } from 'rxjs';
 import { FeatureService } from '@core/features/feature.service';
 import { map } from 'rxjs/operators';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -500,6 +500,13 @@ export class BudgetTreeApi {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
   private readonly features = inject(FeatureService);
+
+  /**
+   * A save of a Kostenstelle ended after its section went off the page, for example the
+   * save of a text that the person typed and then went back. The budget page that shows
+   * then reads the tree again, because its first read can be older than that save.
+   */
+  readonly changed = new Subject<void>();
 
   /**
    * The budget and dashboard pages have their own loading indicator; every other call only fills

@@ -642,6 +642,7 @@ export class BudgetPlanComponent {
   });
 
   constructor() {
+    this.treeApi.changed.pipe(takeUntilDestroyed()).subscribe(() => this.reloadTree());
     this.destroyRef.onDestroy(() => {
       this.gone = true;
     });
@@ -1061,8 +1062,6 @@ export class BudgetPlanComponent {
   /** The numbers of the tree reads: an answer that is older than the tree on the page is dropped. */
   private treeSent = 0;
   private treeShown = 0;
-  /** The tree read for a section "Kostenstelle" that went off the page while its save ran. */
-  readonly rereadTree = (): void => this.reloadTree();
 
   /** Delete the Kostenstelle after the confirmation. A refusal shows its reason. */
   private deleteNode(row: PlanRow): void {
@@ -1112,10 +1111,18 @@ export class BudgetPlanComponent {
       (change.transferable === undefined || change.transferable === known.transferable) &&
       (change.coverable === undefined || change.coverable === known.coverable);
     if (!version || !this.editable() || same) return ended?.();
-    const sent = { ...this.lineSent[key], ...change };
-    this.lineSent = { ...this.lineSent, [key]: sent };
+    const fields = Object.keys(change).map((field) => `${key}:${field}`);
+    const count = (by: number) => (runs: Readonly<Record<string, number>>): Readonly<Record<string, number>> => ({
+      ...runs,
+      ...Object.fromEntries(fields.map((field) => [field, (runs[field] ?? 0) + by])),
+    });
+    this.lineSent = { ...this.lineSent, [key]: { ...this.lineSent[key], ...change } };
+    this.lineRuns = count(1)(this.lineRuns);
     const done = (): void => {
-      if (this.lineSent[key] === sent) this.lineSent = Object.fromEntries(Object.entries(this.lineSent).filter(([k]) => k !== key));
+      this.lineRuns = count(-1)(this.lineRuns);
+      const left = Object.fromEntries(Object.entries(this.lineSent[key] ?? {}).filter(([field]) => this.lineRuns[`${key}:${field}`]));
+      this.lineSent = { ...Object.fromEntries(Object.entries(this.lineSent).filter(([k]) => k !== key)), ...(Object.keys(left).length ? { [key]: left } : {}) };
+      this.lineRuns = Object.fromEntries(Object.entries(this.lineRuns).filter(([, n]) => n));
       ended?.();
     };
     this.write(this.api.setLine(version.id, row.id, change).pipe(finalize(done)), null, null, false);
@@ -1127,6 +1134,11 @@ export class BudgetPlanComponent {
    * these saves: a field that the person sets back while its save runs must be saved again.
    */
   private lineSent: Readonly<Record<string, PlanLineSet>> = {};
+  /**
+   * The number of the saves that run for a field of a line. A field leaves `lineSent` when
+   * its last save ended, and not with the end of a save of another field of its line.
+   */
+  private lineRuns: Readonly<Record<string, number>> = {};
 
   /**
    * The key of a press or a typed text that the page keeps for a field of a line. It names

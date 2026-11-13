@@ -70,6 +70,7 @@ async function setup(opts: Opts = {}) {
   };
   const treeApi = {
     tree: jest.fn(() => of(opts.tree ?? [TOP, QSM])),
+    changed: new Subject<void>(),
     listFiscalYears: jest.fn((_id: string) => of(opts.years ?? [FY25, FY26])),
     deleteNode: jest.fn((_id: string) => of(undefined)),
   };
@@ -366,7 +367,7 @@ describe('BudgetPlanComponent', () => {
         providers: [
           provideRouter([]),
           { provide: BudgetPlanApi, useValue: {} },
-          { provide: BudgetTreeApi, useValue: { tree: () => throwError(() => problem(500)) } },
+          { provide: BudgetTreeApi, useValue: { tree: () => throwError(() => problem(500)), changed: new Subject<void>() } },
           { provide: AuthService, useValue: { can: () => true } },
           { provide: AdminApiService, useValue: { listGremienOptions: () => of([]) } },
         ],
@@ -962,6 +963,17 @@ describe('BudgetPlanComponent', () => {
       expect(mark).toHaveAttribute('aria-checked', 'false');
     });
 
+    it('§F/finance/budget/000812: a field set back is saved again after a save of another field of its line ended', async () => {
+      const view = await setup({ query: { costCentre: 'grants' } });
+      const held = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(held);
+      const mark = screen.getByRole('switch', { name: 'Übertragbar' });
+      await userEvent.click(mark);
+      await userEvent.click(screen.getByRole('switch', { name: 'Deckungsfähig' }));
+      await userEvent.click(mark);
+      expect(view.api.setLine.mock.calls.map((call) => call[2])).toEqual([{ transferable: true }, { coverable: true }, { transferable: false }]);
+    });
+
     it('§F/finance/budget/000812: an Erläuterung keeps the last text until its last save ended', async () => {
       const view = await setup({ query: { costCentre: 'grants' } });
       const note = () => view.container.querySelector<HTMLTextAreaElement>('[name="line-note-grants"]') as HTMLTextAreaElement;
@@ -1300,11 +1312,10 @@ describe('BudgetPlanComponent', () => {
       expect((view.fixture.componentInstance as unknown as { tree(): BudgetTreeNode[] }).tree()[0].name).toBe('Neu');
     });
 
-    it('§F/finance/budget/000850: reads the tree after a save of a section that went off the page', async () => {
+    it('§F/finance/budget/000850: reads the tree after a save of a section that went off a page before', async () => {
       const view = await setup({ query: { costCentre: 'fees' } });
-      const settings = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent)).componentInstance as CostCentreSettingsComponent;
       const reads = view.treeApi.tree.mock.calls.length;
-      settings.whenGone()?.();
+      view.treeApi.changed.next();
       expect(view.treeApi.tree.mock.calls.length).toBe(reads + 1);
     });
 

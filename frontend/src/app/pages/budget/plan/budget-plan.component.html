@@ -305,7 +305,7 @@
   @if (canWrite()) {
     @if (nodeOf(row.id); as node) {
       <app-section class="bd__sec" size="lg" [heading]="'budget.cc.heading' | t">
-        <app-cost-centre-settings [node]="node" [sided]="sided(node)" [gremiumOptions]="gremiumOptions()" [whenGone]="rereadTree" (saved)="reloadTree()" (sideSaved)="refreshPlan()" />
+        <app-cost-centre-settings [node]="node" [sided]="sided(node)" [gremiumOptions]="gremiumOptions()" (saved)="reloadTree()" (sideSaved)="refreshPlan()" />
       </app-section>
     }
   }

@@ -14,7 +14,7 @@ const KS = node({ id: 'ks', parentId: 'top', key: '800', name: 'Kultur', color: 
 async function setup(over: Partial<BudgetTreeNode> = {}, fail = '', sided = true) {
   TestBed.resetTestingModule();
   const answer = () => (fail ? throwError(() => ({ status: 409, error: { code: fail } })) : of({}));
-  const api = { updateNode: jest.fn((_id: string, _patch: object) => answer()) };
+  const api = { updateNode: jest.fn((_id: string, _patch: object) => answer()), changed: new Subject<void>() };
   const planApi = { setSide: jest.fn((_id: string, _side: string) => answer()) };
   const saved = jest.fn();
   const sideSaved = jest.fn();
@@ -257,6 +257,25 @@ describe('CostCentreSettingsComponent', () => {
     await waitFor(() => expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('StuPa'));
   });
 
+  it('§F/finance/budget/000849: the third press is saved while the tree holds the state of the first', async () => {
+    const view = await setup();
+    const first = new Subject<object>();
+    const second = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const active = screen.getByRole('switch', { name: 'Aktiv' });
+    await userEvent.click(active);
+    await userEvent.click(active);
+    first.next({});
+    first.complete();
+    view.fixture.componentRef.setInput('node', { ...KS, active: false });
+    view.fixture.detectChanges();
+    await userEvent.click(active);
+    second.next({});
+    second.complete();
+    expect(view.api.updateNode.mock.calls.map((call) => call[1])).toEqual([{ active: false }, { active: true }, { active: false }]);
+    expect(active).toHaveAttribute('aria-checked', 'false');
+  });
+
   it('§F/finance/budget/000849: a value that another person set back is saved again', async () => {
     const view = await setup();
     await retype(view.field('Name'), 'Neu');
@@ -335,7 +354,7 @@ describe('CostCentreSettingsComponent', () => {
   it('§F/finance/budget/000850: a typed text is saved when the section goes off the page', async () => {
     const view = await setup();
     const reread = jest.fn();
-    view.fixture.componentRef.setInput('whenGone', reread);
+    view.api.changed.subscribe(reread);
     const pending = new Subject<object>();
     view.api.updateNode.mockReturnValueOnce(pending);
     await userEvent.type(view.field('Name'), ' Y');
