@@ -305,3 +305,40 @@ def test_embedded_pdfs_become_watermarked_anlagen_with_linked_references(tmp_pat
         if "/Dest" in annot.get_object()
     ]
     assert targets == [pages - 3, pages - 1]
+
+
+def _gray_page(pdf: bytes, tmp_path: Path, page: int, dpi: int) -> tuple[int, bytes]:
+    """Render one page as an 8-bit gray PGM and return its width and pixels."""
+    path = tmp_path / "bar.pdf"
+    path.write_bytes(pdf)
+    pgm = subprocess.run(
+        ["pdftoppm", "-gray", "-r", str(dpi), "-f", str(page), "-l", str(page), str(path)],
+        capture_output=True,
+        check=True,
+    ).stdout
+    head = pgm.split(b"\n", 3)
+    width = int(head[1].split()[0])
+    return width, head[3]
+
+
+def _dark_rows(pixels: bytes, width: int, x0: int, x1: int) -> list[int]:
+    """The rows with a dark pixel between the columns x0 and x1."""
+    rows = len(pixels) // width
+    return [y for y in range(rows) if any(pixels[y * width + x] < 100 for x in range(x0, x1))]
+
+
+def test_a_black_bar_sits_on_the_baseline(tmp_path: Path) -> None:
+    """§000887: the bar reaches from just under the baseline to the cap height."""
+    pdf = _render("---\ntitle: T\n---\n\nHalli %%%% HHH\n", None)
+    lines = _lines(pdf, tmp_path)
+    page, x, y = _find(lines, "Halli")
+    dpi = 144
+    scale = dpi / 72
+    width, pixels = _gray_page(pdf, tmp_path, page, dpi)
+    top = round((y - 2) * scale)
+    band = pixels[top * width : (top + round(24 * scale)) * width]
+    letters = _dark_rows(band, width, round(x * scale), round((x + 4) * scale))
+    bar = _dark_rows(band, width, round((x + 40) * scale), round((x + 50) * scale))
+    baseline, cap = letters[-1], letters[0]
+    assert 0 <= bar[-1] - baseline <= round(2 * scale)
+    assert abs(bar[0] - cap) <= round(1.5 * scale)

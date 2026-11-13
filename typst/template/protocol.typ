@@ -163,7 +163,9 @@
     } else if t == "bar" {
       // A blacked-out segment (000687, 000688): one fixed width, so the bar does not
       // tell the length. The black word "geschwärzt" on the black bar is the text
-      // that a screen reader and a copy of the text get.
+      // that a screen reader and a copy of the text get. The word is placed, so it
+      // gives the box no baseline: the bottom of the bar is the baseline of the box,
+      // and the bar reaches from 0.1em under the line to the cap height.
       box(
         width: 4.5em,
         height: 0.8em,
@@ -171,7 +173,7 @@
         fill: black,
         radius: 1pt,
         clip: true,
-        align(center + horizon, text(fill: black, size: 0.55em)[geschwärzt]),
+        place(center + horizon, text(fill: black, size: 0.55em)[geschwärzt]),
       )
     } else if t == "sym" {
       math.equation(block: false, alt: n.v, math-symbols.at(n.v, default: n.v))
