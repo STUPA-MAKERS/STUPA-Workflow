@@ -254,7 +254,15 @@ class AllocationSet(FrozenCamelModel, frozen=True):
 
     #: ``le`` keeps the value inside ``Numeric(12, 2)``: a larger one gives 422, not a
     #: 500 from the database.
-    allocated: Decimal = Field(ge=0, le=_MAX_AMOUNT, allow_inf_nan=False)
+    #: Two decimal places at most, and the validator gives the amount exactly two and
+    #: drops the sign of a negative zero, so the answer and the audit entry hold the
+    #: amount that the database holds. A third place gives 422, because the database
+    #: would round it and the revert of the entry would then never match.
+    allocated: Annotated[
+        Decimal,
+        Field(ge=0, le=_MAX_AMOUNT, allow_inf_nan=False, decimal_places=2),
+        AfterValidator(lambda value: abs(value.quantize(Decimal("0.01")))),
+    ]
 
 
 class AllocationOut(FrozenCamelModel, frozen=True):

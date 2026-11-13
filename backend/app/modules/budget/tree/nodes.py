@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Literal, cast
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.applications.models import Application
@@ -56,6 +56,10 @@ def _node_out(
         side=cast("Side | None", b.side),
         planEnabled=bool(b.plan_enabled),
     )
+
+#: Fixed advisory-lock key of the keys of the top-level budgets (``"BUDGET_K"``).
+_TOP_KEYS_LOCK = 0x4255444745545F4B
+
 
 
 class NodeOps(BudgetTreeServiceBase):
@@ -169,6 +173,30 @@ class NodeOps(BudgetTreeServiceBase):
                 errors=[{"field": field, "msg": "unknown gremium"}],
             )
 
+    async def _lock_top_keys(self) -> None:
+        """Take the lock of the keys of the top-level budgets until the commit.
+
+        The top-level budgets have no common parent row to lock, so a fixed advisory
+        lock stands in for it. A request takes it after the lock of its tree and
+        before the audit log.
+        """
+        await self.session.execute(select(func.pg_advisory_xact_lock(_TOP_KEYS_LOCK)))
+
+    @staticmethod
+    def _flush_error(exc: IntegrityError, key: str) -> Exception:
+        """Name the error of a flush that writes a key.
+
+        Only the two unique constraints of the key mean a key that a sibling has.
+        Any other error stays the error of the database, because a 409 for the key
+        would name a wrong cause, for example for a Gremium that went away.
+        """
+        if "uq_budget_" not in str(exc.orig):
+            return exc
+        return ConflictError(
+            f"budget key {key!r} already exists under this parent",
+            code="budget_key_exists",
+        )
+
     async def _decision_view(self, node: Budget) -> tuple[UUID | None, UUID | None]:
         """Return the effective deciding Gremium of `node` and the node that holds it.
 
@@ -196,6 +224,8 @@ class NodeOps(BudgetTreeServiceBase):
             )
 
         await self._lock_tree(payload.parent_id)
+        if payload.parent_id is None:
+            await self._lock_top_keys()
         parent = await self._get_node(payload.parent_id) if payload.parent_id is not None else None
         if parent is None and payload.gremium_id is not None:
             gremium = (
@@ -248,10 +278,7 @@ class NodeOps(BudgetTreeServiceBase):
         try:
             await self.session.flush()
         except IntegrityError as exc:
-            raise ConflictError(
-                f"budget key {payload.key!r} already exists under this parent",
-                code="budget_key_exists",
-            ) from exc
+            raise self._flush_error(exc, payload.key) from exc
         await self._audit(
             AuditAction.BUDGET_NODE_CREATE,
             target_type="budget",
@@ -345,10 +372,12 @@ class NodeOps(BudgetTreeServiceBase):
 
         The descendants are fetched by path prefix before the node is renamed.
 
-        The flush comes before the audit entry. A request that takes the same key at
-        the same moment holds the unique index until its commit, and two top-level
-        budgets share no lock of a tree, so the wait for that index must not hold the
-        lock of the audit log.
+        Two top-level budgets share no lock of a tree, so a top-level budget takes
+        the lock of the top-level keys before the check of its siblings. Without it
+        two budgets with Kostenstellen that take one key at the same moment each
+        write a part of the path keys and then wait for the other. The flush comes
+        before the audit entry, so a wait for the unique index never holds the lock
+        of the audit log.
 
         Raises:
             ValidationProblem: The new key segment is invalid (422).
@@ -359,6 +388,8 @@ class NodeOps(BudgetTreeServiceBase):
                 "Invalid budget key.",
                 errors=[{"field": "key", "msg": "must be alphanumeric (no '-')"}],
             )
+        if node.parent_id is None:
+            await self._lock_top_keys()
         if await self._sibling_exists(node.parent_id, new_key):
             raise ConflictError(
                 f"budget key {new_key!r} already exists under this parent",
@@ -385,10 +416,7 @@ class NodeOps(BudgetTreeServiceBase):
         try:
             await self.session.flush()
         except IntegrityError as exc:
-            raise ConflictError(
-                f"budget key {new_key!r} already exists under this parent",
-                code="budget_key_exists",
-            ) from exc
+            raise self._flush_error(exc, new_key) from exc
 
     async def _plans_of_top(self, node: Budget) -> dict[str, object]:
         """Return the plans that go with a top-level budget, as audit data.

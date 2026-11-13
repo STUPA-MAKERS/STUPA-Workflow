@@ -381,6 +381,25 @@ def test_the_node_schemas_refuse_what_they_cannot_store() -> None:
         PlanLineSet.model_validate({"transferable": "yes"})
 
 
+def test_an_allocation_has_two_decimal_places() -> None:
+    """An allocation with a third decimal place is refused, and the rest gets two places.
+
+    Rule: §F/finance/budget/000846.
+    """
+    from pydantic import ValidationError
+
+    from app.modules.budget.tree_schemas import AllocationSet
+
+    for amount in ("0.005", "12.345", "-1"):
+        with pytest.raises(ValidationError):
+            AllocationSet.model_validate({"allocated": amount})
+    shown = [
+        str(AllocationSet.model_validate({"allocated": amount}).allocated)
+        for amount in ("-0", "1e2", "7", "12.30")
+    ]
+    assert shown == ["0.00", "100.00", "7.00", "12.30"]
+
+
 def test_an_amount_of_minus_zero_is_zero() -> None:
     """An amount of "-0" has no sign in the answer and in the audit entry.
 

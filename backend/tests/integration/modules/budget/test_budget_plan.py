@@ -2048,3 +2048,68 @@ async def test_a_gremium_with_a_budget_is_not_deleted(session: AsyncSession) -> 
     await session.commit()
     await ConfigService(session).delete_gremium(gremium, admin)
     assert await session.get(Gremium, gremium) is None
+
+
+async def test_only_a_taken_key_is_a_key_conflict(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another error of the write of a key stays an error and is no 409 for the key.
+
+    A Gremium that goes away between its check and the write breaks a foreign key. The
+    key is free then, so the answer must not name the key.
+    Rule: §F/finance/budget/000246.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    t = await _tree(session, enabled=False)
+
+    async def unchecked(_gremium: object, _field: str) -> None:
+        return None
+
+    monkeypatch.setattr(t.svc, "_check_gremium", unchecked)
+    with pytest.raises(IntegrityError):
+        await t.svc.update_node(
+            t.exp.id, BudgetNodeUpdate(key="77", viewGremiumId=uuid.uuid4())
+        )
+    await session.rollback()
+    with pytest.raises(IntegrityError):
+        await t.svc.create_node(
+            BudgetNodeCreate(
+                key="78", name="Neu", parentId=t.exp.id, decisionGremiumId=uuid.uuid4()
+            )
+        )
+    await session.rollback()
+
+
+@pytest.mark.parametrize("write", ["rename", "create"])
+async def test_a_top_level_key_waits_for_the_lock_of_the_top_level_keys(
+    session: AsyncSession, write: str
+) -> None:
+    """A top-level budget takes the lock of the top-level keys before it writes its key.
+
+    Two budgets with Kostenstellen that take one key at the same moment would else
+    each write a part of the path keys and wait for the other.
+    Rules: §F/finance/budget/000246, §F/finance/budget/000842.
+    """
+    from sqlalchemy import func
+
+    from app.modules.budget.tree.nodes import _TOP_KEYS_LOCK
+
+    t = await _tree(session, enabled=False)
+    key = f"L{uuid.uuid4().hex[:8]}"
+    maker = async_sessionmaker(session.bind, expire_on_commit=False)
+
+    async def run() -> str:
+        async with maker() as other:
+            svc = BudgetTreeService(other, actor="tester")
+            if write == "rename":
+                return (await svc.update_node(t.top.id, BudgetNodeUpdate(key=key))).path_key
+            return (await svc.create_node(BudgetNodeCreate(key=key, name="Neu"))).path_key
+
+    async with maker() as holder:
+        await holder.execute(select(func.pg_advisory_xact_lock(_TOP_KEYS_LOCK)))
+        task = asyncio.create_task(run())
+        await asyncio.sleep(0.3)
+        assert not task.done()
+        await holder.commit()
+    assert await asyncio.wait_for(task, 10) == key
