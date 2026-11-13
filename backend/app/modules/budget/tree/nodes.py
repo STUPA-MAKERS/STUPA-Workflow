@@ -153,13 +153,21 @@ class NodeOps(BudgetTreeServiceBase):
     ) -> None:
         """Refuse a deciding or a viewing Gremium that does not exist.
 
+        The read takes a key-share lock on the Gremium, so it waits for a delete of
+        that Gremium and then reads that it is gone. Without the lock the check passes
+        and the write breaks the foreign key at its flush.
+
         Raises:
             ValidationProblem: `decision_gremium_invalid` or `view_gremium_invalid`
                 (422).
         """
         if gremium_id is None:
             return
-        found = await self.session.scalar(select(Gremium.id).where(Gremium.id == gremium_id))
+        found = await self.session.scalar(
+            select(Gremium.id)
+            .where(Gremium.id == gremium_id)
+            .with_for_update(read=True, key_share=True)
+        )
         if found is None:
             raise ValidationProblem(
                 f"{field} is not the id of a Gremium.",
@@ -228,7 +236,9 @@ class NodeOps(BudgetTreeServiceBase):
         if parent is None and payload.gremium_id is not None:
             gremium = (
                 await self.session.execute(
-                    select(Gremium).where(Gremium.id == payload.gremium_id)
+                    select(Gremium)
+                    .where(Gremium.id == payload.gremium_id)
+                    .with_for_update(read=True, key_share=True)
                 )
             ).scalar_one_or_none()
             if gremium is None:

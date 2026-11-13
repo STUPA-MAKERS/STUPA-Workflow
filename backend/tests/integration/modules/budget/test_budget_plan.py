@@ -2135,6 +2135,67 @@ async def test_a_gremium_with_a_budget_is_not_deleted(session: AsyncSession) -> 
     assert await session.get(Gremium, gremium) is None
 
 
+@pytest.mark.parametrize("field", ["viewGremiumId", "decisionGremiumId"])
+async def test_a_gremium_that_went_while_a_write_waited_is_not_valid(
+    session: AsyncSession, field: str
+) -> None:
+    """A write that names a Gremium beside the delete of that Gremium answers 422.
+
+    The write waits for the delete and then reads that the Gremium is gone. Without the
+    wait the write passes its check and breaks the foreign key at its flush.
+    Rule: §F/finance/budget/000842.
+    """
+    t = await _tree(session, enabled=False)
+    gremium = await _gremium(session)
+    maker = async_sessionmaker(session.bind, expire_on_commit=False)
+
+    async def run() -> str:
+        async with maker() as other:
+            svc = BudgetTreeService(other, actor="tester")
+            try:
+                await svc.update_node(t.exp.id, BudgetNodeUpdate.model_validate({field: gremium}))
+            except ValidationProblem as exc:
+                return exc.code
+            return "saved"
+
+    async with maker() as holder:
+        await holder.execute(delete(Gremium).where(Gremium.id == gremium))
+        task = asyncio.create_task(run())
+        await asyncio.sleep(0.3)
+        assert not task.done()
+        await holder.commit()
+    code = "view_gremium_invalid" if field == "viewGremiumId" else "decision_gremium_invalid"
+    assert await asyncio.wait_for(task, 10) == code
+
+
+async def test_a_budget_for_a_gremium_that_goes_beside_the_create_is_not_found(
+    session: AsyncSession,
+) -> None:
+    """The create of a budget beside the delete of its Gremium answers 404.
+
+    Rule: §F/finance/budget/000842.
+    """
+    gremium = await _gremium(session)
+    maker = async_sessionmaker(session.bind, expire_on_commit=False)
+
+    async def run() -> str:
+        async with maker() as other:
+            node = BudgetNodeCreate(key=f"N{uuid.uuid4().hex[:8]}", name="Neu", gremiumId=gremium)
+            try:
+                await BudgetTreeService(other, actor="tester").create_node(node)
+            except NotFoundError:
+                return "not found"
+            return "saved"
+
+    async with maker() as holder:
+        await holder.execute(delete(Gremium).where(Gremium.id == gremium))
+        task = asyncio.create_task(run())
+        await asyncio.sleep(0.3)
+        assert not task.done()
+        await holder.commit()
+    assert await asyncio.wait_for(task, 10) == "not found"
+
+
 async def test_only_a_taken_key_is_a_key_conflict(
     session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
