@@ -291,7 +291,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000823](requirements/functional/finance/budget/000823_plan-steps-per-budget.md) | A budget holds the steps of its Haushaltsplan | draft |
 | [F/finance/budget/000824](requirements/functional/finance/budget/000824_plan-version-keeps-steps.md) | A version keeps the steps it started with | draft |
 | [F/finance/budget/000825](requirements/functional/finance/budget/000825_plan-step-recorded.md) | A person records a passed step | draft |
-| [F/finance/budget/000826](requirements/functional/finance/budget/000826_plan-step-by-vote.md) | An accepted vote of the Gremium passes its step | draft |
+| [F/finance/budget/000826](requirements/functional/finance/budget/000826_plan-step-by-vote.md) | An accepted vote of the Gremium passes its step | approved |
 | [F/finance/budget/000827](requirements/functional/finance/budget/000827_plan-steps-edit.md) | The steps of a budget are edited in its edit form | draft |
 | [F/finance/budget/000828](requirements/functional/finance/budget/000828_admin-lists-budgets.md) | Verwaltung lists only the budgets | draft |
 | [F/finance/budget/000829](requirements/functional/finance/budget/000829_cost-centre-create-in-budget-tab.md) | A Kostenstelle is created in the Budget tab | draft |
@@ -303,7 +303,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000835](requirements/functional/finance/budget/000835_plan-version-delete.md) | A draft version can be deleted | draft |
 | [F/finance/budget/000836](requirements/functional/finance/budget/000836_fiscal-year-delete-with-plan.md) | A fiscal year with a decided plan cannot be deleted | draft |
 | [F/finance/budget/000837](requirements/functional/finance/budget/000837_plan-copy-from-year.md) | A new plan can copy the plan of another year | draft |
-| [F/finance/budget/000838](requirements/functional/finance/budget/000838_plan-step-vote.md) | The vote of a plan step runs in a meeting of its Gremium | draft |
+| [F/finance/budget/000838](requirements/functional/finance/budget/000838_plan-step-vote.md) | The vote of a plan step runs in a meeting of its Gremium | approved |
 | [F/finance/budget/000839](requirements/functional/finance/budget/000839_plan-back-to-draft-ends-votes.md) | A version back in draft ends the votes of its steps | draft |
 | [F/finance/budget/000840](requirements/functional/finance/budget/000840_plan-page-confirmations.md) | The plan page asks before an action that binds or deletes | draft |
 | [F/finance/budget/000841](requirements/functional/finance/budget/000841_plan-step-named.md) | A request that records a step names the step | draft |

@@ -2,7 +2,7 @@
 id: "000838"
 title: The vote of a plan step runs in a meeting of its Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 tests:
