@@ -1,13 +1,14 @@
 ---
 name: be-pdf
-description: The HTTP client to the internal typst render service — TypstClient.render_pdf, TypstError, build_typst_client, variants and the multipart logo channel. Protocols are the only caller; applications no longer render a PDF. Use when working on the render call, its error and retry discipline, or the render settings in backend/app/modules/pdf.
+description: The HTTP client to the internal typst render service — TypstClient.render_pdf, TypstError, build_typst_client, variants and the multipart logo channel. The callers are the protocols and the export of a Haushaltsplan; applications no longer render a PDF. Use when working on the render call, its error and retry discipline, or the render settings in backend/app/modules/pdf.
 ---
 
 # typst client — `backend/app/modules/pdf`
 
 **Does:** Holds the HTTP client to the internal typst `/render` service. Nothing else. The
-one caller is `be-protocol`, which renders a meeting protocol to PDF and stores it in
-MinIO itself.
+callers are `be-protocol`, which renders a meeting protocol to PDF and stores it in
+MinIO itself, and `be-budget`, which renders a version of a Haushaltsplan with the variant
+`plan` and answers the bytes (spec 000875).
 
 > **Applications no longer render a PDF.** The route, the `render_job` table, the arq
 > `render_pdf` task, the `exportPdf` flow action and the application Markdown builder were

@@ -11,7 +11,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -43,6 +43,7 @@ from app.modules.budget.tree_schemas import (
     BudgetNodeOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
+    ExpenseCreate,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
@@ -721,6 +722,66 @@ async def test_the_default_changes_no_line_that_exists(session: AsyncSession) ->
     assert _coverable(nachtrag) == {
         t.inc.id: False, t.exp.id: False, t.exp_a.id: True, t.exp_b.id: False,
     }
+
+
+async def test_a_version_exports_with_the_year_before_and_the_version_before(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The export holds the lines, the year before and, for a Nachtrag, the version before.
+
+    Rule: §F/finance/budget/000875.
+    """
+    today = date(2026, 11, 13)
+    t = await _tree(session)
+    plan = await _in_force(t)
+    await t.svc.book_expense(
+        ExpenseCreate(budgetId=t.exp_a.id, fiscalYearId=t.fy.id, amount=D(25), description="x"),
+        actor="tester",
+    )
+    first = await t.svc.plan_export(_version(plan).id, today)
+    assert (first.head.title, first.head.state, first.head.prev_year) == (
+        "Haushaltsplan VS-Mittel 2026", "in_force", None,
+    )
+    assert first.head.exported_on == today
+    assert [(g.group, g.amount) for g in first.groups] == [("income", D(100)), ("expense", D(100))]
+    assert [(r.key.split("-", 1)[1], r.name, r.depth, r.amount) for r in first.groups[1].rows] == [
+        ("8", "Zuschüsse", 0, D(100)),
+        ("8-1", "Fachschaften", 1, D(60)),
+        ("8-2", "AKs", 1, D(40)),
+    ]
+    assert first.balance == D(0)
+
+    nachtrag = _version(await t.svc.create_nachtrag(t.top.id, t.fy.id))
+    await t.svc.set_line(nachtrag.id, t.inc.id, PlanLineSet(amount=D(120)))
+    await t.svc.set_line(nachtrag.id, t.exp_a.id, PlanLineSet(amount=D(80)))
+    second = await t.svc.plan_export(nachtrag.id, today)
+    assert (second.head.version, second.head.mark, second.nachtrag) == (
+        "Nachtrag 1", "Entwurf", True,
+    )
+    assert [(r.amount, r.base, r.change) for r in second.groups[1].rows] == [
+        (D(120), D(100), D(20)), (D(80), D(60), D(20)), (D(40), D(40), D(0)),
+    ]
+
+    nxt = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2027))
+    await session.commit()
+    draft = _version(await t.svc.get_plan(t.top.id, nxt.id))
+    await _sided(t, draft.id)
+    await t.svc.set_line(draft.id, t.exp_a.id, PlanLineSet(amount=D(70)))
+    third = await t.svc.plan_export(draft.id, today)
+    assert (third.head.fiscal_year, third.head.prev_year) == ("2027", "2026")
+    rows = {r.name: (r.amount, r.prev, r.actual) for g in third.groups for r in g.rows}
+    assert rows["Fachschaften"] == (D(70), D(60), D(25))
+    assert rows["Beiträge"] == (D(100), D(100), D(0))
+
+    with pytest.raises(NotFoundError):
+        await t.svc.plan_export(uuid.uuid4(), today)
+
+    async def no_tree() -> list[BudgetTreeNodeOut]:
+        return []
+
+    monkeypatch.setattr(t.svc, "get_tree", no_tree)
+    with pytest.raises(NotFoundError):
+        await t.svc.plan_export(draft.id, today)
 
 
 async def test_delete_line(session: AsyncSession) -> None:

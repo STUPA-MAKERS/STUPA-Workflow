@@ -8,12 +8,17 @@ commit, so each write route commits after the method returns.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
-from app.deps import Principal, require_principal
+from app.deps import Principal, SettingsDep, require_principal
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
+from app.modules.budget import plan_export
+from app.modules.budget.plan_export import PlanExport
 from app.modules.budget.plan_schemas import (
     PlanCreate,
     PlanLineSet,
@@ -27,7 +32,12 @@ from app.modules.budget.plan_schemas import (
     PlanSwitchOut,
     PlanSwitchSet,
 )
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_router import ServiceDep, _errors, _require_node_view
+from app.modules.pdf.typst_client import TypstError, build_typst_client
+from app.shared.errors import BadRequestError, ServiceUnavailableError
+from app.shared.filenames import content_disposition
+from app.shared.xlsx import XLSX_MEDIA_TYPE, build_table_workbook
 
 router = APIRouter(tags=["budget"])
 
@@ -84,6 +94,94 @@ async def get_plan_of_version(
     out = await service.plan_of_version(version_id)
     await _require_node_view(service, principal, out.budget_id)
     return out
+
+
+async def _export_of(
+    service: BudgetTreeService, principal: Principal, version_id: UUID, extension: str
+) -> PlanExport:
+    """Read a version for a file under the read rule of its budget, and record the export."""
+    plan = await service.plan_of_version(version_id)
+    await _require_node_view(service, principal, plan.budget_id)
+    export = await service.plan_export(version_id, datetime.now(UTC).date())
+    await audit_record(
+        service.session,
+        actor=principal.sub,
+        action=AuditAction.EXPORT,
+        target_type="export",
+        target_id=f"haushaltsplan.{extension}",
+        data={"plan_version_id": str(version_id), "state": export.head.state},
+    )
+    await service.session.commit()
+    return export
+
+
+@router.get(
+    "/budget-plan-versions/{version_id}/export.xlsx",
+    responses=_errors(401, 403, 404),
+)
+async def export_plan_xlsx(
+    version_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> Response:
+    """Return a version of a Haushaltsplan as `.xlsx`, for each reader of the plan.
+
+    Rule: §F/finance/budget/000875.
+    """
+    export = await _export_of(service, principal, version_id, "xlsx")
+    rows = plan_export.sheet_rows(export)
+    data = build_table_workbook(
+        title=export.head.title,
+        head=plan_export.head_lines(export.head),
+        headers=plan_export.sheet_headers(export),
+        rows=[row.cells for row in rows],
+        bold_rows=frozenset(i for i, row in enumerate(rows) if row.kind != "line"),
+        indents={i: row.depth for i, row in enumerate(rows)},
+        money_columns=plan_export.money_columns(export),
+    )
+    name = plan_export.export_filename(export.head, "xlsx")
+    return Response(
+        content=data,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": content_disposition("attachment", name)},
+    )
+
+
+@router.get(
+    "/budget-plan-versions/{version_id}/export.pdf",
+    responses=_errors(400, 401, 403, 404, 503),
+)
+async def export_plan_pdf(
+    version_id: UUID,
+    service: ServiceDep,
+    settings: SettingsDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> Response:
+    """Return a version of a Haushaltsplan as a PDF, for each reader of the plan.
+
+    Rule: §F/finance/budget/000875.
+
+    Raises:
+        BadRequestError: `render_failed` (400) when the render service refuses the plan.
+        ServiceUnavailableError: The render service does not answer (503).
+    """
+    export = await _export_of(service, principal, version_id, "pdf")
+    try:
+        pdf = await build_typst_client(settings).render_pdf(
+            plan_export.pdf_source(export), variant="plan", config=plan_export.pdf_config(export)
+        )
+    except TypstError as exc:
+        if not exc.retryable:
+            raise BadRequestError(
+                f"The plan could not be rendered: {exc}", code="render_failed"
+            ) from exc
+        raise ServiceUnavailableError("PDF rendering temporarily unavailable.") from exc
+    name = plan_export.export_filename(export.head, "pdf")
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": content_disposition("attachment", name)},
+    )
 
 
 @router.post(

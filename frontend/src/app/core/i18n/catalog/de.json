@@ -4363,5 +4363,7 @@
   "budget.plan.setState.reason": "Begründung",
   "budget.plan.setState.confirm": "Setzen",
   "budget.plan.step.byHand": "von Hand",
-  "budget.plan.toast.stateSet": "Der Zustand ist gesetzt."
+  "budget.plan.toast.stateSet": "Der Zustand ist gesetzt.",
+  "budget.plan.action.exportPdf": "Als PDF exportieren",
+  "budget.plan.action.exportXlsx": "Als XLSX exportieren"
 }

@@ -1,7 +1,7 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { skipLoading } from '@stupa-makers/ui-kit';
-import type { Observable } from 'rxjs';
+import { map, type Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
 
@@ -111,6 +111,22 @@ export interface PlanLineSet {
   readonly blocked?: string;
 }
 
+/** The format of the file of a plan version. */
+export type PlanExportFormat = 'xlsx' | 'pdf';
+
+/** The file of a plan version with the name that the server gives it. */
+export interface PlanFile {
+  readonly blob: Blob;
+  readonly filename: string;
+}
+
+/** The file name of a `Content-Disposition` header, else `fallback`. */
+export function dispositionName(header: string | null, fallback: string): string {
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header ?? '')?.[1];
+  const plain = /filename="([^"]+)"/i.exec(header ?? '')?.[1];
+  return encoded ? decodeURIComponent(encoded) : (plain ?? fallback);
+}
+
 /** The problem code of a plan read for a year without a plan (404). */
 export const PLAN_NOT_FOUND = 'plan_not_found';
 
@@ -128,6 +144,18 @@ export class BudgetPlanApi {
   /** The plan that holds a version, for the link from the vote of a step. */
   planOfVersion(versionId: Uuid): Observable<BudgetPlan> {
     return this.http.get<BudgetPlan>(`${this.versionUrl(versionId)}/plan`, { context: skipLoading() });
+  }
+
+  /** A version as a file. Each reader of the plan can load it, a draft too. */
+  exportVersion(versionId: Uuid, format: PlanExportFormat): Observable<PlanFile> {
+    return this.http
+      .get(`${this.versionUrl(versionId)}/export.${format}`, { observe: 'response', responseType: 'blob' })
+      .pipe(
+        map((response: HttpResponse<Blob>) => ({
+          blob: response.body ?? new Blob(),
+          filename: dispositionName(response.headers.get('Content-Disposition'), `Haushaltsplan.${format}`),
+        })),
+      );
   }
 
   /** Create the plan with a Stammplan in draft, empty or as a copy of another year. */
