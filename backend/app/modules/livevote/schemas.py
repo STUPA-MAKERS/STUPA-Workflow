@@ -486,29 +486,34 @@ class MeetingVoteOpenBody(MeetingVoteBody, frozen=True):
     repeat_of: UUID | None = Field(default=None, alias="repeatOf")
 
 
+#: The longest Markdown text of one agenda item that a live draft frame carries
+#: (`body_draft`). It is the cap of the protocol Markdown (`ProtocolPatch.markdown`),
+#: because the item texts go into that protocol. The REST route sets no cap of its own.
+AGENDA_BODY_MAX = 512_000
+
+
 class AgendaAddBody(FrozenCamelModel, frozen=True):
     """``POST /meetings/{id}/agenda`` — add an agenda item: application, free text or to-do.
 
-    Supply exactly one of ``applicationId``, ``title`` and ``todoId``.
+    Supply exactly one of ``applicationId``, ``title`` and ``todoId``. ``description``
+    goes only with ``title``: the text of the new free-text item starts with it as a
+    Markdown block quote (spec 000861).
     """
 
     application_id: UUID | None = Field(default=None, alias="applicationId")
     title: str | None = Field(default=None, min_length=1)
     todo_id: UUID | None = Field(default=None, alias="todoId")
     non_public: bool = Field(default=False, alias="nonPublic")
+    description: str | None = Field(default=None, max_length=AGENDA_BODY_MAX // 2)
 
     @model_validator(mode="after")
     def _one_of(self) -> AgendaAddBody:
         given = [v for v in (self.application_id, self.title, self.todo_id) if v is not None]
         if len(given) != 1:
             raise ValueError("exactly one of applicationId, title or todoId is required")
+        if self.description is not None and self.title is None:
+            raise ValueError("description is only allowed with title")
         return self
-
-
-#: The longest Markdown text of one agenda item that a live draft frame carries
-#: (`body_draft`). It is the cap of the protocol Markdown (`ProtocolPatch.markdown`),
-#: because the item texts go into that protocol. The REST route sets no cap of its own.
-AGENDA_BODY_MAX = 512_000
 
 
 class AgendaBodyBody(FrozenCamelModel, frozen=True):

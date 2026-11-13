@@ -287,14 +287,16 @@ async def add_agenda_item(
     meeting_id: str,
     application_id: str | None = None,
     title: str | None = None,
+    description: str | None = None,
 ) -> dict:
     """Add an agenda item to a meeting.
 
     Give EXACTLY ONE of `application_id` for an application item or `title` for a
-    free-text item. Requires write access to the meeting: session.manage
-    or protocol.write in its gremium, the assigned minute-taker, or admin. Only a
-    planned or live meeting takes a new item; a closed meeting gives 409
-    `meeting_closed`. Returns the whole agenda after the add.
+    free-text item. `description` goes only with `title`: the text of the new item
+    starts with it as a Markdown block quote, so it goes into the protocol. Requires
+    write access to the meeting: session.manage or protocol.write in its gremium, the
+    assigned minute-taker, or admin. Only a planned or live meeting takes a new item;
+    a closed meeting gives 409 `meeting_closed`. Returns the whole agenda after the add.
 
     A second free-text item with the same title is a second item. If the call fails
     without an answer from the platform, read the agenda with `get_agenda` before you
@@ -302,7 +304,7 @@ async def add_agenda_item(
     """
     return await api().post(
         f"/meetings/{meeting_id}/agenda",
-        json=params(applicationId=application_id, title=title),
+        json=params(applicationId=application_id, title=title, description=description),
     )
 
 

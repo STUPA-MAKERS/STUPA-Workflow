@@ -60,6 +60,15 @@ def title_of(data: dict[str, Any] | None) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def block_quote(text: str) -> str:
+    """Turn a plain text into a Markdown block quote (spec 000861).
+
+    The function trims the text and gives each line the prefix ``> ``. An empty line
+    becomes ``>``, so the quote does not break into two quotes.
+    """
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").strip().split("\n")
+    return "\n".join(f"> {line.rstrip()}" if line.strip() else ">" for line in lines)
+
 
 def agenda_order() -> tuple[ColumnElement[Any], ...]:
     """Return the sort keys of the agenda order.
@@ -476,6 +485,7 @@ class AgendaService:
         non_public: bool = False,
         *,
         actor: str | None = None,
+        description: str | None = None,
     ) -> list[AgendaItemOut]:
         """Add an agenda item for an application or for free text, then commit.
 
@@ -493,6 +503,7 @@ class AgendaService:
             title=title,
             non_public=non_public,
             actor=actor,
+            description=description,
         ):
             await self.session.commit()
         return await self.list(meeting_id)
@@ -505,11 +516,14 @@ class AgendaService:
         non_public: bool = False,
         *,
         actor: str | None = None,
+        description: str | None = None,
     ) -> bool:
         """Add an agenda item in the transaction of the caller. It does not commit.
 
         A `title` creates a free-text item. The method then ignores
-        `application_id`. Without a title the application must be in a vote
+        `application_id`. A `description` of a free-text item becomes the start of its
+        text as a Markdown block quote (spec 000861); the method ignores it for an
+        application item. Without a title the application must be in a vote
         state of the Gremium of the meeting. A second add for the same
         application changes nothing. The flow engine calls this method before its
         own commit, so the state change and the new item stay atomic. A new item
@@ -530,7 +544,7 @@ class AgendaService:
         meeting = await self._meeting(meeting_id, for_update=True)
         self._assert_agenda_open(meeting)
         if title is not None:
-            await self._add_freetext(meeting_id, title.strip(), non_public, actor)
+            await self._add_freetext(meeting_id, title.strip(), non_public, actor, description)
             return True
 
         app = await self.session.get(Application, application_id, populate_existing=True)
@@ -563,13 +577,22 @@ class AgendaService:
         return True
 
     async def _add_freetext(
-        self, meeting_id: UUID, title: str, non_public: bool, actor: str | None
+        self,
+        meeting_id: UUID,
+        title: str,
+        non_public: bool,
+        actor: str | None,
+        description: str | None = None,
     ) -> None:
-        """Add a free-text item with its own title and write ``agenda_item_add``."""
+        """Add a free-text item with its own title and write ``agenda_item_add``.
+
+        A description that is not blank becomes the text of the item as a block quote.
+        """
         item = MeetingAgendaItem(
             meeting_id=meeting_id,
             application_id=None,
             title=title,
+            body=block_quote(description) if description and description.strip() else None,
             position=await self._next_position(meeting_id),
             non_public=non_public,
         )

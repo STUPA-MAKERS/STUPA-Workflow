@@ -882,6 +882,7 @@
   "meetings.agenda.noAssignable": "Keine zuweisbaren Anträge",
   "meetings.agenda.noMatch": "Kein Antrag passt zu „{q}“",
   "meetings.agenda.freetextTitle": "Titel",
+  "meetings.agenda.freetextDescription": "Beschreibung",
   "meetings.agenda.asFreetext": "Als Freitext anlegen",
   "meetings.agenda.nonPublicLabel": "Nicht öffentlich (NÖ)",
   "meetings.agenda.done": "Erledigt",

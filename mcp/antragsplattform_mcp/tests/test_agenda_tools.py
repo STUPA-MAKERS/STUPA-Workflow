@@ -38,6 +38,29 @@ def test_get_agenda_reads_the_agenda_route(monkeypatch: pytest.MonkeyPatch) -> N
     assert items == [{"id": "i1", "title": "TOP 1", "position": 0}]
 
 
+class _PostApi:
+    """Record each POST and answer with an empty agenda."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, Any]] = []
+
+    async def post(self, path: str, **kw: Any) -> list[dict[str, Any]]:
+        self.calls.append((path, kw.get("json")))
+        return []
+
+
+def test_add_agenda_item_sends_the_description(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§000861: a free-text item takes a description."""
+    fake = _PostApi()
+    monkeypatch.setattr(_common, "_client", fake)
+    asyncio.run(meetings.add_agenda_item("m1", title="Bericht", description="Info"))
+    asyncio.run(meetings.add_agenda_item("m1", title="Kurz"))
+    assert fake.calls == [
+        ("/meetings/m1/agenda", {"title": "Bericht", "description": "Info"}),
+        ("/meetings/m1/agenda", {"title": "Kurz"}),
+    ]
+
+
 def _client(handler: Any, monkeypatch: pytest.MonkeyPatch) -> ApiClient:
     monkeypatch.setattr(
         client_mod.auth, "ensure_access_token", lambda *_a, **_k: "token"

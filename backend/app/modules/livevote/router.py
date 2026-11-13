@@ -878,6 +878,7 @@ async def add_agenda_item(
         payload.title,
         non_public=payload.non_public,
         actor=principal.sub,
+        description=payload.description,
     )
 
 
