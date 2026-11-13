@@ -63,7 +63,7 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-files** — MinIO attachments, ClamAV scan, downloads streamed through the API
 - **be-media** — Markdown images: upload, Pillow re-encode, canonical `/api/media/images/<id>`,
   public protocol images, images in the protocol PDF
-- **be-pdf** — client to the typst render service (protocols only; applications no
+- **be-pdf** — client to the typst render service (protocols and the plan export; applications no
   longer render a PDF)
 - **be-privacy** — DSGVO/GDPR anonymization, export/erasure
 - **be-calendar** — calendar/ICS feed for meetings

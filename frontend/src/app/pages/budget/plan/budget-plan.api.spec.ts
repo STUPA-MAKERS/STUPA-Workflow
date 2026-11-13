@@ -44,6 +44,26 @@ describe('BudgetPlanApi', () => {
     expectCall('DELETE', '/api/budget-plan-versions/v');
   });
 
+  it('§F/finance/budget/000875: loads a version as a file with the name of the server', () => {
+    const files: { filename: string; size: number }[] = [];
+    const keep = (file: { blob: Blob; filename: string }) => files.push({ filename: file.filename, size: file.blob.size });
+    api.exportVersion('v', 'pdf').subscribe(keep);
+    http.expectOne('/api/budget-plan-versions/v/export.pdf').flush(new Blob(['pdf']), {
+      headers: { 'Content-Disposition': `attachment; filename="Plan.pdf"; filename*=UTF-8''Haushaltsplan_M%C3%BCll.pdf` },
+    });
+    api.exportVersion('v', 'xlsx').subscribe(keep);
+    http.expectOne('/api/budget-plan-versions/v/export.xlsx').flush(new Blob(['x']), {
+      headers: { 'Content-Disposition': 'attachment; filename="Plan.xlsx"' },
+    });
+    api.exportVersion('v', 'xlsx').subscribe(keep);
+    http.expectOne('/api/budget-plan-versions/v/export.xlsx').flush(null);
+    expect(files).toEqual([
+      { filename: 'Haushaltsplan_Müll.pdf', size: 3 },
+      { filename: 'Plan.xlsx', size: 1 },
+      { filename: 'Haushaltsplan.xlsx', size: 0 },
+    ]);
+  });
+
   it('calls the routes of the steps', () => {
     api.passNextStep('v', 1).subscribe();
     expectCall('POST', '/api/budget-plan-versions/v/steps/next', { step: 1 });

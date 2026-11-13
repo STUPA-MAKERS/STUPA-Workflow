@@ -34,6 +34,7 @@ from .frontmatter import Meta, Records, parse_frontmatter
 from .markdown import ConversionError, Node, convert_body
 
 __all__ = [
+    "PLAN_VARIANT",
     "PROTOCOL_VARIANTS",
     "VENDORED_LOGOS",
     "build_document",
@@ -52,6 +53,9 @@ PROTOCOL_VARIANTS: Final[dict[str, tuple[str, ...] | None]] = {
     "protocol-stupa": ("STUPA",),
     "protocol-asta": ("ASTA",),
 }
+# The variant of a Haushaltsplan. Its table comes in the `plan` config key.
+PLAN_VARIANT: Final[str] = "plan"
+_PLAN_ROW_KINDS: Final[frozenset[str]] = frozenset({"group", "line", "sum", "balance"})
 _GREMIUM_LOGOS: Final[dict[str, tuple[str, ...]]] = {
     "stupa": ("STUPA",),
     "asta": ("ASTA",),
@@ -347,6 +351,72 @@ def _appendix_data(options: Mapping[str, object], appendix: Sequence[Appendix]) 
     ]
 
 
+def _texts(value: object, what: str) -> list[str]:
+    """Return a list of texts of the plan config.
+
+    Raises:
+        ConversionError: The value is not a list of strings.
+    """
+    if not isinstance(value, list) or not all(
+        isinstance(v, str) for v in cast("list[object]", value)
+    ):
+        raise ConversionError(f"plan {what} must be a list of texts")
+    return cast("list[str]", value)
+
+
+def _plan_row(row: object, cols: int) -> dict[str, object]:
+    """Check one row of the plan table: its kind, its depth and one cell per column."""
+    item = cast("dict[str, object]", row) if isinstance(row, dict) else {}
+    kind, depth = item.get("kind"), item.get("depth", 0)
+    cells = _texts(item.get("cells"), "row cells")
+    if kind not in _PLAN_ROW_KINDS or not isinstance(depth, int) or len(cells) != cols:
+        raise ConversionError("plan row needs a known kind, a depth and one cell per column")
+    return {"kind": kind, "depth": max(0, min(depth, 12)), "cells": cells}
+
+
+def _plan(options: Mapping[str, object]) -> dict[str, object]:
+    """Check the `plan` config key and return the data of the plan layout.
+
+    Raises:
+        ConversionError: The key is missing or it does not have the shape of a plan.
+    """
+    raw = options.get("plan")
+    if not isinstance(raw, dict):
+        raise ConversionError("the plan variant needs a `plan` config object")
+    plan = cast("dict[str, object]", raw)
+    headers = _texts(plan.get("headers"), "headers")
+    rows, head, money = plan.get("rows"), plan.get("head"), plan.get("money")
+    if len(headers) < 2 or not isinstance(rows, list) or not isinstance(head, list):
+        raise ConversionError("plan needs at least two headers, a head and rows")
+    if not isinstance(money, list) or not all(
+        isinstance(i, int) for i in cast("list[object]", money)
+    ):
+        raise ConversionError("plan money must be a list of column places")
+    pairs = [_texts(pair, "head pair") for pair in cast("list[object]", head)]
+    if any(len(pair) != 2 for pair in pairs):
+        raise ConversionError("plan head pair needs a label and a value")
+    return {
+        "title": str(plan.get("title") or _title(options)),
+        "mark": str(plan.get("mark") or ""),
+        "head": pairs,
+        "headers": headers,
+        "money": money,
+        "rows": [_plan_row(row, len(headers)) for row in cast("list[object]", rows)],
+    }
+
+
+def _plan_document(options: Mapping[str, object], assets: Collection[str]) -> dict[str, object]:
+    """Build the document data of a Haushaltsplan. The default logo is that of the StuPa."""
+    title_logos = _logo_list(options, "logos")
+    footer_logos = _logo_list(options, "footer_logos")
+    return {
+        "layout": "plan",
+        "logos": [_logo(n, assets) for n in (("STUPA",) if title_logos is None else title_logos)],
+        "footer_logos": [_logo(n, assets) for n in (footer_logos or ())],
+        "plan": _plan(options),
+    }
+
+
 def build_document(
     source: str,
     *,
@@ -359,8 +429,10 @@ def build_document(
 
     Args:
         source: The Markdown with its YAML frontmatter.
-        variant: `protocol-stupa`, `protocol-asta`, `protocol`, or `None`. The
-            last two read the default logos from the `gremium` key.
+        variant: `protocol-stupa`, `protocol-asta`, `protocol`, `plan`, or `None`.
+            `protocol` and `None` read the default logos from the `gremium` key.
+            `plan` builds a Haushaltsplan from the `plan` config key and reads no
+            Markdown body.
         config: Keys that override the frontmatter, for example `logos`.
         assets: The file names of the uploaded assets.
         documents: The page sizes of each uploaded PDF, by uuid (`appendix.page_sizes`).
@@ -371,8 +443,11 @@ def build_document(
             nests too deep.
         FrontmatterError: The frontmatter is not valid YAML.
     """
+    if variant == PLAN_VARIANT:
+        plan_meta, _records, _body = parse_frontmatter(source)
+        return _plan_document({**plan_meta, **(config or {})}, assets)
     if variant is not None and variant not in PROTOCOL_VARIANTS:
-        allowed = ", ".join(sorted(PROTOCOL_VARIANTS))
+        allowed = ", ".join(sorted({*PROTOCOL_VARIANTS, PLAN_VARIANT}))
         raise ConversionError(f"unknown variant {variant!r}; allowed: {allowed}")
     meta: Meta
     records: Records

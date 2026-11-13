@@ -319,7 +319,7 @@ async def health() -> dict[str, str]:
 async def render(
     request: Request,
     variant: str | None = Query(
-        None, description="protocol-stupa | protocol-asta | protocol; None reads `gremium`"
+        None, description="protocol-stupa | protocol-asta | protocol | plan; None reads `gremium`"
     ),
 ) -> Response:
     """Render the protocol Markdown of the request to a PDF."""

@@ -20,6 +20,7 @@ if TYPE_CHECKING:  # pragma: no cover - types only
     from uuid import UUID
 
     from openpyxl import Workbook
+    from openpyxl.cell.cell import Cell, MergedCell
     from openpyxl.worksheet.worksheet import Worksheet
 
 
@@ -447,3 +448,106 @@ def build_auskunft_workbook(
 
 def _fmt_dt(value: datetime | None) -> str:
     return value.strftime("%Y-%m-%d %H:%M") if value is not None else ""
+
+
+def _bold(cell: Cell | MergedCell) -> None:
+    """Print a cell bold. openpyxl has no cell that is built whole, so this sets it."""
+    from openpyxl.styles import Font
+
+    cell.font = Font(bold=True)
+
+
+def _as_amount(cell: Cell | MergedCell) -> None:
+    """Give a cell the number format of an amount."""
+    cell.number_format = "#,##0.00"
+
+
+def _indent(cell: Cell | MergedCell, depth: int) -> None:
+    """Indent the text of a cell by `depth` steps."""
+    from openpyxl.styles import Alignment
+
+    cell.alignment = Alignment(indent=depth)
+
+
+def _freeze_below(worksheet: Worksheet, row: int) -> None:
+    """Keep the rows up to `row` in view while a person scrolls."""
+    worksheet.freeze_panes = f"A{row + 1}"
+
+
+def _set_width(worksheet: Worksheet, column: int, width: int) -> None:
+    """Set the width of a column, by its place from 1, at most 60."""
+    from openpyxl.utils import get_column_letter
+
+    worksheet.column_dimensions[get_column_letter(column)].width = min(width + 2, 60)
+
+
+def _cell_text(cell: object) -> str:
+    """Return a cell as the sheet shows it, for its width."""
+    return f"{cell:,.2f}" if isinstance(cell, Decimal) else str(cell or "")
+
+
+def _table_row(
+    worksheet: Worksheet,
+    row: Sequence[object],
+    *,
+    bold: bool,
+    indent: int,
+    money_columns: Set[int],
+) -> None:
+    """Append one row of a table and give its cells their look."""
+    _append(worksheet, [_num(c) if isinstance(c, Decimal) else c for c in row])
+    cells = worksheet[worksheet.max_row]
+    for column, cell in enumerate(cells):
+        if bold:
+            _bold(cell)
+        if column in money_columns:
+            _as_amount(cell)
+    if indent and len(cells) > 1:
+        _indent(cells[1], indent)
+
+
+def build_table_workbook(
+    *,
+    title: str,
+    head: Sequence[tuple[str, str]],
+    headers: Sequence[str],
+    rows: Sequence[Sequence[object]],
+    bold_rows: Set[int] = frozenset(),
+    indents: Mapping[int, int] | None = None,
+    money_columns: Set[int] = frozenset(),
+) -> bytes:
+    """Build one sheet with a head of label and value pairs above a table, as `.xlsx` bytes.
+
+    Args:
+        title: The sheet title and the first line of the sheet.
+        head: The pairs below the title, one per row.
+        headers: The column headings of the table.
+        rows: The rows of the table. An amount is a number, so a person can sum it.
+        bold_rows: The places of the rows that print bold, from 0.
+        indents: The indent of the second cell of a row, by the place of the row.
+        money_columns: The places of the columns with the number format of an amount.
+
+    Every text cell passes the formula guard of `_safe`.
+    """
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = _first_sheet(wb.active, _unique_title(title, frozenset()))
+    _table_row(ws, [title], bold=True, indent=0, money_columns=frozenset())
+    for label, value in head:
+        _append(ws, [label, value])
+    _append(ws, [])
+    _table_row(ws, headers, bold=True, indent=0, money_columns=frozenset())
+    _freeze_below(ws, ws.max_row)
+    for place, row in enumerate(rows):
+        _table_row(
+            ws,
+            row,
+            bold=place in bold_rows,
+            indent=(indents or {}).get(place, 0),
+            money_columns=money_columns,
+        )
+    for column, heading in enumerate(headers):
+        cells = (row[column] for row in rows if column < len(row))
+        _set_width(ws, column + 1, max([len(heading), *(len(_cell_text(c)) for c in cells)]))
+    return _workbook_bytes(wb)

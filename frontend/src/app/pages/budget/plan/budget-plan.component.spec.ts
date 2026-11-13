@@ -6,7 +6,7 @@ import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
-import { ToastService } from '@stupa-makers/ui-kit';
+import { downloadBlob, ToastService } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { FeatureService } from '@core/features/feature.service';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
@@ -36,6 +36,11 @@ function setViewport(wide: boolean, phone = false, roomy = wide): void {
 
 const problem = (status: number, code = '') => ({ status, error: { code } });
 
+jest.mock('@stupa-makers/ui-kit', () => ({
+  ...jest.requireActual('@stupa-makers/ui-kit'),
+  downloadBlob: jest.fn(),
+}));
+
 interface Opts {
   tree?: readonly BudgetTreeNode[];
   years?: readonly FiscalYear[];
@@ -47,6 +52,8 @@ interface Opts {
   /** The window is wide and has no room for the column "Änderung" beside the year before. */
   tight?: boolean;
   query?: Record<string, string>;
+  /** The export of a version fails. */
+  exportFail?: boolean;
   /** The feature Abstimmungen is off. */
   votingOff?: boolean;
   /** The read of the Gremien fails. */
@@ -56,6 +63,7 @@ interface Opts {
 }
 
 async function setup(opts: Opts = {}) {
+  (downloadBlob as jest.Mock).mockClear();
   TestBed.resetTestingModule();
   setViewport(opts.wide ?? true, opts.phone, (opts.wide ?? true) && !opts.tight);
   const plans = opts.plans ?? { 'fy-26': plan() };
@@ -73,6 +81,9 @@ async function setup(opts: Opts = {}) {
     passNextStep: jest.fn((..._args: unknown[]) => answer()),
     requestStep: jest.fn((..._args: unknown[]) => answer()),
     setStateByHand: jest.fn((..._args: unknown[]) => answer()),
+    exportVersion: jest.fn((_id: string, format: string) =>
+      opts.exportFail ? throwError(() => problem(503)) : of({ blob: new Blob(['x']), filename: `Haushaltsplan_VS.${format}` }),
+    ),
   };
   const treeApi = {
     tree: jest.fn(() => of(opts.tree ?? [TOP, QSM])),
@@ -125,6 +136,9 @@ const primary = () => within(screen.getByTestId('bp-primary')).getByRole('button
 const treeRow = (view: View, name: string) =>
   within(view.container.querySelector('.bd__tree') as HTMLElement).getByRole('button', { name: new RegExp(`^${name}`) });
 const tableRow = (name: string) => screen.getAllByText(name).find((el) => el.classList.contains('bp__name')) as HTMLElement;
+
+/** The two file entries of the head menu: each reader of the plan has them. */
+const FILES = ['Als PDF exportieren', 'Als XLSX exportieren'];
 
 /** Open the ⋮ menu of the head, or of `scope`, and return the names of its items. */
 async function openMenu(scope: HTMLElement = document.body): Promise<string[]> {
@@ -907,7 +921,7 @@ describe('BudgetPlanComponent', () => {
       expect(screen.queryByRole('button', { name: /^(Titel|Kostenstelle) anlegen$/ })).toBeNull();
       const reader = await setup({ perms: ['budget.view'] });
       expect(screen.queryByTestId('bp-primary')).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      expect(await openMenu()).toEqual(FILES);
       expect(input(reader, 'amount-grants')).toBeNull();
       expect(reader.gremien).not.toHaveBeenCalled();
     });
@@ -1210,12 +1224,32 @@ describe('BudgetPlanComponent', () => {
 
     it('§F/finance/budget/000792 §F/finance/budget/000840: moves a version in progress back to the draft after the confirmation', async () => {
       const view = await setup({ plans: { 'fy-26': plan([version({ state: 'in_progress', steps: passed(1) })]) } });
-      expect(await openMenu()).toEqual(['Zurück in den Entwurf']);
+      expect(await openMenu()).toEqual(['Zurück in den Entwurf', ...FILES]);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Zurück in den Entwurf' }));
       expect(await screen.findByText(/Eine laufende Abstimmung wird abgebrochen/)).toBeInTheDocument();
       await answerDialog('Zurück in den Entwurf?', 'Zurück in den Entwurf');
       expect(view.api.setState).toHaveBeenCalledWith('v0', 'draft');
       expect(view.success).toHaveBeenCalledWith('Die Version ist wieder ein Entwurf.');
+    });
+
+    it('§F/finance/budget/000875: a reader loads the shown version as PDF and as XLSX', async () => {
+      const view = await setup({ perms: ['budget.view'] });
+      await choose('Als PDF exportieren');
+      expect(view.api.exportVersion).toHaveBeenLastCalledWith('v0', 'pdf');
+      await choose('Als XLSX exportieren');
+      expect(view.api.exportVersion).toHaveBeenLastCalledWith('v0', 'xlsx');
+      expect((downloadBlob as jest.Mock).mock.calls.map((call) => call[1])).toEqual([
+        'Haushaltsplan_VS.pdf',
+        'Haushaltsplan_VS.xlsx',
+      ]);
+    });
+
+    it('§F/finance/budget/000875: a failed export shows a toast and frees the menu', async () => {
+      const view = await setup({ exportFail: true });
+      await choose('Als PDF exportieren');
+      expect(view.error).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');
+      expect(downloadBlob).not.toHaveBeenCalled();
+      expect(await openMenu()).toContain('Als XLSX exportieren');
     });
 
     it('§F/finance/budget/000835 §F/finance/budget/000840: deletes the draft after the confirmation and reads the year again', async () => {
@@ -1239,7 +1273,7 @@ describe('BudgetPlanComponent', () => {
     it('§F/finance/budget/000838: asks the Gremium of the next step for its decision', async () => {
       const view = await setup({ plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
       expect(primary()).toHaveAccessibleName('Beschluss anfragen');
-      expect(await openMenu()).toEqual(['Zeile hinzufügen', 'Entwurf löschen']);
+      expect(await openMenu()).toEqual(['Zeile hinzufügen', ...FILES, 'Entwurf löschen']);
       await userEvent.keyboard('{Escape}');
       await userEvent.click(primary());
       expect(view.api.requestStep).toHaveBeenCalledWith('v0');
@@ -1265,7 +1299,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ plans: { 'fy-26': waiting() } });
       expect(text(view.container.querySelector('.bp__stepper'))).toContain('Wartet auf eine Sitzung: StuPa');
       expect(screen.queryByTestId('bp-primary')).toBeNull();
-      expect(await openMenu()).toEqual(['Zurück in den Entwurf']);
+      expect(await openMenu()).toEqual(['Zurück in den Entwurf', ...FILES]);
     });
 
     it('§F/finance/budget/000838: a step that waits names each meeting with the plan on its agenda and links to it', async () => {
@@ -1274,7 +1308,7 @@ describe('BudgetPlanComponent', () => {
         'Auf der Tagesordnung: 12. Sitzung, 20.01.2026 · Sondersitzung',
       );
       expect(primary()).toHaveAccessibleName('Zur Sitzung');
-      expect(await openMenu()).toEqual(['Zur Sitzung „Sondersitzung“', 'Zurück in den Entwurf']);
+      expect(await openMenu()).toEqual(['Zur Sitzung „Sondersitzung“', 'Zurück in den Entwurf', ...FILES]);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Zur Sitzung „Sondersitzung“' }));
       expect(view.navigate).toHaveBeenCalledWith(['/meetings', 'm2']);
       await userEvent.click(primary());
@@ -1297,27 +1331,27 @@ describe('BudgetPlanComponent', () => {
 
     it('§F/finance/budget/000838: a reader gets no action that moves the version', async () => {
       await setup({ plans: { 'fy-26': withVote('open') }, perms: ['budget.view'] });
-      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      expect(await openMenu()).toEqual(FILES);
       await setup({ plans: { 'fy-26': waiting() }, perms: ['budget.view'] });
-      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      expect(await openMenu()).toEqual(FILES);
       await setup({ plans: { 'fy-26': withVote('open') }, perms: ['budget.view'], wide: false, phone: true });
-      expect(await openMenu()).toEqual(['Zur Abstimmung']);
+      expect(await openMenu()).toEqual(['Zur Abstimmung', ...FILES]);
     });
 
     it('§F/finance/budget/000826: a cancelled vote leaves the step waiting for a meeting', async () => {
       const view = await setup({ plans: { 'fy-26': withVote('cancelled') } });
       expect(text(view.container.querySelector('.bp__stepper'))).toContain('Wartet auf eine Sitzung: StuPa');
-      expect(await openMenu()).toEqual(['Zur Abstimmung', 'Zurück in den Entwurf']);
+      expect(await openMenu()).toEqual(['Zur Abstimmung', 'Zurück in den Entwurf', ...FILES]);
     });
 
     it('§F/finance/budget/000838: offers no request for a step without a Gremium or with Abstimmungen off', async () => {
       await setup({ plans: { 'fy-26': plan([version({ state: 'in_progress', steps: passed(1) })]) } });
       expect(primary()).toHaveAccessibleName('Schritt abschließen: Genehmigung');
-      expect(await openMenu()).toEqual(['Zurück in den Entwurf']);
+      expect(await openMenu()).toEqual(['Zurück in den Entwurf', ...FILES]);
       await userEvent.keyboard('{Escape}');
       await setup({ votingOff: true, plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
       expect(primary()).toHaveAccessibleName('Schritt abschließen: Beschluss');
-      expect(await openMenu()).toEqual(['Zeile hinzufügen', 'Entwurf löschen']);
+      expect(await openMenu()).toEqual(['Zeile hinzufügen', ...FILES, 'Entwurf löschen']);
     });
 
     it('§F/finance/budget/000799: creates a Nachtrag from the version in force', async () => {

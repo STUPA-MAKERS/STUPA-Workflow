@@ -7,16 +7,21 @@ database paths.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
+from io import BytesIO
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 
 from app.deps import get_current_applicant, get_current_principal
 from app.main import create_app
+from app.modules.audit.actions import AuditAction
 from app.modules.auth.principal import Principal
+from app.modules.budget import plan_router
+from app.modules.budget.plan_export import ExportHead, PlanExport, build_export
 from app.modules.budget.plan_schemas import (
     PlanLineOut,
     PlanOut,
@@ -25,6 +30,9 @@ from app.modules.budget.plan_schemas import (
     PlanVersionOut,
 )
 from app.modules.budget.tree_router import get_budget_tree_service
+from app.modules.files.cd_resolver import ResolvedCdVariant
+from app.modules.pdf.typst_client import TypstError
+from app.shared.xlsx import XLSX_MEDIA_TYPE
 
 _TOP = uuid.uuid4()
 _NODE = uuid.uuid4()
@@ -49,6 +57,22 @@ def _plan() -> PlanOut:
     )
 
 
+class _ExportNode:
+    id = _NODE
+    name = "Zuschüsse"
+    path_key = "VS-8"
+    by_fiscal_year = ()
+    children = ()
+
+
+class _ExportTop:
+    id = _TOP
+    name = "VS-Mittel"
+    path_key = "VS"
+    by_fiscal_year = ()
+    children = (_ExportNode(),)
+
+
 class _Tx:
     """Stands in for the transaction of the service: it counts the commits."""
 
@@ -68,6 +92,7 @@ class _FakePlans:
         self.calls: list[tuple[str, Any]] = []
         self.session = _Tx()
         self.visible = visible
+        self.design: ResolvedCdVariant | None = None
 
     async def can_view_node(self, budget_id: uuid.UUID, member: object) -> bool:
         return self.visible
@@ -133,6 +158,14 @@ class _FakePlans:
     async def create_plan_node(self, version_id: uuid.UUID, payload: Any) -> PlanOut:
         self.calls.append(("node", payload.key))
         return _plan()
+
+    async def plan_export(self, version_id: uuid.UUID, today: date) -> PlanExport:
+        self.calls.append(("export", version_id))
+        head = ExportHead("VS-Mittel", "2026", None, 0, "draft", today)
+        return build_export(head, _ExportTop(), _plan().versions[0].lines)
+
+    async def plan_design(self, version_id: uuid.UUID) -> ResolvedCdVariant | None:
+        return self.design
 
 
 def _client(fake: _FakePlans, *permissions: str) -> TestClient:
@@ -440,3 +473,124 @@ def test_a_name_needs_a_visible_character(name: str) -> None:
     with pytest.raises(ValidationError):
         BudgetNodeUpdate(name=name)
     assert PlanStepIn(name=" Beschluss​ ").name == "Beschluss​"
+
+
+class _Typst:
+    """Stands in for the render client: it keeps the request and answers as told."""
+
+    def __init__(self, error: TypstError | None = None) -> None:
+        self.error = error
+        self.requests: list[tuple[str, str | None, Any]] = []
+        self.assets: list[Any] = []
+
+    async def render_pdf(
+        self, markdown: str, *, variant: str | None, config: Any, assets: Any
+    ) -> bytes:
+        self.requests.append((markdown, variant, config))
+        self.assets.append(assets)
+        if self.error is not None:
+            raise self.error
+        return b"%PDF-1.7 plan"
+
+
+@pytest.fixture
+def audited(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Collect the audit entries of the export routes instead of a database write."""
+    entries: list[dict[str, Any]] = []
+
+    async def record(session: object, **entry: Any) -> None:
+        entries.append(entry)
+
+    async def no_gremien(_service: object, _sub: str) -> set[uuid.UUID]:
+        return set()
+
+    monkeypatch.setattr(plan_router, "audit_record", record)
+    monkeypatch.setattr("app.modules.budget.tree_router._member_gremium_ids", no_gremien)
+    return entries
+
+
+def test_a_reader_of_the_plan_loads_the_xlsx_file(audited: list[dict[str, Any]]) -> None:
+    """Rule: §F/finance/budget/000875. The export needs the view of the budget, no permission."""
+    fake = _FakePlans(visible=True)
+    resp = _client(fake).get(f"/api/budget-plan-versions/{_VERSION}/export.xlsx")
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"] == XLSX_MEDIA_TYPE
+    assert "Haushaltsplan_VS-Mittel_2026_Entwurf.xlsx" in resp.headers["content-disposition"]
+    sheet = load_workbook(BytesIO(resp.content)).active
+    assert sheet is not None
+    assert sheet["A1"].value == "Haushaltsplan VS-Mittel 2026"
+    assert fake.session.commits == 1
+    assert [(e["action"], e["target_id"]) for e in audited] == [
+        (AuditAction.EXPORT, "haushaltsplan.xlsx")
+    ]
+    assert audited[0]["data"] == {"plan_version_id": str(_VERSION), "state": "draft"}
+
+
+def test_a_reader_of_the_plan_loads_the_pdf_file(
+    monkeypatch: pytest.MonkeyPatch, audited: list[dict[str, Any]]
+) -> None:
+    """Rule: §F/finance/budget/000875. The render service gets the plan variant."""
+    typst = _Typst()
+    monkeypatch.setattr(plan_router, "build_typst_client", lambda settings: typst)
+    resp = _client(_FakePlans()).get(f"/api/budget-plan-versions/{_VERSION}/export.pdf")
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"] == "application/pdf"
+    assert "Haushaltsplan_VS-Mittel_2026_Entwurf.pdf" in resp.headers["content-disposition"]
+    assert resp.content.startswith(b"%PDF")
+    ((_source, variant, config),) = typst.requests
+    assert variant == "plan"
+    assert config["plan"]["mark"] == "Entwurf"
+    assert [e["target_id"] for e in audited] == ["haushaltsplan.pdf"]
+    assert "logos" not in config
+    assert typst.assets == [None]
+
+
+def test_the_pdf_carries_the_design_of_the_gremium(
+    monkeypatch: pytest.MonkeyPatch, audited: list[dict[str, Any]]
+) -> None:
+    """Rule: §F/finance/budget/000875. The logos of the Gremium go to the render service."""
+    typst = _Typst()
+    monkeypatch.setattr(plan_router, "build_typst_client", lambda settings: typst)
+    fake = _FakePlans()
+    fake.design = ResolvedCdVariant(("ASTA", "own.png"), ("own.png",), {"own.png": b"png"})
+    resp = _client(fake).get(f"/api/budget-plan-versions/{_VERSION}/export.pdf")
+    assert resp.status_code == 200, resp.text
+    ((_source, _variant, config),) = typst.requests
+    assert (config["logos"], config["footer_logos"]) == (["ASTA", "own.png"], ["own.png"])
+    assert config["plan"]["title"] == "Haushaltsplan VS-Mittel 2026"
+    assert typst.assets == [{"own.png": b"png"}]
+    fake.design = ResolvedCdVariant(("ASTA",), (), {})
+    _client(fake).get(f"/api/budget-plan-versions/{_VERSION}/export.pdf")
+    assert typst.assets[1] is None
+
+
+@pytest.mark.parametrize("extension", ["xlsx", "pdf"])
+def test_the_export_follows_the_read_rule_of_the_budget(
+    audited: list[dict[str, Any]], extension: str
+) -> None:
+    """A person without the view of the budget gets 403 and no audit entry."""
+    fake = _FakePlans(visible=False)
+    resp = _client(fake).get(f"/api/budget-plan-versions/{_VERSION}/export.{extension}")
+    assert resp.status_code == 403
+    assert audited == []
+    assert ("export", _VERSION) not in fake.calls
+
+
+@pytest.mark.parametrize(
+    ("retryable", "status", "code"),
+    [(False, 400, "render_failed"), (True, 503, "service_unavailable")],
+)
+def test_a_failed_render_is_a_problem_answer(
+    monkeypatch: pytest.MonkeyPatch,
+    audited: list[dict[str, Any]],
+    retryable: bool,
+    status: int,
+    code: str,
+) -> None:
+    """A refusal of the render service gives 400, an outage gives 503."""
+    typst = _Typst(TypstError("no", retryable=retryable))
+    monkeypatch.setattr(plan_router, "build_typst_client", lambda settings: typst)
+    resp = _client(_FakePlans()).get(f"/api/budget-plan-versions/{_VERSION}/export.pdf")
+    assert resp.status_code == status
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    assert resp.json()["code"] == code
