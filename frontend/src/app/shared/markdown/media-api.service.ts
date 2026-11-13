@@ -14,6 +14,28 @@ export interface MediaImage {
   readonly size: number;
 }
 
+/** An embedded PDF (`POST /api/meetings/<id>/documents`, 201, and its info route). */
+export interface MediaDocument {
+  readonly id: string;
+  /** The canonical path `/api/media/documents/<id>`. Markdown stores this path. */
+  readonly url: string;
+  readonly name: string;
+  readonly size: number;
+  readonly pages: number;
+}
+
+/** The type that the PDF upload accepts. */
+export const MEDIA_DOCUMENT_TYPES: readonly string[] = ['application/pdf'];
+
+/**
+ * The Markdown of an embedded PDF: `[name](/api/media/documents/<id>)`. The name keeps its
+ * characters: `\`, `[` and `]` are escaped, and a line break becomes a space.
+ */
+export function markdownDocument(name: string, id: string): string {
+  const clean = name.replace(/\s+/g, ' ').trim().replace(/[\\[\]]/g, '\\$&') || 'PDF';
+  return `[${clean}](/api/media/documents/${id})`;
+}
+
 /** The raster types that the media upload accepts. SVG is never one of them. */
 export const MEDIA_IMAGE_TYPES: readonly string[] = [
   'image/png',
@@ -50,5 +72,21 @@ export class MediaApiService {
     const form = new FormData();
     form.append('file', file);
     return this.http.post<MediaImage>(`${this.base}/media/images`, form);
+  }
+
+  /**
+   * POST /meetings/{id}/documents — upload one PDF for the protocol of a meeting.
+   * Errors: 403 (no write access), 413 (over 20 MiB or 100 pages), 415 (no readable,
+   * unencrypted PDF), 429, 503.
+   */
+  uploadDocument(meetingId: string, file: File): Observable<MediaDocument> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<MediaDocument>(`${this.base}/meetings/${meetingId}/documents`, form);
+  }
+
+  /** GET <url>/info — the name and page count of a PDF; `url` is its same-origin URL. */
+  documentInfo(url: string): Observable<MediaDocument> {
+    return this.http.get<MediaDocument>(`${url}/info`);
   }
 }

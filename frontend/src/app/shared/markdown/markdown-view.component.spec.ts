@@ -1,4 +1,6 @@
 import { Router, provideRouter } from '@angular/router';
+import { of, throwError } from 'rxjs';
+import { MediaApiService } from './media-api.service';
 import { fireEvent, render, screen } from '@testing-library/angular';
 import { MarkdownViewComponent } from './markdown-view.component';
 import { runAxe } from '../../../testing/a11y';
@@ -80,5 +82,35 @@ describe('MarkdownViewComponent', () => {
       providers: [provideRouter([])],
     });
     expect(await runAxe(container)).toHaveNoViolations();
+  });
+
+  it('shows an embedded PDF without a count when its info fails (000863)', async () => {
+    const id = '0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
+    const documentInfo = jest.fn(() => throwError(() => new Error('404')));
+    await render(MarkdownViewComponent, {
+      inputs: { src: `[Plan.pdf](/api/media/documents/${id})` },
+      providers: [{ provide: MediaApiService, useValue: { documentInfo } }],
+    });
+    const badge = await screen.findByRole('button', { name: 'PDF öffnen: Plan.pdf' });
+    expect(badge).not.toHaveTextContent('Seite');
+  });
+
+  it('shows an embedded PDF as a badge with its page count and opens the overlay (000863)', async () => {
+    const id = '0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
+    const documentInfo = jest.fn(() => of({ id, url: '', name: 'Plan.pdf', size: 1, pages: 4 }));
+    await render(MarkdownViewComponent, {
+      inputs: { src: `Anlage: [Plan.pdf](/api/media/documents/${id})` },
+      providers: [{ provide: MediaApiService, useValue: { documentInfo } }],
+    });
+    expect(documentInfo).toHaveBeenCalledWith(`/api/media/documents/${id}`);
+    const badge = await screen.findByRole('button', { name: 'PDF öffnen: Plan.pdf' });
+    expect(badge).toHaveTextContent('4 Seiten');
+    fireEvent.click(badge);
+    const frame = await screen.findByTitle('Plan.pdf');
+    expect(frame).toHaveAttribute('src', `/api/media/documents/${id}?inline=true`);
+    expect(screen.getByRole('link', { name: 'PDF herunterladen' })).toHaveAttribute(
+      'href',
+      `/api/media/documents/${id}`,
+    );
   });
 });

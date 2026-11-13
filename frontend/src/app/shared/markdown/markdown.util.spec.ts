@@ -1,4 +1,4 @@
-import { hasOpenBlackout, markdownToSafeHtml } from './markdown.util';
+import { documentIdsIn, hasOpenBlackout, markdownToSafeHtml } from './markdown.util';
 
 describe('markdownToSafeHtml', () => {
   it('escapes raw HTML before rendering (XSS-safe)', () => {
@@ -164,6 +164,34 @@ describe('markdownToSafeHtml', () => {
     );
     expect(markdownToSafeHtml('> [!NOTE]')).toContain('callout--note');
     expect(markdownToSafeHtml('> [!FOO] bar')).toBe('<blockquote><p>[!FOO] bar</p></blockquote>');
+  });
+
+  it('renders an embedded PDF as a file badge, or as its name without badges (000863)', () => {
+    const id = '0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
+    const src = `Siehe [Angebot \\[neu\\].pdf](/api/media/documents/${id}).`;
+    const docs = {
+      pages: { [id]: 3 },
+      pagesText: (n: number) => `${n} Seiten`,
+      label: (name: string) => `PDF öffnen: ${name}`,
+    };
+    const html = markdownToSafeHtml(src, { documents: docs });
+    expect(html).toContain(`<button type="button" class="mdv__doc" data-doc="${id}" aria-label="PDF öffnen: Angebot [neu].pdf">`);
+    expect(html).toContain('<span class="mdv__doc-name">Angebot [neu].pdf</span>');
+    expect(html).toContain('<span class="mdv__doc-pages">3 Seiten</span>');
+    expect(markdownToSafeHtml(src)).toBe('<p>Siehe Angebot [neu].pdf.</p>');
+    expect(markdownToSafeHtml(`[x](/api/media/documents/${id}/x)`, { documents: docs })).not.toContain('mdv__doc');
+    expect(documentIdsIn(`[a](/api/media/documents/${id}) [b](/api/media/documents/${id})`)).toEqual([id]);
+  });
+
+  it('renders a time note as one line with its time (000872)', () => {
+    expect(markdownToSafeHtml('> [!anmerkung 8:05] **Anna** geht')).toBe(
+      '<p class="mdv__time-note">08:05 Uhr · <strong>Anna</strong> geht</p>',
+    );
+    expect(markdownToSafeHtml('> [!anmerkung 18:42]')).toBe('<p class="mdv__time-note">18:42 Uhr</p>');
+    expect(markdownToSafeHtml('> [!anmerkung 25:00] x')).toBe('<blockquote><p>[!anmerkung 25:00] x</p></blockquote>');
+    expect(markdownToSafeHtml('> [!anmerkung 9:00] a\n> b')).toBe(
+      '<p class="mdv__time-note">09:00 Uhr · a</p><blockquote><p>b</p></blockquote>',
+    );
   });
 
   it('honours headingOffset', () => {

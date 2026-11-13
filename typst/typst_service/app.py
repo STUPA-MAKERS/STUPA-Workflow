@@ -28,7 +28,7 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Final
+from typing import Final, cast
 
 from fastapi import FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse
@@ -36,6 +36,7 @@ from python_multipart.exceptions import FormParserError
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException
 
+from .appendix import Appendix, Size, document_assets, merge_appendix, page_sizes
 from .compiler import ASSET_NAME_RE, CompileError, CompileTimeout, TypstCompiler, default_compiler
 from .document import build_document
 from .frontmatter import FrontmatterError
@@ -44,15 +45,15 @@ from .markdown import ConversionError
 __all__ = ["app"]
 
 # Hard ceiling on the body the service reads at all. It keeps a giant upload
-# out of memory. 32 MiB is the cap that production ran pytex with, after the
-# 4 MiB default answered 413 for real protocols with their logos.
-_MAX_BODY_BYTES = int(os.environ.get("TYPST_MAX_BODY_BYTES", str(32 * 1024 * 1024)))
+# out of memory. The backend sends the logos, at most 24 MiB of images and at
+# most 48 MiB of embedded PDFs (the Anlagen), so 96 MiB leaves room for all.
+_MAX_BODY_BYTES = int(os.environ.get("TYPST_MAX_BODY_BYTES", str(96 * 1024 * 1024)))
 # Caps on the asset channel of a multipart request. They sit under the total
-# cap, so one huge image cannot eat the whole budget of a document. The backend
-# sends the logos plus at most 48 images of the text (24 MiB together), so 64
-# assets of 8 MiB each leave room for both.
-_MAX_ASSETS = int(os.environ.get("TYPST_MAX_ASSETS", "64"))
-_MAX_ASSET_BYTES = int(os.environ.get("TYPST_MAX_ASSET_BYTES", str(8 * 1024 * 1024)))
+# cap, so one huge file cannot eat the whole budget of a document. The backend
+# sends the logos, at most 48 images of 8 MiB and at most 20 PDFs of 20 MiB, so
+# 96 assets of 20 MiB each leave room for all.
+_MAX_ASSETS = int(os.environ.get("TYPST_MAX_ASSETS", "96"))
+_MAX_ASSET_BYTES = int(os.environ.get("TYPST_MAX_ASSET_BYTES", str(20 * 1024 * 1024)))
 # Compiles in parallel. A compile is CPU-bound, so more than the cores only
 # queues work inside the kernel instead of here.
 _MAX_CONCURRENCY = int(os.environ.get("TYPST_MAX_CONCURRENCY", "2"))
@@ -283,6 +284,28 @@ def _enforce_limits(payload: _Payload) -> None:
         raise _TooLarge(f"request body exceeds {_MAX_BODY_BYTES} bytes")
 
 
+def _document_sizes(documents: Mapping[str, bytes]) -> dict[str, tuple[Size, ...]]:
+    """Read the page sizes of each uploaded PDF. A PDF that is no Anlage is left out."""
+    sizes = ((doc, page_sizes(data)) for doc, data in documents.items())
+    return {doc: found for doc, found in sizes if found is not None}
+
+
+def _appendix_of(
+    doc: Mapping[str, object], sizes: Mapping[str, tuple[Size, ...]]
+) -> tuple[Appendix, ...]:
+    """Rebuild the Anlagen of a document tree from its `appendix` data."""
+    items = cast("list[dict[str, object]]", doc.get("appendix", []))
+    return tuple(
+        Appendix(
+            number=int(cast("int", item["n"])),
+            doc=str(item["doc"]),
+            name=str(item["name"]),
+            pages=sizes[str(item["doc"])],
+        )
+        for item in items
+    )
+
+
 def _error(status: int, detail: str) -> JSONResponse:
     return JSONResponse({"error": _scrub(detail)}, status_code=status)
 
@@ -318,8 +341,14 @@ async def render(
             source = payload.source.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise _BadRequest(f"source is not valid UTF-8: {exc}") from None
+        documents = document_assets(payload.assets)
+        sizes = await asyncio.to_thread(_document_sizes, documents)
         doc = build_document(
-            source, variant=variant, config=payload.config, assets=payload.assets.keys()
+            source,
+            variant=variant,
+            config=payload.config,
+            assets=payload.assets.keys(),
+            documents=sizes,
         )
     except _BadRequest as exc:
         return _error(400, exc.detail)
@@ -330,7 +359,10 @@ async def render(
 
     try:
         async with _slots:
-            pdf = await _compiler.compile(doc, payload.assets)
+            compiled = await _compiler.compile(doc, payload.assets)
+            pdf = await asyncio.to_thread(
+                merge_appendix, compiled, _appendix_of(doc, sizes), documents
+            )
     except CompileTimeout as exc:
         # A document that runs past the limit does so on every retry.
         return _error(413, str(exc))

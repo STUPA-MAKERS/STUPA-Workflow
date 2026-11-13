@@ -140,6 +140,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("DELETE", "/api/meetings/{meeting_id}/attendance/{principal_id}"): (
         "livevote.router._require_lead (PermissionOps.can_write)"
     ),
+    ("POST", "/api/meetings/{meeting_id}/documents"): "ProtocolService.authorize_write_meeting",
     ("GET", "/api/meetings/{meeting_id}/guests"): _MEETING_MANAGE,
     ("POST", "/api/meetings/{meeting_id}/guests/admit-all"): _MEETING_MANAGE,
     ("POST", "/api/meetings/{meeting_id}/guests/{guest_id}/admit"): _MEETING_MANAGE,

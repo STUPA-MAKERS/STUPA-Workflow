@@ -189,6 +189,14 @@
       let dot = math.equation(block: false, alt: "·", sym.dot.c)
       strong[Abstimmung: ]
       text(fill: vote-color(n.yes, n.no))[Ja #n.yes #dot Nein #n.no #dot Enthaltung #n.abstain]
+    } else if t == "docref" {
+      // The reference to an Anlage (000866): its number, its name and the page of
+      // its first page, as a link to that page.
+      let target = label("anlage-" + str(n.n))
+      link(target, text(fill: palette.hsrturl, [Anlage #n.n: #n.name (Seite #context counter(page).at(locate(target)).first())]))
+    } else if t == "docmiss" {
+      // A PDF that is missing or past the budget (000868).
+      emph[Anlage nicht eingebunden: #n.name]
     } else if t == "image" {
       if "asset" in n {
         // An uploaded image inside a line: two lines high, aspect kept.
@@ -418,6 +426,8 @@
     "math"
   } else if n.t == "signatures" {
     "sig"
+  } else if n.t == "timenote" {
+    "note"
   } else {
     n.t
   }
@@ -440,6 +450,7 @@
   rule: 16.04pt,
   math: 22.64pt,
   sig: 56.13pt,
+  note: 8.78pt,
 )
 // The gaps that differ after a particular kind of block.
 #let gap-after = (
@@ -454,6 +465,8 @@
   code: (par: 10.95pt, runin: 10.95pt, box: 29.75pt, h1: 39.26pt, h2: 31.7pt, h3: 23.3pt),
   rule: (par: 8.25pt, runin: 8.25pt, box: 26.48pt),
   math: (par: 14.37pt, runin: 14.37pt, box: 33.03pt),
+  // A time note in front of a heading sits close to it, as the line above the TOP.
+  notehead: (h1: 3pt, h2: 3pt, h3: 3pt),
 )
 
 #let gap(prev, cur) = {
@@ -588,6 +601,15 @@
   }
 }
 
+// A time note: one grey, small, centered line "HH:MM Uhr", with its text after a
+// dot. It sticks to the next block, so the time of a TOP never stays alone at the
+// foot of a page.
+#let time-note(n) = block(sticky: true, width: 100%, align(center, par(justify: false, text(
+  size: size.small,
+  fill: palette.gray,
+  [#n.time Uhr] + if n.c.len() > 0 { [ · ] + inline(n.c) },
+))))
+
 #let blocks(nodes, in-item: false) = {
   let prev = none
   let i = 0
@@ -595,7 +617,10 @@
     let n = nodes.at(i)
     let k = kind(n)
     let runin = n.t == "heading" and n.level >= 4
-    let kk = if runin { "runin" } else { k }
+    // A time note right in front of a heading takes the gap of that heading.
+    let next = if i + 1 < nodes.len() { nodes.at(i + 1) } else { none }
+    let note-head = n.t == "timenote" and next != none and next.t == "heading" and next.level <= 3
+    let kk = if runin { "runin" } else if note-head { "h" + str(next.level) } else { k }
     if prev != none {
       let g = if in-item != false and prev == "par" and k == "list" { 8.45pt } else { gap(prev, kk) }
       v(g, weak: true)
@@ -652,9 +677,56 @@
       }
     } else if n.t == "signatures" {
       signatures(n.signers)
+    } else if n.t == "timenote" {
+      time-note(n)
     }
-    prev = kk
+    prev = if note-head { "notehead" } else { kk }
     i += 1
+  }
+}
+
+// -- Anlagen -------------------------------------------------------------------
+
+// The watermark of an Anlage page (000865): one grey, transparent line along the
+// diagonal. The font size makes the line about 80 % of the diagonal long. It is
+// an artifact, so a screen reader skips it.
+#let watermark(text-of, w, h) = {
+  let diag = calc.sqrt(w * w + h * h)
+  let sz = calc.min(0.8 * diag / (0.6 * text-of.clusters().len()), 0.06 * diag)
+  pdf.artifact(place(center + horizon, rotate(
+    -calc.atan2(w, h),
+    reflow: false,
+    box(width: diag * 1pt, align(center, text(
+      font: head-font,
+      weight: "bold",
+      size: sz * 1pt,
+      fill: rgb(128, 128, 128, 80),
+      text-of,
+    ))),
+  )))
+}
+
+// One empty page per page of each Anlage (000864), in the size of that page and
+// at the end of the PDF. The service puts the page of the PDF under it after the
+// compile (`typst_service/appendix.py`), so the watermark lies on top. The first
+// page of an Anlage carries the label that its references link to.
+#let appendix-pages(appendix) = {
+  for a in appendix {
+    for (k, size) in a.pages.enumerate() {
+      let (w, h) = size
+      page(
+        width: w * 1pt,
+        height: h * 1pt,
+        margin: 0pt,
+        header: none,
+        footer: none,
+        background: none,
+        foreground: watermark(a.watermark, w, h),
+      )[
+        #if k == 0 [#metadata(a.n)#label("anlage-" + str(a.n))]
+        #image(bytes("<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/>"), format: "svg", width: 100%, height: 100%, fit: "stretch", alt: "Anlage " + str(a.n) + ": " + a.name + ", Seite " + str(k + 1) + " von " + str(a.pages.len()))
+      ]
+    }
   }
 }
 
@@ -759,4 +831,5 @@
   title-page(doc)
   counter(page).update(1)
   blocks(doc.body)
+  appendix-pages(doc.at("appendix", default: ()))
 }

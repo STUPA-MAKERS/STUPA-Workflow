@@ -164,3 +164,66 @@ async def test_list_filters_by_the_planned_date(
         assert bad.status_code == 422
         assert bad.headers["content-type"] == "application/problem+json"
         assert bad.json()["code"] == "invalid_date_range"
+
+
+async def _keeper_sub(maker: async_sessionmaker[AsyncSession], meeting_id: uuid.UUID) -> str:
+    async with maker() as session:
+        meeting = await session.get(Meeting, meeting_id)
+        assert meeting is not None
+        keeper = await session.get(PrincipalRow, meeting.protokollant_id)
+        assert keeper is not None
+        return keeper.sub
+
+
+async def _item_times(
+    maker: async_sessionmaker[AsyncSession], item_ids: list[uuid.UUID]
+) -> list[object]:
+    async with maker() as session:
+        rows = [await session.get(MeetingAgendaItem, item_id) for item_id in item_ids]
+        return [row.started_at if row is not None else None for row in rows]
+
+
+async def test_a_move_to_a_top_records_its_time_once(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """§000870: the first move to a TOP sets its time, and a move back keeps it."""
+    s = await seed(maker, status="live", items=3)
+    keeper = await _keeper_sub(maker, s.meeting_id)
+    api.dependency_overrides[get_current_principal] = lambda: Principal(sub=keeper)
+    try:
+        with TestClient(api) as client:
+            for item_id in (s.item_ids[0], s.item_ids[1]):
+                moved = client.patch(
+                    f"/api/meetings/{s.meeting_id}", json={"currentAgendaItemId": str(item_id)}
+                )
+                assert moved.status_code == 200, moved.text
+            first, second, never = await _item_times(maker, s.item_ids)
+            assert first is not None
+            assert second is not None
+            assert never is None
+            back = client.patch(
+                f"/api/meetings/{s.meeting_id}", json={"currentAgendaItemId": str(s.item_ids[0])}
+            )
+            assert back.status_code == 200, back.text
+    finally:
+        api.dependency_overrides[get_current_principal] = admin
+    assert (await _item_times(maker, s.item_ids))[0] == first
+
+
+async def test_a_planned_meeting_stamps_its_current_top_at_the_start(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """§000870: a planned meeting records no time; the start stamps the current TOP."""
+    s = await seed(maker, status="planned", items=2)
+    async with maker() as session:
+        meeting = await session.get(Meeting, s.meeting_id)
+        assert meeting is not None
+        meeting.current_agenda_item_id = s.item_ids[0]
+        await session.commit()
+    assert await _item_times(maker, s.item_ids) == [None, None]
+    with TestClient(api) as client:
+        started = client.patch(f"/api/meetings/{s.meeting_id}", json={"status": "live"})
+        assert started.status_code == 200, started.text
+    first, second = await _item_times(maker, s.item_ids)
+    assert first is not None
+    assert second is None
