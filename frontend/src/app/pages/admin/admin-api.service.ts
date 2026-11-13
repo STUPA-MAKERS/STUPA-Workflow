@@ -852,7 +852,6 @@ export class AdminApiService {
         if (body.name) row.name = { ...body.name };
         if (body.gremiumId !== undefined) row.gremiumId = body.gremiumId;
         if (body.hasBudget !== undefined) row.hasBudget = body.hasBudget;
-        if (body.pdfSignatures !== undefined) row.pdfSignatures = body.pdfSignatures;
       }
       return of(void 0);
     }
