@@ -110,13 +110,15 @@ export class CostCentreSettingsComponent {
     effect(() => {
       const node = this.node();
       const own = `${node.id}:`;
+      const running = this.current ? `${this.current.id}:${this.current.field}` : '';
       this.sent = Object.fromEntries(
         Object.entries(this.sent).flatMap(([key, last]) => {
-          if (!key.startsWith(own)) return [[key, last]];
+          if (!key.startsWith(own) || key === running) return [[key, last]];
           if (savedValue(node, key.slice(own.length) as Field) === last.value) return [[key, { ...last, seen: true }]];
           return last.seen ? [] : [[key, last]];
         }),
       );
+      untracked(() => this.forget());
     });
     inject(DestroyRef).onDestroy(() => {
       this.gone = true;
@@ -227,7 +229,8 @@ export class CostCentreSettingsComponent {
    * for the saved value from its request on, because the tree that the page reads after an
    * earlier save of the field is older than this request. `seen` says that a tree held the
    * value. A tree that holds another value after that holds it from another person, so the
-   * entry then goes and the tree counts again.
+   * entry then goes and the tree counts again. A tree that comes while the request runs says
+   * nothing about it, because the page read that tree before the request ended.
    */
   private sent: Readonly<Record<string, { readonly value: Value; readonly seen: boolean }>> = {};
 
@@ -264,6 +267,18 @@ export class CostCentreSettingsComponent {
     return node.id === id ? savedValue(node, field) : undefined;
   }
 
+  /**
+   * Drop the values of the last requests for each Kostenstelle that is not the selected one
+   * and has no save that runs or waits. The section cannot see the tree values of such a
+   * Kostenstelle, so it cannot tell when another person changed one. When the person
+   * selects it again, the tree counts.
+   */
+  private forget(): void {
+    const selected = this.node().id;
+    const busy = new Set([selected, ...(this.current ? [this.current.id] : []), ...this.waiting().map((c) => c.id)]);
+    this.sent = Object.fromEntries(Object.entries(this.sent).filter(([key]) => busy.has(key.slice(0, key.lastIndexOf(':')))));
+  }
+
   /** The change whose save runs. */
   private current: Change | null = null;
 
@@ -272,7 +287,8 @@ export class CostCentreSettingsComponent {
     const [change, ...rest] = this.waiting();
     if (this.running() || !change) return;
     this.waiting.set(rest);
-    if (change.value === (this.known(change.id, change.field) ?? change.saved)) return this.next();
+    const known = this.known(change.id, change.field);
+    if (change.value === (known === undefined ? change.saved : known)) return this.next();
     this.send(change);
   }
 
@@ -320,6 +336,7 @@ export class CostCentreSettingsComponent {
           this.running.set(false);
           this.current = null;
           this.next();
+          this.forget();
         }),
       )
       .subscribe({

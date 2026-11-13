@@ -717,13 +717,20 @@ export class BudgetDashboardComponent {
    * The tree and the years are cached reads, which emit a second time when the fresh answer
    * differs. A root therefore counts once, and only in the newest round: a second tree answer
    * starts a new round, and a late answer of the old one must not count against it.
+   *
+   * The tree read has a number like each later one: a read for a save of the page before
+   * can go out after it and be answered first, and its tree is then the newer one.
    */
   protected load(): void {
     this.loading.set(true);
     this.error.set(false);
+    this.treeSent += 1;
+    const sent = this.treeSent;
     this.api.tree().subscribe({
-      next: (tree) => {
-        this.tree.set(tree);
+      next: (answer) => {
+        if (sent >= this.treeShown) this.tree.set(answer);
+        this.treeShown = Math.max(sent, this.treeShown);
+        const tree = this.tree();
         this.loading.set(false);
         const tops = this.shownTops(tree);
         const round = ++this.fyRound;
@@ -880,6 +887,8 @@ export class BudgetDashboardComponent {
    * Read the tree again after a write, without the skeleton of the first load. `select`
    * names the Kostenstelle that the page then shows. The answer of a read that went out
    * before the read on the page is dropped, because it can hold the state before a save.
+   * A page that has not taken its budget from the URL yet selects nothing here, because a
+   * selection would write the URL without its budget, Kostenstelle and year.
    */
   refreshTree(select: string | null = null): void {
     this.treeSent += 1;
@@ -890,7 +899,7 @@ export class BudgetDashboardComponent {
         this.treeShown = sent;
         this.tree.set(tree);
         if (select && this.nodeById().get(select)) this.selectKs(select);
-        else if (!this.selectedKs()) this.selectKs(this.selectedBudgetId());
+        else if (!this.selectedKs() && this.selectedBudgetId()) this.selectKs(this.selectedBudgetId());
       },
       error: () => this.toast.error(this.i18n.translate('budget.error')),
     });

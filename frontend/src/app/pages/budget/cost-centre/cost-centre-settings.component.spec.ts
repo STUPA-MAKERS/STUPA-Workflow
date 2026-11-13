@@ -276,6 +276,65 @@ describe('CostCentreSettingsComponent', () => {
     expect(active).toHaveAttribute('aria-checked', 'false');
   });
 
+  it('§F/finance/budget/000849: a Gremium that is removed and set again while the save runs is saved again', async () => {
+    const view = await setup({ viewGremiumId: 'g1' });
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('StuPa'));
+    const first = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(first);
+    await pick(/Sichtbar für Gremium/, 'Ohne Gremium');
+    await pick(/Sichtbar für Gremium/, 'StuPa');
+    first.next({});
+    first.complete();
+    expect(view.api.updateNode.mock.calls.map((call) => call[1])).toEqual([{ viewGremiumId: null }, { viewGremiumId: 'g1' }]);
+    expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('StuPa');
+  });
+
+  it('§F/finance/budget/000849: the fourth press is saved when the trees of the first two saves come during the third', async () => {
+    const view = await setup();
+    const saves = [new Subject<object>(), new Subject<object>(), new Subject<object>()];
+    saves.forEach((save) => view.api.updateNode.mockReturnValueOnce(save));
+    const end = (save: Subject<object>) => {
+      save.next({});
+      save.complete();
+    };
+    const tree = (active: boolean) => {
+      view.fixture.componentRef.setInput('node', { ...KS, active });
+      view.fixture.detectChanges();
+    };
+    const active = screen.getByRole('switch', { name: 'Aktiv' });
+    await userEvent.click(active);
+    await userEvent.click(active);
+    end(saves[0]);
+    await userEvent.click(active);
+    end(saves[1]);
+    tree(false);
+    tree(true);
+    await userEvent.click(active);
+    end(saves[2]);
+    expect(view.api.updateNode.mock.calls.map((call) => call[1])).toEqual([
+      { active: false },
+      { active: true },
+      { active: false },
+      { active: true },
+    ]);
+    expect(active).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('§F/finance/budget/000849: a Kostenstelle that the person left and selects again counts with its tree value', async () => {
+    const view = await setup();
+    await retype(view.field('Name'), 'Neu');
+    view.fixture.componentRef.setInput('node', { ...KS, id: 'other', name: 'B' });
+    view.fixture.detectChanges();
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Kultur' });
+    view.fixture.detectChanges();
+    await waitFor(() => expect(view.field('Name').value).toBe('Kultur'));
+    await retype(view.field('Name'), 'Neu');
+    expect(view.api.updateNode.mock.calls).toEqual([
+      ['ks', { name: 'Neu' }],
+      ['ks', { name: 'Neu' }],
+    ]);
+  });
+
   it('§F/finance/budget/000849: a value that another person set back is saved again', async () => {
     const view = await setup();
     await retype(view.field('Name'), 'Neu');

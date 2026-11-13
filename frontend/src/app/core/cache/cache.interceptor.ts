@@ -111,7 +111,9 @@ export function freshly<T>(start: () => T): T {
  * Invalidation happens on the way out, not on the response: a request that fails may still have
  * changed something, and a stale list after a half-failed write is worse than one extra fetch.
  * A read that started before a write is not joined and its answer is not stored, because
- * the server may have answered it before the write. A
+ * the server may have answered it before the write. The same holds for a read that started
+ * while the write ran, so the answer of a write invalidates a second time, before the caller
+ * of the write gets it: a read that the caller starts in its answer is then a new one. A
  * read ahead that is still in flight is joined, so a click right after the list appeared waits for
  * one answer, not two. The same answer again is no news, so an unchanged detail does not render
  * twice. The cached body comes first, then the network answer. `concat` keeps the order and does
@@ -121,8 +123,10 @@ export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
   const cache = inject(HttpCacheService);
 
   if (req.method !== 'GET') {
-    cache.invalidate(new URL(req.url, 'http://x').pathname);
-    return next(req);
+    const path = new URL(req.url, 'http://x').pathname;
+    cache.invalidate(path);
+    const ended = (): void => cache.invalidate(path);
+    return next(req).pipe(tap({ next: (event) => event instanceof HttpResponse && ended(), error: ended }));
   }
 
   const ttl = req.context.get(CACHE_TTL);

@@ -1563,6 +1563,32 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(view.http.match(treeUrl)).toHaveLength(1);
     });
 
+    it('§F/finance/budget/000850: a tree read before the page took its budget from the URL leaves the URL', async () => {
+      setViewport(true);
+      const params = new BehaviorSubject(convertToParamMap({ budget: 'b-vs', costCentre: 'b-800', fy: 'fy-1' }));
+      await render(BudgetDashboardComponent, { providers: providers({}, params) });
+      const http = TestBed.inject(HttpTestingController);
+      const nav = jest.spyOn(TestBed.inject(Router), 'navigate');
+      http.expectOne(treeUrl).flush(TREE);
+      TestBed.inject(BudgetTreeApi).changed.next();
+      http.expectOne(treeUrl).flush(TREE);
+      expect(nav).not.toHaveBeenCalled();
+    });
+
+    it('§F/finance/budget/000851: the first tree read does not replace the tree of a later read', async () => {
+      setViewport(true);
+      const params = new BehaviorSubject(convertToParamMap({ costCentre: 'b-800' }));
+      const view = await render(BudgetDashboardComponent, { providers: providers({}, params) });
+      const http = TestBed.inject(HttpTestingController);
+      TestBed.inject(HttpCacheService).invalidate('/api/budgets');
+      TestBed.inject(BudgetTreeApi).changed.next();
+      const reads = http.match(treeUrl);
+      expect(reads).toHaveLength(2);
+      reads[1].flush([{ ...TREE[0], name: 'Neu' }]);
+      reads[0].flush([{ ...TREE[0], name: 'Alt' }]);
+      expect((view.fixture.componentInstance as unknown as Inst).tree()[0].name).toBe('Neu');
+    });
+
     it('§F/finance/budget/000851: drops the answer of a tree read that went out before the read on the page', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
       view.c.refreshTree();

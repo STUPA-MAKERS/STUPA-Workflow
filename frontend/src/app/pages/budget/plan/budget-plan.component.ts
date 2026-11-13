@@ -159,6 +159,8 @@ const WRITE_ERRORS: Readonly<Record<string, TranslationKey>> = {
 
 const MONEY_COL = '6.75rem';
 const FIELD_COL = '10rem';
+/** The first Ansatz that the narrow amount field of a table cuts. */
+const WIDE_FROM = 10_000_000;
 
 /**
  * The view "Planung" of the Budget tab: the Haushaltsplan of a fiscal year in the list and
@@ -166,9 +168,6 @@ const FIELD_COL = '10rem';
  * the detail shows the plan or one line. A draft is edited in the tables, and each field saves
  * when the person leaves it.
  */
-/** The first Ansatz that the narrow amount field of a table cuts. */
-const WIDE_FROM = 10_000_000;
-
 @Component({
   selector: 'app-budget-plan',
   standalone: true,
@@ -693,11 +692,18 @@ export class BudgetPlanComponent {
     });
   }
 
-  /** Read the tree, then select the wanted budget and year, else the first budget. */
+  /**
+   * Read the tree, then select the wanted budget and year, else the first budget. This
+   * first read has a number too: a read for a save of the page before can go out after it
+   * and be answered first, and its tree is then the newer one.
+   */
   private loadTree(wantedTop: string | null, wantedFy: string | null): void {
+    this.treeSent += 1;
+    const read = this.treeSent;
     this.treeApi.tree().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (tree) => {
-        this.tree.set(tree);
+        if (read >= this.treeShown) this.tree.set(tree);
+        this.treeShown = Math.max(read, this.treeShown);
         const tops = this.tops();
         if (!tops.length) {
           void this.router.navigate(['/budget'], { replaceUrl: true });
@@ -1188,14 +1194,17 @@ export class BudgetPlanComponent {
   }
 
   /**
-   * The amount fields of the tables take the wide form: an Ansatz of the version or a typed
-   * amount has more digits than the narrow field shows.
+   * The amount fields of the tables take the wide form: an Ansatz of the version has more
+   * digits than the narrow field shows, or the person typed such an amount in this version.
+   * The form stays for the version after the typed amount, because the field drops the
+   * typed text when the person leaves it, and the table would else go narrow for the time
+   * of the save and wide again with its answer.
    */
   readonly wideFields = computed(
-    () =>
-      (this.version()?.lines ?? []).some((line) => Number(line.amount) >= WIDE_FROM) ||
-      Object.entries(this.edits()).some(([key, text]) => !key.includes(':note:') && Number(text) >= WIDE_FROM),
+    () => (this.version()?.lines ?? []).some((line) => Number(line.amount) >= WIDE_FROM) || this.wideFor() === (this.version()?.id ?? ''),
   );
+  /** The version in which the person typed an amount that needs the wide form. */
+  private readonly wideFor = signal<string | null>(null);
 
   /** The amount a field shows: the text a person types, else the saved amount. */
   fieldValue(row: PlanRow, field: 'amount' | 'blocked'): string | number {
@@ -1205,6 +1214,7 @@ export class BudgetPlanComponent {
   /** Keep the amount a person types, as the canonical decimal string of the field. */
   edit(row: PlanRow, field: 'amount' | 'blocked', value: string | null): void {
     this.edits.update((e) => ({ ...e, [`${row.id}:${field}`]: value ?? '' }));
+    if (Number(value) >= WIDE_FROM) this.wideFor.set(this.version()?.id ?? null);
   }
 
   /**

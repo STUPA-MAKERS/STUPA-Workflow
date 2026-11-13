@@ -28,10 +28,10 @@ describe('cacheInterceptor', () => {
     const seen: unknown[] = [];
     http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
     http.patch('/api/things/1', {}).subscribe();
+    mock.expectOne('/api/things/1').flush({});
     http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
     const reads = mock.match('/api/things');
     expect(reads).toHaveLength(2);
-    mock.expectOne('/api/things/1').flush({});
     reads[1].flush(['new']);
     reads[0].flush(['old']);
     expect(seen).toEqual([['new'], ['old']]);
@@ -46,6 +46,20 @@ describe('cacheInterceptor', () => {
     expect(after).toEqual([]);
     mock.expectOne('/api/things').flush(['after the write']);
     expect(after).toEqual([['after the write']]);
+  });
+
+  it('§NF/performance/loading/000847: a read in the answer of a write does not join a read that started while the write ran', () => {
+    const seen: unknown[] = [];
+    http.patch('/api/things/1', {}).subscribe(() => http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b)));
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    mock.expectOne('/api/things/1').flush({});
+    const reads = mock.match('/api/things');
+    expect(reads).toHaveLength(2);
+    reads[1].flush(['new']);
+    reads[0].flush(['old']);
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    expect(seen[2]).toEqual(['new']);
+    mock.expectOne('/api/things').flush(['new']);
   });
 
   describe('listContext', () => {

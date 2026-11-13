@@ -932,13 +932,21 @@ describe('BudgetPlanComponent', () => {
       expect(view.api.setLine).toHaveBeenCalledTimes(3);
     });
 
-    it('§F/finance/budget/000810: the amount fields of a table are wide only for a plan with an Ansatz from 10 million euro', async () => {
+    it('§F/finance/budget/000810: the amount fields of a table are wide from a typed Ansatz of 10 million euro on, also while its save runs', async () => {
       const view = await setup();
       const field = () => view.container.querySelector('app-currency-input.bp__field') as HTMLElement;
       expect(field()).not.toHaveClass('bp__field--wide');
-      await typeAmount(input(view, 'amount-fees'), '10000000', '0');
+      const saved = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(saved);
+      await typeAmount(input(view, 'amount-fees'), '10000000');
       view.fixture.detectChanges();
       expect(field()).toHaveClass('bp__field--wide');
+    });
+
+    it('§F/finance/budget/000810: the amount fields of a table are wide for a plan that holds an Ansatz from 10 million euro', async () => {
+      const large = plan([version({ lines: [line('fees', '10000000'), line('staff', '70'), line('wages', '60'), line('grants', '30')] })]);
+      const view = await setup({ plans: { 'fy-26': large } });
+      expect(view.container.querySelector('app-currency-input.bp__field')).toHaveClass('bp__field--wide');
     });
 
     it('§F/finance/budget/000812: a Vermerk keeps the last press until its last save ended', async () => {
@@ -1317,6 +1325,19 @@ describe('BudgetPlanComponent', () => {
       const reads = view.treeApi.tree.mock.calls.length;
       view.treeApi.changed.next();
       expect(view.treeApi.tree.mock.calls.length).toBe(reads + 1);
+    });
+
+    it('§F/finance/budget/000851: the first tree read does not replace the tree of a later read', async () => {
+      const view = await setup({ query: { costCentre: 'fees' } });
+      const older = new Subject<BudgetTreeNode[]>();
+      const newer = new Subject<BudgetTreeNode[]>();
+      view.treeApi.tree.mockReturnValueOnce(older).mockReturnValueOnce(newer);
+      const page = view.fixture.componentInstance as unknown as { tree(): BudgetTreeNode[]; retry(): void };
+      page.retry();
+      view.treeApi.changed.next();
+      newer.next([{ ...TOP, name: 'Neu' }, QSM]);
+      older.next([{ ...TOP, name: 'Alt' }, QSM]);
+      expect(page.tree()[0].name).toBe('Neu');
     });
 
     it('has no Gremien to choose when their read fails', async () => {
