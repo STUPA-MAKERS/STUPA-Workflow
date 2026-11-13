@@ -61,7 +61,7 @@ def test_plan_tools_are_registered() -> None:
         "delete_plan_line",
         "create_plan_cost_centre",
         "pass_plan_step",
-        "create_plan_step_vote",
+        "request_plan_step",
         "set_plan_state",
     } <= names
 
@@ -82,7 +82,7 @@ def test_each_plan_tool_calls_its_route(fake_api: _FakeApi) -> None:
             "v1", S.PlanNodeCreate(parentId="b1", key="9", name="Sport", side="expense")
         ),
         budget_plan.pass_plan_step("v1"),
-        budget_plan.create_plan_step_vote("v1"),
+        budget_plan.request_plan_step("v1"),
         budget_plan.set_plan_state("v1", "in_force"),
     )
     for call in calls:
@@ -104,7 +104,7 @@ def test_each_plan_tool_calls_its_route(fake_api: _FakeApi) -> None:
             {"parentId": "b1", "key": "9", "name": "Sport", "side": "expense", "amount": "0"},
         ),
         ("POST", "/budget-plan-versions/v1/steps/next", None),
-        ("POST", "/budget-plan-versions/v1/steps/next/vote", None),
+        ("POST", "/budget-plan-versions/v1/steps/next/request", None),
         ("POST", "/budget-plan-versions/v1/state", {"state": "in_force"}),
     ]
 

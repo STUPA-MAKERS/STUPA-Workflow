@@ -156,13 +156,17 @@ async def pass_plan_step(version_id: str, step: int | None = None) -> dict:
 
 
 @group.tool
-async def create_plan_step_vote(version_id: str) -> dict:
-    """Create the draft vote of the Gremium of the next step.
+async def request_plan_step(version_id: str) -> dict:
+    """Ask the Gremium of the next step for its decision.
 
-    The vote opens and closes through the vote tools, with the manage right of that
-    Gremium. An accepted vote passes the step. Requires budget.structure.
+    The call creates no vote. The version then waits for a meeting of that Gremium:
+    `list_assignable_agenda_plans` shows it, `add_agenda_item` with `plan_version_id`
+    puts it on the agenda, and `create_meeting_vote` on that item is the vote. An
+    accepted vote passes the step, every other result sends the version back to the
+    draft. 422 `plan_step_no_gremium` for a step without a Gremium, 409
+    `plan_step_waits` when the step already waits. Requires budget.structure.
     """
-    return await api().post(f"/budget-plan-versions/{version_id}/steps/next/vote")
+    return await api().post(f"/budget-plan-versions/{version_id}/steps/next/request")
 
 
 @group.tool

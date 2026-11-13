@@ -1187,8 +1187,9 @@ class PlanOps(NodeOps, AllocationOps):
                 "The step has a vote. Only its result passes the step.",
                 code="plan_step_has_vote",
             )
-        version.state = "in_progress"
-        version.steps = plan_rules.with_step_passed(steps, index, datetime.now(UTC).isoformat())
+        self._keep_steps(
+            version, plan_rules.with_step_passed(steps, index, datetime.now(UTC).isoformat())
+        )
         await self._audit(
             AuditAction.BUDGET_PLAN_STEP,
             target_type="budget_plan",
@@ -1205,6 +1206,12 @@ class PlanOps(NodeOps, AllocationOps):
             },
         )
         return await self._plan_out(plan, top.id)
+
+    @staticmethod
+    def _keep_steps(version: BudgetPlanVersion, steps: list[dict[str, Any]]) -> None:
+        """Store the steps of a version that passes them, so it is in progress."""
+        version.state = "in_progress"
+        version.steps = steps
 
     async def _vote_status(self, vote_id: str | None) -> str | None:
         """Return the status of the vote of a step, or `None` when the vote is gone."""
@@ -1249,9 +1256,8 @@ class PlanOps(NodeOps, AllocationOps):
             raise ConflictError(
                 "The step waits for its Gremium already.", code="plan_step_waits"
             )
-        version.state = "in_progress"
-        version.steps = plan_rules.with_step_requested(
-            steps, index, datetime.now(UTC).isoformat()
+        self._keep_steps(
+            version, plan_rules.with_step_requested(steps, index, datetime.now(UTC).isoformat())
         )
         await self._audit(
             AuditAction.BUDGET_PLAN_STEP_REQUEST,

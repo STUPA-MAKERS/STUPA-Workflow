@@ -411,12 +411,12 @@
       "to": "meetings"
     },
     {
-      "count": 31,
+      "count": 30,
       "from": "budget",
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 2,
       "from": "budget",
       "to": "voting"
     },
@@ -714,6 +714,11 @@
       "count": 21,
       "from": "livevote",
       "to": "auth"
+    },
+    {
+      "count": 2,
+      "from": "livevote",
+      "to": "budget"
     },
     {
       "count": 1,
@@ -1186,7 +1191,7 @@
       "to": "auth"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "voting",
       "to": "budget"
     },

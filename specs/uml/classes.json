@@ -540,6 +540,13 @@
       "to": "Application"
     },
     {
+      "column": "plan_version_id",
+      "from": "MeetingAgendaItem",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "BudgetPlanVersion"
+    },
+    {
       "column": "meeting_id",
       "from": "MeetingAgendaItem",
       "multiplicity": "*",
@@ -4242,6 +4249,12 @@
         },
         {
           "name": "todo_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "plan_version_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"

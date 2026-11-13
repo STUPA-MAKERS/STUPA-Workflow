@@ -136,8 +136,13 @@ async def test_the_item_of_a_plan_takes_one_motion_of_the_members(
         for extra, code in (
             ({"kind": "election", "seats": 1, "candidates": [{"name": "A"}, {"name": "B"}]},
              "plan_item_motion_only"),
-            ({"kind": "poll", "poll": {"mode": "single", "options": [{"label": "A"}, {"label": "B"}]}},
-             "plan_item_motion_only"),
+            (
+                {
+                    "kind": "poll",
+                    "poll": {"mode": "single", "options": [{"label": "A"}, {"label": "B"}]},
+                },
+                "plan_item_motion_only",
+            ),
             ({"guestsVote": True}, "guests_vote_unavailable"),
         ):
             refused = client.post(f"/api/meetings/{s.meeting_id}/votes", json={**base, **extra})
