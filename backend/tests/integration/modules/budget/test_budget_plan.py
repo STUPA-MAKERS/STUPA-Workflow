@@ -2113,3 +2113,28 @@ async def test_a_top_level_key_waits_for_the_lock_of_the_top_level_keys(
         assert not task.done()
         await holder.commit()
     assert await asyncio.wait_for(task, 10) == key
+
+
+async def test_the_read_of_a_version_beside_its_delete_is_no_error(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A delete that takes the version away during the read of its plan gives no error.
+
+    Rule: §F/finance/budget/000838.
+    """
+    t = await _tree(session)
+    vid = _version(await _draft(t)).id
+    await session.commit()
+    maker = async_sessionmaker(session.bind, expire_on_commit=False)
+    read = t.svc._get_fiscal_year
+
+    async def gone(fiscal_year_id: uuid.UUID) -> FiscalYear:
+        async with maker() as other:
+            await BudgetTreeService(other, actor="tester").delete_version(vid)
+            await other.commit()
+        return await read(fiscal_year_id)
+
+    monkeypatch.setattr(t.svc, "_get_fiscal_year", gone)
+    shown = await t.svc.plan_of_version(vid)
+    assert shown.fiscal_year_id == t.fy.id
+    assert vid not in [version.id for version in shown.versions]

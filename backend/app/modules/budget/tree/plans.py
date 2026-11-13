@@ -739,7 +739,8 @@ class PlanOps(NodeOps, AllocationOps):
 
         Raises:
             NotFoundError: The version does not exist (404). A version that a delete
-                takes away between the two reads counts as one that does not exist.
+                takes away after the first read is no error: the answer then holds the
+                rows that are left.
         """
         plan = await self.session.scalar(
             select(BudgetPlan)
@@ -1560,10 +1561,7 @@ class PlanOps(NodeOps, AllocationOps):
         try:
             await self.session.flush()
         except IntegrityError as exc:
-            raise ConflictError(
-                f"budget key {payload.key!r} already exists under this parent",
-                code="budget_key_exists",
-            ) from exc
+            raise NodeOps._flush_error(exc, payload.key) from exc
         await self._audit(
             AuditAction.BUDGET_NODE_CREATE,
             target_type="budget",
