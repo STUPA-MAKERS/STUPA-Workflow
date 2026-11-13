@@ -5,7 +5,18 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_upload_route_201_for_a_writer"
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_upload_route_refuses_who_cannot_write"
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_document_ids_come_in_the_order_of_the_first_reference"
+  - "frontend/src/app/features/meetings/top-sheet/top-sheet.component.spec.ts:TopSheetComponent"
+implementation:
+  - backend/app/modules/media/refs.py
+  - backend/app/modules/media/service.py
+  - backend/app/modules/protocol/documents_router.py
+  - frontend/vendor/ui-kit/markdown-editor/src/document.extension.ts
+  - frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.component.ts
+  - frontend/src/app/features/meetings/top-sheet/top-sheet.component.ts
 scope:
   - backend/app/modules/media
   - backend/app/modules/protocol

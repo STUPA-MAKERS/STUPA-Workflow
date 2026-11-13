@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "frontend/src/app/shared/markdown/markdown-view.component.spec.ts:MarkdownViewComponent"
+  - "frontend/src/app/shared/markdown/markdown.util.spec.ts:markdownToSafeHtml"
+implementation:
+  - frontend/vendor/ui-kit/markdown-editor/src/document.extension.ts
+  - frontend/src/app/shared/markdown/markdown.util.ts
+  - frontend/src/app/shared/markdown/markdown-view.component.ts
+  - frontend/src/app/shared/markdown/document-viewer.component.ts
 scope:
   - frontend/src/app/shared/markdown
   - frontend/src/app/features/meetings

@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_public_document_ids_leave_out_a_non_public_top"
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_public_download_only_for_a_pdf_of_the_public_text"
+implementation:
+  - backend/app/modules/protocol/public.py
+  - backend/app/modules/protocol/public_images_router.py
+  - frontend/src/app/features/public-protocols/public-protocol-detail.component.ts
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/public-protocols

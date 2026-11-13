@@ -34,11 +34,23 @@ import {
 } from '@stupa-makers/ui-kit';
 import {
   MarkdownEditorComponent,
+  type MarkdownDocumentInfo,
+  type MarkdownDocumentRef,
+  type MarkdownDocumentUploader,
   type MarkdownFormat,
   type MarkdownImageUploader,
 } from '@stupa-makers/ui-kit/markdown-editor';
 import { ImageAltService } from '@shared/markdown/image-alt.service';
-import { MediaApiService } from '@shared/markdown/media-api.service';
+import {
+  DocumentViewerComponent,
+  type ShownDocument,
+} from '@shared/markdown/document-viewer.component';
+import {
+  MEDIA_DOCUMENT_TYPES,
+  MediaApiService,
+  type MediaDocument,
+  markdownDocument,
+} from '@shared/markdown/media-api.service';
 import {
   MarkdownImageUploadDirective,
   imageUploadErrorKey,
@@ -48,7 +60,13 @@ import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { hasOpenBlackout } from '../../../shared/markdown/markdown.util';
-import { applyRawFormat, insertRawTable, insertRawTimeNote, protocolNow } from './raw-format';
+import {
+  applyRawFormat,
+  insertRawInline,
+  insertRawTable,
+  insertRawTimeNote,
+  protocolNow,
+} from './raw-format';
 import { topApplicationLead } from '../top-application-lead.util';
 
 /** The autosave state of the text of the open item. */
@@ -58,6 +76,24 @@ export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 export type EditorMode = 'formatted' | 'raw';
 
 const NO_FORMATS: ReadonlySet<MarkdownFormat> = new Set();
+
+/** The i18n key of a PDF upload error, from the HTTP status of the problem response. */
+export function documentUploadErrorKey(status?: number): TranslationKey {
+  switch (status) {
+    case 403:
+      return 'markdown.document.error.forbidden';
+    case 413:
+      return 'markdown.document.error.tooLarge';
+    case 415:
+      return 'markdown.document.error.type';
+    case 429:
+      return 'markdown.image.error.rate';
+    case 503:
+      return 'markdown.image.error.storage';
+    default:
+      return 'markdown.document.error.upload';
+  }
+}
 
 /** A button of the format bar. */
 interface FormatTool {
@@ -118,6 +154,7 @@ const TOOLS: readonly FormatTool[] = [
     IconComponent,
     MarkdownEditorComponent,
     MarkdownImageUploadDirective,
+    DocumentViewerComponent,
     NoteComponent,
     ProtocolBarComponent,
     ScrollFadeDirective,
@@ -292,6 +329,98 @@ export class TopSheetComponent {
     }
   };
 
+  /**
+   * Upload a PDF of the formatted view to the protocol of the meeting (spec 000862). An
+   * error shows as a toast; the editor then inserts nothing.
+   */
+  protected readonly documentUpload: MarkdownDocumentUploader = async (file) => {
+    const doc = await this.sendDocument(file);
+    return { src: doc.url, name: doc.name };
+  };
+
+  /** The page count of a PDF badge, from its info route; cached per path. */
+  private readonly pageCounts = signal<ReadonlyMap<string, Promise<number | null>>>(new Map());
+  protected readonly documentInfo: MarkdownDocumentInfo = (src) => {
+    const known = this.pageCounts().get(src);
+    if (known) return known;
+    const next = firstValueFrom(this.injector.get(MediaApiService).documentInfo(src)).then(
+      (info) => info.pages,
+      () => null,
+    );
+    this.pageCounts.update((counts) => new Map([...counts, [src, next]]));
+    return next;
+  };
+
+  /** The PDF in the overlay (spec 000863). */
+  protected readonly shownDocument = signal<ShownDocument | null>(null);
+
+  protected openDocument(ref: MarkdownDocumentRef): void {
+    this.shownDocument.set({ name: ref.name, url: ref.src });
+  }
+
+  private async sendDocument(file: File): Promise<MediaDocument> {
+    try {
+      return await firstValueFrom(
+        this.injector.get(MediaApiService).uploadDocument(this.meeting().id, file),
+      );
+    } catch (err) {
+      this.toast.error(
+        this.i18n.translate(documentUploadErrorKey((err as { status?: number } | null)?.status)),
+      );
+      throw err;
+    }
+  }
+
+  /** "PDF einfügen": the file dialog of the editor, or of the Markdown source. */
+  insertDocument(): void {
+    if (this.mode() !== 'raw') {
+      this.editor()?.pickDocument();
+      return;
+    }
+    const area = this.rawArea()?.nativeElement;
+    if (!area || area.readOnly) return;
+    const picker = document.createElement('input');
+    picker.setAttribute('type', 'file');
+    picker.setAttribute('accept', MEDIA_DOCUMENT_TYPES.join(','));
+    picker.toggleAttribute('multiple', true);
+    picker.addEventListener('change', () => void this.uploadRawDocuments(Array.from(picker.files ?? [])));
+    picker.click();
+  }
+
+  /** A paste of PDF files into the Markdown source uploads them (images go to the directive). */
+  protected onRawPaste(event: ClipboardEvent): void {
+    const pdfs = pdfFiles(event.clipboardData?.files);
+    if (!pdfs.length || !this.editable()) return;
+    event.preventDefault();
+    void this.uploadRawDocuments(pdfs);
+  }
+
+  /** A drop of PDF files on the Markdown source uploads them at the caret. */
+  protected onRawDrop(event: DragEvent): void {
+    const pdfs = pdfFiles(event.dataTransfer?.files);
+    if (!pdfs.length || !this.editable()) return;
+    event.preventDefault();
+    void this.uploadRawDocuments(pdfs);
+  }
+
+  /** Upload PDFs one after the other and put each reference at the caret of the source. */
+  private async uploadRawDocuments(files: readonly File[]): Promise<void> {
+    await files.reduce(async (done, file) => {
+      await done;
+      const doc = await this.sendDocument(file).catch(() => null);
+      const area = this.rawArea()?.nativeElement;
+      const t = this.top();
+      if (!doc || !area || !t || area.readOnly) return;
+      const next = insertRawInline(
+        { text: area.value, start: area.selectionStart, end: area.selectionEnd },
+        markdownDocument(doc.name, doc.id),
+      );
+      Reflect.set(area, 'value', next.text);
+      area.setSelectionRange(next.start, next.end);
+      this.bodyChange.emit({ itemId: t.id, body: next.text });
+    }, Promise.resolve());
+  }
+
   /** The text has a `%%` without its closing pair (000686): the public variant would show the name. */
   protected readonly openBlackout = computed(() => hasOpenBlackout(this.top()?.body ?? ''));
 
@@ -317,7 +446,7 @@ export class TopSheetComponent {
       { text: area.value, start: area.selectionStart, end: area.selectionEnd },
       format,
     );
-    area.value = next.text;
+    Reflect.set(area, 'value', next.text);
     area.focus();
     area.setSelectionRange(next.start, next.end);
     this.bodyChange.emit({ itemId: t.id, body: next.text });
@@ -333,7 +462,7 @@ export class TopSheetComponent {
     const t = this.top();
     if (!area || !t || area.readOnly) return;
     const next = insertRawTable({ text: area.value, start: area.selectionStart, end: area.selectionEnd });
-    area.value = next.text;
+    Reflect.set(area, 'value', next.text);
     area.focus();
     area.setSelectionRange(next.start, next.end);
     this.bodyChange.emit({ itemId: t.id, body: next.text });
@@ -353,7 +482,7 @@ export class TopSheetComponent {
     const t = this.top();
     if (!area || !t || area.readOnly) return;
     const next = insertRawTimeNote({ text: area.value, start: area.selectionStart, end: area.selectionEnd }, time);
-    area.value = next.text;
+    Reflect.set(area, 'value', next.text);
     area.focus();
     area.setSelectionRange(next.start, next.end);
     this.bodyChange.emit({ itemId: t.id, body: next.text });
@@ -437,4 +566,9 @@ function textHash(text: string): string {
     .split('')
     .reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 0x01000193), 0x811c9dc5);
   return `${text.length}.${(hash >>> 0).toString(36)}`;
+}
+
+/** The PDF files of a paste or a drop. */
+function pdfFiles(list: FileList | null | undefined): readonly File[] {
+  return Array.from(list ?? []).filter((f) => MEDIA_DOCUMENT_TYPES.includes(f.type));
 }

@@ -4,7 +4,7 @@
   @if (!loaded()) {
     <app-skeleton variant="rows" [count]="6" [label]="'a11yStatement.loading' | t" />
   } @else if (markdown()) {
-    <app-markdown-view class="as__text" [src]="markdown()" [headingOffset]="0" [imageSrc]="null" />
+    <app-markdown-view class="as__text" [src]="markdown()" [headingOffset]="0" [imageSrc]="null" [documentSrc]="null" />
   } @else {
     <p class="as__empty">{{ 'a11yStatement.empty' | t }}</p>
   }

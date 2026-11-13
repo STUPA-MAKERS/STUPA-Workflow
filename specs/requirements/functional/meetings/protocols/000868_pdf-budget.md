@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_render_documents_keep_the_order_and_the_budget"
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_render_documents_never_fail_for_a_missing_pdf"
+  - "typst/tests/test_appendix.py:test_a_missing_or_unreadable_pdf_or_one_past_the_budget_is_no_anlage"
+implementation:
+  - backend/app/modules/media/service.py
+  - typst/typst_service/appendix.py
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/media

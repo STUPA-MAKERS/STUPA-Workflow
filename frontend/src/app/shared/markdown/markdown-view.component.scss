@@ -197,3 +197,57 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
+
+// An embedded PDF: one inline file badge button (spec 000863).
+.mdv .mdv__doc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  margin: 0 1px;
+  padding: 1px var(--space-2) 1px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .mdv .mdv__doc:hover {
+    background: var(--color-surface-3);
+  }
+}
+.mdv .mdv__doc:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.mdv .mdv__doc-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-muted);
+}
+.mdv .mdv__doc-kind {
+  flex: none;
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+.mdv .mdv__doc-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mdv .mdv__doc-pages {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.mdv .mdv__doc-pages::before {
+  content: '· ';
+}

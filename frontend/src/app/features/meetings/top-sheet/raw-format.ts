@@ -117,3 +117,17 @@ export function insertRawTimeNote({ text, end }: RawText, time: string): RawText
   const caret = before.length + lead.length + line.length;
   return { text: before + lead + line + tail + after, start: caret, end: caret };
 }
+
+/**
+ * Insert an inline reference (an embedded PDF) at the caret, in place of the selection,
+ * with a space on each side where the text has none. The caret goes behind it.
+ */
+export function insertRawInline({ text, start, end }: RawText, reference: string): RawText {
+  const before = text.slice(0, start);
+  const after = text.slice(end);
+  const lead = before && !/\s$/.test(before) ? ' ' : '';
+  const trail = /^\s/.test(after) ? '' : ' ';
+  const insert = `${lead}${reference}${trail}`;
+  const caret = start + insert.length;
+  return { text: before + insert + after, start: caret, end: caret };
+}

@@ -85,6 +85,8 @@
             [blackoutTitle]="'markdown.blackout.mark' | t"
             [timeNoteSuffix]="'meetings.editor.timeNoteSuffix' | t"
             [timeNoteLabel]="'meetings.editor.timeNoteTime' | t"
+            [documentInfo]="documentInfo"
+            (documentOpen)="openDocument($event)"
         />
       } @placeholder {
         <div class="ts__editor ts__editor--wait" aria-hidden="true">
@@ -131,6 +133,16 @@
               (click)="insertImage()"
             >
               <app-icon name="image" [size]="20" />
+            </button>
+            <button
+              type="button"
+              class="ts__tool"
+              [attr.aria-label]="'meetings.editor.document' | t"
+              [title]="'meetings.editor.document' | t"
+              (mousedown)="$event.preventDefault()"
+              (click)="insertDocument()"
+            >
+              <app-icon name="file" [size]="20" />
             </button>
             <button
               type="button"
@@ -190,6 +202,8 @@
             [placeholder]="'meetings.protocol.placeholder' | t"
             spellcheck="true"
             (input)="onRawInput(t, raw.value)"
+            (paste)="onRawPaste($event)"
+            (drop)="onRawDrop($event)"
           ></textarea>
         </div>
       } @else {
@@ -203,6 +217,9 @@
             [value]="t.body ?? ''"
             [disabled]="!editable()"
             [imageUpload]="editable() ? imageUpload : null"
+            [documentUpload]="editable() ? documentUpload : null"
+            [documentInfo]="documentInfo"
+            (documentOpen)="openDocument($event)"
             [ariaLabel]="'participant.top.protocol' | t"
             [placeholder]="'meetings.protocol.placeholder' | t"
             [blackoutTitle]="'markdown.blackout.mark' | t"
@@ -233,6 +250,10 @@
   }
 
 </article>
+
+@if (shownDocument()) {
+  <app-document-viewer [(doc)]="shownDocument" />
+}
 
 <ng-template #saveTpl>
   <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">

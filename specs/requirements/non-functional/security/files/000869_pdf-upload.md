@@ -5,7 +5,18 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_check_refuses_no_pdf_a_broken_and_an_encrypted_pdf"
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_check_refuses_more_than_the_page_limit"
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_upload_scans_before_pypdf_reads"
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_upload_refusals_map_to_415_and_413"
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_upload_route_415_and_413"
+  - "backend/tests/unit/modules/media/test_media_documents.py:test_download_is_an_attachment_and_inline_is_framable"
+implementation:
+  - backend/app/modules/media/documents.py
+  - backend/app/modules/media/service.py
+  - backend/app/modules/media/router.py
+  - deploy/web/nginx.conf
 scope:
   - backend/app/modules/media
   - backend/app/modules/files

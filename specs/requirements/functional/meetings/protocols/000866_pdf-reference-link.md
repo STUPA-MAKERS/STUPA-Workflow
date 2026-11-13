@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "typst/tests/test_integration.py:test_embedded_pdfs_become_watermarked_anlagen_with_linked_references"
+implementation:
+  - typst/template/protocol.typ
+  - typst/typst_service/markdown.py
 scope:
   - typst/
 ---

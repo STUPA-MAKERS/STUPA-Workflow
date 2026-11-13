@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
-implementation: null
+tests:
+  - "typst/tests/test_appendix.py:test_number_documents_follows_the_first_reference"
+  - "typst/tests/test_appendix.py:test_merge_puts_each_page_under_its_anlage_page_as_an_artifact"
+  - "typst/tests/test_integration.py:test_embedded_pdfs_become_watermarked_anlagen_with_linked_references"
+implementation:
+  - typst/typst_service/appendix.py
+  - typst/typst_service/document.py
+  - typst/template/protocol.typ
+  - backend/app/modules/protocol/service.py
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/media

@@ -15,6 +15,8 @@
  * https or mailto protocol or an app path (`/…`), and an image. An image renders only
  * when its destination is the canonical path `/api/media/images/<uuid>`. Every other
  * destination renders as its alt text, so no external image loads (tracking pixels).
+ * A link to the canonical path of an embedded PDF (`/api/media/documents/<uuid>`) renders
+ * as a file badge button with `documents`, else as its plain name.
  */
 
 import { linkify } from './linkify';
@@ -39,6 +41,51 @@ export interface MarkdownOptions {
   readonly imageSrc?: ((id: string) => string) | null;
   /** The tooltip of a marked segment (`%%Name%%`) and the text of a black bar (`%%%%`). */
   readonly blackout?: { readonly mark: string; readonly bar: string };
+  /**
+   * The embedded PDFs (`[name](/api/media/documents/<uuid>)`). With it, a reference renders
+   * as a file badge button with `data-doc="<uuid>"`; without it, as its plain name.
+   */
+  readonly documents?: DocumentBadges | null;
+}
+
+/** The texts and page counts of the PDF badges. */
+export interface DocumentBadges {
+  /** The page count by uuid, where known. */
+  readonly pages: Readonly<Record<string, number>>;
+  /** The text of a page count, for example "4 Seiten". */
+  readonly pagesText: (pages: number) => string;
+  /** The accessible name of a badge, for example "PDF öffnen: Angebot.pdf". */
+  readonly label: (name: string) => string;
+}
+
+/** The canonical path of an embedded PDF. Group 1 is the lowercase uuid. */
+export const DOCUMENT_PATH_RE =
+  /^\/api\/media\/documents\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+
+/** The uuids of the embedded PDFs of a Markdown text, each once, in order. */
+export function documentIdsIn(src: string): readonly string[] {
+  const found = Array.from(
+    src.matchAll(/\]\(\/api\/media\/documents\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/g),
+    (m) => m[1],
+  );
+  return [...new Set(found)];
+}
+
+/** The file icon of the kit as static SVG markup. */
+const FILE_ICON =
+  '<svg class="mdv__doc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+  '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>' +
+  '<path d="M9 13h6M9 17h6"/></svg>';
+
+/** The badge of an embedded PDF. `name` and `plain` are escaped already. */
+function documentBadge(id: string, name: string, plain: string, docs: DocumentBadges): string {
+  const count = docs.pages[id];
+  const pages = count ? `<span class="mdv__doc-pages">${escapeHtml(docs.pagesText(count))}</span>` : '';
+  return (
+    `<button type="button" class="mdv__doc" data-doc="${id}" aria-label="${escapeHtml(docs.label(plain))}">` +
+    `${FILE_ICON}<span class="mdv__doc-kind">PDF</span><span class="mdv__doc-name">${name}</span>${pages}</button>`
+  );
 }
 
 /** The default image source: the canonical path, served to any authenticated session. */
@@ -149,6 +196,7 @@ type Inline = (text: string) => string;
 function inlineRenderer(
   imageSrc: ((id: string) => string) | null,
   blackout: { readonly mark: string; readonly bar: string },
+  documents: DocumentBadges | null = null,
 ): Inline {
   return (text: string): string => {
     const parts: string[] = [];
@@ -190,6 +238,11 @@ function inlineRenderer(
       return stash(`<img src="${src}" alt="${plain}" loading="lazy" decoding="async">`, plain);
     });
     const linked = replaceRefs(imaged, false, (label, href) => {
+      const doc = DOCUMENT_PATH_RE.exec(href)?.[1];
+      if (doc && label) {
+        const plain = fill(label, true);
+        return documents ? stash(documentBadge(doc, label, plain, documents), plain) : stash(label, plain);
+      }
       const kind = label ? hrefKind(href) : null;
       if (!kind) return null;
       const attrs = kind === 'external' ? ' target="_blank" rel="noopener noreferrer"' : '';
@@ -297,6 +350,7 @@ export function markdownToSafeHtml(src: string, opts: MarkdownOptions = {}): str
   const inline = inlineRenderer(
     opts.imageSrc === undefined ? defaultImageSrc : opts.imageSrc,
     opts.blackout ?? { mark: '', bar: '' },
+    opts.documents ?? null,
   );
   const clean = src.replace(/\r\n?/g, '\n').replace(CONTROL_RE, '');
   return linkify(renderBlocks(escapeHtml(clean).split('\n'), offset, inline));

@@ -1,4 +1,4 @@
-import { applyRawFormat, insertRawTable, insertRawTimeNote, protocolNow } from './raw-format';
+import { applyRawFormat, insertRawInline, insertRawTable, insertRawTimeNote, protocolNow } from './raw-format';
 
 describe('applyRawFormat', () => {
   it('puts the blackout marks around the selection and takes them away again (000690)', () => {
@@ -87,5 +87,17 @@ describe('protocolNow', () => {
   it('gives the time of Berlin with two digits', () => {
     expect(protocolNow(new Date('2026-11-13T08:05:00Z'))).toBe('09:05');
     expect(protocolNow(new Date('2026-07-01T22:30:00Z'))).toBe('00:30');
+  });
+});
+
+describe('insertRawInline', () => {
+  it('puts the reference at the caret with a space around it', () => {
+    expect(insertRawInline({ text: 'Siehe Text', start: 5, end: 5 }, '[a](x)')).toEqual({
+      text: 'Siehe [a](x) Text',
+      start: 12,
+      end: 12,
+    });
+    expect(insertRawInline({ text: '', start: 0, end: 0 }, '[a](x)').text).toBe('[a](x) ');
+    expect(insertRawInline({ text: 'A weg B', start: 2, end: 5 }, '[a](x)').text).toBe('A [a](x) B');
   });
 });
