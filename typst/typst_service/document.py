@@ -405,9 +405,7 @@ def _plan(options: Mapping[str, object]) -> dict[str, object]:
     }
 
 
-def _plan_document(
-    options: Mapping[str, object], assets: Collection[str]
-) -> dict[str, object]:
+def _plan_document(options: Mapping[str, object], assets: Collection[str]) -> dict[str, object]:
     """Build the document data of a Haushaltsplan. The default logo is that of the StuPa."""
     title_logos = _logo_list(options, "logos")
     footer_logos = _logo_list(options, "footer_logos")
