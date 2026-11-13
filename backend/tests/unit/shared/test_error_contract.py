@@ -190,3 +190,39 @@ def test_problem_detail_serialization() -> None:
     assert dumped["traceId"] == "abc"
     assert "detail" not in dumped
     assert "errors" not in dumped
+
+
+class _PgError(Exception):
+    """The driver error of Postgres, with its SQLSTATE."""
+
+    def __init__(self, sqlstate: str) -> None:
+        super().__init__(sqlstate)
+        self.sqlstate = sqlstate
+
+
+def _db_error_app(sqlstate: str) -> TestClient:
+    from sqlalchemy.exc import DBAPIError
+
+    app = FastAPI()
+    app.add_middleware(RequestContextMiddleware)
+    register_exception_handlers(app)
+
+    @app.get("/write")
+    def write() -> None:
+        raise DBAPIError("INSERT", {}, _PgError(sqlstate))
+
+    return TestClient(app, raise_server_exceptions=False)
+
+
+def test_a_text_that_the_database_refuses_is_a_422() -> None:
+    """A NUL character in a text is an input error of the caller, not a 500."""
+    resp = _db_error_app("22021").get("/write")
+    assert resp.status_code == 422
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    assert resp.json()["code"] == "validation_error"
+
+
+def test_another_database_error_stays_a_bare_500() -> None:
+    resp = _db_error_app("40P01").get("/write")
+    assert resp.status_code == 500
+    assert resp.json()["code"] == "internal_error"

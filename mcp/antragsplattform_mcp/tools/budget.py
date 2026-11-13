@@ -96,11 +96,44 @@ async def create_fiscal_year(budget_id: str, year: int, active: bool = True) -> 
 async def update_fiscal_year(
     budget_id: str, fiscal_year_id: str, year: int | None = None, active: bool | None = None
 ) -> dict:
-    """Patch the year or the active flag of a fiscal year. Requires budget.structure."""
+    """Patch the year or the active flag of a fiscal year.
+
+    A new year gives 409 `fiscal_year_closed` for a closed year and 409
+    `fiscal_year_has_plan` while the Haushaltsplan of the year has a version that
+    left the draft. Requires budget.structure.
+    """
     return await api().patch(
         f"/budgets/{budget_id}/fiscal-years/{fiscal_year_id}",
         json=params(year=year, active=active),
     )
+
+
+@group.tool
+async def close_fiscal_year(budget_id: str, fiscal_year_id: str) -> dict:
+    """Close a fiscal year, so no money or plan write changes it.
+
+    The call gives 409 `plan_in_progress` while a version of its Haushaltsplan waits
+    for a step. Requires budget.structure.
+    """
+    return await api().post(f"/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/close")
+
+
+@group.tool
+async def reopen_fiscal_year(budget_id: str, fiscal_year_id: str) -> dict:
+    """Open a closed fiscal year again. Requires budget.structure."""
+    return await api().post(f"/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/reopen")
+
+
+@group.tool
+async def delete_fiscal_year(budget_id: str, fiscal_year_id: str) -> dict:
+    """Delete a fiscal year that nothing uses.
+
+    A Haushaltsplan that is only a draft goes with the year. The call gives 409
+    `fiscal_year_has_plan` for a plan with a version that left the draft, 409
+    `fiscal_year_closed` for a closed year and 409 `fiscal_year_has_...` while
+    allocations, bookings or applications use the year. Requires budget.structure.
+    """
+    return await api().delete(f"/budgets/{budget_id}/fiscal-years/{fiscal_year_id}")
 
 
 @group.tool

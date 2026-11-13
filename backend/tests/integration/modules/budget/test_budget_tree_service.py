@@ -137,7 +137,7 @@ async def test_top_down_allocation_constraint(session: AsyncSession) -> None:
 async def test_rename_key_recomputes_descendant_paths(session: AsyncSession) -> None:
     """A rename of mid from 800 to 810 moves the paths of mid and of leaf.
 
-    The key of a sibling gives 409.
+    The key of a sibling gives 409. Rule: §F/finance/budget/000246.
     """
     svc = BudgetTreeService(session)
     g = await _gremium(session)

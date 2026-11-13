@@ -56,9 +56,13 @@ class _Tx:
 
     def __init__(self) -> None:
         self.commits = 0
+        self.rollbacks = 0
 
     async def commit(self) -> None:
         self.commits += 1
+
+    async def rollback(self) -> None:
+        self.rollbacks += 1
 
 
 class _FakePlans:
@@ -80,8 +84,11 @@ class _FakePlans:
         self.calls.append(("switch", (enabled, confirm_changes)))
         return PlanSwitchOut(budgetId=budget_id, planEnabled=enabled)
 
-    async def preview_plan_switch(self, budget_id: uuid.UUID) -> PlanSwitchPreview:
+    async def preview_plan_switch(
+        self, budget_id: uuid.UUID, sides: dict[uuid.UUID, str] | None = None
+    ) -> PlanSwitchPreview:
         self.calls.append(("preview", budget_id))
+        self.calls.append(("preview_sides", sides))
         return PlanSwitchPreview(budgetId=budget_id)
 
     async def delete_version(self, version_id: uuid.UUID) -> None:
@@ -124,8 +131,10 @@ class _FakePlans:
         self.calls.append(("set_steps", tuple(step.name for step in payload.steps)))
         return PlanStepsOut(budgetId=budget_id)
 
-    async def pass_next_step(self, version_id: uuid.UUID) -> PlanOut:
-        self.calls.append(("next", version_id))
+    async def pass_next_step(
+        self, version_id: uuid.UUID, *, expected: int | None = None
+    ) -> PlanOut:
+        self.calls.append(("next", version_id if expected is None else (version_id, expected)))
         return _plan()
 
     async def create_step_vote(self, version_id: uuid.UUID) -> PlanOut:
@@ -219,7 +228,13 @@ def test_preview_of_the_plan_switch(client: TestClient, fake: _FakePlans) -> Non
     resp = client.get(f"/api/budgets/{_TOP}/plan-switch/preview")
     assert resp.status_code == 200
     assert resp.json() == {"budgetId": str(_TOP), "changes": []}
-    assert fake.calls == [("preview", _TOP)]
+    assert fake.calls == [("preview", _TOP), ("preview_sides", {})]
+    assert (fake.session.commits, fake.session.rollbacks) == (0, 1)
+    child, other = uuid.uuid4(), uuid.uuid4()
+    client.get(
+        f"/api/budgets/{_TOP}/plan-switch/preview", params={"income": child, "expense": other}
+    )
+    assert fake.calls[-1] == ("preview_sides", {child: "income", other: "expense"})
     denied = _client(_FakePlans(), "budget.view").get(f"/api/budgets/{_TOP}/plan-switch/preview")
     assert denied.status_code == 403
 
@@ -316,3 +331,51 @@ def test_line_amount_is_validated(client: TestClient, fake: _FakePlans) -> None:
         f"/api/budget-plan-versions/{_VERSION}/state", json={"state": "nope"}
     ).status_code == 422
     assert fake.calls == []
+
+
+def test_the_step_route_passes_the_named_step(client: TestClient, fake: _FakePlans) -> None:
+    """Rule: §F/finance/budget/000841."""
+    resp = client.post(f"/api/budget-plan-versions/{_VERSION}/steps/next", json={"step": 1})
+    assert resp.status_code == 200
+    assert ("next", (_VERSION, 1)) in fake.calls
+    assert (
+        client.post(
+            f"/api/budget-plan-versions/{_VERSION}/steps/next", json={"step": -1}
+        ).status_code
+        == 422
+    )
+
+
+def test_the_steps_route_needs_its_list(client: TestClient) -> None:
+    """A body without `steps` must not empty the list of a budget.
+
+    Rule: §F/finance/budget/000824.
+    """
+    assert client.put(f"/api/budgets/{_TOP}/plan-steps", json={}).status_code == 422
+
+
+def test_the_node_schemas_refuse_what_they_cannot_store() -> None:
+    """Rules: §F/finance/budget/000246, §F/finance/budget/000831."""
+    from pydantic import ValidationError
+
+    from app.modules.budget.plan_schemas import PlanLineSet
+    from app.modules.budget.tree_schemas import BudgetNodeCreate, BudgetNodeUpdate
+
+    for body in (
+        {"name": None},
+        {"active": None},
+        {"key": None},
+        {"fiscalStartDay": None},
+        {"name": "   "},
+        {"name": "x", "unknown": 1},
+    ):
+        with pytest.raises(ValidationError):
+            BudgetNodeUpdate.model_validate(body)
+    assert BudgetNodeUpdate.model_validate({"name": "  Sport "}).name == "Sport"
+    assert BudgetNodeUpdate.model_validate({"color": None}).color is None
+    with pytest.raises(ValidationError):
+        BudgetNodeUpdate.model_validate([])
+    with pytest.raises(ValidationError):
+        BudgetNodeCreate.model_validate({"key": "1", "name": " "})
+    with pytest.raises(ValidationError):
+        PlanLineSet.model_validate({"transferable": "yes"})

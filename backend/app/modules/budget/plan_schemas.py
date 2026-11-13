@@ -7,9 +7,10 @@ from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import AfterValidator, Field, StringConstraints
+from pydantic import AfterValidator, Field, StrictBool, StringConstraints
 
 from app.modules.budget.plan_rules import MAX_AMOUNT, MAX_STEPS, PlanState, PlanTarget, Side
+from app.modules.budget.tree_schemas import NodeName
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 VoteStatus = Literal["draft", "open", "closed", "cancelled"]
@@ -96,8 +97,8 @@ class PlanLineSet(FrozenStrictCamelModel, frozen=True):
 
     amount: Amount = Decimal("0.00")
     note: str | None = Field(default=None, max_length=4000)
-    transferable: bool = False
-    coverable: bool = False
+    transferable: StrictBool = False
+    coverable: StrictBool = False
     blocked: Amount = Decimal("0.00")
 
 
@@ -117,7 +118,13 @@ class PlanStepIn(FrozenStrictCamelModel, frozen=True):
 class PlanStepsSet(FrozenStrictCamelModel, frozen=True):
     """Set the ordered steps of a top-level cost center. The list can be empty."""
 
-    steps: tuple[PlanStepIn, ...] = Field(default=(), max_length=MAX_STEPS)
+    steps: tuple[PlanStepIn, ...] = Field(max_length=MAX_STEPS)
+
+
+class PlanStepPass(FrozenStrictCamelModel, frozen=True):
+    """Name the step that a request records as passed, by its place from 0."""
+
+    step: int | None = Field(default=None, ge=0, lt=MAX_STEPS)
 
 
 class PlanStepOut(FrozenCamelModel, frozen=True):
@@ -146,7 +153,7 @@ class PlanNodeCreate(FrozenStrictCamelModel, frozen=True):
 
     parent_id: UUID = Field(alias="parentId")
     key: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9]+$")
-    name: str = Field(min_length=1, max_length=200)
+    name: NodeName
     side: Side | None = None
     amount: Amount = Decimal("0.00")
 

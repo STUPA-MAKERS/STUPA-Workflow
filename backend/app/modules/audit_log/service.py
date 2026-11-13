@@ -33,13 +33,16 @@ def data_uuid_strings(data: object) -> frozenset[str]:
     """Collect every UUID-shaped string value from a ``data`` payload, recursively.
 
     The caller resolves the entity ids inside ``data`` to display names with this
-    set. The walk ignores keys and looks at values only.
+    set. The walk reads the values and the keys of an object, because a map such as
+    the changed allocations of a plan names each cost center in its key.
     """
     match data:
         case str():
             return frozenset({data}) if _as_uuid(data) is not None else frozenset()
         case dict():
-            return frozenset[str]().union(*(data_uuid_strings(v) for v in data.values()))
+            return frozenset(
+                key for key in data if isinstance(key, str) and _as_uuid(key) is not None
+            ).union(*(data_uuid_strings(v) for v in data.values()))
         case list() | tuple():
             return frozenset[str]().union(*(data_uuid_strings(v) for v in data))
         case _:

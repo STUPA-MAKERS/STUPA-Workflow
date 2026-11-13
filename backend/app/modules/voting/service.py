@@ -1872,6 +1872,23 @@ class VotingService:
             data={**self._audit_refs(vote), "reason": reason, "previousStatus": previous},
         )
 
+    async def lock_for_plan_version(self, plan_version_id: UUID) -> None:
+        """Lock the draft and open votes of a plan version, before its plan row.
+
+        The close of a step vote locks the vote first and the plan after it. The move
+        back to draft takes the same order with this call, because the other order
+        ends in a deadlock that Postgres breaks with an error.
+        """
+        await self.session.execute(
+            select(Vote.id)
+            .where(
+                Vote.plan_version_id == plan_version_id,
+                Vote.status.in_(("draft", "open")),
+            )
+            .order_by(Vote.id)
+            .with_for_update()
+        )
+
     async def end_for_plan_version(self, plan_version_id: UUID, *, actor: str | None) -> None:
         """End the votes of a plan version that moves back to draft, without a commit.
 
@@ -2138,6 +2155,7 @@ class VotingService:
         tally_out = TallyOut(
             counts=counts,
             eligible=eligible,
+            voted=sum(counts.values()),
             quorumMet=outcome.quorum_met,
             leading=outcome.leading,
             result=result_value,

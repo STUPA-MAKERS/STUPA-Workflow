@@ -12,15 +12,17 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.deps import Principal, require_principal
+from app.modules.budget.plan_rules import Side
 from app.modules.budget.plan_schemas import (
     PlanCreate,
     PlanLineSet,
     PlanNodeCreate,
     PlanOut,
     PlanStateSet,
+    PlanStepPass,
     PlanStepsOut,
     PlanStepsSet,
     PlanSwitchOut,
@@ -76,9 +78,24 @@ async def set_plan_switch(
     dependencies=_STRUCTURE,
     responses=_errors(401, 403, 404, 422),
 )
-async def preview_plan_switch(budget_id: UUID, service: ServiceDep) -> PlanSwitchPreview:
-    """Return the allocations that change when the plan switch goes on."""
-    return await service.preview_plan_switch(budget_id)
+async def preview_plan_switch(
+    budget_id: UUID,
+    service: ServiceDep,
+    income: Annotated[list[UUID] | None, Query()] = None,
+    expense: Annotated[list[UUID] | None, Query()] = None,
+) -> PlanSwitchPreview:
+    """Return the allocations that change when the plan switch goes on.
+
+    `income` and `expense` name direct children whose side a form has not saved yet.
+    The preview counts with these sides and saves none of them.
+    """
+    sides: dict[UUID, Side] = {
+        **dict.fromkeys(income or (), "income"),
+        **dict.fromkeys(expense or (), "expense"),
+    }
+    out = await service.preview_plan_switch(budget_id, sides)
+    await service.session.rollback()
+    return out
 
 
 @router.get(
@@ -220,9 +237,17 @@ async def set_plan_steps(
     dependencies=_STRUCTURE,
     responses=_errors(401, 403, 404, 409, 422),
 )
-async def pass_next_plan_step(version_id: UUID, service: ServiceDep) -> PlanOut:
-    """Record the next step of a version as passed."""
-    out = await service.pass_next_step(version_id)
+async def pass_next_plan_step(
+    version_id: UUID, service: ServiceDep, payload: PlanStepPass | None = None
+) -> PlanOut:
+    """Record the next step of a version as passed.
+
+    A body with `step` names the step that the caller means, by its place in the
+    list from 0. The call answers 409 when that step is no longer the next one.
+    """
+    out = await service.pass_next_step(
+        version_id, expected=payload.step if payload is not None else None
+    )
     await service.session.commit()
     return out
 

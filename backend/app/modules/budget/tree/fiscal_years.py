@@ -118,7 +118,8 @@ class FiscalYearOps(BudgetTreeServiceBase):
 
         Raises:
             ConflictError: `fiscal_year_closed` (409) for a year change on a
-                closed fiscal year.
+                closed fiscal year, `fiscal_year_has_plan` (409) for a year change
+                while the Haushaltsplan of the year has a version that left the draft.
         """
         top = await self._require_top_level(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
@@ -126,6 +127,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
         new_year = provided.get("year", fy.year)
         if new_year != fy.year:
             self._refuse_closed(fy)
+            await self._refuse_decided_plan(fiscal_year_id)
         if new_year != fy.year and any(
             f.year == new_year and f.id != fiscal_year_id
             for f in await self._fiscal_years_of(budget_id)
@@ -202,12 +204,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
                 Application.id, Application.fiscal_year_id, fiscal_year_id
             ),
         )
-        states = await self._plan_states(fiscal_year_id)
-        if any(state != "draft" for state in states):
-            raise ConflictError(
-                "The Haushaltsplan of this fiscal year has a decided version.",
-                code="fiscal_year_has_plan",
-            )
+        states = await self._refuse_decided_plan(fiscal_year_id)
         if blocker is not None:
             raise ConflictError(
                 f"fiscal year still has {blocker}; remove them first",
@@ -217,10 +214,48 @@ class FiscalYearOps(BudgetTreeServiceBase):
             AuditAction.BUDGET_FISCAL_YEAR_DELETE,
             target_type="fiscal_year",
             target_id=str(fiscal_year_id),
-            data={"budgetId": str(top.id), "year": fy.year, "planDeleted": bool(states)},
+            data={
+                "budgetId": str(top.id),
+                "year": fy.year,
+                "planDeleted": bool(states),
+                **await self._plan_ids(fiscal_year_id),
+            },
         )
         await self.session.delete(fy)
         await self.session.commit()
+
+    async def _refuse_decided_plan(self, fiscal_year_id: UUID) -> list[str]:
+        """Refuse a fiscal year whose plan left the draft, and return its version states.
+
+        A decided plan is a record of its year, so the year keeps its number and is
+        not deleted.
+
+        Raises:
+            ConflictError: `fiscal_year_has_plan` (409).
+        """
+        states = await self._plan_states(fiscal_year_id)
+        if any(state != "draft" for state in states):
+            raise ConflictError(
+                "The Haushaltsplan of this fiscal year has a decided version.",
+                code="fiscal_year_has_plan",
+            )
+        return states
+
+    async def _plan_ids(self, fiscal_year_id: UUID) -> dict[str, object]:
+        """Return the plan and the versions that go with a fiscal year, as audit data."""
+        rows = (
+            await self.session.execute(
+                select(BudgetPlan.id, BudgetPlanVersion.id)
+                .join(BudgetPlanVersion, BudgetPlanVersion.plan_id == BudgetPlan.id)
+                .where(BudgetPlan.fiscal_year_id == fiscal_year_id)
+                .order_by(BudgetPlanVersion.number)
+            )
+        ).all()
+        return (
+            {"planId": str(rows[0][0]), "versionIds": [str(version) for _plan, version in rows]}
+            if rows
+            else {}
+        )
 
     async def _plan_states(self, fiscal_year_id: UUID) -> list[str]:
         """Return the state of each version of the Haushaltsplan of a fiscal year."""

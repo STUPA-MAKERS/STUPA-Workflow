@@ -10,14 +10,14 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field, StringConstraints, model_validator
 
 from app.modules.budget.plan_rules import Side
 from app.shared.paging import Page
-from app.shared.schemas import FrozenCamelModel
+from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 #: Money cap that matches the DB column `numeric(12, 2)`. An input field applies
 #: it as `le`, so an oversized amount gives a clean 422 instead of a
@@ -25,7 +25,24 @@ from app.shared.schemas import FrozenCamelModel
 _MAX_AMOUNT = Decimal("9999999999.99")
 
 
-class BudgetNodeCreate(FrozenCamelModel, frozen=True):
+#: The name of a cost center, without blanks around it. A name of blanks only is empty.
+NodeName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+
+#: The fields of `BudgetNodeUpdate` whose column holds no NULL.
+_REQUIRED_NODE_FIELDS = frozenset(
+    {
+        "key",
+        "name",
+        "active",
+        "fiscalStartMonth",
+        "fiscal_start_month",
+        "fiscalStartDay",
+        "fiscal_start_day",
+    }
+)
+
+
+class BudgetNodeCreate(FrozenStrictCamelModel, frozen=True):
     """Create a cost center.
 
     `parentId=null` means top level, and `gremiumId` is then required.
@@ -34,7 +51,7 @@ class BudgetNodeCreate(FrozenCamelModel, frozen=True):
     """
 
     key: str = Field(min_length=1, max_length=64)
-    name: str = Field(min_length=1, max_length=200)
+    name: NodeName
     parent_id: UUID | None = Field(default=None, alias="parentId")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     #: Deciding Gremium of the node and its subtree (flow variant B). Optional.
@@ -53,16 +70,18 @@ class BudgetNodeCreate(FrozenCamelModel, frozen=True):
     side: Side | None = None
 
 
-class BudgetNodeUpdate(FrozenCamelModel, frozen=True):
+class BudgetNodeUpdate(FrozenStrictCamelModel, frozen=True):
     """Partially update a cost center.
 
     The parent stays immutable. A new key makes the path key of the node and of
-    each node below it again. `None` means unchanged. `color=""` clears the
-    color. `fiscalStart*` makes sense at the top level only.
+    each node below it again. A field that the request leaves out stays unchanged.
+    `null` clears a Gremium or the color and is refused for the key, the name, the
+    active flag and the fiscal start date, because their columns hold no NULL.
+    `color=""` clears the color. `fiscalStart*` makes sense at the top level only.
     """
 
     key: str | None = Field(default=None, min_length=1, max_length=64)
-    name: str | None = Field(default=None, min_length=1, max_length=200)
+    name: NodeName | None = None
     active: bool | None = None
     color: str | None = None
     #: Visibility Gremium. `None` in the payload clears the assignment.
@@ -73,6 +92,17 @@ class BudgetNodeUpdate(FrozenCamelModel, frozen=True):
     fiscal_start_month: int | None = Field(default=None, ge=1, le=12, alias="fiscalStartMonth")
     #: 1..28: see `BudgetNodeCreate`. The cutoff must exist in every month.
     fiscal_start_day: int | None = Field(default=None, ge=1, le=28, alias="fiscalStartDay")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _no_null_for_required(cls, data: object) -> object:
+        """Refuse `null` for a field whose column holds no NULL."""
+        if not isinstance(data, Mapping):
+            return data
+        nulls = sorted(name for name in _REQUIRED_NODE_FIELDS if data.get(name, 0) is None)
+        if nulls:
+            raise ValueError(f"{', '.join(nulls)} must not be null")
+        return data
 
 
 class BudgetNodeOut(FrozenCamelModel, frozen=True):

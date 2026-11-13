@@ -83,6 +83,16 @@ async def get_budget_plan(budget_id: str, fiscal_year_id: str) -> dict:
 
 
 @group.tool
+async def get_plan_of_version(version_id: str) -> dict:
+    """Read the Haushaltsplan that a version belongs to, with every version.
+
+    Use it with the `planVersionId` of a vote of a plan step. The call gives 404 for
+    a version that does not exist and 403 without the view of the budget.
+    """
+    return await api().get(f"/budget-plan-versions/{version_id}/plan")
+
+
+@group.tool
 async def create_budget_plan(
     budget_id: str, fiscal_year_id: str, copy_from_fiscal_year_id: str | None = None
 ) -> dict:
@@ -149,14 +159,21 @@ async def create_plan_cost_centre(version_id: str, node: S.PlanNodeCreate) -> di
 
 
 @group.tool
-async def pass_plan_step(version_id: str) -> dict:
+async def pass_plan_step(version_id: str, step: int | None = None) -> dict:
     """Record the next step of a version as passed.
 
-    The first step needs a balanced version and takes it out of the draft. The call
-    gives 409 `plan_step_has_vote` while the step has a vote that is not cancelled.
-    Requires budget.structure.
+    `step` names the step that you mean, by its place in the list from 0. Give it, so
+    a repeated call does not pass the step after it: the call then gives 409
+    `plan_step_not_next`. The first step needs a version with a line (422
+    `plan_empty`) that is balanced (422 `plan_not_balanced`) and takes it out of the
+    draft. The call gives 409 `plan_step_has_vote` while the step has a vote that is
+    not cancelled, 409 `plan_not_enabled` while the plan switch of the budget is off
+    and 409 `fiscal_year_closed` for a closed year. Requires budget.structure.
     """
-    return await api().post(f"/budget-plan-versions/{version_id}/steps/next")
+    return await api().post(
+        f"/budget-plan-versions/{version_id}/steps/next",
+        json={"step": step} if step is not None else None,
+    )
 
 
 @group.tool
@@ -173,9 +190,11 @@ async def create_plan_step_vote(version_id: str) -> dict:
 async def set_plan_state(version_id: str, state: Literal["in_force", "draft"]) -> dict:
     """Bring a version into force, or move a version in progress back to draft.
 
-    In force needs every step passed and writes the allocations of the year. Back to
-    draft drops the passed steps, deletes a draft vote of the version and cancels an
-    open one. Requires budget.structure.
+    In force needs every step passed and a version with a line (422 `plan_empty`), and
+    it writes the allocations of the year. Back to draft drops the passed steps,
+    deletes a draft vote of the version and cancels an open one. The call gives 409
+    `plan_not_enabled` while the plan switch of the budget is off. Requires
+    budget.structure.
     """
     return await api().post(f"/budget-plan-versions/{version_id}/state", json={"state": state})
 

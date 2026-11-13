@@ -216,6 +216,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         previous = data.get("previousAllocated")
         if previous is None:
             node = await self._get_node(budget_id)
+            self._refuse_closed(await self._get_fiscal_year(fiscal_year_id))
             await self._refuse_planned(await self._top_level(node), fiscal_year_id)
             await self._audit(
                 AuditAction.BUDGET_ALLOCATION_SET,

@@ -203,6 +203,27 @@ def allocation_changes(
     }
 
 
+def proposed_side(
+    parent_of: Mapping[UUID, UUID | None],
+    top_id: UUID,
+    sides: Mapping[UUID, Side],
+    node_id: UUID,
+) -> Side | None:
+    """Return the side that `sides` gives a node, or `None` when it names no side for it.
+
+    `sides` names direct children of the top-level node. A node below takes the side of
+    the direct child above it.
+    """
+    parent = parent_of.get(node_id)
+    if node_id == top_id or parent is None:
+        return None
+    return (
+        sides.get(node_id)
+        if parent == top_id
+        else proposed_side(parent_of, top_id, sides, parent)
+    )
+
+
 def allocations_from_lines(
     nodes: Sequence[tuple[UUID, UUID | None, str | None]],
     amounts: Mapping[UUID, Decimal],

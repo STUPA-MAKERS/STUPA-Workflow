@@ -120,3 +120,25 @@ def test_a_cost_centre_takes_its_side_at_the_create(fake_api: _FakeApi) -> None:
     asyncio.run(budget.create_budget(node))
     (call,) = fake_api.calls
     assert call[2]["side"] == "expense"
+
+
+def test_a_step_is_named_and_a_vote_finds_its_plan(fake_api: _FakeApi) -> None:
+    """Rules: §F/finance/budget/000838, §F/finance/budget/000841."""
+    asyncio.run(budget_plan.pass_plan_step("v1", step=1))
+    asyncio.run(budget_plan.get_plan_of_version("v1"))
+    assert fake_api.calls == [
+        ("POST", "/budget-plan-versions/v1/steps/next", {"step": 1}),
+        ("GET", "/budget-plan-versions/v1/plan", None),
+    ]
+
+
+def test_a_fiscal_year_closes_reopens_and_goes(fake_api: _FakeApi) -> None:
+    """Rule: §F/finance/budget/000836."""
+    asyncio.run(budget.close_fiscal_year("b1", "fy1"))
+    asyncio.run(budget.reopen_fiscal_year("b1", "fy1"))
+    asyncio.run(budget.delete_fiscal_year("b1", "fy1"))
+    assert fake_api.calls == [
+        ("POST", "/budgets/b1/fiscal-years/fy1/close", None),
+        ("POST", "/budgets/b1/fiscal-years/fy1/reopen", None),
+        ("DELETE", "/budgets/b1/fiscal-years/fy1", None),
+    ]

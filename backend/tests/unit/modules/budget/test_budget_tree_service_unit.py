@@ -301,12 +301,12 @@ async def test_update_fiscal_year_active_only() -> None:
 async def test_update_fiscal_year_change_year_rederives_dates() -> None:
     """A new year re-derives the dates and checks the year for uniqueness.
 
-    The fake session serves ``_require_top_level``, ``_get_fiscal_year`` and
-    ``_fiscal_years_of``.
+    The fake session serves ``_require_top_level``, ``_get_fiscal_year``, the plan
+    states of the year and ``_fiscal_years_of``.
     """
     top = _budget(path_key="VS")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, year=2026)
-    sess = fake_session(result(top), result(fy), result(fy))
+    sess = fake_session(result(top), result(fy), result(), result(fy))
     svc = BudgetTreeService(sess)
     out = await svc.update_fiscal_year(top.id, fy.id, FiscalYearUpdate(year=2027))
     assert out.year == 2027
@@ -317,7 +317,7 @@ async def test_update_fiscal_year_duplicate_year() -> None:
     top = _budget(path_key="VS")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, year=2026)
     other = _fy(id=uuid.uuid4(), budget_id=top.id, year=2027)
-    sess = fake_session(result(top), result(fy), result(fy, other))
+    sess = fake_session(result(top), result(fy), result(), result(fy, other))
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem) as ei:
         await svc.update_fiscal_year(top.id, fy.id, FiscalYearUpdate(year=2027))

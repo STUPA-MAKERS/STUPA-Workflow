@@ -1711,7 +1711,9 @@ async def test_revert_allocation_removes_row_when_no_previous() -> None:
     bid, fy = uuid.uuid4(), uuid.uuid4()
     alloc = _alloc(budget_id=bid, fy_id=fy, allocated="100")
     top = _budget(id=bid)
-    sess = fake_session(result(alloc), result(top), result(top))
+    sess = fake_session(
+        result(alloc), result(top), result(_fy(id=fy, budget_id=bid)), result(top)
+    )
     svc = BudgetTreeService(sess, actor="admin")
     data = {"fiscalYearId": str(fy), "allocated": "100", "previousAllocated": None}
     await svc.revert_audit(_entry(AuditAction.BUDGET_ALLOCATION_SET, bid, data), "admin")

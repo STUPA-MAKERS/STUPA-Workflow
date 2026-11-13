@@ -58,12 +58,6 @@ def _node_out(
     )
 
 
-def _assign(row: object, **values: object) -> None:
-    """Write column values into an ORM row."""
-    for name, value in values.items():
-        setattr(row, name, value)
-
-
 class NodeOps(BudgetTreeServiceBase):
     """Create, update (with key rename) and delete cost-center nodes."""
 
@@ -108,11 +102,14 @@ class NodeOps(BudgetTreeServiceBase):
         for line in lines:
             if line.budget_id in changed:
                 total = changed[line.budget_id]
-                _assign(line, amount=total, blocked=min(line.blocked, total))
+                line.amount = total
+                line.blocked = min(line.blocked, total)
         return changed
 
-    async def _leave_drafts(self, node: Budget) -> None:
+    async def _leave_drafts(self, node: Budget) -> list[dict[str, object]]:
         """Take a cost center that goes away out of the sums of each draft version.
+
+        Returns the removed line and the changed parents of each draft, as audit data.
 
         The delete of the node removes its plan lines through the foreign key. Each
         parent of a draft version then holds the sum of the children that stay.
@@ -130,14 +127,24 @@ class NodeOps(BudgetTreeServiceBase):
             )
         ).all()
         if not versions:
-            return
+            return []
         parent_of = {n.id: n.parent_id for n in await self._subtree(await self._top_level(node))}
-        for version in versions:
-            plan = await self.session.get_one(BudgetPlan, version.plan_id)
-            self._refuse_closed(await self._get_fiscal_year(plan.fiscal_year_id))
-            self._resum(
-                [ln for ln in await self._lines(version.id) if ln.budget_id != node.id], parent_of
-            )
+        return [await self._leave_draft(node, version, parent_of) for version in versions]
+
+    async def _leave_draft(
+        self, node: Budget, version: BudgetPlanVersion, parent_of: Mapping[UUID, UUID | None]
+    ) -> dict[str, object]:
+        """Take the line of `node` out of one draft, and return the change as audit data."""
+        plan = await self.session.get_one(BudgetPlan, version.plan_id)
+        self._refuse_closed(await self._get_fiscal_year(plan.fiscal_year_id))
+        lines = await self._lines(version.id)
+        own = next(line for line in lines if line.budget_id == node.id)
+        lowered = self._resum([ln for ln in lines if ln.budget_id != node.id], parent_of)
+        return {
+            "versionId": str(version.id),
+            "previousAmount": f"{own.amount:.2f}",
+            "lowered": {str(bid): f"{total:.2f}" for bid, total in lowered.items()},
+        }
 
     async def _check_decision_gremium(self, gremium_id: UUID | None) -> None:
         """Refuse a deciding Gremium that does not exist.
@@ -200,6 +207,12 @@ class NodeOps(BudgetTreeServiceBase):
             )
         await self._check_decision_gremium(payload.decision_gremium_id)
         direct = parent is not None and parent.parent_id is None
+        if payload.side is not None and not direct:
+            raise ValidationProblem(
+                "The side is set on a direct child of a top-level cost centre.",
+                code="side_not_settable",
+                errors=[{"field": "side", "msg": "not a direct child of the top level"}],
+            )
         side = payload.side if direct else (parent.side if parent is not None else None)
         if direct and parent is not None and parent.plan_enabled and side is None:
             raise ValidationProblem(
@@ -227,7 +240,6 @@ class NodeOps(BudgetTreeServiceBase):
         try:
             await self.session.flush()
         except IntegrityError as exc:
-            await self.session.rollback()
             raise ConflictError(
                 f"budget key {payload.key!r} already exists under this parent",
                 code="budget_key_exists",
@@ -411,12 +423,12 @@ class NodeOps(BudgetTreeServiceBase):
                 "budget is part of a decided Haushaltsplan",
                 code="budget_in_plan",
             )
-        await self._leave_drafts(node)
+        left = await self._leave_drafts(node)
         await self._audit(
             AuditAction.BUDGET_NODE_DELETE,
             target_type="budget",
             target_id=str(budget_id),
-            data={"pathKey": node.path_key},
+            data={"pathKey": node.path_key, "name": node.name, "draftLines": left},
         )
         await self.session.delete(node)
         await self.session.commit()
