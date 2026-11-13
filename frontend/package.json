@@ -46,7 +46,7 @@
     "@tiptap/extension-table": "^3.31.4",
     "@tiptap/pm": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
-    "elkjs": "^0.12.0",
+    "elkjs": "^0.12.1",
     "katex": "^0.18.6",
     "rxjs": "~7.8.0",
     "tiptap-markdown": "^0.9.0",
