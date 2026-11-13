@@ -33,7 +33,8 @@ save before can arrive after the answer of the last save. When two trees after t
 hold another value, the field must show that value, because it is the value of another
 person. A Kostenstelle that the person
 selects again while a save of one of its fields runs must show the value of that save in
-the field, so a leave of the field sends nothing.
+the field, so a leave of the field sends nothing. A change of that field that waits for the
+save must show instead, because it is the last value of the person.
 
 Reason: Two writes that run at the same moment can reach the server in the other order, and
 the tree that the page reads after the first one is older than the second one. The last
@@ -47,6 +48,6 @@ Kostenstelle before, set a select back while its save runs, save a name again th
 took back, refuse a save while a later press of the switch waits, and select another
 Kostenstelle while a press that is back at the saved state and a field without a change
 wait. One test leaves a Kostenstelle after a save, selects it again with another saved
-value and saves the first value again. One test answers the tree of the save before after the last save of a name and of a select and reads the last text and choice. One test gives the section two trees with the value of another person after a save and reads that value in the field. One test selects a Kostenstelle again during the save of its name and reads the text of that save and one request. One test presses the switch a third time while the tree holds the state of the first
+value and saves the first value again. One test answers the tree of the save before after the last save of a name and of a select and reads the last text and choice. One test gives the section two trees with the value of another person after a save and reads that value in the field. One test selects a Kostenstelle again during the save of its name and reads the text of that save and one request. One test selects a Kostenstelle again while a text waits for the save of its switch and reads that text and its request. One test presses the switch a third time while the tree holds the state of the first
 press, one removes a Gremium and sets it again during the save, and one presses the switch
 a fourth time after the trees of the first two saves came during the third.
