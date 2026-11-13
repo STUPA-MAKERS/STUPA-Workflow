@@ -71,5 +71,9 @@ describe('BudgetPlanApi', () => {
     expect(preview.request.params.getAll('income')).toEqual(['a']);
     expect(preview.request.params.getAll('expense')).toEqual(['b']);
     preview.flush({ budgetId: 't', changes: [] });
+    api.switchPreview('t').subscribe();
+    const plain = http.expectOne((r) => r.url === '/api/budgets/t/plan-switch/preview');
+    expect(plain.request.params.getAll('income')).toEqual([]);
+    plain.flush({ budgetId: 't', changes: [] });
   });
 });

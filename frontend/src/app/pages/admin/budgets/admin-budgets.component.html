@@ -175,6 +175,8 @@
           </app-section>
         }
         <app-section [heading]="'admin.budgets.steps' | t">
+          <app-load-state [state]="stepsState()" [lines]="2" [errorText]="'admin.budgets.stepsLoadError' | t" (retry)="loadSteps()">
+            <ng-template #content>
           @if (f.steps.length) {
             <ol class="ab__steps">
               @for (step of f.steps; track $index; let i = $index; let first = $first; let last = $last) {
@@ -219,6 +221,8 @@
           @if (canAddStep()) {
             <app-button class="ab__stepAdd" variant="tonal" (click)="addStep()"><app-icon name="plus" /> {{ 'admin.budgets.stepAdd' | t }}</app-button>
           }
+            </ng-template>
+          </app-load-state>
         </app-section>
       }
       <button type="submit" hidden></button>

@@ -157,7 +157,7 @@ describe('CostCentreSettingsComponent', () => {
     await pick(/Seite/, 'Ausgabe');
     expect(screen.getByRole('combobox', { name: /Seite/ })).toHaveTextContent('Ausgabe');
     pending.error({ status: 409, error: { code: 'side_in_plan' } });
-    expect(view.error).toHaveBeenCalledWith('Die Seite lässt sich nicht ändern, weil die Kostenstelle einen Ansatz in einem Plan hat.');
+    expect(view.error).toHaveBeenCalledWith('Die Seite lässt sich nicht ändern, weil die Kostenstelle einen Ansatz oder einen Vermerk in einem Plan hat.');
     await waitFor(() => expect(screen.getByRole('combobox', { name: /Seite/ })).toHaveTextContent('Einnahme'));
   });
 

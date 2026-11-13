@@ -1643,6 +1643,12 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       view.http.expectOne(put).flush({}, { status: 500, statusText: 'Error' });
       expect(error).toHaveBeenLastCalledWith('Die Zuteilung konnte nicht gespeichert werden.');
       view.http.expectOne(treeUrl).flush(TREE);
+      await retype('-5');
+      view.http.expectNone(put);
+      expect(error).toHaveBeenCalledTimes(4);
+      await retype('99999999999');
+      view.http.expectNone(put);
+      expect(error).toHaveBeenCalledTimes(5);
       view.c.selectedKsId.set('gone');
       view.c.editAllocation('1');
       view.c.saveAllocation();

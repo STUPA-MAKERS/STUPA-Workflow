@@ -221,6 +221,8 @@ export class BudgetPlanComponent {
   private readonly adminApi = inject(AdminApiService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
+  /** The component is destroyed: a late answer writes no URL. */
+  private gone = false;
   private readonly location = inject(Location);
 
   readonly wide = mediaQuery(MEDIA.wide);
@@ -443,10 +445,12 @@ export class BudgetPlanComponent {
     return this.i18n.translate('budget.plan.col.amount', { year: base ? this.versionName(base) : '' });
   });
 
-  /** The step the head offers next, or `null` when the reader cannot move the version. */
+  /**
+   * The action of the head: the step the version takes next. A reader cannot move the
+   * version, so the head then shows the way to the vote of the step, when there is one.
+   */
   readonly primary = computed<PrimaryAction | null>(() => {
     const version = this.version();
-    if (!version || !this.canWrite() || this.year()?.closedAt) return null;
     const action = (id: string, label: string, icon: IconName, reason: string | null = null): PrimaryAction => ({
       id,
       label,
@@ -454,6 +458,9 @@ export class BudgetPlanComponent {
       reason,
     });
     const t = (key: TranslationKey): string => this.i18n.translate(key);
+    if (!version) return null;
+    if (!this.canWrite() || this.year()?.closedAt)
+      return this.linkedVote() ? action('openVote', t('budget.plan.action.openVote'), 'vote') : null;
     switch (version.state) {
       case 'draft':
       case 'in_progress':
@@ -629,6 +636,9 @@ export class BudgetPlanComponent {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.gone = true;
+    });
     const qp = this.route.snapshot.queryParamMap;
     this.selId.set(qp.get('costCentre') ?? '');
     const wanted = Number(qp.get('version') ?? '');
@@ -794,8 +804,20 @@ export class BudgetPlanComponent {
     }
   }
 
+  /**
+   * The person is on the way to another page, or already there. An answer that arrives
+   * then must not write the URL of this page, because that would cancel the navigation
+   * or pull the person back.
+   */
+  private leaving(): boolean {
+    const path = (url: string): string => url.split(/[?#]/)[0];
+    const next = this.router.getCurrentNavigation();
+    return this.gone || (!!next && path(this.router.serializeUrl(next.extractedUrl)) !== path(this.router.url));
+  }
+
   /** The URL names the budget, the year, the chosen version and the Kostenstelle. */
   private syncUrl(replaceUrl = true): void {
+    if (this.leaving()) return;
     const chosen = this.versions().find((v) => v.id === this.versionId());
     void this.router.navigate([], {
       relativeTo: this.route,

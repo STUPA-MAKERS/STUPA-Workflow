@@ -34,6 +34,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { formatMoney } from '@shared/format-money';
+import type { LoadState } from '@shared/forms/settings-form';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../../budget/budget-tree.api';
@@ -155,6 +156,8 @@ export class AdminBudgetsComponent {
   readonly form = signal<EditForm | null>(null);
   /** The steps as the server holds them, to send the list only after a change. */
   private savedSteps: readonly StepDraft[] = [];
+  /** The read of the steps of the budget in the form: it runs, it failed, or the steps are there. */
+  readonly stepsState = signal<LoadState>('ok');
   /** The sides as the server holds them, to send only a changed side. */
   private savedSides: Readonly<Record<string, Side | ''>> = {};
   /** The person pressed "Speichern": the fields now show what is missing. */
@@ -393,13 +396,28 @@ export class AdminBudgetsComponent {
       sides: this.savedSides,
       steps: [],
     });
+    this.loadSteps();
+  }
+
+  /**
+   * Read the steps of the budget in the form. A failed read shows the load error in place
+   * of the steps, so the form never takes an unread list for an empty one and never
+   * replaces the stored steps.
+   */
+  loadSteps(): void {
+    const budget = this.editNode();
+    if (!budget) return;
+    this.stepsState.set('loading');
     this.planApi.steps(budget.id).subscribe({
       next: (out) => {
         if (this.editNode()?.id !== budget.id) return;
         this.savedSteps = out.steps.map((s) => ({ name: s.name, gremiumId: s.gremiumId ?? '' }));
         this.patch({ steps: this.savedSteps });
+        this.stepsState.set('ok');
       },
-      error: () => undefined,
+      error: () => {
+        if (this.editNode()?.id === budget.id) this.stepsState.set('error');
+      },
     });
   }
 
@@ -513,7 +531,7 @@ export class AdminBudgetsComponent {
           ...(form.month !== node.fiscalStartMonth ? { fiscalStartMonth: form.month } : {}),
         }),
       ),
-      ...(form.plan && !sameSteps ? [defer(() => this.planApi.setSteps(node.id, steps))] : []),
+      ...(form.plan && !sameSteps && this.stepsState() === 'ok' ? [defer(() => this.planApi.setSteps(node.id, steps))] : []),
     ];
     this.busy.set(true);
     concat(...requests)

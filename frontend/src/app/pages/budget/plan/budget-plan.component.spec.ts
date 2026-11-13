@@ -565,6 +565,31 @@ describe('BudgetPlanComponent', () => {
       expect(screen.queryByRole('heading', { level: 2, name: 'Zuschüsse' })).toBeNull();
     });
 
+    it('§F/finance/budget/000812: a save that answers after the person left writes no URL of the plan page', async () => {
+      const view = await setup();
+      const answers: Subject<BudgetPlan>[] = [new Subject(), new Subject(), new Subject()];
+      answers.forEach((answer) => view.api.setLine.mockReturnValueOnce(answer));
+      const save = async (value: string, answer: Subject<BudgetPlan>) => {
+        await typeAmount(input(view, 'amount-grants'), value);
+        view.navigate.mockClear();
+        answer.next(plan());
+        answer.complete();
+      };
+      const leaving = jest.spyOn(view.router, 'getCurrentNavigation');
+      leaving.mockReturnValue({ extractedUrl: view.router.parseUrl('/voting') } as ReturnType<Router['getCurrentNavigation']>);
+      await save('41', answers[0]);
+      expect(view.navigate).not.toHaveBeenCalled();
+      leaving.mockReturnValue({ extractedUrl: view.router.parseUrl(`${view.router.url}?fy=fy-26`) } as ReturnType<Router['getCurrentNavigation']>);
+      await save('42', answers[1]);
+      expect(view.navigate).toHaveBeenCalled();
+      leaving.mockReturnValue(null);
+      await typeAmount(input(view, 'amount-grants'), '43');
+      view.navigate.mockClear();
+      view.fixture.destroy();
+      answers[2].next(plan());
+      expect(view.navigate).not.toHaveBeenCalled();
+    });
+
     it('§F/finance/budget/000812: Enter saves the amount and keeps the plan open', async () => {
       const view = await setup();
       await typeAmount(input(view, 'amount-grants'), '12', '{Enter}');
@@ -749,6 +774,13 @@ describe('BudgetPlanComponent', () => {
       expect(text(open.container.querySelector('.bp__stepper'))).toContain('Abstimmung läuft');
       await userEvent.click(primary());
       expect(open.navigate).toHaveBeenCalledWith(['/voting', 'vote-1']);
+    });
+
+    it('§F/finance/budget/000838: a reader finds the vote of the step in the head, not alone in the menu', async () => {
+      const view = await setup({ plans: { 'fy-26': withVote('open') }, perms: ['budget.view'] });
+      expect(primary()).toHaveAccessibleName('Zur Abstimmung');
+      await userEvent.click(primary());
+      expect(view.navigate).toHaveBeenCalledWith(['/voting', 'vote-1']);
     });
 
     it('§F/finance/budget/000826: after a refused vote the next action is a new vote, and the menu opens the old one', async () => {

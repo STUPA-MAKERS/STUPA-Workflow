@@ -258,12 +258,32 @@ describe('AdminBudgetsComponent', () => {
       expect(view.api.updateNode).not.toHaveBeenCalled();
     });
 
-    it('opens the form without steps when their read fails, and ignores the steps of another budget', async () => {
+    it('§F/finance/budget/000827: a failed read of the steps shows the error, offers no step and keeps the stored steps', async () => {
       const view = await setup();
       view.planApi.steps.mockReturnValueOnce(refuse(500));
       const first = await openEdit('VS-Mittel');
-      expect(within(first).getByText('Keine Schritte')).toBeInTheDocument();
-      await userEvent.click(button(first, 'Abbrechen'));
+      const loadError = () => view.fixture.debugElement.queryAll(By.directive(LoadErrorComponent)).map((d) => (d.componentInstance as LoadErrorComponent).message());
+      expect(loadError()).toContain('Die Schritte konnten nicht geladen werden.');
+      expect(within(first).queryByText('Keine Schritte')).toBeNull();
+      expect(within(first).queryByRole('button', { name: 'Schritt hinzufügen' })).toBeNull();
+      await userEvent.click(button(first, 'Speichern'));
+      await waitFor(() => expect(view.api.updateNode).toHaveBeenCalled());
+      expect(view.planApi.setSteps).not.toHaveBeenCalled();
+      const again = await openEdit('VS-Mittel');
+      view.planApi.steps.mockReturnValueOnce(refuse(500));
+      view.fixture.componentInstance.loadSteps();
+      view.fixture.detectChanges();
+      expect(within(again).queryByRole('button', { name: 'Schritt hinzufügen' })).toBeNull();
+      const stepsError = view.fixture.debugElement
+        .queryAll(By.directive(LoadErrorComponent))
+        .map((d) => d.componentInstance as LoadErrorComponent)
+        .find((c) => c.message() === 'Die Schritte konnten nicht geladen werden.');
+      stepsError?.retry.emit();
+      view.fixture.detectChanges();
+      expect(within(again).getByRole('button', { name: 'Schritt hinzufügen' })).toBeInTheDocument();
+      const first2 = again;
+      await userEvent.click(button(first2, 'Abbrechen'));
+      view.fixture.componentInstance.loadSteps();
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
       const late = new Subject<PlanSteps>();
       view.planApi.steps.mockReturnValueOnce(late);

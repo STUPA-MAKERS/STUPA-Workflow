@@ -171,7 +171,7 @@
           </p>
         </header>
       }
-      <div class="bd__sheetBody" appScrollFade="y">
+      <div class="bd__sheetBody" [class.bd__sheetBody--fab]="byHand()" appScrollFade="y">
         @if (!wide()) {
           <h2 class="sr-only">{{ current()?.name }}</h2>
         }

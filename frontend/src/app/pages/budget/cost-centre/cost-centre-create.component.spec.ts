@@ -151,6 +151,20 @@ describe('CostCentreCreateComponent', () => {
     expect(view.submit).toBeEnabled();
   });
 
+  it('§F/finance/budget/000794: an Ansatz below 0 or above the largest amount blocks the button', async () => {
+    const view = await setup({ versionId: 'v1', top: QSM, parentNodes: [QSM] });
+    await fill(view, '810', 'Werkstatt');
+    view.fixture.componentInstance.setAmount('-5');
+    view.fixture.detectChanges();
+    expect(view.submit).toBeDisabled();
+    view.fixture.componentInstance.setAmount('99999999999');
+    view.fixture.detectChanges();
+    expect(view.submit).toBeDisabled();
+    view.fixture.componentInstance.setAmount(null);
+    view.fixture.detectChanges();
+    expect(view.submit).toBeEnabled();
+  });
+
   it('§F/finance/budget/000794: the first child starts with the Ansatz of its parent', async () => {
     const view = await setup({ versionId: 'v1', parent: 'grants', firstChildAmounts: new Map([['grants', '30.00']]) });
     await waitFor(() => expect(view.field('ccAmount').value).toBe('30,00'));

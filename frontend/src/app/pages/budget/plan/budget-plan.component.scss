@@ -115,3 +115,19 @@
     grid-column: 1 / -1;
   }
 }
+
+// A line has two, three or four figures. Between the phone and the wide layout they stand
+// in one row of equal columns, so no cell stays empty. On a phone they keep the two columns.
+@include bp.below-wide {
+  .bp__lineFigs {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+}
+@include bp.phone {
+  .bp__lineFigs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+  }
+}
