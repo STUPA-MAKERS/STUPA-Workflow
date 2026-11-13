@@ -19,6 +19,7 @@ from sqlalchemy import ColumnElement, Select, or_, select
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import tree_rules
+from app.modules.budget.access import viewed_by
 from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.budget.tree_rules import _SEP
 from app.settings import Settings, get_settings
@@ -118,10 +119,9 @@ class BudgetTreeServiceBase:
     async def visible_budget_ids(self, member_gremium_ids: set[UUID]) -> set[UUID]:
         """Return the ids of the cost centres that a gremium-scoped reader may see.
 
-        A node is visible when the node itself or an ancestor carries a
-        ``view_gremium_id`` of a member Gremium. This is the set form of
-        `TreeViewOps.can_view_node`: the root paths with a matching
-        ``view_gremium_id`` open their whole subtree through the ``path_key`` prefix.
+        A node is visible when a member Gremium reads the node itself or an ancestor
+        (`access.viewed_by`). This is the set form of `TreeViewOps.can_view_node`: the
+        matching root paths open their whole subtree through the ``path_key`` prefix.
         A holder of the full budget view needs no filter and does not call this.
 
         A path segment is alphanumeric (`tree_rules.is_valid_key`), so the prefix holds
@@ -131,7 +131,7 @@ class BudgetTreeServiceBase:
             return set()
         root_paths = (
             await self.session.scalars(
-                select(Budget.path_key).where(Budget.view_gremium_id.in_(member_gremium_ids))
+                select(Budget.path_key).where(viewed_by(member_gremium_ids))
             )
         ).all()
         if not root_paths:

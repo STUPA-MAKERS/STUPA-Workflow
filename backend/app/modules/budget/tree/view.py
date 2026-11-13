@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 
 from app.modules.applications.models import Application
 from app.modules.budget import plan_rules, tree_rules
+from app.modules.budget.access import viewed_by
 from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
 from app.modules.budget.tree.service_base import _ZERO, BudgetTreeServiceBase
 from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpense, FiscalYear
@@ -81,20 +82,20 @@ class TreeViewOps(BudgetTreeServiceBase):
     async def can_view_node(self, budget_id: UUID, member_gremium_ids: set[UUID]) -> bool:
         """Tell if a member of a Gremium can see the node.
 
-        The result is true when the node itself or an ancestor belongs to one of
-        the Gremien of the member.
+        The result is true when one of the Gremien of the member reads the node itself
+        or an ancestor (`access.viewed_by`).
         """
         if not member_gremium_ids:
             return False
         node = await self._get_node(budget_id)
         segments = node.path_key.split(_SEP)
         prefixes = [_SEP.join(segments[: i + 1]) for i in range(len(segments))]
-        rows = (
-            await self.session.execute(
-                select(Budget.view_gremium_id).where(Budget.path_key.in_(prefixes))
-            )
-        ).scalars()
-        return any(v in member_gremium_ids for v in rows if v is not None)
+        hit = await self.session.scalar(
+            select(Budget.id)
+            .where(Budget.path_key.in_(prefixes), viewed_by(member_gremium_ids))
+            .limit(1)
+        )
+        return hit is not None
 
     async def _planned_in(self) -> Mapping[object, Sequence[object]]:
         """Return the fiscal years in which the Haushaltsplan counts each cost center.
@@ -153,7 +154,7 @@ class TreeViewOps(BudgetTreeServiceBase):
         too, so an expense never counts twice.
 
         Without a global ``budget.*`` permission only the assigned subtrees become
-        roots: those whose ``view_gremium_id`` is one of the Gremien of the member.
+        roots: those that one of the Gremien of the member reads (`access.viewed_by`).
         """
         nodes = sorted(
             (await self.session.execute(select(Budget))).scalars().all(),
@@ -247,6 +248,13 @@ class TreeViewOps(BudgetTreeServiceBase):
         scoped = (
             forest
             if visible_gremium_ids is None
-            else tree_rules.scope_forest(forest, set(visible_gremium_ids))
+            else tree_rules.scope_forest(
+                forest,
+                set(
+                    await self.session.scalars(
+                        select(Budget.id).where(viewed_by(visible_gremium_ids))
+                    )
+                ),
+            )
         )
         return [BudgetTreeNodeOut.model_validate(d) for d in scoped]

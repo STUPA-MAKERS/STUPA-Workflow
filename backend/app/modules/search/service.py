@@ -27,7 +27,7 @@ from sqlalchemy import ColumnElement, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.access import READ_ALL_PERMISSION, READ_PERMISSION
-from app.modules.budget.access import has_budget_read
+from app.modules.budget.access import has_budget_read, viewed_by
 from app.modules.budget.form_options import below_active_only
 from app.modules.budget.tree_models import Budget
 from app.modules.gremien.models import Gremium
@@ -294,7 +294,7 @@ class SearchService:
         if has_budget_read(principal):
             return ()
         member = await gremium_reader_ids(self.session, principal.sub)
-        return (Budget.view_gremium_id.in_(member),) if member else None
+        return (viewed_by(member),) if member else None
 
     async def _gremien(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
         """Search the committees, for a caller who can act on one.

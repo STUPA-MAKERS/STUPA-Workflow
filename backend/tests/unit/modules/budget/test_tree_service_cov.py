@@ -1512,7 +1512,8 @@ async def test_get_tree_with_gremium_scope() -> None:
     """Reach scope_forest with visible_gremium_ids set."""
     g = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", view_gremium_id=g)
-    sess = fake_session(result(top), result(), result(), result())
+    empty = (result(), result(), result(), result(), result())
+    sess = fake_session(result(top), *empty, result(top.id))
     svc = BudgetTreeService(sess)
     tree = await svc.get_tree(visible_gremium_ids={g})
     assert len(tree) == 1

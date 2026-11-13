@@ -81,16 +81,16 @@
   }
   block(below: 4pt, text(font: head-font, size: size.Huge * 0.72, weight: "bold", hyphenate: false, p.title))
   rect(width: 100%, height: 0.5mm, fill: black, stroke: none)
-  v(0.35cm)
+  v(0.15cm)
   {
-    set text(size: size.small)
+    set text(size: size.small * 0.85)
     grid(
       columns: (auto,) * (2 * p.head.len()),
       column-gutter: (0.45em, 1.6em) * p.head.len(),
       ..p.head.map(pair => (text(fill: palette.gray, pair.at(0)), strong(pair.at(1)))).flatten(),
     )
   }
-  v(0.5cm)
+  v(0.25cm)
 
   let money = p.money
   table(

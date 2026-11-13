@@ -161,7 +161,7 @@
       box(width: 0pt, hide[x])
       text(font: mono-font, n.v)
     } else if t == "link" {
-      link(n.url, text(fill: palette.hsrturl, inline(n.c)))
+      link(n.url, text(fill: palette.hsrturl, hyphenate: false, inline(n.c)))
     } else if t == "br" {
       linebreak()
     } else if t == "bar" {
@@ -627,8 +627,13 @@
 #let table-block(n, nested: false) = {
   let aligns = n.align.map(a => if a == "center" { center } else if a == "right" { right } else { left })
   let cols = n.head.len()
+  // In a nested table a right-aligned column holds amounts, so it is narrower and
+  // the text columns get its room (000881).
+  let widths = if nested {
+    n.align.map(a => if a == "right" { 0.65fr } else { 1fr })
+  } else { (1fr,) * cols }
   let row(cells) = grid(
-    columns: (1fr,) * cols,
+    columns: widths,
     align: aligns,
     inset: if nested { 0pt } else { (x: 6pt) },
     column-gutter: if nested { 12pt } else { 0pt },
@@ -663,7 +668,7 @@
     let filled = range(cols).filter(k => cells.at(k, default: ()).len() > 0)
     let start = if filled.len() > 0 { filled.first() } else { 0 }
     grid(
-      columns: (1fr,) * cols,
+      columns: widths,
       column-gutter: 12pt,
       grid.cell(x: start, colspan: cols - start, line(length: 100%, stroke: (paint: palette.gray, thickness: 0.4pt, dash: "dashed"))),
     )

@@ -24,6 +24,7 @@ from app.modules.documents.application_markdown import (
     field_row,
     format_day,
     is_empty,
+    offer_name,
 )
 from app.modules.documents.router import application_pdf_filename
 from app.modules.site_config.export_logo import ExportLogo
@@ -227,6 +228,17 @@ def test_a_vote_decision_names_its_result_and_a_rejected_one_has_no_amount() -> 
     md = build_application_document(_doc(decision=rejected))
     assert row("Ergebnis", "Abgelehnt") in md
     assert "[!feld] Bewilligter Betrag" not in md
+
+
+def test_an_offer_that_is_a_web_address_is_a_short_link() -> None:
+    """§000881: the link text drops scheme, www and the closing slash and is cut at 40."""
+    assert offer_name("https://www.epidemicsound.com/business/") == (
+        "[epidemicsound\\.com/business](https://www.epidemicsound.com/business/)"
+    )
+    long = "https://example.org/" + "a" * 60
+    assert offer_name(long) == f"[example\\.org/{'a' * 27}…]({long})"
+    assert offer_name("Firma (A) https://x.org") == "Firma \\(A\\) https://x\\.org"
+    assert offer_name(" ") == "—"
 
 
 def test_the_decision_lists_its_conditions() -> None:

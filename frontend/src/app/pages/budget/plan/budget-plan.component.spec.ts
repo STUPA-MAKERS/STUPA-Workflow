@@ -293,6 +293,16 @@ describe('BudgetPlanComponent', () => {
       expect(text(cells)).toContain('+20 €');
     });
 
+    it('§F/finance/budget/000889: a year before without a plan in force shows neither its Ansatz nor its Ist', async () => {
+      const before = plan([version({ id: 'p', lines: [line('fees', '80')] })], 'fy-25');
+      const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before } });
+      const income = view.container.querySelectorAll('app-data-table')[0] as HTMLElement;
+      expect(within(income).getAllByRole('columnheader').map(text)).toEqual(['Titel', 'Ansatz 2026/27', 'Änderung']);
+      const detail = await setup({ plans: { 'fy-26': plan(), 'fy-25': before }, query: { costCentre: 'fees' } });
+      const figures = text(detail.container.querySelector('.bp__lineFigs') as HTMLElement);
+      expect(figures).not.toContain('2025/26');
+    });
+
     it('§F/finance/budget/000808: a wide window below 1340 px has no column "Änderung" beside the year before', async () => {
       const before = plan([version({ id: 'p', state: 'in_force', lines: [line('fees', '80'), line('grants', '30')] })], 'fy-25');
       const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before }, tight: true });

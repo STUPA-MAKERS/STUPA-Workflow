@@ -47,6 +47,11 @@ def _in_force(plan: PlanOut | None) -> tuple[PlanLineOut, ...]:
     return next((v.lines for v in versions if v.state == "in_force"), ())
 
 
+def _decided(plan: PlanOut | None) -> bool:
+    """Say if a plan has a version in force."""
+    return plan is not None and any(v.state == "in_force" for v in plan.versions)
+
+
 def _open_step(version: PlanVersionOut) -> str | None:
     """Return the name of the first step that the version has not passed, else none."""
     return next((s.name for s in version.steps if s.passed_at is None), None)
@@ -85,6 +90,7 @@ class PlanExportOps(PlanOps, TreeViewOps):
             raise NotFoundError(f"plan version {version_id} not found")
         fy = await self._get_fiscal_year(plan.fiscal_year_id)
         before = await self._year_before(fy)
+        plan_before = await self._plan_in(before)
         month, day = top.fiscal_start_month, top.fiscal_start_day
         head = ExportHead(
             budget_name=top.name,
@@ -96,13 +102,14 @@ class PlanExportOps(PlanOps, TreeViewOps):
             state=version.state,
             exported_on=today,
             step=_open_step(version),
+            prev_decided=_decided(plan_before),
         )
         return build_export(
             head,
             top,
             version.lines,
             base=_before(plan, version),
-            prev=_in_force(await self._plan_in(before)),
+            prev=_in_force(plan_before),
             prev_fiscal_year_id=before.id if before else None,
         )
 

@@ -114,6 +114,21 @@ def test_a_plan_without_lines_has_no_group_and_a_balance_of_zero() -> None:
     assert [row.kind for row in plan_export.sheet_rows(export)] == ["balance"]
 
 
+def test_the_ist_needs_a_plan_in_the_year_before() -> None:
+    """A year before without a plan in force gives neither its Ansatz nor its Ist.
+
+    Rule: §F/finance/budget/000889.
+    """
+    export = _export()
+    bare = replace(export, head=replace(export.head, prev_decided=False))
+    headers = plan_export.sheet_headers(bare)
+    assert headers == (
+        "Schlüssel", "Bezeichnung", "Ansatz 2026", "Vermerke", "Gesperrt", "Erläuterung",
+    )
+    assert plan_export.money_columns(bare) == frozenset({2, 4})
+    assert all(len(row.cells) == len(headers) for row in plan_export.sheet_rows(bare))
+
+
 def test_the_table_of_a_first_plan_with_a_year_before() -> None:
     """The table has the Ansatz and the Ist of the year before, and no change."""
     export = _export()
@@ -202,6 +217,7 @@ def test_the_pdf_request_holds_the_table_as_text() -> None:
     assert isinstance(plan, dict)
     assert plan["title"] == "Haushaltsplan VS-Mittel 2026"
     assert plan["mark"] == "Entwurf"
+    assert [pair[0] for pair in plan["head"]] == ["Haushalt", "Haushaltsjahr", "Version", "Stand"]
     assert plan["money"] == [2, 3, 4, 6]
     assert plan["rows"][5] == {
         "kind": "line",

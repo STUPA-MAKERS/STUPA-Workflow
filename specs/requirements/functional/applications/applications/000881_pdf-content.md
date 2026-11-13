@@ -36,6 +36,11 @@ A dashed rule must stand between two rows of the Kostenaufstellung. The rule bet
 goes from the position column to the right edge, and so does the rule above the total. The rule between two offers of one position
 starts at the offer column and goes to the right edge.
 
+An offer whose name is a web address must print as a link to that address. The link text
+must be the address without the scheme, without a leading "www." and without a closing slash,
+cut at 40 characters with "…", and it must break only at the places a web address breaks, never
+with a hyphen. The amount column of the Kostenaufstellung must be narrower than the text columns.
+
 The version, each date, an IBAN and each amount must print in the monospace font. The e-mail of the
 applicant must stand on its own line below the name, in the monospace font, as a `mailto:` link.
 The names of

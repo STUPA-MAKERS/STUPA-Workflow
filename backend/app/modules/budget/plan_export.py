@@ -151,6 +151,8 @@ class ExportHead:
     exported_on: date
     #: The name of the first step that a version in progress has not passed.
     step: str | None = None
+    #: The year before has a plan in force, so the file shows its Ansatz and its Ist.
+    prev_decided: bool = True
 
     @property
     def version(self) -> str:
@@ -335,10 +337,11 @@ def _columns(
 ) -> tuple[Cell, ...]:
     """Return the cells of one row, with only the columns that the version has.
 
-    A Nachtrag has the version before and the change. A year with a year before has
-    the Ansatz and the booked amount of that year.
+    A Nachtrag has the version before and the change. A year whose year before has
+    a plan in force has the Ansatz and the booked amount of that year (spec 000889),
+    because without a plan both columns hold nothing to compare.
     """
-    has_prev = export.head.prev_year is not None
+    has_prev = export.head.prev_year is not None and export.head.prev_decided
     return tuple(
         cell
         for on, cell in (
@@ -444,15 +447,19 @@ def sheet_rows(export: PlanExport) -> tuple[SheetRow, ...]:
     return (*(row for group in export.groups for row in _group_rows(export, group)), balance)
 
 
-def head_lines(head: ExportHead) -> tuple[tuple[str, str], ...]:
-    """Return the head of a file as pairs of a label and a value."""
+def plan_lines(head: ExportHead) -> tuple[tuple[str, str], ...]:
+    """Return what names the version, as pairs of a label and a value: the head of the PDF."""
     return (
         ("Haushalt", head.budget_name),
         ("Haushaltsjahr", head.fiscal_year),
         ("Version", head.version),
         ("Stand", head.state_label),
-        ("Exportiert am", head.exported_on.strftime("%d.%m.%Y")),
     )
+
+
+def head_lines(head: ExportHead) -> tuple[tuple[str, str], ...]:
+    """Return the head of the XLSX file: what names the version, and the day of the export."""
+    return (*plan_lines(head), ("Exportiert am", head.exported_on.strftime("%d.%m.%Y")))
 
 
 def money(value: Decimal) -> str:
@@ -480,7 +487,7 @@ def pdf_config(export: PlanExport) -> dict[str, object]:
         "plan": {
             "title": export.head.title,
             "mark": export.head.mark,
-            "head": [list(pair) for pair in head_lines(export.head)],
+            "head": [list(pair) for pair in plan_lines(export.head)],
             "headers": list(sheet_headers(export)),
             "money": sorted(money_columns(export)),
             "rows": [
