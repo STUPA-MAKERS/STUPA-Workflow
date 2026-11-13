@@ -752,8 +752,8 @@
       table-block(n, nested: in-field)
     } else if n.t == "fields" {
       // Field rows (an Antrag), drawn as the table of the Haushaltsplan PDF: a thick
-      // rule above and below, no rule between the rows, and the section name on a
-      // grey band across the table. Every field table has the same label column, so
+      // rule above and below, a dashed grey rule between the rows, and the section name
+      // on a grey band across the table. Every field table has the same label column, so
       // the tables of one document line up; a longer label wraps. The table breaks
       // between rows. It is a grid, as the Markdown tables: PDF/UA-1 asks a tagged
       // table for a header row, and a field table has none, so a screen reader reads
@@ -775,7 +775,8 @@
           align: left + top,
           grid.hline(stroke: 0.876pt),
           ..band,
-          ..n.rows.map(r => (
+          ..n.rows.enumerate().map(((i, r)) => (
+            ..if i > 0 { (grid.hline(stroke: (paint: palette.gray, thickness: 0.4pt, dash: "dashed")),) },
             strong(text(hyphenate: false, inline(r.label))),
             clamp(r.c, 30, nodes => blocks(nodes, in-field: true)),
           )).flatten(),
