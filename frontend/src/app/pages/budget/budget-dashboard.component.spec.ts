@@ -1476,11 +1476,18 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(screen.queryByRole('combobox', { name: /Seite/ })).toBeNull();
       expect(screen.getByRole('heading', { name: 'Zuteilung' })).toBeInTheDocument();
       expect(view.container.querySelector('[name="allocation-b-800"]')).not.toBeNull();
+      expect(screen.getByLabelText('Schlüssel')).toBeEnabled();
       expect(screen.getByRole('heading', { name: 'Titel' })).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Kostenstelle' })).toBeNull();
       expect(screen.getByRole('heading', { name: 'Auslastung' })).toBeInTheDocument();
       await userEvent.click(within(view.container.querySelector('.bd__head') as HTMLElement).getByRole('button', { name: 'Weitere Aktionen' }));
       expect((await screen.findAllByRole('menuitem')).map((i) => i.textContent?.trim())).toEqual(['Buchungen ansehen', 'Kostenstelle löschen']);
+    });
+
+    it('§F/finance/budget/000877: locks the key and the name of a Kostenstelle in a budget with a Haushaltsplan', async () => {
+      await setup({ tree: PLAN_TREE, queryParams: { costCentre: 'b-800' } });
+      await waitFor(() => expect(screen.getByLabelText('Schlüssel')).toBeDisabled());
+      expect(screen.getByLabelText('Name')).toBeDisabled();
     });
 
     it('offers nothing to edit without budget.structure, and no settings for the budget itself', async () => {

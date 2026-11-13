@@ -128,6 +128,12 @@ class _FakePlans:
         self.calls.append(("line", payload.amount))
         return _plan()
 
+    async def rename_line(
+        self, version_id: uuid.UUID, budget_id: uuid.UUID, payload: Any
+    ) -> PlanOut:
+        self.calls.append(("rename", (payload.name, payload.key)))
+        return _plan()
+
     async def delete_line(self, version_id: uuid.UUID, budget_id: uuid.UUID) -> PlanOut:
         self.calls.append(("delete_line", budget_id))
         return _plan()
@@ -198,6 +204,12 @@ _WRITES: tuple[tuple[str, str, dict[str, Any] | None, tuple[str, Any]], ...] = (
         f"/api/budget-plan-versions/{_VERSION}/lines/{_NODE}",
         {"amount": "10.00"},
         ("line", Decimal("10.00")),
+    ),
+    (
+        "PUT",
+        f"/api/budget-plan-versions/{_VERSION}/lines/{_NODE}/name",
+        {"name": "Sport", "key": "9"},
+        ("rename", ("Sport", "9")),
     ),
     ("DELETE", f"/api/budget-plan-versions/{_VERSION}/lines/{_NODE}", None, ("delete_line", _NODE)),
     ("POST", f"/api/budget-plan-versions/{_VERSION}/state", {"state": "in_force"},
@@ -321,7 +333,8 @@ def test_get_plan_with_the_full_view() -> None:
     assert body["fiscalYearId"] == str(_FY)
     assert body["versions"][0]["lines"][0] == {
         "budgetId": str(_NODE), "side": None, "amount": "10.00", "note": None, "name": None,
-        "pathKey": None, "transferable": False, "coverable": False, "blocked": "0",
+        "pathKey": None, "key": None, "transferable": False, "coverable": False,
+        "blocked": "0",
     }
     assert fake.session.commits == 0
 

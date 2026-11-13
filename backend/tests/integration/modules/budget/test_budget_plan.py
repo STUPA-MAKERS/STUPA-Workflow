@@ -26,6 +26,7 @@ from app.modules.budget.form_options import budget_field_options
 from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
 from app.modules.budget.plan_schemas import (
     PlanCreate,
+    PlanLineRename,
     PlanLineSet,
     PlanNodeCreate,
     PlanOut,
@@ -2148,7 +2149,7 @@ async def test_a_write_beside_a_plan_waits_for_the_lock_of_its_budget(
     """
     t = await _tree(session)
     vid = _version(await _draft(t)).id
-    await t.svc.update_node(t.exp_b.id, BudgetNodeUpdate(name="Arbeitskreise"))
+    await t.svc.update_node(t.exp_b.id, BudgetNodeUpdate(color="#123456"))
     renamed = (
         await session.scalars(
             select(AuditEntry)
@@ -2906,3 +2907,121 @@ async def test_a_new_fiscal_year_gets_a_draft(session: AsyncSession) -> None:
         )
     ).one()
     assert entry.data["copiedFromFiscalYearId"] == str(t.fy.id)
+
+
+async def test_a_draft_gives_a_cost_centre_its_new_name_and_key(session: AsyncSession) -> None:
+    """A Kostenstelle of a Haushalt with a plan gets a new name or key only in a draft.
+
+    Rule: §F/finance/budget/000877.
+    """
+    t = await _tree(session)
+    vid = _version(await _balanced_draft(t)).id
+    top = t.top.path_key
+    with pytest.raises(ConflictError) as by_name:
+        await t.svc.update_node(t.exp_a.id, BudgetNodeUpdate(name="FS"))
+    with pytest.raises(ConflictError) as by_key:
+        await t.svc.update_node(t.exp.id, BudgetNodeUpdate(key="9"))
+    assert (_code(by_name), _code(by_key)) == ("plan_draft_only", "plan_draft_only")
+    await t.svc.update_node(t.exp_a.id, BudgetNodeUpdate(name="Fachschaften", key="1"))
+    await t.svc.update_node(t.top.id, BudgetNodeUpdate(name="VS"))
+
+    with pytest.raises(ValidationProblem) as bad:
+        await t.svc.rename_line(vid, t.exp_a.id, PlanLineRename(key="a-b"))
+    with pytest.raises(ConflictError) as taken:
+        await t.svc.rename_line(vid, t.exp_a.id, PlanLineRename(key="2"))
+    with pytest.raises(ValidationProblem) as no_line:
+        await t.svc.rename_line(vid, t.top.id, PlanLineRename(name="Neu"))
+    with pytest.raises(ValidationProblem) as no_node:
+        await t.svc.rename_line(vid, uuid.uuid4(), PlanLineRename(name="Neu"))
+    assert [_code(bad), _code(taken), _code(no_line), _code(no_node)] == [
+        "budget_key_invalid", "budget_key_exists", "plan_line_missing", "plan_line_missing",
+    ]
+
+    await t.svc.rename_line(vid, t.exp.id, PlanLineRename(key="9"))
+    plan = await t.svc.rename_line(
+        vid, t.exp_a.id, PlanLineRename(name="Fachschaftsräte", key="5")
+    )
+    with pytest.raises(ConflictError) as in_draft:
+        await t.svc.rename_line(vid, t.exp_b.id, PlanLineRename(key="5"))
+    assert _code(in_draft) == "budget_key_exists"
+    await session.commit()
+    shown = {line.budget_id: (line.name, line.path_key, line.key) for line in _version(plan).lines}
+    assert shown[t.exp_a.id] == ("Fachschaftsräte", f"{top}-9-5", "5")
+    assert shown[t.exp_b.id] == (None, f"{top}-9-2", None)
+    assert shown[t.exp.id] == (None, f"{top}-9", "9")
+    assert shown[t.inc.id] == (None, None, None)
+    node = await session.get_one(Budget, t.exp_a.id)
+    assert (node.name, node.key, node.path_key) == ("Fachschaften", "1", f"{top}-8-1")
+
+    back = await t.svc.rename_line(vid, t.exp.id, PlanLineRename(key="8"))
+    kept = await t.svc.rename_line(vid, t.exp_a.id, PlanLineRename(name="Fachschaften"))
+    assert {ln.budget_id: ln.path_key for ln in _version(back).lines}[t.exp_a.id] == f"{top}-8-5"
+    assert {ln.budget_id: ln.name for ln in _version(kept).lines}[t.exp_a.id] is None
+    await t.svc.rename_line(vid, t.exp.id, PlanLineRename(key="9"))
+    await t.svc.rename_line(vid, t.exp_a.id, PlanLineRename(name="Fachschaftsräte"))
+    await t.svc.rename_line(vid, t.inc.id, PlanLineRename(name="Semesterbeiträge"))
+    await session.commit()
+    export = await t.svc.plan_export(vid, date(2026, 11, 13))
+    rows = {r.key: r.name for g in export.groups for r in g.rows}
+    assert rows[f"{top}-9-5"] == "Fachschaftsräte"
+    assert rows[f"{top}-9-2"] == "AKs"
+
+    done = _version(await _in_force_from(t, vid))
+    decided = {line.budget_id: (line.name, line.path_key, line.key) for line in done.lines}
+    assert decided[t.exp_a.id] == ("Fachschaftsräte", f"{top}-9-5", None)
+    await session.refresh(node)
+    assert (node.name, node.key, node.path_key) == ("Fachschaftsräte", "5", f"{top}-9-5")
+    other = await session.get_one(Budget, t.exp_b.id)
+    await session.refresh(other)
+    assert other.path_key == f"{top}-9-2"
+    income = await session.get_one(Budget, t.inc.id)
+    await session.refresh(income)
+    assert (income.name, income.key) == ("Semesterbeiträge", "1")
+    left = await session.scalars(
+        select(BudgetPlanLine.draft_key).where(BudgetPlanLine.version_id == vid)
+    )
+    assert set(left) == {None}
+    entry = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_NODE_UPDATE.value)
+            .where(AuditEntry.target_id == str(t.exp_a.id))
+            .order_by(AuditEntry.id.desc())
+        )
+    ).first()
+    assert entry is not None
+    assert entry.data["after"] == {"name": "Fachschaftsräte", "key": "5"}
+    assert entry.data["planVersionId"] == str(vid)
+    with pytest.raises(ConflictError) as locked:
+        await t.svc.rename_line(vid, t.exp_a.id, PlanLineRename(name="Neu"))
+    assert _code(locked) == "plan_version_locked"
+
+
+async def test_a_version_in_progress_keeps_the_new_name_on_its_way_back(
+    session: AsyncSession,
+) -> None:
+    """A version that leaves the draft shows the new values, and holds them back in the draft.
+
+    Rules: §F/finance/budget/000877, §F/finance/budget/000821.
+    """
+    t = await _tree(session)
+    await _steps(t, "Beschluss", "Genehmigung")
+    vid = _version(await _balanced_draft(t)).id
+    top = t.top.path_key
+    await t.svc.rename_line(vid, t.exp_b.id, PlanLineRename(name="Arbeitskreise", key="7"))
+    await session.commit()
+    waiting = _version(await t.svc.set_state_by_hand(vid, _by_hand("in_progress", 0)))
+    await session.commit()
+    kept = {line.budget_id: (line.name, line.path_key, line.key) for line in waiting.lines}
+    assert kept[t.exp_b.id] == ("Arbeitskreise", f"{top}-8-7", None)
+    assert kept[t.exp_a.id] == ("Fachschaften", f"{top}-8-1", None)
+    again = _version(await t.svc.set_state_by_hand(vid, _by_hand("draft")))
+    await session.commit()
+    draft = {line.budget_id: (line.name, line.path_key, line.key) for line in again.lines}
+    assert draft[t.exp_b.id] == ("Arbeitskreise", f"{top}-8-7", "7")
+    node = await session.get_one(Budget, t.exp_b.id)
+    assert (node.name, node.key) == ("AKs", "2")
+    await t.svc.delete_version(vid)
+    await session.commit()
+    await session.refresh(node)
+    assert (node.name, node.key, node.path_key) == ("AKs", "2", f"{top}-8-2")

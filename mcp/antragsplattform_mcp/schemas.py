@@ -439,6 +439,13 @@ class PlanLineSet(WireModel, frozen=True):
     )
 
 
+class PlanLineRename(WireModel, frozen=True):
+    name: str | None = Field(default=None, description="The new name of the cost center")
+    key: str | None = Field(
+        default=None, description="The new key, the last segment of the path key"
+    )
+
+
 class PlanStep(WireModel, frozen=True):
     name: str
     gremiumId: str | None = Field(

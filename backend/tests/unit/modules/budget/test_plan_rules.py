@@ -283,3 +283,33 @@ def test_allocation_changes() -> None:
     assert plan_rules.allocation_changes({a: D(5), b: D(1)}, {a: D(5), b: D(2), c: D(0)}) == {
         b: (D(1), D(2))
     }
+
+
+def test_draft_paths_follow_the_new_key_of_a_parent() -> None:
+    """A new key of a Kostenstelle changes its path key and each path key below it.
+
+    Rule: §F/finance/budget/000877.
+    """
+    top, titel, child, other = (uuid.uuid4() for _ in range(4))
+    parent_of = {top: None, titel: top, child: titel, other: top}
+    key_of = {top: "VS", titel: "8", child: "1", other: "1"}
+    assert plan_rules.draft_paths(top, "VS", parent_of, key_of, {}) == {
+        titel: "VS-8", child: "VS-8-1", other: "VS-1",
+    }
+    assert plan_rules.draft_paths(top, "VS", parent_of, key_of, {titel: "9", child: None}) == {
+        titel: "VS-9", child: "VS-9-1", other: "VS-1",
+    }
+
+
+def test_a_key_is_taken_by_a_sibling_now_or_in_the_draft() -> None:
+    """A sibling blocks a key that it has or that it takes in the draft.
+
+    Rule: §F/finance/budget/000877.
+    """
+    top, a, b, below = (uuid.uuid4() for _ in range(4))
+    parent_of = {top: None, a: top, b: top, below: a}
+    key_of = {top: "VS", a: "1", b: "2", below: "3"}
+    assert plan_rules.key_taken(a, "2", parent_of, key_of, {})
+    assert plan_rules.key_taken(a, "5", parent_of, key_of, {b: "5"})
+    assert not plan_rules.key_taken(a, "3", parent_of, key_of, {})
+    assert not plan_rules.key_taken(a, "1", parent_of, key_of, {a: "9"})

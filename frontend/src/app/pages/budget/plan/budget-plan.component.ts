@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Location, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { type Observable, forkJoin, of } from 'rxjs';
+import { EMPTY, type Observable, forkJoin, of } from 'rxjs';
 import { catchError, finalize, tap } from 'rxjs/operators';
 import {
   ButtonComponent,
@@ -417,10 +417,37 @@ export class BudgetPlanComponent {
     return version && (version.state === 'draft' || version.state === 'in_progress') ? nextStep(version) : null;
   });
 
-  /** The tree node of a row, for the settings of the Kostenstelle. */
+  /**
+   * The Kostenstellen that the shown draft gives a new key or name, with these values. One
+   * object per Kostenstelle while the plan and the tree stay, so the settings keep their text.
+   */
+  private readonly renamed = computed<ReadonlyMap<string, BudgetTreeNode>>(() => {
+    const lines = this.version()?.state === 'draft' ? (this.version()?.lines ?? []) : [];
+    return new Map(
+      lines
+        .filter((line) => line.key !== null || line.name !== null)
+        .flatMap((line) => {
+          const node = findNode(this.tree(), line.budgetId);
+          return node ? [[line.budgetId, { ...node, key: line.key ?? node.key, name: line.name ?? node.name }] as const] : [];
+        }),
+    );
+  });
+  /** The tree node of a row, for the settings of the Kostenstelle. A draft shows the key and the name that it sets. */
   nodeOf(id: string): BudgetTreeNode | null {
-    return findNode(this.tree(), id);
+    return this.renamed().get(id) ?? findNode(this.tree(), id);
   }
+  /** The draft takes a new key or name of a Kostenstelle; they apply when the version comes into force (000877). */
+  readonly renameInDraft = (id: Uuid, field: 'key' | 'name', value: string): Observable<unknown> => {
+    const version = this.version();
+    const place = this.place();
+    return version
+      ? this.api.renameLine(version.id, id, { [field]: value }).pipe(
+          tap((plan) => {
+            if (this.place() === place) this.load.set({ kind: 'plan', plan });
+          }),
+        )
+      : EMPTY;
+  };
   /** The heading of the section of a node: Titel directly below the Haushalt, else Kostenstelle. */
   levelKey(node: BudgetTreeNode): TranslationKey {
     return levelKey(node, this.top());

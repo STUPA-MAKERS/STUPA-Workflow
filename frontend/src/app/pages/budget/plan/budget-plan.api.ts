@@ -70,9 +70,14 @@ export interface PlanLine {
   readonly side: Side | null;
   readonly amount: string;
   readonly note: string | null;
-  /** The name and the path key at the decision. `null` in a draft. */
+  /**
+   * The name and the path key at the decision. In a draft: the name and the path key that
+   * the draft gives the Kostenstelle, `null` where it changes neither.
+   */
   readonly name: string | null;
   readonly pathKey: string | null;
+  /** The key that a draft gives the Kostenstelle. `null` in every other case. */
+  readonly key: string | null;
   readonly transferable: boolean;
   readonly coverable: boolean;
   readonly blocked: string;
@@ -170,6 +175,11 @@ export class BudgetPlanApi {
 
   setLine(versionId: Uuid, budgetId: Uuid, body: PlanLineSet): Observable<BudgetPlan> {
     return this.http.put<BudgetPlan>(this.lineUrl(versionId, budgetId), body, { context: skipLoading() });
+  }
+
+  /** Give the Kostenstelle of a draft line a new name or key. It applies when the version comes into force. */
+  renameLine(versionId: Uuid, budgetId: Uuid, body: { readonly name?: string; readonly key?: string }): Observable<BudgetPlan> {
+    return this.http.put<BudgetPlan>(`${this.lineUrl(versionId, budgetId)}/name`, body, { context: skipLoading() });
   }
 
   deleteLine(versionId: Uuid, budgetId: Uuid): Observable<BudgetPlan> {

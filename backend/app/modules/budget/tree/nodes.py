@@ -314,6 +314,11 @@ class NodeOps(BudgetTreeServiceBase):
         The audit entry holds the prior and the new values of the changed fields. The
         revert uses the new values to detect a later edit and answers 409 instead of
         overwriting the changes of another user.
+
+        Raises:
+            ConflictError: `plan_draft_only` (409) for a new name or a new key of a
+                cost center below a budget with a plan, because a draft of the plan
+                sets them (spec 000877).
         """
         await self._lock_tree(budget_id)
         node = await self._get_node(budget_id)
@@ -324,6 +329,14 @@ class NodeOps(BudgetTreeServiceBase):
             await self._check_gremium(provided["decision_gremium_id"], "decisionGremiumId")
         if "view_gremium_id" in provided:
             await self._check_gremium(provided["view_gremium_id"], "viewGremiumId")
+        renames = (new_key is not None and new_key != node.key) or (
+            "name" in provided and provided["name"] != node.name
+        )
+        if renames and node.parent_id is not None and (await self._top_level(node)).plan_enabled:
+            raise ConflictError(
+                "A cost centre of a budget with a plan gets a new name or key in a draft.",
+                code="plan_draft_only",
+            )
         stichtag_changed = (
             "fiscal_start_month" in provided
             and provided["fiscal_start_month"] != node.fiscal_start_month

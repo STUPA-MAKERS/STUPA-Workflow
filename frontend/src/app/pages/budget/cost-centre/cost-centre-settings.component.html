@@ -5,6 +5,7 @@
       class="ccs__key"
       [label]="'budget.tree.key' | t"
       [error]="keyError()"
+      [disabled]="textLocked()"
       [ngModel]="key()"
       (ngModelChange)="key.set($event)"
       (focusout)="saveText('key')"
@@ -14,6 +15,7 @@
     <app-input
       [label]="'budget.tree.name' | t"
       [error]="nameError()"
+      [disabled]="textLocked()"
       [ngModel]="name()"
       (ngModelChange)="name.set($event)"
       (focusout)="saveText('name')"

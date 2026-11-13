@@ -315,12 +315,12 @@ def _node_update(**kw: Any) -> BudgetNodeUpdate:
 async def test_update_node_rename_key_child_with_parent_lookup() -> None:
     """A child key change looks up the parent path.
 
-    The fake session serves the node, an empty sibling check, the parent, then no
-    descendants.
+    The fake session serves the node, the top-level budget for the plan switch, an
+    empty sibling check, the parent, then no descendants.
     """
     parent = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     node = _budget(id=uuid.uuid4(), parent_id=parent.id, path_key="VS-800", key="800")
-    sess = fake_session(result(node), result(), result(parent), result())
+    sess = fake_session(result(node), result(parent), result(), result(parent), result())
     svc = BudgetTreeService(sess)
     out = await svc.update_node(node.id, _node_update(key="900"))
     assert out.key == "900" and out.path_key == "VS-900"

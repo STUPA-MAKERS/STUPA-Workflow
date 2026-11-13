@@ -50,6 +50,25 @@ describe('CostCentreSettingsComponent', () => {
     expect(screen.getByRole('combobox', { name: /Entscheidendes Gremium/ })).toHaveTextContent('Wie übergeordnet');
   });
 
+  it('§F/finance/budget/000877: a page with its own save takes the key and the name, and locked fields take none', async () => {
+    const view = await setup();
+    const rename = jest.fn((_id: string, _field: string, _value: string) => of({}));
+    view.fixture.componentRef.setInput('rename', rename);
+    view.fixture.detectChanges();
+    await retype(view.field('Name'), 'Kultur und Sport');
+    await retype(view.field('Schlüssel'), '810');
+    expect(rename.mock.calls).toEqual([
+      ['ks', 'name', 'Kultur und Sport'],
+      ['ks', 'key', '810'],
+    ]);
+    expect(view.api.updateNode).not.toHaveBeenCalled();
+    expect(view.saved).toHaveBeenCalledTimes(2);
+    view.fixture.componentRef.setInput('textLocked', true);
+    view.fixture.detectChanges();
+    await waitFor(() => expect(view.field('Name')).toBeDisabled());
+    expect(view.field('Schlüssel')).toBeDisabled();
+  });
+
   it('§F/finance/budget/000831: saves a changed key or name when the person leaves the field', async () => {
     const view = await setup();
     await retype(view.field('Name'), ' Kultur und Sport ');

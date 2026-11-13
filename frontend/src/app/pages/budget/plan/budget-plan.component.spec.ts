@@ -75,6 +75,7 @@ async function setup(opts: Opts = {}) {
     createPlan: jest.fn((..._args: unknown[]) => of(plan())),
     createNachtrag: jest.fn((..._args: unknown[]) => answer()),
     setLine: jest.fn((..._args: unknown[]) => answer()),
+    renameLine: jest.fn((..._args: unknown[]) => answer()),
     deleteLine: jest.fn((..._args: unknown[]) => answer()),
     setState: jest.fn((..._args: unknown[]) => answer()),
     deleteVersion: jest.fn((..._args: unknown[]) => of(undefined)),
@@ -1568,6 +1569,28 @@ describe('BudgetPlanComponent', () => {
       await answerDialog('Kostenstelle löschen?', 'Löschen');
       expect(view.treeApi.deleteNode).toHaveBeenCalledWith('grants');
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Zuschüsse' })).toBeNull());
+    });
+  });
+
+  describe('key and name', () => {
+    const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
+
+    it('§F/finance/budget/000877: a draft shows and takes the new key and name of a Kostenstelle', async () => {
+      const renamed = line('fees', '100', { key: '9', name: 'Semesterbeiträge', pathKey: 'VS-9' });
+      const view = await setup({ plans: { 'fy-26': plan([version({ lines: [renamed, line('grants', '100')] })]) }, query: { costCentre: 'fees' } });
+      await waitFor(() => expect(field('Name')).toHaveValue('Semesterbeiträge'));
+      expect(field('Schlüssel')).toHaveValue('9');
+      expect(screen.getByRole('heading', { level: 2, name: 'Semesterbeiträge' })).toBeInTheDocument();
+      await userEvent.clear(field('Name'));
+      await userEvent.type(field('Name'), 'Beiträge neu');
+      await userEvent.tab();
+      expect(view.api.renameLine).toHaveBeenCalledWith('v0', 'fees', { name: 'Beiträge neu' });
+    });
+
+    it('§F/finance/budget/000877: a version that is no draft locks the key and the name', async () => {
+      await setup({ plans: { 'fy-26': plan([version({ state: 'in_force' })]) }, query: { costCentre: 'fees' } });
+      await waitFor(() => expect(field('Name')).toBeDisabled());
+      expect(field('Schlüssel')).toBeDisabled();
     });
   });
 
