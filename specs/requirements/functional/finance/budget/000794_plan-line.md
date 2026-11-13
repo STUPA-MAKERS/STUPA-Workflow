@@ -16,9 +16,11 @@ tests:
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_summed_amounts_give_each_parent_the_sum_of_its_children"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
   - "frontend/src/app/pages/budget/cost-centre/cost-centre-create.component.spec.ts:CostCentreCreateComponent"
+  - "backend/tests/unit/modules/budget/test_plan_router.py:test_an_amount_of_minus_zero_is_zero"
 implementation:
   - backend/app/modules/budget/tree/plans.py
   - backend/app/modules/budget/plan_rules.py
+  - backend/app/modules/budget/plan_schemas.py
 scope:
   - backend/app/modules/budget
 ---
@@ -34,7 +36,8 @@ platform must answer 422 `plan_amount_too_large` when a sum passes 9 999 999 999
 person must not set the Ansatz of such a Kostenstelle: the platform must ignore an amount
 that a request gives for it, and the plan must show no Ansatz field for it. When the sum
 falls below the gesperrt amount of the parent, the platform must lower that amount to the
-sum. A Kostenstelle without such a child keeps the Ansatz that a person set.
+sum. A Kostenstelle without such a child keeps the Ansatz that a person set. An amount of
+minus zero must count as 0 €: the answer and the audit entry must show `0.00`.
 
 The first child line of a Kostenstelle must take the Ansatz and the gesperrt amount of
 that Kostenstelle when the request names no Ansatz above 0 €. The form for a new

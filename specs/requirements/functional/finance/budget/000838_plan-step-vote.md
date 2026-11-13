@@ -37,7 +37,9 @@ leave the draft with this request (000792). A step without a Gremium must answer
 
 The vote must open and close only through the vote routes, with the right of that Gremium
 to manage votes. The plan page must link to the vote, for a person who cannot move the version as the
-action of its head. The vote page must show a link to
+action of its head, and must show that person no action that moves the version. The read
+of the plan of a version (`GET /budget-plan-versions/{id}/plan`) must answer 404 for a
+version that does not exist, also when a delete takes the version away during the read. The vote page must show a link to
 the plan to a person who can read the plan (000800), and to no other person.
 
 Reason: The person who manages the plan asks the body for its decision, and the body
@@ -46,4 +48,5 @@ Gremium.
 
 Test: The backend tests create the vote of a step with and without a Gremium, a second vote
 beside a running one, and read the config and the question. The vote page tests read the link to
-the plan with and without the read right.
+the plan with and without the read right. The plan page test opens the menu of a version
+with a vote as a person without `budget.structure`.

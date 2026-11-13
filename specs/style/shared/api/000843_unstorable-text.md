@@ -7,6 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-13
 tests:
   - "backend/tests/unit/shared/test_error_contract.py:test_a_text_that_the_database_refuses_is_a_422"
+  - "backend/tests/unit/shared/test_error_contract.py:test_another_database_error_stays_a_bare_500"
 implementation:
   - backend/app/shared/errors.py
 scope:

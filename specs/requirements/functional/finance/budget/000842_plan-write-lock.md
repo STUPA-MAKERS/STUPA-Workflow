@@ -12,6 +12,7 @@ tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_an_allocation_that_waited_for_the_plan_switch_is_refused"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_key_taken_at_the_same_moment_is_a_conflict"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_close_of_a_step_vote_locks_the_plan_before_the_audit_entry"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_kostenstelle_that_went_while_a_write_waited_is_not_found"
 implementation:
   - backend/app/modules/budget/tree/service_base.py
   - backend/app/modules/budget/tree/plans.py
@@ -45,8 +46,7 @@ force, or an allocation by hand beside the plan switch. Locks in two orders stop
 other, and the database then ends one request with an error. A key can change (000246), so
 a path key that a request read before its wait can name no Kostenstelle after it.
 
-Test: The integration test holds the lock of a budget in one session and starts each write
-in a second session, reads that it waits, and reads its answer after the first session
-ends. One test each deletes the plan and the version while a write waits, and one turns
+Test: The integration test holds the lock of a budget in one session and starts each write of the list above in a second session, reads that it waits, and reads its answer after the first session
+ends. One test each deletes the Kostenstelle, the plan and the version while a write waits, and one turns
 the plan switch on while an allocation waits. One test reads that the close of a step vote
 holds the lock of the plan before it writes its audit entry.

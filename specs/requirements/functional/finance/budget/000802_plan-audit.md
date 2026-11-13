@@ -14,8 +14,10 @@ tests:
 implementation:
   - backend/app/modules/budget/tree/plans.py
   - backend/app/modules/audit/actions.py
+  - backend/app/modules/audit_log/service.py
 scope:
   - backend/app/modules/budget
+  - backend/app/modules/audit_log
 ---
 
 # Each plan state change is audited
@@ -45,4 +47,5 @@ steps.
 
 Test: The test runs each plan action and reads the audit entries and their data, and deletes a fiscal year
 and a Kostenstelle that hold plan data, and a budget with a plan, and reads the names in the
-entries.
+entries, also in the entry of a step vote. One test reads the labels that the audit log
+gives a plan and a Kostenstelle.
