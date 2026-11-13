@@ -552,6 +552,8 @@
   "applications.detail.budgetAssign": "Zuordnen",
   "applications.detail.budgetWithYear": "Kostenstelle · HHJ {year}",
   "applications.detail.compareVersions": "Versionen vergleichen",
+  "applications.detail.downloadPdf": "Als PDF herunterladen",
+  "applications.detail.pdfError": "Das PDF konnte nicht erstellt werden.",
   "applications.detail.tab.app": "Antrag",
   "applications.detail.tab.history": "Verlauf",
   "applications.detail.tab.files": "Anhänge",

@@ -552,6 +552,8 @@
   "applications.detail.budgetAssign": "Assign",
   "applications.detail.budgetWithYear": "Cost centre · FY {year}",
   "applications.detail.compareVersions": "Compare versions",
+  "applications.detail.downloadPdf": "Download as PDF",
+  "applications.detail.pdfError": "The PDF could not be created.",
   "applications.detail.tab.app": "Application",
   "applications.detail.tab.history": "History",
   "applications.detail.tab.files": "Attachments",

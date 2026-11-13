@@ -551,6 +551,15 @@ describe('ApiClient', () => {
     req.flush({ items: [], total: 0, limit: 20, offset: 0 });
   });
 
+  it('downloads the PDF of an application with its headers', () => {
+    let name: string | null = null;
+    api.applicationPdf('a1').subscribe((res) => (name = res.headers.get('Content-Disposition')));
+    const req = http.expectOne((r) => r.url === '/api/applications/a1/pdf');
+    expect(req.request.responseType).toBe('blob');
+    req.flush(new Blob(['%PDF']), { headers: { 'Content-Disposition': 'attachment; filename="a.pdf"' } });
+    expect(name).toBe('attachment; filename="a.pdf"');
+  });
+
   it('exports xlsx with no query (default {} param)', () => {
     api.exportApplicationsXlsx().subscribe();
     const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');

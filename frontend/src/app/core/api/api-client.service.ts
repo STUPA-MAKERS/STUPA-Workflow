@@ -1,4 +1,11 @@
-import { HttpClient, type HttpContext, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
+import {
+  HttpClient,
+  type HttpContext,
+  HttpErrorResponse,
+  HttpHeaders,
+  HttpParams,
+  type HttpResponse,
+} from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, map, of, throwError } from 'rxjs';
 import { detailContext, listContext } from '@core/cache/cache.interceptor';
@@ -290,6 +297,18 @@ export class ApiClient {
         context: readContext(opts),
       })
       .pipe(map((wire) => mapApplication(wire, lang)));
+  }
+
+  /**
+   * GET /applications/{id}/pdf — the Antrag as PDF, as the reader sees it on the detail
+   * page. The response keeps its headers, because the server names the file.
+   */
+  applicationPdf(id: Uuid): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.base}/applications/${id}/pdf`, {
+      observe: 'response',
+      responseType: 'blob',
+      context: skipLoading(),
+    });
   }
 
   /**
