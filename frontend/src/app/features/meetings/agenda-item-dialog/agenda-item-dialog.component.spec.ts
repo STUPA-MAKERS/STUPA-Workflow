@@ -146,6 +146,24 @@ describe('AgendaItemDialogComponent', () => {
     expect(added).toHaveBeenCalledWith([]);
   });
 
+  /** §000861: a free-text item takes a description; the kind Antrag shows no field. */
+  it('freetextDescription: sends the description of a free-text item', async () => {
+    const { http, fixture } = await setup();
+    flushApps(http, fixture);
+    expect(screen.queryByLabelText('Beschreibung')).toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: 'Freitext' }));
+    await userEvent.type(screen.getByLabelText(/Titel/), 'Bericht');
+    await userEvent.type(screen.getByLabelText('Beschreibung'), ' Zeile 1{Enter}Zeile 2 ');
+    await userEvent.click(submitButton());
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({
+      title: 'Bericht',
+      nonPublic: false,
+      description: 'Zeile 1\nZeile 2',
+    });
+    req.flush([]);
+  });
+
   /** The to-do kind is offered only with todo.write in the gremium. */
   it('accepts only the known kinds', async () => {
     const { http, fixture, cmp } = await setup();

@@ -26,6 +26,23 @@
   min-height: 0;
   height: clamp(14rem, calc(78dvh - 21rem), 26rem);
 }
+// The description of a free-text item fills the rest of the area.
+.aid__desc {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  --textarea-min-height: 6rem;
+}
+.aid__desc ::ng-deep .ta {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.aid__desc ::ng-deep .ta textarea {
+  flex: 1 1 auto;
+  resize: none;
+  overflow-y: auto;
+}
 @include bp.phone {
   .aid__area {
     height: auto;

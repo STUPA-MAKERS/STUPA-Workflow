@@ -34,6 +34,7 @@ import {
   type SegmentedOption,
   SkeletonComponent,
   SwitchComponent,
+  TextareaComponent,
   ToastService,
   TruncatedDirective,
 } from '@stupa-makers/ui-kit';
@@ -70,7 +71,8 @@ export interface AgendaTodoOption {
  * to "To-Do", and the kind shows only with `todo.write` in the gremium. The server makes
  * the item from the card title and links the card to the item. The new item goes to the
  * end of the agenda. "Nicht öffentlich" marks it at once, so the public protocol leaves
- * it out.
+ * it out. A free-text item takes an optional description; the server puts it at the
+ * start of the item text as a block quote, so it goes into the protocol (spec 000861).
  */
 @Component({
   selector: 'app-agenda-item-dialog',
@@ -88,6 +90,7 @@ export interface AgendaTodoOption {
     InputComponent,
     SegmentedComponent,
     SwitchComponent,
+    TextareaComponent,
     SearchPillComponent,
     SkeletonComponent,
     EmptyStateComponent,
@@ -119,6 +122,11 @@ export class AgendaItemDialogComponent {
   readonly query = signal('');
   readonly pick = signal<Uuid | null>(null);
   readonly freetext = signal('');
+  /**
+   * The optional description of a free-text item. The server puts it at the start of
+   * the item text as a block quote (spec 000861).
+   */
+  readonly description = signal('');
   readonly nonPublic = signal(false);
   readonly saving = signal(false);
 
@@ -209,6 +217,7 @@ export class AgendaItemDialogComponent {
     this.query.set('');
     this.pick.set(null);
     this.freetext.set('');
+    this.description.set('');
     this.nonPublic.set(false);
     this.saving.set(false);
     this.todos.set(null);
@@ -339,7 +348,12 @@ export class AgendaItemDialogComponent {
         ? this.api.addAgendaItem(meetingId, pick, this.nonPublic())
         : kind === 'todo' && todo !== null
           ? this.api.addAgendaTodo(meetingId, todo, this.nonPublic())
-          : this.api.addAgendaFreetext(meetingId, this.freetext().trim(), this.nonPublic());
+          : this.api.addAgendaFreetext(
+              meetingId,
+              this.freetext().trim(),
+              this.nonPublic(),
+              this.description().trim() || undefined,
+            );
     this.saving.set(true);
     req.subscribe({
       next: (rows) => {

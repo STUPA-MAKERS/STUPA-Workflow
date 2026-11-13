@@ -2491,7 +2491,7 @@ class _FakeAgendaService:
         return self.item_row
 
     async def add(
-        self, meeting_id: UUID, application_id, title, non_public=False, *, actor
+        self, meeting_id: UUID, application_id, title, non_public=False, *, actor, description=None
     ) -> list[Any]:
         self.calls.append("add")
         self.actors.append(actor)

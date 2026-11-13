@@ -957,6 +957,13 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
+  it('adds a freetext agenda item with a description', () => {
+    api.addAgendaFreetext('m-1', 'Bericht', false, 'Info').subscribe();
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ title: 'Bericht', nonPublic: false, description: 'Info' });
+    req.flush([]);
+  });
+
   it('puts a to-do on the agenda', () => {
     api.addAgendaTodo('m-1', 'k-1').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');

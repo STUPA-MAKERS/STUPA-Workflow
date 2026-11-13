@@ -882,6 +882,7 @@
   "meetings.agenda.noAssignable": "No assignable applications",
   "meetings.agenda.noMatch": "No application matches “{q}”",
   "meetings.agenda.freetextTitle": "Title",
+  "meetings.agenda.freetextDescription": "Description",
   "meetings.agenda.asFreetext": "Add as free text",
   "meetings.agenda.nonPublicLabel": "Non-public",
   "meetings.agenda.done": "Done",

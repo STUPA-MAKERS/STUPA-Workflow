@@ -915,12 +915,19 @@ export class ApiClient {
 
   /**
    * POST /meetings/{id}/agenda — create a free-text agenda item (no application).
-   * `nonPublic` marks the new item as non-public (NÖ) at once.
+   * `nonPublic` marks the new item as non-public (NÖ) at once. A `description` becomes
+   * the start of the item text as a block quote (spec 000861).
    */
-  addAgendaFreetext(meetingId: Uuid, title: string, nonPublic = false): Observable<AgendaItem[]> {
+  addAgendaFreetext(
+    meetingId: Uuid,
+    title: string,
+    nonPublic = false,
+    description?: string,
+  ): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       title,
       nonPublic,
+      ...(description ? { description } : {}),
     });
   }
 

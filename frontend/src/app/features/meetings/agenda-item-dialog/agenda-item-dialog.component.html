@@ -97,6 +97,16 @@
           [ngModel]="freetext()"
           (ngModelChange)="freetext.set($event)"
         />
+        <app-textarea class="aid__desc" [label]="'meetings.agenda.freetextDescription' | t">
+          <textarea
+            id="aid-desc"
+            name="description"
+            rows="4"
+            maxlength="20000"
+            [ngModel]="description()"
+            (ngModelChange)="description.set($event)"
+          ></textarea>
+        </app-textarea>
       }
     </div>
 
