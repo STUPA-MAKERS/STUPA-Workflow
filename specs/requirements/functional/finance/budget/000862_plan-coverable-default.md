@@ -2,7 +2,7 @@
 id: "000862"
 title: A budget says if its new plan lines start deckungsfähig
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 tests:
