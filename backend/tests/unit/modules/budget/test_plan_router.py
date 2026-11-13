@@ -30,6 +30,7 @@ from app.modules.budget.plan_schemas import (
     PlanVersionOut,
 )
 from app.modules.budget.tree_router import get_budget_tree_service
+from app.modules.files.cd_resolver import ResolvedCdVariant
 from app.modules.pdf.typst_client import TypstError
 from app.shared.xlsx import XLSX_MEDIA_TYPE
 
@@ -91,6 +92,7 @@ class _FakePlans:
         self.calls: list[tuple[str, Any]] = []
         self.session = _Tx()
         self.visible = visible
+        self.design: ResolvedCdVariant | None = None
 
     async def can_view_node(self, budget_id: uuid.UUID, member: object) -> bool:
         return self.visible
@@ -161,6 +163,9 @@ class _FakePlans:
         self.calls.append(("export", version_id))
         head = ExportHead("VS-Mittel", "2026", None, 0, "draft", today)
         return build_export(head, _ExportTop(), _plan().versions[0].lines)
+
+    async def plan_design(self, version_id: uuid.UUID) -> ResolvedCdVariant | None:
+        return self.design
 
 
 def _client(fake: _FakePlans, *permissions: str) -> TestClient:
@@ -476,9 +481,13 @@ class _Typst:
     def __init__(self, error: TypstError | None = None) -> None:
         self.error = error
         self.requests: list[tuple[str, str | None, Any]] = []
+        self.assets: list[Any] = []
 
-    async def render_pdf(self, markdown: str, *, variant: str | None, config: Any) -> bytes:
+    async def render_pdf(
+        self, markdown: str, *, variant: str | None, config: Any, assets: Any
+    ) -> bytes:
         self.requests.append((markdown, variant, config))
+        self.assets.append(assets)
         if self.error is not None:
             raise self.error
         return b"%PDF-1.7 plan"
@@ -532,6 +541,27 @@ def test_a_reader_of_the_plan_loads_the_pdf_file(
     assert variant == "plan"
     assert config["plan"]["mark"] == "Entwurf"
     assert [e["target_id"] for e in audited] == ["haushaltsplan.pdf"]
+    assert "logos" not in config
+    assert typst.assets == [None]
+
+
+def test_the_pdf_carries_the_design_of_the_gremium(
+    monkeypatch: pytest.MonkeyPatch, audited: list[dict[str, Any]]
+) -> None:
+    """Rule: §F/finance/budget/000875. The logos of the Gremium go to the render service."""
+    typst = _Typst()
+    monkeypatch.setattr(plan_router, "build_typst_client", lambda settings: typst)
+    fake = _FakePlans()
+    fake.design = ResolvedCdVariant(("ASTA", "own.png"), ("own.png",), {"own.png": b"png"})
+    resp = _client(fake).get(f"/api/budget-plan-versions/{_VERSION}/export.pdf")
+    assert resp.status_code == 200, resp.text
+    ((_source, _variant, config),) = typst.requests
+    assert (config["logos"], config["footer_logos"]) == (["ASTA", "own.png"], ["own.png"])
+    assert config["plan"]["title"] == "Haushaltsplan VS-Mittel 2026"
+    assert typst.assets == [{"own.png": b"png"}]
+    fake.design = ResolvedCdVariant(("ASTA",), (), {})
+    _client(fake).get(f"/api/budget-plan-versions/{_VERSION}/export.pdf")
+    assert typst.assets[1] is None
 
 
 @pytest.mark.parametrize("extension", ["xlsx", "pdf"])

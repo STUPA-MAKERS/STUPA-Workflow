@@ -149,6 +149,8 @@ class ExportHead:
     number: int
     state: PlanState
     exported_on: date
+    #: The name of the first step that a version in progress has not passed.
+    step: str | None = None
 
     @property
     def version(self) -> str:
@@ -157,8 +159,12 @@ class ExportHead:
 
     @property
     def state_label(self) -> str:
-        """The state of the version in words."""
-        return STATE_LABELS[self.state]
+        """The state of the version in words: the open step for a version in progress."""
+        return (
+            self.step
+            if self.state == "in_progress" and self.step
+            else STATE_LABELS[self.state]
+        )
 
     @property
     def title(self) -> str:

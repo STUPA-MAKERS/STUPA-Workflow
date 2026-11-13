@@ -391,7 +391,7 @@
       "to": "auth"
     },
     {
-      "count": 4,
+      "count": 6,
       "from": "budget",
       "to": "files"
     },
@@ -566,9 +566,19 @@
       "to": "auth"
     },
     {
-      "count": 12,
+      "count": 1,
+      "from": "files",
+      "to": "gremien"
+    },
+    {
+      "count": 13,
       "from": "files",
       "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "files",
+      "to": "site_config"
     },
     {
       "count": 1,
@@ -946,12 +956,12 @@
       "to": "auth"
     },
     {
-      "count": 7,
+      "count": 6,
       "from": "protocol",
       "to": "files"
     },
     {
-      "count": 3,
+      "count": 2,
       "from": "protocol",
       "to": "gremien"
     },
@@ -981,14 +991,9 @@
       "to": "pdf"
     },
     {
-      "count": 20,
+      "count": 19,
       "from": "protocol",
       "to": "shared"
-    },
-    {
-      "count": 2,
-      "from": "protocol",
-      "to": "site_config"
     },
     {
       "count": 6,

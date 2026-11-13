@@ -51,6 +51,7 @@ from app.modules.budget.tree_schemas import (
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.search.service import SearchService
+from app.modules.site_config.models import CdVariant, CdVariantLogo
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
@@ -772,6 +773,13 @@ async def test_a_version_exports_with_the_year_before_and_the_version_before(
     rows = {r.name: (r.amount, r.prev, r.actual) for g in third.groups for r in g.rows}
     assert rows["Fachschaften"] == (D(70), D(60), D(25))
     assert rows["Beiträge"] == (D(100), D(100), D(0))
+    assert (first.head.step, third.head.step) == (None, None)
+
+    await _steps(t, "Beschluss", "Genehmigung")
+    await t.svc.set_line(draft.id, t.exp_a.id, PlanLineSet(amount=D(60)))
+    await t.svc.pass_next_step(draft.id)
+    waits = await t.svc.plan_export(draft.id, today)
+    assert (waits.head.state, waits.head.mark) == ("in_progress", "Genehmigung")
 
     with pytest.raises(NotFoundError):
         await t.svc.plan_export(uuid.uuid4(), today)
@@ -1187,6 +1195,46 @@ async def test_each_plan_change_is_audited(session: AsyncSession) -> None:
     assert rows[-1].data["allocations"][str(t.top.id)] == ["0.00", "100.00"]
     assert (rows[-1].data["before"], rows[-1].data["after"]) == ("draft", "in_force")
     assert rows[-1].data["versionId"] == str(plan.versions[0].id)
+
+
+async def test_the_export_takes_the_design_of_the_gremium_of_the_budget(
+    session: AsyncSession,
+) -> None:
+    """The PDF of a plan carries the logos of the Gremium of its budget, else the default.
+
+    Rule: §F/finance/budget/000875.
+    """
+    t = await _tree(session)
+    vid = _version(await t.svc.get_plan(t.top.id, t.fy.id)).id
+    top = await session.get(Budget, t.top.id)
+    assert top is not None
+    top.gremium_id = None
+    await session.commit()
+    assert await t.svc.plan_design(vid) is None
+
+    variant = CdVariant(id=uuid.uuid4(), key=f"cd{uuid.uuid4().hex[:8]}", name="Plan")
+    session.add(variant)
+    await session.flush()
+    session.add_all(
+        [
+            CdVariantLogo(variant_id=variant.id, slot="title", position=0, vendored_name="ASTA"),
+            CdVariantLogo(variant_id=variant.id, slot="footer", position=0, vendored_name="HSRT"),
+        ]
+    )
+    gremium_id = await _gremium(session)
+    top.gremium_id = gremium_id
+    await session.commit()
+    assert await t.svc.plan_design(vid) is None
+
+    gremium = await session.get(Gremium, gremium_id)
+    assert gremium is not None
+    gremium.cd_variant_id = variant.id
+    await session.commit()
+    design = await t.svc.plan_design(vid)
+    assert design is not None
+    assert (design.title_logos, design.footer_logos, dict(design.assets)) == (
+        ("ASTA",), ("HSRT",), {},
+    )
 
 
 async def _gremium(session: AsyncSession) -> uuid.UUID:

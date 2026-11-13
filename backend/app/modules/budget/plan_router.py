@@ -34,6 +34,7 @@ from app.modules.budget.plan_schemas import (
 )
 from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_router import ServiceDep, _errors, _require_node_view
+from app.modules.files.cd_resolver import cd_render_config
 from app.modules.pdf.typst_client import TypstError, build_typst_client
 from app.shared.errors import BadRequestError, ServiceUnavailableError
 from app.shared.filenames import content_disposition
@@ -159,6 +160,8 @@ async def export_plan_pdf(
 ) -> Response:
     """Return a version of a Haushaltsplan as a PDF, for each reader of the plan.
 
+    The PDF carries the logos of the corporate design of the Gremium of the budget.
+
     Rule: §F/finance/budget/000875.
 
     Raises:
@@ -166,9 +169,14 @@ async def export_plan_pdf(
         ServiceUnavailableError: The render service does not answer (503).
     """
     export = await _export_of(service, principal, version_id, "pdf")
+    design = await service.plan_design(version_id)
+    logos = cd_render_config(design) if design else {}
     try:
         pdf = await build_typst_client(settings).render_pdf(
-            plan_export.pdf_source(export), variant="plan", config=plan_export.pdf_config(export)
+            plan_export.pdf_source(export),
+            variant="plan",
+            config={**logos, **plan_export.pdf_config(export)},
+            assets=(design.assets or None) if design else None,
         )
     except TypstError as exc:
         if not exc.retryable:

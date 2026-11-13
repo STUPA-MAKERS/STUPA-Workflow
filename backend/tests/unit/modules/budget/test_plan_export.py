@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from decimal import Decimal
 from io import BytesIO
@@ -166,6 +166,15 @@ def test_the_head_names_the_version_and_its_state() -> None:
         ("Stand", "Entwurf"),
         ("Exportiert am", "13.11.2026"),
     )
+
+
+def test_a_version_in_progress_shows_its_open_step() -> None:
+    """Rule: §F/finance/budget/000875. The open step stands in place of the state."""
+    waits = replace(_head(0, "in_progress"), step="Genehmigung Rektorat")
+    assert (waits.state_label, waits.mark) == ("Genehmigung Rektorat", "Genehmigung Rektorat")
+    assert ("Stand", "Genehmigung Rektorat") in plan_export.head_lines(waits)
+    assert _head(0, "in_progress").state_label == "Im Verfahren"
+    assert replace(_head(0, "draft"), step="Beschluss StuPa").state_label == "Entwurf"
 
 
 def test_the_file_name() -> None:
