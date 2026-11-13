@@ -4,7 +4,8 @@
 for the protocol of a meeting. Only a person who can write that protocol may upload
 (`ProtocolService.authorize_write_meeting`), because only that person can put the
 reference into a text. The route caps the body, applies its own rate limit and lets
-`MediaService.upload_document` scan, check and store the file (spec 000869).
+`MediaService.upload_document` scan, check and store the file (spec 000869). The route
+commits, so the service never does (000474).
 
 The route is in `protocol` and not in `media`, because it reads the meeting, and
 `media` imports no higher module (§S/backend/python/000651). The download and the
@@ -22,6 +23,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, UploadFile, status
 
+from app.deps import DbSession
 from app.modules.files.body import read_capped
 from app.modules.media.router import ServiceDep as MediaDep
 from app.modules.media.schemas import MarkdownDocumentOut
@@ -50,6 +52,7 @@ async def upload_document(
     protocols: ServiceDep,
     media: MediaDep,
     principal: PrincipalDep,
+    session: DbSession,
     file: Annotated[UploadFile, File()],
 ) -> MarkdownDocumentOut:
     """Upload one PDF for a text of the protocol of the meeting.
@@ -59,4 +62,6 @@ async def upload_document(
     """
     await protocols.authorize_write_meeting(meeting_id, principal)
     data = await read_capped(file, media.max_document_bytes)
-    return await media.upload_document(data, file.filename)
+    out = await media.upload_document(data, file.filename)
+    await session.commit()
+    return out

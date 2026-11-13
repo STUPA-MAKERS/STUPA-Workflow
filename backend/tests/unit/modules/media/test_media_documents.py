@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from types import SimpleNamespace
 from typing import Any
 
@@ -105,7 +105,7 @@ async def test_upload_stores_the_pdf_with_its_name_and_pages() -> None:
     assert out.url == f"/api/media/documents/{out.id}"
     assert (out.name, out.pages) == ("Haushaltplan.pdf", 2)
     assert storage.objects[f"media/documents/{out.id}"][1] == "application/pdf"
-    assert session.committed == 1
+    assert session.committed == 0, "the route commits, not the service (000474)"
 
 
 async def test_upload_refusals_map_to_415_and_413() -> None:
@@ -183,23 +183,9 @@ async def test_render_documents_never_fail_for_a_missing_pdf() -> None:
 # -- public render input (spec 000867) ----------------------------------------
 
 
-class _Result:
-    def __init__(self, row: Any) -> None:
-        self._row = row
-
-    def first(self) -> Any:
-        return self._row
-
-
-class _PublicSession:
-    def __init__(self, row: Any) -> None:
-        self.row = row
-
-    async def execute(self, _stmt: object) -> _Result:
-        return _Result(self.row)
-
-
-async def test_public_document_ids_leave_out_a_non_public_top() -> None:
+async def test_public_document_ids_leave_out_a_non_public_top(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """§000867: a PDF of a non-public TOP is not in the public version."""
     a, b, c = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     snapshot = PublicSnapshot(
@@ -216,7 +202,12 @@ async def test_public_document_ids_leave_out_a_non_public_top() -> None:
         SimpleNamespace(title="Sitzung", date=None),
         SimpleNamespace(id=uuid.uuid4(), name="StuPa", slug="stupa"),
     )
-    svc = PublicProtocolService(_PublicSession(row))  # pyright: ignore[reportArgumentType]
+    svc = PublicProtocolService(object())  # pyright: ignore[reportArgumentType]
+
+    async def visible(_self: object, _protocol_id: uuid.UUID) -> Any:
+        return row
+
+    monkeypatch.setattr(PublicProtocolService, "_visible", visible)
     assert await svc.public_document_ids(PROTOCOL_ID) == {a, c}
 
 
@@ -244,8 +235,11 @@ class _Protocols:
             raise ForbiddenError("not allowed to write this meeting's minutes")
 
 
-async def _no_session() -> AsyncIterator[object]:
-    yield object()
+def _same_session(session: MediaSession) -> Callable[[], AsyncIterator[MediaSession]]:
+    async def dependency() -> AsyncIterator[MediaSession]:
+        yield session
+
+    return dependency
 
 
 @pytest.fixture
@@ -273,7 +267,7 @@ def app(
     session: MediaSession, storage: MediaStorage, public: _PublicProtocols, protocols: _Protocols
 ) -> FastAPI:
     application = create_app()
-    application.dependency_overrides[get_session] = _no_session
+    application.dependency_overrides[get_session] = _same_session(session)
     application.dependency_overrides[get_media_service] = lambda: _service(session, storage)
     application.dependency_overrides[get_public_protocols] = lambda: public
     application.dependency_overrides[get_protocol_service] = lambda: protocols
@@ -296,11 +290,14 @@ def _upload(client: TestClient, data: bytes, meeting: uuid.UUID = MEETING_ID) ->
     )
 
 
-def test_upload_route_201_for_a_writer(app: FastAPI, client: TestClient) -> None:
-    """§000862: a person who can write the protocol uploads a PDF."""
+def test_upload_route_201_for_a_writer(
+    app: FastAPI, client: TestClient, session: MediaSession
+) -> None:
+    """§000862: a person who can write the protocol uploads a PDF; the route commits."""
     _as_principal(app)
     r = _upload(client, make_pdf(2))
     assert r.status_code == 201
+    assert session.committed == 1
     body = r.json()
     assert (body["name"], body["pages"]) == ("Angebot.pdf", 2)
     assert body["url"] == f"/api/media/documents/{body['id']}"

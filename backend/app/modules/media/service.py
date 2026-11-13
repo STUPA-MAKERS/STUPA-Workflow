@@ -86,15 +86,14 @@ CLEAN_CONCURRENCY: Final[int] = 2
 _clean_slots: Final[asyncio.Semaphore] = asyncio.Semaphore(CLEAN_CONCURRENCY)
 #: A cancelled request releases ``_clean_slots`` while its thread still works. This
 #: semaphore holds the limit in that case too.
-_clean_threads: Final[threading.BoundedSemaphore] = threading.BoundedSemaphore(
-    CLEAN_CONCURRENCY
-)
+_clean_threads: Final[threading.BoundedSemaphore] = threading.BoundedSemaphore(CLEAN_CONCURRENCY)
 
 
 def _clean_bounded(data: bytes) -> CleanImage:
     """Run ``clean_image`` in one of the ``CLEAN_CONCURRENCY`` thread slots."""
     with _clean_threads:
         return clean_image(data)
+
 
 def _check_bounded(data: bytes) -> CheckedPdf:
     """Run ``check_pdf`` in one of the ``CLEAN_CONCURRENCY`` thread slots."""
@@ -342,7 +341,6 @@ class MediaService:
             await self.storage.put(row.storage_key, data, PDF_MIME)
         except StorageError as exc:
             raise ServiceUnavailableError("Object storage write failed.") from exc
-        await self.session.commit()
         logger.info("markdown document stored", extra={"document_id": str(document_id)})
         return _document_out(row)
 
@@ -410,9 +408,7 @@ class MediaService:
         if self.storage is None or not ids:
             return {}
         rows = (
-            await self.session.scalars(
-                select(MarkdownDocument).where(MarkdownDocument.id.in_(ids))
-            )
+            await self.session.scalars(select(MarkdownDocument).where(MarkdownDocument.id.in_(ids)))
         ).all()
         by_id = {row.id: row for row in rows}
         ordered = [by_id[i] for i in ids if i in by_id and by_id[i].size <= max_asset_bytes]

@@ -12,7 +12,7 @@ import userEvent from '@testing-library/user-event';
 import type { AgendaItem, Meeting, Protocol } from '@core/api/models';
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
 import { AGENDA, meeting, protocol } from '../../../../testing/meeting-fixtures';
-import { type SaveState, TopSheetComponent } from './top-sheet.component';
+import { type SaveState, TopSheetComponent, documentUploadErrorKey } from './top-sheet.component';
 import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
 
 interface Inputs {
@@ -240,6 +240,50 @@ describe('TopSheetComponent', () => {
     expect(event.defaultPrevented).toBe(true);
     expect(area.value).toBe(`Siehe [Plan.pdf](/api/media/documents/${ID}) `);
     expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
+  });
+
+  it('maps each upload status to its message key (000869)', () => {
+    expect([403, 413, 415, 429, 503, 500, undefined].map((s) => documentUploadErrorKey(s))).toEqual([
+      'markdown.document.error.forbidden',
+      'markdown.document.error.tooLarge',
+      'markdown.document.error.type',
+      'markdown.image.error.rate',
+      'markdown.image.error.storage',
+      'markdown.document.error.upload',
+      'markdown.document.error.upload',
+    ]);
+  });
+
+  it('picks and drops PDFs into the Markdown source, and leaves other files alone', async () => {
+    const doc = { id: ID, url: `/api/media/documents/${ID}`, name: 'Plan.pdf', size: 9, pages: 1 };
+    const documentInfo = jest.fn(() => throwError(() => new Error('404')));
+    const view = await setup({ top: { ...AGENDA[0], body: '' } }, [
+      { provide: MediaApiService, useValue: { uploadDocument: () => of(doc), documentInfo } },
+    ]);
+    await expect(editorOf(view).documentInfo()!(doc.url)).resolves.toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+    const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+    const pdf = new File(['x'], 'Plan.pdf', { type: 'application/pdf' });
+    const click = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      Object.defineProperty(this, 'files', { value: [pdf] });
+      this.dispatchEvent(new Event('change'));
+    });
+    view.fixture.componentInstance.insertDocument();
+    await new Promise((r) => setTimeout(r, 0));
+    click.mockRestore();
+    expect(area.value).toBe(`[Plan.pdf](/api/media/documents/${ID}) `);
+    const drop = (files: File[]): Event => {
+      const event = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'dataTransfer', { value: { files } });
+      area.dispatchEvent(event);
+      return event;
+    };
+    expect(drop([new File(['x'], 'a.txt', { type: 'text/plain' })]).defaultPrevented).toBe(false);
+    expect(drop([pdf]).defaultPrevented).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(area.value.match(/Plan\.pdf\]/g)).toHaveLength(2);
   });
 
   it('gives a reader no PDF upload', async () => {
