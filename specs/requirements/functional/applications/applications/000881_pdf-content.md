@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation:
-  - backend/app/modules/applications/pdf.py
+  - backend/app/modules/documents
   - frontend/src/app/pages/applications
 scope:
   - backend/app/modules/applications

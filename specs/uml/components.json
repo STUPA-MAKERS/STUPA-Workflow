@@ -551,6 +551,61 @@
       "to": "voting"
     },
     {
+      "count": 1,
+      "from": "documents",
+      "to": "application_types"
+    },
+    {
+      "count": 7,
+      "from": "documents",
+      "to": "applications"
+    },
+    {
+      "count": 5,
+      "from": "documents",
+      "to": "files"
+    },
+    {
+      "count": 1,
+      "from": "documents",
+      "to": "forms"
+    },
+    {
+      "count": 2,
+      "from": "documents",
+      "to": "gremien"
+    },
+    {
+      "count": 1,
+      "from": "documents",
+      "to": "media"
+    },
+    {
+      "count": 1,
+      "from": "documents",
+      "to": "meetings"
+    },
+    {
+      "count": 2,
+      "from": "documents",
+      "to": "pdf"
+    },
+    {
+      "count": 10,
+      "from": "documents",
+      "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "documents",
+      "to": "site_config"
+    },
+    {
+      "count": 1,
+      "from": "documents",
+      "to": "voting"
+    },
+    {
       "count": 4,
       "from": "files",
       "to": "audit"
@@ -926,7 +981,7 @@
       "to": "voting"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "protocol",
       "to": "applications"
     },
@@ -941,12 +996,17 @@
       "to": "auth"
     },
     {
-      "count": 7,
+      "count": 2,
+      "from": "protocol",
+      "to": "documents"
+    },
+    {
+      "count": 5,
       "from": "protocol",
       "to": "files"
     },
     {
-      "count": 3,
+      "count": 2,
       "from": "protocol",
       "to": "gremien"
     },
@@ -979,11 +1039,6 @@
       "count": 20,
       "from": "protocol",
       "to": "shared"
-    },
-    {
-      "count": 2,
-      "from": "protocol",
-      "to": "site_config"
     },
     {
       "count": 6,
@@ -1246,19 +1301,19 @@
     },
     {
       "id": "antiabuse",
-      "layer": 5,
+      "layer": 6,
       "name": "antiabuse",
       "path": "backend/app/modules/antiabuse"
     },
     {
       "id": "application_types",
-      "layer": 4,
+      "layer": 5,
       "name": "application_types",
       "path": "backend/app/modules/application_types"
     },
     {
       "id": "applications",
-      "layer": 3,
+      "layer": 4,
       "name": "applications",
       "path": "backend/app/modules/applications"
     },
@@ -1270,7 +1325,7 @@
     },
     {
       "id": "audit",
-      "layer": 5,
+      "layer": 6,
       "name": "audit",
       "path": "backend/app/modules/audit"
     },
@@ -1282,13 +1337,13 @@
     },
     {
       "id": "auth",
-      "layer": 5,
+      "layer": 6,
       "name": "auth",
       "path": "backend/app/modules/auth"
     },
     {
       "id": "avatars",
-      "layer": 4,
+      "layer": 5,
       "name": "avatars",
       "path": "backend/app/modules/avatars"
     },
@@ -1300,7 +1355,7 @@
     },
     {
       "id": "budget",
-      "layer": 3,
+      "layer": 4,
       "name": "budget",
       "path": "backend/app/modules/budget"
     },
@@ -1318,31 +1373,37 @@
     },
     {
       "id": "delegations",
-      "layer": 3,
+      "layer": 4,
       "name": "delegations",
       "path": "backend/app/modules/delegations"
     },
     {
+      "id": "documents",
+      "layer": 3,
+      "name": "documents",
+      "path": "backend/app/modules/documents"
+    },
+    {
       "id": "files",
-      "layer": 4,
+      "layer": 5,
       "name": "files",
       "path": "backend/app/modules/files"
     },
     {
       "id": "flow",
-      "layer": 3,
+      "layer": 4,
       "name": "flow",
       "path": "backend/app/modules/flow"
     },
     {
       "id": "forms",
-      "layer": 4,
+      "layer": 5,
       "name": "forms",
       "path": "backend/app/modules/forms"
     },
     {
       "id": "gremien",
-      "layer": 5,
+      "layer": 6,
       "name": "gremien",
       "path": "backend/app/modules/gremien"
     },
@@ -1360,25 +1421,25 @@
     },
     {
       "id": "media",
-      "layer": 4,
+      "layer": 5,
       "name": "media",
       "path": "backend/app/modules/media"
     },
     {
       "id": "meetings",
-      "layer": 3,
+      "layer": 4,
       "name": "meetings",
       "path": "backend/app/modules/meetings"
     },
     {
       "id": "notifications",
-      "layer": 4,
+      "layer": 5,
       "name": "notifications",
       "path": "backend/app/modules/notifications"
     },
     {
       "id": "pdf",
-      "layer": 5,
+      "layer": 6,
       "name": "pdf",
       "path": "backend/app/modules/pdf"
     },
@@ -1408,7 +1469,7 @@
     },
     {
       "id": "site_config",
-      "layer": 5,
+      "layer": 6,
       "name": "site_config",
       "path": "backend/app/modules/site_config"
     },
@@ -1426,19 +1487,19 @@
     },
     {
       "id": "translations",
-      "layer": 4,
+      "layer": 5,
       "name": "translations",
       "path": "backend/app/modules/translations"
     },
     {
       "id": "voting",
-      "layer": 3,
+      "layer": 4,
       "name": "voting",
       "path": "backend/app/modules/voting"
     },
     {
       "id": "webhooks",
-      "layer": 4,
+      "layer": 5,
       "name": "webhooks",
       "path": "backend/app/modules/webhooks"
     }
