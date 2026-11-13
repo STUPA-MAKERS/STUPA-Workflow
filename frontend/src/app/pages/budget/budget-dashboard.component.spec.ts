@@ -4,7 +4,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { render, screen, within } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { AuthService } from '@core/auth/auth.service';
 import { AdminApiService } from '../admin/admin-api.service';
@@ -222,10 +223,32 @@ async function bare(opts: SetupOpts = {}) {
   return { ...view, http, c: view.fixture.componentInstance as unknown as Inst };
 }
 
+/** Only the date is fixed, so the default fiscal year does not move with the calendar. */
+const NOT_FAKED = [
+  'hrtime',
+  'nextTick',
+  'performance',
+  'queueMicrotask',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'requestIdleCallback',
+  'cancelIdleCallback',
+  'setImmediate',
+  'clearImmediate',
+  'setInterval',
+  'clearInterval',
+  'setTimeout',
+  'clearTimeout',
+] as const;
+
 describe('BudgetDashboardComponent', () => {
   const realMatchMedia = window.matchMedia;
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  beforeEach(() => {
+    localStorage.setItem('ap.locale', 'de');
+    jest.useFakeTimers({ now: new Date('2026-11-12T10:00:00Z'), doNotFake: [...NOT_FAKED] });
+  });
   afterEach(() => {
+    jest.useRealTimers();
     const http = TestBed.inject(HttpTestingController);
     flushApps(http);
     http.verify();
@@ -784,11 +807,14 @@ describe('BudgetDashboardComponent', () => {
   });
 
   describe('fiscal year and roots', () => {
-    it('selects the newest fiscal year by default', async () => {
+    it('§F/finance/budget/000140: selects the fiscal year that holds today, else the newest open one', async () => {
       const view = await setup({ fys: [FY, FY2] });
-      const c = view.fixture.componentInstance as unknown as Inst;
-      expect(c.selectedFyId()).toBe('fy-2');
+      expect(view.container.querySelector('.bd__pane app-filter-select button')).toHaveTextContent('HHJ 2026');
       view.http.match(() => true);
+      TestBed.resetTestingModule();
+      const closed = await setup({ fys: [{ ...FY, closedAt: '2026-11-01T00:00:00Z' }, FY2] });
+      expect(closed.container.querySelector('.bd__pane app-filter-select button')).toHaveTextContent('HHJ 2027');
+      closed.http.match(() => true);
     });
 
     it('marks a closed fiscal year in the year chip', async () => {
@@ -815,14 +841,14 @@ describe('BudgetDashboardComponent', () => {
         'HHJ 2026',
         'HHJ 2027',
       ]);
-      within(list).getByRole('option', { name: 'HHJ 2026' }).click();
+      within(list).getByRole('option', { name: 'HHJ 2027' }).click();
       view.fixture.detectChanges();
-      expect(c.selectedFyId()).toBe('fy-1');
+      expect(c.selectedFyId()).toBe('fy-2');
       expect(nav).toHaveBeenCalled();
       const req = view.http.expectOne((r) => r.url.endsWith('/budgets/b-vs/applications'));
-      expect(req.request.params.get('fiscalYear')).toBe('fy-1');
+      expect(req.request.params.get('fiscalYear')).toBe('fy-2');
       req.flush([]);
-      c.selectYear('fy-1');
+      c.selectYear('fy-2');
       view.http.expectNone((r) => r.url.endsWith('/applications'));
     });
 
@@ -939,7 +965,7 @@ describe('BudgetDashboardComponent', () => {
       more.click();
       view.fixture.detectChanges();
       const items = view.getAllByRole('menuitem').map((i) => i.textContent?.trim());
-      expect(items).toEqual(['Exportieren', 'Buchungen ansehen', 'Kostenstelle anlegen']);
+      expect(items).toEqual(['Exportieren', 'Buchungen ansehen']);
       const exp = jest.spyOn(c, 'onExport').mockImplementation(() => undefined);
       const book = jest.spyOn(c, 'openBookings').mockImplementation(() => undefined);
       view.getAllByRole('menuitem')[0].click();
@@ -972,12 +998,12 @@ describe('BudgetDashboardComponent', () => {
       const c = view.fixture.componentInstance as unknown as Inst;
       jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       const chips = view.container.querySelector('.bd__top .bd__chips') as HTMLElement;
-      within(chips).getByRole('button', { name: 'Haushaltsjahr: HHJ 2027' }).click();
+      within(chips).getByRole('button', { name: 'Haushaltsjahr: HHJ 2026' }).click();
       view.fixture.detectChanges();
       const sheet = screen.getByRole('dialog', { name: 'Haushaltsjahr' });
-      within(sheet).getByRole('option', { name: 'HHJ 2026' }).click();
+      within(sheet).getByRole('option', { name: 'HHJ 2027' }).click();
       view.fixture.detectChanges();
-      expect(c.selectedFyId()).toBe('fy-1');
+      expect(c.selectedFyId()).toBe('fy-2');
       expect(screen.queryByRole('dialog', { name: 'Haushaltsjahr' })).toBeNull();
       view.http.match(() => true);
     });
@@ -1370,14 +1396,14 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
   });
 
   describe('views', () => {
-    it('§000804: shows the view switch only when a top level has the plan switch on', async () => {
+    it('§F/finance/budget/000804: shows the view switch only when a top level has the plan switch on', async () => {
       const off = await setup();
       expect(off.container.querySelector('app-segmented')).toBeNull();
       expect(off.c.planTop()).toBeNull();
       off.c.setMode('plan');
     });
 
-    it('§000804: opens Planung with the top level and the year of this view', async () => {
+    it('§F/finance/budget/000804: opens Planung with the top level and the year of this view', async () => {
       const tree = [{ ...TREE[0], planEnabled: true }, ...TREE.slice(1)];
       const view = await setup({ tree });
       expect(view.container.querySelector('app-segmented')).not.toBeNull();
@@ -1392,7 +1418,7 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(navigate).toHaveBeenLastCalledWith(['/budget/plan'], { queryParams: { budget: 'b-vs', fy: null } });
     });
 
-    it('§000804: puts the view switch below the title on a phone', async () => {
+    it('§F/finance/budget/000804: puts the view switch below the title on a phone', async () => {
       const tree = [{ ...TREE[0], planEnabled: true }, ...TREE.slice(1)];
       const view = await setup({ tree, wide: false, phone: true });
       expect(view.container.querySelector('.bd__top app-segmented')).not.toBeNull();
@@ -1406,36 +1432,33 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
     const lineOf = (budgetId: string) => ({ budgetId, amount: '1' });
     const planOf = (state: string, ids: string[]) => ({ id: 'p', budgetId: 'b-vs', fiscalYearId: 'fy-1', versions: [{ id: 'v', number: 0, state, steps: [], lines: ids.map(lineOf) }] });
 
-    it('§000834: shows an inactive Kostenstelle with its mark to a person who can set it active again', async () => {
+    it('§F/finance/budget/000834: shows an inactive Kostenstelle with its mark to a person who can set it active again', async () => {
       const tree = [{ ...TREE[0], children: [{ ...TREE[0].children[0], active: false }, TREE[0].children[1]] }];
       const view = await setup({ tree });
       expect(view.c.treeRows().map((r: { node: { id: string } }) => r.node.id)).toContain('b-800');
       expect(within(view.container.querySelector('.bd__tree') as HTMLElement).getByText('inaktiv')).toBeInTheDocument();
     });
 
-    it('§000831: edits by hand in a budget without a Haushaltsplan', async () => {
+    it('§F/finance/budget/000831: edits by hand in a budget without a Haushaltsplan', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
-      expect(view.c.byHand()).toBe(true);
-      expect(view.c.editable()).toBe(true);
-      expect(view.c.allocatable()).toBe(true);
-      expect(view.c.sided()).toBe(false);
-      expect(view.c.parents().map((o: { value: string }) => o.value)).toEqual(['b-vs', 'b-800', 'b-810', 'b-900']);
-      expect(view.c.moreSections().map((sec: { items: { id: string }[] }) => sec.items.map((i) => i.id))).toEqual([['bookings'], ['new'], ['delete']]);
+      expect(screen.getByRole('button', { name: 'Kostenstelle anlegen' })).toBeInTheDocument();
       expect(view.container.querySelector('app-cost-centre-settings')).not.toBeNull();
-      expect(view.container.querySelector('.bd__allocation')).not.toBeNull();
+      expect(screen.queryByRole('combobox', { name: /Seite/ })).toBeNull();
+      expect(screen.getByRole('heading', { name: 'Zuteilung' })).toBeInTheDocument();
+      expect(view.container.querySelector('[name="allocation-b-800"]')).not.toBeNull();
+      await userEvent.click(within(view.container.querySelector('.bd__head') as HTMLElement).getByRole('button', { name: 'Weitere Aktionen' }));
+      expect((await screen.findAllByRole('menuitem')).map((i) => i.textContent?.trim())).toEqual(['Buchungen ansehen', 'Kostenstelle löschen']);
     });
 
     it('offers nothing to edit without budget.structure, and no settings for the budget itself', async () => {
       const reader = await setup({ perms: ['budget.view'], queryParams: { costCentre: 'b-800' } });
-      expect(reader.c.byHand()).toBe(false);
-      expect(reader.c.moreSections()).toEqual([{ items: [expect.objectContaining({ id: 'bookings' })] }]);
+      expect(screen.queryByRole('button', { name: 'Kostenstelle anlegen' })).toBeNull();
       expect(reader.container.querySelector('app-cost-centre-settings')).toBeNull();
+      expect(reader.container.querySelector('[name="allocation-b-800"]')).toBeNull();
       TestBed.resetTestingModule();
       const top = await setup();
-      expect(top.c.editable()).toBe(false);
-      expect(top.c.parents()).toHaveLength(4);
       expect(top.container.querySelector('app-cost-centre-settings')).toBeNull();
-      expect(top.container.querySelector('.bd__allocation')).not.toBeNull();
+      expect(top.container.querySelector('[name="allocation-b-vs"]')).not.toBeNull();
     });
 
     it('has no allocation field in a closed year, and no Gremien when their read fails', async () => {
@@ -1444,7 +1467,7 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(view.c.gremiumOptions()).toEqual([]);
     });
 
-    it('§000822: shows in a year with a plan in force only its Kostenstellen and edits nothing by hand', async () => {
+    it('§F/finance/budget/000822: shows in a year with a plan in force only its Kostenstellen and edits nothing by hand', async () => {
       const view = await setup({ tree: [...PLAN_TREE, node({ id: 'b-qs', byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })] })], queryParams: { costCentre: 'b-900' } });
       expect(view.c.yearPlan()).toBeUndefined();
       view.http.expectOne(planUrl).flush(planOf('in_force', ['b-800']));
@@ -1475,32 +1498,48 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
     it('edits by hand in a year without a plan, and keeps the answer of a year that is no longer shown', async () => {
       const view = await setup({ tree: PLAN_TREE, fys: [FY, FY2] });
       const first = view.http.expectOne(planUrl);
-      view.c.selectYear('fy-1');
+      view.c.selectYear('fy-2');
       const second = view.http.expectOne(planUrl);
       first.flush(planOf('in_force', []));
       expect(view.c.yearPlan()).toBeUndefined();
       second.flush({ code: 'plan_not_found' }, { status: 404, statusText: 'Not Found' });
       expect(view.c.yearPlan()).toBeNull();
       expect(view.c.byHand()).toBe(true);
-      view.c.selectYear('fy-2');
-      const third = view.http.expectOne(planUrl);
       view.c.selectYear('fy-1');
+      const third = view.http.expectOne(planUrl);
+      view.c.selectYear('fy-2');
       third.flush({}, { status: 500, statusText: 'Error' });
       expect(view.c.yearPlan()).toBeUndefined();
       view.http.expectOne(planUrl).flush(planOf('draft', []));
     });
 
-    it('§000829: opens the create dialog and selects the new Kostenstelle', async () => {
-      const view = await setup();
-      view.c.onAction({ id: 'new', label: '' });
-      expect(view.c.createOpen()).toBe(true);
-      view.c.onCreated({ id: 'b-900', plan: null });
-      expect(view.c.createOpen()).toBe(false);
+    it('§F/finance/budget/000829: the floating button creates a Kostenstelle below the shown one, and the page selects it', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-800' } });
+      await userEvent.click(screen.getByRole('button', { name: 'Kostenstelle anlegen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Kostenstelle anlegen' });
+      expect(dialog.querySelector('[data-cc-trigger]')).toHaveTextContent('Dezentrale Einrichtungen');
+      await userEvent.type(dialog.querySelector('[name="ccKey"] input') as HTMLElement, '820');
+      await userEvent.type(dialog.querySelector('[name="ccName"] input') as HTMLElement, 'Labor');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+      const post = view.http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/budgets'));
+      expect(post.request.body).toEqual({ parentId: 'b-800', key: '820', name: 'Labor', side: null, currency: 'EUR' });
+      post.flush({ id: 'b-900' });
       view.http.expectOne(treeUrl).flush(TREE);
-      expect(view.c.selectedKsId()).toBe('b-900');
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kostenstelle anlegen' })).toBeNull());
+      expect(screen.getByRole('heading', { level: 2, name: 'Rücklage' })).toBeInTheDocument();
+    });
+
+    it('§F/finance/budget/000829: keeps the shown Kostenstelle when the new one is not in the tree, and closes the dialog from Abbrechen', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-800' } });
+      await userEvent.click(screen.getByRole('button', { name: 'Kostenstelle anlegen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Kostenstelle anlegen' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kostenstelle anlegen' })).toBeNull());
+      view.c.onCreated({ id: 'gone', plan: null });
+      view.http.expectOne(treeUrl).flush(TREE);
       view.c.onCreated({ id: null, plan: null });
       view.http.expectOne(treeUrl).flush(TREE);
-      expect(view.c.selectedKsId()).toBe('b-900');
+      expect(view.c.selectedKsId()).toBe('b-800');
     });
 
     it('selects the budget when the selected Kostenstelle is gone after a refresh, and names a failed refresh', async () => {
@@ -1514,50 +1553,84 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(error).toHaveBeenCalledWith('Die Budget-Statistik konnte nicht geladen werden.');
     });
 
-    it('§000832: deletes the selected Kostenstelle after the confirmation', async () => {
+    it('§F/finance/budget/000832: deletes the selected Kostenstelle after the confirmation', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-810' } });
       const toast = TestBed.inject(ToastService);
       const success = jest.spyOn(toast, 'success');
       const error = jest.spyOn(toast, 'error');
-      view.c.deleteNode();
-      view.c.onAction({ id: 'delete', label: '' });
-      expect(view.c.deleteTarget().id).toBe('b-810');
-      view.c.deleteNode();
-      view.http.expectOne((r) => r.method === 'DELETE' && r.url.endsWith('/budgets/b-810')).flush({ code: 'budget_has_bookings' }, { status: 409, statusText: 'Conflict' });
+      const remove = async (button: string) => {
+        await userEvent.click(within(view.container.querySelector('.bd__head') as HTMLElement).getByRole('button', { name: 'Weitere Aktionen' }));
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Kostenstelle löschen' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Kostenstelle löschen?' });
+        expect(dialog).toHaveTextContent('„Werkstatt“ (VS-800-810) wird gelöscht. Das lässt sich nicht rückgängig machen.');
+        await userEvent.click(within(dialog).getByRole('button', { name: button }));
+      };
+      const del = (r: { method: string; url: string }) => r.method === 'DELETE' && r.url.endsWith('/budgets/b-810');
+      await remove('Abbrechen');
+      view.http.expectNone(del);
+      await remove('Löschen');
+      view.http.expectOne(del).flush({ code: 'budget_has_bookings' }, { status: 409, statusText: 'Conflict' });
       expect(error).toHaveBeenCalledWith('Die Kostenstelle hat Buchungen und lässt sich nicht löschen.');
-      expect(view.c.selectedKsId()).toBe('b-810');
-      view.c.onAction({ id: 'delete', label: '' });
-      view.c.deleteNode();
-      view.http.expectOne((r) => r.method === 'DELETE').flush(null);
+      expect(screen.getByRole('heading', { level: 2, name: 'Werkstatt' })).toBeInTheDocument();
+      await remove('Löschen');
+      view.http.expectOne(del).flush(null);
       expect(success).toHaveBeenCalledWith('Kostenstelle gelöscht.');
-      expect(view.c.selectedKsId()).toBe('b-800');
-      expect(view.c.deleteTarget()).toBeNull();
       view.http.expectOne(treeUrl).flush(TREE);
+      view.fixture.detectChanges();
+      expect(screen.getByRole('heading', { level: 2, name: 'Dezentrale Einrichtungen' })).toBeInTheDocument();
+      view.c.deleteNode();
+      view.http.expectNone((r) => r.method === 'DELETE');
     });
 
-    it('§000833: saves the allocation when the field loses the focus', async () => {
+    it('§F/finance/budget/000833: saves the allocation when the field loses the focus', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
       const toast = TestBed.inject(ToastService);
       const success = jest.spyOn(toast, 'success');
-      const error = jest.spyOn(toast, 'error');
       const put = (r: { method: string; url: string }) => r.method === 'PUT' && r.url.endsWith('/budgets/b-800/allocations/fy-1');
-      view.c.saveAllocation();
-      view.c.editAllocation('');
-      view.c.saveAllocation();
-      view.c.editAllocation('400');
-      view.c.saveAllocation();
+      const field = () => view.container.querySelector('[name="allocation-b-800"]') as HTMLInputElement;
+      const retype = async (value: string) => {
+        await userEvent.clear(field());
+        if (value) await userEvent.type(field(), value);
+        await userEvent.tab();
+      };
+      await waitFor(() => expect(field().value).toBe('400,00'));
+      await userEvent.click(field());
+      await userEvent.tab();
+      await retype('400');
       view.http.expectNone(put);
-      view.c.editAllocation('450');
-      view.c.saveAllocation();
+      await retype('450');
       const req = view.http.expectOne(put);
       expect(req.request.body).toEqual({ allocated: '450' });
       req.flush({});
       expect(success).toHaveBeenCalledWith('Zuteilung gespeichert.');
       view.http.expectOne(treeUrl).flush(TREE);
-      view.c.editAllocation('9999');
-      view.c.saveAllocation();
+    });
+
+    it('§F/finance/budget/000833: an empty or refused allocation shows the saved one again and names the cause', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-800' } });
+      const error = jest.spyOn(TestBed.inject(ToastService), 'error');
+      const put = (r: { method: string; url: string }) => r.method === 'PUT' && r.url.endsWith('/budgets/b-800/allocations/fy-1');
+      const field = () => view.container.querySelector('[name="allocation-b-800"]') as HTMLInputElement;
+      const retype = async (value: string) => {
+        await userEvent.clear(field());
+        if (value) await userEvent.type(field(), value);
+        await userEvent.tab();
+      };
+      await retype('');
+      view.http.expectNone(put);
+      await waitFor(() => expect(field().value).toBe('400,00'));
+      await retype('9999');
       view.http.expectOne(put).flush({ code: 'children_allocation_exceeds_parent' }, { status: 422, statusText: 'Unprocessable' });
-      expect(error).toHaveBeenCalledWith('Die Zuteilung konnte nicht gespeichert werden.');
+      expect(error).toHaveBeenLastCalledWith('Die Zuteilung liegt über der Zuteilung der übergeordneten Kostenstelle. Erhöhe zuerst diese.');
+      view.http.expectOne(treeUrl).flush(TREE);
+      await waitFor(() => expect(field().value).toBe('400,00'));
+      await retype('1');
+      view.http.expectOne(put).flush({ code: 'parent_allocation_below_children' }, { status: 422, statusText: 'Unprocessable' });
+      expect(error).toHaveBeenLastCalledWith('Die Zuteilung liegt unter der Summe der untergeordneten Kostenstellen.');
+      view.http.expectOne(treeUrl).flush(TREE);
+      await retype('2');
+      view.http.expectOne(put).flush({}, { status: 500, statusText: 'Error' });
+      expect(error).toHaveBeenLastCalledWith('Die Zuteilung konnte nicht gespeichert werden.');
       view.http.expectOne(treeUrl).flush(TREE);
       view.c.selectedKsId.set('gone');
       view.c.editAllocation('1');

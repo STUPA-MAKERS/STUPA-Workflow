@@ -4,6 +4,7 @@
     <app-input
       class="ccs__key"
       [label]="'budget.tree.key' | t"
+      [error]="keyError()"
       [ngModel]="key()"
       (ngModelChange)="key.set($event)"
       (focusout)="saveText('key')"
@@ -11,6 +12,7 @@
     />
     <app-input
       [label]="'budget.tree.name' | t"
+      [error]="nameError()"
       [ngModel]="name()"
       (ngModelChange)="name.set($event)"
       (focusout)="saveText('name')"
@@ -18,17 +20,14 @@
     />
   </div>
   @if (sided()) {
-    <div class="ccs__side">
-      <span class="ccs__label" [id]="'cc-side-' + n.id">{{ 'budget.cc.side' | t }}</span>
-      <app-segmented
-        width="equal"
-        size="control"
-        [ariaLabel]="'budget.cc.side' | t"
-        [options]="sides()"
-        [value]="n.side ?? null"
-        (valueChange)="saveSide($event)"
-      />
-    </div>
+    <app-select
+      [name]="'cc-side-' + n.id"
+      [label]="'budget.cc.side' | t"
+      [clearable]="false"
+      [options]="sides()"
+      [ngModel]="side()"
+      (ngModelChange)="saveSide($event)"
+    />
   }
   <app-colour-field [(value)]="colour" [name]="'cc-colour-' + n.id" (picked)="saveColour($event)" />
   <app-switch [id]="'cc-active-' + n.id" [checked]="n.active" (checkedChange)="save({ active: $event })">

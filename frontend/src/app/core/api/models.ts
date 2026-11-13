@@ -1370,6 +1370,8 @@ export interface Vote extends ElectionFields {
   readonly agendaItemId?: Uuid | null;
   /** The motion of a meeting vote. A standalone vote often has none. */
   readonly question?: string | null;
+  /** The version of a Haushaltsplan whose step the vote decides, else `null`. */
+  readonly planVersionId?: Uuid | null;
   readonly eligibleGroup: string;
   readonly config: VoteConfig;
   readonly status: VoteStatus;

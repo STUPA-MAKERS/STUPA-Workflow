@@ -10,7 +10,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
 import {
-  BadgeComponent,
+  FabComponent,
   ButtonComponent,
   ConfirmDialogComponent,
   CurrencyInputComponent,
@@ -36,6 +36,7 @@ import {
   ToastService,
   PageHeaderComponent,
   SectionComponent,
+  StatusTextComponent,
 } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { exportDownload } from '@shared/download.util';
@@ -52,9 +53,10 @@ import {
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
+import { defaultFiscalYearId } from './fiscal-year.util';
 import { CostCentreCreateComponent, type CostCentreCreated } from './cost-centre/cost-centre-create.component';
 import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
-import { activeOnly, costCentreError, hasSide, parentOptions, withDescendants } from './cost-centre/cost-centre.util';
+import { activeOnly, costCentreError, hasSide } from './cost-centre/cost-centre.util';
 import { BudgetPlanApi, type BudgetPlan } from './plan/budget-plan.api';
 import { inForce, memberIds, yearMembers } from './plan/budget-plan.util';
 import { AdminApiService } from '../admin/admin-api.service';
@@ -158,7 +160,8 @@ export const APPS_SHOWN = 5;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TodoLinkedListComponent,
-    BadgeComponent,
+    FabComponent,
+    StatusTextComponent,
     ConfirmDialogComponent,
     CostCentreCreateComponent,
     CostCentreSettingsComponent,
@@ -293,15 +296,18 @@ export class BudgetDashboardComponent {
   readonly createOpen = signal(false);
   /** The Kostenstelle that waits for the confirmation of its delete. */
   readonly deleteTarget = signal<BudgetTreeNode | null>(null);
+  /** The text of the delete confirmation: the name and the path of the Kostenstelle. */
+  readonly deleteBody = computed(() => {
+    const node = this.deleteTarget();
+    return node ? this.i18n.translate('budget.tree.deleteConfirm', { name: node.name, path: node.pathKey }) : '';
+  });
   readonly gremiumOptions = signal<readonly SelectOption[]>([]);
   /** The allocation a person typed and did not leave yet. */
   private readonly allocationDraft = signal<string | null>(null);
-  /** The parents of a new Kostenstelle: the budget and each Kostenstelle below it. */
-  readonly parents = computed<SelectOption[]>(() => {
+  /** The parents of a new Kostenstelle: the budget with each Kostenstelle below it. */
+  readonly parentNodes = computed<readonly BudgetTreeNode[]>(() => {
     const top = this.selectedTop();
-    return top
-      ? parentOptions(top, withDescendants(top).slice(1), this.i18n.translate('budget.cc.budget'))
-      : [];
+    return top ? [top] : [];
   });
   /** The selected Kostenstelle is below a budget, so the page edits and deletes it. */
   readonly editable = computed(() => this.canManageStructure() && !!this.current()?.parentId);
@@ -812,7 +818,7 @@ export class BudgetDashboardComponent {
     return {
       budgetId,
       ksId: ks && this.nodeById().get(ks) ? ks : budgetId,
-      fyId: fy && fys.some((f) => f.id === fy) ? fy : newestFyId(fys),
+      fyId: fy && fys.some((f) => f.id === fy) ? fy : defaultFiscalYearId(fys),
     };
   }
 
@@ -856,22 +862,25 @@ export class BudgetDashboardComponent {
     });
   }
 
-  /** Read the tree again after a write, without the skeleton of the first load. */
-  refreshTree(): void {
+  /**
+   * Read the tree again after a write, without the skeleton of the first load. `select`
+   * names the Kostenstelle that the page then shows.
+   */
+  refreshTree(select: string | null = null): void {
     this.api.tree().subscribe({
       next: (tree) => {
         this.tree.set(tree);
-        if (!this.selectedKs()) this.selectKs(this.selectedBudgetId());
+        if (select && this.nodeById().get(select)) this.selectKs(select);
+        else if (!this.selectedKs()) this.selectKs(this.selectedBudgetId());
       },
       error: () => this.toast.error(this.i18n.translate('budget.error')),
     });
   }
 
+  /** The dialog created a Kostenstelle: the page shows it. */
   onCreated(created: CostCentreCreated): void {
     this.createOpen.set(false);
-    if (created.id) this.selectedKsId.set(created.id);
-    this.refreshTree();
-    this.syncUrl();
+    this.refreshTree(created.id);
   }
 
   /** Delete the Kostenstelle after the confirmation. A refusal shows its reason. */
@@ -891,11 +900,17 @@ export class BudgetDashboardComponent {
     });
   }
 
-  editAllocation(value: string): void {
-    this.allocationDraft.set(value);
+  editAllocation(value: string | null): void {
+    this.allocationDraft.set(value ?? '');
   }
 
-  /** The allocation field lost the focus: save the typed amount. An empty field saves nothing. */
+  /** The amount of the allocation field: the text a person types, else the saved allocation. */
+  readonly allocationValue = computed<string | number>(() => this.allocationDraft() ?? this.figures().allocated);
+
+  /**
+   * The allocation field lost the focus: save the typed amount. An empty field saves
+   * nothing, and a refused amount goes: the field then shows the saved allocation again.
+   */
   saveAllocation(): void {
     const ks = this.current();
     const value = this.allocationDraft();
@@ -945,7 +960,7 @@ export class BudgetDashboardComponent {
     const root = this.rootOf(id) ?? id;
     if (root !== this.selectedBudgetId()) {
       const fys = this.fiscalYearsByBudget()[root] ?? [];
-      const fy = this.fyIdFor(root) || newestFyId(fys);
+      const fy = this.fyIdFor(root) || defaultFiscalYearId(fys);
       this.setSelection(root, id, fy);
     } else {
       this.setSelection(root, id, this.selectedFyId());
@@ -976,15 +991,11 @@ export class BudgetDashboardComponent {
     this.itemsOpen.set(true);
   }
 
-  /** The actions on the structure: a new Kostenstelle, and the delete of the selected one. */
+  /** The action on the structure: the delete of the selected Kostenstelle. */
   private structureItems(): RowMenuSection[] {
-    const create: RowMenuItem[] = this.byHand()
-      ? [{ id: 'new', label: this.i18n.translate('budget.cc.create'), icon: 'plus' }]
+    return this.editable()
+      ? [{ items: [{ id: 'delete', label: this.i18n.translate('budget.cc.delete'), icon: 'trash', danger: true }] }]
       : [];
-    const remove: RowMenuItem[] = this.editable()
-      ? [{ id: 'delete', label: this.i18n.translate('budget.cc.delete'), icon: 'trash', danger: true }]
-      : [];
-    return [create, remove].filter((items) => items.length).map((items) => ({ items }));
   }
 
   /** The actions of the page, as the "more" menu of a phone. */
@@ -1017,7 +1028,6 @@ export class BudgetDashboardComponent {
   onAction(item: RowMenuItem): void {
     if (item.id === 'export') this.onExport();
     else if (item.id === 'bookings') this.openBookings();
-    else if (item.id === 'new') this.createOpen.set(true);
     else if (item.id === 'delete') this.deleteTarget.set(this.current());
   }
 
@@ -1057,12 +1067,6 @@ function toFigures(a: BudgetAllocationView): Figures {
 export function utilisation(f: Figures): number | null {
   const total = f.available + f.committed;
   return total > 0 ? Math.round((f.committed / total) * 100) : null;
-}
-
-/** The id of the newest fiscal year (the highest start year), or `''` without one. */
-function newestFyId(fys: readonly FiscalYear[]): string {
-  const newest = fys.reduce<FiscalYear | null>((n, f) => (!n || f.year > n.year ? f : n), null);
-  return newest?.id ?? '';
 }
 
 /** Every node of a forest, each before its subtree. */

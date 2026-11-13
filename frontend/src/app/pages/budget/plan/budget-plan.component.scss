@@ -1,3 +1,5 @@
+@use 'breakpoints' as bp;
+
 .bp__node {
   display: flex;
   flex-direction: column;
@@ -33,11 +35,6 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-.bp__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
 
 :host .bp__table ::ng-deep .dt__table th,
 :host .bp__table ::ng-deep .dt__table td {
@@ -67,7 +64,7 @@
   gap: var(--space-2);
   margin: var(--space-3) 0 2px;
   padding: 0 var(--space-3) 0 calc(4px + 1.75rem + var(--space-1));
-  font-size: 0.78125rem;
+  font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   color: var(--color-text-muted);
 }
@@ -76,18 +73,14 @@
 }
 .bp__figNote {
   margin: 0;
-  font-size: 0.78125rem;
-  line-height: 1.125rem;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-small);
   color: var(--color-text-muted);
 }
 .bp__form {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-.bp__ansatz {
-  display: block;
-  max-width: 14rem;
 }
 .bp__sumCell {
   display: block;
@@ -101,18 +94,16 @@
   gap: var(--space-1) var(--space-2);
 }
 
-.bp__blocked {
-  display: block;
-  max-width: 14rem;
-}
-.bp__none {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-2);
-}
 .bp__addForm {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+// On a phone the figures stand in two columns: the difference takes the whole row, so no
+// cell stays empty.
+@include bp.phone {
+  .bp__figWide {
+    grid-column: 1 / -1;
+  }
 }

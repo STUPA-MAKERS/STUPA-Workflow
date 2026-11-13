@@ -1,52 +1,72 @@
-import { type Observable, of, throwError } from 'rxjs';
+import { type Observable, Subject, of, throwError } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
-import { BudgetTreeApi, type BudgetTreeNode } from '../../budget/budget-tree.api';
-import { BudgetPlanApi } from '../../budget/plan/budget-plan.api';
-import { FY25, FY26, QSM, TOP, fy } from '../../budget/plan/budget-plan.fixtures';
+import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../../budget/budget-tree.api';
+import { BudgetPlanApi, type PlanSteps, type PlanSwitchChange } from '../../budget/plan/budget-plan.api';
+import { FY25, FY26, QSM, TOP, fy, node, plan } from '../../budget/plan/budget-plan.fixtures';
 import { AdminApiService } from '../admin-api.service';
 import { AdminBudgetsComponent } from './admin-budgets.component';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Inst = any;
-
-const problem = (status: number, code = '', detail = '') => ({ status, error: { code, detail } });
-const refuse = (status: number, code = '', detail = ''): Observable<never> => throwError(() => problem(status, code, detail));
-const submit = () => ({ preventDefault: jest.fn() }) as unknown as Event;
+const problem = (status: number, code = '') => ({ status, error: { code } });
+const refuse = (status: number, code = ''): Observable<never> => throwError(() => problem(status, code));
 const STEPS = [
   { name: 'Beschluss', gremiumId: 'g1' },
   { name: 'Genehmigung', gremiumId: null },
 ];
+/** VS-Mittel with a side on each Kostenstelle directly below it. */
+const VSM: BudgetTreeNode = { ...TOP, children: TOP.children.filter((c) => c.id !== 'noside') };
+/** A budget without a plan: one Kostenstelle without a side, one with a side. */
+const KSM: BudgetTreeNode = node({
+  id: 'ksm',
+  name: 'Kultur',
+  children: [node({ id: 'k1', parentId: 'ksm', name: 'Feste' }), node({ id: 'k2', parentId: 'ksm', name: 'Reisen', side: 'expense' })],
+});
+const CHANGE: PlanSwitchChange = {
+  fiscalYearId: 'fy-26',
+  year: '2026/27',
+  budgetId: 'k1',
+  pathKey: 'KSM-K1',
+  name: 'Feste',
+  allocated: '100',
+  planned: '0',
+};
 
 interface Opts {
   tree?: Observable<readonly BudgetTreeNode[]>;
   perms?: readonly string[];
   gremienFail?: boolean;
+  years?: readonly FiscalYear[];
 }
 
 async function setup(opts: Opts = {}) {
   TestBed.resetTestingModule();
   const perms = opts.perms ?? ['budget.structure'];
-  const ok = () => of({});
+  const ok = (..._args: unknown[]): Observable<unknown> => of({});
   const api = {
-    tree: jest.fn(() => opts.tree ?? of([TOP, QSM])),
+    tree: jest.fn(() => opts.tree ?? of([VSM, QSM, KSM])),
     createNode: jest.fn(ok),
     updateNode: jest.fn(ok),
     deleteNode: jest.fn(ok),
-    listFiscalYears: jest.fn(() => of([FY25, FY26])),
+    listFiscalYears: jest.fn((_id: string): Observable<readonly FiscalYear[]> => of(opts.years ?? [FY25, FY26])),
     createFiscalYear: jest.fn(ok),
     updateFiscalYear: jest.fn(ok),
     setFiscalYearClosed: jest.fn(ok),
     deleteFiscalYear: jest.fn(ok),
   };
   const planApi = {
-    steps: jest.fn(() => of({ budgetId: 'vsm', steps: STEPS })),
+    steps: jest.fn((id: string): Observable<PlanSteps> => of({ budgetId: id, steps: id === 'vsm' ? STEPS : [] })),
     setSteps: jest.fn(ok),
     setPlanSwitch: jest.fn(ok),
+    setSide: jest.fn(ok),
+    switchPreview: jest.fn((id: string) => of({ budgetId: id, changes: [] as readonly PlanSwitchChange[] })),
+    plan: jest.fn((..._args: unknown[]): Observable<unknown> => refuse(404, 'plan_not_found')),
   };
   const view = await render(AdminBudgetsComponent, {
     providers: [
@@ -61,390 +81,680 @@ async function setup(opts: Opts = {}) {
     ],
   });
   const toast = TestBed.inject(ToastService);
-  return {
-    ...view,
-    api,
-    planApi,
-    toast,
-    success: jest.spyOn(toast, 'success'),
-    error: jest.spyOn(toast, 'error'),
-    c: view.fixture.componentInstance as unknown as Inst,
-  };
+  return { ...view, api, planApi, success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
+}
+
+const field = (scope: HTMLElement, name: string) => scope.querySelector<HTMLInputElement>(`[name="${name}"] input`) as HTMLInputElement;
+const labelled = (scope: HTMLElement, label: string) => within(scope).getByLabelText(new RegExp(`^${label}`)) as HTMLInputElement;
+const button = (scope: HTMLElement, name: string | RegExp) => within(scope).getByRole('button', { name });
+
+/** Replace the text of a field. */
+async function retype(input: HTMLInputElement, value: string): Promise<void> {
+  await userEvent.clear(input);
+  if (value) await userEvent.type(input, value);
+}
+/** Choose an option of a select field of a dialog. */
+async function pick(scope: HTMLElement, label: string | RegExp, option: string): Promise<void> {
+  await userEvent.click(within(scope).getByRole('combobox', { name: label }));
+  await userEvent.click(await screen.findByRole('option', { name: option }));
+}
+/** Open the edit form of a budget with a press on its row. */
+async function openEdit(name: string): Promise<HTMLElement> {
+  await userEvent.click(screen.getByText(name));
+  return screen.findByRole('dialog', { name: 'Budget bearbeiten' });
+}
+/** Press an item of the menu of a row. */
+async function rowMenu(row: string, item: string): Promise<void> {
+  await userEvent.click(screen.getByRole('button', { name: `Aktionen: ${row}` }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: item }));
+}
+/** Open the fiscal years of VS-Mittel. */
+async function openYears(row = 'VS-Mittel'): Promise<HTMLElement> {
+  await rowMenu(row, 'Haushaltsjahre');
+  return screen.findByRole('dialog', { name: `Haushaltsjahre: ${row}` });
 }
 
 describe('AdminBudgetsComponent', () => {
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  beforeEach(() => {
+    localStorage.setItem('ap.locale', 'de');
+    jest.useFakeTimers({
+      now: new Date('2026-11-12T10:00:00Z'),
+      doNotFake: [
+        'hrtime',
+        'nextTick',
+        'performance',
+        'queueMicrotask',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'requestIdleCallback',
+        'cancelIdleCallback',
+        'setImmediate',
+        'clearImmediate',
+        'setInterval',
+        'clearInterval',
+        'setTimeout',
+        'clearTimeout',
+      ],
+    });
+  });
+  afterEach(() => jest.useRealTimers());
 
   describe('list', () => {
-    it('§000828: lists only the top-level budgets, each with its start and its plan switch', async () => {
-      const view = await setup();
-      expect(view.c.budgets().map((b: BudgetTreeNode) => b.id)).toEqual(['vsm', 'qsm']);
+    it('§F/finance/budget/000828: lists only the top-level budgets, each with its start and its plan switch', async () => {
+      const view = await setup({ tree: of([VSM, { ...QSM, active: false }]) });
       expect(screen.getByText('VS-Mittel')).toBeInTheDocument();
       expect(screen.queryByText('Beiträge')).toBeNull();
       expect(screen.getAllByText('01.03.')).toHaveLength(2);
       expect(screen.getByText('Mit Haushaltsplan')).toBeInTheDocument();
       expect(screen.getByText('Ohne Haushaltsplan')).toBeInTheDocument();
-      expect(view.c.columns().map((col: { key: string }) => col.key)).toEqual(['node', 'start', 'plan', 'actions']);
-      expect(view.c.rowId(TOP)).toBe('vsm');
-      expect(view.c.asBudget(TOP)).toBe(TOP);
-      expect(view.c.gremiumOptions()).toEqual([{ value: 'g1', label: 'StuPa' }]);
+      expect(screen.getByText('Inaktiv')).toBeInTheDocument();
+      expect(screen.getAllByRole('columnheader').map((h) => h.textContent?.trim())).toEqual([
+        'Budget',
+        'Beginn des Haushaltsjahrs',
+        'Haushaltsplan',
+        'Aktionen',
+      ]);
       expect(await axe(view.container)).toHaveNoViolations();
     });
 
-    it('shows the load error, and no Gremien when their read fails', async () => {
+    it('shows the load error and reads the list again on the retry', async () => {
       const view = await setup({ tree: refuse(500), gremienFail: true });
-      expect(view.c.loadError()).toBe(true);
-      expect(view.c.loading()).toBe(false);
-      expect(view.c.gremiumOptions()).toEqual([]);
+      expect(screen.queryByText('VS-Mittel')).toBeNull();
+      view.api.tree.mockReturnValueOnce(of([VSM]));
+      (view.fixture.debugElement.query(By.directive(LoadErrorComponent)).componentInstance as LoadErrorComponent).retry.emit();
+      view.fixture.detectChanges();
+      expect(screen.getByText('VS-Mittel')).toBeInTheDocument();
+      const dialog = await openEdit('VS-Mittel');
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Sichtbar für Gremium' }));
+      expect(screen.queryByRole('option', { name: 'StuPa' })).toBeNull();
     });
 
     it('shows the empty state without a budget', async () => {
-      const view = await setup({ tree: of([]) });
-      expect(view.container.querySelector('app-empty-state')).not.toBeNull();
-    });
-
-    it('opens the fiscal years or the delete dialog from the menu of a row', async () => {
-      const view = await setup();
-      expect(view.c.rowMenu().map((s: { items: { id: string }[] }) => s.items[0].id)).toEqual(['years', 'delete']);
-      view.c.onRowMenu(TOP, { id: 'years', label: '' });
-      expect(view.c.fyOpen()).toBe(true);
-      view.c.deleteBlocked.set('x');
-      view.c.onRowMenu(TOP, { id: 'delete', label: '' });
-      expect(view.c.deleteTarget()).toBe(TOP);
-      expect(view.c.deleteBlocked()).toBeNull();
+      await setup({ tree: of([]) });
+      expect(screen.getByText('Noch keine Budgets angelegt.')).toBeInTheDocument();
     });
   });
 
   describe('create', () => {
     it('creates a budget with the start of its fiscal year', async () => {
       const view = await setup();
-      view.c.openTop();
-      expect(view.c.topOpen()).toBe(true);
-      view.c.createTop(submit());
-      expect(view.api.createNode).not.toHaveBeenCalled();
-      view.c.patchTop('key', ' QS ');
-      view.c.patchTop('name', ' QS-Mittel ');
-      view.c.patchTopCutoff('day', '40');
-      view.c.patchTopCutoff('month', '10');
-      view.c.createTop(submit());
+      await userEvent.click(screen.getByRole('button', { name: 'Budget anlegen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Budget anlegen' });
+      const create = button(dialog, 'Anlegen');
+      expect(create).toBeDisabled();
+      await userEvent.type(field(dialog, 'topKey'), 'Q-S');
+      await userEvent.type(field(dialog, 'topName'), ' QS-Mittel ');
+      expect(within(dialog).getByText('Nur Buchstaben und Ziffern, höchstens 64 Zeichen.')).toBeInTheDocument();
+      expect(create).toBeDisabled();
+      await retype(field(dialog, 'topKey'), ' QS ');
+      await retype(labelled(dialog, 'Tag'), '40');
+      await retype(labelled(dialog, 'Monat'), '10');
+      await userEvent.click(create);
       expect(view.api.createNode).toHaveBeenCalledWith({ key: 'QS', name: 'QS-Mittel', fiscalStartDay: 28, fiscalStartMonth: 10 });
       expect(view.success).toHaveBeenCalledWith('Budget angelegt.');
-      expect(view.c.topOpen()).toBe(false);
       expect(view.api.tree).toHaveBeenCalledTimes(2);
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget anlegen' })).toBeNull());
     });
 
-    it('names the cause of a refused create', async () => {
+    it('names the cause of a refused create, keeps the dialog and creates with Enter', async () => {
       const view = await setup();
       view.api.createNode.mockReturnValueOnce(refuse(409, 'budget_key_exists'));
-      view.c.patchTop('key', 'VS');
-      view.c.patchTop('name', 'X');
-      view.c.createTop(submit());
+      await userEvent.click(screen.getByRole('button', { name: 'Budget anlegen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Budget anlegen' });
+      await userEvent.type(field(dialog, 'topKey'), 'VS');
+      await userEvent.type(field(dialog, 'topName'), 'X{Enter}');
       expect(view.error).toHaveBeenCalledWith('Diesen Schlüssel gibt es an dieser Stelle schon.');
+      expect(screen.getByRole('dialog', { name: 'Budget anlegen' })).toBeInTheDocument();
+      await userEvent.click(button(dialog, 'Abbrechen'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget anlegen' })).toBeNull());
+    });
+
+    it('creates nothing a second time while the create runs', async () => {
+      const view = await setup();
+      view.api.createNode.mockReturnValueOnce(new Subject<unknown>());
+      await userEvent.click(screen.getByRole('button', { name: 'Budget anlegen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Budget anlegen' });
+      await userEvent.type(field(dialog, 'topKey'), 'VS');
+      await userEvent.type(field(dialog, 'topName'), 'X{Enter}');
+      await userEvent.type(field(dialog, 'topName'), '{Enter}');
+      expect(view.api.createNode).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('edit', () => {
-    it('§000827: opens the form of a budget with its steps', async () => {
-      const view = await setup();
-      view.c.openEdit({ ...TOP, color: ' #112233 ', viewGremiumId: 'g1', decisionGremiumId: 'g1' });
-      view.fixture.detectChanges();
-      expect(view.c.form()).toMatchObject({
-        key: 'vsm',
-        name: 'VS-Mittel',
-        colour: '#112233',
-        active: true,
-        viewGremium: 'g1',
-        decisionGremium: 'g1',
-        day: 1,
-        month: 3,
-        plan: true,
-        steps: [
-          { name: 'Beschluss', gremiumId: 'g1' },
-          { name: 'Genehmigung', gremiumId: '' },
-        ],
-      });
-      expect(view.c.formValid()).toBe(true);
-      expect(view.c.canAddStep()).toBe(true);
-      view.c.closeEdit();
-      expect(view.c.form()).toBeNull();
-      expect(view.c.formValid()).toBe(false);
-      expect(view.c.canAddStep()).toBe(true);
-      view.c.patch({ name: 'x' });
-      view.c.addStep();
-      expect(view.c.form()).toBeNull();
+    it('§F/finance/budget/000827: a press on a row opens the form of the budget with its sides and steps', async () => {
+      await setup({ tree: of([{ ...VSM, color: ' #112233 ', viewGremiumId: 'g1', decisionGremiumId: 'g1' }]) });
+      const dialog = await openEdit('VS-Mittel');
+      await waitFor(() => expect(field(dialog, 'editKey').value).toBe('vsm'));
+      expect(field(dialog, 'editName').value).toBe('VS-Mittel');
+      expect(labelled(dialog, 'Farbe als Hex-Wert').value).toBe('#112233');
+      expect(labelled(dialog, 'Tag').value).toBe('1');
+      expect(labelled(dialog, 'Monat').value).toBe('3');
+      expect(within(dialog).getByRole('switch', { name: 'Aktiv' })).toBeChecked();
+      expect(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' })).toBeChecked();
+      expect(within(dialog).getByRole('combobox', { name: 'Sichtbar für Gremium' })).toHaveTextContent('StuPa');
+      expect(within(dialog).getByRole('combobox', { name: 'Entscheidendes Gremium' })).toHaveTextContent('StuPa');
+      for (const heading of ['Budget', 'Beginn des Haushaltsjahrs', 'Gremien', 'Haushaltsplan', 'Seite der Kostenstellen', 'Schritte bis zum Inkrafttreten'])
+        expect(within(dialog).getByRole('heading', { name: heading })).toBeInTheDocument();
+      expect(within(dialog).getByRole('combobox', { name: /Beiträge/ })).toHaveTextContent('Einnahme');
+      expect(within(dialog).getByRole('combobox', { name: /Zuschüsse/ })).toHaveTextContent('Ausgabe');
+      expect(labelled(dialog, 'Name von Schritt 1').value).toBe('Beschluss');
+      expect(labelled(dialog, 'Name von Schritt 2').value).toBe('Genehmigung');
+      expect(within(dialog).getByRole('combobox', { name: 'Gremium von Schritt 1' })).toHaveTextContent('StuPa');
+      expect(within(dialog).getByRole('combobox', { name: 'Gremium von Schritt 2' })).toHaveTextContent('Ohne Gremium');
     });
 
-    it('opens the form without steps when their read fails or answers for another budget', async () => {
+    it('a budget without a plan shows neither sides nor steps, and Abbrechen closes the form', async () => {
       const view = await setup();
-      view.planApi.steps.mockReturnValueOnce(refuse(500));
-      view.c.openEdit(QSM);
-      expect(view.c.form()).toMatchObject({ plan: false, colour: '', viewGremium: '', decisionGremium: '', steps: [] });
-      const late: { next: (v: unknown) => void } = { next: () => undefined };
-      view.planApi.steps.mockReturnValueOnce({ subscribe: (o: { next: (v: unknown) => void }) => (late.next = o.next) } as never);
-      view.c.openEdit(TOP);
-      view.c.openEdit(QSM);
-      late.next({ budgetId: 'vsm', steps: [{ name: 'Alt', gremiumId: null }] });
-      expect(view.c.form().steps.map((s: { name: string }) => s.name)).toEqual(['Beschluss', 'Genehmigung']);
-    });
-
-    it('§000827: adds, changes, moves and removes the steps', async () => {
-      const view = await setup();
-      view.c.openEdit(TOP);
-      const names = () => view.c.form().steps.map((s: { name: string }) => s.name);
-      view.c.addStep();
-      expect(view.c.formValid()).toBe(false);
-      view.c.patchStep(2, { name: 'Anzeige' });
-      view.c.moveStep(2, -1);
-      expect(names()).toEqual(['Beschluss', 'Anzeige', 'Genehmigung']);
-      view.c.removeStep(0);
-      expect(names()).toEqual(['Anzeige', 'Genehmigung']);
-      view.c.patch({ steps: Array.from({ length: 10 }, () => ({ name: 'S', gremiumId: '' })) });
-      expect(view.c.canAddStep()).toBe(false);
-      view.c.patch({ plan: false, steps: [{ name: '', gremiumId: '' }] });
-      expect(view.c.formValid()).toBe(true);
-    });
-
-    it('checks the key, the name and the colour of the form', async () => {
-      const view = await setup();
-      view.c.openEdit(TOP);
-      view.c.patch({ key: ' ' });
-      expect(view.c.formValid()).toBe(false);
-      view.c.patch({ key: 'VS', name: '' });
-      expect(view.c.formValid()).toBe(false);
-      view.c.patch({ name: 'VS', colour: '#12' });
-      expect(view.c.formValid()).toBe(false);
-      view.c.saveEdit();
+      const dialog = await openEdit('QS-Mittel');
+      expect(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' })).not.toBeChecked();
+      expect(within(dialog).queryByRole('heading', { name: 'Schritte bis zum Inkrafttreten' })).toBeNull();
+      expect(within(dialog).queryByRole('heading', { name: 'Seite der Kostenstellen' })).toBeNull();
+      await userEvent.click(button(dialog, 'Abbrechen'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
       expect(view.api.updateNode).not.toHaveBeenCalled();
     });
 
-    it('saves only the settings when the plan switch and the steps did not change', async () => {
+    it('opens the form without steps when their read fails, and ignores the steps of another budget', async () => {
       const view = await setup();
-      view.c.saveEdit();
-      view.c.openEdit(TOP);
-      view.c.patch({ name: ' VS ' });
-      view.c.saveEdit();
+      view.planApi.steps.mockReturnValueOnce(refuse(500));
+      const first = await openEdit('VS-Mittel');
+      expect(within(first).getByText('Keine Schritte')).toBeInTheDocument();
+      await userEvent.click(button(first, 'Abbrechen'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
+      const late = new Subject<PlanSteps>();
+      view.planApi.steps.mockReturnValueOnce(late);
+      const second = await openEdit('VS-Mittel');
+      await userEvent.click(button(second, 'Abbrechen'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
+      const third = await openEdit('Kultur');
+      await userEvent.click(within(third).getByRole('switch', { name: 'Haushaltsplan führen' }));
+      late.next({ budgetId: 'vsm', steps: [{ name: 'Alt', gremiumId: null }] });
+      view.fixture.detectChanges();
+      expect(within(third).getByText('Keine Schritte')).toBeInTheDocument();
+    });
+
+    it('§F/finance/budget/000827: adds, names, moves and removes the steps, and saves them in their order', async () => {
+      const view = await setup();
+      const dialog = await openEdit('VS-Mittel');
+      await userEvent.click(button(dialog, 'Schritt hinzufügen'));
+      await userEvent.type(labelled(dialog, 'Name von Schritt 3'), ' Anzeige ');
+      await pick(dialog, 'Gremium von Schritt 3', 'StuPa');
+      const third = labelled(dialog, 'Name von Schritt 3').closest('li') as HTMLElement;
+      await userEvent.click(button(third, 'Nach oben'));
+      await waitFor(() => expect(labelled(dialog, 'Name von Schritt 2').value.trim()).toBe('Anzeige'));
+      await userEvent.click(button(dialog, 'Schritt 1 entfernen'));
+      await waitFor(() => expect(labelled(dialog, 'Name von Schritt 1').value.trim()).toBe('Anzeige'));
+      await userEvent.click(button(labelled(dialog, 'Name von Schritt 1').closest('li') as HTMLElement, 'Nach unten'));
+      await waitFor(() => expect(labelled(dialog, 'Name von Schritt 2').value.trim()).toBe('Anzeige'));
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.planApi.setSteps).toHaveBeenCalledWith('vsm', [
+        { name: 'Genehmigung', gremiumId: null },
+        { name: 'Anzeige', gremiumId: 'g1' },
+      ]);
+      expect(view.planApi.setPlanSwitch).not.toHaveBeenCalled();
+      expect(view.planApi.setSide).not.toHaveBeenCalled();
+    });
+
+    it('§F/finance/budget/000827: a step without a name shows what is missing, and ten steps take no eleventh', async () => {
+      const view = await setup();
+      view.planApi.steps.mockReturnValueOnce(of({ budgetId: 'vsm', steps: Array.from({ length: 9 }, (_, i) => ({ name: `S${i}`, gremiumId: null })) }));
+      const dialog = await openEdit('VS-Mittel');
+      await userEvent.click(button(dialog, 'Schritt hinzufügen'));
+      expect(within(dialog).queryByRole('button', { name: 'Schritt hinzufügen' })).toBeNull();
+      expect(within(dialog).queryByText('Pflichtfeld')).toBeNull();
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(within(dialog).getByText('Pflichtfeld')).toBeInTheDocument();
+      expect(view.api.updateNode).not.toHaveBeenCalled();
+      expect(screen.getByRole('dialog', { name: 'Budget bearbeiten' })).toBeInTheDocument();
+    });
+
+    it('"Speichern" names an empty or wrong key, name and colour and saves nothing', async () => {
+      const view = await setup();
+      const dialog = await openEdit('VS-Mittel');
+      await retype(field(dialog, 'editKey'), '');
+      await retype(field(dialog, 'editName'), ' ');
+      expect(within(dialog).queryByText('Pflichtfeld')).toBeNull();
+      const save = button(dialog, 'Speichern');
+      expect(save).toBeEnabled();
+      await userEvent.click(save);
+      expect(within(dialog).getAllByText('Pflichtfeld')).toHaveLength(2);
+      await retype(field(dialog, 'editKey'), 'V-S');
+      expect(within(dialog).getByText('Nur Buchstaben und Ziffern, höchstens 64 Zeichen.')).toBeInTheDocument();
+      await userEvent.click(field(dialog, 'editName'));
+      await userEvent.paste('x'.repeat(201));
+      expect(within(dialog).getByText('Höchstens 200 Zeichen.')).toBeInTheDocument();
+      await retype(field(dialog, 'editKey'), 'VS');
+      await retype(field(dialog, 'editName'), 'VS');
+      await retype(labelled(dialog, 'Farbe als Hex-Wert'), '#12');
+      await userEvent.click(save);
+      expect(view.api.updateNode).not.toHaveBeenCalled();
+    });
+
+    it('saves only the settings when the plan switch, the sides and the steps did not change', async () => {
+      const view = await setup();
+      const dialog = await openEdit('VS-Mittel');
+      await retype(field(dialog, 'editName'), ' VS ');
+      await userEvent.type(field(dialog, 'editName'), '{Enter}');
       expect(view.api.updateNode).toHaveBeenCalledWith('vsm', { key: 'vsm', name: 'VS', color: '', active: true, viewGremiumId: null });
       expect(view.planApi.setPlanSwitch).not.toHaveBeenCalled();
       expect(view.planApi.setSteps).not.toHaveBeenCalled();
+      expect(view.planApi.setSide).not.toHaveBeenCalled();
+      expect(view.planApi.switchPreview).not.toHaveBeenCalled();
       expect(view.success).toHaveBeenCalledWith('Gespeichert.');
-      expect(view.c.editNode()).toBeNull();
       expect(view.api.tree).toHaveBeenCalledTimes(2);
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
     });
 
-    it('§000827: saves the changed Gremium, the start, the plan switch and the steps in this order', async () => {
-      const view = await setup();
-      view.planApi.steps.mockReturnValueOnce(of({ budgetId: 'qsm', steps: [] }));
-      view.c.openEdit(QSM);
-      view.c.patch({ plan: true, decisionGremium: 'g1', viewGremium: 'g1' });
-      view.c.patchCutoff('day', '15');
-      view.c.patchCutoff('month', '10');
-      view.c.addStep();
-      view.c.patchStep(0, { name: ' Beschluss ', gremiumId: 'g1' });
-      view.c.saveEdit();
-      expect(view.api.updateNode).toHaveBeenCalledWith('qsm', expect.objectContaining({ viewGremiumId: 'g1', decisionGremiumId: 'g1', fiscalStartDay: 15, fiscalStartMonth: 10 }));
-      expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('qsm', true);
-      expect(view.planApi.setSteps).toHaveBeenCalledWith('qsm', [{ name: 'Beschluss', gremiumId: 'g1' }]);
-      expect(view.planApi.setPlanSwitch.mock.invocationCallOrder[0]).toBeLessThan(view.planApi.setSteps.mock.invocationCallOrder[0]);
+    it('saves the colour, the switch "Aktiv", the Gremien and the start of the fiscal year', async () => {
+      const view = await setup({ tree: of([{ ...QSM, decisionGremiumId: 'g1' }]) });
+      const dialog = await openEdit('QS-Mittel');
+      await retype(labelled(dialog, 'Farbe als Hex-Wert'), '#112233');
+      await userEvent.click(within(dialog).getByRole('switch', { name: 'Aktiv' }));
+      await pick(dialog, 'Sichtbar für Gremium', 'StuPa');
+      await pick(dialog, 'Entscheidendes Gremium', 'Ohne Gremium');
+      await retype(labelled(dialog, 'Tag'), '15');
+      await retype(labelled(dialog, 'Monat'), '13');
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.api.updateNode).toHaveBeenCalledWith('qsm', {
+        key: 'qsm',
+        name: 'QS-Mittel',
+        color: '#112233',
+        active: false,
+        viewGremiumId: 'g1',
+        decisionGremiumId: null,
+        fiscalStartDay: 15,
+        fiscalStartMonth: 12,
+      });
     });
 
-    it('removes the deciding Gremium and sends no steps for a budget without a plan', async () => {
+    it('§F/finance/budget/000795: a Kostenstelle without a side shows what is missing in the form, and the save sends its side first', async () => {
+      const view = await setup({ tree: of([TOP]) });
+      const dialog = await openEdit('VS-Mittel');
+      expect(within(dialog).getByRole('combobox', { name: /Ohne Seite/ })).toHaveAttribute('aria-required', 'true');
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(within(dialog).getByText('Pflichtfeld')).toBeInTheDocument();
+      expect(view.planApi.setSide).not.toHaveBeenCalled();
+      expect(view.api.updateNode).not.toHaveBeenCalled();
+      expect(view.error).not.toHaveBeenCalled();
+      await pick(dialog, /Ohne Seite/, 'Ausgabe');
+      expect(within(dialog).queryByText('Pflichtfeld')).toBeNull();
+      await pick(dialog, /Beiträge/, 'Ausgabe');
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.planApi.setSide.mock.calls).toEqual([
+        ['fees', 'expense'],
+        ['noside', 'expense'],
+      ]);
+      expect(view.planApi.setSide.mock.invocationCallOrder[1]).toBeLessThan(view.api.updateNode.mock.invocationCallOrder[0]);
+      expect(view.success).toHaveBeenCalledWith('Gespeichert.');
+    });
+
+    it('§F/finance/budget/000803: turning the plan on asks for the sides, shows the changed allocations and saves after the confirmation', async () => {
       const view = await setup();
-      view.c.openEdit({ ...TOP, decisionGremiumId: 'g1' });
-      view.c.patch({ plan: false, decisionGremium: '' });
-      view.c.removeStep(0);
-      view.c.saveEdit();
-      expect(view.api.updateNode).toHaveBeenCalledWith('vsm', expect.objectContaining({ decisionGremiumId: null }));
-      expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('vsm', false);
+      view.planApi.switchPreview.mockReturnValue(of({ budgetId: 'ksm', changes: [CHANGE] }));
+      const dialog = await openEdit('Kultur');
+      await userEvent.click(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' }));
+      await waitFor(() => expect(within(dialog).getByRole('combobox', { name: /Reisen/ })).toHaveTextContent('Ausgabe'));
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(within(dialog).getByText('Pflichtfeld')).toBeInTheDocument();
+      expect(view.planApi.switchPreview).not.toHaveBeenCalled();
+      await pick(dialog, /Feste/, 'Einnahme');
+      await userEvent.click(button(dialog, 'Schritt hinzufügen'));
+      await userEvent.type(labelled(dialog, 'Name von Schritt 1'), 'Beschluss');
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.planApi.setSide.mock.calls).toEqual([['k1', 'income']]);
+      expect(view.planApi.switchPreview).toHaveBeenCalledWith('ksm');
+      const confirm = await screen.findByRole('dialog', { name: 'Zuteilungen ändern?' });
+      expect(confirm).toHaveTextContent('Feste · 2026/27');
+      expect(confirm).toHaveTextContent('100 € → 0 €');
+      expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull();
+      expect(view.planApi.setPlanSwitch).not.toHaveBeenCalled();
+      await userEvent.click(button(confirm, 'Abbrechen'));
+      const again = await screen.findByRole('dialog', { name: 'Budget bearbeiten' });
+      await waitFor(() => expect(labelled(again, 'Name von Schritt 1').value).toBe('Beschluss'));
+      await userEvent.click(button(again, 'Speichern'));
+      expect(view.planApi.setSide).toHaveBeenCalledTimes(1);
+      expect(view.planApi.switchPreview).toHaveBeenCalledTimes(2);
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Zuteilungen ändern?' }), 'Haushaltsplan einschalten'));
+      expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('ksm', true, true);
+      expect(view.planApi.setSteps).toHaveBeenCalledWith('ksm', [{ name: 'Beschluss', gremiumId: null }]);
+      const order = [view.planApi.setSide, view.planApi.setPlanSwitch, view.api.updateNode, view.planApi.setSteps].map(
+        (m) => m.mock.invocationCallOrder[0],
+      );
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+      expect(view.success).toHaveBeenCalledWith('Gespeichert.');
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Zuteilungen ändern?' })).toBeNull());
+      expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull();
+    });
+
+    it('§F/finance/budget/000803: turning the plan on without a changed allocation saves at once', async () => {
+      const view = await setup();
+      const dialog = await openEdit('QS-Mittel');
+      await userEvent.click(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' }));
+      expect(within(dialog).queryByRole('heading', { name: 'Seite der Kostenstellen' })).toBeNull();
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.planApi.switchPreview).toHaveBeenCalledWith('qsm');
+      expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('qsm', true, true);
       expect(view.planApi.setSteps).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog', { name: 'Zuteilungen ändern?' })).toBeNull();
     });
 
-    it('names the cause of a refused save, reads the list again and sends nothing while a save runs', async () => {
+    it('§F/finance/budget/000814: turning the plan off sends the switch and neither sides nor steps', async () => {
+      const view = await setup({ tree: of([TOP]) });
+      const dialog = await openEdit('VS-Mittel');
+      await userEvent.click(button(dialog, 'Schritt 1 entfernen'));
+      await userEvent.click(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' }));
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('vsm', false, false);
+      expect(view.planApi.setSteps).not.toHaveBeenCalled();
+      expect(view.planApi.setSide).not.toHaveBeenCalled();
+      expect(view.planApi.switchPreview).not.toHaveBeenCalled();
+    });
+
+    it('§F/finance/budget/000814: names why the plan cannot go off, keeps the form and reads the budget again', async () => {
       const view = await setup();
-      view.c.openEdit(TOP);
+      view.planApi.setPlanSwitch.mockReturnValueOnce(refuse(409, 'plan_switch_has_plans'));
+      const dialog = await openEdit('VS-Mittel');
+      await userEvent.click(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' }));
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.error).toHaveBeenCalledWith('Der Haushaltsplan lässt sich nicht ausschalten, weil ein Plan beschlossen oder in Arbeit ist.');
+      expect(view.api.updateNode).not.toHaveBeenCalled();
+      expect(view.api.tree).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('dialog', { name: 'Budget bearbeiten' })).toBeInTheDocument();
+    });
+
+    it('names the cause of a refused save and of a failed preview', async () => {
+      const view = await setup();
+      const dialog = await openEdit('VS-Mittel');
       view.api.updateNode.mockReturnValueOnce(refuse(409, 'budget_key_exists'));
-      view.c.saveEdit();
-      expect(view.error).toHaveBeenCalledWith('Diesen Schlüssel gibt es an dieser Stelle schon.');
-      expect(view.c.editNode()).not.toBeNull();
-      expect(view.c.busy()).toBe(false);
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.error).toHaveBeenLastCalledWith('Diesen Schlüssel gibt es an dieser Stelle schon.');
       view.api.updateNode.mockReturnValueOnce(refuse(500));
-      view.c.saveEdit();
-      expect(view.error).toHaveBeenLastCalledWith(view.c.i18n.translate('admin.budgets.error.save'));
-      view.c.busy.set(true);
-      view.c.saveEdit();
-      expect(view.api.updateNode).toHaveBeenCalledTimes(2);
+      view.api.tree.mockReturnValueOnce(refuse(500));
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.error).toHaveBeenLastCalledWith('Das Budget konnte nicht gespeichert werden.');
+      view.planApi.setSteps.mockReturnValueOnce(refuse(422, 'plan_step_limit'));
+      await userEvent.click(button(dialog, 'Schritt hinzufügen'));
+      await userEvent.type(labelled(dialog, 'Name von Schritt 3'), 'X');
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.error).toHaveBeenLastCalledWith('Ein Budget hat höchstens 10 Schritte.');
+      await userEvent.click(button(dialog, 'Abbrechen'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget bearbeiten' })).toBeNull());
+      view.planApi.switchPreview.mockReturnValueOnce(refuse(500));
+      const other = await openEdit('QS-Mittel');
+      await userEvent.click(within(other).getByRole('switch', { name: 'Haushaltsplan führen' }));
+      await userEvent.click(button(other, 'Speichern'));
+      expect(view.error).toHaveBeenLastCalledWith('Das Budget konnte nicht gespeichert werden.');
+      expect(view.planApi.setPlanSwitch).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing a second time while a save runs', async () => {
+      const view = await setup();
+      view.api.updateNode.mockReturnValueOnce(new Subject<unknown>());
+      const dialog = await openEdit('VS-Mittel');
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(button(dialog, 'Speichern')).toBeDisabled();
+      await userEvent.type(field(dialog, 'editName'), '{Enter}');
+      expect(view.api.updateNode).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('delete', () => {
     it('deletes a budget after the confirmation', async () => {
       const view = await setup();
-      view.c.deleteBudget();
+      await rowMenu('QS-Mittel', 'Löschen');
+      const dialog = await screen.findByRole('dialog', { name: 'Budget löschen?' });
+      expect(dialog).toHaveTextContent('„QS-Mittel“ (QSM) wird gelöscht. Das lässt sich nicht rückgängig machen.');
+      await userEvent.click(button(dialog, 'Abbrechen'));
       expect(view.api.deleteNode).not.toHaveBeenCalled();
-      view.c.deleteTarget.set(QSM);
-      view.c.deleteBudget();
+      await rowMenu('QS-Mittel', 'Löschen');
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Budget löschen?' }), 'Löschen'));
       expect(view.api.deleteNode).toHaveBeenCalledWith('qsm');
       expect(view.success).toHaveBeenCalledWith('Budget gelöscht.');
-      expect(view.c.deleteTarget()).toBeNull();
+      expect(view.api.tree).toHaveBeenCalledTimes(2);
     });
 
-    it('names the reason of a refused delete in the dialog', async () => {
+    it('names the reason of a refused delete and closes the question', async () => {
       const view = await setup();
       view.api.deleteNode.mockReturnValueOnce(refuse(409, 'budget_has_children'));
-      view.c.deleteTarget.set(TOP);
-      view.c.deleteBudget();
-      expect(view.c.deleteBlocked()).toBe(view.c.i18n.translate('budget.cc.error.hasChildren'));
-      expect(view.c.deleteTarget()).toBe(TOP);
-      view.c.closeDelete();
-      expect(view.c.deleteBlocked()).toBeNull();
+      await rowMenu('VS-Mittel', 'Löschen');
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Budget löschen?' }), 'Löschen'));
+      expect(view.error).toHaveBeenCalledWith('Lösche zuerst die untergeordneten Kostenstellen.');
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Budget löschen?' })).toBeNull());
+      view.api.deleteNode.mockReturnValueOnce(refuse(500));
+      await rowMenu('VS-Mittel', 'Löschen');
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Budget löschen?' }), 'Löschen'));
+      expect(view.error).toHaveBeenLastCalledWith('Löschen fehlgeschlagen (nur ohne Unter-Kostenstellen, Buchungen oder zugewiesene Anträge).');
     });
   });
 
   describe('fiscal years', () => {
     const closed = fy('fy-24', 2024, { closedAt: '2025-03-01T00:00:00Z' });
 
-    it('lists the fiscal years of a budget, the newest first', async () => {
-      const view = await setup();
-      view.c.openFy(TOP);
-      expect(view.c.fiscalYears().map((y: { id: string }) => y.id)).toEqual(['fy-26', 'fy-25']);
-      expect(view.c.fyBudgetLabel()).toBe('vsm – VS-Mittel');
-      expect(view.c.fyColumns().map((col: { key: string }) => col.key)).toEqual(['display', 'active', 'actions']);
-      expect(view.c.fyRowId(FY25)).toBe('fy-25');
-      expect(view.c.asYear(FY25)).toBe(FY25);
-      view.api.listFiscalYears.mockReturnValueOnce(refuse(500));
-      view.c.openFy(TOP);
-      expect(view.c.fiscalYears()).toEqual([]);
+    it('lists the fiscal years of a budget, the newest first, and offers the next year', async () => {
+      const view = await setup({ years: [closed, FY25, { ...FY26, active: false }] });
+      const dialog = await openYears();
+      const rows = within(dialog).getAllByRole('row').slice(1).map((r) => r.textContent?.replace(/\s+/g, ' ').trim());
+      expect(rows).toEqual(['2026/27Inaktiv', '2025/26Aktiv', '2024/25Abgeschlossen']);
+      await waitFor(() => expect(field(dialog, 'fyYear').value).toBe('2027'));
+      await userEvent.click(button(dialog, 'Fertig'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' })).toBeNull());
+      expect(view.api.listFiscalYears).toHaveBeenCalledWith('vsm');
     });
 
-    it('has no label and no actions column without a budget or the permission', async () => {
-      const view = await setup({ perms: [] });
-      expect(view.c.fyBudgetLabel()).toBe('');
-      expect(view.c.fyColumns().map((col: { key: string }) => col.key)).toEqual(['display', 'active']);
-      view.c.createFiscalYear(submit());
-      view.c.saveFyEdit();
-      view.c.doFyClose();
-      view.c.doFyDelete();
-      expect(view.api.createFiscalYear).not.toHaveBeenCalled();
-      expect(view.api.listFiscalYears).not.toHaveBeenCalled();
+    it('starts with this year for a budget without a year, and shows no year when the read fails', async () => {
+      const view = await setup({ years: [] });
+      const dialog = await openYears();
+      expect(within(dialog).getByText('Noch keine Haushaltsjahre in diesem Budget.')).toBeInTheDocument();
+      await waitFor(() => expect(field(dialog, 'fyYear').value).toBe('2026'));
+      await userEvent.click(button(dialog, 'Fertig'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' })).toBeNull());
+      view.api.listFiscalYears.mockReturnValueOnce(refuse(500));
+      const failed = await openYears('QS-Mittel');
+      expect(within(failed).getByText('Noch keine Haushaltsjahre in diesem Budget.')).toBeInTheDocument();
+    });
+
+    it('a reader sees the years without a form and without actions', async () => {
+      await setup({ perms: [] });
+      const dialog = await openYears();
+      expect(within(dialog).getAllByRole('columnheader').map((h) => h.textContent?.trim())).toEqual(['Jahr', 'Status']);
+      expect(dialog.querySelector('[name="fyYear"]')).toBeNull();
+      expect(within(dialog).queryByRole('button', { name: /^Aktionen/ })).toBeNull();
     });
 
     it('keeps the years of the budget that is open when a late answer arrives', async () => {
       const view = await setup();
-      const late: { next: (v: unknown) => void } = { next: () => undefined };
-      view.api.listFiscalYears.mockReturnValueOnce({ subscribe: (o: { next: (v: unknown) => void }) => (late.next = o.next) } as never);
-      view.c.openFy(TOP);
-      view.c.fyBudget.set(QSM);
+      const late = new Subject<readonly FiscalYear[]>();
+      view.api.listFiscalYears.mockReturnValueOnce(late);
+      const first = await openYears();
+      await userEvent.click(button(first, 'Fertig'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' })).toBeNull());
+      view.api.listFiscalYears.mockReturnValueOnce(of([]));
+      const second = await openYears('QS-Mittel');
       late.next([FY25]);
-      expect(view.c.fiscalYears()).toEqual([]);
+      view.fixture.detectChanges();
+      expect(within(second).getByText('Noch keine Haushaltsjahre in diesem Budget.')).toBeInTheDocument();
     });
 
-    it('creates a fiscal year', async () => {
+    it('creates a fiscal year and names a year that is no year', async () => {
       const view = await setup();
-      view.c.openFy(TOP);
-      view.c.patchFyYear('2027');
-      view.c.createFiscalYear(submit());
+      const dialog = await openYears();
+      await userEvent.click(button(dialog, 'Anlegen'));
       expect(view.api.createFiscalYear).toHaveBeenCalledWith('vsm', { year: 2027 });
+      expect(view.success).toHaveBeenCalledWith('Haushaltsjahr angelegt.');
       expect(view.api.listFiscalYears).toHaveBeenCalledTimes(2);
-      view.c.patchFyYear('x');
-      expect(view.c.newFyYear()).toBe(new Date().getFullYear());
+      await retype(field(dialog, 'fyYear'), '1800');
+      expect(within(dialog).getByText('Ein Jahr von 1900 bis 2200.')).toBeInTheDocument();
+      await userEvent.type(field(dialog, 'fyYear'), '{Enter}');
+      await retype(field(dialog, 'fyYear'), '');
+      await userEvent.click(button(dialog, 'Anlegen'));
+      expect(view.api.createFiscalYear).toHaveBeenCalledTimes(1);
+    });
+
+    it('names the cause of a refused new year', async () => {
+      const view = await setup();
+      const dialog = await openYears();
+      view.api.createFiscalYear.mockReturnValueOnce(refuse(409, 'fiscal_year_exists'));
+      await userEvent.click(button(dialog, 'Anlegen'));
+      expect(view.error).toHaveBeenLastCalledWith('Dieses Jahr gibt es in diesem Budget bereits.');
       view.api.createFiscalYear.mockReturnValueOnce(refuse(422));
-      view.c.createFiscalYear(submit());
-      expect(view.error).toHaveBeenCalledWith(view.c.i18n.translate('budget.tree.toast.fyFailed'));
+      await userEvent.click(button(dialog, 'Anlegen'));
+      expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr konnte nicht gespeichert werden.');
+      view.api.createFiscalYear.mockReturnValueOnce(new Subject<unknown>());
+      await userEvent.click(button(dialog, 'Anlegen'));
+      expect(button(dialog, 'Anlegen')).toBeDisabled();
+      await userEvent.type(field(dialog, 'fyYear'), '{Enter}');
+      expect(view.api.createFiscalYear).toHaveBeenCalledTimes(3);
     });
 
-    it('edits the year and the active flag of a fiscal year', async () => {
+    it('a press on a year edits its year and its switch "Aktiv"', async () => {
       const view = await setup();
-      view.c.openFy(TOP);
-      view.c.openFyEdit(FY25);
-      expect(view.c.fyOpen()).toBe(false);
-      view.c.patchFyEditYear('2030');
-      view.c.fyEditActive.set(false);
-      view.c.saveFyEdit();
+      const list = await openYears();
+      await userEvent.click(within(list).getByText('2025/26'));
+      const dialog = await screen.findByRole('dialog', { name: 'Haushaltsjahr bearbeiten' });
+      expect(screen.queryByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' })).toBeNull();
+      await waitFor(() => expect(field(dialog, 'fyEditYear').value).toBe('2025'));
+      await retype(field(dialog, 'fyEditYear'), '99');
+      expect(within(dialog).getByText('Ein Jahr von 1900 bis 2200.')).toBeInTheDocument();
+      expect(button(dialog, 'Speichern')).toBeDisabled();
+      await userEvent.type(field(dialog, 'fyEditYear'), '{Enter}');
+      expect(view.api.updateFiscalYear).not.toHaveBeenCalled();
+      await retype(field(dialog, 'fyEditYear'), '2030');
+      await userEvent.click(within(dialog).getByRole('switch', { name: 'Aktiv' }));
+      await userEvent.click(button(dialog, 'Speichern'));
       expect(view.api.updateFiscalYear).toHaveBeenCalledWith('vsm', 'fy-25', { year: 2030, active: false });
-      expect(view.c.fyEdit()).toBeNull();
-      expect(view.c.fyOpen()).toBe(true);
-      view.c.patchFyEditYear('');
-      expect(view.c.fyEditYear()).toBe(new Date().getFullYear());
-      view.c.openFyEdit(FY25);
-      view.api.updateFiscalYear.mockReturnValueOnce(refuse(422));
-      view.c.saveFyEdit();
-      expect(view.error).toHaveBeenLastCalledWith(view.c.i18n.translate('budget.tree.toast.fyDuplicate'));
+      expect(view.success).toHaveBeenCalledWith('Haushaltsjahr gespeichert.');
+      expect(await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' })).toBeInTheDocument();
+      expect(view.api.listFiscalYears).toHaveBeenCalledTimes(2);
+    });
+
+    it('a closed year keeps its year, and a refused edit names its cause', async () => {
+      const view = await setup({ years: [closed, FY25] });
+      const list = await openYears();
+      await userEvent.click(within(list).getByText('2024/25'));
+      const dialog = await screen.findByRole('dialog', { name: 'Haushaltsjahr bearbeiten' });
+      await waitFor(() => expect(field(dialog, 'fyEditYear')).toBeDisabled());
+      view.api.updateFiscalYear.mockReturnValueOnce(refuse(409, 'fiscal_year_closed'));
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr ist abgeschlossen.');
+      const back = await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' });
+      await userEvent.click(within(back).getByText('2025/26'));
+      const second = await screen.findByRole('dialog', { name: 'Haushaltsjahr bearbeiten' });
       view.api.updateFiscalYear.mockReturnValueOnce(refuse(500));
-      view.c.saveFyEdit();
-      expect(view.error).toHaveBeenLastCalledWith(view.c.i18n.translate('budget.tree.toast.fyFailed'));
+      await userEvent.click(button(second, 'Speichern'));
+      expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr konnte nicht gespeichert werden.');
+      await userEvent.click(within(await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' })).getByText('2025/26'));
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushaltsjahr bearbeiten' }), 'Abbrechen'));
+      expect(await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' })).toBeInTheDocument();
     });
 
-    it('closes an open year and reopens a closed one', async () => {
-      const view = await setup();
-      view.c.openFy(TOP);
-      expect(view.c.fyMenu(FY25).map((s: { items: { id: string }[] }) => s.items[0].id)).toEqual(['close', 'delete']);
-      expect(view.c.fyMenu(closed)[0].items[0].id).toBe('reopen');
-      expect(view.c.fyMenu(closed)[1].items[0].disabledReason).toBeTruthy();
-      expect(view.c.fyMenu(FY25)[1].items[0].disabledReason).toBeNull();
-      view.c.onFyMenu(FY25, { id: 'close', label: '' });
-      expect(view.c.fyOpen()).toBe(false);
-      view.c.doFyClose();
+    it('closes an open year and reopens a closed one after the confirmation', async () => {
+      const view = await setup({ years: [closed, FY25] });
+      await openYears();
+      await rowMenu('2025/26', 'Abschließen');
+      const close = await screen.findByRole('dialog', { name: 'Haushaltsjahr 2025/26 abschließen?' });
+      await userEvent.click(button(close, 'Abbrechen'));
+      expect(view.api.setFiscalYearClosed).not.toHaveBeenCalled();
+      await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' });
+      await rowMenu('2025/26', 'Abschließen');
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushaltsjahr 2025/26 abschließen?' }), 'Abschließen'));
       expect(view.api.setFiscalYearClosed).toHaveBeenLastCalledWith('vsm', 'fy-25', true);
-      view.c.onFyMenu(closed, { id: 'reopen', label: '' });
-      view.c.doFyClose();
+      expect(view.success).toHaveBeenLastCalledWith('Haushaltsjahr 2025/26 abgeschlossen.');
+      await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' });
+      await rowMenu('2024/25', 'Wieder öffnen');
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushaltsjahr 2024/25 wieder öffnen?' }), 'Wieder öffnen'));
       expect(view.api.setFiscalYearClosed).toHaveBeenLastCalledWith('vsm', 'fy-24', false);
-      view.c.onFyMenu(FY25, { id: 'close', label: '' });
+      expect(view.success).toHaveBeenLastCalledWith('Haushaltsjahr 2024/25 wieder geöffnet.');
+    });
+
+    it('§F/finance/budget/000801: names why a year cannot be closed', async () => {
+      const view = await setup();
+      await openYears();
+      view.api.setFiscalYearClosed.mockReturnValueOnce(refuse(409, 'plan_in_progress'));
+      await rowMenu('2025/26', 'Abschließen');
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushaltsjahr 2025/26 abschließen?' }), 'Abschließen'));
+      expect(view.error).toHaveBeenLastCalledWith('Der Haushaltsplan ist noch in Arbeit.');
+      await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' });
       view.api.setFiscalYearClosed.mockReturnValueOnce(refuse(500));
-      view.c.doFyClose();
-      expect(view.error).toHaveBeenCalledWith(view.c.i18n.translate('budget.tree.toast.failed'));
+      await rowMenu('2025/26', 'Abschließen');
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushaltsjahr 2025/26 abschließen?' }), 'Abschließen'));
+      expect(view.error).toHaveBeenLastCalledWith('Aktion fehlgeschlagen.');
     });
 
-    it('deletes a fiscal year, and names why a year cannot be deleted', async () => {
+    it('§F/finance/budget/000836: deletes a fiscal year after the confirmation, and says when the draft of its plan goes with it', async () => {
+      const view = await setup({ tree: of([VSM, QSM]) });
+      await openYears();
+      await rowMenu('2025/26', 'Haushaltsjahr löschen');
+      const plain = await screen.findByRole('dialog', { name: 'Haushaltsjahr löschen?' });
+      expect(view.planApi.plan).toHaveBeenCalledWith('vsm', 'fy-25');
+      expect(plain).toHaveTextContent('Das Haushaltsjahr 2025/26 wird gelöscht. Das lässt sich nicht rückgängig machen.');
+      await userEvent.click(button(plain, 'Abbrechen'));
+      expect(view.api.deleteFiscalYear).not.toHaveBeenCalled();
+      await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' });
+      view.planApi.plan.mockReturnValueOnce(of(plan()));
+      await rowMenu('2026/27', 'Haushaltsjahr löschen');
+      const withDraft = await screen.findByRole('dialog', { name: 'Haushaltsjahr löschen?' });
+      expect(withDraft).toHaveTextContent('Das Haushaltsjahr 2026/27 wird mit dem Entwurf seines Haushaltsplans gelöscht.');
+      await userEvent.click(button(withDraft, 'Löschen'));
+      expect(view.api.deleteFiscalYear).toHaveBeenCalledWith('vsm', 'fy-26');
+      expect(view.success).toHaveBeenLastCalledWith('Haushaltsjahr gelöscht.');
+      expect(await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' })).toBeInTheDocument();
+    });
+
+    it('§F/finance/budget/000836: a budget without a plan asks no plan, and a late answer for another year changes nothing', async () => {
       const view = await setup();
-      view.c.openFy(TOP);
-      view.c.onFyMenu(FY25, { id: 'delete', label: '' });
-      expect(view.c.fyDelete()).toBe(FY25);
-      view.api.deleteFiscalYear.mockReturnValueOnce(refuse(409, '', 'has bookings'));
-      view.c.doFyDelete();
-      expect(view.c.fyDeleteBlocked()).toBe(view.c.i18n.translate('budget.tree.fyBlocked.bookings'));
-      view.api.deleteFiscalYear.mockReturnValueOnce(refuse(500));
-      view.c.doFyDelete();
-      expect(view.error).toHaveBeenCalledWith(view.c.i18n.translate('budget.tree.toast.fyDeleteFailed'));
-      view.c.doFyDelete();
-      expect(view.api.deleteFiscalYear).toHaveBeenLastCalledWith('vsm', 'fy-25');
-      expect(view.c.fyDelete()).toBeNull();
-      expect(view.c.fyDeleteBlocked()).toBeNull();
-      expect(view.c.fyOpen()).toBe(true);
-    });
-  });
-
-  describe('footer buttons', () => {
-    const press = (view: { fixture: { detectChanges: () => void } }, dialog: string, name: string): void => {
+      await openYears('QS-Mittel');
+      await rowMenu('2025/26', 'Haushaltsjahr löschen');
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushaltsjahr löschen?' }), 'Abbrechen'));
+      expect(view.planApi.plan).not.toHaveBeenCalled();
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushaltsjahre: QS-Mittel' }), 'Fertig'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushaltsjahre: QS-Mittel' })).toBeNull());
+      const late = new Subject<unknown>();
+      view.planApi.plan.mockReturnValueOnce(late);
+      await openYears();
+      await rowMenu('2025/26', 'Haushaltsjahr löschen');
+      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushaltsjahr löschen?' }), 'Abbrechen'));
+      await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' });
+      await rowMenu('2026/27', 'Haushaltsjahr löschen');
+      late.next(plan());
       view.fixture.detectChanges();
-      const scope = screen.getByRole('dialog', { name: dialog });
-      const button = [...scope.querySelectorAll('button')].find((b) => b.textContent?.trim() === name);
-      button?.click();
-    };
-
-    it('the button of the create dialog creates the budget', async () => {
-      const view = await setup();
-      view.c.openTop();
-      view.c.patchTop('key', 'QS');
-      view.c.patchTop('name', 'QS-Mittel');
-      press(view, 'Budget anlegen', 'Anlegen');
-      expect(view.api.createNode).toHaveBeenCalledTimes(1);
+      expect(await screen.findByRole('dialog', { name: 'Haushaltsjahr löschen?' })).toHaveTextContent('Das Haushaltsjahr 2026/27 wird gelöscht.');
     });
 
-    it('the button of the edit dialog saves the budget', async () => {
-      const view = await setup();
-      view.c.openEdit(TOP);
-      press(view, 'Budget bearbeiten', 'Speichern');
-      expect(view.api.updateNode).toHaveBeenCalledTimes(1);
+    it('§F/finance/budget/000836: names why a year cannot be deleted, and a closed year offers no delete', async () => {
+      const view = await setup({ years: [closed, FY25] });
+      await openYears();
+      const del = async (code: string, status = 409) => {
+        view.api.deleteFiscalYear.mockReturnValueOnce(refuse(status, code));
+        await rowMenu('2025/26', 'Haushaltsjahr löschen');
+        await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushaltsjahr löschen?' }), 'Löschen'));
+        await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' });
+      };
+      await del('fiscal_year_has_plan');
+      expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr hat einen Haushaltsplan, der beschlossen oder in Arbeit ist. Es lässt sich nicht löschen.');
+      await del('fiscal_year_has_bookings');
+      expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr hat Buchungen. Lösche sie zuerst oder buche sie in ein anderes Jahr um.');
+      await del('zzz');
+      expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr hat Buchungen, Zuteilungen oder Anträge. Entferne sie zuerst.');
+      await del('', 500);
+      expect(view.error).toHaveBeenLastCalledWith('Haushaltsjahr konnte nicht gelöscht werden.');
+      await userEvent.click(screen.getByRole('button', { name: 'Aktionen: 2024/25' }));
+      const item = await screen.findByRole('menuitem', { name: 'Haushaltsjahr löschen' });
+      expect(item).toHaveAttribute('aria-disabled', 'true');
+      expect(item).toHaveAttribute('title', 'Das Haushaltsjahr ist abgeschlossen.');
     });
 
-    it('the button of the fiscal year dialog saves the year', async () => {
+    it('runs no second write on a year while one runs', async () => {
       const view = await setup();
-      view.c.openFy(TOP);
-      view.c.openFyEdit(FY25);
-      view.c.patchFyEditYear('2030');
-      view.fixture.detectChanges();
-      const scope = screen.getAllByRole('dialog').at(-1) as HTMLElement;
-      [...scope.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Speichern')?.click();
-      expect(view.api.updateFiscalYear).toHaveBeenCalledTimes(1);
+      await openYears();
+      view.api.deleteFiscalYear.mockReturnValueOnce(new Subject<unknown>());
+      await rowMenu('2025/26', 'Haushaltsjahr löschen');
+      const dialog = await screen.findByRole('dialog', { name: 'Haushaltsjahr löschen?' });
+      await userEvent.click(button(dialog, 'Löschen'));
+      const busy = within(dialog).getAllByRole('button').at(-1) as HTMLButtonElement;
+      expect(busy).toBeDisabled();
+      await userEvent.click(busy);
+      expect(view.api.deleteFiscalYear).toHaveBeenCalledTimes(1);
     });
   });
 });

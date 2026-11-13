@@ -1,5 +1,3 @@
-@use 'breakpoints' as bp;
-
 .ab__node {
   display: flex;
   flex-direction: column;
@@ -38,26 +36,25 @@
 .ab__keyField ::ng-deep input {
   font-family: var(--font-mono);
 }
-.ab__group {
+.ab__fields {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
+  gap: var(--space-3);
+}
+.ab__changes {
+  margin: var(--space-3) 0 0;
   padding: 0;
-  border: 0;
-  min-width: 0;
+  list-style: none;
 }
-.ab__legend {
-  padding: 0;
-  font-weight: var(--fw-semibold);
+.ab__change {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
 }
-.ab__rule {
-  height: 1px;
-  margin: var(--space-2) 0;
-  background: var(--color-border);
-}
-.ab__foot {
-  --dialog-footer-gap: var(--space-2);
+.ab__changeName {
+  overflow-wrap: anywhere;
 }
 .ab__steps {
   display: flex;
@@ -69,9 +66,12 @@
 }
 .ab__step {
   display: grid;
-  grid-template-columns: 1.5rem minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
   gap: var(--space-2);
   align-items: center;
+}
+.ab__stepGremium {
+  grid-column: 2 / -1;
 }
 .ab__stepNo {
   color: var(--color-text-muted);
@@ -94,17 +94,3 @@
   --section-gap: var(--space-2);
 }
 
-@include bp.phone {
-  .ab__step {
-    grid-template-columns: 1.5rem minmax(0, 1fr);
-    padding-bottom: var(--space-2);
-    border-bottom: 1px solid var(--color-border);
-  }
-  .ab__stepGremium,
-  .ab__stepActions {
-    grid-column: 2;
-  }
-  .ab__stepActions {
-    justify-content: flex-end;
-  }
-}

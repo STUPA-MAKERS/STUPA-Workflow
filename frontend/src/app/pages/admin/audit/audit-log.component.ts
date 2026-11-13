@@ -152,6 +152,7 @@ export const AUDIT_ACTIONS = [
   'budget_side_set',
   'budget_plan_switch',
   'budget_plan_version_create',
+  'budget_plan_version_delete',
   'budget_plan_state',
   'budget_plan_steps_set',
   'budget_plan_step',

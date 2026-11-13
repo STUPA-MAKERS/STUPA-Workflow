@@ -3,7 +3,6 @@ import { FormsModule } from '@angular/forms';
 import type { Observable } from 'rxjs';
 import {
   InputComponent,
-  SegmentedComponent,
   SelectFieldComponent,
   type SelectOption,
   SwitchComponent,
@@ -15,13 +14,13 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { BudgetTreeApi, type BudgetNodeUpdate, type BudgetTreeNode } from '../budget-tree.api';
 import { BudgetPlanApi, type Side } from '../plan/budget-plan.api';
 import { ColourFieldComponent } from './colour-field.component';
-import { costCentreError } from './cost-centre.util';
+import { costCentreError, keyProblem, NAME_MAX } from './cost-centre.util';
 
 /**
  * The settings of one Kostenstelle in the Budget tab: key, name, side, colour, the switch
  * "Aktiv" and its two Gremien. Each field saves when the person leaves it; `saved` then
- * tells the page to read the tree again. A failed save shows its reason and the field
- * takes the saved value again.
+ * tells the page to read the tree again and a toast says that the change is saved. A failed
+ * save shows its reason and the field takes the saved value again.
  */
 @Component({
   selector: 'app-cost-centre-settings',
@@ -32,7 +31,6 @@ import { costCentreError } from './cost-centre.util';
     TranslatePipe,
     ColourFieldComponent,
     InputComponent,
-    SegmentedComponent,
     SelectFieldComponent,
     SwitchComponent,
   ],
@@ -54,17 +52,29 @@ export class CostCentreSettingsComponent {
   readonly key = linkedSignal(() => this.node().key);
   readonly name = linkedSignal(() => this.node().name);
   readonly colour = linkedSignal(() => this.node().color?.trim() ?? '');
+  readonly side = linkedSignal<Side | null>(() => this.node().side ?? null);
   readonly gremien = computed<SelectOption[]>(() => [...this.gremiumOptions()]);
-  readonly sides = computed(() => [
+  /** The error under the key: only letters and digits, at most 64 characters. */
+  readonly keyError = computed(() =>
+    keyProblem(this.key().trim()) ? this.i18n.translate('budget.cc.error.keyInvalid') : '',
+  );
+  readonly nameError = computed(() =>
+    this.name().trim().length > NAME_MAX ? this.i18n.translate('budget.cc.error.nameLong') : '',
+  );
+  readonly sides = computed<SelectOption[]>(() => [
     { value: 'income', label: this.i18n.translate('budget.plan.side.income') },
     { value: 'expense', label: this.i18n.translate('budget.plan.side.expense') },
   ]);
 
-  /** Save the key or the name when the person leaves the field. An empty text is not saved. */
+  /**
+   * Save the key or the name when the person leaves the field. An empty text is not saved:
+   * the field shows the saved text again. A text with an error stays for the correction.
+   */
   saveText(field: 'key' | 'name'): void {
     const value = this[field]().trim();
+    const error = field === 'key' ? this.keyError() : this.nameError();
     if (!value) this[field].set(this.node()[field]);
-    else if (value !== this.node()[field]) this.save({ [field]: value });
+    else if (!error && value !== this.node()[field]) this.save({ [field]: value });
   }
 
   saveColour(colour: string): void {
@@ -75,8 +85,11 @@ export class CostCentreSettingsComponent {
     if ((value || null) !== (this.node()[field] ?? null)) this.save({ [field]: value || null });
   }
 
+  /** Save the side. A refused change shows the saved side again. */
   saveSide(side: string | null): void {
-    if (side && side !== this.node().side) this.run(this.planApi.setSide(this.node().id, side as Side));
+    if (!side || side === this.node().side) return;
+    this.side.set(side as Side);
+    this.run(this.planApi.setSide(this.node().id, side as Side));
   }
 
   save(patch: BudgetNodeUpdate): void {
@@ -85,12 +98,16 @@ export class CostCentreSettingsComponent {
 
   private run(request: Observable<unknown>): void {
     request.subscribe({
-      next: () => this.saved.emit(),
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
+        this.saved.emit();
+      },
       error: (err: unknown) => {
         this.toast.error(this.i18n.translate(costCentreError(problemCode(err))));
         this.key.set(this.node().key);
         this.name.set(this.node().name);
         this.colour.set(this.node().color?.trim() ?? '');
+        this.side.set(this.node().side ?? null);
         this.saved.emit();
       },
     });

@@ -375,6 +375,11 @@ export interface BudgetTreeNode {
   readonly side?: 'income' | 'expense' | null;
   /** The plan switch of a top-level node: its years can have a Haushaltsplan. */
   readonly planEnabled?: boolean;
+  /**
+   * For a top-level node the fiscal years with a plan version in force, for a node below
+   * it the fiscal years whose version in force has a line for the node.
+   */
+  readonly plannedIn?: readonly Uuid[];
   readonly byFiscalYear: readonly BudgetAllocationView[];
   readonly children: readonly BudgetTreeNode[];
 }

@@ -35,13 +35,31 @@ export function stepsToSave(steps: readonly StepDraft[]): readonly { readonly na
   return steps.map((s) => ({ name: s.name.trim(), gremiumId: (s.gremiumId || null) as Uuid | null }));
 }
 
-/**
- * The reason why a fiscal year cannot be deleted. The server names exactly one of
- * `bookings`, `allocations` or `applications` in the detail of its 409.
- */
-export function fyBlockerKey(detail: string | undefined): TranslationKey {
-  if (detail?.includes('bookings')) return 'budget.tree.fyBlocked.bookings';
-  if (detail?.includes('allocations')) return 'budget.tree.fyBlocked.allocations';
-  if (detail?.includes('applications')) return 'budget.tree.fyBlocked.applications';
-  return 'budget.tree.fyBlocked.generic';
+/** The messages of the problem codes of a refused fiscal-year write. */
+const FY_BLOCKERS: Readonly<Record<string, TranslationKey>> = {
+  fiscal_year_has_bookings: 'budget.tree.fyBlocked.bookings',
+  fiscal_year_has_allocations: 'budget.tree.fyBlocked.allocations',
+  fiscal_year_has_applications: 'budget.tree.fyBlocked.applications',
+  fiscal_year_has_plan: 'budget.tree.fyBlocked.plan',
+  fiscal_year_closed: 'budget.fy.closedError',
+  plan_in_progress: 'budget.plan.error.inProgress',
+};
+
+/** The message of a refused fiscal-year write: the one of its problem code, else `fallback`. */
+export function fyBlockerKey(code: string, fallback: TranslationKey): TranslationKey {
+  return FY_BLOCKERS[code] ?? fallback;
+}
+
+const MIN_YEAR = 1900;
+const MAX_YEAR = 2200;
+
+/** The text of a year field is no whole year from 1900 to 2200. */
+export function yearProblem(text: string): boolean {
+  const year = Number(text);
+  return !text.trim() || !Number.isInteger(year) || year < MIN_YEAR || year > MAX_YEAR;
+}
+
+/** The year a new fiscal year starts with: the year after the newest one, else `thisYear`. */
+export function nextYear(years: readonly { readonly year: number }[], thisYear: number): number {
+  return years.length ? Math.max(...years.map((y) => y.year)) + 1 : thisYear;
 }

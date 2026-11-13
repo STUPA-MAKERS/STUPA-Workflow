@@ -411,6 +411,15 @@ describe('ApiClient', () => {
     req.flush({ id: 'c', authorKind: 'principal', body: '', visibility: 'internal', at: '2026-06-05T13:00:00Z' });
   });
 
+  it('§F/finance/budget/000826: says if the reader may read the Haushaltsplan of a version', () => {
+    const answers: boolean[] = [];
+    api.planOfVersionReadable('pv1').subscribe((ok) => answers.push(ok));
+    http.expectOne('/api/budget-plan-versions/pv1/plan').flush({ id: 'p' });
+    api.planOfVersionReadable('pv1').subscribe((ok) => answers.push(ok));
+    http.expectOne('/api/budget-plan-versions/pv1/plan').flush({}, { status: 403, statusText: 'Forbidden' });
+    expect(answers).toEqual([true, false]);
+  });
+
   it('GETs a vote state + tally from /votes/{id}', (done) => {
     api.getVote('v1').subscribe((vote) => {
       expect(vote.status).toBe('open');

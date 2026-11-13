@@ -11,17 +11,3 @@
 .ccc__key ::ng-deep input {
   font-family: var(--font-mono);
 }
-.ccc__side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.ccc__label {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-.ccc__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}

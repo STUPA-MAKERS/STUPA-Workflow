@@ -1,7 +1,7 @@
 import { node, TOP } from '../plan/budget-plan.fixtures';
-import { activeOnly, costCentreError, findNode, hasSide, parentOptions, withDescendants } from './cost-centre.util';
+import { NAME_MAX, activeOnly, costCentreError, findNode, hasSide, keyProblem, pickable, usedIn, withDescendants } from './cost-centre.util';
 
-describe('cost-centre.util', () => {
+describe('CostCentreUtil', () => {
   it('names the message of a problem code, else the fallback', () => {
     expect(costCentreError('budget_key_exists')).toBe('budget.cc.error.keyExists');
     expect(costCentreError('other')).toBe('budget.cc.error.failed');
@@ -15,11 +15,42 @@ describe('cost-centre.util', () => {
     expect(hasSide({ parentId: 'vsm' }, null)).toBe(false);
   });
 
-  it('lists the budget first among the parents, then each Kostenstelle with its path', () => {
-    expect(parentOptions(TOP, [{ id: 'wages', name: 'Löhne', pathKey: 'STAFF-WAGES' }], 'Budget')).toEqual([
-      { value: 'vsm', label: 'VS-Mittel (Budget)' },
-      { value: 'wages', label: 'Löhne (STAFF-WAGES)' },
-    ]);
+  it('§F/finance/budget/000246: a key holds only letters and digits and at most 64 characters', () => {
+    expect(keyProblem('')).toBe(false);
+    expect(keyProblem('A1b')).toBe(false);
+    expect(keyProblem('A-1')).toBe(true);
+    expect(keyProblem('ä')).toBe(true);
+    expect(keyProblem('a'.repeat(64))).toBe(false);
+    expect(keyProblem('a'.repeat(65))).toBe(true);
+    expect(NAME_MAX).toBe(200);
+  });
+
+  it('a Kostenstelle is used in a year with a booking or an Antrag', () => {
+    const figures = { fiscalYearId: 'fy', allocated: '5', bound: '0', expended: '0', income: '0', committed: '0', requested: '0', available: '0' };
+    expect(usedIn(node({ id: 'a' }), 'fy')).toBe(false);
+    expect(usedIn(node({ id: 'a', byFiscalYear: [figures] }), 'fy')).toBe(false);
+    expect(usedIn(node({ id: 'a', byFiscalYear: [{ ...figures, requested: '1' }] }), 'fy')).toBe(true);
+    expect(usedIn(node({ id: 'a', byFiscalYear: [{ ...figures, bound: '1' }] }), 'other')).toBe(false);
+  });
+
+  it('§F/finance/budget/000822 §F/finance/budget/000834: a picker offers no inactive Kostenstelle and, in a planned year, only those of the plan or in use', () => {
+    const figures = { fiscalYearId: 'fy', allocated: '0', bound: '0', expended: '2', income: '0', committed: '0', requested: '0', available: '0' };
+    const planned = node({
+      id: 'p',
+      plannedIn: ['fy'],
+      children: [
+        node({ id: 'in', plannedIn: ['fy'], children: [node({ id: 'in-out' }), node({ id: 'in-in', plannedIn: ['fy'] })] }),
+        node({ id: 'out' }),
+        node({ id: 'used', byFiscalYear: [figures] }),
+        node({ id: 'off', plannedIn: ['fy'], active: false }),
+      ],
+    });
+    const free = node({ id: 'f', children: [node({ id: 'f1' }), node({ id: 'f2', active: false })] });
+    const ids = (forest: readonly ReturnType<typeof node>[]) => forest.flatMap(withDescendants).map((n) => n.id);
+    expect(ids(pickable([planned, free], () => ['fy']))).toEqual(['p', 'in', 'in-in', 'used', 'f', 'f1']);
+    expect(ids(pickable([planned], () => ['', 'other']))).toEqual(['p', 'in', 'in-out', 'in-in', 'out', 'used']);
+    expect(ids(pickable([planned], () => []))).toEqual(['p', 'in', 'in-out', 'in-in', 'out', 'used']);
+    expect(ids(pickable([planned], () => ['other', 'fy']))).toEqual(['p', 'in', 'in-in', 'used']);
   });
 
   it('walks a node and the nodes below it in tree order', () => {

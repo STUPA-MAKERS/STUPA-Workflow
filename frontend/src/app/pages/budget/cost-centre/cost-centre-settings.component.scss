@@ -19,16 +19,6 @@
 .ccs__key ::ng-deep input {
   font-family: var(--font-mono);
 }
-.ccs__side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  max-width: 22rem;
-}
-.ccs__label {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
 @include bp.phone {
   .ccs__pair,
   .ccs__pair--even {
