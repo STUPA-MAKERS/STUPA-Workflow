@@ -872,13 +872,23 @@ export class BudgetDashboardComponent {
     });
   }
 
+  private treeSent = 0;
+  private treeShown = 0;
+  /** The tree read for a section "Kostenstelle" that went off the page while its save ran. */
+  readonly rereadTree = (): void => this.refreshTree();
+
   /**
    * Read the tree again after a write, without the skeleton of the first load. `select`
-   * names the Kostenstelle that the page then shows.
+   * names the Kostenstelle that the page then shows. The answer of a read that went out
+   * before the read on the page is dropped, because it can hold the state before a save.
    */
   refreshTree(select: string | null = null): void {
+    this.treeSent += 1;
+    const sent = this.treeSent;
     this.api.tree().subscribe({
       next: (tree) => {
+        if (sent < this.treeShown) return;
+        this.treeShown = sent;
         this.tree.set(tree);
         if (select && this.nodeById().get(select)) this.selectKs(select);
         else if (!this.selectedKs()) this.selectKs(this.selectedBudgetId());

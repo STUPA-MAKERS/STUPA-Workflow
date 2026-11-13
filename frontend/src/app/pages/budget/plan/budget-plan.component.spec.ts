@@ -517,7 +517,7 @@ describe('BudgetPlanComponent', () => {
       );
     });
 
-    it('§F/finance/budget/000812 §F/finance/budget/000805: the answer of a new Kostenstelle and the years of a budget that the person left stay off the page', async () => {
+    it('§F/finance/budget/000812 §F/finance/budget/000848: the answer of a new Kostenstelle and the years of a budget that the person left stay off the page', async () => {
       const second = node({ id: 'two', name: 'Zweiter', planEnabled: true });
       const view = await setup({
         tree: [TOP, second],
@@ -883,6 +883,68 @@ describe('BudgetPlanComponent', () => {
       expect(page.noteValue({ id: 'wages', note: 'x' } as never)).toBe('x');
     });
 
+    it('§F/finance/budget/000812: a press and a text of one year do not show in the line of another year', async () => {
+      const marked = [line('fees', '100'), line('staff', '70'), line('wages', '60'), line('grants', '30')];
+      const view = await setup({
+        plans: { 'fy-25': plan([version({ id: 'v25', lines: marked })], 'fy-25'), 'fy-26': plan() },
+        query: { costCentre: 'grants' },
+      });
+      const note = () => view.container.querySelector<HTMLTextAreaElement>('[name="line-note-grants"]') as HTMLTextAreaElement;
+      const mark = new Subject<BudgetPlan>();
+      const text = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(mark).mockReturnValueOnce(text);
+      await userEvent.click(screen.getByRole('switch', { name: 'Übertragbar' }));
+      await userEvent.type(note(), 'Text von 26');
+      await pickChip(/Haushaltsjahr/, 'HHJ 2025/26');
+      view.fixture.detectChanges();
+      expect(view.api.setLine).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('switch', { name: 'Übertragbar' })).toHaveAttribute('aria-checked', 'false');
+      expect(note().value).toBe('');
+      mark.next(plan());
+      mark.complete();
+      text.next(plan());
+      text.complete();
+      await pickChip(/Haushaltsjahr/, 'HHJ 2026/27');
+      view.fixture.detectChanges();
+      expect(screen.getByRole('switch', { name: 'Übertragbar' })).toHaveAttribute('aria-checked', 'false');
+      expect(note().value).toBe('');
+    });
+
+    it('§F/finance/budget/000812: a field that is set back while its save runs is saved again', async () => {
+      const view = await setup({ query: { costCentre: 'grants' } });
+      const first = new Subject<BudgetPlan>();
+      const second = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(first).mockReturnValueOnce(second);
+      const mark = screen.getByRole('switch', { name: 'Übertragbar' });
+      await userEvent.click(mark);
+      await userEvent.click(mark);
+      expect(view.api.setLine.mock.calls.map((call) => call[2])).toEqual([{ transferable: true }, { transferable: false }]);
+      first.next(plan([version({ lines: [line('fees', '100'), line('staff', '70'), line('wages', '60'), line('grants', '30', { transferable: true })] })]));
+      first.complete();
+      view.fixture.detectChanges();
+      expect(mark).toHaveAttribute('aria-checked', 'false');
+      second.next(plan());
+      second.complete();
+      view.fixture.detectChanges();
+      expect(mark).toHaveAttribute('aria-checked', 'false');
+      await userEvent.click(mark);
+      expect(view.api.setLine).toHaveBeenCalledTimes(3);
+    });
+
+    it('§F/finance/budget/000812: the read after mixed answers waits for a page that loads another budget', async () => {
+      const view = await setup({ tree: [TOP, node({ id: 'two', name: 'Zweiter', planEnabled: true })], query: { costCentre: 'fees' } });
+      const first = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(first).mockReturnValueOnce(of(plan([version({ lines: [line('fees', '9')] })])));
+      await typeAmount(input(view, 'line-amount-fees'), '8');
+      await typeAmount(input(view, 'line-amount-fees'), '9');
+      view.treeApi.listFiscalYears.mockReturnValueOnce(new Subject<FiscalYear[]>());
+      view.fixture.componentInstance.pickTop('two');
+      const reads = view.api.plan.mock.calls.length;
+      first.next(plan([version({ lines: [line('fees', '8')] })]));
+      first.complete();
+      expect(view.api.plan.mock.calls.length).toBe(reads);
+    });
+
     it('§F/finance/budget/000812: after answers in another order than their requests the page reads the plan once more', async () => {
       const view = await setup({ query: { costCentre: 'fees' } });
       const first = new Subject<BudgetPlan>();
@@ -898,7 +960,7 @@ describe('BudgetPlanComponent', () => {
       expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('80 €');
     });
 
-    it('§F/finance/budget/000805: another budget takes the selected Kostenstelle of the budget before off the page', async () => {
+    it('§F/finance/budget/000848: another budget takes the selected Kostenstelle of the budget before off the page', async () => {
       const view = await setup({ tree: [TOP, node({ id: 'two', name: 'Zweiter', planEnabled: true })], query: { costCentre: 'grants' } });
       const page = view.fixture.componentInstance;
       expect(page.selId()).toBe('grants');

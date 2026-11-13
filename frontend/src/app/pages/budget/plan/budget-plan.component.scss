@@ -51,10 +51,19 @@
 }
 
 
+/* Wide enough for the largest Ansatz that a plan takes (9.999.999.999,99 €), so the field
+   never shows a part of an amount that reads as another amount. */
 .bp__field {
   display: block;
-  width: 9.5rem;
+  width: 12rem;
   margin-inline-start: auto;
+}
+
+/* The Erläuterung of a version that takes no change shows the disabled state of the amount
+   fields beside it. The textarea box of the ui-kit has no disabled state of its own. */
+.bp__note:has(textarea:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .bp__group {

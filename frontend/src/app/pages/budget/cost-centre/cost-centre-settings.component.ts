@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   input,
   linkedSignal,
@@ -24,10 +25,40 @@ import type { Uuid } from '@core/api/models';
 import { problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { BudgetTreeApi, type BudgetNodeUpdate, type BudgetTreeNode } from '../budget-tree.api';
+import { BudgetTreeApi, type BudgetTreeNode } from '../budget-tree.api';
 import { BudgetPlanApi, type Side } from '../plan/budget-plan.api';
 import { ColourFieldComponent } from './colour-field.component';
 import { costCentreError, keyProblem, NAME_MAX } from './cost-centre.util';
+
+type Field = 'key' | 'name' | 'color' | 'side' | 'viewGremiumId' | 'decisionGremiumId' | 'active';
+type Value = string | boolean | null;
+
+/** A change of one field of a Kostenstelle that the person made. */
+interface Change {
+  readonly id: Uuid;
+  readonly field: Field;
+  readonly value: Value;
+}
+
+/** The saved value of a field, in the form that a request holds. */
+function savedValue(node: BudgetTreeNode, field: Field): Value {
+  switch (field) {
+    case 'key':
+      return node.key;
+    case 'name':
+      return node.name;
+    case 'color':
+      return node.color?.trim() ?? '';
+    case 'side':
+      return node.side ?? null;
+    case 'viewGremiumId':
+      return node.viewGremiumId ?? null;
+    case 'decisionGremiumId':
+      return node.decisionGremiumId ?? null;
+    case 'active':
+      return node.active;
+  }
+}
 
 /** A saved value with the Kostenstelle that holds it. */
 interface Saved<T> {
@@ -69,6 +100,28 @@ export class CostCentreSettingsComponent {
   readonly saved = output<void>();
   /** The side changed, so the lines of a plan can differ: the plan page reads its plan again. */
   readonly sideSaved = output<void>();
+  /**
+   * Runs in place of `saved` after the section went off the page, because a component that
+   * is gone cannot emit. A text that the person typed and did not leave is saved when the
+   * section goes, for example by Back on a phone, and its answer arrives after that.
+   */
+  readonly whenGone = input<(() => void) | null>(null);
+  private gone: (() => void) | null = null;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      this.gone = this.whenGone() ?? ((): void => undefined);
+      this.saveText('key');
+      this.saveText('name');
+    });
+  }
+
+  /** Tell the page that a save ended. */
+  private tell(side: boolean): void {
+    if (this.gone) return this.gone();
+    this.saved.emit();
+    if (side) this.sideSaved.emit();
+  }
 
   /**
    * A field follows the saved value of its own field of its Kostenstelle, and not the node
@@ -86,30 +139,29 @@ export class CostCentreSettingsComponent {
     return linkedSignal({ source: this.stored(value), computation: (saved) => saved.value });
   }
   /**
-   * A state of the switch. While a save runs it keeps the press, because the tree that the
-   * page reads after the first of two saves holds the state of the first press and not of
+   * A switch or a select. While a save runs it keeps the choice of the person, because the
+   * tree that the page reads after the first of two saves holds the first choice and not
    * the one that is on its way.
    */
-  private pressed(): WritableSignal<boolean> {
-    return linkedSignal<Saved<boolean>, boolean>({
-      source: this.stored((node) => node.active),
+  private choice<T>(value: (node: BudgetTreeNode) => T): WritableSignal<T> {
+    return linkedSignal<Saved<T>, T>({
+      source: this.stored(value),
       computation: (saved, last) =>
-        last && last.source.id === saved.id && untracked(this.saving) ? last.value : saved.value,
+        last && last.source.id === saved.id && untracked(this.running) ? last.value : saved.value,
     });
   }
 
   /** A save runs. */
-  readonly saving = signal(false);
+  private readonly running = signal(false);
+  readonly saving = this.running.asReadonly();
   readonly key = this.field((node) => node.key);
   readonly name = this.field((node) => node.name);
   readonly colour = this.field((node) => node.color?.trim() ?? '');
-  readonly side = this.field<Side | null>((node) => node.side ?? null);
-  readonly viewGremium = this.field((node) => node.viewGremiumId ?? '');
-  readonly decisionGremium = this.field((node) => node.decisionGremiumId ?? '');
+  readonly side = this.choice<Side | null>((node) => node.side ?? null);
+  readonly viewGremium = this.choice((node) => node.viewGremiumId ?? '');
+  readonly decisionGremium = this.choice((node) => node.decisionGremiumId ?? '');
   /** The state that the switch shows: the last press, else the saved state. */
-  readonly active = this.pressed();
-  /** The state that the last request for the switch holds. */
-  private readonly sentActive = this.pressed();
+  readonly active = this.choice((node) => node.active);
   readonly gremien = computed<SelectOption[]>(() => [...this.gremiumOptions()]);
   /** The error under the key: only letters and digits, at most 64 characters. */
   readonly keyError = computed(() =>
@@ -135,94 +187,129 @@ export class CostCentreSettingsComponent {
     const value = this[field]().trim();
     const error = field === 'key' ? this.keyError() : this.nameError();
     if (!value) setTimeout(() => this[field].set(this.node()[field]));
-    else if (!error && value !== this.node()[field]) this.save({ [field]: value });
+    else if (!error) this.change(field, value);
   }
 
   saveColour(colour: string): void {
-    if (colour !== (this.node().color?.trim() ?? '')) this.save({ color: colour });
+    this.change('color', colour);
   }
 
   saveGremium(field: 'viewGremiumId' | 'decisionGremiumId', value: string | null): void {
-    if ((value || null) === (this.node()[field] ?? null)) return;
     (field === 'viewGremiumId' ? this.viewGremium : this.decisionGremium).set(value ?? '');
-    this.save({ [field]: value || null });
+    this.change(field, value || null);
   }
 
-  /** Save the side. A refused change shows the saved side again. */
   saveSide(side: string | null): void {
-    if (!side || side === this.node().side) return;
+    if (!side) return;
     this.side.set(side as Side);
-    this.run(this.node().id, this.planApi.setSide(this.node().id, side as Side), ['side'], true);
+    this.change('side', side);
   }
 
-  save(patch: BudgetNodeUpdate): void {
-    this.run(this.node().id, this.api.updateNode(this.node().id, patch), Object.keys(patch));
-  }
-
-  /** The press of the switch that waits for the save that runs, with its Kostenstelle. */
-  private readonly waiting = signal<{ readonly id: Uuid; readonly active: boolean } | null>(null);
-
-  /**
-   * Save the switch "Aktiv". A press while a save runs waits for it, so two writes never
-   * race and the last press is the one that counts. The switch stays enabled, because a
-   * disabled control loses the keyboard focus.
-   */
+  /** Save the switch "Aktiv". It stays enabled, because a disabled control loses the keyboard focus. */
   saveActive(active: boolean): void {
     this.active.set(active);
-    if (this.saving()) return this.waiting.set({ id: this.node().id, active });
-    if (active === this.sentActive()) return;
-    this.sentActive.set(active);
-    this.save({ active });
+    this.change('active', active);
+  }
+
+  /** The changes that wait for the save that runs, at most one for each field of a Kostenstelle. */
+  private readonly waiting = signal<readonly Change[]>([]);
+  /**
+   * The value that the last request for a field holds, by Kostenstelle and field, with the
+   * saved value of that moment (`base`). It stands for the saved value until the tree that
+   * the page reads after the save holds another value than `base`.
+   */
+  private sent: Readonly<Record<string, { readonly value: Value; readonly base: Value | undefined }>> = {};
+
+  /**
+   * Take a change of a field. The changes are saved one after the other, so two writes
+   * never race, and the tree that the page reads after a save is not older than that save.
+   * A change that comes while a save runs waits for it, and a later change of the same
+   * field takes its place: the last value of the person is the one that counts.
+   */
+  private change(field: Field, value: Value): void {
+    const id = this.node().id;
+    this.waiting.update((list) => [...list.filter((c) => c.id !== id || c.field !== field), { id, field, value }]);
+    this.next();
   }
 
   /**
-   * A save ended: send the press of the switch that waited for it, to the Kostenstelle that
-   * the person pressed it for, also when another one is selected now. The two states of the
-   * switch are read before the save counts as ended, because a linked signal computes when
-   * it is read, and a tree that came during the save must not replace them.
+   * The value that the server holds for a field as far as the page knows: the value of the
+   * last request, else the saved value of the tree. For a Kostenstelle that is not the
+   * selected one the page knows only its own last request.
    */
-  private ended(): void {
-    const waiting = this.waiting();
-    this.active();
-    this.sentActive();
-    this.waiting.set(null);
-    this.saving.set(false);
-    if (!waiting) return;
-    if (waiting.id === this.node().id) return this.saveActive(waiting.active);
-    this.run(waiting.id, this.api.updateNode(waiting.id, { active: waiting.active }), ['active']);
-  }
-
-  /** Show the saved values of the fields of a refused save again. */
-  private reset(fields: readonly string[]): void {
+  private known(id: Uuid, field: Field): Value | undefined {
+    const last = this.sent[`${id}:${field}`];
     const node = this.node();
-    if (fields.includes('key')) this.key.set(node.key);
-    if (fields.includes('name')) this.name.set(node.name);
-    if (fields.includes('color')) this.colour.set(node.color?.trim() ?? '');
-    if (fields.includes('side')) this.side.set(node.side ?? null);
-    if (fields.includes('viewGremiumId')) this.viewGremium.set(node.viewGremiumId ?? '');
-    if (fields.includes('decisionGremiumId')) this.decisionGremium.set(node.decisionGremiumId ?? '');
-    if (fields.includes('active')) this.active.set(node.active);
-    if (fields.includes('active')) this.sentActive.set(node.active);
+    if (node.id !== id) return last?.value;
+    return last && last.base === savedValue(node, field) ? last.value : savedValue(node, field);
+  }
+
+  /** Send the first change that waits, when no save runs. A change to the known value needs no request. */
+  private next(): void {
+    const [change, ...rest] = this.waiting();
+    if (this.running() || !change) return;
+    this.waiting.set(rest);
+    if (change.value === this.known(change.id, change.field)) return this.next();
+    this.send(change);
+  }
+
+  /** Show a value in the control of a field. */
+  private show(field: Field, value: Value): void {
+    switch (field) {
+      case 'key':
+        return this.key.set(value as string);
+      case 'name':
+        return this.name.set(value as string);
+      case 'color':
+        return this.colour.set(value as string);
+      case 'side':
+        return this.side.set(value as Side | null);
+      case 'viewGremiumId':
+        return this.viewGremium.set((value as string | null) ?? '');
+      case 'decisionGremiumId':
+        return this.decisionGremium.set((value as string | null) ?? '');
+      case 'active':
+        return this.active.set(value as boolean);
+    }
   }
 
   /**
-   * Run a save. A refused save shows its cause and the saved value of the `fields` that it
-   * held. The other fields keep the text that the person types in them, and so do the
-   * fields of another Kostenstelle that the person selected in the meantime.
+   * Run the save of one change. A refused save shows its cause and the known value of its
+   * field again. The other fields keep the text that the person types in them, and so do
+   * the fields of another Kostenstelle that the person selected in the meantime.
+   *
+   * The choices are read before the save counts as ended, because a linked signal computes
+   * when it is read, and a tree that came during the save must not replace them.
    */
-  private run(id: Uuid, request: Observable<unknown>, fields: readonly string[], side = false): void {
-    this.saving.set(true);
-    request.pipe(finalize(() => this.ended())).subscribe({
-      next: () => {
-        this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
-        this.saved.emit();
-        if (side) this.sideSaved.emit();
-      },
-      error: (err: unknown) => {
-        this.toast.error(this.i18n.translate(costCentreError(problemCode(err))));
-        if (this.node().id === id) this.reset(fields);
-        this.saved.emit();
-      },
-    });
+  private send({ id, field, value }: Change): void {
+    const key = `${id}:${field}`;
+    const before = this.sent[key];
+    const node = this.node();
+    const base = node.id === id ? savedValue(node, field) : undefined;
+    this.sent = { ...this.sent, [key]: { value, base } };
+    this.running.set(true);
+    const request: Observable<unknown> =
+      field === 'side' ? this.planApi.setSide(id, value as Side) : this.api.updateNode(id, { [field]: value });
+    request
+      .pipe(
+        finalize(() => {
+          void [this.side(), this.viewGremium(), this.decisionGremium(), this.active()];
+          this.running.set(false);
+          this.next();
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
+          this.tell(field === 'side');
+        },
+        error: (err: unknown) => {
+          this.toast.error(this.i18n.translate(costCentreError(problemCode(err))));
+          this.sent = Object.fromEntries([...Object.entries(this.sent).filter(([k]) => k !== key), ...(before ? [[key, before]] : [])]);
+          const known = this.known(id, field);
+          if (this.node().id === id && known !== undefined) this.show(field, known);
+          this.tell(false);
+        },
+      });
   }
 }

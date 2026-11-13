@@ -37,7 +37,15 @@ describe('cacheInterceptor', () => {
     expect(seen).toEqual([['new'], ['old']]);
     http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
     expect(seen[2]).toEqual(['new']);
-    mock.expectOne('/api/things').flush(['new']);
+    const behind = mock.expectOne('/api/things');
+    http.patch('/api/things/1', {}).subscribe();
+    mock.expectOne('/api/things/1').flush({});
+    behind.flush(['before the write']);
+    const after: unknown[] = [];
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => after.push(b));
+    expect(after).toEqual([]);
+    mock.expectOne('/api/things').flush(['after the write']);
+    expect(after).toEqual([['after the write']]);
   });
 
   describe('listContext', () => {

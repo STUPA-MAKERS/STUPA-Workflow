@@ -71,7 +71,7 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.api.updateNode).toHaveBeenLastCalledWith('ks', { key: '810' });
   });
 
-  it('§F/finance/budget/000831: keeps the text a person types while the page reads the tree again', async () => {
+  it('§F/finance/budget/000849: keeps the text a person types while the page reads the tree again', async () => {
     const view = await setup();
     await userEvent.clear(view.field('Schlüssel'));
     await userEvent.type(view.field('Schlüssel'), '59');
@@ -120,7 +120,7 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.api.updateNode).not.toHaveBeenCalled();
   });
 
-  it('§F/finance/budget/000831: the switch keeps the focus, and a press while a save runs waits for it', async () => {
+  it('§F/finance/budget/000849: the switch keeps the focus, and a press while a save runs waits for it', async () => {
     const view = await setup();
     const pending = new Subject<object>();
     view.api.updateNode.mockReturnValueOnce(pending);
@@ -156,7 +156,7 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.api.updateNode).toHaveBeenCalledTimes(1);
   });
 
-  it('§F/finance/budget/000831: the switch keeps the second press while the tree holds the first', async () => {
+  it('§F/finance/budget/000849: the switch keeps the second press while the tree holds the first', async () => {
     const view = await setup();
     const first = new Subject<object>();
     const second = new Subject<object>();
@@ -187,7 +187,7 @@ describe('CostCentreSettingsComponent', () => {
     await waitFor(() => expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('Ohne Gremium'));
   });
 
-  it('§F/finance/budget/000831: a refused key keeps the text that the person types in the name', async () => {
+  it('§F/finance/budget/000849: a refused key keeps the text that the person types in the name', async () => {
     const view = await setup();
     const pending = new Subject<object>();
     view.api.updateNode.mockReturnValueOnce(pending);
@@ -198,7 +198,7 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.field('Name').value).toBe('Kultur XY');
   });
 
-  it('§F/finance/budget/000831: a press that waits is saved for its own Kostenstelle, and a refusal leaves the next one alone', async () => {
+  it('§F/finance/budget/000849: each press that waits is saved for its own Kostenstelle', async () => {
     const view = await setup();
     const name = new Subject<object>();
     const press = new Subject<object>();
@@ -208,15 +208,68 @@ describe('CostCentreSettingsComponent', () => {
     view.fixture.componentRef.setInput('node', { ...KS, id: 'other' });
     view.fixture.detectChanges();
     expect(screen.getByRole('switch', { name: 'Aktiv' })).toHaveAttribute('aria-checked', 'true');
-    await userEvent.type(view.field('Name'), ' XY');
+    await userEvent.click(screen.getByRole('switch', { name: 'Aktiv' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Aktiv' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Aktiv' }));
     name.next({});
     name.complete();
     expect(view.api.updateNode).toHaveBeenLastCalledWith('ks', { active: false });
     press.error({ status: 409, error: { code: 'x' } });
     view.fixture.detectChanges();
-    expect(view.field('Name').value).toBe('Kultur XY');
-    expect(screen.getByRole('switch', { name: 'Aktiv' })).toHaveAttribute('aria-checked', 'true');
-    expect(view.api.updateNode).toHaveBeenCalledTimes(2);
+    expect(view.api.updateNode.mock.calls.slice(1)).toEqual([
+      ['ks', { active: false }],
+      ['other', { active: false }],
+    ]);
+    expect(screen.getByRole('switch', { name: 'Aktiv' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('§F/finance/budget/000849: a refused save of the Kostenstelle before leaves the fields of the selected one', async () => {
+    const view = await setup();
+    const pending = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(pending);
+    await retype(view.field('Schlüssel'), '900');
+    view.fixture.componentRef.setInput('node', { ...KS, id: 'other' });
+    view.fixture.detectChanges();
+    await waitFor(() => expect(view.field('Schlüssel').value).toBe('800'));
+    await userEvent.type(view.field('Schlüssel'), '7');
+    pending.error({ status: 409, error: { code: 'budget_key_exists' } });
+    view.fixture.detectChanges();
+    expect(view.field('Schlüssel').value).toBe('8007');
+  });
+
+  it('§F/finance/budget/000849: a choice that is set back while its save runs is saved again, one save at a time', async () => {
+    const view = await setup();
+    const first = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(first);
+    await pick(/Sichtbar für Gremium/, 'StuPa');
+    await pick(/Sichtbar für Gremium/, 'Ohne Gremium');
+    await retype(view.field('Name'), 'Kultur neu');
+    expect(view.api.updateNode).toHaveBeenCalledTimes(1);
+    first.next({});
+    first.complete();
+    view.fixture.componentRef.setInput('node', { ...KS, viewGremiumId: 'g1', name: 'Kultur neu' });
+    view.fixture.detectChanges();
+    expect(view.api.updateNode.mock.calls.map((call) => call[1])).toEqual([
+      { viewGremiumId: 'g1' },
+      { viewGremiumId: null },
+      { name: 'Kultur neu' },
+    ]);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('StuPa'));
+  });
+
+  it('§F/finance/budget/000849: a typed text is saved when the section goes off the page', async () => {
+    const view = await setup();
+    const reread = jest.fn();
+    view.fixture.componentRef.setInput('whenGone', reread);
+    const pending = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(pending);
+    await userEvent.type(view.field('Name'), ' Y');
+    view.fixture.destroy();
+    expect(view.api.updateNode).toHaveBeenCalledWith('ks', { name: 'Kultur Y' });
+    pending.next({});
+    pending.complete();
+    expect(reread).toHaveBeenCalledTimes(1);
+    expect(view.saved).not.toHaveBeenCalled();
   });
 
   it('saves the colour, the Gremien and the switch', async () => {

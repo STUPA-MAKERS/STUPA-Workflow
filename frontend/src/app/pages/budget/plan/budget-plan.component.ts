@@ -800,7 +800,8 @@ export class BudgetPlanComponent {
    * A numbered request ended. The number of a request is the order in which the page sent
    * it, and the server can take two requests in the other order. So after answers that came
    * in another order than their requests, the page reads the plan once more when no request
-   * is on its way: that read holds the saved plan.
+   * is on its way: that read holds the saved plan. A page that loads another budget or
+   * year reads its plan by itself.
    */
   private ended<T>(request: Observable<T>, sent: number): Observable<T> {
     return request.pipe(
@@ -808,7 +809,7 @@ export class BudgetPlanComponent {
         this.open = this.open.filter((n) => n !== sent);
         if (this.open.length || !this.mixed) return;
         this.mixed = false;
-        this.refreshPlan();
+        if (this.fyId() && this.load().kind !== 'loading') this.refreshPlan();
       }),
     );
   }
@@ -1037,9 +1038,12 @@ export class BudgetPlanComponent {
   reloadTree(plan: BudgetPlan | null = null): void {
     const place = this.place();
     const sent = plan ? this.send() : 0;
+    this.treeSent += 1;
+    const read = this.treeSent;
     (plan ? this.ended(this.treeApi.tree(), sent) : this.treeApi.tree()).subscribe({
       next: (tree) => {
-        this.tree.set(tree);
+        if (read >= this.treeShown) this.tree.set(tree);
+        this.treeShown = Math.max(read, this.treeShown);
         if (plan && this.place() === place && this.newest(sent)) this.load.set({ kind: 'plan', plan });
       },
       error: () => this.reloadPlan(),
@@ -1048,8 +1052,14 @@ export class BudgetPlanComponent {
 
   /** Read the tree again after a write that changed the allocations. */
   private readTree(): void {
-    this.treeApi.tree().subscribe((tree) => this.tree.set(tree));
+    this.reloadTree();
   }
+
+  /** The numbers of the tree reads: an answer that is older than the tree on the page is dropped. */
+  private treeSent = 0;
+  private treeShown = 0;
+  /** The tree read for a section "Kostenstelle" that went off the page while its save ran. */
+  readonly rereadTree = (): void => this.reloadTree();
 
   /** Delete the Kostenstelle after the confirmation. A refusal shows its reason. */
   private deleteNode(row: PlanRow): void {
@@ -1081,23 +1091,47 @@ export class BudgetPlanComponent {
 
   /**
    * Save the changed fields of a line. The request holds only these fields, so two saves
-   * of one line that follow each other do not overwrite each other.
+   * of one line that follow each other do not overwrite each other. `ended` runs when the
+   * save ended or was not needed, also when the person chose another year in the meantime.
    */
   saveLine(
     row: PlanRow,
     change: PlanLineSet,
-    refused: (() => void) | null = null,
-    saved: (() => void) | null = null,
+    ended: (() => void) | null = null,
   ): void {
     const version = this.version();
+    const key = `${version?.id}:${row.id}`;
+    const known = { ...row, ...this.lineSent[key] };
     const same =
-      (change.amount === undefined || Number(change.amount) === row.amount) &&
-      (change.blocked === undefined || Number(change.blocked) === row.blocked) &&
-      (change.note === undefined || (change.note ?? '') === row.note) &&
-      (change.transferable === undefined || change.transferable === row.transferable) &&
-      (change.coverable === undefined || change.coverable === row.coverable);
-    if (!version || !this.editable() || same) return saved?.();
-    this.write(this.api.setLine(version.id, row.id, change), null, saved, false, refused);
+      (change.amount === undefined || Number(change.amount) === Number(known.amount)) &&
+      (change.blocked === undefined || Number(change.blocked) === Number(known.blocked)) &&
+      (change.note === undefined || (change.note ?? '') === (known.note ?? '')) &&
+      (change.transferable === undefined || change.transferable === known.transferable) &&
+      (change.coverable === undefined || change.coverable === known.coverable);
+    if (!version || !this.editable() || same) return ended?.();
+    const sent = { ...this.lineSent[key], ...change };
+    this.lineSent = { ...this.lineSent, [key]: sent };
+    const done = (): void => {
+      if (this.lineSent[key] === sent) this.lineSent = Object.fromEntries(Object.entries(this.lineSent).filter(([k]) => k !== key));
+      ended?.();
+    };
+    this.write(this.api.setLine(version.id, row.id, change).pipe(finalize(done)), null, null, false);
+  }
+
+  /**
+   * The fields of the saves that run, by version and line. A change is compared with them
+   * and then with the plan on the page, because the plan on the page is the plan before
+   * these saves: a field that the person sets back while its save runs must be saved again.
+   */
+  private lineSent: Readonly<Record<string, PlanLineSet>> = {};
+
+  /**
+   * The key of a press or a typed text that the page keeps for a field of a line. It names
+   * the version, because a Kostenstelle has the same id in each year of its budget, and the
+   * line of another year must not show it.
+   */
+  private kept(row: PlanRow, field: 'transferable' | 'coverable' | 'note'): string {
+    return `${row.id}:${field}:${this.version()?.id ?? ''}`;
   }
 
   /** The presses of the Vermerk switches whose save runs, by line and Vermerk. */
@@ -1105,7 +1139,7 @@ export class BudgetPlanComponent {
 
   /** The state a Vermerk switch shows: the press whose save runs, else the saved state. */
   mark(row: PlanRow, field: 'transferable' | 'coverable'): boolean {
-    return this.marks()[`${row.id}:${field}`] ?? row[field];
+    return this.marks()[this.kept(row, field)] ?? row[field];
   }
 
   /**
@@ -1115,10 +1149,11 @@ export class BudgetPlanComponent {
    * nothing into the switch.
    */
   saveMark(row: PlanRow, field: 'transferable' | 'coverable', value: boolean): void {
-    const key = `${row.id}:${field}`;
-    const ended = (): void => this.marks.update((m) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== key)));
+    const key = this.kept(row, field);
+    const ended = (): void =>
+      this.marks.update((m) => Object.fromEntries(Object.entries(m).filter(([k, v]) => k !== key || v !== value)));
     this.marks.update((m) => ({ ...m, [key]: value }));
-    this.saveLine(row, { [field]: value }, ended, ended);
+    this.saveLine(row, { [field]: value }, ended);
   }
 
   /** The amount a field shows: the text a person types, else the saved amount. */
@@ -1164,13 +1199,14 @@ export class BudgetPlanComponent {
    * that takes no change shows only the saved text.
    */
   noteValue(row: PlanRow): string {
-    return (this.editable() ? this.edits()[`${row.id}:note`] : undefined) ?? row.note;
+    return (this.editable() ? this.edits()[this.kept(row, 'note')] : undefined) ?? row.note;
   }
 
   /** Keep the Erläuterung a person types, so the answer of a save does not replace it. */
   editNote(row: PlanRow, event: Event): void {
     const text = (event.target as HTMLTextAreaElement).value;
-    this.edits.update((e) => ({ ...e, [`${row.id}:note`]: text }));
+    const key = this.kept(row, 'note');
+    this.edits.update((e) => ({ ...e, [key]: text }));
   }
 
   /**
@@ -1179,7 +1215,7 @@ export class BudgetPlanComponent {
    * save shows the saved text again.
    */
   saveNote(row: PlanRow): void {
-    const key = `${row.id}:note`;
+    const key = this.kept(row, 'note');
     const text = this.edits()[key];
     if (text === undefined || this.noteSent[key] === text) return;
     const without = (texts: Readonly<Record<string, string>>): Readonly<Record<string, string>> =>
@@ -1189,7 +1225,7 @@ export class BudgetPlanComponent {
       this.edits.update(without);
     };
     this.noteSent = { ...this.noteSent, [key]: text };
-    this.saveLine(row, { note: text.trim() || null }, ended, ended);
+    this.saveLine(row, { note: text.trim() || null }, ended);
   }
 
   /** The Erläuterung whose save runs, by line, so a second leave of the field sends no second request. */
@@ -1197,7 +1233,7 @@ export class BudgetPlanComponent {
 
   /**
    * Run a plan write and show the plan it answers. `after` runs after the answer. A failed
-   * write runs `refused` and reads the saved plan again. A write that `locks` takes no second action while it runs;
+   * write reads the saved plan again. A write that `locks` takes no second action while it runs;
    * the save of a field does not lock, so a second field can save beside it.
    */
   private write(
@@ -1205,7 +1241,6 @@ export class BudgetPlanComponent {
     toast: TranslationKey | null,
     after: (() => void) | null = null,
     locks = true,
-    refused: (() => void) | null = null,
   ): void {
     if (locks && this.busy()) return;
     if (locks) this.busy.set(true);
@@ -1222,10 +1257,7 @@ export class BudgetPlanComponent {
         after?.();
         this.syncUrl();
       },
-      error: (err: unknown) => {
-        refused?.();
-        this.fail(err, !locks);
-      },
+      error: (err: unknown) => this.fail(err, !locks),
     });
   }
 

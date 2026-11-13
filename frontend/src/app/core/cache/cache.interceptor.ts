@@ -146,9 +146,11 @@ export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
     return fresh;
   }
 
+  const epoch = cache.epoch;
   const fresh = next(req).pipe(
     tap((event) => {
-      if (event instanceof HttpResponse && event.status === 200) cache.set(key, event.body);
+      const current = cache.epoch === epoch;
+      if (current && event instanceof HttpResponse && event.status === 200) cache.set(key, event.body);
     }),
     filter((event) => !(event instanceof HttpResponse && sameBody(event.body, hit))),
   );

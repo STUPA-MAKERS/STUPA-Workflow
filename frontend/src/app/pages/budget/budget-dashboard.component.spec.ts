@@ -1,3 +1,4 @@
+import { HttpCacheService } from '@core/cache/http-cache.service';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import type { Observable } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
@@ -1553,6 +1554,18 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       view.c.refreshTree();
       view.http.expectOne(treeUrl).flush({}, { status: 500, statusText: 'Error' });
       expect(error).toHaveBeenCalledWith('Die Budget-Statistik konnte nicht geladen werden.');
+    });
+
+    it('§F/finance/budget/000849: drops the answer of a tree read that went out before the read on the page', async () => {
+      const view = await setup({ queryParams: { costCentre: 'b-800' } });
+      view.c.refreshTree();
+      TestBed.inject(HttpCacheService).invalidate('/api/budgets');
+      view.c.refreshTree();
+      const reads = view.http.match(treeUrl);
+      expect(reads).toHaveLength(2);
+      reads[1].flush([{ ...TREE[0], name: 'Neu' }]);
+      reads[0].flush([{ ...TREE[0], name: 'Alt' }]);
+      expect(view.c.tree()[0].name).toBe('Neu');
     });
 
     it('§F/finance/budget/000832: deletes the selected Kostenstelle after the confirmation', async () => {
