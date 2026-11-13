@@ -19,8 +19,12 @@ def test_collects_top_level_uuid_values() -> None:
     assert data_uuid_strings({"gremiumId": _U1, "budgetId": _U2}) == {_U1, _U2}
 
 
-def test_ignores_non_uuid_and_keys() -> None:
-    assert data_uuid_strings({_U1: "not-a-uuid", "count": 7, "flag": True}) == set()
+def test_ignores_non_uuid_values_and_reads_uuid_keys() -> None:
+    """A map of changes names each cost center in its key.
+
+    Rule: §F/finance/budget/000802.
+    """
+    assert data_uuid_strings({_U1: "not-a-uuid", "count": 7, "flag": True}) == {_U1}
 
 
 def test_walks_nested_dicts_and_lists() -> None:

@@ -131,6 +131,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         Raises:
             ConflictError: The cost center is now in use (409).
         """
+        await self._lock_tree(budget_id)
         node = await self.session.get(Budget, budget_id)
         if node is None:
             raise ConflictError(
@@ -182,6 +183,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
             raise ConflictError(
                 "No prior state recorded for this change.", code="not_revertable"
             )
+        await self._lock_tree(budget_id)
         node = await self.session.get(Budget, budget_id)
         if node is None:
             raise ConflictError(
@@ -202,6 +204,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         if not fy_raw:
             raise ConflictError("No fiscal year recorded.", code="not_revertable")
         fiscal_year_id = UUID(fy_raw)
+        await self._lock_tree(budget_id)
         cur = await self._allocation(budget_id, fiscal_year_id)
         set_value = data.get("allocated")
         if (
@@ -216,6 +219,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         previous = data.get("previousAllocated")
         if previous is None:
             node = await self._get_node(budget_id)
+            self._refuse_closed(await self._get_fiscal_year(fiscal_year_id))
             await self._refuse_planned(await self._top_level(node), fiscal_year_id)
             await self._audit(
                 AuditAction.BUDGET_ALLOCATION_SET,

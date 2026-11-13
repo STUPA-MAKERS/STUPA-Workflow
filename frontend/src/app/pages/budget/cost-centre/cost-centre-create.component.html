@@ -1,12 +1,11 @@
 <app-dialog [open]="open()" [title]="'budget.cc.create' | t" [closeLabel]="'action.close' | t" (closed)="closed.emit()">
   <form id="cc-create-form" class="ccc" (submit)="submit($event)">
-    <app-select
-      name="ccParent"
+    <app-cost-centre-select
+      [nodes]="parentNodes()"
+      [value]="parentId()"
       [label]="'budget.cc.parent' | t"
       [required]="true"
-      [options]="parentOptions()"
-      [ngModel]="parentId()"
-      (ngModelChange)="parentId.set($event ?? '')"
+      (picked)="pickParent($event)"
     />
     <div class="ccc__pair">
       <app-input
@@ -14,31 +13,37 @@
         name="ccKey"
         [label]="'budget.tree.key' | t"
         [required]="true"
+        [error]="keyError()"
         [ngModel]="key()"
         (ngModelChange)="key.set($event)"
       />
-      <app-input name="ccName" [label]="'budget.tree.name' | t" [required]="true" [ngModel]="name()" (ngModelChange)="name.set($event)" />
+      <app-input
+        name="ccName"
+        [label]="'budget.tree.name' | t"
+        [required]="true"
+        [error]="nameError()"
+        [ngModel]="name()"
+        (ngModelChange)="name.set($event)"
+      />
     </div>
     @if (sided()) {
-      <div class="ccc__side">
-        <span class="ccc__label">{{ 'budget.cc.side' | t }}</span>
-        <app-segmented
-          width="equal"
-          size="control"
-          [ariaLabel]="'budget.cc.side' | t"
-          [options]="sides()"
-          [value]="side()"
-          (valueChange)="side.set($any($event))"
-        />
-      </div>
+      <app-select
+        name="ccSide"
+        [label]="'budget.cc.side' | t"
+        [required]="true"
+        [clearable]="false"
+        [options]="sides()"
+        [ngModel]="side()"
+        (ngModelChange)="side.set($event || null)"
+      />
     }
     @if (versionId()) {
-      <app-currency-input name="ccAmount" [label]="amountLabel()" [ngModel]="amount()" (ngModelChange)="amount.set($event)" />
+      <app-currency-input name="ccAmount" [label]="amountLabel()" [ngModel]="amount()" [error]="amountError()" (ngModelChange)="setAmount($event)" />
     }
     <button type="submit" hidden></button>
   </form>
-  <div dialog-footer class="ccc__foot">
+  <div dialog-footer>
     <app-button variant="text" (click)="closed.emit()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="submit($event)" [disabled]="!valid() || busy()">{{ 'budget.cc.createSubmit' | t }}</app-button>
+    <app-button variant="fill" (click)="submit($event)" [disabled]="!valid() || busy()" [loading]="busy()">{{ 'budget.tree.create' | t }}</app-button>
   </div>
 </app-dialog>

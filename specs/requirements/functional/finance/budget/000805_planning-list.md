@@ -2,9 +2,9 @@
 id: "000805"
 title: The list of Planung shows the plan as a tree
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
 implementation:
@@ -22,3 +22,6 @@ chip must name the Stammplan and each Nachtrag.
 
 Reason: The view keeps the list and detail geometry of the Budget tab, and one plan belongs
 to one fiscal year and one version.
+
+Test: The component test reads the groups, the rows, the sums and the two filter chips of the
+list.

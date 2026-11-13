@@ -2,9 +2,9 @@
 id: "000791"
 title: A fiscal year has one Haushaltsplan with versions
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_create_plan"
 implementation:
@@ -21,3 +21,5 @@ versions with the numbers 0, 1, 2 and so on. Version 0 is the Stammplan. Each la
 is a Nachtrag.
 
 Reason: LHO § 33 lets a Nachtrag change the plan, and the earlier plan must stay readable.
+
+Test: The test creates the plan of a year twice and reads the version numbers.

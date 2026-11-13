@@ -49,14 +49,14 @@ class AllocationOps(BudgetTreeServiceBase):
             )
 
     async def _lock_budget(self, budget_id: UUID) -> None:
-        """Lock the budget row pessimistically (``SELECT … FOR UPDATE``).
+        """Lock the budget row pessimistically (``SELECT … FOR NO KEY UPDATE``).
 
         The lock serializes concurrent sibling allocations. They all lock the
         same parent row. Read-sum, validate and write then stay atomic, so no
         double over-allocation gets through.
         """
         await self.session.execute(
-            select(Budget.id).where(Budget.id == budget_id).with_for_update()
+            select(Budget.id).where(Budget.id == budget_id).with_for_update(key_share=True)
         )
 
     async def _children_alloc_sum(
@@ -102,6 +102,7 @@ class AllocationOps(BudgetTreeServiceBase):
                 budget, the children sum exceeds the parent allocation, or the
                 new allocation falls below the sum already given to children.
         """
+        await self._lock_tree(budget_id)
         node = await self._get_node(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
         top = await self._top_level(node)
@@ -128,6 +129,7 @@ class AllocationOps(BudgetTreeServiceBase):
             ):
                 raise ValidationProblem(
                     "Children allocation would exceed the parent budget.",
+                    code="children_allocation_exceeds_parent",
                     errors=[{"field": "allocated", "msg": "exceeds parent budget"}],
                 )
 
@@ -135,6 +137,7 @@ class AllocationOps(BudgetTreeServiceBase):
         if tree_rules.parent_allocation_below_children(payload.allocated, own_children):
             raise ValidationProblem(
                 "Allocation is below the sum already distributed to children.",
+                code="parent_allocation_below_children",
                 errors=[{"field": "allocated", "msg": "below children allocations"}],
             )
 

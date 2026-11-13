@@ -1,3 +1,5 @@
+@use 'display' as d;
+
 .cf {
   display: flex;
   flex-direction: column;
@@ -39,8 +41,10 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 3px;
 }
+// The button of the free colour shows the colour wheel. Its colours are the hues that a
+// person can pick, not colours of the theme, so they are the same in each theme and no token.
 .cf__native {
-  background: conic-gradient(#e5484d, #f5a524, #f5d90a, #46a758, #0091ff, #8e4ec6, #e5484d);
+  background: conic-gradient(red, orange, yellow, green, blue, purple, red);
 }
 .cf__native::-webkit-color-swatch-wrapper {
   padding: 5px;
@@ -56,6 +60,16 @@
 .cf__hex {
   width: 9rem;
 }
+// The hex code reads in the mono font like each key and code of the app. The input is inside
+// the shared field component, which has no input for the font.
 .cf__hex ::ng-deep input {
   font-family: var(--font-mono);
+}
+
+/* Very high contrast (spec 000614): a colour that a person can press has a yellow edge. */
+@include d.host-on(veryHigh) {
+  .cf__pick,
+  .cf__native {
+    border: 2px solid var(--vh-hi);
+  }
 }

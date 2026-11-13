@@ -324,7 +324,13 @@ export const routes: Routes = [
       {
         path: 'budget/plan',
         canMatch: [featureMatch('budget')],
-        data: { title: 'nav.budget', permission: BUDGET_PERMISSIONS, parent: ['budget'], wide: true },
+        data: {
+          title: 'budget.view.plan',
+          permission: BUDGET_PERMISSIONS,
+          allowScopedBudgetView: true,
+          parent: ['budget'],
+          wide: true,
+        },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/budget/plan/budget-plan.component').then((m) => m.BudgetPlanComponent),

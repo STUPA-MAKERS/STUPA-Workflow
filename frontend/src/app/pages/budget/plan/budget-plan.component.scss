@@ -1,3 +1,5 @@
+@use 'breakpoints' as bp;
+
 .bp__node {
   display: flex;
   flex-direction: column;
@@ -6,6 +8,15 @@
 }
 .bp__name {
   overflow-wrap: anywhere;
+}
+// A Vermerk of a line breaks between its words, and inside a word when the column has no
+// room for the word, as the name above it does. A text that cannot break sets the least
+// width of the name column, and the five columns of a draft then do not fit the table area.
+.bp__node app-status-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .bp__path {
   font-size: var(--fs-xs);
@@ -33,12 +44,10 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-.bp__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
 
+// The plan tables hold up to five amount columns beside the name. The shared table has one
+// cell padding for each page, so the columns get the narrower padding here, else the name
+// column is too narrow for a Kostenstelle at the list width of the tab.
 :host .bp__table ::ng-deep .dt__table th,
 :host .bp__table ::ng-deep .dt__table td {
   padding-inline: var(--space-2);
@@ -51,23 +60,35 @@
 }
 
 
+/* Wide enough for an Ansatz below 10 million euro, so the five columns of a draft fit a
+   laptop window. A plan that holds a larger Ansatz takes the width of the largest one that a
+   plan takes (9.999.999.999,99 €), so the field never shows a part of an amount that reads
+   as another amount. */
 .bp__field {
   display: block;
   width: 9.5rem;
   margin-inline-start: auto;
 }
-
-:host {
-  flex: 1 1 0;
-  min-height: 0;
+.bp__field--wide {
+  width: 12rem;
 }
+
+/* The Erläuterung of a version that takes no change shows the disabled state of the amount
+   fields beside it. The textarea box of the ui-kit has no disabled state of its own. */
+.bp__note:has(textarea:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .bp__group {
   display: flex;
   justify-content: space-between;
   gap: var(--space-2);
   margin: var(--space-3) 0 2px;
+  // The heading starts where the names of the tree rows start: the inset of a row, the
+  // column of its chevron and the gap behind it.
   padding: 0 var(--space-3) 0 calc(4px + 1.75rem + var(--space-1));
-  font-size: 0.78125rem;
+  font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   color: var(--color-text-muted);
 }
@@ -76,18 +97,14 @@
 }
 .bp__figNote {
   margin: 0;
-  font-size: 0.78125rem;
-  line-height: 1.125rem;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-small);
   color: var(--color-text-muted);
 }
 .bp__form {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-.bp__ansatz {
-  display: block;
-  max-width: 14rem;
 }
 .bp__sumCell {
   display: block;
@@ -101,18 +118,50 @@
   gap: var(--space-1) var(--space-2);
 }
 
-.bp__blocked {
-  display: block;
-  max-width: 14rem;
-}
-.bp__none {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-2);
-}
 .bp__addForm {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+// The sections of the sheet stand below each other with the gap of the sheet.
+.bp__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+// On a phone the figures stand in two columns: the difference takes the whole row, so no
+// cell stays empty.
+@include bp.phone {
+  .bp__figWide {
+    grid-column: 1 / -1;
+  }
+}
+
+// A line has two, three or four figures. Between the phone and the wide layout two or three
+// stand in one row of equal columns, so no cell stays empty. Four stand in two rows of two,
+// because a tile of a quarter of the sheet is too narrow for an amount with cents. An
+// amount that is still too long breaks inside its tile and is not cut or laid over the
+// next one. On a phone they keep the two columns.
+@include bp.below-wide {
+  .bp__lineFigs {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+  .bp__lineFigs:has(> .bd__fig:nth-child(4)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+  }
+  .bp__lineFigs .bd__figValue {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+@include bp.phone {
+  .bp__lineFigs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+  }
 }

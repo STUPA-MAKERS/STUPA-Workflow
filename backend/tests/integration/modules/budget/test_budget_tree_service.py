@@ -125,17 +125,19 @@ async def test_top_down_allocation_constraint(session: AsyncSession) -> None:
     )
     await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("1000")))
     await svc.set_allocation(c1.id, fy.id, AllocationSet(allocated=Decimal("600")))
-    with pytest.raises(ValidationProblem):
+    with pytest.raises(ValidationProblem) as above:
         await svc.set_allocation(c2.id, fy.id, AllocationSet(allocated=Decimal("500")))
+    assert above.value.code == "children_allocation_exceeds_parent"
     await svc.set_allocation(c2.id, fy.id, AllocationSet(allocated=Decimal("400")))
-    with pytest.raises(ValidationProblem):
+    with pytest.raises(ValidationProblem) as below:
         await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("900")))
+    assert below.value.code == "parent_allocation_below_children"
 
 
 async def test_rename_key_recomputes_descendant_paths(session: AsyncSession) -> None:
     """A rename of mid from 800 to 810 moves the paths of mid and of leaf.
 
-    The key of a sibling gives 409.
+    The key of a sibling gives 409. Rule: §F/finance/budget/000246.
     """
     svc = BudgetTreeService(session)
     g = await _gremium(session)

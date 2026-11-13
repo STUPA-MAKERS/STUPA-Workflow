@@ -2,9 +2,9 @@
 id: "000804"
 title: The Budget tab has the views Bewirtschaftung and Planung
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
@@ -25,3 +25,6 @@ the title. The view Planung must have the route `/budget/plan`. The switch must 
 when a top-level Kostenstelle has the plan switch on (000814).
 
 Reason: A person must see how to go from the budget to its plan and back.
+
+Test: The component tests read the switch with and without a budget that has the plan switch on
+and change the view.

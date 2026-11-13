@@ -108,8 +108,13 @@ export function freshly<T>(start: () => T): T {
  * A non-GET drops every cached entry under the same collection path, so a booking that
  * was just created cannot be missing from the list that follows it.
  *
- * Invalidation happens on the way out, not on the response: a request that fails may still have
- * changed something, and a stale list after a half-failed write is worse than one extra fetch. A
+ * Invalidation happens on the way out and not only on the response: a request that fails may
+ * still have changed something, and a stale list after a half-failed write is worse than one
+ * extra fetch. A read that started before a write is not joined and its answer is not stored,
+ * because the server may have answered it before the write. The same holds for a read that
+ * started while the write ran: its answer is not stored while a write runs, whatever its
+ * path is, and the answer of a write invalidates a second time, before the caller of the
+ * write gets it, so a read that the caller starts in its answer is a new one. A
  * read ahead that is still in flight is joined, so a click right after the list appeared waits for
  * one answer, not two. The same answer again is no news, so an unchanged detail does not render
  * twice. The cached body comes first, then the network answer. `concat` keeps the order and does
@@ -119,8 +124,14 @@ export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
   const cache = inject(HttpCacheService);
 
   if (req.method !== 'GET') {
-    cache.invalidate(new URL(req.url, 'http://x').pathname);
-    return next(req);
+    const path = new URL(req.url, 'http://x').pathname;
+    cache.invalidate(path);
+    cache.writeStarts();
+    const ended = (): void => cache.invalidate(path);
+    return next(req).pipe(
+      tap({ next: (event) => event instanceof HttpResponse && ended(), error: ended }),
+      finalize(() => cache.writeEnds()),
+    );
   }
 
   const ttl = req.context.get(CACHE_TTL);
@@ -130,21 +141,25 @@ export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
   const hit = freshReads > 0 ? undefined : cache.get(key, ttl);
   if (hit === undefined) {
     const flying = freshReads > 0 ? undefined : inflight.get(key);
-    if (flying) return flying;
-    const fresh = next(req).pipe(
+    const epoch = cache.epoch;
+    if (flying?.epoch === epoch) return flying.read;
+    const fresh: Observable<HttpEvent<unknown>> = next(req).pipe(
       tap((event) => {
-        if (event instanceof HttpResponse && event.status === 200) cache.set(key, event.body);
+        const current = cache.epoch === epoch && !cache.writing;
+        if (current && event instanceof HttpResponse && event.status === 200) cache.set(key, event.body);
       }),
-      finalize(() => inflight.delete(key)),
+      finalize(() => inflight.get(key)?.read === fresh && inflight.delete(key)),
       share(),
     );
-    inflight.set(key, fresh);
+    inflight.set(key, { read: fresh, epoch });
     return fresh;
   }
 
+  const epoch = cache.epoch;
   const fresh = next(req).pipe(
     tap((event) => {
-      if (event instanceof HttpResponse && event.status === 200) cache.set(key, event.body);
+      const current = cache.epoch === epoch && !cache.writing;
+      if (current && event instanceof HttpResponse && event.status === 200) cache.set(key, event.body);
     }),
     filter((event) => !(event instanceof HttpResponse && sameBody(event.body, hit))),
   );
@@ -153,7 +168,7 @@ export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
 };
 
 /** The cached reads in flight by key, shared between the reader ahead and a click. */
-const inflight = new Map<string, Observable<HttpEvent<unknown>>>();
+const inflight = new Map<string, { readonly read: Observable<HttpEvent<unknown>>; readonly epoch: number }>();
 
 function sameBody(a: unknown, b: unknown): boolean {
   try {

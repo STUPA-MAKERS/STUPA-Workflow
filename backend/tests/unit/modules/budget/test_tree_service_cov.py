@@ -61,6 +61,7 @@ from app.shared.errors import (
     UnsupportedMediaTypeError,
     ValidationProblem,
 )
+from tests._support.auth_fakes import is_plan_lock
 from tests._support.identity_rows import sub_ref
 
 
@@ -121,8 +122,17 @@ class _Session:
         text = str(stmt).lower()
         return "pg_advisory_xact_lock" in text or "audit_entry" in text
 
+    @staticmethod
+    def _is_plan_lock(stmt: Any) -> bool:
+        """Report whether a statement is the lock of the plans of a budget.
+
+        The stub holds no row to lock, and the lock returns nothing that the service
+        reads, so the test queue leaves it out.
+        """
+        return is_plan_lock(stmt)
+
     async def execute(self, stmt: Any) -> _R:
-        if self._is_audit_stmt(stmt):
+        if self._is_audit_stmt(stmt) or self._is_plan_lock(stmt):
             return _R()
         return self._results.pop(0) if self._results else _R()
 
@@ -1711,7 +1721,9 @@ async def test_revert_allocation_removes_row_when_no_previous() -> None:
     bid, fy = uuid.uuid4(), uuid.uuid4()
     alloc = _alloc(budget_id=bid, fy_id=fy, allocated="100")
     top = _budget(id=bid)
-    sess = fake_session(result(alloc), result(top), result(top))
+    sess = fake_session(
+        result(alloc), result(top), result(_fy(id=fy, budget_id=bid)), result(top)
+    )
     svc = BudgetTreeService(sess, actor="admin")
     data = {"fiscalYearId": str(fy), "allocated": "100", "previousAllocated": None}
     await svc.revert_audit(_entry(AuditAction.BUDGET_ALLOCATION_SET, bid, data), "admin")
@@ -1984,6 +1996,10 @@ async def test_delete_fiscal_year_of_other_budget_404() -> None:
 
 
 async def test_delete_fiscal_year_with_bookings_409() -> None:
+    """A fiscal year with bookings answers 409 fiscal_year_has_bookings.
+
+    Rule: §F/finance/budget/000836.
+    """
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id)
     sess = fake_session(
@@ -1993,10 +2009,15 @@ async def test_delete_fiscal_year_with_bookings_409() -> None:
     with pytest.raises(ConflictError) as ei:
         await svc.delete_fiscal_year(top.id, fy.id)
     assert "bookings" in str(ei.value)
+    assert ei.value.code == "fiscal_year_has_bookings"
     assert sess.deleted == []
 
 
 async def test_delete_fiscal_year_with_allocations_409() -> None:
+    """A fiscal year with allocations answers 409 fiscal_year_has_allocations.
+
+    Rule: §F/finance/budget/000836.
+    """
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id)
     sess = fake_session(
@@ -2006,6 +2027,7 @@ async def test_delete_fiscal_year_with_allocations_409() -> None:
     with pytest.raises(ConflictError) as ei:
         await svc.delete_fiscal_year(top.id, fy.id)
     assert "allocations" in str(ei.value)
+    assert ei.value.code == "fiscal_year_has_allocations"
 
 
 async def test_delete_fiscal_year_with_applications_409() -> None:
@@ -2013,6 +2035,8 @@ async def test_delete_fiscal_year_with_applications_409() -> None:
 
     ``application.fiscal_year_id`` has no cascade, so an unguarded delete would fail on
     the foreign key with a 500.
+
+    Rule: §F/finance/budget/000836.
     """
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id)
@@ -2023,6 +2047,7 @@ async def test_delete_fiscal_year_with_applications_409() -> None:
     with pytest.raises(ConflictError) as ei:
         await svc.delete_fiscal_year(top.id, fy.id)
     assert "applications" in str(ei.value)
+    assert ei.value.code == "fiscal_year_has_applications"
 
 
 def _transfer_pair(*, transfer_id=None, src=None, dst=None, fy=None, actor=None):

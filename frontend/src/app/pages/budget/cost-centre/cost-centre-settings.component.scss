@@ -16,18 +16,10 @@
 .ccs__pair--even {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+// The key reads in the mono font like each key of the app. The input is inside the shared
+// field component, which has no input for the font.
 .ccs__key ::ng-deep input {
   font-family: var(--font-mono);
-}
-.ccs__side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  max-width: 22rem;
-}
-.ccs__label {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
 }
 @include bp.phone {
   .ccs__pair,

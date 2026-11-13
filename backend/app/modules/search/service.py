@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.access import READ_ALL_PERMISSION, READ_PERMISSION
 from app.modules.budget.access import has_budget_read
+from app.modules.budget.form_options import below_active_only
 from app.modules.budget.tree_models import Budget
 from app.modules.gremien.models import Gremium
 from app.modules.search.schemas import SearchHit, SearchKind, SearchResults
@@ -267,7 +268,9 @@ class SearchService:
         scope = await self._budget_scope(principal)
         if scope is None:
             return []
-        stmt = select(Budget).where(where, Budget.active.is_(True), *scope)
+        stmt = select(Budget).where(
+            where, Budget.active.is_(True), below_active_only(), *scope
+        )
         rows = (await self.session.scalars(stmt.order_by(rank.desc()).limit(PER_KIND + 1))).all()
         return [
             SearchHit(

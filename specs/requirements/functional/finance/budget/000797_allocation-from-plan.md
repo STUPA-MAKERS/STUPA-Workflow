@@ -2,9 +2,9 @@
 id: "000797"
 title: The plan in force sets the allocations
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_in_force_writes_the_allocations"
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_allocations_from_lines"
@@ -24,3 +24,5 @@ Ansätze of its direct children.
 
 Reason: The allocation and the approved plan must show the same amounts. An allocation is
 money to spend, so an income Ansatz is no allocation.
+
+Test: The tests bring a version into force and read the allocation of each Kostenstelle.

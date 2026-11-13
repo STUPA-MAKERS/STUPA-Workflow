@@ -1,6 +1,6 @@
 @if (error()) {
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
-  <app-load-error [message]="'budget.error' | t" />
+  <app-load-error [message]="'budget.plan.loadError' | t" (retry)="retry()" />
 } @else if (loading()) {
   <app-skeleton variant="rows" [count]="8" [label]="'budget.loading' | t" />
 } @else {
@@ -20,11 +20,13 @@
               <button type="button" class="tn__main" [attr.aria-current]="sel() ? null : 'true'" (click)="selectId('')">
                 <span class="tn__line">
                   <span class="tn__name tn__name--root ell">{{ top()?.name }}</span>
-                  <span class="tn__amt mono">{{ money(expenseTotal()) }}</span>
+                  @if (plan()) {
+                    <span class="tn__amt mono">{{ money(expenseTotal()) }}</span>
+                  }
                 </span>
               </button>
             </div>
-            @for (group of groups(); track group.side) {
+            @for (group of plan() ? groups() : []; track group.side) {
               <p class="bp__group">
                 <span>{{ group.heading }}</span>
                 <span class="mono">{{ money(group.total) }}</span>
@@ -37,11 +39,13 @@
                       type="button"
                       class="tn__main"
                       [attr.aria-current]="row.id === selId() ? 'true' : null"
-                      [title]="row.name + ' · ' + (row.pathKey | simplifyPath)"
                       (click)="selectId(row.id)"
                     >
                       <span class="tn__line">
                         <span class="tn__name ell">{{ row.name }}</span>
+                        @if (!row.active) {
+                          <app-status-text kind="muted">{{ 'budget.cc.inactive' | t }}</app-status-text>
+                        }
                         <span class="tn__amt mono">{{ money(row.amount) }}</span>
                       </span>
                     </button>
@@ -62,6 +66,7 @@
           <ng-container *ngTemplateOutlet="actions" />
         </div>
         <ng-container *ngTemplateOutlet="modes" />
+        <app-search-pill size="lg" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
         <div class="bd__chips">
           <ng-container *ngTemplateOutlet="pickers" />
         </div>
@@ -72,7 +77,7 @@
       @if (wide()) {
         <header class="sheet-head bd__head">
           <app-sheet-bar>
-            <h2 appSheetBarTitle id="bp-title" class="sheet-title">{{ sel()?.name ?? top()?.name }}</h2>
+            <h2 appSheetBarTitle id="bp-title" class="sheet-title" tabindex="-1">{{ sel()?.name ?? top()?.name }}</h2>
             <ng-container *ngTemplateOutlet="actions" />
           </app-sheet-bar>
           <p class="sheet-line bd__line">
@@ -94,31 +99,31 @@
           </p>
         </header>
       }
-      <div class="bd__sheetBody" appScrollFade="y">
+      <div class="bd__sheetBody" [class.bd__sheetBody--fab]="!!fab()" appScrollFade="y">
         @switch (load().kind) {
           @case ('loading') {
             <app-skeleton variant="rows" [count]="6" [label]="'budget.loading' | t" />
           }
           @case ('error') {
             <app-load-error [message]="'budget.plan.loadError' | t" (retry)="reloadPlan()" />
+            <app-empty-state plain icon="cal" fill [heading]="'budget.plan.loadError' | t" />
           }
           @case ('none') {
-            <app-empty-state plain icon="cal" fill [heading]="'budget.plan.none.title' | t" [body]="'budget.plan.none.body' | t">
-              @if (canWrite() && year() && !year()?.closedAt) {
-                <div class="bp__none">
-                  @if (canCopy()) {
-                    <app-button variant="tonal" [disabled]="busy()" (click)="createPlan(true)">{{ 'budget.plan.none.copy' | t }}</app-button>
-                  }
-                  <app-button variant="fill" [disabled]="busy()" (click)="createPlan(false)">{{ 'budget.plan.none.create' | t }}</app-button>
-                </div>
-              }
-            </app-empty-state>
+            @if (year()) {
+              <app-empty-state plain icon="cal" fill [heading]="'budget.plan.none.title' | t">
+                @if (canWrite() && !year()?.closedAt && canCopy()) {
+                  <app-button variant="tonal" [disabled]="busy()" data-testid="bp-copy" (click)="createPlan(true)">{{ 'budget.plan.none.copy' | t }}</app-button>
+                }
+              </app-empty-state>
+            } @else {
+              <app-empty-state plain icon="cal" fill [heading]="'budget.plan.noYear' | t" />
+            }
           }
           @case ('plan') {
             @if (sel(); as row) {
               <ng-container *ngTemplateOutlet="lineDetail; context: { $implicit: row }" />
-            } @else {
-              <ng-container *ngTemplateOutlet="planDetail" />
+            } @else if (version(); as v) {
+              <ng-container *ngTemplateOutlet="planDetail; context: { $implicit: v }" />
             }
           }
         }
@@ -132,40 +137,33 @@
 </ng-template>
 
 <ng-template #pickers>
-  @if (tops().length > 1) {
-    <app-filter-select icon="pie" [label]="'budget.plan.top' | t" [options]="topOptions()" [value]="topId()" (valueChange)="pickTop($event)" [active]="true" />
+  @if (tops().length > 1 || !wide()) {
+    <app-filter-select icon="pie" [label]="'budget.cc.budget' | t" [text]="topChip()" [options]="topOptions()" [value]="topId()" (valueChange)="pickTop($event)" [active]="true" />
   }
   <app-filter-select icon="cal" [label]="'budget.dash.year' | t" [options]="yearOptions()" [value]="fyId()" (valueChange)="pickYear($event)" [active]="true" />
   @if (version(); as v) {
-    <app-filter-select icon="history" [label]="'budget.plan.version.label' | t" [options]="versionOptions()" [value]="v.id" (valueChange)="pickVersion($event)" [active]="true" />
+    <app-filter-select icon="history" [label]="'budget.plan.version.label' | t" [text]="versionChip()" [options]="versionOptions()" [value]="v.id" (valueChange)="pickVersion($event)" [active]="true" />
   }
 </ng-template>
 
 <ng-template #actions>
   <div class="bd__actions">
     @if (!phone()) {
-      @if (primary(); as p) {
-        <app-button variant="text" [iconOnly]="true" [ariaLabel]="p.label" [title]="p.label" [disabled]="p.disabled || busy()" data-testid="bp-primary" (click)="onAction(p.id)">
+      @if (headPrimary(); as p) {
+        <app-button variant="text" [iconOnly]="true" [ariaLabel]="p.label" [title]="p.reason ?? p.label" [disabled]="!!p.reason || busy()" data-testid="bp-primary" (click)="onAction(p.id)">
           <app-icon [name]="p.icon" />
         </app-button>
       }
     }
     @if (menu().length) {
-      <app-row-menu class="bd__more" [sections]="menu()" (selected)="onAction($event.id)" />
+      <app-row-menu class="bd__more" [sections]="menu()" [loading]="busy()" (selected)="onAction($event.id)" />
     }
   </div>
 </ng-template>
 
-<ng-template #planDetail>
-  @let v = version()!;
-  <app-stepper class="bp__stepper" [steps]="steps()" [activeIndex]="stepAt()" [ariaLabel]="'budget.plan.steps' | t" />
-  @if (v.state === 'replaced') {
-    <app-note icon="history">{{ 'budget.plan.note.replaced' | t }}</app-note>
-  } @else if (!balanced()) {
-    <app-note kind="warn" icon="alert" role="status">{{
-      (difference() < 0 ? 'budget.plan.note.expenseAbove' : 'budget.plan.note.incomeAbove') | t: { amount: money(difference() < 0 ? -difference() : difference()) }
-    }}</app-note>
-  }
+<ng-template #planDetail let-v>
+  <app-stepper class="bp__stepper" orientation="vertical" [steps]="steps()" [activeIndex]="stepAt()" [ariaLabel]="'budget.plan.steps' | t" />
+  <ng-container *ngTemplateOutlet="stateNote; context: { $implicit: v }" />
 
   <dl class="bd__figs">
     <div class="bd__fig">
@@ -176,7 +174,7 @@
       <dt class="bd__figLabel">{{ 'budget.plan.expense' | t }}</dt>
       <dd class="bd__figValue mono">{{ money(expenseTotal()) }}</dd>
     </div>
-    <div class="bd__fig bd__fig--main">
+    <div class="bd__fig bd__fig--main bp__figWide">
       <dt class="bd__figLabel">{{ 'budget.plan.difference' | t }}</dt>
       <dd class="bd__figValue mono" [class.bd__neg]="!balanced()">{{ money(difference()) }}</dd>
       <dd class="bp__figNote">{{ (balanced() ? 'budget.plan.balanced' : 'budget.plan.unbalanced') | t }}</dd>
@@ -184,21 +182,55 @@
   </dl>
 
   @for (group of groups(); track group.side) {
+    @let sideRows = group.side === 'income' ? incomeRows() : expenseRows();
     <app-section class="bd__sec" size="lg" [heading]="group.heading">
-      <ng-container *ngTemplateOutlet="table; context: { $implicit: group.side === 'income' ? incomeRows() : expenseRows(), nested: true }" />
+      @if (sideRows.length) {
+        <ng-container *ngTemplateOutlet="table; context: { $implicit: sideRows, nested: true }" />
+      } @else {
+        <app-empty-state rows="1" [heading]="(query().trim() ? 'budget.dash.searchNone' : 'budget.plan.noLines') | t" />
+      }
     </app-section>
   }
 </ng-template>
 
+<ng-template #stateNote let-v>
+  @if (v.state === 'replaced') {
+    <app-note icon="history">{{ 'budget.plan.note.replaced' | t }}</app-note>
+  } @else if (!balanced()) {
+    <app-note kind="warn" icon="alert" role="status">{{
+      (difference() < 0 ? 'budget.plan.note.expenseAbove' : 'budget.plan.note.incomeAbove') | t: { amount: money(difference() < 0 ? -difference() : difference()) }
+    }}</app-note>
+  }
+</ng-template>
+
 <ng-template #lineDetail let-row>
-  <dl class="bd__figs">
+  @if (version(); as v) {
+    <ng-container *ngTemplateOutlet="stateNote; context: { $implicit: v }" />
+  }
+  <ng-container *ngTemplateOutlet="lineFigs; context: { $implicit: row }" />
+
+  <ng-container *ngTemplateOutlet="lineForm; context: { $implicit: row, cols: true }" />
+
+  <ng-container *ngTemplateOutlet="lineChildren" />
+</ng-template>
+
+<ng-template #lineChildren>
+  @if (childRows().length) {
+    <app-section class="bd__sec" size="lg" [heading]="'budget.plan.children' | t">
+      <ng-container *ngTemplateOutlet="table; context: { $implicit: childRows(), nested: false }" />
+    </app-section>
+  }
+</ng-template>
+
+<ng-template #lineFigs let-row>
+  <dl class="bd__figs bp__lineFigs">
     <div class="bd__fig bd__fig--main">
-      <dt class="bd__figLabel">{{ columns()[1].label }}</dt>
+      <dt class="bd__figLabel">{{ amountLabel() }}</dt>
       <dd class="bd__figValue mono">{{ money(row.amount) }}</dd>
     </div>
     @if (nachtrag()) {
       <div class="bd__fig">
-        <dt class="bd__figLabel">{{ 'budget.plan.col.base' | t }}</dt>
+        <dt class="bd__figLabel">{{ baseLabel() }}</dt>
         <dd class="bd__figValue mono">{{ money(row.base) }}</dd>
       </div>
     } @else if (prevYear(); as prev) {
@@ -211,77 +243,72 @@
         <dd class="bd__figValue mono">{{ money(row.actual) }}</dd>
       </div>
     }
-    <div class="bd__fig">
+    <div class="bd__fig" [class.bp__figWide]="nachtrag()">
       <dt class="bd__figLabel">{{ 'budget.plan.col.change' | t }}</dt>
       <dd class="bd__figValue mono">{{ changeText(row) }}</dd>
     </div>
   </dl>
-
-  <ng-container *ngTemplateOutlet="lineForm; context: { $implicit: row, cols: true }" />
-
-  @if (childRows().length) {
-    <app-section class="bd__sec" size="lg" [heading]="'budget.plan.children' | t">
-      <ng-container *ngTemplateOutlet="table; context: { $implicit: childRows(), nested: false }" />
-    </app-section>
-  }
 </ng-template>
 
 <ng-template #lineForm let-row let-cols="cols">
-  @if (canWrite()) {
-    @if (nodeOf(row.id); as node) {
-      <app-section class="bd__sec" size="lg" [heading]="'budget.cc.heading' | t">
-        <app-cost-centre-settings [node]="node" [sided]="sided(node)" [gremiumOptions]="gremiumOptions()" (saved)="reloadTree()" />
-      </app-section>
-    }
-  }
-  <div [class.bd__cols]="cols" [class.bd__cols--single]="cols && row.side === 'income'">
+  <div [class.bd__cols]="cols" [class.bp__stack]="!cols" [class.bd__cols--single]="cols && row.side === 'income'">
     <app-section class="bd__sec" size="lg" [heading]="(row.hasChildren ? 'budget.plan.line.note' : 'budget.plan.line.heading') | t">
       <div class="bp__form">
         @if (!row.hasChildren) {
           <app-currency-input
-            class="bp__ansatz"
             [name]="'line-amount-' + row.id"
-            [label]="columns()[1].label"
-            [ngModel]="row.amount"
+            [label]="'budget.plan.line.amount' | t"
+            [ngModel]="fieldValue(row, 'amount')"
             (ngModelChange)="edit(row, 'amount', $event)"
             (focusout)="saveAmount(row)"
+            (keydown.enter)="saveAmount(row)"
             [disabled]="!editable()"
           />
         }
-        <app-textarea [label]="'budget.plan.line.note' | t" [grow]="true">
-          <textarea
-            rows="3"
-            maxlength="4000"
-            [name]="'line-note-' + row.id"
-            [value]="row.note"
-            [disabled]="!editable()"
-            (blur)="saveNote(row, $event)"
-          ></textarea>
+        <app-textarea class="bp__note" [label]="'budget.plan.line.note' | t" [grow]="true">
+          @for (line of [row]; track line.id) {
+            <textarea
+              rows="3"
+              maxlength="4000"
+              [name]="'line-note-' + line.id"
+              [value]="noteValue(line)"
+              [disabled]="!editable()"
+              (input)="editNote(line, $event)"
+              (blur)="saveNote(line)"
+            ></textarea>
+          }
         </app-textarea>
       </div>
     </app-section>
     @if (row.side === 'expense') {
       <app-section class="bd__sec" size="lg" [heading]="'budget.plan.marks.heading' | t">
         <div class="bp__switches">
-          <app-switch [id]="'bp-transfer-' + row.id" [checked]="row.transferable" (checkedChange)="saveLine(row, { transferable: $event })" [disabled]="!editable()">
+          <app-switch [id]="'bp-transfer-' + row.id" [checked]="mark(row, 'transferable')" (checkedChange)="saveMark(row, 'transferable', $event)" [disabled]="!editable()">
             <span>{{ 'budget.plan.marks.transferable' | t }}</span>
           </app-switch>
-          <app-switch [id]="'bp-cover-' + row.id" [checked]="row.coverable" (checkedChange)="saveLine(row, { coverable: $event })" [disabled]="!editable()">
+          <app-switch [id]="'bp-cover-' + row.id" [checked]="mark(row, 'coverable')" (checkedChange)="saveMark(row, 'coverable', $event)" [disabled]="!editable()">
             <span>{{ 'budget.plan.marks.coverable' | t }}</span>
           </app-switch>
           <app-currency-input
-            class="bp__blocked"
             [name]="'line-blocked-' + row.id"
             [label]="'budget.plan.marks.blocked' | t"
-            [ngModel]="row.blocked"
+            [ngModel]="fieldValue(row, 'blocked')"
             (ngModelChange)="edit(row, 'blocked', $event)"
             (focusout)="saveAmount(row, 'blocked')"
+            (keydown.enter)="saveAmount(row, 'blocked')"
             [disabled]="!editable()"
           />
         </div>
       </app-section>
     }
   </div>
+  @if (canWrite()) {
+    @if (nodeOf(row.id); as node) {
+      <app-section class="bd__sec" size="lg" [heading]="'budget.cc.heading' | t">
+        <app-cost-centre-settings [node]="node" [sided]="sided(node)" [gremiumOptions]="gremiumOptions()" (saved)="reloadTree()" (sideSaved)="refreshPlan()" />
+      </app-section>
+    }
+  }
 </ng-template>
 
 <ng-template #table let-rows let-nested="nested">
@@ -291,14 +318,17 @@
         <span class="bp__name">{{ $any(row).name }}</span>
         <span class="bp__sub">
           <span class="bp__path mono">{{ $any(row).pathKey | simplifyPath }}</span>
+          @if (!$any(row).active) {
+            <app-status-text kind="muted">{{ 'budget.cc.inactive' | t }}</app-status-text>
+          }
           @if ($any(row).transferable) {
-            <app-badge>{{ 'budget.plan.marks.transferable' | t }}</app-badge>
+            <app-status-text>{{ 'budget.plan.marks.transferable' | t }}</app-status-text>
           }
           @if ($any(row).coverable) {
-            <app-badge>{{ 'budget.plan.marks.coverable' | t }}</app-badge>
+            <app-status-text>{{ 'budget.plan.marks.coverable' | t }}</app-status-text>
           }
           @if ($any(row).blocked > 0) {
-            <app-badge>{{ 'budget.plan.marks.blockedBadge' | t: { amount: money($any(row).blocked) } }}</app-badge>
+            <app-status-text kind="warn">{{ 'budget.plan.marks.blockedBadge' | t: { amount: money($any(row).blocked) } }}</app-status-text>
           }
         </span>
       </span>
@@ -307,12 +337,14 @@
       @if (tableFields() && !$any(row).hasChildren) {
         <app-currency-input
           class="bp__field"
+          [class.bp__field--wide]="wideFields()"
           [name]="'amount-' + $any(row).id"
           [ariaLabel]="'budget.plan.amountOf' | t: { name: $any(row).name }"
-          [ngModel]="$any(row).amount"
+          [ngModel]="fieldValue($any(row), 'amount')"
           (ngModelChange)="edit($any(row), 'amount', $event)"
           (focusout)="saveAmount($any(row))"
           (click)="$event.stopPropagation()"
+          (keydown.enter)="onFieldEnter($event, $any(row))"
         />
       } @else {
         <span class="bp__num bp__plan mono" [class.bp__sumCell]="tableFields()">{{ money($any(row).amount) }}</span>
@@ -325,49 +357,56 @@
   </app-data-table>
 </ng-template>
 
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [contentScrolls]="true" [heading]="sheetRow()?.name ?? ''" [open]="!!sheetRow()" (closed)="sheetId.set('')">
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="sheetRow()?.name ?? ''" [open]="!!sheetRow()" (closed)="selectId('')">
+  @if (sheetMenu().length) {
+    <app-row-menu sheet-actions [sections]="sheetMenu()" (selected)="onAction($event.id, sheetRow())" />
+  }
   @if (sheetRow(); as row) {
     <div class="bp__sheet">
       <p class="bp__sheetPath"><span class="mono">{{ row.pathKey | simplifyPath }}</span> · {{ sideLabel(row) }}</p>
+      @if (version(); as v) {
+        <ng-container *ngTemplateOutlet="stateNote; context: { $implicit: v }" />
+      }
+      <ng-container *ngTemplateOutlet="lineFigs; context: { $implicit: row }" />
       <ng-container *ngTemplateOutlet="lineForm; context: { $implicit: row, cols: false }" />
+      <ng-container *ngTemplateOutlet="lineChildren" />
     </div>
   }
 </app-side-sheet>
 
+@if (fab(); as f) {
+  <app-fab [label]="f.label" [disabled]="busy()" (activate)="onAction(f.id)" />
+}
+
 <app-confirm-dialog
-  [open]="confirmInForce()"
-  [title]="'budget.plan.inForce.title' | t"
-  [body]="'budget.plan.inForce.body' | t"
-  (confirm)="setInForce()"
-  (cancel)="confirmInForce.set(false)"
+  [open]="!!askView()"
+  [title]="askView()?.title ?? ''"
+  [body]="askView()?.body ?? ''"
+  [confirmLabel]="askView()?.confirmLabel ?? ''"
+  [danger]="askView()?.danger ?? true"
+  (confirm)="confirmAsk()"
+  (cancel)="ask.set(null)"
 />
 
 <app-dialog [open]="addOpen()" [title]="'budget.plan.action.add' | t" [closeLabel]="'action.close' | t" (closed)="addOpen.set(false)">
   <form id="bp-add-form" class="bp__addForm" (submit)="addLine($event)">
-    <app-select name="add" [label]="'budget.plan.col.node' | t" [required]="true" [options]="addOptions()" [ngModel]="addId()" (ngModelChange)="addId.set($event)" />
+    <app-cost-centre-select [nodes]="addNodes()" [value]="addId()" [label]="'budget.plan.col.node' | t" [required]="true" (picked)="addId.set($event)" />
     <button type="submit" hidden></button>
   </form>
-  <div dialog-footer class="bp__foot">
+  <div dialog-footer>
     <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="addLine($event)" [disabled]="!addId()">{{ 'budget.plan.action.add' | t }}</app-button>
+    <app-button variant="fill" (click)="addLine($event)" [disabled]="!addId() || busy()">{{ 'budget.plan.action.add' | t }}</app-button>
   </div>
 </app-dialog>
 
 <app-cost-centre-create
   [open]="createOpen()"
   [top]="top()"
-  [parents]="parents()"
+  [parentNodes]="parentNodes()"
   [parent]="selId()"
   [versionId]="version()?.id ?? null"
-  [amountLabel]="columns()[1].label"
+  [amountLabel]="'budget.plan.line.amount' | t"
+  [firstChildAmounts]="firstChildAmounts()"
   (created)="onCreated($event)"
   (closed)="createOpen.set(false)"
-/>
-
-<app-confirm-dialog
-  [open]="!!deleteRow()"
-  [title]="'budget.tree.deleteTitle' | t"
-  [body]="deleteRow() ? ('budget.tree.deleteConfirm' | t: { name: deleteRow()!.name, path: deleteRow()!.pathKey }) : ''"
-  (confirm)="deleteNode()"
-  (cancel)="deleteRow.set(null)"
 />

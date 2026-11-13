@@ -2,11 +2,12 @@
 id: "000795"
 title: A plan version is balanced before the decision
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
-  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_state_moves_and_balance"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_version_passes_the_steps_of_its_budget"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_budget_without_steps_goes_from_draft_into_force"
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_side_sums_and_balance"
 implementation:
   - backend/app/modules/budget/tree/plans.py
@@ -22,3 +23,6 @@ leaves `draft`. The sums use the direct children of the top-level Kostenstelle. 
 version must answer 422 `plan_not_balanced`.
 
 Reason: LHO § 106 tells the Studierendenschaft to balance income and expenses in the plan.
+
+Test: The tests pass the first step of an unbalanced version and get 422, and sum the two sides
+of example lines.

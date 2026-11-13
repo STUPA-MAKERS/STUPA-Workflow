@@ -3,7 +3,8 @@
 A read follows the read rule of the cost center: the full budget view or the gremium
 scope of the top-level node. Each write needs ``budget.structure``. A write in a
 closed fiscal year gives 409 ``fiscal_year_closed``. The service methods do not
-commit, so each write route commits after the method returns.
+commit, so each write route commits after the method returns. The vote of a step is
+the exception: the voting service commits the vote it creates.
 """
 
 from __future__ import annotations
@@ -11,18 +12,21 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.deps import Principal, require_principal
+from app.modules.budget.plan_rules import Side
 from app.modules.budget.plan_schemas import (
     PlanCreate,
     PlanLineSet,
     PlanNodeCreate,
     PlanOut,
     PlanStateSet,
+    PlanStepPass,
     PlanStepsOut,
     PlanStepsSet,
     PlanSwitchOut,
+    PlanSwitchPreview,
     PlanSwitchSet,
     SideOut,
     SideSet,
@@ -61,8 +65,36 @@ async def set_plan_switch(
     When the switch goes on, each open fiscal year without a plan gets a Stammplan in
     force from its allocations.
     """
-    out = await service.set_plan_switch(budget_id, payload.enabled)
+    out = await service.set_plan_switch(
+        budget_id, payload.enabled, confirm_changes=payload.confirm_changes
+    )
     await service.session.commit()
+    return out
+
+
+@router.get(
+    "/budgets/{budget_id}/plan-switch/preview",
+    response_model=PlanSwitchPreview,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 422),
+)
+async def preview_plan_switch(
+    budget_id: UUID,
+    service: ServiceDep,
+    income: Annotated[list[UUID] | None, Query()] = None,
+    expense: Annotated[list[UUID] | None, Query()] = None,
+) -> PlanSwitchPreview:
+    """Return the allocations that change when the plan switch goes on.
+
+    `income` and `expense` name direct children whose side a form has not saved yet.
+    The preview counts with these sides and saves none of them.
+    """
+    sides: dict[UUID, Side] = {
+        **dict.fromkeys(income or (), "income"),
+        **dict.fromkeys(expense or (), "expense"),
+    }
+    out = await service.preview_plan_switch(budget_id, sides)
+    await service.session.rollback()
     return out
 
 
@@ -80,6 +112,22 @@ async def get_plan(
     """Return the Haushaltsplan of a fiscal year with every version and its lines."""
     await _require_node_view(service, principal, budget_id)
     return await service.get_plan(budget_id, fiscal_year_id)
+
+
+@router.get(
+    "/budget-plan-versions/{version_id}/plan",
+    response_model=PlanOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def get_plan_of_version(
+    version_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> PlanOut:
+    """Return the Haushaltsplan that holds a version, under the read rule of its budget."""
+    out = await service.plan_of_version(version_id)
+    await _require_node_view(service, principal, out.budget_id)
+    return out
 
 
 @router.post(
@@ -189,9 +237,17 @@ async def set_plan_steps(
     dependencies=_STRUCTURE,
     responses=_errors(401, 403, 404, 409, 422),
 )
-async def pass_next_plan_step(version_id: UUID, service: ServiceDep) -> PlanOut:
-    """Record the next step of a version as passed."""
-    out = await service.pass_next_step(version_id)
+async def pass_next_plan_step(
+    version_id: UUID, service: ServiceDep, payload: PlanStepPass | None = None
+) -> PlanOut:
+    """Record the next step of a version as passed.
+
+    A body with `step` names the step that the caller means, by its place in the
+    list from 0. The call answers 409 when that step is no longer the next one.
+    """
+    out = await service.pass_next_step(
+        version_id, expected=payload.step if payload is not None else None
+    )
     await service.session.commit()
     return out
 
@@ -212,6 +268,18 @@ async def create_plan_step_vote(version_id: UUID, service: ServiceDep) -> PlanOu
     out = await service.create_step_vote(version_id)
     await service.session.commit()
     return out
+
+
+@router.delete(
+    "/budget-plan-versions/{version_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 409),
+)
+async def delete_plan_version(version_id: UUID, service: ServiceDep) -> None:
+    """Delete a draft version, and the plan with it when it has no other version."""
+    await service.delete_version(version_id)
+    await service.session.commit()
 
 
 @router.post(

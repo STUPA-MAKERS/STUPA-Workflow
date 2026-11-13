@@ -224,22 +224,30 @@ export class VoteCastComponent implements OnDestroy {
   });
 
   /**
-   * The poll of a Gremium (no meeting) that the person may manage: "Starten" while it is
-   * a draft, "Umfrage beenden" while it is open. A meeting poll runs in its meeting.
+   * The poll of a Gremium, or the vote on a step of a Haushaltsplan (both without a
+   * meeting), that the person may manage: "Starten" while it is a draft, "beenden" while
+   * it is open. A vote of a meeting runs in its meeting.
    */
   readonly pollAction = computed<'start' | 'close' | null>(() => {
     const vote = this.loaded();
-    if (!vote || vote.kind !== 'poll' || vote.meetingId || vote.canManage !== true) return null;
+    const standalone = !!vote && (vote.kind === 'poll' || !!vote.planVersionId) && !vote.meetingId;
+    if (!vote || !standalone || vote.canManage !== true) return null;
     if (vote.status === 'draft') return 'start';
     return vote.status === 'open' ? 'close' : null;
   });
   /** A poll action runs. */
   readonly pollBusy = signal(false);
 
-  /** The ⋮ menu: the poll action, then the delete. */
+  /** The reader may read the Haushaltsplan that the vote decides a step of. */
+  readonly planReadable = signal(false);
+
+  /** The ⋮ menu: the Haushaltsplan of the vote, the poll action, then the delete. */
   readonly menu = computed<readonly RowMenuSection[]>(() => {
     const action = this.pollAction();
-    const pollItems: readonly RowMenuItem[] = action ? [this.pollMenuItem(action)] : [];
+    const planItems: readonly RowMenuItem[] = this.planReadable()
+      ? [{ id: 'plan', label: this.i18n.translate('voting.plan.open'), icon: 'link' }]
+      : [];
+    const pollItems: readonly RowMenuItem[] = [...planItems, ...(action ? [this.pollMenuItem(action)] : [])];
     const deleteItems: readonly RowMenuItem[] = this.canDelete()
       ? [
           {
@@ -324,18 +332,32 @@ export class VoteCastComponent implements OnDestroy {
       case 'close':
         this.runPoll(id);
         return;
+      case 'plan':
+        void this.router.navigate(['/budget/plan'], { queryParams: { planVersion: this.loaded()?.planVersionId } });
+        return;
       default:
         return;
     }
   }
 
-  /** The menu item of a poll action: "Starten" or "Umfrage beenden". */
+  /** The menu item of a poll action: "Starten" or "Umfrage beenden", for a plan vote "Abstimmung …". */
   private pollMenuItem(action: 'start' | 'close'): RowMenuItem {
+    const plan = !!this.loaded()?.planVersionId;
     switch (action) {
       case 'start':
-        return { id: 'start', label: this.i18n.translate('poll.action.start'), icon: 'play' };
+        return { id: 'start', label: this.i18n.translate(plan ? 'voting.plan.start' : 'poll.action.start'), icon: 'play' };
       case 'close':
-        return { id: 'close', label: this.i18n.translate('poll.action.close'), icon: 'square' };
+        return { id: 'close', label: this.i18n.translate(plan ? 'voting.plan.close' : 'poll.action.close'), icon: 'square' };
+    }
+  }
+
+  /** The toast after a poll action: its own text for the vote of a Haushaltsplan. */
+  private pollToast(action: 'start' | 'close', plan: boolean): TranslationKey {
+    switch (action) {
+      case 'start':
+        return plan ? 'voting.plan.started' : 'poll.toast.started';
+      case 'close':
+        return plan ? 'voting.plan.closed' : 'poll.toast.closed';
     }
   }
 
@@ -349,9 +371,7 @@ export class VoteCastComponent implements OnDestroy {
     call.subscribe({
       next: () => {
         this.pollBusy.set(false);
-        this.toast.success(
-          this.i18n.translate(action === 'start' ? 'poll.toast.started' : 'poll.toast.closed'),
-        );
+        this.toast.success(this.i18n.translate(this.pollToast(action, !!vote.planVersionId)));
         this.page?.notify({ id: vote.id, kind: 'updated' });
         this.reload();
       },
@@ -453,6 +473,7 @@ export class VoteCastComponent implements OnDestroy {
     this.delegation.set(null);
     this.proxyRefused.set(false);
     this.confirmDelete.set(false);
+    this.planReadable.set(false);
     this.phase.set('loading');
     if (!id) {
       this.phase.set('error');
@@ -464,6 +485,7 @@ export class VoteCastComponent implements OnDestroy {
         if (this.currentId !== id) return;
         const first = this.loaded() === null;
         this.loaded.set(vote);
+        if (first) this.checkPlan(vote);
         this.notEligible.set(vote.canCast !== true || !!this.delegation()?.blocked);
         this.phase.set('ready');
         if (!first) return;
@@ -588,6 +610,15 @@ export class VoteCastComponent implements OnDestroy {
         if (was && was !== v.status) this.page?.notify({ id, kind: 'updated' });
       },
       error: () => {},
+    });
+  }
+
+  /** Offer the link to the Haushaltsplan of the vote only to a reader of that plan. */
+  private checkPlan(vote: Vote): void {
+    this.planReadable.set(false);
+    if (!vote.planVersionId) return;
+    this.api.planOfVersionReadable(vote.planVersionId).subscribe((readable) => {
+      if (this.currentId === vote.id) this.planReadable.set(readable);
     });
   }
 

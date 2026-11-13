@@ -2,9 +2,9 @@
 id: "000799"
 title: A Nachtrag starts as a copy of the version in force
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_nachtrag"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_nachtrag_needs_a_plan_in_force"
@@ -21,3 +21,6 @@ Haushaltsplan must have at most one version before `in_force` at one time, else 
 `plan_draft_exists`.
 
 Reason: Two open versions make it unclear which one the STUPA decides.
+
+Test: The tests create a Nachtrag with a plan in force, without one and beside a second open
+version.

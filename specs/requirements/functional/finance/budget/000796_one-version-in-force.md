@@ -2,9 +2,9 @@
 id: "000796"
 title: One version of a plan is in force
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_nachtrag"
 implementation:
@@ -20,3 +20,5 @@ A Haushaltsplan must have at most one version in the state `in_force`. When a ve
 comes into force, the platform must set the earlier version in force to `replaced`.
 
 Reason: Only one plan applies at one time.
+
+Test: The test brings a Nachtrag into force and reads the state of the version before it.

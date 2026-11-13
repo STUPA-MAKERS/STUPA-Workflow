@@ -1165,6 +1165,19 @@ export class ApiClient {
     return this.http.post<VoteClosed>(`${this.base}/votes/${voteId}/close`, {});
   }
 
+  /**
+   * GET /budget-plan-versions/{id}/plan — say if the reader may read the Haushaltsplan
+   * that holds this version. The vote of a step links to the plan only then.
+   */
+  planOfVersionReadable(versionId: Uuid): Observable<boolean> {
+    return this.http
+      .get<unknown>(`${this.base}/budget-plan-versions/${versionId}/plan`, { context: skipLoading() })
+      .pipe(
+        map(() => true),
+        catchError(() => of(false)),
+      );
+  }
+
   /** POST /votes/{id}/draw-lot — draw the lot of a tied election (vote manager). */
   drawElectionLot(voteId: Uuid): Observable<Vote> {
     return this.http.post<Vote>(`${this.base}/votes/${voteId}/draw-lot`, {});

@@ -27,7 +27,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 from sqlalchemy import and_, delete, func, or_, select, update
@@ -73,6 +73,9 @@ from app.modules.voting.schemas import (
 from app.shared.config_schemas import ElectionConfig, PollConfig, VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.paging import DEFAULT_LIMIT, Page
+
+if TYPE_CHECKING:
+    from app.modules.budget.tree.service import BudgetTreeService
 
 #: The problem code of a second cast (REST 409 and the live-vote error frame).
 ALREADY_VOTED = "already_voted"
@@ -822,6 +825,7 @@ class VotingService:
             proposal=DecisionIn.from_stored(getattr(vote, "proposal", None)),
             repeatOfId=getattr(vote, "repeat_of_id", None),
             attempt=getattr(vote, "attempt", 1) or 1,
+            planVersionId=getattr(vote, "plan_version_id", None),
             **election_mod.election_fields(vote),
             **poll_mod.poll_fields(vote),
         )
@@ -1871,6 +1875,75 @@ class VotingService:
             data={**self._audit_refs(vote), "reason": reason, "previousStatus": previous},
         )
 
+    async def _locked_plan(
+        self, plan_version_id: UUID | None, principal: Principal
+    ) -> BudgetTreeService | None:
+        """Lock the plan of a step vote and return the budget service, else `None`.
+
+        The close holds the vote and takes the lock of the budget and of the plan here,
+        before it writes its audit entry. A plan write takes the same order, because
+        the other order ends in a deadlock that Postgres breaks with an error.
+        """
+        if plan_version_id is None:
+            return None
+        from app.modules.budget.tree.service import BudgetTreeService
+
+        plans = BudgetTreeService(self.session, actor=principal.sub)
+        await plans.lock_plan_of_version(plan_version_id)
+        return plans
+
+    async def lock_for_plan_version(self, plan_version_id: UUID) -> None:
+        """Lock the draft and open votes of a plan version, before its plan row.
+
+        The close of a step vote locks the vote first and the plan after it. The move
+        back to draft takes the same order with this call, because the other order
+        ends in a deadlock that Postgres breaks with an error.
+        """
+        await self.session.execute(
+            select(Vote.id)
+            .where(
+                Vote.plan_version_id == plan_version_id,
+                Vote.status.in_(("draft", "open")),
+            )
+            .order_by(Vote.id)
+            .with_for_update()
+        )
+
+    async def end_for_plan_version(self, plan_version_id: UUID, *, actor: str | None) -> None:
+        """End the votes of a plan version that moves back to draft, without a commit.
+
+        A draft vote is deleted, and an open vote is cancelled, because the plan can
+        change again and the Gremium must not decide on the old text. A closed or
+        cancelled vote stays as the record of the Gremium. One statement locks the
+        votes in id order before the first audit entry, for the reason
+        `lock_for_gremium_delete` gives.
+        """
+        rows = (
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(
+                        Vote.plan_version_id == plan_version_id,
+                        Vote.status.in_(("draft", "open")),
+                    )
+                    .order_by(Vote.id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        now = datetime.now(UTC)
+        for vote in rows:
+            if vote.status == "open":
+                await self._mark_cancelled(vote, now=now, actor=actor, reason="plan_to_draft")
+        await self.delete_locked_votes(
+            [vote for vote in rows if vote.status == "draft"],
+            actor=actor or "system",
+            reason="plan_to_draft",
+        )
+
     async def cancel_for_application(
         self,
         application_id: UUID,
@@ -2050,6 +2123,8 @@ class VotingService:
         closed_at = now or datetime.now(UTC)
         eligible = await self._fix_attendance(vote, config)
 
+        plan_version_id: UUID | None = getattr(vote, "plan_version_id", None)
+        plans = await self._locked_plan(plan_version_id, principal)
         vote.status = "closed"
         vote.result = result_value
         vote.closed_at = closed_at
@@ -2086,13 +2161,8 @@ class VotingService:
             vote.result_branch_transition_id = staged.transition.id
             if decision is not None:
                 decision.status_event_id = staged.status_event_id
-        plan_version_id: UUID | None = getattr(vote, "plan_version_id", None)
-        if plan_version_id is not None and result_value == "passed":
-            from app.modules.budget.tree.service import BudgetTreeService
-
-            await BudgetTreeService(self.session, actor=principal.sub).pass_step_by_vote(
-                plan_version_id, vote.id
-            )
+        if plans is not None and plan_version_id is not None and result_value == "passed":
+            await plans.pass_step_by_vote(plan_version_id, vote.id)
         await self.session.commit()
 
         new_state_id = (
@@ -2102,6 +2172,7 @@ class VotingService:
         tally_out = TallyOut(
             counts=counts,
             eligible=eligible,
+            voted=sum(counts.values()),
             quorumMet=outcome.quorum_met,
             leading=outcome.leading,
             result=result_value,

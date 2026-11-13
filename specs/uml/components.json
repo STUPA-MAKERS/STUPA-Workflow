@@ -51,7 +51,7 @@
       "to": "backup"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "admin",
       "to": "budget"
     },
@@ -286,7 +286,7 @@
       "to": "auth"
     },
     {
-      "count": 1,
+      "count": 6,
       "from": "audit_log",
       "to": "budget"
     },
@@ -1001,7 +1001,7 @@
       "to": "auth"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "search",
       "to": "budget"
     },
@@ -1186,7 +1186,7 @@
       "to": "auth"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "voting",
       "to": "budget"
     },

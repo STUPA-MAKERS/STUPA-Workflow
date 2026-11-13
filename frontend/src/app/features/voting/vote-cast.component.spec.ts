@@ -92,6 +92,8 @@ async function setup(opts: {
   page?: { split: boolean };
   /** The read answers twice, as a vote read ahead does: the kept vote, then this one. */
   newer?: Partial<Vote>;
+  /** The reader may read the Haushaltsplan of the vote. */
+  planReadable?: boolean;
 } = {}) {
   const served: Vote = {
     canCast: opts.canCast ?? true,
@@ -119,7 +121,8 @@ async function setup(opts: {
       { id: 'ag3', position: 2 },
     ]),
   );
-  const api = { getVote, castBallot, deleteVote, getMeeting, listAgenda };
+  const planOfVersionReadable = jest.fn((_id: string) => of(opts.planReadable ?? false));
+  const api = { getVote, castBallot, deleteVote, getMeeting, listAgenda, planOfVersionReadable };
   const voteStatus = opts.delegationError
     ? jest.fn(() => throwError(() => new Error('boom')))
     : jest.fn(() => of(opts.delegation ?? NO_DELEGATION));
@@ -179,6 +182,7 @@ async function setup(opts: {
     castBallot,
     deleteVote,
     getMeeting,
+    planOfVersionReadable,
     voteStatus,
     toast,
     waiting,
@@ -1044,6 +1048,80 @@ describe('VoteCastComponent', () => {
       const { fixture } = await setup({ vote: pollVote(over), canManage });
       expect(fixture.componentInstance.pollAction()).toBeNull();
       if (!canManage) expect(fixture.componentInstance.hasMenu()).toBe(false);
+    });
+  });
+
+  describe('vote on a step of a Haushaltsplan (§F/finance/budget/000826, §F/finance/budget/000838)', () => {
+    const planVote = (over: Partial<Vote> = {}) =>
+      vote({ meetingId: null, agendaItemId: null, applicationId: null, planVersionId: 'pv1', status: 'draft', ...over });
+
+    async function withPlan(v: Vote, opts: { readable?: boolean; canManage?: boolean; fail?: boolean } = {}) {
+      const view = await setup({ vote: v, canManage: opts.canManage ?? true, planReadable: opts.readable ?? true, page: { split: true } });
+      const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<string, jest.Mock>;
+      const answer = () => (opts.fail ? throwError(() => conflict('vote_not_open')) : of(void 0));
+      api['openVote'] = jest.fn(answer);
+      api['closeVote'] = jest.fn(answer);
+      const navigate = jest.spyOn(view.fixture.debugElement.injector.get(Router), 'navigate').mockResolvedValue(true);
+      return { ...view, api, navigate };
+    }
+    const items = async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
+      return screen.getAllByRole('menuitem').map((i) => i.textContent?.trim());
+    };
+
+    it('starts the prepared vote from the menu', async () => {
+      const view = await withPlan(planVote());
+      expect(view.planOfVersionReadable).toHaveBeenCalledWith('pv1');
+      expect(await items()).toEqual(['Haushaltsplan öffnen', 'Abstimmung starten', 'Abstimmung löschen']);
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung starten' }));
+      expect(view.api['openVote']).toHaveBeenCalledWith('v1');
+      expect(view.toast.success).toHaveBeenCalledWith('Abstimmung gestartet.');
+      expect(view.page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'updated' });
+    });
+
+    it('closes the open vote from the menu', async () => {
+      const view = await withPlan(planVote({ status: 'open' }));
+      expect(await items()).toEqual(['Haushaltsplan öffnen', 'Abstimmung beenden']);
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung beenden' }));
+      expect(view.api['closeVote']).toHaveBeenCalledWith('v1');
+      expect(view.toast.success).toHaveBeenCalledWith('Abstimmung beendet.');
+    });
+
+    it('says why the vote cannot close', async () => {
+      const view = await withPlan(planVote({ status: 'open' }), { fail: true });
+      await items();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung beenden' }));
+      expect(view.toast.error).toHaveBeenCalled();
+      expect(view.toast.success).not.toHaveBeenCalled();
+    });
+
+    it('opens the Haushaltsplan of the vote for a reader of the plan', async () => {
+      const view = await withPlan(planVote({ status: 'open' }), { canManage: false });
+      expect(await items()).toEqual(['Haushaltsplan öffnen']);
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Haushaltsplan öffnen' }));
+      expect(view.navigate).toHaveBeenCalledWith(['/budget/plan'], { queryParams: { planVersion: 'pv1' } });
+    });
+
+    it('offers no link to a member who cannot read the plan, and asks nothing for another vote', async () => {
+      const member = await withPlan(planVote({ status: 'open' }), { canManage: false, readable: false });
+      expect(member.planOfVersionReadable).toHaveBeenCalledWith('pv1');
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      TestBed.resetTestingModule();
+      const other = await setup({ vote: draftVote(), canManage: true });
+      expect(other.planOfVersionReadable).not.toHaveBeenCalled();
+    });
+
+    it('drops the answer of the plan read when the page shows another vote', async () => {
+      const late = new Subject<boolean>();
+      const view = await setup({ vote: planVote({ status: 'open' }) });
+      view.planOfVersionReadable.mockReturnValueOnce(late);
+      view.getVote.mockReturnValue(of({ ...planVote({ id: 'v2', planVersionId: 'pv2', status: 'open' }), canCast: true, canManage: false }));
+      view.params.next(convertToParamMap({ id: 'v2' }));
+      view.getVote.mockReturnValue(of({ ...vote({ id: 'v3', meetingId: null }), canCast: true, canManage: false }));
+      view.params.next(convertToParamMap({ id: 'v3' }));
+      late.next(true);
+      view.fixture.detectChanges();
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
     });
   });
 });

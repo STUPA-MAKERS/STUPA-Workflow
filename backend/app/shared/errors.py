@@ -16,6 +16,7 @@ from collections.abc import Mapping, Sequence
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import JSONResponse
 
@@ -322,11 +323,34 @@ async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
     return _problem_response(problem, extra)
 
 
+#: SQLSTATE `character_not_in_repertoire` and `untranslatable_character`: Postgres refuses
+#: a NUL character in a text column and in a JSONB column.
+_SQLSTATES_BAD_TEXT = frozenset({"22021", "22P05"})
+
+
+async def _db_error_handler(request: Request, exc: DBAPIError) -> JSONResponse:
+    """Answer 422 for a text that the database cannot hold, else the bare 500.
+
+    A NUL character passes the JSON parser and the length checks, and only Postgres
+    refuses it: 22021 in a text column and 22P05 in a JSONB column, which the audit
+    entry of a write is. That is an input error of the caller, not a fault of the server.
+    """
+    state = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+    if state in _SQLSTATES_BAD_TEXT:
+        return _validation_problem(
+            request,
+            detail="A text holds a character that cannot be stored.",
+            errors=(FieldError(field="body", msg="A text holds a NUL character."),),
+        )
+    return await _unhandled_handler(request, exc)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Bind all handlers to the app (order: specific -> generic)."""
     app.add_exception_handler(AppError, _app_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, _validation_handler)  # type: ignore[arg-type]
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(DBAPIError, _db_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, _unhandled_handler)
 
 

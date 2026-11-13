@@ -2,16 +2,16 @@
 id: "000828"
 title: Verwaltung lists only the budgets
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "frontend/src/app/pages/admin/budgets/admin-budgets.component.spec.ts:AdminBudgetsComponent"
 implementation:
   - frontend/src/app/pages/admin/budgets/admin-budgets.component.ts
   - frontend/src/app/app.routes.ts
 scope:
-  - frontend/src/app/pages/budget
+  - frontend/src/app/pages/admin/budgets
 ---
 
 # Verwaltung lists only the budgets
@@ -25,3 +25,6 @@ new path.
 
 Reason: A Kostenstelle below a budget belongs to the plan of a year. It comes and goes
 with the plan, so it is no setting of the platform.
+
+Test: The component tests read the list, create, edit and delete a budget and open its fiscal
+years.

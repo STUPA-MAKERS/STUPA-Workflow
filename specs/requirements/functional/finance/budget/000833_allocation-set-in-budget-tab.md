@@ -2,9 +2,9 @@
 id: "000833"
 title: The allocation of a year without a plan is set in the Budget tab
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
 implementation:
@@ -21,3 +21,6 @@ plan must not offer the field (000798).
 
 Reason: A budget without a Haushaltsplan has no Ansatz. Its allocation is set by hand, and
 Verwaltung no longer lists its Kostenstellen (000828).
+
+Test: The component tests set the allocation in a year without a plan, read a refused save and
+open a year with a plan.

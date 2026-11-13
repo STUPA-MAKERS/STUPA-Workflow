@@ -43,7 +43,9 @@ async def create_budget(node: S.BudgetNodeCreate) -> dict:
 
     Set `gremiumId` on a top-level node only. After creation, `parentId` and
     `gremiumId` stay fixed. `decisionGremiumId` names the Gremium that decides on
-    spending from the node and its subtree. Requires budget.structure.
+    spending from the node and its subtree. A direct child of a top-level node whose
+    plan switch is on needs a `side`, else 422 `plan_side_missing`. Requires
+    budget.structure.
     """
     return await api().post("/budgets", json=dump_create(node))
 
@@ -56,7 +58,9 @@ async def update_budget(budget_id: str, patch: S.BudgetNodeUpdate) -> dict:
     come from the flags of the flow states, not from the cost center.
     `decisionGremiumId` sets the deciding Gremium (null clears it; the node then
     inherits from its ancestors). An unknown Gremium gives 422
-    `decision_gremium_invalid`. Requires budget.structure.
+    `decision_gremium_invalid`, and an unknown `viewGremiumId` gives 422
+    `view_gremium_invalid`. A key that a sibling has gives 409 `budget_key_exists`.
+    Requires budget.structure.
     """
     return await api().patch(f"/budgets/{budget_id}", json=dump_patch(patch))
 
@@ -65,7 +69,8 @@ async def update_budget(budget_id: str, patch: S.BudgetNodeUpdate) -> dict:
 async def delete_budget(budget_id: str) -> dict:
     """Delete a cost center node.
 
-    The call fails with a conflict when the node has children.
+    The call fails with a conflict when the node has children, and with 409
+    `budget_in_plan` when a decided version of a Haushaltsplan has a line for it.
     Requires budget.structure.
     """
     return await api().delete(f"/budgets/{budget_id}")
@@ -93,7 +98,12 @@ async def create_fiscal_year(budget_id: str, year: int, active: bool = True) -> 
 async def update_fiscal_year(
     budget_id: str, fiscal_year_id: str, year: int | None = None, active: bool | None = None
 ) -> dict:
-    """Patch the year or the active flag of a fiscal year. Requires budget.structure."""
+    """Patch the year or the active flag of a fiscal year.
+
+    A new year gives 409 `fiscal_year_closed` for a closed year and 409
+    `fiscal_year_has_plan` while the Haushaltsplan of the year has a version that
+    left the draft. Requires budget.structure.
+    """
     return await api().patch(
         f"/budgets/{budget_id}/fiscal-years/{fiscal_year_id}",
         json=params(year=year, active=active),
@@ -101,11 +111,40 @@ async def update_fiscal_year(
 
 
 @group.tool
+async def close_fiscal_year(budget_id: str, fiscal_year_id: str) -> dict:
+    """Close a fiscal year, so no money or plan write changes it.
+
+    The call gives 409 `plan_in_progress` while a version of its Haushaltsplan waits
+    for a step. Requires budget.structure.
+    """
+    return await api().post(f"/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/close")
+
+
+@group.tool
+async def reopen_fiscal_year(budget_id: str, fiscal_year_id: str) -> dict:
+    """Open a closed fiscal year again. Requires budget.structure."""
+    return await api().post(f"/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/reopen")
+
+
+@group.tool
+async def delete_fiscal_year(budget_id: str, fiscal_year_id: str) -> dict:
+    """Delete a fiscal year that nothing uses.
+
+    A Haushaltsplan that is only a draft goes with the year. The call gives 409
+    `fiscal_year_has_plan` for a plan with a version that left the draft, 409
+    `fiscal_year_closed` for a closed year and 409 `fiscal_year_has_...` while
+    allocations, bookings or applications use the year. Requires budget.structure.
+    """
+    return await api().delete(f"/budgets/{budget_id}/fiscal-years/{fiscal_year_id}")
+
+
+@group.tool
 async def set_allocation(budget_id: str, fiscal_year_id: str, allocated: str) -> dict:
     """Set the top-down allocation of a cost center for one fiscal year.
 
-    The call gives a 422 when the sum of the children is more than the parent.
-    Requires budget.structure.
+    The call gives a 422 when the sum of the children is more than the parent, and
+    409 `allocation_from_plan` for a fiscal year with a Haushaltsplan: there the plan
+    in force sets the allocations. Requires budget.structure.
 
     Args:
         allocated: The allocated amount as a decimal string.

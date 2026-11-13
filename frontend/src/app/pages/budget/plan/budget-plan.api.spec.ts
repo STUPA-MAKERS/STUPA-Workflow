@@ -23,7 +23,7 @@ describe('BudgetPlanApi', () => {
     if (body !== undefined) expect(req.request.body).toEqual(body);
     req.flush({});
   };
-  const line = { amount: '1', note: null, transferable: false, coverable: false, blocked: '0' };
+  const line = { amount: '1' };
 
   it('calls the plan routes', () => {
     api.plan('t', 'f').subscribe();
@@ -38,11 +38,15 @@ describe('BudgetPlanApi', () => {
     expectCall('DELETE', '/api/budget-plan-versions/v/lines/b');
     api.setState('v', 'in_force').subscribe();
     expectCall('POST', '/api/budget-plan-versions/v/state', { state: 'in_force' });
+    api.planOfVersion('v').subscribe();
+    expectCall('GET', '/api/budget-plan-versions/v/plan');
+    api.deleteVersion('v').subscribe();
+    expectCall('DELETE', '/api/budget-plan-versions/v');
   });
 
   it('calls the routes of the steps', () => {
-    api.passNextStep('v').subscribe();
-    expectCall('POST', '/api/budget-plan-versions/v/steps/next', {});
+    api.passNextStep('v', 1).subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/steps/next', { step: 1 });
     api.createStepVote('v').subscribe();
     expectCall('POST', '/api/budget-plan-versions/v/steps/next/vote', {});
     api.steps('t').subscribe();
@@ -59,6 +63,17 @@ describe('BudgetPlanApi', () => {
     api.setSide('b', 'income').subscribe();
     expectCall('PUT', '/api/budgets/b/side', { side: 'income' });
     api.setPlanSwitch('t', true).subscribe();
-    expectCall('PUT', '/api/budgets/t/plan-switch', { enabled: true });
+    expectCall('PUT', '/api/budgets/t/plan-switch', { enabled: true, confirmChanges: false });
+    api.setPlanSwitch('t', true, true).subscribe();
+    expectCall('PUT', '/api/budgets/t/plan-switch', { enabled: true, confirmChanges: true });
+    api.switchPreview('t', { a: 'income', b: 'expense', c: '' }).subscribe();
+    const preview = http.expectOne((r) => r.url === '/api/budgets/t/plan-switch/preview');
+    expect(preview.request.params.getAll('income')).toEqual(['a']);
+    expect(preview.request.params.getAll('expense')).toEqual(['b']);
+    preview.flush({ budgetId: 't', changes: [] });
+    api.switchPreview('t').subscribe();
+    const plain = http.expectOne((r) => r.url === '/api/budgets/t/plan-switch/preview');
+    expect(plain.request.params.getAll('income')).toEqual([]);
+    plain.flush({ budgetId: 't', changes: [] });
   });
 });

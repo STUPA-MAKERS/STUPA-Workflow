@@ -14,11 +14,15 @@ from app.modules.budget import tree_rules as r
 
 
 def test_is_valid_key() -> None:
-    """A key is alphanumeric without the separator and at most ``_KEY_MAX`` long."""
+    """A key is alphanumeric without the separator and at most ``_KEY_MAX`` long.
+
+    Rule: §F/finance/budget/000246.
+    """
     assert r.is_valid_key("VS")
     assert r.is_valid_key("800")
     assert not r.is_valid_key("VS-800")
     assert not r.is_valid_key("")
+    assert not r.is_valid_key("AB\n")
     assert r.is_valid_key("A" * r._KEY_MAX)
     assert not r.is_valid_key("A" * (r._KEY_MAX + 1))
 

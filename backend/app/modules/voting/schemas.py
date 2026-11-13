@@ -386,6 +386,8 @@ class VoteOut(FrozenCamelModel, frozen=True):
     can_cast: bool = Field(default=False, alias="canCast")
     #: The decision proposal of an application vote, or None.
     proposal: DecisionIn | None = None
+    #: The version of a Haushaltsplan that the vote decides a step of, or None.
+    plan_version_id: UUID | None = Field(default=None, alias="planVersionId")
 
 
 VoteStatus = Literal["draft", "open", "closed", "cancelled"]

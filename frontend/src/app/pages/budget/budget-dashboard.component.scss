@@ -10,6 +10,12 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+// Beside the list the panes are the only visible child. The dialogs and sheets of the page
+// are flex children without a height, and a gap for each would end the panes above the
+// place where the panes of the other list pages end.
+:host(.pane-page) {
+  gap: 0;
+}
 
 .bd__title {
   margin: 0;
@@ -244,6 +250,11 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
+// The round "+" button stands on the lower right corner of the pane. The pane scrolls by
+// itself, so it keeps the room of the button at its end and the button covers no content.
+.bd--wide .bd__sheetBody--fab {
+  padding-bottom: calc(var(--space-5) + 56px + var(--space-4));
+}
 
 // The head of the sheet is the shared detail head (`.sheet-head`): the title on the line of the
 // actions, a status line, a rule. It stays above the scrolling body. The rule runs inside the
@@ -462,6 +473,15 @@
   }
 }
 
+// Below the wide layout a large amount breaks inside its tile and is not cut or laid over
+// the next one.
+@include bp.below-wide {
+  .bd__figValue {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 @include bp.phone {
   .bd__figs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -510,20 +530,32 @@
   width: 5.5em;
 }
 
-/* Very high contrast (spec 000605): a colour swatch of a cost centre is white. */
+/* Very high contrast (spec 000605): each surface has a white edge of 2 px, and a colour
+   swatch of a cost centre is white. */
 @include d.host-on(veryHigh) {
+  .bd__sheet,
+  .bd__figs {
+    border: 2px solid #ffffff;
+  }
+
+  /* Below the wide layout the sheet and the figure box are no surfaces: each figure and
+     each section is a card of its own, so the edge belongs to those. */
+  @include bp.below-wide {
+    .bd__sheet,
+    .bd__figs {
+      border: 0;
+    }
+
+    .bd__fig,
+    .bd__fig + .bd__fig,
+    .bd__sec {
+      border: 2px solid #ffffff;
+    }
+  }
+
   .tn__swatch,
   .bd__keySwatch {
     background: #ffffff !important;
   }
 }
 
-.bd__settings {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.bd__allocation {
-  display: block;
-  max-width: 14rem;
-}

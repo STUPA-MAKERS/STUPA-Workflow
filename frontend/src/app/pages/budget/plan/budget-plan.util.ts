@@ -1,5 +1,6 @@
 import type { Uuid } from '@core/api/models';
 import type { BudgetTreeNode } from '../budget-tree.api';
+import { usedIn } from '../cost-centre/cost-centre.util';
 import type { PlanLine, PlanState, PlanStep, PlanVersion, Side } from './budget-plan.api';
 
 /** One Kostenstelle of a plan version, ready for the list and the tables. */
@@ -9,6 +10,8 @@ export interface PlanRow {
   readonly name: string;
   readonly pathKey: string;
   readonly side: Side;
+  /** The Kostenstelle is active. An inactive one shows its mark. */
+  readonly active: boolean;
   /** 0 for a direct child of the top-level Kostenstelle. */
   readonly depth: number;
   readonly amount: number;
@@ -30,7 +33,7 @@ export interface PlanRow {
 export interface PlanRowSource {
   readonly top: BudgetTreeNode;
   readonly version: PlanVersion;
-  /** The version in force, when `version` is a Nachtrag before `in_force`. */
+  /** The version before `version`, when `version` is a Nachtrag. */
   readonly base: PlanVersion | null;
   /** The version in force of the year before. */
   readonly prev: PlanVersion | null;
@@ -66,6 +69,7 @@ export function planRows(source: PlanRowSource): readonly PlanRow[] {
       name: line.name ?? node.name,
       pathKey: line.pathKey ?? node.pathKey,
       side: node.side,
+      active: node.active,
       depth,
       amount: Number(line.amount),
       base: base.has(node.id) ? Number(base.get(node.id)?.amount) : null,
@@ -100,6 +104,28 @@ export function addable(top: BudgetTreeNode, version: PlanVersion): readonly Bud
   return top.children.flatMap(below).filter((n) => !!n.side);
 }
 
+/** The top-level Kostenstelle with only the Kostenstellen that have a line in the version. */
+export function planTree(top: BudgetTreeNode, version: PlanVersion): BudgetTreeNode {
+  const lines = lineMap(version);
+  const kept = (nodes: readonly BudgetTreeNode[]): readonly BudgetTreeNode[] =>
+    nodes.filter((n) => lines.has(n.id)).map((n) => ({ ...n, children: kept(n.children) }));
+  return { ...top, children: kept(top.children) };
+}
+
+/** The version before a Nachtrag: the one with the next lower number, or `null`. */
+export function versionBefore(versions: readonly PlanVersion[], version: PlanVersion): PlanVersion | null {
+  return versions.filter((v) => v.number < version.number).reduce<PlanVersion | null>(
+    (best, v) => (!best || v.number > best.number ? v : best),
+    null,
+  );
+}
+
+/** The step whose vote the page links: the next step with a vote, else the last one with a vote. */
+export function voteStep(version: PlanVersion): PlanStep | null {
+  const voted = version.steps.filter((s) => !!s.voteId && !!s.voteStatus);
+  return voted.find((s) => !s.passedAt) ?? voted.at(-1) ?? null;
+}
+
 /** The ids of the Kostenstellen of a year: those with a line in the version in force. */
 export function memberIds(version: PlanVersion | null): ReadonlySet<Uuid> | null {
   return version ? new Set(version.lines.map((l) => l.budgetId)) : null;
@@ -111,12 +137,8 @@ export function memberIds(version: PlanVersion | null): ReadonlySet<Uuid> | null
  * always shows.
  */
 export function yearMembers(top: BudgetTreeNode, ids: ReadonlySet<Uuid>, fiscalYearId: string): BudgetTreeNode {
-  const used = (node: BudgetTreeNode): boolean => {
-    const view = node.byFiscalYear.find((a) => a.fiscalYearId === fiscalYearId);
-    return !!view && [view.bound, view.requested, view.expended, view.income].some((v) => Number(v) !== 0);
-  };
   const members = (nodes: readonly BudgetTreeNode[]): readonly BudgetTreeNode[] =>
-    nodes.filter((n) => ids.has(n.id) || used(n)).map((n) => ({ ...n, children: members(n.children) }));
+    nodes.filter((n) => ids.has(n.id) || usedIn(n, fiscalYearId)).map((n) => ({ ...n, children: members(n.children) }));
   return { ...top, children: members(top.children) };
 }
 
@@ -154,4 +176,14 @@ export function stepIndex(version: PlanVersion): number {
 /** The vote of a step waits for its result: the step takes no second vote. */
 export function voteRuns(step: PlanStep): boolean {
   return step.voteStatus === 'draft' || step.voteStatus === 'open';
+}
+
+/** The largest Ansatz the platform stores. */
+export const MAX_AMOUNT = 9_999_999_999.99;
+
+/** Why a typed amount cannot be saved, or `null`. */
+export function amountProblem(value: string): 'negative' | 'tooLarge' | null {
+  const amount = Number(value);
+  if (amount < 0) return 'negative';
+  return amount > MAX_AMOUNT ? 'tooLarge' : null;
 }

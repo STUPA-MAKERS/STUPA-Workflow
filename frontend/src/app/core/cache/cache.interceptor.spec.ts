@@ -23,6 +23,62 @@ describe('cacheInterceptor', () => {
 
   afterEach(() => mock.verify());
 
+  /** A page that reads again after its save gets the state after that save. */
+  it('§NF/performance/loading/000847: does not join or store a read that started before a write', () => {
+    const seen: unknown[] = [];
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    http.patch('/api/things/1', {}).subscribe();
+    mock.expectOne('/api/things/1').flush({});
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    const reads = mock.match('/api/things');
+    expect(reads).toHaveLength(2);
+    reads[1].flush(['new']);
+    reads[0].flush(['old']);
+    expect(seen).toEqual([['new'], ['old']]);
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    expect(seen[2]).toEqual(['new']);
+    const behind = mock.expectOne('/api/things');
+    http.patch('/api/things/1', {}).subscribe();
+    mock.expectOne('/api/things/1').flush({});
+    behind.flush(['before the write']);
+    const after: unknown[] = [];
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => after.push(b));
+    expect(after).toEqual([]);
+    mock.expectOne('/api/things').flush(['after the write']);
+    expect(after).toEqual([['after the write']]);
+  });
+
+  it('§NF/performance/loading/000847: a read in the answer of a write does not join a read that started while the write ran', () => {
+    const seen: unknown[] = [];
+    http.patch('/api/things/1', {}).subscribe(() => http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b)));
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    mock.expectOne('/api/things/1').flush({});
+    const reads = mock.match('/api/things');
+    expect(reads).toHaveLength(2);
+    reads[1].flush(['new']);
+    reads[0].flush(['old']);
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    expect(seen[2]).toEqual(['new']);
+    mock.expectOne('/api/things').flush(['new']);
+  });
+
+  it('§NF/performance/loading/000847: the answer of a read of another path that comes while a write runs is not stored', () => {
+    const seen: unknown[] = [];
+    http.post('/api/expenses', {}).subscribe();
+    http.get('/api/budgets', { context: cached(60_000) }).subscribe();
+    mock.expectOne('/api/budgets').flush(['old']);
+    mock.expectOne('/api/expenses').flush({});
+    http.get('/api/budgets', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    mock.expectOne('/api/budgets').flush(['new']);
+    expect(seen).toEqual([['new']]);
+  });
+
+  it('a write that its caller gives up counts as ended', () => {
+    http.post('/api/expenses', {}).subscribe().unsubscribe();
+    mock.expectOne('/api/expenses');
+    expect(cache.writing).toBe(false);
+  });
+
   describe('listContext', () => {
     /**
      * A page switch shows the list at once, and the list corrects itself a moment later, instead of

@@ -103,3 +103,11 @@ export const plan = (versions: readonly PlanVersion[] = [version()], fiscalYearI
   fiscalYearId,
   versions,
 });
+
+/** A budget with only the Kostenstellen of the default version, as the parent picker gets it. */
+export const planTreeOf = (top: BudgetTreeNode): BudgetTreeNode => {
+  const ids = new Set(version().lines.map((l) => l.budgetId));
+  const kept = (nodes: readonly BudgetTreeNode[]): readonly BudgetTreeNode[] =>
+    nodes.filter((n) => ids.has(n.id)).map((n) => ({ ...n, children: kept(n.children) }));
+  return { ...top, children: kept(top.children) };
+};

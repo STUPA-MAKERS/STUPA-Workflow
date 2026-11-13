@@ -74,13 +74,30 @@ export interface BudgetPlan {
   readonly versions: readonly PlanVersion[];
 }
 
-/** The body of a line write. */
+/** The body of a line write. A field the body leaves out keeps the value of the line. */
 export interface PlanLineSet {
-  readonly amount: string;
-  readonly note: string | null;
-  readonly transferable: boolean;
-  readonly coverable: boolean;
-  readonly blocked: string;
+  readonly amount?: string;
+  readonly note?: string | null;
+  readonly transferable?: boolean;
+  readonly coverable?: boolean;
+  readonly blocked?: string;
+}
+
+/** One allocation that the Stammplan of the plan switch changes. Money is a string. */
+export interface PlanSwitchChange {
+  readonly fiscalYearId: Uuid;
+  readonly year: string;
+  readonly budgetId: Uuid;
+  readonly pathKey: string;
+  readonly name: string;
+  readonly allocated: string;
+  readonly planned: string;
+}
+
+/** What the plan switch changes when it goes on. */
+export interface PlanSwitchPreview {
+  readonly budgetId: Uuid;
+  readonly changes: readonly PlanSwitchChange[];
 }
 
 /** The problem code of a plan read for a year without a plan (404). */
@@ -95,6 +112,11 @@ export class BudgetPlanApi {
   /** The plan of a fiscal year. A year without a plan answers 404 `plan_not_found`. */
   plan(topId: Uuid, fiscalYearId: Uuid): Observable<BudgetPlan> {
     return this.http.get<BudgetPlan>(this.planUrl(topId, fiscalYearId), { context: skipLoading() });
+  }
+
+  /** The plan that holds a version, for the link from the vote of a step. */
+  planOfVersion(versionId: Uuid): Observable<BudgetPlan> {
+    return this.http.get<BudgetPlan>(`${this.versionUrl(versionId)}/plan`, { context: skipLoading() });
   }
 
   /** Create the plan with a Stammplan in draft, empty or as a copy of another year. */
@@ -119,9 +141,14 @@ export class BudgetPlanApi {
     return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/state`, { state });
   }
 
+  /** Delete a draft version. The plan goes with it when it has no other version. */
+  deleteVersion(versionId: Uuid): Observable<void> {
+    return this.http.delete<void>(this.versionUrl(versionId));
+  }
+
   /** Record the next step of a version as passed. */
-  passNextStep(versionId: Uuid): Observable<BudgetPlan> {
-    return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/steps/next`, {});
+  passNextStep(versionId: Uuid, step: number): Observable<BudgetPlan> {
+    return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/steps/next`, { step });
   }
 
   /** Create the draft vote of the Gremium of the next step. */
@@ -146,8 +173,18 @@ export class BudgetPlanApi {
     return this.http.put(`${this.base}/budgets/${budgetId}/side`, { side });
   }
 
-  setPlanSwitch(topId: Uuid, enabled: boolean): Observable<unknown> {
-    return this.http.put(`${this.base}/budgets/${topId}/plan-switch`, { enabled });
+  /** The allocations that the Stammplan changes when the plan switch goes on. */
+  switchPreview(topId: Uuid, sides: Readonly<Record<string, Side | ''>> = {}): Observable<PlanSwitchPreview> {
+    const of = (side: Side): string[] => Object.keys(sides).filter((id) => sides[id] === side);
+    return this.http.get<PlanSwitchPreview>(`${this.base}/budgets/${topId}/plan-switch/preview`, {
+      context: skipLoading(),
+      params: { income: of('income'), expense: of('expense') },
+    });
+  }
+
+  /** Set the plan switch. `confirmChanges` says that the person saw the changed allocations. */
+  setPlanSwitch(topId: Uuid, enabled: boolean, confirmChanges = false): Observable<unknown> {
+    return this.http.put(`${this.base}/budgets/${topId}/plan-switch`, { enabled, confirmChanges });
   }
 
   private planUrl(topId: Uuid, fiscalYearId: Uuid): string {

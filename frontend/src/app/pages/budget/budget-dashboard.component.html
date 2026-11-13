@@ -171,7 +171,7 @@
           </p>
         </header>
       }
-      <div class="bd__sheetBody" appScrollFade="y">
+      <div class="bd__sheetBody" [class.bd__sheetBody--fab]="byHand()" appScrollFade="y">
         @if (!wide()) {
           <h2 class="sr-only">{{ current()?.name }}</h2>
         }
@@ -186,23 +186,21 @@
         </dl>
 
         @if (current(); as ks) {
-          @if (editable() || allocatable()) {
-            <app-section class="bd__sec" size="lg" [heading]="(ks.parentId ? 'budget.cc.heading' : 'budget.cc.budget') | t">
-              <div class="bd__settings">
-                @if (allocatable()) {
-                  <app-currency-input
-                    class="bd__allocation"
-                    [name]="'allocation-' + ks.id"
-                    [label]="'budget.cc.allocation' | t: { year: selectedYear()?.display ?? '' }"
-                    [ngModel]="figures().allocated"
-                    (ngModelChange)="editAllocation($event)"
-                    (focusout)="saveAllocation()"
-                  />
-                }
-                @if (editable()) {
-                  <app-cost-centre-settings [node]="ks" [sided]="sided()" [gremiumOptions]="gremiumOptions()" (saved)="refreshTree()" />
-                }
-              </div>
+          @if (allocatable()) {
+            <app-section class="bd__sec" size="lg" [heading]="'budget.cc.allocationHeading' | t">
+              <app-currency-input
+                [name]="'allocation-' + ks.id"
+                [label]="'budget.cc.allocation' | t: { year: selectedYear()?.display ?? '' }"
+                [ngModel]="allocationValue()"
+                (ngModelChange)="editAllocation($event)"
+                (focusout)="saveAllocation()"
+                (keydown.enter)="saveAllocation()"
+              />
+            </app-section>
+          }
+          @if (editable()) {
+            <app-section class="bd__sec" size="lg" [heading]="'budget.cc.heading' | t">
+              <app-cost-centre-settings [node]="ks" [sided]="sided()" [gremiumOptions]="gremiumOptions()" (saved)="refreshTree(null, !$event)" />
             </app-section>
           }
         }
@@ -356,7 +354,7 @@
                 }
                 <span class="tn__name ell" [class.tn__name--root]="row.depth === 0">{{ row.node.name }}</span>
                 @if (!row.node.active) {
-                  <app-badge>{{ 'budget.cc.inactive' | t }}</app-badge>
+                  <app-status-text kind="muted">{{ 'budget.cc.inactive' | t }}</app-status-text>
                 }
                 <span class="tn__amt mono">{{ moneyShort(row.allocated, row.node.currency) }}</span>
               </span>
@@ -473,7 +471,7 @@
 <app-cost-centre-create
   [open]="createOpen()"
   [top]="createTop()"
-  [parents]="parents()"
+  [parentNodes]="parentNodes()"
   [parent]="selectedKsId()"
   (created)="onCreated($event)"
   (closed)="createOpen.set(false)"
@@ -482,7 +480,11 @@
 <app-confirm-dialog
   [open]="!!deleteTarget()"
   [title]="'budget.tree.deleteTitle' | t"
-  [body]="deleteTarget() ? ('budget.tree.deleteConfirm' | t: { name: deleteTarget()!.name, path: deleteTarget()!.pathKey }) : ''"
+  [body]="deleteBody()"
   (confirm)="deleteNode()"
   (cancel)="deleteTarget.set(null)"
 />
+
+@if (byHand()) {
+  <app-fab [label]="'budget.cc.create' | t" (activate)="createOpen.set(true)" />
+}

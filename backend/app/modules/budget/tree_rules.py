@@ -18,7 +18,7 @@ from typing import Any
 
 #: Path segment: alphanumeric, for example `VS`, `800` or `04`. Path composition
 #: reserves the separator `-`, so a segment must not contain it.
-_KEY_RE = re.compile(r"^[A-Za-z0-9]+$")
+_KEY_RE = re.compile(r"[A-Za-z0-9]+")
 _SEP = "-"
 _ZERO = Decimal(0)
 #: Length cap per path segment. It matches `max_length` in the schemas and bounds
@@ -27,8 +27,11 @@ _KEY_MAX = 64
 
 
 def is_valid_key(key: str) -> bool:
-    """Check for a valid path segment: alphanumeric, no `-`, length-capped."""
-    return len(key) <= _KEY_MAX and bool(_KEY_RE.match(key))
+    """Check for a valid path segment: alphanumeric, no `-`, length-capped.
+
+    The whole text must match, because `$` also matches before a line feed at the end.
+    """
+    return len(key) <= _KEY_MAX and _KEY_RE.fullmatch(key) is not None
 
 
 def compose_path_key(parent_path: str | None, key: str) -> str:

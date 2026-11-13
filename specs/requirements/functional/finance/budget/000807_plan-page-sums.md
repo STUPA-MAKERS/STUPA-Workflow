@@ -2,12 +2,12 @@
 id: "000807"
 title: The plan page shows the sums and the balance
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-13
 tests:
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
-  - "frontend/src/app/pages/budget/plan/budget-plan.util.spec.ts:sideSum"
+  - "frontend/src/app/pages/budget/plan/budget-plan.util.spec.ts:BudgetPlanUtil"
 implementation:
   - frontend/src/app/pages/budget/plan/budget-plan.component.ts
 scope:
@@ -21,3 +21,6 @@ their difference. It must show "Ausgeglichen" for a difference of 0 € and "Nic
 for a different value.
 
 Reason: The plan must be balanced before the decision.
+
+Test: The component test reads the two sums and the difference of a balanced and of an
+unbalanced version.

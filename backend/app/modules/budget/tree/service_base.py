@@ -190,6 +190,41 @@ class BudgetTreeServiceBase:
         if fy is not None:
             self._refuse_closed(fy)
 
+    async def _lock_tree(self, budget_id: UUID | None) -> None:
+        """Lock the top-level budget above a cost center, before a write in its tree.
+
+        Each write in the tree of a budget takes this lock first: a write of a plan, and
+        each write that a plan depends on or that reads what such a write changes (a
+        cost center, a key, a side, an allocation, a fiscal year, the steps, the plan
+        switch). Two writes on one budget then run one after the other, and the second
+        reads what the first left: the statement reads the row of the budget again, so
+        its plan switch is the one that the write before left. A caller reads its own
+        rows after this lock, never before. The lock comes before the lock of a plan
+        row and before the audit entry, so no two writes wait for each other.
+
+        The statement finds the top level by the parent chain, because the parent of a
+        cost center never changes and its path key can. The lock is `FOR NO KEY
+        UPDATE`, because a new row that points at the budget (a booking, a line) must
+        not wait for it. A cost center that does not exist locks no row.
+        """
+        if budget_id is None:
+            return
+        up = (
+            select(Budget.id, Budget.parent_id)
+            .where(Budget.id == budget_id)
+            .cte("up", recursive=True)
+        )
+        chain = up.union_all(
+            select(Budget.id, Budget.parent_id).where(Budget.id == up.c.parent_id)
+        )
+        top = select(chain.c.id).where(chain.c.parent_id.is_(None)).scalar_subquery()
+        await self.session.execute(
+            select(Budget)
+            .where(Budget.id == top)
+            .with_for_update(of=Budget, key_share=True)
+            .execution_options(populate_existing=True)
+        )
+
     async def _top_level(self, node: Budget) -> Budget:
         """Return the top-level budget of a node.
 

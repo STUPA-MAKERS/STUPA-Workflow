@@ -130,6 +130,39 @@ describe('CostCentreSelectComponent', () => {
     window.matchMedia = realMatchMedia;
   });
 
+  it('§F/finance/budget/000822 §F/finance/budget/000834: offers no inactive Kostenstelle and, in a planned year, only those of the plan or in use', async () => {
+    const used = { ...FIG('fy-v', '0'), expended: '5' };
+    const tree = [
+      NODE('vsm', null, 'VSM', 'VSM', 'VS-Mittel', {
+        plannedIn: ['fy-v'],
+        children: [
+          NODE('in', 'vsm', '1', 'VSM-1', 'Im Plan', { plannedIn: ['fy-v'] }),
+          NODE('out', 'vsm', '2', 'VSM-2', 'Nicht im Plan'),
+          NODE('used', 'vsm', '3', 'VSM-3', 'Mit Buchung', { byFiscalYear: [used] }),
+          NODE('off', 'vsm', '4', 'VSM-4', 'Stillgelegt', { plannedIn: ['fy-v'], active: false }),
+        ],
+      }),
+      NODE('qsm', null, 'QSM', 'QSM', 'QS-Mittel', { children: [NODE('q1', 'qsm', '1', 'QSM-1', 'Frei'), NODE('q2', 'qsm', '2', 'QSM-2', 'Aus', { active: false })] }),
+    ];
+    const names = () => screen.getAllByRole('option').map((o) => o.querySelector('.ccs__optName')?.textContent?.trim() ?? o.textContent?.trim());
+    const { field, tick, user, host } = await setup((h) => {
+      h.nodes.set(tree);
+      h.fy.set('fy-v');
+    });
+    await user.click(field());
+    await tick();
+    const shown = names().join('|');
+    for (const name of ['Im Plan', 'Mit Buchung', 'Frei']) expect(shown).toContain(name);
+    for (const name of ['Nicht im Plan', 'Stillgelegt', 'Aus']) expect(shown).not.toContain(name);
+    await user.keyboard('{Escape}');
+    host.fy.set('fy-other');
+    await tick();
+    await user.click(field());
+    await tick();
+    expect(names().join('|')).toContain('Nicht im Plan');
+    expect(names().join('|')).not.toContain('Stillgelegt');
+  });
+
   /** An id that the tree does not hold shows the placeholder. */
   it('shows the placeholder, then the pick with its swatch and path key', async () => {
     const { field, view, host } = await setup();
@@ -191,7 +224,7 @@ describe('CostCentreSelectComponent', () => {
     const { field, tick, user, view } = await setup();
     await user.click(field());
     await tick();
-    const search = screen.getByRole('combobox', { name: 'Kostenstelle suchen' });
+    const search = screen.getByRole('combobox', { name: 'Kostenstellen durchsuchen' });
     expect(search).toHaveFocus();
     await user.type(search, 'erst');
     const options = screen
@@ -228,7 +261,7 @@ describe('CostCentreSelectComponent', () => {
     field().focus();
     await user.keyboard('{ArrowDown}');
     await tick();
-    const search = screen.getByRole('combobox', { name: 'Kostenstelle suchen' });
+    const search = screen.getByRole('combobox', { name: 'Kostenstellen durchsuchen' });
     const active = () =>
       document.getElementById(search.getAttribute('aria-activedescendant') ?? '');
     expect(active()).toHaveTextContent('Erstsemesterwoche');

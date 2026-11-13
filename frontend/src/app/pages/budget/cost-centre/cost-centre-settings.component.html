@@ -4,34 +4,35 @@
     <app-input
       class="ccs__key"
       [label]="'budget.tree.key' | t"
+      [error]="keyError()"
       [ngModel]="key()"
       (ngModelChange)="key.set($event)"
       (focusout)="saveText('key')"
+      (keydown.enter)="saveText('key')"
       [name]="'cc-key-' + n.id"
     />
     <app-input
       [label]="'budget.tree.name' | t"
+      [error]="nameError()"
       [ngModel]="name()"
       (ngModelChange)="name.set($event)"
       (focusout)="saveText('name')"
+      (keydown.enter)="saveText('name')"
       [name]="'cc-name-' + n.id"
     />
   </div>
   @if (sided()) {
-    <div class="ccs__side">
-      <span class="ccs__label" [id]="'cc-side-' + n.id">{{ 'budget.cc.side' | t }}</span>
-      <app-segmented
-        width="equal"
-        size="control"
-        [ariaLabel]="'budget.cc.side' | t"
-        [options]="sides()"
-        [value]="n.side ?? null"
-        (valueChange)="saveSide($event)"
-      />
-    </div>
+    <app-select
+      [name]="'cc-side-' + n.id"
+      [label]="'budget.cc.side' | t"
+      [clearable]="false"
+      [options]="sides()"
+      [ngModel]="side()"
+      (ngModelChange)="saveSide($event)"
+    />
   }
   <app-colour-field [(value)]="colour" [name]="'cc-colour-' + n.id" (picked)="saveColour($event)" />
-  <app-switch [id]="'cc-active-' + n.id" [checked]="n.active" (checkedChange)="save({ active: $event })">
+  <app-switch [id]="'cc-active-' + n.id" [checked]="active()" (checkedChange)="saveActive($event)">
     <span>{{ 'budget.tree.active' | t }}</span>
   </app-switch>
   <div class="ccs__pair ccs__pair--even">
@@ -40,7 +41,7 @@
       [label]="'budget.tree.viewGremium' | t"
       [placeholder]="'budget.tree.viewGremiumNone' | t"
       [options]="gremien()"
-      [ngModel]="n.viewGremiumId ?? ''"
+      [ngModel]="viewGremium()"
       (ngModelChange)="saveGremium('viewGremiumId', $event)"
     />
     <app-select
@@ -48,7 +49,7 @@
       [label]="'budget.tree.decisionGremium' | t"
       [placeholder]="'budget.tree.decisionGremiumNone' | t"
       [options]="gremien()"
-      [ngModel]="n.decisionGremiumId ?? ''"
+      [ngModel]="decisionGremium()"
       (ngModelChange)="saveGremium('decisionGremiumId', $event)"
     />
   </div>

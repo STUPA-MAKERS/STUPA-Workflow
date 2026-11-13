@@ -12,6 +12,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
+from app.modules.budget.plan_models import BudgetPlan, BudgetPlanVersion
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase
 from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpense, FiscalYear
 from app.modules.budget.tree_schemas import FiscalYearCreate, FiscalYearOut, FiscalYearUpdate
@@ -84,6 +85,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
 
     async def create_fiscal_year(self, budget_id: UUID, payload: FiscalYearCreate) -> FiscalYearOut:
         """Create a fiscal year. Its bounds derive from the budget start date."""
+        await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
         start, end = self._fiscal_year_bounds(
             payload.year, top.fiscal_start_month, top.fiscal_start_day
@@ -92,6 +94,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
         if any(f.year == payload.year for f in existing):
             raise ValidationProblem(
                 "Fiscal year already exists for this budget.",
+                code="fiscal_year_exists",
                 errors=[{"field": "year", "msg": "fiscal year already exists"}],
             )
         fy = FiscalYear(
@@ -115,21 +118,26 @@ class FiscalYearOps(BudgetTreeServiceBase):
         dates. The active flag stays free: it only picks the default year.
 
         Raises:
+            NotFoundError: The fiscal year is not one of this budget (404).
             ConflictError: `fiscal_year_closed` (409) for a year change on a
-                closed fiscal year.
+                closed fiscal year, `fiscal_year_has_plan` (409) for a year change
+                while the Haushaltsplan of the year has a version that left the draft.
         """
+        await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
-        fy = await self._get_fiscal_year(fiscal_year_id)
+        fy = await self._own_fiscal_year(top, fiscal_year_id)
         provided = payload.model_dump(exclude_unset=True)
         new_year = provided.get("year", fy.year)
         if new_year != fy.year:
             self._refuse_closed(fy)
+            await self._refuse_decided_plan(fiscal_year_id)
         if new_year != fy.year and any(
             f.year == new_year and f.id != fiscal_year_id
             for f in await self._fiscal_years_of(budget_id)
         ):
             raise ValidationProblem(
                 "Fiscal year already exists for this budget.",
+                code="fiscal_year_exists",
                 errors=[{"field": "year", "msg": "fiscal year already exists"}],
             )
         bounds = (
@@ -178,9 +186,14 @@ class FiscalYearOps(BudgetTreeServiceBase):
             NotFoundError: The budget or the fiscal year does not exist, or the
                 fiscal year belongs to another top-level budget (404).
             ValidationProblem: `budget_id` is not a top-level budget (422).
-            ConflictError: Money rows still reference the fiscal year, or the
-                fiscal year is closed (409).
+            ConflictError: Money rows still reference the fiscal year
+                (`fiscal_year_has_bookings`, `fiscal_year_has_allocations` or
+                `fiscal_year_has_applications`), the fiscal year is closed, or its
+                Haushaltsplan has a version that left the draft
+                (`fiscal_year_has_plan`) (409). A plan that is only a draft goes with
+                the year, and the audit entry says so.
         """
+        await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
         fy = await self._own_fiscal_year(top, fiscal_year_id)
         self._refuse_closed(fy)
@@ -195,19 +208,70 @@ class FiscalYearOps(BudgetTreeServiceBase):
                 Application.id, Application.fiscal_year_id, fiscal_year_id
             ),
         )
+        states = await self._refuse_decided_plan(fiscal_year_id)
         if blocker is not None:
             raise ConflictError(
                 f"fiscal year still has {blocker}; remove them first",
-                code="fiscal_year_in_use",
+                code=f"fiscal_year_has_{blocker}",
             )
         await self._audit(
             AuditAction.BUDGET_FISCAL_YEAR_DELETE,
             target_type="fiscal_year",
             target_id=str(fiscal_year_id),
-            data={"budgetId": str(top.id), "year": fy.year},
+            data={
+                "budgetId": str(top.id),
+                "year": fy.year,
+                "planDeleted": bool(states),
+                **await self._plan_ids(fiscal_year_id),
+            },
         )
         await self.session.delete(fy)
         await self.session.commit()
+
+    async def _refuse_decided_plan(self, fiscal_year_id: UUID) -> list[str]:
+        """Refuse a fiscal year whose plan left the draft, and return its version states.
+
+        A decided plan is a record of its year, so the year keeps its number and is
+        not deleted.
+
+        Raises:
+            ConflictError: `fiscal_year_has_plan` (409).
+        """
+        states = await self._plan_states(fiscal_year_id)
+        if any(state != "draft" for state in states):
+            raise ConflictError(
+                "The Haushaltsplan of this fiscal year has a decided version.",
+                code="fiscal_year_has_plan",
+            )
+        return states
+
+    async def _plan_ids(self, fiscal_year_id: UUID) -> dict[str, object]:
+        """Return the plan and the versions that go with a fiscal year, as audit data."""
+        rows = (
+            await self.session.execute(
+                select(BudgetPlan.id, BudgetPlanVersion.id)
+                .join(BudgetPlanVersion, BudgetPlanVersion.plan_id == BudgetPlan.id)
+                .where(BudgetPlan.fiscal_year_id == fiscal_year_id)
+                .order_by(BudgetPlanVersion.number)
+            )
+        ).all()
+        return (
+            {"planId": str(rows[0][0]), "versionIds": [str(version) for _plan, version in rows]}
+            if rows
+            else {}
+        )
+
+    async def _plan_states(self, fiscal_year_id: UUID) -> list[str]:
+        """Return the state of each version of the Haushaltsplan of a fiscal year."""
+        return list(
+            (
+                await self.session.scalars(
+                    select(BudgetPlanVersion.state)
+                    .join(BudgetPlan, BudgetPlan.id == BudgetPlanVersion.plan_id)
+                    .where(BudgetPlan.fiscal_year_id == fiscal_year_id)
+                )
+            ).all()
+        )
 
     async def _own_fiscal_year(self, top: Budget, fiscal_year_id: UUID) -> FiscalYear:
         """Load a fiscal year and make sure that it belongs to the top-level budget.
@@ -237,9 +301,19 @@ class FiscalYearOps(BudgetTreeServiceBase):
             NotFoundError: The budget or the fiscal year does not exist, or the
                 fiscal year belongs to another top-level budget (404).
             ValidationProblem: `budget_id` is not a top-level budget (422).
+            ConflictError: `plan_in_progress` (409) for a close while a version of the
+                Haushaltsplan passes its steps, because a vote that ends after the
+                close could not pass its step.
         """
+        await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
         fy = await self._own_fiscal_year(top, fiscal_year_id)
+        if closed and "in_progress" in await self._plan_states(fiscal_year_id):
+            raise ConflictError(
+                "A version of the Haushaltsplan passes its steps. Bring it into force "
+                "or move it back to draft first.",
+                code="plan_in_progress",
+            )
         if closed != (fy.closed_at is not None):
             fy.closed_at = datetime.now(UTC) if closed else None
             await self._audit(

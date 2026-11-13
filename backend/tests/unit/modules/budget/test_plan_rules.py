@@ -38,19 +38,22 @@ def test_next_step() -> None:
     ],
 )
 def test_can_enter_force(state: str, steps: list[dict[str, object]], allowed: bool) -> None:
-    """§000792: into force after the last step, or from draft without steps."""
+    """§F/finance/budget/000792: into force after the last step, or from draft without steps."""
     assert plan_rules.can_enter_force(state, steps) is allowed
 
 
 def test_can_return_to_draft() -> None:
-    """§000792: only a version that passes its steps moves back to draft."""
+    """§F/finance/budget/000792: only a version that passes its steps moves back to draft."""
     assert [plan_rules.can_return_to_draft(s) for s in ("in_progress", "draft", "in_force")] == [
         True, False, False,
     ]
 
 
 def test_step_snapshot_and_pass() -> None:
-    """§000824: a version keeps the steps of its budget and the time of each one."""
+    """A version keeps the steps of its budget and the time of each one.
+
+    Rule: §F/finance/budget/000824.
+    """
     gremium = uuid.uuid4()
     steps = plan_rules.step_snapshot([("Beschluss", gremium), ("Genehmigung", None)])
     assert steps == [
@@ -63,7 +66,10 @@ def test_step_snapshot_and_pass() -> None:
 
 
 def test_step_vote() -> None:
-    """§000826: a step keeps its vote, and only the vote of the next step decides."""
+    """A step keeps its vote, and only the vote of the next step decides.
+
+    Rule: §F/finance/budget/000826.
+    """
     steps = plan_rules.step_snapshot([("Beschluss", uuid.uuid4()), ("Genehmigung", None)])
     voted = plan_rules.with_step_vote(steps, 0, "v1")
     assert [s.get("voteId") for s in voted] == ["v1", None]
@@ -77,6 +83,10 @@ def test_step_vote() -> None:
 
 
 def test_step_vote_config_and_question() -> None:
+    """The vote of a step is secret, simple, refused on a tie and names its plan.
+
+    Rule: §F/finance/budget/000838.
+    """
     assert plan_rules.step_vote_config(None) == {
         "options": ["yes", "no", "abstain"],
         "majorityRule": "simple",
@@ -96,7 +106,7 @@ def test_version_name() -> None:
 
 
 def test_side_sums_and_balance() -> None:
-    """§000795: the income Ansätze equal the expense Ansätze."""
+    """§F/finance/budget/000795: the income Ansätze equal the expense Ansätze."""
     lines = [("income", D(100)), ("expense", D(60)), ("expense", D(40)), (None, D(7))]
     assert plan_rules.side_sums(lines) == (D(100), D(100))
     assert plan_rules.is_balanced(lines)
@@ -104,36 +114,26 @@ def test_side_sums_and_balance() -> None:
     assert plan_rules.is_balanced([])
 
 
-def test_children_sum() -> None:
-    amounts = {EXP_A: D(30), EXP_B: D(12), EXP_A1: D(99)}
-    assert plan_rules.children_sum(EXP, PARENT_OF, amounts) == D(42)
-    assert plan_rules.children_sum(EXP_B, PARENT_OF, amounts) == D(0)
-
-
-def test_summed_ancestors_follow_the_children_up_to_the_top() -> None:
-    """§000794: a parent holds the sum of its children, so it rises and falls."""
+def test_summed_amounts_give_each_parent_the_sum_of_its_children() -> None:
+    """§F/finance/budget/000794: a parent holds the sum of its children on every level."""
     amounts = {EXP: D(40), EXP_A: D(30), EXP_B: D(10), EXP_A1: D(50)}
-    assert plan_rules.summed_ancestors(EXP_A1, PARENT_OF, amounts, TOP) == {
-        EXP_A: D(50), EXP: D(60),
+    assert plan_rules.summed_amounts(PARENT_OF, amounts) == {
+        EXP: D(60), EXP_A: D(50), EXP_B: D(10), EXP_A1: D(50),
     }
     lower = {EXP: D(100), EXP_A: D(80), EXP_B: D(10), EXP_A1: D(5)}
-    assert plan_rules.summed_ancestors(EXP_A1, PARENT_OF, lower, TOP) == {
-        EXP_A: D(5), EXP: D(15),
-    }
+    assert plan_rules.summed_amounts(PARENT_OF, lower)[EXP] == D(15)
 
 
-def test_summed_ancestors_stop_at_a_parent_without_a_child_line() -> None:
-    """A removed last child leaves the Ansatz of its parent as it is."""
-    assert plan_rules.summed_ancestors(EXP_A1, PARENT_OF, {EXP_A: D(50), EXP: D(70)}, TOP) == {}
-
-
-def test_summed_ancestors_of_a_direct_child_and_of_the_top() -> None:
-    assert plan_rules.summed_ancestors(EXP, PARENT_OF, {EXP: D(5)}, TOP) == {}
-    assert plan_rules.summed_ancestors(TOP, PARENT_OF, {}, TOP) == {}
+def test_summed_amounts_keep_a_cost_centre_without_a_child_line() -> None:
+    """A parent whose children have no line keeps the Ansatz a person typed."""
+    amounts = {EXP: D(70), EXP_A: D(50)}
+    assert plan_rules.summed_amounts(PARENT_OF, amounts) == {EXP: D(50), EXP_A: D(50)}
+    assert plan_rules.summed_amounts(PARENT_OF, {EXP_A: D(50)}) == {EXP_A: D(50)}
+    assert plan_rules.summed_amounts(PARENT_OF, {}) == {}
 
 
 def test_allocations_from_lines() -> None:
-    """§000797: expense Ansätze become allocations, income and missing lines 0."""
+    """§F/finance/budget/000797: expense Ansätze become allocations, income and missing lines 0."""
     nodes = [
         (TOP, None, None), (INC, TOP, "income"), (EXP, TOP, "expense"),
         (EXP_A, EXP, "expense"), (EXP_B, EXP, "expense"),
@@ -145,14 +145,52 @@ def test_allocations_from_lines() -> None:
 
 
 def test_with_plan_fields() -> None:
+    """Each node of the forest gets its side, its switch and the years that plan it.
+
+    Rule: §F/finance/budget/000818.
+    """
     forest = [{"id": 1, "children": [{"id": 2, "children": []}]}]
-    out = plan_rules.with_plan_fields(forest, {2: "income"}, {1: True})
+    out = plan_rules.with_plan_fields(forest, {2: "income"}, {1: True}, {1: ["fy"], 2: ["fy"]})
     assert out == [
         {
-            "id": 1, "side": None, "plan_enabled": True,
+            "id": 1, "side": None, "plan_enabled": True, "planned_in": ("fy",),
             "children": [
-                {"id": 2, "side": "income", "plan_enabled": False,
+                {"id": 2, "side": "income", "plan_enabled": False, "planned_in": ("fy",),
                  "children": []}
             ],
         }
     ]
+
+
+def test_first_child_of() -> None:
+    top, parent, a, b = (uuid.uuid4() for _ in range(4))
+    parent_of = {top: None, parent: top, a: parent, b: parent}
+    assert plan_rules.first_child_of(a, parent_of, [parent]) == parent
+    assert plan_rules.first_child_of(a, parent_of, [parent, b]) is None
+    assert plan_rules.first_child_of(a, parent_of, [parent, a]) is None
+    assert plan_rules.first_child_of(a, parent_of, []) is None
+    assert plan_rules.first_child_of(top, parent_of, []) is None
+
+
+def test_is_plain_stammplan() -> None:
+    """Only a Stammplan in force without a passed step is a plan of the switch alone.
+
+    Rule: §F/finance/budget/000814.
+    """
+    assert plan_rules.is_plain_stammplan([(0, "in_force", [])])
+    assert not plan_rules.is_plain_stammplan([(0, "in_force", [{"name": "A"}])])
+    assert not plan_rules.is_plain_stammplan([(0, "draft", [])])
+    assert not plan_rules.is_plain_stammplan([(0, "replaced", []), (1, "in_force", [])])
+    assert not plan_rules.is_plain_stammplan([])
+
+
+def test_allocation_changes() -> None:
+    """Only an allocation that differs from its Ansatz is a change, with before and after.
+
+    Rule: §F/finance/budget/000803.
+    """
+    a, b, c = (uuid.uuid4() for _ in range(3))
+    D = Decimal
+    assert plan_rules.allocation_changes({a: D(5), b: D(1)}, {a: D(5), b: D(2), c: D(0)}) == {
+        b: (D(1), D(2))
+    }

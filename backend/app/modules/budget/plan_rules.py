@@ -19,6 +19,10 @@ Side = Literal["income", "expense"]
 
 _ZERO = Decimal(0)
 
+#: The largest value of ``Numeric(12, 2)``: a larger Ansatz gives 422, not a 500 from
+#: the database.
+MAX_AMOUNT = Decimal("9999999999.99")
+
 #: The states before ``in_force``. A plan has at most one version in them.
 OPEN_STATES: tuple[str, ...] = ("draft", "in_progress")
 
@@ -127,46 +131,97 @@ def is_balanced(lines: Sequence[tuple[str | None, Decimal]]) -> bool:
     return income == expense
 
 
-def children_sum(
-    parent_id: UUID,
-    parent_of: Mapping[UUID, UUID | None],
-    amounts: Mapping[UUID, Decimal],
-) -> Decimal:
-    """Sum the Ansätze of the direct children of `parent_id`."""
-    return sum(
-        (amounts.get(node, _ZERO) for node, parent in parent_of.items() if parent == parent_id),
-        _ZERO,
-    )
+def ancestors_below(
+    node_id: UUID, parent_of: Mapping[UUID, UUID | None], top_id: UUID
+) -> tuple[UUID, ...]:
+    """Return the ancestors of `node_id` below `top_id`, nearest first.
 
-
-def summed_ancestors(
-    node_id: UUID,
-    parent_of: Mapping[UUID, UUID | None],
-    amounts: Mapping[UUID, Decimal],
-    top_id: UUID,
-) -> dict[UUID, Decimal]:
-    """Return the Ansatz of each ancestor of `node_id` after a change of its line.
-
-    `amounts` holds the Ansatz of each cost center with a line, the change of
-    `node_id` included. An ancestor with a child that has a line holds the sum of the
-    Ansätze of those children, so it rises and falls with them. The walk goes up to
-    the node below `top_id`, because the top level has no line, and each step sees
-    the sums of the steps before. It stops at an ancestor without such a child: that
-    cost center keeps the Ansatz a person typed.
+    The top level has no plan line, so the walk stops below it.
     """
     parent = parent_of.get(node_id)
     if parent is None or parent == top_id:
-        return {}
-    children = tuple(
-        amounts[node] for node, above in parent_of.items() if above == parent and node in amounts
-    )
-    if not children:
-        return {}
-    total = sum(children, _ZERO)
-    return {
-        parent: total,
-        **summed_ancestors(parent, parent_of, {**amounts, parent: total}, top_id),
+        return ()
+    return (parent, *ancestors_below(parent, parent_of, top_id))
+
+
+def summed_amounts(
+    parent_of: Mapping[UUID, UUID | None],
+    amounts: Mapping[UUID, Decimal],
+) -> dict[UUID, Decimal]:
+    """Return the Ansatz of each line when every parent holds the sum of its children.
+
+    `amounts` holds the Ansatz of each cost center with a line. A cost center with a
+    child that has a line gets the sum of the Ansätze of those children, on every
+    level, so a parent can stand neither above nor below its children. A cost center
+    without such a child keeps the Ansatz a person typed.
+    """
+    below = {
+        parent: tuple(n for n, above in parent_of.items() if above == parent and n in amounts)
+        for parent in amounts
     }
+
+    def total(node: UUID) -> Decimal:
+        children = below[node]
+        return sum((total(child) for child in children), _ZERO) if children else amounts[node]
+
+    return {node: total(node) for node in amounts}
+
+
+def is_plain_stammplan(versions: Sequence[tuple[int, str, Sequence[Any]]]) -> bool:
+    """Say if a plan holds nothing but a Stammplan in force that passed no step.
+
+    `versions` holds `(number, state, steps)` of each version. Such a plan says the
+    same as the allocations, so the plan switch can go off and take it along.
+    """
+    return len(versions) == 1 and all(
+        number == 0 and state == "in_force" and not steps for number, state, steps in versions
+    )
+
+
+def first_child_of(
+    node_id: UUID, parent_of: Mapping[UUID, UUID | None], with_line: Sequence[UUID]
+) -> UUID | None:
+    """Return the parent whose first child line `node_id` gets, or `None`.
+
+    A cost center gets the first child line of its parent when the parent has a line
+    and neither the cost center nor one of its siblings has one. The parent then stops
+    to hold an Ansatz of its own, so the line of the child takes that Ansatz over.
+    """
+    parent = parent_of.get(node_id)
+    taken = any(n in with_line for n, above in parent_of.items() if above == parent)
+    return parent if parent is not None and parent in with_line and not taken else None
+
+
+def allocation_changes(
+    current: Mapping[UUID, Decimal], target: Mapping[UUID, Decimal]
+) -> dict[UUID, tuple[Decimal, Decimal]]:
+    """Return `(before, after)` for each cost center whose allocation the plan changes."""
+    return {
+        node: (current.get(node, _ZERO), after)
+        for node, after in target.items()
+        if current.get(node, _ZERO) != after
+    }
+
+
+def proposed_side(
+    parent_of: Mapping[UUID, UUID | None],
+    top_id: UUID,
+    sides: Mapping[UUID, Side],
+    node_id: UUID,
+) -> Side | None:
+    """Return the side that `sides` gives a node, or `None` when it names no side for it.
+
+    `sides` names direct children of the top-level node. A node below takes the side of
+    the direct child above it.
+    """
+    parent = parent_of.get(node_id)
+    if node_id == top_id or parent is None:
+        return None
+    return (
+        sides.get(node_id)
+        if parent == top_id
+        else proposed_side(parent_of, top_id, sides, parent)
+    )
 
 
 def allocations_from_lines(
@@ -197,14 +252,21 @@ def with_plan_fields(
     forest: Sequence[dict[str, Any]],
     side_of: Mapping[object, str | None],
     enabled_of: Mapping[object, bool],
+    planned_in: Mapping[object, Sequence[object]],
 ) -> list[dict[str, Any]]:
-    """Add `side` and `plan_enabled` to each node dict of a forest."""
+    """Add `side`, `plan_enabled` and `planned_in` to each node dict of a forest.
+
+    `planned_in` holds, for a top-level node, the fiscal years with a version in
+    force, and for a node below it the fiscal years whose version in force has a line
+    for the node.
+    """
     return [
         {
             **node,
             "side": side_of.get(node["id"]),
             "plan_enabled": enabled_of.get(node["id"], False),
-            "children": with_plan_fields(node["children"], side_of, enabled_of),
+            "planned_in": tuple(planned_in.get(node["id"], ())),
+            "children": with_plan_fields(node["children"], side_of, enabled_of, planned_in),
         }
         for node in forest
     ]
