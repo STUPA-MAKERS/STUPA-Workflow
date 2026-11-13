@@ -29,7 +29,8 @@ The German texts of the platform must name the parts of the budget tree as follo
 1. The top level of the tree is a "Haushalt" (plural "Haushalte"). This holds for the menu
    entry, the page in the Verwaltung, the headings, the buttons, the dialogs, the toasts,
    the error texts and the names of the audit entries. It holds for every top level, with
-   or without a Haushaltsplan.
+   or without a Haushaltsplan. The list of the nodes below a selected node has the heading
+   "Auslastung", because its rows are Titel or Kostenstellen and never Haushalte.
 2. A Kostenstelle directly below a Haushalt is a "Titel". A text that names this level
    alone must say "Titel": the heading of the section of such a node, the dialog that
    creates a node below a Haushalt, the column heading of the plan, and the error texts

@@ -2582,6 +2582,7 @@
   "budget.empty.noFiscalYear.body": "Kostenstellen sind vorhanden, aber es gibt noch kein Haushaltsjahr. Alle Zahlen auf dieser Seite gehören zu einem Haushaltsjahr. Lege eines an, dann erscheinen die Kostenstellen hier.",
   "budget.empty.noFiscalYear.action": "Haushaltsjahr anlegen",
   "budget.usage.heading": "Auslastung je Haushalt",
+  "budget.usage.headingNode": "Auslastung",
   "budget.dash.tree": "Kostenstellen",
   "budget.dash.search": "Kostenstellen durchsuchen",
   "budget.dash.searchNone": "Keine Kostenstelle gefunden.",

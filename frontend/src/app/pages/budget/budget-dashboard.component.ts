@@ -105,7 +105,7 @@ interface TreeRow {
   readonly percent: number | null;
 }
 
-/** One row of "Auslastung je Budget". */
+/** One row of "Auslastung". */
 interface UsageRow {
   readonly node: BudgetTreeNode;
   readonly color: string;
@@ -526,7 +526,7 @@ export class BudgetDashboardComponent {
     this.metric.set(value as DistributionMetric);
   }
 
-  /** "Auslastung je Budget": the direct sub cost centres, or the cost centre itself when
+  /** "Auslastung": the direct sub cost centres, or the cost centre itself when
    *  it has none. */
   readonly usageRows = computed<UsageRow[]>(() => {
     const ks = this.selectedKs();

@@ -2582,6 +2582,7 @@
   "budget.empty.noFiscalYear.body": "Cost centres exist, but there is no fiscal year yet. Every figure on this page belongs to a fiscal year. Create one, and the cost centres show up here.",
   "budget.empty.noFiscalYear.action": "Create a fiscal year",
   "budget.usage.heading": "Utilisation per budget",
+  "budget.usage.headingNode": "Utilisation per budget",
   "budget.dash.tree": "Cost centres",
   "budget.dash.search": "Search cost centres",
   "budget.dash.searchNone": "No cost centre found.",

@@ -5,7 +5,7 @@ import type { BudgetTreeNode } from './budget-tree.api';
  *
  * A cost centre can carry its own colour (`BudgetTreeNode.color`), for example the colour
  * of a faculty. {@link nodeColors} gives every node one display colour, and every view of
- * the budget page uses it: the tree rows, the "Auslastung je Budget" bars, the
+ * the budget page uses it: the tree rows, the "Auslastung" bars, the
  * "Verteilung" chart and the overview. The pickers use it for their roots. So a cost
  * centre has the same colour in each place.
  *

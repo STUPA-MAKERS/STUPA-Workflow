@@ -1462,6 +1462,7 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(view.container.querySelector('[name="allocation-b-800"]')).not.toBeNull();
       expect(screen.getByRole('heading', { name: 'Titel' })).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Kostenstelle' })).toBeNull();
+      expect(screen.getByRole('heading', { name: 'Auslastung' })).toBeInTheDocument();
       await userEvent.click(within(view.container.querySelector('.bd__head') as HTMLElement).getByRole('button', { name: 'Weitere Aktionen' }));
       expect((await screen.findAllByRole('menuitem')).map((i) => i.textContent?.trim())).toEqual(['Buchungen ansehen', 'Kostenstelle löschen']);
     });
