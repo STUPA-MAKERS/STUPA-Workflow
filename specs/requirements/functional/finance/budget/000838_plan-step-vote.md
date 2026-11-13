@@ -39,7 +39,7 @@ The vote must open and close only through the vote routes, with the right of tha
 to manage votes. The plan page must link to the vote, for a person who cannot move the version as the
 action of its head, and must show that person no action that moves the version. The read
 of the plan of a version (`GET /budget-plan-versions/{id}/plan`) must answer 404 for a
-version that does not exist, also when a delete takes the version away during the read. The vote page must show a link to
+version that does not exist, and must never answer 500 when a delete takes the version away during the read. The vote page must show a link to
 the plan to a person who can read the plan (000800), and to no other person.
 
 Reason: The person who manages the plan asks the body for its decision, and the body

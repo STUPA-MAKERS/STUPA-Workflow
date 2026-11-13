@@ -26,7 +26,9 @@ on, the section must also show the side (000817). A person with `budget.structur
 change each field there, and the platform must save a field when the person leaves it. An
 empty key or name must show the saved text again and save nothing. A key or a name that the
 rules of the path key refuse (000246) must show the cause below the field and save nothing.
-A refused save must show its cause and the saved values again. A person without
+A refused save must show its cause and the saved values again. The save of one field must
+not change the text that the person types in another field. The switch "Aktiv" must keep
+the keyboard focus while its save runs, and a press during a save must be saved after it. A person without
 `budget.structure` must not see the section. The state of the plan version must not lock
 these fields, because a decided version keeps its own name and key (000821).
 
@@ -34,4 +36,5 @@ Reason: The settings of a Kostenstelle stand beside its amounts, so one place ho
 that a person sets on it.
 
 Test: The component tests change each field and leave it, type a key and a name that the rules
-refuse, and read the fields after a refused save.
+refuse, and read the fields after a refused save. One test types in a field while the page gives
+the section the saved values again, and one presses the switch twice while a save runs.
