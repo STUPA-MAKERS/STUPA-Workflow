@@ -16,10 +16,11 @@ scope:
 # A black bar in the PDF sits on the baseline of its line
 
 In the protocol PDF, a black bar must sit on the baseline of the text around it. The bar must
-reach from 0.1em below the baseline to the cap height of the font. This applies in a paragraph,
+be 1em high and reach from the descender (0.22em below the baseline) to just above the cap
+height of the font. This applies in a paragraph,
 in a list and in the grey line of a time note.
 
 Reason: A bar that hangs below the baseline looks like a layout fault.
 
-Test: A typst test renders a line with a bar and compares the lower edge of the bar with the
-baseline of the letters next to it.
+Test: A typst test renders a line with a bar and compares the edges of the bar with the
+baseline and the cap height of the letters next to it.
