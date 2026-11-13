@@ -28,4 +28,5 @@ state that the save just changed.
 Test: The test of the cache interceptor starts a read, a write and a second read, reads two
 requests and reads that the answer of the first read is not the stored one. It does the same
 for a read that starts with a stored answer, and for a read that starts between a write and
-its answer.
+its answer. One test answers a read of another path while a write runs and reads that the
+next read does not get that answer.
