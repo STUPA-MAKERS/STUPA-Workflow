@@ -81,24 +81,25 @@ describe('CostCentreCreateComponent', () => {
     expect(view.api.createNode).not.toHaveBeenCalled();
   });
 
-  it('§F/finance/budget/000795: asks for the side of a direct child of a budget with a Haushaltsplan', async () => {
-    const view = await setup();
+  it('§F/finance/budget/000853: a Titel in a draft needs its side, and a Kostenstelle below a Titel has none', async () => {
+    const view = await setup({ versionId: 'v1', amountLabel: 'Ansatz' });
     await fill(view, '810', 'Werkstatt');
     expect(within(view.dialog).getByRole('combobox', { name: /Seite/ })).toHaveAttribute('aria-required', 'true');
     expect(view.submit).toBeDisabled();
     await pickSide(view, 'Ausgabe');
     expect(view.submit).toBeEnabled();
-    await userEvent.click(view.submit);
-    expect(view.api.createNode).toHaveBeenCalledWith({ parentId: 'vsm', key: '810', name: 'Werkstatt', side: 'expense', currency: 'EUR' });
-  });
-
-  it('§F/finance/budget/000795: a Kostenstelle below another one has no side', async () => {
-    const view = await setup();
-    await fill(view, '810', 'Werkstatt');
     await pickParent(view, /Personal/);
     expect(within(view.dialog).queryByRole('combobox', { name: /Seite/ })).toBeNull();
     await userEvent.click(view.submit);
-    expect(view.api.createNode).toHaveBeenCalledWith(expect.objectContaining({ parentId: 'staff', side: null }));
+    expect(view.planApi.createNode).toHaveBeenCalledWith('v1', { parentId: 'staff', key: '810', name: 'Werkstatt', side: null, amount: '0' });
+  });
+
+  it('§F/finance/budget/000829 §F/finance/budget/000853: outside a draft the form asks for no side, also for a Titel', async () => {
+    const view = await setup();
+    await fill(view, '810', 'Werkstatt');
+    expect(within(view.dialog).queryByRole('combobox', { name: /Seite/ })).toBeNull();
+    await userEvent.click(view.submit);
+    expect(view.api.createNode).toHaveBeenCalledWith({ parentId: 'vsm', key: '810', name: 'Werkstatt', currency: 'EUR' });
   });
 
   it('§F/finance/budget/000246: refuses a key with other characters and a name that is too long', async () => {
@@ -119,7 +120,7 @@ describe('CostCentreCreateComponent', () => {
     const view = await setup({ top: QSM, parentNodes: [QSM] });
     await fill(view, ' 810 ', ' Werkstatt ');
     await userEvent.keyboard('{Enter}');
-    expect(view.api.createNode).toHaveBeenCalledWith({ parentId: 'qsm', key: '810', name: 'Werkstatt', side: null, currency: 'EUR' });
+    expect(view.api.createNode).toHaveBeenCalledWith({ parentId: 'qsm', key: '810', name: 'Werkstatt', currency: 'EUR' });
     expect(view.created).toHaveBeenCalledWith({ id: 'new', plan: null });
     expect(view.success).toHaveBeenCalledWith('Titel angelegt.');
     expect(view.dialog.querySelector('[name="ccAmount"]')).toBeNull();
@@ -144,6 +145,7 @@ describe('CostCentreCreateComponent', () => {
   it('§F/finance/budget/000829: text that is no amount blocks the button', async () => {
     const view = await setup({ versionId: 'v1', top: QSM, parentNodes: [QSM] });
     await fill(view, '810', 'Werkstatt');
+    await pickSide(view, 'Ausgabe');
     expect(view.submit).toBeEnabled();
     await userEvent.type(view.field('ccAmount'), 'abc');
     expect(view.submit).toBeDisabled();
@@ -155,6 +157,7 @@ describe('CostCentreCreateComponent', () => {
   it('§F/finance/budget/000794: an Ansatz below 0 or above the largest amount blocks the button', async () => {
     const view = await setup({ versionId: 'v1', top: QSM, parentNodes: [QSM] });
     await fill(view, '810', 'Werkstatt');
+    await pickSide(view, 'Ausgabe');
     view.fixture.componentInstance.setAmount('-5');
     view.fixture.detectChanges();
     expect(view.submit).toBeDisabled();
@@ -196,6 +199,7 @@ describe('CostCentreCreateComponent', () => {
     first.fixture.destroy();
     const second = await setup({ top: QSM, parentNodes: [QSM], versionId: 'v1' }, 'other');
     await fill(second, '1', 'A');
+    await pickSide(second, 'Ausgabe');
     await userEvent.click(second.submit);
     expect(second.error).toHaveBeenCalledWith('Die Kostenstelle konnte nicht gespeichert werden.');
   });

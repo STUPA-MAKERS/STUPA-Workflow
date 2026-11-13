@@ -63,14 +63,15 @@ TYPICAL FLOWS:
   `update_budget` (sets `decisionGremiumId`), `book_expense`, `set_allocation`,
   `create_budget_transfer`; bind an application via `assign_application_budget`. Browse all
   bookings flat/filtered with `list_expenses`.
-- Haushaltsplan: a budget with the plan switch on (`set_plan_switch`, after
-  `preview_plan_switch`) plans each fiscal year. `get_budget_plan` reads the versions
+- Haushaltsplan: a budget with the plan switch on (`set_plan_switch`) plans each fiscal
+  year, and each year starts with a draft. `get_budget_plan` reads the versions
   (Stammplan, then each Nachtrag). Edit a draft with `set_plan_line`, `delete_plan_line`
   and `create_plan_cost_centre`; a cost center with children holds the sum of its children.
   `pass_plan_step` or `create_plan_step_vote` pass the steps of the budget
   (`get_plan_steps`/`set_plan_steps`), then `set_plan_state("in_force")` writes the
   allocations. `create_plan_nachtrag` starts a change, `delete_plan_version` drops a draft.
-  The side of a cost center directly below the budget: `set_budget_side`.
+  The side of a Titel, a cost center directly below the budget, is the `side` of its
+  line in the draft (`set_plan_line`).
 - Invoices (#invoices): `list_invoices`/`get_invoice`/`create_invoice`/`update_invoice`/
   `delete_invoice`. To attach an original PDF: `parse_invoice(file_path)` (ZUGFeRD/Factur-X →
   extracted fields + `fileToken`) or `upload_invoice_file(file_path)`, then pass `fileToken`

@@ -67,6 +67,7 @@ async function setup(opts: Opts = {}) {
     deleteVersion: jest.fn((..._args: unknown[]) => of(undefined)),
     passNextStep: jest.fn((..._args: unknown[]) => answer()),
     createStepVote: jest.fn((..._args: unknown[]) => answer()),
+    setStateByHand: jest.fn((..._args: unknown[]) => answer()),
   };
   const treeApi = {
     tree: jest.fn(() => of(opts.tree ?? [TOP, QSM])),
@@ -425,14 +426,14 @@ describe('BudgetPlanComponent', () => {
       expect(failed.api.plan).toHaveBeenCalledWith('vsm', 'fy-26');
     });
 
-    it('§F/finance/budget/000816: a changed side reads the plan again and keeps the line open', async () => {
+    it('§F/finance/budget/000816: a quiet read of the plan keeps the line open', async () => {
       const view = await setup({ query: { costCentre: 'fees' } });
       const settings = () =>
         view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent))?.componentInstance as CostCentreSettingsComponent;
       const first = settings();
       const late = new Subject<BudgetPlan>();
       view.api.plan.mockReturnValueOnce(late);
-      first.sideSaved.emit();
+      view.fixture.componentInstance.refreshPlan();
       view.fixture.detectChanges();
       expect(settings()).toBe(first);
       expect(view.container.querySelector('app-skeleton')).toBeNull();
@@ -442,7 +443,7 @@ describe('BudgetPlanComponent', () => {
       expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('77 €');
       const failed = new Subject<BudgetPlan>();
       view.api.plan.mockReturnValueOnce(failed).mockReturnValueOnce(throwError(() => problem(500)));
-      first.sideSaved.emit();
+      view.fixture.componentInstance.refreshPlan();
       failed.error(problem(500));
       view.fixture.detectChanges();
       expect(view.container.querySelector('.bd__sheetBody app-load-error')).not.toBeNull();
@@ -1362,7 +1363,6 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ query: { costCentre: 'fees' } });
       const settings = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent)).componentInstance as CostCentreSettingsComponent;
       expect(settings.node().name).toBe('Beiträge');
-      expect(settings.sided()).toBe(true);
       expect(settings.gremiumOptions()).toEqual([{ value: 'g1', label: 'StuPa' }]);
       const before = view.api.plan.mock.calls.length;
       settings.saved.emit(true);
@@ -1372,9 +1372,6 @@ describe('BudgetPlanComponent', () => {
       const reads = view.api.plan.mock.calls.length;
       settings.saved.emit(true);
       expect(view.api.plan.mock.calls.length).toBeGreaterThan(reads);
-      await userEvent.click(treeRow(view, 'Löhne'));
-      const child = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent)).componentInstance as CostCentreSettingsComponent;
-      expect(child.sided()).toBe(false);
     });
 
     it('§F/finance/budget/000851: drops the answer of a tree read that went out before the read on the page', async () => {
@@ -1467,6 +1464,154 @@ describe('BudgetPlanComponent', () => {
       await answerDialog('Kostenstelle löschen?', 'Löschen');
       expect(view.treeApi.deleteNode).toHaveBeenCalledWith('grants');
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Zuschüsse' })).toBeNull());
+    });
+  });
+
+  describe('sides', () => {
+    const select = () => screen.getByRole('combobox', { name: /Seite/ });
+
+    it('§F/finance/budget/000853: the line of a Titel sets its side in a draft, and a Kostenstelle below it has no side field', async () => {
+      const view = await setup({ query: { costCentre: 'fees' } });
+      await waitFor(() => expect(select()).toHaveTextContent('Einnahme'));
+      expect(view.container.querySelector('app-cost-centre-settings [name^="cc-side"]')).toBeNull();
+      const late = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(late);
+      await userEvent.click(select());
+      await userEvent.click(await screen.findByRole('option', { name: 'Ausgabe' }));
+      expect(view.api.setLine).toHaveBeenCalledWith('v0', 'fees', { side: 'expense' });
+      expect(select()).toHaveTextContent('Ausgabe');
+      late.next(plan([version({ lines: [line('fees', '100', { side: 'expense' }), line('grants', '30')] })]));
+      late.complete();
+      view.fixture.detectChanges();
+      expect(texts(view, '.bp__group')).toEqual(['Einnahmen0 €', 'Ausgaben130 €']);
+      expect(screen.getByRole('heading', { name: 'Vermerke' })).toBeInTheDocument();
+      await userEvent.click(select());
+      await userEvent.click(await screen.findByRole('option', { name: 'Ausgabe' }));
+      expect(view.api.setLine).toHaveBeenCalledTimes(1);
+      view.fixture.componentInstance.saveSide(view.fixture.componentInstance.rows()[0], null);
+      expect(view.api.setLine).toHaveBeenCalledTimes(1);
+      await userEvent.click(treeRow(view, 'Zuschüsse'));
+      expect(select()).toHaveTextContent('Ausgabe');
+      const below = await setup({ query: { costCentre: 'wages' } });
+      expect(below.container.querySelector('[name^="line-side"]')).toBeNull();
+    });
+
+    it('§F/finance/budget/000853: a version that left the draft shows the side and takes no change', async () => {
+      await setup({ plans: { 'fy-26': plan([version({ state: 'in_force' })]) }, query: { costCentre: 'fees' } });
+      await waitFor(() => expect(select()).toHaveTextContent('Einnahme'));
+      expect(select()).toBeDisabled();
+    });
+
+    it('§F/finance/budget/000853: lists a Titel without a side in its own group and keeps the version in the draft', async () => {
+      const lines = [line('noside', '5'), line('fees', '30'), line('grants', '30')];
+      const view = await setup({ plans: { 'fy-26': plan([version({ lines })]) } });
+      expect(texts(view, '.bp__group')).toEqual(['Ohne Seite', 'Einnahmen30 €', 'Ausgaben30 €']);
+      expect(texts(view, '.bd__tree .tn__name')).toEqual(['VS-Mittel', 'Ohne Seite', 'Beiträge', 'Zuschüsse']);
+      expect(screen.getByRole('heading', { level: 3, name: 'Ohne Seite' })).toBeInTheDocument();
+      expect(primary()).toBeDisabled();
+      expect(primary()).toHaveAttribute('title', 'Jeder Titel braucht eine Seite.');
+      await userEvent.click(treeRow(view, 'Ohne Seite'));
+      expect(text(view.container.querySelector('.bd__line'))).toContain('Ohne Seite');
+      expect(select()).toHaveAttribute('aria-required', 'true');
+      expect(screen.queryByRole('heading', { name: 'Vermerke' })).toBeNull();
+      await userEvent.click(select());
+      await userEvent.click(await screen.findByRole('option', { name: 'Einnahme' }));
+      expect(view.api.setLine).toHaveBeenCalledWith('v0', 'noside', { side: 'income' });
+    });
+
+    it('§F/finance/budget/000853: names the cause of a refused side', async () => {
+      const view = await setup({ query: { costCentre: 'fees' } });
+      const refused = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(refused);
+      await userEvent.click(select());
+      await userEvent.click(await screen.findByRole('option', { name: 'Ausgabe' }));
+      await waitFor(() => expect(select()).toHaveTextContent('Ausgabe'));
+      refused.error(problem(422, 'plan_side_missing'));
+      view.fixture.detectChanges();
+      expect(view.error).toHaveBeenCalledWith('Jeder Titel braucht eine Seite.');
+      await waitFor(() => expect(select()).toHaveTextContent('Einnahme'));
+    });
+  });
+
+  describe('state by hand', () => {
+    const PERMS = ['budget.view', 'budget.structure', 'budget.plan.set_state'];
+    const stepped = (over: Parameters<typeof version>[0] = {}) => plan([version({ steps: STEPS, ...over })]);
+    const dialog = () => screen.findByRole('dialog', { name: 'Zustand setzen' });
+    async function pickState(scope: HTMLElement, option: string): Promise<void> {
+      await userEvent.click(within(scope).getByRole('combobox', { name: /Zustand/ }));
+      await userEvent.click(await screen.findByRole('option', { name: option }));
+    }
+    const options = async (scope: HTMLElement) => {
+      await userEvent.click(within(scope).getByRole('combobox', { name: /Zustand/ }));
+      const names = (await screen.findAllByRole('option')).map(text);
+      await userEvent.keyboard('{Escape}');
+      return names;
+    };
+
+    it('§F/finance/budget/000855 §F/finance/budget/000840: sets a step by hand with a reason and reads the allocations again', async () => {
+      const view = await setup({ perms: PERMS, plans: { 'fy-26': stepped() } });
+      await choose('Zustand setzen');
+      const open = await dialog();
+      const save = within(screen.getByTestId('bp-state-save')).getByRole('button');
+      expect(save).toBeDisabled();
+      await pickState(open, 'Genehmigung');
+      expect(save).toBeDisabled();
+      expect(within(open).queryByText(/Danach ändert nur ein Nachtrag/)).toBeNull();
+      await userEvent.type(within(open).getByRole('textbox', { name: /Begründung/ }), ' Beschluss vom 3. März ');
+      await userEvent.click(save);
+      expect(view.api.setStateByHand).toHaveBeenCalledWith('v0', { state: 'in_progress', step: 1, reason: 'Beschluss vom 3. März' });
+      expect(view.success).toHaveBeenCalledWith('Der Zustand ist gesetzt.');
+      expect(view.treeApi.tree).toHaveBeenCalledTimes(2);
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Zustand setzen' })).toBeNull());
+    });
+
+    it('§F/finance/budget/000855: offers each state but the own one and names what a version in force does', async () => {
+      const view = await setup({ perms: PERMS, plans: { 'fy-26': stepped() } });
+      await choose('Zustand setzen');
+      const open = await dialog();
+      expect(await options(open)).toEqual(['Beschluss', 'Genehmigung', 'In Kraft']);
+      await pickState(open, 'In Kraft');
+      expect(within(open).getByText(/Danach ändert nur ein Nachtrag/)).toBeInTheDocument();
+      await userEvent.type(within(open).getByRole('textbox', { name: /Begründung/ }), 'Altbestand{Enter}');
+      fireEvent.submit(open.querySelector('form') as HTMLFormElement);
+      expect(view.api.setStateByHand).toHaveBeenCalledWith('v0', { state: 'in_force', step: null, reason: 'Altbestand' });
+      expect(view.api.setStateByHand).toHaveBeenCalledTimes(1);
+
+      await setup({ perms: PERMS, plans: { 'fy-26': stepped({ state: 'in_progress', steps: passed(1) }) } });
+      await choose('Zustand setzen');
+      expect(await options(await dialog())).toEqual(['Entwurf', 'Beschluss', 'In Kraft']);
+      await setup({ perms: PERMS, plans: { 'fy-26': stepped({ state: 'in_progress', steps: passed(2) }) } });
+      await choose('Zustand setzen');
+      expect(await options(await dialog())).toEqual(['Entwurf', 'Beschluss', 'Genehmigung', 'In Kraft']);
+      await setup({ perms: PERMS, plans: { 'fy-26': stepped({ state: 'in_force', steps: passed(2) }) } });
+      await choose('Zustand setzen');
+      const last = await dialog();
+      expect(await options(last)).toEqual(['Entwurf', 'Beschluss', 'Genehmigung']);
+      await userEvent.click(within(last).getByRole('button', { name: 'Abbrechen' }));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Zustand setzen' })).toBeNull());
+    });
+
+    it('§F/finance/budget/000855: only the own permission, an open year and the newest version offer the action', async () => {
+      await setup({ plans: { 'fy-26': stepped() } });
+      expect(await openMenu()).not.toContain('Zustand setzen');
+      await setup({ perms: PERMS, years: [FY25, fy('fy-26', 2026, { closedAt: '2026-05-01T00:00:00Z' })], plans: { 'fy-26': stepped() } });
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      const two = plan([version({ id: 'old', state: 'in_force' }), version({ id: 'new', number: 1 })]);
+      const view = await setup({ perms: PERMS, plans: { 'fy-26': two }, query: { version: '0' } });
+      expect(view.fixture.componentInstance.canSetState()).toBe(false);
+      await pickChip(/^Version/, '1. Nachtrag');
+      expect(view.fixture.componentInstance.canSetState()).toBe(true);
+      const none = await setup({ perms: PERMS, plans: {} });
+      expect(none.fixture.componentInstance.canSetState()).toBe(false);
+      expect(none.fixture.componentInstance.stateOptions()).toEqual([]);
+      none.fixture.componentInstance.setStateByHand(new Event('submit'));
+      expect(none.api.setStateByHand).not.toHaveBeenCalled();
+    });
+
+    it('§F/finance/budget/000855: a step that was passed by hand says so under its date', async () => {
+      const steps = [{ ...STEPS[0], passedAt: '2026-01-14T00:00:00Z', byHand: true }, STEPS[1]];
+      const view = await setup({ plans: { 'fy-26': stepped({ state: 'in_progress', steps }) } });
+      expect(text(view.container.querySelector('.bp__stepper'))).toContain('14.01.2026 · von Hand');
     });
   });
 });

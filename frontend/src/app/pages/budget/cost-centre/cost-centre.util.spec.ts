@@ -1,18 +1,11 @@
 import { node, TOP } from '../plan/budget-plan.fixtures';
-import { NAME_MAX, activeOnly, costCentreError, findNode, hasSide, keyProblem, pickable, usedIn, withDescendants } from './cost-centre.util';
+import { NAME_MAX, activeOnly, costCentreError, findNode, keyProblem, pickable, usedIn, withDescendants } from './cost-centre.util';
 
 describe('CostCentreUtil', () => {
   it('names the message of a problem code, else the fallback', () => {
     expect(costCentreError('budget_key_exists')).toBe('budget.cc.error.keyExists');
     expect(costCentreError('other')).toBe('budget.cc.error.failed');
     expect(costCentreError('other', 'budget.cc.error.allocation')).toBe('budget.cc.error.allocation');
-  });
-
-  it('gives a side only to a direct child of a budget with a Haushaltsplan', () => {
-    expect(hasSide({ parentId: 'vsm' }, TOP)).toBe(true);
-    expect(hasSide({ parentId: 'staff' }, TOP)).toBe(false);
-    expect(hasSide({ parentId: 'vsm' }, { ...TOP, planEnabled: false })).toBe(false);
-    expect(hasSide({ parentId: 'vsm' }, null)).toBe(false);
   });
 
   it('§F/finance/budget/000246: a key holds only letters and digits and at most 64 characters', () => {

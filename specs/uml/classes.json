@@ -2290,16 +2290,6 @@
           "type": "SMALLINT"
         },
         {
-          "name": "side",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "TEXT",
-          "values": [
-            "income",
-            "expense"
-          ]
-        },
-        {
           "name": "plan_enabled",
           "nullable": false,
           "primaryKey": false,
@@ -2560,6 +2550,16 @@
           "nullable": true,
           "primaryKey": false,
           "type": "TEXT"
+        },
+        {
+          "name": "side",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "income",
+            "expense"
+          ]
         },
         {
           "name": "transferable",

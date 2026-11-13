@@ -19,7 +19,8 @@ scope:
 # A plan version is balanced before the decision
 
 The sum of the income Ansätze must equal the sum of the expense Ansätze when a version
-leaves `draft`. The sums use the direct children of the top-level Kostenstelle. An unequal
+leaves `draft`. The sums use the direct children of the top-level Kostenstelle, each with the side of its line
+in that version (000853). An unequal
 version must answer 422 `plan_not_balanced`.
 
 Reason: LHO § 106 tells the Studierendenschaft to balance income and expenses in the plan.

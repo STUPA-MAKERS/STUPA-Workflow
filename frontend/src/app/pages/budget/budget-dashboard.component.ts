@@ -56,7 +56,7 @@ import { nodeColors, resolveNodeColors } from './budget-color.util';
 import { defaultFiscalYearId } from './fiscal-year.util';
 import { CostCentreCreateComponent, type CostCentreCreated } from './cost-centre/cost-centre-create.component';
 import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
-import { activeOnly, costCentreError, createKey, hasSide, levelKey } from './cost-centre/cost-centre.util';
+import { activeOnly, costCentreError, createKey, levelKey } from './cost-centre/cost-centre.util';
 import { pageItemTitle } from '../../layout/page-title.service';
 import { BudgetPlanApi, type BudgetPlan } from './plan/budget-plan.api';
 import { amountProblem, inForce, memberIds, yearMembers } from './plan/budget-plan.util';
@@ -289,11 +289,18 @@ export class BudgetDashboardComponent {
    * year without a plan. A year with a version in force shows only its Kostenstellen.
    */
   readonly yearPlan = signal<BudgetPlan | null | undefined>(undefined);
-  /** The selected root is a budget and its selected year has no plan, so its
+  /** The selected root is a budget and its selected year has no version in force, so its
    *  Kostenstellen and allocations are set here by hand. */
-  readonly byHand = computed(
-    () => this.canManageStructure() && this.yearPlan() === null && !!this.selectedTop() && !!this.selectedFyId(),
-  );
+  readonly byHand = computed(() => {
+    const plan = this.yearPlan();
+    return (
+      this.canManageStructure() &&
+      plan !== undefined &&
+      !inForce(plan?.versions ?? []) &&
+      !!this.selectedTop() &&
+      !!this.selectedFyId()
+    );
+  });
   private readonly selectedTop = computed(
     () => this.tree().find((n) => n.id === this.selectedBudgetId() && !n.parentId) ?? null,
   );
@@ -318,10 +325,6 @@ export class BudgetDashboardComponent {
   readonly editable = computed(() => this.canManageStructure() && !!this.current()?.parentId);
   /** The allocation of the selected year is set by hand and the year is open. */
   readonly allocatable = computed(() => this.byHand() && !this.selectedYear()?.closedAt);
-  readonly sided = computed(() => {
-    const ks = this.current();
-    return !!ks && hasSide(ks, this.selectedTop());
-  });
 
   /** Roots of the tree: the forest roots of the server response that HAVE a fiscal year.
    *  The full view gives the top budgets; a gremium scope gives the assigned sub cost

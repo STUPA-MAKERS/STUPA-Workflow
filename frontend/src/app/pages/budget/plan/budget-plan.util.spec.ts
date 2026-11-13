@@ -58,8 +58,8 @@ describe('BudgetPlanUtil', () => {
   });
 
   it('§F/finance/budget/000819: offers a Kostenstelle without a line whose parent is in the plan', () => {
-    expect(addable(TOP, version()).map((n) => n.id)).toEqual(['other', 'fees2']);
-    expect(addable(TOP, version({ lines: [] })).map((n) => n.id)).toEqual(['fees', 'other', 'staff', 'grants']);
+    expect(addable(TOP, version()).map((n) => n.id)).toEqual(['other', 'fees2', 'noside']);
+    expect(addable(TOP, version({ lines: [] })).map((n) => n.id)).toEqual(['fees', 'other', 'staff', 'grants', 'noside']);
   });
 
   it('finds the version in force and the version to work on', () => {

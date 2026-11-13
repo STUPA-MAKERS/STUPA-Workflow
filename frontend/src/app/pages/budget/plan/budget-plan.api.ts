@@ -5,7 +5,7 @@ import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
 
-/** The side of a Kostenstelle in a Haushaltsplan. */
+/** The side of a Titel in a version of a Haushaltsplan. */
 export type Side = 'income' | 'expense';
 
 /** The state of a plan version, in the order a version passes them. */
@@ -14,12 +14,24 @@ export type PlanState = 'draft' | 'in_progress' | 'in_force' | 'replaced';
 /** A state a person asks for: into force, or back to the draft. */
 export type PlanTarget = 'draft' | 'in_force';
 
+/** A state that a person with `budget.plan.set_state` sets by hand. */
+export type ManualState = 'draft' | 'in_progress' | 'in_force';
+
+/** The body of a state set by hand. `step` is the place of the step that the version waits for. */
+export interface PlanStateByHand {
+  readonly state: ManualState;
+  readonly step: number | null;
+  readonly reason: string;
+}
+
 /** One step of a budget or of a version. A version keeps the time it passed the step. */
 export interface PlanStep {
   readonly name: string;
   readonly gremiumId: Uuid | null;
   readonly gremiumName?: string | null;
   readonly passedAt?: string | null;
+  /** A person recorded the step by hand, without a decision. */
+  readonly byHand?: boolean;
   /** The vote of the Gremium on this step. A deleted vote leaves the id without a status. */
   readonly voteId?: Uuid | null;
   readonly voteStatus?: 'draft' | 'open' | 'closed' | 'cancelled' | null;
@@ -44,6 +56,8 @@ export interface PlanNodeCreate {
 /** One line of a plan version. Money is a string (Decimal). */
 export interface PlanLine {
   readonly budgetId: Uuid;
+  /** The side of the Titel of the line in this version. `null` while the Titel has none. */
+  readonly side: Side | null;
   readonly amount: string;
   readonly note: string | null;
   /** The name and the path key at the decision. `null` in a draft. */
@@ -76,28 +90,13 @@ export interface BudgetPlan {
 
 /** The body of a line write. A field the body leaves out keeps the value of the line. */
 export interface PlanLineSet {
+  /** The side, for the line of a Titel in a draft. */
+  readonly side?: Side;
   readonly amount?: string;
   readonly note?: string | null;
   readonly transferable?: boolean;
   readonly coverable?: boolean;
   readonly blocked?: string;
-}
-
-/** One allocation that the Stammplan of the plan switch changes. Money is a string. */
-export interface PlanSwitchChange {
-  readonly fiscalYearId: Uuid;
-  readonly year: string;
-  readonly budgetId: Uuid;
-  readonly pathKey: string;
-  readonly name: string;
-  readonly allocated: string;
-  readonly planned: string;
-}
-
-/** What the plan switch changes when it goes on. */
-export interface PlanSwitchPreview {
-  readonly budgetId: Uuid;
-  readonly changes: readonly PlanSwitchChange[];
 }
 
 /** The problem code of a plan read for a year without a plan (404). */
@@ -141,6 +140,11 @@ export class BudgetPlanApi {
     return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/state`, { state });
   }
 
+  /** Set the state of the newest version by hand. Needs `budget.plan.set_state`. */
+  setStateByHand(versionId: Uuid, body: PlanStateByHand): Observable<BudgetPlan> {
+    return this.http.put<BudgetPlan>(`${this.versionUrl(versionId)}/state`, body);
+  }
+
   /** Delete a draft version. The plan goes with it when it has no other version. */
   deleteVersion(versionId: Uuid): Observable<void> {
     return this.http.delete<void>(this.versionUrl(versionId));
@@ -169,22 +173,9 @@ export class BudgetPlanApi {
     return this.http.put<PlanSteps>(`${this.base}/budgets/${topId}/plan-steps`, { steps });
   }
 
-  setSide(budgetId: Uuid, side: Side): Observable<unknown> {
-    return this.http.put(`${this.base}/budgets/${budgetId}/side`, { side });
-  }
-
-  /** The allocations that the Stammplan changes when the plan switch goes on. */
-  switchPreview(topId: Uuid, sides: Readonly<Record<string, Side | ''>> = {}): Observable<PlanSwitchPreview> {
-    const of = (side: Side): string[] => Object.keys(sides).filter((id) => sides[id] === side);
-    return this.http.get<PlanSwitchPreview>(`${this.base}/budgets/${topId}/plan-switch/preview`, {
-      context: skipLoading(),
-      params: { income: of('income'), expense: of('expense') },
-    });
-  }
-
-  /** Set the plan switch. `confirmChanges` says that the person saw the changed allocations. */
-  setPlanSwitch(topId: Uuid, enabled: boolean, confirmChanges = false): Observable<unknown> {
-    return this.http.put(`${this.base}/budgets/${topId}/plan-switch`, { enabled, confirmChanges });
+  /** Set the plan switch. On gives each open fiscal year without a plan a draft. */
+  setPlanSwitch(topId: Uuid, enabled: boolean): Observable<unknown> {
+    return this.http.put(`${this.base}/budgets/${topId}/plan-switch`, { enabled });
   }
 
   private planUrl(topId: Uuid, fiscalYearId: Uuid): string {

@@ -30,6 +30,7 @@ import {
   SearchPillComponent,
   SectionComponent,
   SegmentedComponent,
+  SelectFieldComponent,
   type SelectOption,
   SheetBarComponent,
   SheetBarTitleDirective,
@@ -58,22 +59,26 @@ import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../budget-t
 import { CostCentreCreateComponent, type CostCentreCreated } from '../cost-centre/cost-centre-create.component';
 import { CostCentreSettingsComponent } from '../cost-centre/cost-centre-settings.component';
 import { CostCentreSelectComponent } from '../cost-centre-select/cost-centre-select.component';
-import { costCentreError, createKey, findNode, hasSide, levelKey } from '../cost-centre/cost-centre.util';
+import { costCentreError, createKey, findNode, levelKey } from '../cost-centre/cost-centre.util';
 import { defaultFiscalYearId } from '../fiscal-year.util';
 import {
   BudgetPlanApi,
   type BudgetPlan,
+  type ManualState,
   type PlanLineSet,
   type PlanState,
   type PlanStep,
   type PlanVersion,
+  type Side,
 } from './budget-plan.api';
 import {
+  type PlanGroup,
   type PlanRow,
   addable,
   amountProblem,
   cents,
   currentVersion,
+  groupOf,
   inForce,
   nextStep,
   planRows,
@@ -121,6 +126,7 @@ const ACTIONS = [
   'new',
   'vote',
   'openVote',
+  'setState',
 ] as const;
 type ActionId = (typeof ACTIONS)[number];
 
@@ -152,6 +158,9 @@ const WRITE_ERRORS: Readonly<Record<string, TranslationKey>> = {
   plan_line_node_invalid: 'budget.plan.error.lineNode',
   plan_amount_too_large: 'budget.plan.error.amountTooLarge',
   plan_empty: 'budget.plan.error.empty',
+  plan_side_missing: 'budget.plan.error.sideMissing',
+  plan_step_invalid: 'budget.plan.error.stateInvalid',
+  side_not_settable: 'budget.cc.error.sideNotSettable',
   plan_step_not_next: 'budget.plan.error.stepNotNext',
   plan_in_progress: 'budget.plan.error.inProgress',
   fiscal_year_closed: 'budget.fy.closedError',
@@ -198,6 +207,7 @@ const WIDE_FROM = 10_000_000;
     SearchPillComponent,
     SectionComponent,
     SegmentedComponent,
+    SelectFieldComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
     SideSheetComponent,
@@ -333,15 +343,26 @@ export class BudgetPlanComponent {
   });
   /** The rows of the tables. On a narrow screen the search of the page filters them. */
   private readonly tableRows = computed(() => (this.wide() ? this.rows() : this.listRows()));
-  readonly incomeRows = computed(() => this.tableRows().filter((r) => r.side === 'income'));
-  readonly expenseRows = computed(() => this.tableRows().filter((r) => r.side === 'expense'));
+  /** The rows of the table of a group: a side, or the Titel without one. */
+  rowsOf(group: PlanGroup): readonly PlanRow[] {
+    return this.tableRows().filter((r) => groupOf(r) === group);
+  }
+  readonly groupOf = groupOf;
+  /** A Titel of the version has no side yet, so the version stays a draft. */
+  private readonly unsided = computed(() => this.rows().some((r) => r.side === null));
   readonly incomeTotal = computed(() => sideSum(this.rows(), 'income'));
   readonly expenseTotal = computed(() => sideSum(this.rows(), 'expense'));
   readonly difference = computed(() => (cents(this.incomeTotal()) - cents(this.expenseTotal())) / 100);
   readonly balanced = computed(() => this.difference() === 0);
-  readonly groups = computed(() => [
+  /** The groups of the list and the tables. The Titel without a side stand first, and only while there is one. */
+  readonly groups = computed<readonly { readonly side: PlanGroup; readonly heading: string; readonly total: number | null }[]>(() => [
+    ...(this.unsided() ? [{ side: 'none' as const, heading: this.i18n.translate('budget.plan.side.none'), total: null }] : []),
     { side: 'income' as const, heading: this.i18n.translate('budget.plan.income'), total: this.incomeTotal() },
     { side: 'expense' as const, heading: this.i18n.translate('budget.plan.expense'), total: this.expenseTotal() },
+  ]);
+  readonly sideOptions = computed<SelectOption[]>(() => [
+    { value: 'income', label: this.i18n.translate('budget.plan.side.income') },
+    { value: 'expense', label: this.i18n.translate('budget.plan.side.expense') },
   ]);
 
   /** The rows of the list, filtered by the search text. */
@@ -387,10 +408,6 @@ export class BudgetPlanComponent {
   /** The heading of the section of a node: Titel directly below the Haushalt, else Kostenstelle. */
   levelKey(node: BudgetTreeNode): TranslationKey {
     return levelKey(node, this.top());
-  }
-  /** The row is a direct child of the budget, so it has a side. */
-  sided(node: BudgetTreeNode): boolean {
-    return hasSide(node, this.top());
   }
   /** The parents of a new Kostenstelle: the budget with each Kostenstelle of the version. */
   readonly parentNodes = computed<readonly BudgetTreeNode[]>(() => {
@@ -480,14 +497,12 @@ export class BudgetPlanComponent {
     }
   });
 
-  /** Why the version cannot leave the draft or come into force: no line, or not balanced. */
-  private readonly notReady = computed<string | null>(() =>
-    !this.rows().length
-      ? this.i18n.translate('budget.plan.error.empty')
-      : this.balanced()
-        ? null
-        : this.i18n.translate('budget.plan.error.notBalanced'),
-  );
+  /** Why the version cannot leave the draft or come into force: no line, a Titel without a side, or not balanced. */
+  private readonly notReady = computed<string | null>(() => {
+    if (!this.rows().length) return this.i18n.translate('budget.plan.error.empty');
+    if (this.unsided()) return this.i18n.translate('budget.plan.error.sideMissing');
+    return this.balanced() ? null : this.i18n.translate('budget.plan.error.notBalanced');
+  });
 
   /**
    * The next action of a version that is not in force: the vote of the next step while it
@@ -546,6 +561,7 @@ export class BudgetPlanComponent {
       ...item('openVote', 'budget.plan.action.openVote', 'link', !!this.linkedVote()),
       ...item('backToDraft', 'budget.plan.action.backToDraft', 'undo', this.moves() && state === 'in_progress'),
       ...item('add', 'budget.plan.action.add', 'fileplus', this.editable() && this.addableNodes().length > 0),
+      ...item('setState', 'budget.plan.action.setState', 'edit', this.canSetState()),
     ];
     const draft: RowMenuItem[] =
       this.editable() && this.versions().length > 0
@@ -568,6 +584,37 @@ export class BudgetPlanComponent {
     ];
     return [{ items }];
   }
+
+  /**
+   * The person can set the state of the shown version by hand: the own permission, an open
+   * year and the newest version of the plan.
+   */
+  readonly canSetState = computed(() => {
+    const version = this.version();
+    return (
+      this.auth.can('budget.plan.set_state') &&
+      !this.year()?.closedAt &&
+      !!version &&
+      version.number === Math.max(...this.versions().map((v) => v.number))
+    );
+  });
+  /** The dialog "Zustand setzen": the chosen state and the reason. */
+  readonly stateOpen = signal(false);
+  readonly stateTarget = signal('');
+  readonly stateReason = signal('');
+  /** The states the version can take by hand: the draft, each step, in force, without its own state. */
+  readonly stateOptions = computed<SelectOption[]>(() => {
+    const version = this.version();
+    if (!version) return [];
+    const count = version.steps.length;
+    const passed = version.steps.filter((step) => !!step.passedAt).length;
+    const own = version.state === 'draft' ? 0 : version.state === 'in_force' ? count + 1 : passed < count ? passed + 1 : -1;
+    return [
+      { value: 'draft', label: this.stateLabel('draft') },
+      ...version.steps.map((step, i) => ({ value: `step:${i}`, label: step.name })),
+      { value: 'in_force', label: this.stateLabel('in_force') },
+    ].filter((_, i) => i !== own);
+  });
 
   private readonly voting = computed(() => this.features.isOn('voting'));
   /** The next step names a Gremium and has no vote that waits for its result. */
@@ -991,7 +1038,25 @@ export class BudgetPlanComponent {
       case 'openVote':
         void this.router.navigate(['/voting', this.linkedVote()?.voteId]);
         return;
+      case 'setState':
+        this.stateTarget.set('');
+        this.stateReason.set('');
+        this.stateOpen.set(true);
+        return;
     }
+  }
+
+  /** Save the state of the dialog "Zustand setzen". A version in force sets the allocations, so the tree is read again. */
+  setStateByHand(event: Event): void {
+    event.preventDefault();
+    const version = this.version();
+    const target = this.stateTarget();
+    const reason = this.stateReason().trim();
+    if (!version || !target || !reason || this.busy()) return;
+    const step = target.startsWith('step:') ? Number(target.slice(5)) : null;
+    const state: ManualState = step === null ? (target as ManualState) : 'in_progress';
+    this.stateOpen.set(false);
+    this.write(this.api.setStateByHand(version.id, { state, step, reason }), 'budget.plan.toast.stateSet', () => this.readTree());
   }
 
   /** The person confirmed the open question: run its step. */
@@ -1049,7 +1114,7 @@ export class BudgetPlanComponent {
   }
 
   /**
-   * A setting of a Kostenstelle changed: the names and sides of the rows come from the tree.
+   * A setting of a Kostenstelle changed: the names of the rows come from the tree.
    * A failed read reads the plan again, but not on a page that has not taken its budget from
    * the URL yet, because that would write the URL without its budget and year.
    */
@@ -1119,6 +1184,7 @@ export class BudgetPlanComponent {
     const key = `${version?.id}:${row.id}`;
     const known = { ...row, ...this.lineSent()[key] };
     const same =
+      (change.side === undefined || change.side === known.side) &&
       (change.amount === undefined || Number(change.amount) === Number(known.amount)) &&
       (change.blocked === undefined || Number(change.blocked) === Number(known.blocked)) &&
       (change.note === undefined || (change.note ?? '') === (known.note ?? '')) &&
@@ -1174,6 +1240,16 @@ export class BudgetPlanComponent {
    */
   private kept(row: PlanRow, field: 'transferable' | 'coverable' | 'note'): string {
     return `${row.id}:${field}:${this.version()?.id ?? ''}`;
+  }
+
+  /** The side a select shows: the choice whose save runs, else the saved side. */
+  sideValue(row: PlanRow): Side | null {
+    return this.lineSent()[`${this.version()?.id}:${row.id}`]?.side ?? row.side;
+  }
+
+  /** Save the side of the line of a Titel. The answer holds the lines without the Vermerke that an income side takes off. */
+  saveSide(row: PlanRow, side: string | null): void {
+    if (side === 'income' || side === 'expense') this.saveLine(row, { side });
   }
 
   /** The presses of the Vermerk switches whose save runs, by line and Vermerk. */
@@ -1366,7 +1442,7 @@ export class BudgetPlanComponent {
   }
 
   sideLabel(row: PlanRow): string {
-    return this.i18n.translate(row.side === 'income' ? 'budget.plan.side.income' : 'budget.plan.side.expense');
+    return this.i18n.translate(`budget.plan.side.${groupOf(row)}` as TranslationKey);
   }
 
   money(value: number | null): string {
@@ -1389,7 +1465,10 @@ export class BudgetPlanComponent {
 
   /** Under a step: the date it was passed, else the state of the vote of its Gremium. */
   private stepHint(step: PlanStep): string | null {
-    if (step.passedAt) return this.date(step.passedAt);
+    if (step.passedAt)
+      return step.byHand
+        ? `${this.date(step.passedAt)} · ${this.i18n.translate('budget.plan.step.byHand')}`
+        : this.date(step.passedAt);
     switch (step.voteStatus) {
       case 'draft':
         return this.i18n.translate('budget.plan.vote.draft');

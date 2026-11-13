@@ -43,21 +43,6 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-.ab__changes {
-  margin: var(--space-3) 0 0;
-  padding: 0;
-  list-style: none;
-}
-.ab__change {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--space-1) var(--space-3);
-  padding: var(--space-2) var(--space-3);
-}
-.ab__changeName {
-  overflow-wrap: anywhere;
-}
 .ab__steps {
   display: flex;
   flex-direction: column;

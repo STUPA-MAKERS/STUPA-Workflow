@@ -24,12 +24,12 @@ scope:
 
 The platform must write an audit entry for each new version, each deleted version, each
 state change of a version, each passed step, each vote created for a step, each change of
-the steps of a budget, each change of the plan switch, each change of a side and each
-change of a line. The entry must name the Haushaltsplan, the version and the actor. The
+the steps of a budget, each change of the plan switch, each state set by hand (000855) and
+each change of a line, its side included. The entry must name the Haushaltsplan, the version and the actor. The
 entry of a line must hold the Ansatz before and after, the Erläuterung, the Vermerke, the
 gesperrt amount and each Ansatz of a parent that the change moved. The entry of a version
-that comes into force, and the entry of the plan switch, must hold each allocation that the
-plan changed, with the amount before and after. The entry of a delete that takes plan data
+that comes into force must hold each allocation that the plan changed, with the amount
+before and after. The entry of the plan switch that goes on must name the plans it created. The entry of a delete that takes plan data
 along must name that data: the delete of a fiscal year its plan and versions, the delete of
 a Kostenstelle its draft lines with the Ansatz of each, and the plan switch that goes off
 its deleted versions, and the delete of a top-level Kostenstelle its plans with the
@@ -37,8 +37,8 @@ year and the versions of each. The entry of a version must name the budget by it
 and the year, and the entry of a line the path key and the name of its Kostenstelle. The
 entry of a step, of a vote of a step and of a state change must name the budget and the
 year too, and the plan switch that goes off the year of each deleted plan. The entry of a
-side that takes Vermerke off draft lines (000816) must name those lines with the path key
-and the name of their Kostenstelle. The audit log must show a plan as its budget and its
+line whose new side takes Vermerke off draft lines (000816) must name those lines with the
+path key and the name of their Kostenstelle. The audit log must show a plan as its budget and its
 year and a Kostenstelle by its name. A plan action must not be revertable from the audit log.
 
 Reason: An entry that holds only an id cannot be read after the plan is gone. An examiner must be able to see who changed the plan and when. The plan changes

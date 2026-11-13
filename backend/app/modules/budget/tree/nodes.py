@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Literal, cast
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -16,7 +16,6 @@ from app.modules.audit.actions import AuditAction
 from app.modules.budget import plan_rules, tree_rules
 from app.modules.budget.decision import decision_gremium_of
 from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
-from app.modules.budget.plan_rules import Side
 from app.modules.budget.tree.service_base import (
     BudgetTreeServiceBase,
     _json_safe,
@@ -53,7 +52,6 @@ def _node_out(
         decisionGremiumSourceId=decision[1],
         fiscalStartMonth=b.fiscal_start_month,
         fiscalStartDay=b.fiscal_start_day,
-        side=cast("Side | None", b.side),
         planEnabled=bool(b.plan_enabled),
     )
 
@@ -244,20 +242,6 @@ class NodeOps(BudgetTreeServiceBase):
                 code="budget_key_exists",
             )
         await self._check_gremium(payload.decision_gremium_id, "decisionGremiumId")
-        direct = parent is not None and parent.parent_id is None
-        if payload.side is not None and not direct:
-            raise ValidationProblem(
-                "The side is set on a direct child of a top-level cost centre.",
-                code="side_not_settable",
-                errors=[{"field": "side", "msg": "not a direct child of the top level"}],
-            )
-        side = payload.side if direct else (parent.side if parent is not None else None)
-        if direct and parent is not None and parent.plan_enabled and side is None:
-            raise ValidationProblem(
-                "A cost centre directly below a budget with a Haushaltsplan needs a side.",
-                code="plan_side_missing",
-                errors=[{"field": "side", "msg": "the cost centre has no side"}],
-            )
 
         node = Budget(
             id=uuid.uuid4(),
@@ -272,7 +256,6 @@ class NodeOps(BudgetTreeServiceBase):
             decision_gremium_id=payload.decision_gremium_id,
             fiscal_start_month=payload.fiscal_start_month,
             fiscal_start_day=payload.fiscal_start_day,
-            side=side,
         )
         self.session.add(node)
         try:

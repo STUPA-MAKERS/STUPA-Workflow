@@ -242,6 +242,7 @@ class AuditAction(StrEnum):
     BUDGET_PLAN_VERSION_CREATE = "budget_plan_version_create"
     BUDGET_PLAN_VERSION_DELETE = "budget_plan_version_delete"
     BUDGET_PLAN_STATE = "budget_plan_state"
+    BUDGET_PLAN_STATE_SET = "budget_plan_state_set"
     BUDGET_PLAN_STEPS_SET = "budget_plan_steps_set"
     BUDGET_PLAN_STEP = "budget_plan_step"
     BUDGET_PLAN_STEP_VOTE = "budget_plan_step_vote"

@@ -50,8 +50,6 @@ def test_plan_tools_are_registered() -> None:
     register_all(server)
     names = {tool.name for tool in asyncio.run(server.list_tools())}
     assert {
-        "set_budget_side",
-        "preview_plan_switch",
         "set_plan_switch",
         "get_plan_steps",
         "set_plan_steps",
@@ -70,9 +68,7 @@ def test_plan_tools_are_registered() -> None:
 
 def test_each_plan_tool_calls_its_route(fake_api: _FakeApi) -> None:
     calls = (
-        budget_plan.set_budget_side("n1", "income"),
-        budget_plan.preview_plan_switch("b1"),
-        budget_plan.set_plan_switch("b1", True, confirm_changes=True),
+        budget_plan.set_plan_switch("b1", True),
         budget_plan.get_plan_steps("b1"),
         budget_plan.set_plan_steps("b1", [S.PlanStep(name="Beschluss", gremiumId="g1")]),
         budget_plan.get_budget_plan("b1", "fy1"),
@@ -80,7 +76,7 @@ def test_each_plan_tool_calls_its_route(fake_api: _FakeApi) -> None:
         budget_plan.create_budget_plan("b1", "fy1", copy_from_fiscal_year_id="fy0"),
         budget_plan.create_plan_nachtrag("b1", "fy1"),
         budget_plan.delete_plan_version("v1"),
-        budget_plan.set_plan_line("v1", "n1", S.PlanLineSet(amount="10.00")),
+        budget_plan.set_plan_line("v1", "n1", S.PlanLineSet(amount="10.00", side="income")),
         budget_plan.delete_plan_line("v1", "n1"),
         budget_plan.create_plan_cost_centre(
             "v1", S.PlanNodeCreate(parentId="b1", key="9", name="Sport", side="expense")
@@ -92,9 +88,7 @@ def test_each_plan_tool_calls_its_route(fake_api: _FakeApi) -> None:
     for call in calls:
         asyncio.run(call)
     assert fake_api.calls == [
-        ("PUT", "/budgets/n1/side", {"side": "income"}),
-        ("GET", "/budgets/b1/plan-switch/preview", None),
-        ("PUT", "/budgets/b1/plan-switch", {"enabled": True, "confirmChanges": True}),
+        ("PUT", "/budgets/b1/plan-switch", {"enabled": True}),
         ("GET", "/budgets/b1/plan-steps", None),
         ("PUT", "/budgets/b1/plan-steps", {"steps": [{"name": "Beschluss", "gremiumId": "g1"}]}),
         ("GET", "/budgets/b1/fiscal-years/fy1/plan", None),
@@ -102,7 +96,7 @@ def test_each_plan_tool_calls_its_route(fake_api: _FakeApi) -> None:
         ("POST", "/budgets/b1/fiscal-years/fy1/plan", {"copyFromFiscalYearId": "fy0"}),
         ("POST", "/budgets/b1/fiscal-years/fy1/plan/versions", None),
         ("DELETE", "/budget-plan-versions/v1", None),
-        ("PUT", "/budget-plan-versions/v1/lines/n1", {"amount": "10.00"}),
+        ("PUT", "/budget-plan-versions/v1/lines/n1", {"side": "income", "amount": "10.00"}),
         ("DELETE", "/budget-plan-versions/v1/lines/n1", None),
         (
             "POST",
@@ -113,13 +107,6 @@ def test_each_plan_tool_calls_its_route(fake_api: _FakeApi) -> None:
         ("POST", "/budget-plan-versions/v1/steps/next/vote", None),
         ("POST", "/budget-plan-versions/v1/state", {"state": "in_force"}),
     ]
-
-
-def test_a_cost_centre_takes_its_side_at_the_create(fake_api: _FakeApi) -> None:
-    node = S.BudgetNodeCreate(key="8", name="Zuschüsse", parentId="b1", side="expense")
-    asyncio.run(budget.create_budget(node))
-    (call,) = fake_api.calls
-    assert call[2]["side"] == "expense"
 
 
 def test_a_step_is_named_and_a_vote_finds_its_plan(fake_api: _FakeApi) -> None:

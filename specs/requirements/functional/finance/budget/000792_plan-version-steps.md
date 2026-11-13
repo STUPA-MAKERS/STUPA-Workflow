@@ -26,7 +26,8 @@ A plan version must have one of the states `draft`, `in_progress`, `in_force` an
 step at a time, and the platform must keep the time of each passed step. A version must
 come into force only after its last step. A version without steps must come into force
 from `draft`. A version without a line must not leave `draft` and must not come into force,
-else 422 `plan_empty`. A
+else 422 `plan_empty`. A version starts in `draft` (000854). A person with the permission of
+000855 sets a state by hand, without the steps. A
 version in `in_progress` can move back to `draft`, and the platform must then clear the
 passed steps and end the votes of the steps (000839). A different move must answer 409
 `plan_state_invalid`.

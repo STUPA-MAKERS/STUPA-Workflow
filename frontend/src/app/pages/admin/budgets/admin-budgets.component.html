@@ -103,7 +103,7 @@
   </app-section>
 </ng-template>
 
-<app-dialog [open]="!!editNode() && !switchChanges()" [title]="'admin.budgets.edit' | t" [closeLabel]="'action.close' | t" (closed)="closeEdit()">
+<app-dialog [open]="!!editNode()" [title]="'admin.budgets.edit' | t" [closeLabel]="'action.close' | t" (closed)="closeEdit()">
   @if (form(); as f) {
     <form id="ab-edit-form" class="ab__form" (submit)="$event.preventDefault(); saveEdit()">
       <app-section [heading]="'admin.budgets.col.budget' | t">
@@ -156,24 +156,6 @@
         <app-switch [checked]="f.plan" (checkedChange)="patch({ plan: $event })">{{ 'admin.budgets.planSwitch' | t }}</app-switch>
       </app-section>
       @if (f.plan) {
-        @if (sideNodes().length) {
-          <app-section [heading]="'admin.budgets.sides' | t">
-            <div class="ab__fields">
-              @for (node of sideNodes(); track node.id) {
-                <app-select
-                  [name]="'side-' + node.id"
-                  [label]="node.name"
-                  [required]="true"
-                  [clearable]="false"
-                  [error]="requiredError(f.sides[node.id] || '')"
-                  [options]="sideOptions()"
-                  [ngModel]="f.sides[node.id] || null"
-                  (ngModelChange)="patchSide(node.id, $event)"
-                />
-              }
-            </div>
-          </app-section>
-        }
         <app-section [heading]="'admin.budgets.steps' | t">
           <app-load-state [state]="stepsState()" [lines]="2" [errorText]="'admin.budgets.stepsLoadError' | t" (retry)="loadSteps()">
             <ng-template #content>
@@ -233,26 +215,6 @@
     <app-button variant="fill" (click)="saveEdit()" [disabled]="busy()" [loading]="busy()">{{ 'budget.tree.save' | t }}</app-button>
   </div>
 </app-dialog>
-
-<app-confirm-dialog
-  [open]="!!switchChanges()"
-  [title]="'admin.budgets.switch.title' | t"
-  [body]="'admin.budgets.switch.body' | t"
-  [confirmLabel]="'admin.budgets.switch.confirm' | t"
-  [danger]="false"
-  [busy]="busy()"
-  (confirm)="saveEdit(true)"
-  (cancel)="switchChanges.set(null)"
->
-  <ul class="rowgroup ab__changes">
-    @for (c of switchChanges() ?? []; track c.fiscalYearId + c.budgetId) {
-      <li class="ab__change">
-        <span class="ab__changeName"><span class="mono">{{ c.pathKey | simplifyPath }}</span> {{ c.name }} · {{ c.year }}</span>
-        <span class="mono">{{ money(c.allocated) }} → {{ money(c.planned) }}</span>
-      </li>
-    }
-  </ul>
-</app-confirm-dialog>
 
 <app-confirm-dialog
   [open]="!!deleteTarget()"

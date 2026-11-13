@@ -60,20 +60,15 @@ describe('BudgetPlanApi', () => {
     const body = { parentId: 't', key: '1', name: 'A', side: null, amount: '0' };
     api.createNode('v', body).subscribe();
     expectCall('POST', '/api/budget-plan-versions/v/cost-centres', body);
-    api.setSide('b', 'income').subscribe();
-    expectCall('PUT', '/api/budgets/b/side', { side: 'income' });
     api.setPlanSwitch('t', true).subscribe();
-    expectCall('PUT', '/api/budgets/t/plan-switch', { enabled: true, confirmChanges: false });
-    api.setPlanSwitch('t', true, true).subscribe();
-    expectCall('PUT', '/api/budgets/t/plan-switch', { enabled: true, confirmChanges: true });
-    api.switchPreview('t', { a: 'income', b: 'expense', c: '' }).subscribe();
-    const preview = http.expectOne((r) => r.url === '/api/budgets/t/plan-switch/preview');
-    expect(preview.request.params.getAll('income')).toEqual(['a']);
-    expect(preview.request.params.getAll('expense')).toEqual(['b']);
-    preview.flush({ budgetId: 't', changes: [] });
-    api.switchPreview('t').subscribe();
-    const plain = http.expectOne((r) => r.url === '/api/budgets/t/plan-switch/preview');
-    expect(plain.request.params.getAll('income')).toEqual([]);
-    plain.flush({ budgetId: 't', changes: [] });
+    expectCall('PUT', '/api/budgets/t/plan-switch', { enabled: true });
+    api.setLine('v', 'b', { side: 'income' }).subscribe();
+    expectCall('PUT', '/api/budget-plan-versions/v/lines/b', { side: 'income' });
+  });
+
+  it('§F/finance/budget/000855: sets the state of a version by hand', () => {
+    const body = { state: 'in_progress' as const, step: 1, reason: 'Altbestand' };
+    api.setStateByHand('v', body).subscribe();
+    expectCall('PUT', '/api/budget-plan-versions/v/state', body);
   });
 });

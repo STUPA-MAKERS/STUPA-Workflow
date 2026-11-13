@@ -20,8 +20,8 @@ scope:
 
 The create of a Haushaltsplan can name a different fiscal year of the same budget
 (`copyFromFiscalYearId`). The new Stammplan must then start in `draft` with a copy of the
-lines of the version in force of that year: the Ansatz, the Erläuterung, the Vermerke and
-the gesperrt amount. Each parent of the copy must hold the sum of its children (000794). A
+lines of the version in force of that year: the side (000853), the Ansatz, the Erläuterung,
+the Vermerke and the gesperrt amount. Each parent of the copy must hold the sum of its children (000794). A
 year without a version in force and a year of a different budget must answer 422
 `plan_copy_source_invalid`. For a fiscal year without a plan, the plan page must offer
 "Aus Vorjahr übernehmen" beside "Haushaltsplan anlegen" when the fiscal year before it has

@@ -21,8 +21,7 @@ scope:
 
 The detail of a selected Kostenstelle in the Budget tab must show the section
 "Kostenstelle" with its key, its name, its colour, the switch "Aktiv", the Gremium that
-sees it and the Gremium that decides. For a direct child of a budget with the plan switch
-on, the section must also show the side (000817). When the person selects another
+sees it and the Gremium that decides. The section must show no side (000853). When the person selects another
 Kostenstelle, each field must show the saved value of that Kostenstelle, also after a text
 that was typed and not saved. A person with `budget.structure` must
 change each field there, and the platform must save a field when the person leaves it. An

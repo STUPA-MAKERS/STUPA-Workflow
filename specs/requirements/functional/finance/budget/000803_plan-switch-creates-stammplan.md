@@ -1,16 +1,14 @@
 ---
 id: "000803"
-title: The plan switch gives each open fiscal year a Stammplan
+title: The plan switch gives each open fiscal year a draft
 kind: functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-13
 tests:
-  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_plan_switch_gives_open_years_a_stammplan"
-  - "backend/tests/unit/modules/budget/test_plan_router.py:test_preview_of_the_plan_switch"
-  - "backend/tests/unit/modules/budget/test_plan_rules.py:test_allocation_changes"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_plan_switch_gives_open_years_a_draft"
   - "frontend/src/app/pages/admin/budgets/admin-budgets.component.spec.ts:AdminBudgetsComponent"
-  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_preview_counts_with_sides_that_are_not_saved"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_new_fiscal_year_gets_a_draft"
 implementation:
   - backend/app/modules/budget/tree/plans.py
   - backend/app/modules/budget/plan_rules.py
@@ -21,23 +19,24 @@ scope:
   - frontend/src/app/pages/admin/budgets
 ---
 
-# The plan switch gives each open fiscal year a Stammplan
+# The plan switch gives each open fiscal year a draft
 
-When a person sets the plan switch (000814) of a top-level Kostenstelle to on, the system
-must give each open fiscal year of that Kostenstelle that has no Haushaltsplan a Stammplan
-in the state `in_force`. The Ansatz of a Kostenstelle without a child must equal its
-allocation, and a parent must hold the sum of its children (000794). The Stammplan then
-sets the allocations (000797). When that changes an allocation, the request must answer 409
-`plan_changes_allocations` unless it confirms the changes (`confirmChanges`).
-`GET /budgets/{id}/plan-switch/preview` must name each allocation that changes, with the
-amount before and after. The preview must count with the sides that the request names
-(`income`, `expense`) and must write nothing. The edit form of the budget must show that
-list and ask before it saves anything, the sides included. A closed fiscal year must not get a Haushaltsplan.
+When a person sets the plan switch (000814) of a Haushalt to on, the platform must give
+each open fiscal year of that Haushalt that has no Haushaltsplan a Haushaltsplan with one
+version in `draft` (000854). The Ansatz of a node without a child must equal its
+allocation, and a parent must hold the sum of its children (000794). The switch must
+change no allocation, so the request has no preview and no confirmation, and the edit form
+of the Haushalt asks for nothing. A closed fiscal year must not get a Haushaltsplan.
 
-Reason: A current year needs the plan for a Nachtrag. A closed year does not change. A
-parent whose allocation differs from the sum of its children cannot stay as it is in a
-plan, so the person must see the new amounts first.
+A fiscal year that a person creates for a Haushalt with the switch on must get its draft
+at once. The draft must copy the lines, the Ansätze, the Vermerke and the sides of the
+version in force of the latest fiscal year before it that has one (000837). Without such a
+year the draft must hold a line for each node with an Ansatz of 0 € and no side.
 
-Test: The backend test switches a budget on and reads the plan and the allocations of each year,
-with and without the confirmation. The form test turns the switch on and reads the list of
-changed allocations before a write.
+Reason: A current year needs the plan for a Nachtrag. A closed year does not change. The
+switch brings no plan into force, because no body decided one. The plan of a year starts
+from the plan of the year before.
+
+Test: The backend tests switch a Haushalt on and read the draft and the allocations of each
+year, and create a year before and after a plan in force. The form test turns the switch on
+and reads the requests.

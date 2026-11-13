@@ -272,6 +272,13 @@ class BudgetTreeServiceBase:
                 errors=[{"field": "fiscalStartDay", "msg": str(exc)}],
             ) from exc
 
+    async def _plan_for_new_year(self, top: Budget, fy: FiscalYear) -> None:
+        """Give a new fiscal year what the plan of its budget needs.
+
+        The plan operations replace this, because the fiscal year operations sit below
+        them and cannot call them.
+        """
+
     async def _resolve_fiscal_year(self, node: Budget, fiscal_year_id: UUID | None) -> UUID:
         """Resolve the fiscal year of a node operation.
 

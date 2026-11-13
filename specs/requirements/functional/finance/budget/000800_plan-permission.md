@@ -17,8 +17,9 @@ scope:
 
 # A plan write needs budget.structure
 
-Each write to a Haushaltsplan, a version, a line, the steps, the plan switch or a side must
-need the permission `budget.structure`. A read of a Haushaltsplan, by its fiscal year or by
+Each write to a Haushaltsplan, a version, a line with its side, the steps or the plan switch
+must need the permission `budget.structure`. The state by hand needs `budget.plan.set_state`
+(000855). A read of a Haushaltsplan, by its fiscal year or by
 one of its versions, and a read of the steps must follow the read rule of the top-level
 Kostenstelle of the plan: a person who can see that Kostenstelle can read its plan.
 

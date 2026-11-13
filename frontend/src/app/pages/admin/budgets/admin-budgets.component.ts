@@ -33,14 +33,13 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { SimplifyPathPipe } from '@shared/budget-path';
-import { formatMoney } from '@shared/format-money';
 import type { LoadState } from '@shared/forms/settings-form';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../../budget/budget-tree.api';
 import { ColourFieldComponent, isColour } from '../../budget/cost-centre/colour-field.component';
 import { costCentreError, keyProblem, NAME_MAX } from '../../budget/cost-centre/cost-centre.util';
-import { BudgetPlanApi, type PlanSwitchChange, type Side } from '../../budget/plan/budget-plan.api';
+import { BudgetPlanApi } from '../../budget/plan/budget-plan.api';
 import { AdminApiService } from '../admin-api.service';
 import {
   type StepDraft,
@@ -65,15 +64,12 @@ interface EditForm {
   readonly day: number;
   readonly month: number;
   readonly plan: boolean;
-  /** The side of each Kostenstelle directly below the budget, '' while none is chosen. */
-  readonly sides: Readonly<Record<string, Side | ''>>;
   readonly steps: readonly StepDraft[];
 }
 
 /** The messages of the problem codes of a save of the edit form. */
 const SAVE_ERRORS: Readonly<Record<string, TranslationKey>> = {
   plan_switch_has_plans: 'admin.budgets.error.switchHasPlans',
-  plan_changes_allocations: 'admin.budgets.error.changesAllocations',
   plan_step_limit: 'admin.budgets.error.steps',
 };
 
@@ -87,10 +83,9 @@ const MAX_STEPS = 10;
  *
  * A row opens the edit form of its budget. The form holds the key, the name, the colour,
  * the switch "Aktiv", the two Gremien, the start of the fiscal year, the switch
- * "Haushaltsplan führen" and, while that switch is on, the side of each Kostenstelle directly
- * below the budget and the steps a plan version passes. When the switch goes on and the
- * Stammplan changes an allocation, the page shows the changes and asks first. The menu of a
- * row opens the fiscal years of the budget and deletes the budget.
+ * "Haushaltsplan führen" and, while that switch is on, the steps a plan version passes. The
+ * switch asks for nothing: it gives each open fiscal year a draft and changes no allocation.
+ * The menu of a row opens the fiscal years of the budget and deletes the budget.
  */
 /** The longest name of a step that the server takes. */
 const STEP_NAME_MAX = 120;
@@ -158,19 +153,9 @@ export class AdminBudgetsComponent {
   private savedSteps: readonly StepDraft[] = [];
   /** The read of the steps of the budget in the form: it runs, it failed, or the steps are there. */
   readonly stepsState = signal<LoadState>('ok');
-  /** The sides as the server holds them, to send only a changed side. */
-  private savedSides: Readonly<Record<string, Side | ''>> = {};
   /** The person pressed "Speichern": the fields now show what is missing. */
   readonly showErrors = signal(false);
-  /** The allocations that the Stammplan changes; the save waits for the confirmation. */
-  readonly switchChanges = signal<readonly PlanSwitchChange[] | null>(null);
   readonly canAddStep = computed(() => (this.form()?.steps.length ?? 0) < MAX_STEPS);
-  readonly sideOptions = computed<SelectOption[]>(() => [
-    { value: 'income', label: this.i18n.translate('budget.plan.side.income') },
-    { value: 'expense', label: this.i18n.translate('budget.plan.side.expense') },
-  ]);
-  /** The Kostenstellen directly below the budget of the edit form: each needs a side. */
-  readonly sideNodes = computed(() => this.editNode()?.children ?? []);
   readonly keyError = computed(() => {
     const key = this.form()?.key.trim() ?? '';
     if (keyProblem(key)) return this.i18n.translate('budget.cc.error.keyInvalid');
@@ -203,7 +188,7 @@ export class AdminBudgetsComponent {
       !cutoffProblem('day', form.day) &&
       !cutoffProblem('month', form.month) &&
       (!form.plan ||
-        (form.steps.every((s) => !!s.name.trim() && s.name.trim().length <= STEP_NAME_MAX) && this.sideNodes().every((n) => !!form.sides[n.id])))
+        form.steps.every((s) => !!s.name.trim() && s.name.trim().length <= STEP_NAME_MAX))
     );
   });
 
@@ -379,9 +364,7 @@ export class AdminBudgetsComponent {
   /** Open the edit form of a budget. The steps load with it when the budget has a plan. */
   openEdit(budget: BudgetTreeNode): void {
     this.savedSteps = [];
-    this.savedSides = Object.fromEntries(budget.children.map((n) => [n.id, n.side ?? '']));
     this.showErrors.set(false);
-    this.switchChanges.set(null);
     this.editNode.set(budget);
     this.form.set({
       key: budget.key,
@@ -393,7 +376,6 @@ export class AdminBudgetsComponent {
       day: budget.fiscalStartDay,
       month: budget.fiscalStartMonth,
       plan: !!budget.planEnabled,
-      sides: this.savedSides,
       steps: [],
     });
     this.loadSteps();
@@ -424,11 +406,6 @@ export class AdminBudgetsComponent {
   closeEdit(): void {
     this.editNode.set(null);
     this.form.set(null);
-    this.switchChanges.set(null);
-  }
-
-  patchSide(id: string, side: string | null): void {
-    this.form.update((f) => (f ? { ...f, sides: { ...f.sides, [id]: (side || '') as Side | '' } } : f));
   }
 
   patch(change: Partial<EditForm>): void {
@@ -461,15 +438,12 @@ export class AdminBudgetsComponent {
 
   /**
    * Save the edit form. A form with a missing field saves nothing, shows what is missing and
-   * brings the first such field into view. When the switch goes on and the Stammplan changes
-   * an allocation, the form first reads these changes for the sides of the form and shows
-   * them, and it saves nothing before the person agreed; `confirmed` says that the person
-   * did. The order of the save is: each changed side, then the plan switch when it changed,
-   * then the settings of the budget, then the steps when they changed. A request goes out
-   * only after the one before it succeeded. The deciding Gremium goes out only on a change,
-   * because each sent field is audited.
+   * brings the first such field into view. The order of the save is: the plan switch when it
+   * changed, then the settings of the budget, then the steps when they changed. A request
+   * goes out only after the one before it succeeded. The deciding Gremium goes out only on a
+   * change, because each sent field is audited.
    */
-  saveEdit(confirmed = false): void {
+  saveEdit(): void {
     const node = this.editNode();
     const form = this.form();
     if (!node || !form || this.busy()) return;
@@ -478,45 +452,15 @@ export class AdminBudgetsComponent {
       setTimeout(() => this.host.nativeElement.ownerDocument.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
       return;
     }
-    this.switchChanges.set(null);
-    this.busy.set(true);
-    const preview =
-      form.plan && !node.planEnabled && !confirmed
-        ? this.planApi.switchPreview(node.id, form.sides).pipe(map((p) => p.changes))
-        : of([]);
-    preview.subscribe({
-      next: (changes) => {
-        if (changes.length) {
-          this.busy.set(false);
-          this.switchChanges.set(changes);
-        } else this.saveSides(node, form);
-      },
-      error: (err: unknown) => this.saveFailed(err),
-    });
+    this.saveRest(node, form);
   }
 
-  /** The first part of the save: each changed side, one after the other. */
-  private saveSides(node: BudgetTreeNode, form: EditForm): void {
-    const sides = form.plan
-      ? this.sideNodes().filter((n) => !!form.sides[n.id] && form.sides[n.id] !== this.savedSides[n.id])
-      : [];
-    concat(...sides.map((n) => defer(() => this.planApi.setSide(n.id, form.sides[n.id] as Side))), of(null))
-      .pipe(last())
-      .subscribe({
-        next: () => {
-          this.savedSides = { ...this.savedSides, ...Object.fromEntries(sides.map((n) => [n.id, form.sides[n.id]])) };
-          this.saveRest(node, form);
-        },
-        error: (err: unknown) => this.saveFailed(err),
-      });
-  }
-
-  /** The second part of the save: the plan switch, the settings of the budget, the steps. */
+  /** The requests of the save: the plan switch, the settings of the budget, the steps. */
   private saveRest(node: BudgetTreeNode, form: EditForm): void {
     const steps = stepsToSave(form.steps);
     const sameSteps = JSON.stringify(steps) === JSON.stringify(stepsToSave(this.savedSteps));
     const requests: Observable<unknown>[] = [
-      ...(form.plan !== !!node.planEnabled ? [defer(() => this.planApi.setPlanSwitch(node.id, form.plan, form.plan))] : []),
+      ...(form.plan !== !!node.planEnabled ? [defer(() => this.planApi.setPlanSwitch(node.id, form.plan))] : []),
       defer(() =>
         this.api.updateNode(node.id, {
           key: form.key.trim(),
@@ -564,12 +508,6 @@ export class AdminBudgetsComponent {
       },
       error: () => undefined,
     });
-  }
-
-  /** The Ansatz and the allocation of a change of the plan switch, as money. */
-  money(value: string): string {
-    const amount = Number(value);
-    return formatMoney(amount, this.i18n.formatLocale(), { whole: Number.isInteger(amount) });
   }
 
   /** Delete the budget after the confirmation. A refusal closes the dialog and names its reason. */

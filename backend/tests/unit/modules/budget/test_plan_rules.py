@@ -150,18 +150,17 @@ def test_allocations_from_lines() -> None:
 
 
 def test_with_plan_fields() -> None:
-    """Each node of the forest gets its side, its switch and the years that plan it.
+    """Each node of the forest gets its switch and the years that plan it.
 
     Rule: §F/finance/budget/000818.
     """
     forest = [{"id": 1, "children": [{"id": 2, "children": []}]}]
-    out = plan_rules.with_plan_fields(forest, {2: "income"}, {1: True}, {1: ["fy"], 2: ["fy"]})
+    out = plan_rules.with_plan_fields(forest, {1: True}, {1: ["fy"], 2: ["fy"]})
     assert out == [
         {
-            "id": 1, "side": None, "plan_enabled": True, "planned_in": ("fy",),
+            "id": 1, "plan_enabled": True, "planned_in": ("fy",),
             "children": [
-                {"id": 2, "side": "income", "plan_enabled": False, "planned_in": ("fy",),
-                 "children": []}
+                {"id": 2, "plan_enabled": False, "planned_in": ("fy",), "children": []}
             ],
         }
     ]
@@ -177,16 +176,67 @@ def test_first_child_of() -> None:
     assert plan_rules.first_child_of(top, parent_of, []) is None
 
 
-def test_is_plain_stammplan() -> None:
-    """Only a Stammplan in force without a passed step is a plan of the switch alone.
+def test_is_plain_draft() -> None:
+    """Only a plan with nothing but its first version in draft goes with the switch.
 
     Rule: §F/finance/budget/000814.
     """
-    assert plan_rules.is_plain_stammplan([(0, "in_force", [])])
-    assert not plan_rules.is_plain_stammplan([(0, "in_force", [{"name": "A"}])])
-    assert not plan_rules.is_plain_stammplan([(0, "draft", [])])
-    assert not plan_rules.is_plain_stammplan([(0, "replaced", []), (1, "in_force", [])])
-    assert not plan_rules.is_plain_stammplan([])
+    assert plan_rules.is_plain_draft([(0, "draft")])
+    assert not plan_rules.is_plain_draft([(0, "in_force")])
+    assert not plan_rules.is_plain_draft([(0, "in_progress")])
+    assert not plan_rules.is_plain_draft([(0, "replaced"), (1, "draft")])
+    assert not plan_rules.is_plain_draft([])
+
+
+def test_the_side_of_a_node_is_the_side_of_its_titel() -> None:
+    """§F/finance/budget/000853: a line below a Titel has the side of the Titel."""
+    sides = {INC: "income", EXP: "expense"}
+    assert plan_rules.titel_of(PARENT_OF, TOP, EXP_A1) == EXP
+    assert plan_rules.titel_of(PARENT_OF, TOP, INC) == INC
+    assert plan_rules.titel_of(PARENT_OF, TOP, TOP) is None
+    assert plan_rules.titel_of(PARENT_OF, TOP, uuid.uuid4()) is None
+    assert plan_rules.side_of(PARENT_OF, TOP, sides, EXP_A1) == "expense"
+    assert plan_rules.side_of(PARENT_OF, TOP, sides, TOP) is None
+    assert plan_rules.side_of(PARENT_OF, TOP, {INC: "income"}, EXP_B) is None
+    assert plan_rules.sides_of(PARENT_OF, TOP, {INC: "income"}) == {
+        TOP: None, INC: "income", EXP: None, EXP_A: None, EXP_B: None, EXP_A1: None,
+    }
+
+
+def test_steps_by_hand() -> None:
+    """§F/finance/budget/000855: the steps before the state are passed, the others open."""
+    voted = {**_DONE, "voteId": "v1"}
+    waiting = {**_OPEN, "voteId": "v2"}
+    out = plan_rules.steps_by_hand([voted, waiting, waiting], 2, "now")
+    assert out == [
+        voted,
+        {**_OPEN, "voteId": "v2", "passedAt": "now", "byHand": True},
+        _OPEN,
+    ]
+    assert plan_rules.steps_by_hand([voted, _DONE], 0, "now") == [_OPEN, _OPEN]
+    assert plan_rules.steps_by_hand([], 0, "now") == []
+
+
+@pytest.mark.parametrize(
+    ("state", "step", "count", "passed"),
+    [
+        ("draft", None, 3, 0),
+        ("draft", 0, 3, None),
+        ("in_force", None, 3, 3),
+        ("in_force", None, 0, 0),
+        ("in_force", 2, 3, None),
+        ("in_progress", 0, 3, 0),
+        ("in_progress", 2, 3, 2),
+        ("in_progress", 3, 3, None),
+        ("in_progress", None, 3, None),
+        ("in_progress", 0, 0, None),
+    ],
+)
+def test_manual_passed(
+    state: plan_rules.ManualState, step: int | None, count: int, passed: int | None
+) -> None:
+    """§F/finance/budget/000855: a state by hand names a step only for `in_progress`."""
+    assert plan_rules.manual_passed(state, step, count) == passed
 
 
 def test_allocation_changes() -> None:
