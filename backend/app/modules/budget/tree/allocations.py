@@ -128,6 +128,7 @@ class AllocationOps(BudgetTreeServiceBase):
             ):
                 raise ValidationProblem(
                     "Children allocation would exceed the parent budget.",
+                    code="children_allocation_exceeds_parent",
                     errors=[{"field": "allocated", "msg": "exceeds parent budget"}],
                 )
 
@@ -135,6 +136,7 @@ class AllocationOps(BudgetTreeServiceBase):
         if tree_rules.parent_allocation_below_children(payload.allocated, own_children):
             raise ValidationProblem(
                 "Allocation is below the sum already distributed to children.",
+                code="parent_allocation_below_children",
                 errors=[{"field": "allocated", "msg": "below children allocations"}],
             )
 

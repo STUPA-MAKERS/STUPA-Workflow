@@ -43,7 +43,9 @@ async def create_budget(node: S.BudgetNodeCreate) -> dict:
 
     Set `gremiumId` on a top-level node only. After creation, `parentId` and
     `gremiumId` stay fixed. `decisionGremiumId` names the Gremium that decides on
-    spending from the node and its subtree. Requires budget.structure.
+    spending from the node and its subtree. A direct child of a top-level node whose
+    plan switch is on needs a `side`, else 422 `plan_side_missing`. Requires
+    budget.structure.
     """
     return await api().post("/budgets", json=dump_create(node))
 
@@ -65,7 +67,8 @@ async def update_budget(budget_id: str, patch: S.BudgetNodeUpdate) -> dict:
 async def delete_budget(budget_id: str) -> dict:
     """Delete a cost center node.
 
-    The call fails with a conflict when the node has children.
+    The call fails with a conflict when the node has children, and with 409
+    `budget_in_plan` when a decided version of a Haushaltsplan has a line for it.
     Requires budget.structure.
     """
     return await api().delete(f"/budgets/{budget_id}")
@@ -104,8 +107,9 @@ async def update_fiscal_year(
 async def set_allocation(budget_id: str, fiscal_year_id: str, allocated: str) -> dict:
     """Set the top-down allocation of a cost center for one fiscal year.
 
-    The call gives a 422 when the sum of the children is more than the parent.
-    Requires budget.structure.
+    The call gives a 422 when the sum of the children is more than the parent, and
+    409 `allocation_from_plan` for a fiscal year with a Haushaltsplan: there the plan
+    in force sets the allocations. Requires budget.structure.
 
     Args:
         allocated: The allocated amount as a decimal string.

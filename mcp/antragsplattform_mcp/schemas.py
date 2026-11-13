@@ -416,6 +416,43 @@ class BudgetNodeCreate(WireModel, frozen=True):
         description="Gremium that decides on spending from this node (and from its "
         "subtree unless a descendant sets its own)",
     )
+    side: Literal["income", "expense"] | None = Field(
+        default=None,
+        description="Side in the Haushaltsplan. Only for a direct child of a top-level "
+        "node, and required there when the plan switch of that node is on. A node "
+        "further down takes the side of its parent.",
+    )
+
+
+class PlanLineSet(WireModel, frozen=True):
+    amount: str | None = Field(
+        default=None,
+        description="The Ansatz as a decimal string. Ignored for a cost center with a "
+        "child line: it holds the sum of its children.",
+    )
+    note: str | None = Field(default=None, description="The Erläuterung")
+    transferable: bool | None = Field(default=None, description="Vermerk übertragbar")
+    coverable: bool | None = Field(default=None, description="Vermerk deckungsfähig")
+    blocked: str | None = Field(
+        default=None, description="The gesperrt amount as a decimal string, at most the Ansatz"
+    )
+
+
+class PlanStep(WireModel, frozen=True):
+    name: str
+    gremiumId: str | None = Field(
+        default=None, description="The Gremium that decides this step by a vote"
+    )
+
+
+class PlanNodeCreate(WireModel, frozen=True):
+    parentId: str
+    key: str
+    name: str
+    side: Literal["income", "expense"] | None = Field(
+        default=None, description="Required for a direct child of the top-level node"
+    )
+    amount: str = "0"
 
 
 class BudgetNodeUpdate(WireModel, frozen=True):

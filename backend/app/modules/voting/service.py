@@ -822,6 +822,7 @@ class VotingService:
             proposal=DecisionIn.from_stored(getattr(vote, "proposal", None)),
             repeatOfId=getattr(vote, "repeat_of_id", None),
             attempt=getattr(vote, "attempt", 1) or 1,
+            planVersionId=getattr(vote, "plan_version_id", None),
             **election_mod.election_fields(vote),
             **poll_mod.poll_fields(vote),
         )
@@ -1869,6 +1870,41 @@ class VotingService:
             target_type="vote",
             target_id=str(vote.id),
             data={**self._audit_refs(vote), "reason": reason, "previousStatus": previous},
+        )
+
+    async def end_for_plan_version(self, plan_version_id: UUID, *, actor: str | None) -> None:
+        """End the votes of a plan version that moves back to draft, without a commit.
+
+        A draft vote is deleted, and an open vote is cancelled, because the plan can
+        change again and the Gremium must not decide on the old text. A closed or
+        cancelled vote stays as the record of the Gremium. One statement locks the
+        votes in id order before the first audit entry, for the reason
+        `lock_for_gremium_delete` gives.
+        """
+        rows = (
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(
+                        Vote.plan_version_id == plan_version_id,
+                        Vote.status.in_(("draft", "open")),
+                    )
+                    .order_by(Vote.id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        now = datetime.now(UTC)
+        for vote in rows:
+            if vote.status == "open":
+                await self._mark_cancelled(vote, now=now, actor=actor, reason="plan_to_draft")
+        await self.delete_locked_votes(
+            [vote for vote in rows if vote.status == "draft"],
+            actor=actor or "system",
+            reason="plan_to_draft",
         )
 
     async def cancel_for_application(

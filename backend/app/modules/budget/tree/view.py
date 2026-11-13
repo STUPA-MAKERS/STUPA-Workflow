@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from itertools import groupby
 from typing import Any, Literal
@@ -12,8 +12,9 @@ from sqlalchemy import func, select
 
 from app.modules.applications.models import Application
 from app.modules.budget import plan_rules, tree_rules
+from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
 from app.modules.budget.tree.service_base import _ZERO, BudgetTreeServiceBase
-from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpense
+from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpense, FiscalYear
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import BudgetTreeNodeOut
 from app.modules.flow.models import State
@@ -94,6 +95,38 @@ class TreeViewOps(BudgetTreeServiceBase):
             )
         ).scalars()
         return any(v in member_gremium_ids for v in rows if v is not None)
+
+    async def _planned_in(self) -> Mapping[object, Sequence[object]]:
+        """Return the fiscal years in which the Haushaltsplan counts each cost center.
+
+        A top-level node has the years with a version in force. A node below it has
+        the years whose version in force holds a line for it.
+        """
+        in_force = (
+            select(BudgetPlanVersion.id, BudgetPlan.fiscal_year_id)
+            .join(BudgetPlan, BudgetPlan.id == BudgetPlanVersion.plan_id)
+            .where(BudgetPlanVersion.state == "in_force")
+            .subquery()
+        )
+        tops = (
+            await self.session.execute(
+                select(FiscalYear.budget_id, in_force.c.fiscal_year_id).join(
+                    in_force, in_force.c.fiscal_year_id == FiscalYear.id
+                )
+            )
+        ).all()
+        lines = (
+            await self.session.execute(
+                select(BudgetPlanLine.budget_id, in_force.c.fiscal_year_id).join(
+                    in_force, in_force.c.id == BudgetPlanLine.version_id
+                )
+            )
+        ).all()
+        pairs = [(row[0], row[1]) for row in (*tops, *lines)]
+        return {
+            node: [year for other, year in pairs if other == node]
+            for node in dict.fromkeys(node for node, _year in pairs)
+        }
 
     async def get_tree(
         self,
@@ -209,6 +242,7 @@ class TreeViewOps(BudgetTreeServiceBase):
             plain,
             {n.id: n.side for n in nodes},
             {n.id: bool(n.plan_enabled) for n in nodes},
+            await self._planned_in(),
         )
         scoped = (
             forest

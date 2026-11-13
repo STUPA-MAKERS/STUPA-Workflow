@@ -279,8 +279,9 @@ async def test_create_fiscal_year_duplicate_year() -> None:
     existing = _fy(budget_id=top.id, year=2026)
     sess = fake_session(result(top), result(existing))
     svc = BudgetTreeService(sess)
-    with pytest.raises(ValidationProblem):
+    with pytest.raises(ValidationProblem) as ei:
         await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    assert ei.value.code == "fiscal_year_exists"
 
 
 async def test_update_fiscal_year_active_only() -> None:
@@ -318,8 +319,9 @@ async def test_update_fiscal_year_duplicate_year() -> None:
     other = _fy(id=uuid.uuid4(), budget_id=top.id, year=2027)
     sess = fake_session(result(top), result(fy), result(fy, other))
     svc = BudgetTreeService(sess)
-    with pytest.raises(ValidationProblem):
+    with pytest.raises(ValidationProblem) as ei:
         await svc.update_fiscal_year(top.id, fy.id, FiscalYearUpdate(year=2027))
+    assert ei.value.code == "fiscal_year_exists"
 
 
 async def test_set_allocation_fy_mismatch() -> None:

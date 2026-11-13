@@ -1984,6 +1984,10 @@ async def test_delete_fiscal_year_of_other_budget_404() -> None:
 
 
 async def test_delete_fiscal_year_with_bookings_409() -> None:
+    """A fiscal year with bookings answers 409 fiscal_year_has_bookings.
+
+    Rule: §F/finance/budget/000836.
+    """
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id)
     sess = fake_session(
@@ -1993,10 +1997,15 @@ async def test_delete_fiscal_year_with_bookings_409() -> None:
     with pytest.raises(ConflictError) as ei:
         await svc.delete_fiscal_year(top.id, fy.id)
     assert "bookings" in str(ei.value)
+    assert ei.value.code == "fiscal_year_has_bookings"
     assert sess.deleted == []
 
 
 async def test_delete_fiscal_year_with_allocations_409() -> None:
+    """A fiscal year with allocations answers 409 fiscal_year_has_allocations.
+
+    Rule: §F/finance/budget/000836.
+    """
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id)
     sess = fake_session(
@@ -2006,6 +2015,7 @@ async def test_delete_fiscal_year_with_allocations_409() -> None:
     with pytest.raises(ConflictError) as ei:
         await svc.delete_fiscal_year(top.id, fy.id)
     assert "allocations" in str(ei.value)
+    assert ei.value.code == "fiscal_year_has_allocations"
 
 
 async def test_delete_fiscal_year_with_applications_409() -> None:
@@ -2013,6 +2023,8 @@ async def test_delete_fiscal_year_with_applications_409() -> None:
 
     ``application.fiscal_year_id`` has no cascade, so an unguarded delete would fail on
     the foreign key with a 500.
+
+    Rule: §F/finance/budget/000836.
     """
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id)
@@ -2023,6 +2035,7 @@ async def test_delete_fiscal_year_with_applications_409() -> None:
     with pytest.raises(ConflictError) as ei:
         await svc.delete_fiscal_year(top.id, fy.id)
     assert "applications" in str(ei.value)
+    assert ei.value.code == "fiscal_year_has_applications"
 
 
 def _transfer_pair(*, transfer_id=None, src=None, dst=None, fy=None, actor=None):

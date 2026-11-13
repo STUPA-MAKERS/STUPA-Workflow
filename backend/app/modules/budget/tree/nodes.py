@@ -3,18 +3,25 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, Sequence
+from decimal import Decimal
 from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
-from app.modules.budget import tree_rules
+from app.modules.budget import plan_rules, tree_rules
 from app.modules.budget.decision import decision_gremium_of
-from app.modules.budget.plan_models import BudgetPlanLine, BudgetPlanVersion
+from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
 from app.modules.budget.plan_rules import Side
-from app.modules.budget.tree.service_base import BudgetTreeServiceBase, _json_safe
+from app.modules.budget.tree.service_base import (
+    BudgetTreeServiceBase,
+    _json_safe,
+    _subtree_ids,
+)
 from app.modules.budget.tree_models import Budget, BudgetExpense
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import BudgetNodeCreate, BudgetNodeOut, BudgetNodeUpdate
@@ -51,8 +58,86 @@ def _node_out(
     )
 
 
+def _assign(row: object, **values: object) -> None:
+    """Write column values into an ORM row."""
+    for name, value in values.items():
+        setattr(row, name, value)
+
+
 class NodeOps(BudgetTreeServiceBase):
     """Create, update (with key rename) and delete cost-center nodes."""
+
+    async def _subtree(self, top: Budget) -> list[Budget]:
+        """Return `top` and every node below it."""
+        return list(
+            (await self.session.scalars(select(Budget).where(Budget.id.in_(_subtree_ids(top)))))
+            .all()
+        )
+
+    async def _lines(self, version_id: UUID) -> list[BudgetPlanLine]:
+        return list(
+            (
+                await self.session.scalars(
+                    select(BudgetPlanLine).where(BudgetPlanLine.version_id == version_id)
+                )
+            ).all()
+        )
+
+    @staticmethod
+    def _resum(
+        lines: Sequence[BudgetPlanLine], parent_of: Mapping[UUID, UUID | None]
+    ) -> dict[UUID, Decimal]:
+        """Give each parent among `lines` the sum of its children, and return the changes.
+
+        `lines` are the lines that stay in the version. A blocked amount of a parent
+        falls with its Ansatz.
+
+        Raises:
+            ValidationProblem: `plan_amount_too_large` (422) when a sum passes the
+                largest amount that the database holds.
+        """
+        amounts = {line.budget_id: line.amount for line in lines}
+        sums = plan_rules.summed_amounts(parent_of, amounts)
+        if any(total > plan_rules.MAX_AMOUNT for total in sums.values()):
+            raise ValidationProblem(
+                "The sum of the child cost centres is above the largest amount.",
+                code="plan_amount_too_large",
+                errors=[{"field": "amount", "msg": "the sum of a parent is too large"}],
+            )
+        changed = {bid: total for bid, total in sums.items() if total != amounts[bid]}
+        for line in lines:
+            if line.budget_id in changed:
+                total = changed[line.budget_id]
+                _assign(line, amount=total, blocked=min(line.blocked, total))
+        return changed
+
+    async def _leave_drafts(self, node: Budget) -> None:
+        """Take a cost center that goes away out of the sums of each draft version.
+
+        The delete of the node removes its plan lines through the foreign key. Each
+        parent of a draft version then holds the sum of the children that stay.
+
+        Raises:
+            ConflictError: `fiscal_year_closed` (409) when a draft with a line of the
+                node belongs to a closed fiscal year, because a closed year does not
+                change.
+        """
+        versions = (
+            await self.session.scalars(
+                select(BudgetPlanVersion)
+                .join(BudgetPlanLine, BudgetPlanLine.version_id == BudgetPlanVersion.id)
+                .where(BudgetPlanLine.budget_id == node.id, BudgetPlanVersion.state == "draft")
+            )
+        ).all()
+        if not versions:
+            return
+        parent_of = {n.id: n.parent_id for n in await self._subtree(await self._top_level(node))}
+        for version in versions:
+            plan = await self.session.get_one(BudgetPlan, version.plan_id)
+            self._refuse_closed(await self._get_fiscal_year(plan.fiscal_year_id))
+            self._resum(
+                [ln for ln in await self._lines(version.id) if ln.budget_id != node.id], parent_of
+            )
 
     async def _check_decision_gremium(self, gremium_id: UUID | None) -> None:
         """Refuse a deciding Gremium that does not exist.
@@ -139,6 +224,14 @@ class NodeOps(BudgetTreeServiceBase):
             side=side,
         )
         self.session.add(node)
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise ConflictError(
+                f"budget key {payload.key!r} already exists under this parent",
+                code="budget_key_exists",
+            ) from exc
         await self._audit(
             AuditAction.BUDGET_NODE_CREATE,
             target_type="budget",
@@ -318,6 +411,7 @@ class NodeOps(BudgetTreeServiceBase):
                 "budget is part of a decided Haushaltsplan",
                 code="budget_in_plan",
             )
+        await self._leave_drafts(node)
         await self._audit(
             AuditAction.BUDGET_NODE_DELETE,
             target_type="budget",

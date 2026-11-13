@@ -240,6 +240,7 @@ class AuditAction(StrEnum):
     BUDGET_SIDE_SET = "budget_side_set"
     BUDGET_PLAN_SWITCH = "budget_plan_switch"
     BUDGET_PLAN_VERSION_CREATE = "budget_plan_version_create"
+    BUDGET_PLAN_VERSION_DELETE = "budget_plan_version_delete"
     BUDGET_PLAN_STATE = "budget_plan_state"
     BUDGET_PLAN_STEPS_SET = "budget_plan_steps_set"
     BUDGET_PLAN_STEP = "budget_plan_step"

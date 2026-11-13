@@ -4,19 +4,32 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import AfterValidator, Field, StringConstraints
 
-from app.modules.budget.plan_rules import MAX_STEPS, PlanState, PlanTarget, Side
-from app.shared.schemas import FrozenCamelModel
+from app.modules.budget.plan_rules import MAX_AMOUNT, MAX_STEPS, PlanState, PlanTarget, Side
+from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
-#: The largest value of ``Numeric(12, 2)``: a larger one gives 422, not a 500 from
-#: the database.
-_MAX_AMOUNT = Decimal("9999999999.99")
+VoteStatus = Literal["draft", "open", "closed", "cancelled"]
+VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
+
+_CENT = Decimal("0.01")
+
+#: An amount of a plan line. The validator gives every amount two decimal places, so a
+#: response never shows "7" or "1E+3" for an amount that the database holds as 7.00.
+Amount = Annotated[
+    Decimal,
+    Field(ge=0, le=MAX_AMOUNT, allow_inf_nan=False, decimal_places=2),
+    AfterValidator(lambda value: value.quantize(_CENT)),
+]
+
+#: The name of a step, without blanks around it. A name of blanks only is empty.
+StepName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 
 
-class SideSet(FrozenCamelModel, frozen=True):
+class SideSet(FrozenStrictCamelModel, frozen=True):
     """Set the side of a direct child of a top-level cost center."""
 
     side: Side
@@ -29,10 +42,12 @@ class SideOut(FrozenCamelModel, frozen=True):
     side: Side
 
 
-class PlanSwitchSet(FrozenCamelModel, frozen=True):
+class PlanSwitchSet(FrozenStrictCamelModel, frozen=True):
     """Set the plan switch of a top-level cost center."""
 
     enabled: bool
+    #: The person saw the allocations that the Stammplan changes and agrees.
+    confirm_changes: bool = Field(default=False, alias="confirmChanges")
 
 
 class PlanSwitchOut(FrozenCamelModel, frozen=True):
@@ -42,7 +57,7 @@ class PlanSwitchOut(FrozenCamelModel, frozen=True):
     plan_enabled: bool = Field(alias="planEnabled")
 
 
-class PlanCreate(FrozenCamelModel, frozen=True):
+class PlanCreate(FrozenStrictCamelModel, frozen=True):
     """Create the Haushaltsplan of a fiscal year with a Stammplan in draft.
 
     `copyFromFiscalYearId` names a fiscal year of the same top-level cost center. The
@@ -52,32 +67,54 @@ class PlanCreate(FrozenCamelModel, frozen=True):
     copy_from_fiscal_year_id: UUID | None = Field(default=None, alias="copyFromFiscalYearId")
 
 
-class PlanLineSet(FrozenCamelModel, frozen=True):
-    """Set the line of one cost center in a draft version."""
+class PlanSwitchChange(FrozenCamelModel, frozen=True):
+    """One allocation that the Stammplan of the plan switch changes."""
 
-    amount: Decimal = Field(ge=0, le=_MAX_AMOUNT, allow_inf_nan=False, decimal_places=2)
+    fiscal_year_id: UUID = Field(alias="fiscalYearId")
+    year: str
+    budget_id: UUID = Field(alias="budgetId")
+    path_key: str = Field(alias="pathKey")
+    name: str
+    allocated: Decimal
+    planned: Decimal
+
+
+class PlanSwitchPreview(FrozenCamelModel, frozen=True):
+    """What the plan switch changes when it goes on."""
+
+    budget_id: UUID = Field(alias="budgetId")
+    changes: tuple[PlanSwitchChange, ...] = ()
+
+
+class PlanLineSet(FrozenStrictCamelModel, frozen=True):
+    """Set the line of one cost center in a draft version.
+
+    A field that the request leaves out keeps the value of the line, so two requests
+    that each change one field do not overwrite each other. A new line starts with
+    the defaults.
+    """
+
+    amount: Amount = Decimal("0.00")
     note: str | None = Field(default=None, max_length=4000)
     transferable: bool = False
     coverable: bool = False
-    blocked: Decimal = Field(
-        default=Decimal(0), ge=0, le=_MAX_AMOUNT, allow_inf_nan=False, decimal_places=2
-    )
+    blocked: Amount = Decimal("0.00")
 
 
-class PlanStateSet(FrozenCamelModel, frozen=True):
+class PlanStateSet(FrozenStrictCamelModel, frozen=True):
     """Bring a version into force, or move a version in progress back to draft."""
 
     state: PlanTarget
 
 
-class PlanStepIn(FrozenCamelModel, frozen=True):
+class PlanStepIn(FrozenStrictCamelModel, frozen=True):
     """One step of the list a budget gets."""
 
-    name: str = Field(min_length=1, max_length=120)
+    name: StepName
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
 
 
-class PlanStepsSet(FrozenCamelModel, frozen=True):
+class PlanStepsSet(FrozenStrictCamelModel, frozen=True):
     """Set the ordered steps of a top-level cost center. The list can be empty."""
 
     steps: tuple[PlanStepIn, ...] = Field(default=(), max_length=MAX_STEPS)
@@ -93,8 +130,8 @@ class PlanStepOut(FrozenCamelModel, frozen=True):
     #: The vote of the Gremium on this step, and its status and result. A deleted
     #: vote leaves the id without a status.
     vote_id: UUID | None = Field(default=None, alias="voteId")
-    vote_status: str | None = Field(default=None, alias="voteStatus")
-    vote_result: str | None = Field(default=None, alias="voteResult")
+    vote_status: VoteStatus | None = Field(default=None, alias="voteStatus")
+    vote_result: VoteResult | None = Field(default=None, alias="voteResult")
 
 
 class PlanStepsOut(FrozenCamelModel, frozen=True):
@@ -104,16 +141,14 @@ class PlanStepsOut(FrozenCamelModel, frozen=True):
     steps: tuple[PlanStepOut, ...] = ()
 
 
-class PlanNodeCreate(FrozenCamelModel, frozen=True):
+class PlanNodeCreate(FrozenStrictCamelModel, frozen=True):
     """Create a cost center and its line in a draft version."""
 
     parent_id: UUID = Field(alias="parentId")
     key: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9]+$")
     name: str = Field(min_length=1, max_length=200)
     side: Side | None = None
-    amount: Decimal = Field(
-        default=Decimal(0), ge=0, le=_MAX_AMOUNT, allow_inf_nan=False, decimal_places=2
-    )
+    amount: Amount = Decimal("0.00")
 
 
 class PlanLineOut(FrozenCamelModel, frozen=True):

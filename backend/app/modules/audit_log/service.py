@@ -199,7 +199,9 @@ class AuditLogService(AuditService):
         shows the name of the account it was merged into. A draft attachment has no
         application yet, so its file name stays out of the log view until the create
         binds it. A site-config version has no name column, so its version number is
-        the label: it tells two drafts apart and reads the same in both UI locales.
+        the label: it tells two drafts apart and reads the same in both UI locales. A
+        Haushaltsplan has no name either, so the name of its budget and its fiscal
+        year are the label.
         """
         from app.modules.application_types.models import ApplicationType
         from app.modules.applications.models import Application
@@ -269,7 +271,9 @@ class AuditLogService(AuditService):
                 SiteConfigVersion.id.in_(site_config_ids)
             ),
         )
+        plans = await self._plan_labels(by_type.get("budget_plan", frozenset()))
         pairs = (
+            *((("budget_plan", key), label) for key, label in plans.items()),
             *((("application", str(i)), _application_title(data)) for i, data in applications),
             *_type_label_pairs(types, form_ids, type_ids),
             *((("role", str(i)), _i18n_label(name_i18n) or key) for i, name_i18n, key in roles),
@@ -282,6 +286,20 @@ class AuditLogService(AuditService):
             *((("site_config", str(i)), f"Version {version}") for i, version in site_configs),
         )
         return {key: label for key, label in pairs if label}
+
+    async def _plan_labels(self, plan_ids: frozenset[uuid.UUID]) -> dict[str, str]:
+        """Return `<budget> <year>` for each Haushaltsplan, by its id."""
+        from app.modules.budget.plan_models import BudgetPlan
+        from app.modules.budget.tree_models import Budget, FiscalYear
+
+        rows = await self._rows_for(
+            plan_ids,
+            select(BudgetPlan.id, Budget.name, FiscalYear.year)
+            .join(FiscalYear, FiscalYear.id == BudgetPlan.fiscal_year_id)
+            .join(Budget, Budget.id == FiscalYear.budget_id)
+            .where(BudgetPlan.id.in_(plan_ids)),
+        )
+        return {str(plan_id): f"{name} {year}" for plan_id, name, year in rows}
 
     async def resolve_data_ids(
         self, data_dicts: Sequence[dict[str, Any] | None]
@@ -314,6 +332,8 @@ class AuditLogService(AuditService):
         from app.modules.applications.models import Application
         from app.modules.auth.identity import refs_by_id
         from app.modules.auth.models import Role
+        from app.modules.budget.plan_models import BudgetPlanVersion
+        from app.modules.budget.plan_rules import version_name
         from app.modules.budget.tree_models import Budget, FiscalYear
         from app.modules.files.models import Attachment
         from app.modules.gremien.models import Gremium
@@ -351,8 +371,15 @@ class AuditLogService(AuditService):
             candidates,
             select(FiscalYear.id, FiscalYear.year).where(FiscalYear.id.in_(candidates)),
         )
+        versions = await self._rows_for(
+            candidates,
+            select(BudgetPlanVersion.id, BudgetPlanVersion.number).where(
+                BudgetPlanVersion.id.in_(candidates)
+            ),
+        )
         return _first_wins(
             (
+                *((str(i), version_name(number)) for i, number in versions),
                 *((str(i), _application_title(data)) for i, data in applications),
                 *((str(i), name) for rows in named for i, name in rows),
                 *((str(i), ref.label) for i, ref in principals.items()),

@@ -3,7 +3,8 @@
 A read follows the read rule of the cost center: the full budget view or the gremium
 scope of the top-level node. Each write needs ``budget.structure``. A write in a
 closed fiscal year gives 409 ``fiscal_year_closed``. The service methods do not
-commit, so each write route commits after the method returns.
+commit, so each write route commits after the method returns. The vote of a step is
+the exception: the voting service commits the vote it creates.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from app.modules.budget.plan_schemas import (
     PlanStepsOut,
     PlanStepsSet,
     PlanSwitchOut,
+    PlanSwitchPreview,
     PlanSwitchSet,
     SideOut,
     SideSet,
@@ -61,9 +63,22 @@ async def set_plan_switch(
     When the switch goes on, each open fiscal year without a plan gets a Stammplan in
     force from its allocations.
     """
-    out = await service.set_plan_switch(budget_id, payload.enabled)
+    out = await service.set_plan_switch(
+        budget_id, payload.enabled, confirm_changes=payload.confirm_changes
+    )
     await service.session.commit()
     return out
+
+
+@router.get(
+    "/budgets/{budget_id}/plan-switch/preview",
+    response_model=PlanSwitchPreview,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 422),
+)
+async def preview_plan_switch(budget_id: UUID, service: ServiceDep) -> PlanSwitchPreview:
+    """Return the allocations that change when the plan switch goes on."""
+    return await service.preview_plan_switch(budget_id)
 
 
 @router.get(
@@ -80,6 +95,22 @@ async def get_plan(
     """Return the Haushaltsplan of a fiscal year with every version and its lines."""
     await _require_node_view(service, principal, budget_id)
     return await service.get_plan(budget_id, fiscal_year_id)
+
+
+@router.get(
+    "/budget-plan-versions/{version_id}/plan",
+    response_model=PlanOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def get_plan_of_version(
+    version_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> PlanOut:
+    """Return the Haushaltsplan that holds a version, under the read rule of its budget."""
+    out = await service.plan_of_version(version_id)
+    await _require_node_view(service, principal, out.budget_id)
+    return out
 
 
 @router.post(
@@ -212,6 +243,18 @@ async def create_plan_step_vote(version_id: UUID, service: ServiceDep) -> PlanOu
     out = await service.create_step_vote(version_id)
     await service.session.commit()
     return out
+
+
+@router.delete(
+    "/budget-plan-versions/{version_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 409),
+)
+async def delete_plan_version(version_id: UUID, service: ServiceDep) -> None:
+    """Delete a draft version, and the plan with it when it has no other version."""
+    await service.delete_version(version_id)
+    await service.session.commit()
 
 
 @router.post(

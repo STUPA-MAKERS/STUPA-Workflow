@@ -56,9 +56,9 @@ class BudgetNodeCreate(FrozenCamelModel, frozen=True):
 class BudgetNodeUpdate(FrozenCamelModel, frozen=True):
     """Partially update a cost center.
 
-    The key and the parent stay immutable to keep the path stable. `None` means
-    unchanged. `color=""` clears the color. `fiscalStart*` makes sense at the top
-    level only.
+    The parent stays immutable. A new key makes the path key of the node and of
+    each node below it again. `None` means unchanged. `color=""` clears the
+    color. `fiscalStart*` makes sense at the top level only.
     """
 
     key: str | None = Field(default=None, min_length=1, max_length=64)
@@ -100,8 +100,8 @@ class BudgetNodeOut(FrozenCamelModel, frozen=True):
     )
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
-    #: Side in the Haushaltsplan, the plan switch and the contribution cost center of
-    #: a top-level node. Read only here: the plan routes change them.
+    #: The side in the Haushaltsplan and the plan switch of a top-level node. Read only
+    #: here: the plan routes change them.
     side: Side | None = None
     plan_enabled: bool = Field(default=False, alias="planEnabled")
 
@@ -151,10 +151,14 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     )
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
-    #: Side in the Haushaltsplan, the plan switch and the contribution cost center of
-    #: a top-level node. Read only here: the plan routes change them.
+    #: The side in the Haushaltsplan and the plan switch of a top-level node. Read only
+    #: here: the plan routes change them.
     side: Side | None = None
     plan_enabled: bool = Field(default=False, alias="planEnabled")
+    #: The fiscal years in which the Haushaltsplan counts the node: for a top-level
+    #: node the years with a version in force, for a node below it the years whose
+    #: version in force has a line for it.
+    planned_in: tuple[UUID, ...] = Field(default=(), alias="plannedIn")
     by_fiscal_year: tuple[AllocationView, ...] = Field(
         default_factory=tuple, alias="byFiscalYear"
     )
