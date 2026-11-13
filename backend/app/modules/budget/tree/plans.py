@@ -9,7 +9,7 @@ exception, because the voting service commits the vote it creates.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, assert_never, cast
@@ -906,8 +906,8 @@ class PlanOps(NodeOps, AllocationOps):
             ValidationProblem: `plan_line_node_invalid` (422) for the top-level node
                 or a node of a different tree, `plan_side_missing` (422),
                 `plan_marks_income` (422), `plan_blocked_above_amount` (422),
-                `plan_amount_too_large` (422) when the sum of a parent passes the
-                largest amount.
+                `plan_amount_too_large` (422) when the sum of a parent or of a side
+                passes the largest amount.
         """
         version, plan, _fy, top = await self._version_context(version_id)
         if version.state != "draft":
@@ -952,6 +952,7 @@ class PlanOps(NodeOps, AllocationOps):
             giver.blocked = _ZERO
         kept = {id(ln): ln for ln in (*lines.values(), own, *above)}
         raised = self._resum(list(kept.values()), parent_of)
+        self._refuse_large_side(top, nodes, {ln.budget_id: ln.amount for ln in kept.values()})
         await self._audit(
             AuditAction.BUDGET_PLAN_LINE_SET,
             target_type="budget_plan",
@@ -1129,17 +1130,40 @@ class PlanOps(NodeOps, AllocationOps):
         """Refuse a version whose income Ansätze differ from its expense Ansätze.
 
         Raises:
-            ValidationProblem: `plan_not_balanced` (422).
+            ValidationProblem: `plan_not_balanced` (422), `plan_amount_too_large` (422)
+                when the sum of a side passes the largest amount.
         """
         direct = [(n.side, amounts.get(n.id, _ZERO)) for n in nodes if n.parent_id == top.id]
-        if plan_rules.is_balanced(direct):
-            return
         income, expense = plan_rules.side_sums(direct)
-        raise ValidationProblem(
-            "The plan is not balanced.",
-            code="plan_not_balanced",
-            errors=[{"field": "state", "msg": f"income {income} differs from expenses {expense}"}],
-        )
+        if not plan_rules.is_balanced(direct):
+            raise ValidationProblem(
+                "The plan is not balanced.",
+                code="plan_not_balanced",
+                errors=[
+                    {"field": "state", "msg": f"income {income} differs from expenses {expense}"}
+                ],
+            )
+        self._refuse_large_side(top, nodes, amounts)
+
+    @staticmethod
+    def _refuse_large_side(
+        top: Budget, nodes: Sequence[Budget], amounts: Mapping[UUID, Decimal]
+    ) -> None:
+        """Refuse a plan whose income or expense sum passes the largest amount.
+
+        The top-level cost center gets the expense sum as its allocation when the plan
+        comes into force, and the database holds no larger amount.
+
+        Raises:
+            ValidationProblem: `plan_amount_too_large` (422).
+        """
+        direct = [(n.side, amounts.get(n.id, _ZERO)) for n in nodes if n.parent_id == top.id]
+        if max(plan_rules.side_sums(direct)) > plan_rules.MAX_AMOUNT:
+            raise ValidationProblem(
+                "The sum of a side is above the largest amount.",
+                code="plan_amount_too_large",
+                errors=[{"field": "amount", "msg": "the sum of a side is too large"}],
+            )
 
     @staticmethod
     def _keep_names(lines: list[BudgetPlanLine], nodes: list[Budget]) -> None:

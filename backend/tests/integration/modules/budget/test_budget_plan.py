@@ -508,6 +508,43 @@ async def test_a_sum_above_the_largest_amount_is_refused(session: AsyncSession) 
     assert _code(exc) == "plan_amount_too_large"
 
 
+async def test_a_side_sum_above_the_largest_amount_is_refused(session: AsyncSession) -> None:
+    """A sum of a side that the allocation cannot hold answers 422 at the line and at the state.
+
+    Rule: §F/finance/budget/000794.
+    """
+    t = await _tree(session)
+    more = await t.svc.create_node(
+        BudgetNodeCreate(key="9", name="Sonstiges", parentId=t.top.id, side="expense")
+    )
+    gain = await t.svc.create_node(
+        BudgetNodeCreate(key="2", name="Spenden", parentId=t.top.id, side="income")
+    )
+    vid = _version(await _draft(t)).id
+    largest = D("9999999999.99")
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=largest))
+    await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=largest))
+    await session.commit()
+    with pytest.raises(ValidationProblem) as at_line:
+        await t.svc.set_line(vid, more.id, PlanLineSet(amount=D(1)))
+    assert _code(at_line) == "plan_amount_too_large"
+    await session.rollback()
+    await t.svc.set_line(vid, more.id, PlanLineSet(amount=D(0)))
+    await t.svc.set_line(vid, gain.id, PlanLineSet(amount=D(0)))
+    for node in (more, gain):
+        line = await session.scalar(
+            select(BudgetPlanLine).where(
+                BudgetPlanLine.version_id == vid, BudgetPlanLine.budget_id == node.id
+            )
+        )
+        assert line is not None
+        line.amount = D(1)
+    await session.commit()
+    with pytest.raises(ValidationProblem) as at_state:
+        await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
+    assert _code(at_state) == "plan_amount_too_large"
+
+
 async def test_a_set_line_heals_every_parent_of_the_version(session: AsyncSession) -> None:
     """Each write gives every parent of the version the sum of its children.
 
