@@ -28,22 +28,22 @@
             <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
           } @else if (shown().length) {
             <div class="aid__list" appScrollFade="y" role="radiogroup" [attr.aria-label]="'meetings.agenda.assignableLabel' | t">
-              @for (a of shown(); track a.applicationId) {
-                @let on = pick() === a.applicationId;
+              @for (a of shown(); track a.id) {
+                @let on = pick() === a.id;
                 <label class="aid__row" [class.aid__row--on]="on">
                   <input
                     class="aid__radio"
                     type="radio"
                     name="aid-pick"
-                    [value]="a.applicationId"
+                    [value]="a.id"
                     [checked]="on"
-                    (change)="pick.set(a.applicationId)"
+                    (change)="pick.set(a.id)"
                   />
                   <app-icon class="aid__mark" [name]="on ? 'circleok' : 'circle'" [size]="20" />
                   <span class="aid__text">
-                    <span class="aid__title ell" [appTruncated]="a.title ?? ''" #cut="appTruncated" [attr.title]="cut.truncated() ? a.title ?? '' : null">{{ a.title }}</span>
-                    @if (stateOf(a); as state) {
-                      <span class="aid__sub ell">{{ state }}</span>
+                    <span class="aid__title ell" [appTruncated]="a.title" #cut="appTruncated" [attr.title]="cut.truncated() ? a.title : null">{{ a.title }}</span>
+                    @if (a.sub) {
+                      <span class="aid__sub ell">{{ a.sub }}</span>
                     }
                   </span>
                 </label>

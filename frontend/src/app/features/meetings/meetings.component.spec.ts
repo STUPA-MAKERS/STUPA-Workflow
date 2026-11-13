@@ -1589,6 +1589,8 @@ describe('MeetingsComponent — methods', () => {
         votes: [{ ...cmp.meeting()!.votes[0], agendaItemId: 't-x' }],
       });
       expect(session.canAddVote(AGENDA_ITEM({ id: 't-x', applicationId: 'app-1' }) as never)).toBe(false);
+      expect(session.canAddVote(AGENDA_ITEM({ id: 't-x', applicationId: null, planVersionId: 'pv-1' }) as never)).toBe(false);
+      expect(session.canAddVote(AGENDA_ITEM({ id: 't-y', applicationId: null, planVersionId: 'pv-1' }) as never)).toBe(true);
     });
 
     it('casts a ballot and records the local choice', async () => {

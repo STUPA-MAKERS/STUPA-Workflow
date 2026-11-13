@@ -51,14 +51,16 @@ async def build_meeting_vote(
     """Check the body against the meeting and the agenda item and build the vote.
 
     The admitted guests vote by default in a meeting where guests vote, on a public
-    item, and never in an election unless the lead switches them on. A vote with
+    item, and never in an election unless the lead switches them on. On the item of a
+    Haushaltsplan only the members vote, with the quorum of the Gremium. A vote with
     guests and a poll have no quorum; without an explicit percent the vote inherits
     the percent quorum of the Gremium.
 
     Raises:
         ValidationProblem: Guests cannot vote here (``guests_vote_unavailable``,
             ``guests_vote_non_public``), an election or a poll is on an application
-            item, a motion or an election is open (``open_vote_unavailable``), or a
+            item or on the item of a Haushaltsplan (``plan_item_motion_only``), a motion
+            or an election is open (``open_vote_unavailable``), or a
             candidate account does not exist.
     """
     guests_allowed = meeting.public_join and meeting.guests_mode == "vote"
@@ -87,10 +89,23 @@ async def build_meeting_vote(
             code="poll_on_application_item",
             errors=[{"field": "kind", "msg": "an application agenda item"}],
         )
+    of_plan = getattr(item, "plan_version_id", None) is not None
+    if of_plan and (election or payload.poll is not None):
+        raise ValidationProblem(
+            "The agenda item of a Haushaltsplan takes a motion only.",
+            code="plan_item_motion_only",
+            errors=[{"field": "kind", "msg": "an agenda item of a plan"}],
+        )
+    if of_plan and payload.guests_vote:
+        raise ValidationProblem(
+            "Only the members of the Gremium decide on a Haushaltsplan.",
+            code="guests_vote_unavailable",
+            errors=[{"field": "guestsVote", "msg": "an agenda item of a plan"}],
+        )
     guests_vote = (
         payload.guests_vote
         if payload.guests_vote is not None
-        else guests_allowed and not item.non_public and not election
+        else guests_allowed and not item.non_public and not election and not of_plan
     )
     base: dict[str, object] = (
         {

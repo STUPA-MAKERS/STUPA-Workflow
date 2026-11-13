@@ -127,6 +127,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/meetings/{meeting_id}/agenda"): _LIVE,
     ("POST", "/api/meetings/{meeting_id}/agenda"): _MEETING_WRITE,
     ("GET", "/api/meetings/{meeting_id}/agenda/assignable"): _LIVE,
+    ("GET", "/api/meetings/{meeting_id}/agenda/assignable-plans"): _LIVE,
     ("PUT", "/api/meetings/{meeting_id}/agenda/order"): _MEETING_WRITE,
     ("PATCH", "/api/meetings/{meeting_id}/agenda/{item_id}"): _MEETING_WRITE,
     ("DELETE", "/api/meetings/{meeting_id}/agenda/{item_id}"): _MEETING_WRITE,

@@ -98,6 +98,7 @@ def _item_out(
         id=row.id,
         applicationId=row.application_id,
         todoId=row.todo_id,
+        planVersionId=getattr(row, "plan_version_id", None),
         title=row.title or app_title,
         applicationTitle=app_title,
         body=row.body,
@@ -649,6 +650,58 @@ class AgendaService:
             item=item,
             nonPublic=non_public,
             todoId=str(todo_id),
+        )
+        return item
+
+    async def add_plan_in_tx(
+        self,
+        meeting_id: UUID,
+        *,
+        plan_version_id: UUID,
+        title: str,
+        non_public: bool = False,
+        actor: str | None = None,
+    ) -> MeetingAgendaItem:
+        """Add an agenda item for a version of a Haushaltsplan, without a commit.
+
+        The item has no application; its ``title`` names the plan and its
+        ``plan_version_id`` the version. The caller checks that the version waits for
+        the Gremium of the meeting. A new item writes ``agenda_item_add``.
+
+        Raises:
+            NotFoundError: The meeting does not exist.
+            ConflictError: The meeting is closed (``meeting_closed``), or the version
+                is already on the agenda (``plan_already_on_agenda``).
+        """
+        meeting = await self._meeting(meeting_id, for_update=True)
+        self._assert_agenda_open(meeting)
+        existing = await self.session.scalar(
+            select(MeetingAgendaItem.id).where(
+                MeetingAgendaItem.meeting_id == meeting_id,
+                MeetingAgendaItem.plan_version_id == plan_version_id,
+            )
+        )
+        if existing is not None:
+            raise ConflictError(
+                "the plan is already on the agenda of this meeting",
+                code="plan_already_on_agenda",
+            )
+        item = MeetingAgendaItem(
+            meeting_id=meeting_id,
+            application_id=None,
+            plan_version_id=plan_version_id,
+            title=title,
+            position=await self._next_position(meeting_id),
+            non_public=non_public,
+        )
+        self.session.add(item)
+        await self.session.flush()
+        await self._audit(
+            AuditAction.AGENDA_ITEM_ADD,
+            actor=actor,
+            item=item,
+            nonPublic=non_public,
+            planVersionId=str(plan_version_id),
         )
         return item
 

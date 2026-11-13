@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date as _date
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal
@@ -130,6 +131,9 @@ class PlanStepOut(FrozenCamelModel, frozen=True):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     gremium_name: str | None = Field(default=None, alias="gremiumName")
     passed_at: datetime | None = Field(default=None, alias="passedAt")
+    #: The time a person asked for the decision of the Gremium. The step then waits
+    #: for a meeting of that Gremium.
+    requested_at: datetime | None = Field(default=None, alias="requestedAt")
     #: A person with `budget.plan.set_state` recorded the step, without a decision.
     by_hand: bool = Field(default=False, alias="byHand")
     #: The vote of the Gremium on this step, and its status and result. A deleted
@@ -173,6 +177,29 @@ class PlanLineOut(FrozenCamelModel, frozen=True):
     blocked: Decimal = Decimal(0)
 
 
+class PlanMeetingOut(FrozenCamelModel, frozen=True):
+    """A meeting that has a plan version on its agenda."""
+
+    id: UUID
+    title: str
+    date: _date | None = None
+    status: str
+
+
+class WaitingPlanOut(FrozenCamelModel, frozen=True):
+    """A plan version that waits for the decision of a Gremium, for an agenda."""
+
+    plan_version_id: UUID = Field(alias="planVersionId")
+    budget_name: str = Field(alias="budgetName")
+    #: The fiscal year as the page shows it, `2026` or `2026/27`.
+    fiscal_year: str = Field(alias="fiscalYear")
+    #: The number of the version: 0 for the Haushaltsplan, 1 for the first Nachtrag.
+    number: int
+    step: str
+    #: The title that the agenda item of the plan takes.
+    title: str
+
+
 class PlanVersionOut(FrozenCamelModel, frozen=True):
     """One version of a Haushaltsplan with its lines."""
 
@@ -183,6 +210,8 @@ class PlanVersionOut(FrozenCamelModel, frozen=True):
     in_force_at: datetime | None = Field(default=None, alias="inForceAt")
     #: The steps of the version. A draft shows the steps of its budget, none passed.
     steps: tuple[PlanStepOut, ...] = ()
+    #: The meetings that have the version on their agenda, the newest first.
+    meetings: tuple[PlanMeetingOut, ...] = ()
     lines: tuple[PlanLineOut, ...] = ()
 
 

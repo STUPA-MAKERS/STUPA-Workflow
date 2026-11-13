@@ -435,6 +435,8 @@ export interface AgendaItem {
   readonly applicationId: Uuid | null;
   /** The to-do card that the item was made from, or `null`. */
   readonly todoId?: Uuid | null;
+  /** The version of a Haushaltsplan that the item decides, or `null`. */
+  readonly planVersionId?: Uuid | null;
   /** The own title of the item, else the title of its application. */
   readonly title: string | null;
   /** The title of the application. `null` for a free-text item. */
@@ -456,6 +458,17 @@ export interface AssignableApplication {
   readonly applicationId: Uuid;
   readonly title: string | null;
   readonly stateLabel?: I18nMap | null;
+}
+
+/** `WaitingPlanOut`. A version of a Haushaltsplan that waits for the decision of the Gremium. */
+export interface WaitingPlan {
+  readonly planVersionId: Uuid;
+  readonly budgetName: string;
+  readonly fiscalYear: string;
+  readonly number: number;
+  readonly step: string;
+  /** The title that the agenda item of the plan takes. */
+  readonly title: string;
 }
 
 /** `AltchaChallengeOut`. A server-signed proof-of-work challenge. GET /altcha/challenge. */

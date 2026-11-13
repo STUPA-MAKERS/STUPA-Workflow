@@ -179,7 +179,7 @@
   @if (canAddVote() && top(); as t) {
     <app-button class="mp__addVote" variant="tonal" [block]="true" (click)="voteDialog.emit(t)">
       <app-icon name="plus" />
-      {{ (t.applicationId ? addVoteKey() : 'meetings.vote.addQuestion') | t }}
+      {{ (t.applicationId || t.planVersionId ? addVoteKey() : 'meetings.vote.addQuestion') | t }}
     </app-button>
   }
 </ng-template>

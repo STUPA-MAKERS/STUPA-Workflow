@@ -82,6 +82,8 @@ class AgendaItemOut(FrozenCamelModel, frozen=True):
     application_id: UUID | None = Field(default=None, alias="applicationId")
     #: The to-do card of an item of kind to-do (the item title is the card title).
     todo_id: UUID | None = Field(default=None, alias="todoId")
+    #: The version of a Haushaltsplan that an item of kind plan decides.
+    plan_version_id: UUID | None = Field(default=None, alias="planVersionId")
     #: The title of the item: its own title, else the title of its application.
     title: str | None = None
     #: The title of the application. None for a free-text item.

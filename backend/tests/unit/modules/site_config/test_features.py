@@ -143,8 +143,8 @@ def test_uses_of_keeps_the_uses_of_the_given_features() -> None:
         ("/api/budget-transfers", {Feature.BUDGET}),
         ("/api/budget-plan-versions/{version_id}/state", {Feature.BUDGET}),
         (
-            "/api/budget-plan-versions/{version_id}/steps/next/vote",
-            {Feature.BUDGET, Feature.VOTING},
+            "/api/budget-plan-versions/{version_id}/steps/next/request",
+            {Feature.BUDGET, Feature.VOTING, Feature.MEETINGS},
         ),
         ("/api/expenses/export.xlsx", {Feature.BUDGET}),
         ("/api/applications/{application_id}/assign-budget", {Feature.BUDGET}),

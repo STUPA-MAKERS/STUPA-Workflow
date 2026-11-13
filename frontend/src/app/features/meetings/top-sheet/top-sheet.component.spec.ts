@@ -9,6 +9,7 @@ import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-up
 import { renderDeferred } from '../../../../testing/defer';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem, Meeting, Protocol } from '@core/api/models';
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
 import { AGENDA, meeting, protocol } from '../../../../testing/meeting-fixtures';
@@ -119,6 +120,17 @@ describe('TopSheetComponent', () => {
     const row = link.closest('li');
     expect(row).toHaveTextContent(/Antrag · Abstimmung · 1\.250,00\s€/);
     expect(container.querySelector('app-todo-linked-list li')).toBe(row);
+  });
+
+  /** §F/finance/budget/000838: the item of a plan names its kind and links to the version. */
+  it('shows the Haushaltsplan of a plan item as a row for a reader of the plan', async () => {
+    await setup(
+      { top: { ...AGENDA[0], applicationId: null, planVersionId: 'pv-1', title: 'Haushaltsplan VS-Mittel 2026: Beschluss' }, topIndex: 2 },
+      [{ provide: ApiClient, useValue: { planOfVersionReadable: () => of(true) } }],
+    );
+    expect(screen.getByText(/TOP 3 · Haushaltsplan/)).toBeInTheDocument();
+    const link = await screen.findByRole('link', { name: 'Haushaltsplan VS-Mittel 2026: Beschluss' });
+    expect(link).toHaveAttribute('href', '/budget/plan?planVersion=pv-1');
   });
 
   it('keeps the application row in the participant view', async () => {

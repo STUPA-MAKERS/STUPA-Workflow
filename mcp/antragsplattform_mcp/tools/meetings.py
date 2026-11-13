@@ -288,11 +288,15 @@ async def add_agenda_item(
     application_id: str | None = None,
     title: str | None = None,
     description: str | None = None,
+    plan_version_id: str | None = None,
 ) -> dict:
     """Add an agenda item to a meeting.
 
-    Give EXACTLY ONE of `application_id` for an application item or `title` for a
-    free-text item. `description` goes only with `title`: the text of the new item
+    Give EXACTLY ONE of `application_id` for an application item, `plan_version_id`
+    for a version of a Haushaltsplan that waits for the Gremium of the meeting
+    (`list_assignable_agenda_plans`), or `title` for a free-text item. A plan that
+    does not wait gives 409 `plan_step_not_waiting`, a plan already on this agenda
+    409 `plan_already_on_agenda`. `description` goes only with `title`: the text of the new item
     starts with it as a Markdown block quote, so it goes into the protocol. Requires
     write access to the meeting: session.manage or protocol.write in its gremium, the
     assigned minute-taker, or admin. Only a planned or live meeting takes a new item;
@@ -304,7 +308,12 @@ async def add_agenda_item(
     """
     return await api().post(
         f"/meetings/{meeting_id}/agenda",
-        json=params(applicationId=application_id, title=title, description=description),
+        json=params(
+            applicationId=application_id,
+            planVersionId=plan_version_id,
+            title=title,
+            description=description,
+        ),
     )
 
 
@@ -363,6 +372,16 @@ async def reorder_agenda(meeting_id: str, item_ids: list[str]) -> dict:
 async def list_assignable_agenda_items(meeting_id: str) -> dict:
     """List the applications that you can add as agenda items to this meeting."""
     return await api().get(f"/meetings/{meeting_id}/agenda/assignable")
+
+
+@group.tool
+async def list_assignable_agenda_plans(meeting_id: str) -> dict:
+    """List the versions of a Haushaltsplan that wait for the Gremium of the meeting.
+
+    Each row has `planVersionId`, `budgetName`, `fiscalYear`, `number`, `step` and the
+    `title` of the agenda item. Requires write access to the meeting.
+    """
+    return await api().get(f"/meetings/{meeting_id}/agenda/assignable-plans")
 
 
 @group.tool

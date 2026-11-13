@@ -443,9 +443,9 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  /** An application TOP holds exactly one vote. A freetext TOP holds any number. */
+  /** An application TOP and a plan TOP hold exactly one vote. A freetext TOP holds any number. */
   canAddVote(item: AgendaItem): boolean {
-    return !item.applicationId || this.votesForTop(item.id).length === 0;
+    return !(item.applicationId || item.planVersionId) || this.votesForTop(item.id).length === 0;
   }
 
   /** Re-read an existing protocol with GET, which keeps the write rate limit intact. */

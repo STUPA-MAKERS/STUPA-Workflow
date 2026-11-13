@@ -5,6 +5,6 @@
   "backend/app/modules/budget/tree/expenses.py": 1,
   "backend/app/modules/budget/tree/fiscal_years.py": 1,
   "backend/app/modules/budget/tree/nodes.py": 3,
-  "backend/app/modules/budget/tree/plans.py": 21,
+  "backend/app/modules/budget/tree/plans.py": 20,
   "backend/app/modules/budget/tree/service_base.py": 3
 }

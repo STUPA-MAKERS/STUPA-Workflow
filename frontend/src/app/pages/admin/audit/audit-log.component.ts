@@ -157,6 +157,7 @@ export const AUDIT_ACTIONS = [
   'budget_plan_state_set',
   'budget_plan_steps_set',
   'budget_plan_step',
+  'budget_plan_step_request',
   'budget_plan_step_vote',
   'budget_plan_line_set',
   'backup_create',
