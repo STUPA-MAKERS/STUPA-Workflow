@@ -202,6 +202,7 @@ def test_the_pdf_request_holds_the_table_as_text() -> None:
     assert isinstance(plan, dict)
     assert plan["title"] == "Haushaltsplan VS-Mittel 2026"
     assert plan["mark"] == "Entwurf"
+    assert [pair[0] for pair in plan["head"]] == ["Haushalt", "Haushaltsjahr", "Version", "Stand"]
     assert plan["money"] == [2, 3, 4, 6]
     assert plan["rows"][5] == {
         "kind": "line",

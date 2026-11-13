@@ -1353,12 +1353,12 @@ async def test_a_reader_gets_the_drafts_for_a_reading(session: AsyncSession) -> 
     t = await _tree(session)
     other = await _tree(session)
     foreign = await _tree(session)
-    gremium = await _gremium(session)
+    gremium, viewer = await _gremium(session), await _gremium(session)
     await _steps(t, "Beschluss", gremium_id=gremium)
     await _steps(other, "Beschluss", gremium_id=gremium)
     top = await session.get(Budget, t.top.id)
     assert top is not None
-    top.view_gremium_id = gremium
+    top.view_gremium_id = viewer
     await session.commit()
     vid = _version(await t.svc.get_plan(t.top.id, t.fy.id)).id
     other_vid = _version(await other.svc.get_plan(other.top.id, other.fy.id)).id
@@ -1371,16 +1371,18 @@ async def test_a_reader_gets_the_drafts_for_a_reading(session: AsyncSession) -> 
     assert (every[vid].reading, every[vid].step, every[vid].title) == (
         True, "Lesung", "Haushaltsplan VS-Mittel 2026: Lesung",
     )
-    assert [p.plan_version_id for p in await t.svc.reading_plans(gremium, {gremium})] == [vid]
+    assert [p.plan_version_id for p in await t.svc.reading_plans(gremium, {viewer})] == [vid]
+    members = await t.svc.reading_plans(gremium, {gremium})
+    assert {p.plan_version_id for p in members} == {vid, other_vid}
     assert await t.svc.reading_plans(gremium, set()) == []
     assert await t.svc.reading_plans(uuid.uuid4(), None) == []
 
-    mine = await t.svc.reading_plan(vid, gremium, {gremium})
+    mine = await t.svc.reading_plan(vid, gremium, {viewer})
     assert mine is not None and mine.plan_version_id == vid
     assert (await t.svc.reading_plan(other_vid, gremium, None)) is not None
     assert await t.svc.reading_plan(foreign_vid, gremium, None) is None
     with pytest.raises(ForbiddenError):
-        await t.svc.reading_plan(other_vid, gremium, {gremium})
+        await t.svc.reading_plan(other_vid, gremium, {viewer})
     forced = _version(await _in_force(foreign)).id
     assert await t.svc.reading_plan(forced, gremium, None) is None
     assert await t.svc.reading_plan(uuid.uuid4(), gremium, None) is None

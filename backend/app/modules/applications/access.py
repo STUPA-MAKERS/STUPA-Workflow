@@ -284,13 +284,15 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
     the result does not. Both functions must cover the same three paths:
 
     1. the ``view_gremium_id`` of the cost center of the application and of each of
-       its ancestors (the ``path_key`` prefixes, as ``can_view_node`` reads them);
+       its ancestors (the ``path_key`` prefixes, as ``can_view_node`` reads them), and
+       each Gremium that decides the plan of its Haushalt in a step (spec 000888);
     2. the deciding Gremium of the current vote state (``application.vote_gremium_id``);
     3. the Gremium of each meeting that voted on the application.
 
     The mentionable persons of the comments (`applications/mentions.py`) read this
     set, because a mention must name a person who reads the internal comments.
     """
+    from app.modules.budget.plan_models import BudgetPlanStep
     from app.modules.budget.tree_models import Budget
     from app.modules.budget.tree_rules import _SEP
     from app.modules.meetings.models import Meeting
@@ -318,6 +320,19 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
         if path_key is not None
         else ()
     )
+    deciding = (
+        await db.scalars(
+            select(BudgetPlanStep.gremium_id)
+            .join(Budget, Budget.id == BudgetPlanStep.budget_id)
+            .where(
+                Budget.path_key == prefixes[0],
+                Budget.parent_id.is_(None),
+                Budget.plan_enabled.is_(True),
+            )
+        )
+        if path_key is not None
+        else ()
+    )
     meetings = await db.scalars(
         select(Meeting.gremium_id)
         .join(Vote, Vote.meeting_id == Meeting.id)
@@ -325,7 +340,11 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
         .distinct()
     )
     vote_gremien = {vote_gremium_id} if vote_gremium_id is not None else set[UUID]()
-    return {*vote_gremien, *(v for v in views if v is not None), *meetings}
+    return {
+        *vote_gremien,
+        *(v for v in (*views, *deciding) if v is not None),
+        *meetings,
+    }
 
 
 async def _resolve_with_creator(

@@ -444,15 +444,19 @@ def sheet_rows(export: PlanExport) -> tuple[SheetRow, ...]:
     return (*(row for group in export.groups for row in _group_rows(export, group)), balance)
 
 
-def head_lines(head: ExportHead) -> tuple[tuple[str, str], ...]:
-    """Return the head of a file as pairs of a label and a value."""
+def plan_lines(head: ExportHead) -> tuple[tuple[str, str], ...]:
+    """Return what names the version, as pairs of a label and a value: the head of the PDF."""
     return (
         ("Haushalt", head.budget_name),
         ("Haushaltsjahr", head.fiscal_year),
         ("Version", head.version),
         ("Stand", head.state_label),
-        ("Exportiert am", head.exported_on.strftime("%d.%m.%Y")),
     )
+
+
+def head_lines(head: ExportHead) -> tuple[tuple[str, str], ...]:
+    """Return the head of the XLSX file: what names the version, and the day of the export."""
+    return (*plan_lines(head), ("Exportiert am", head.exported_on.strftime("%d.%m.%Y")))
 
 
 def money(value: Decimal) -> str:
@@ -480,7 +484,7 @@ def pdf_config(export: PlanExport) -> dict[str, object]:
         "plan": {
             "title": export.head.title,
             "mark": export.head.mark,
-            "head": [list(pair) for pair in head_lines(export.head)],
+            "head": [list(pair) for pair in plan_lines(export.head)],
             "headers": list(sheet_headers(export)),
             "money": sorted(money_columns(export)),
             "rows": [

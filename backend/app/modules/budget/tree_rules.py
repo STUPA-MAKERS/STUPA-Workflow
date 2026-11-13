@@ -288,23 +288,23 @@ NodeTuple = tuple[
 ]
 
 
-def scope_forest(forest: list[dict[str, Any]], gremium_ids: set[object]) -> list[dict[str, Any]]:
-    """Scope the forest to the Gremien that may see it.
+def scope_forest(forest: list[dict[str, Any]], root_ids: set[object]) -> list[dict[str, Any]]:
+    """Scope the forest to the subtrees that a reader may see.
 
-    The function returns every subtree whose root carries a `view_gremium_id`
-    from `gremium_ids`. Each such subtree becomes a new tab root. The walk goes
-    depth first. A hit takes its WHOLE subtree, so a nested match is not
+    `root_ids` are the nodes that one of the Gremien of the reader reads. The function
+    returns the subtree of every such node. Each such subtree becomes a new tab root.
+    The walk goes depth first. A hit takes its WHOLE subtree, so a nested match is not
     duplicated. The outer match wins.
     """
-    return [hit for root in forest for hit in _scoped(root, gremium_ids)] if gremium_ids else []
+    return [hit for root in forest for hit in _scoped(root, root_ids)] if root_ids else []
 
 
-def _scoped(node: dict[str, Any], gremium_ids: set[object]) -> tuple[dict[str, Any], ...]:
-    """Return the outermost nodes of the subtree of `node` that a Gremium may see."""
+def _scoped(node: dict[str, Any], root_ids: set[object]) -> tuple[dict[str, Any], ...]:
+    """Return the outermost nodes of the subtree of `node` that the reader may see."""
     return (
         (node,)
-        if node.get("view_gremium_id") in gremium_ids
-        else tuple(hit for child in node.get("children", []) for hit in _scoped(child, gremium_ids))
+        if node.get("id") in root_ids
+        else tuple(hit for child in node.get("children", []) for hit in _scoped(child, root_ids))
     )
 
 
