@@ -85,7 +85,7 @@ def test_step_vote() -> None:
 def test_step_request_and_title() -> None:
     """A version waits for the Gremium of its next step after the request.
 
-    Rule: §F/finance/budget/000856.
+    Rule: §F/finance/budget/000838.
     """
     gremium = uuid.uuid4()
     steps = plan_rules.step_snapshot([("Vorberatung", None), ("Beschluss", gremium)])

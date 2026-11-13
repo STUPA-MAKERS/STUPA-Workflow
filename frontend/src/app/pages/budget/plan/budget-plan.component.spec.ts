@@ -14,7 +14,7 @@ import { AdminApiService } from '../../admin/admin-api.service';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../budget-tree.api';
 import { CostCentreCreateComponent } from '../cost-centre/cost-centre-create.component';
 import { CostCentreSettingsComponent } from '../cost-centre/cost-centre-settings.component';
-import { BudgetPlanApi, type BudgetPlan, type PlanStep } from './budget-plan.api';
+import { BudgetPlanApi, type BudgetPlan, type PlanMeeting, type PlanStep } from './budget-plan.api';
 import { BudgetPlanComponent } from './budget-plan.component';
 import { FY25, FY26, QSM, TOP, fy, line, node, plan, version } from './budget-plan.fixtures';
 
@@ -71,7 +71,7 @@ async function setup(opts: Opts = {}) {
     setState: jest.fn((..._args: unknown[]) => answer()),
     deleteVersion: jest.fn((..._args: unknown[]) => of(undefined)),
     passNextStep: jest.fn((..._args: unknown[]) => answer()),
-    createStepVote: jest.fn((..._args: unknown[]) => answer()),
+    requestStep: jest.fn((..._args: unknown[]) => answer()),
     setStateByHand: jest.fn((..._args: unknown[]) => answer()),
   };
   const treeApi = {
@@ -110,8 +110,13 @@ const STEPS: readonly PlanStep[] = [
   { name: 'Genehmigung', gremiumId: null, passedAt: null },
 ];
 const passed = (count: number) => STEPS.map((s, i) => (i < count ? { ...s, passedAt: `2026-01-${14 + i}T00:00:00Z` } : s));
-const withVote = (voteStatus: PlanStep['voteStatus'], state: 'draft' | 'in_progress' = 'in_progress') =>
-  plan([version({ state, steps: [{ ...STEPS[0], voteId: 'vote-1', voteStatus }, STEPS[1]] })]);
+const ASKED = { ...STEPS[0], requestedAt: '2026-01-10T00:00:00Z' };
+const MEETING: PlanMeeting = { id: 'm1', title: '12. Sitzung', date: '2026-01-20', status: 'planned' };
+/** A version whose first step waits for the StuPa, with the meetings that have it on their agenda. */
+const waiting = (meetings: readonly PlanMeeting[] = []) =>
+  plan([version({ state: 'in_progress', steps: [ASKED, STEPS[1]], meetings })]);
+const withVote = (voteStatus: PlanStep['voteStatus']) =>
+  plan([version({ state: 'in_progress', steps: [{ ...ASKED, voteId: 'vote-1', voteStatus }, STEPS[1]] })]);
 
 const text = (el: Element | null | undefined) => el?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 const texts = (view: View, selector: string) => [...view.container.querySelectorAll(selector)].map(text);
@@ -250,15 +255,12 @@ describe('BudgetPlanComponent', () => {
       expect(primary()).toHaveAttribute('title', 'Der Plan hat keine Zeile.');
     });
 
-    it('§F/finance/budget/000811: an empty draft passes no step and takes no vote', async () => {
+    it('§F/finance/budget/000811: an empty draft passes no step and takes no request', async () => {
       const view = await setup({ plans: { 'fy-26': plan([version({ steps: STEPS, lines: [] })]) } });
+      expect(primary()).toHaveAccessibleName('Beschluss anfragen');
       expect(primary()).toBeDisabled();
       expect(primary()).toHaveAttribute('title', 'Der Plan hat keine Zeile.');
-      await openMenu();
-      const item = screen.getByRole('menuitem', { name: 'Abstimmung anlegen' });
-      expect(item).toHaveAttribute('aria-disabled', 'true');
-      expect(item).toHaveAttribute('title', 'Der Plan hat keine Zeile.');
-      expect(view.api.createStepVote).not.toHaveBeenCalled();
+      expect(view.api.requestStep).not.toHaveBeenCalled();
     });
 
     it('§F/finance/budget/000808: shows the columns of the year before and the change', async () => {
@@ -1173,8 +1175,9 @@ describe('BudgetPlanComponent', () => {
   });
 
   describe('steps', () => {
-    it('§F/finance/budget/000792 §F/finance/budget/000825 §F/finance/budget/000840 §F/finance/budget/000841: passes a step by hand after the confirmation', async () => {
-      const view = await setup({ plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
+    it('§F/finance/budget/000792 §F/finance/budget/000825 §F/finance/budget/000840 §F/finance/budget/000841: passes a step without a Gremium by hand after the confirmation', async () => {
+      const steps = STEPS.map((step) => ({ ...step, gremiumId: null }));
+      const view = await setup({ plans: { 'fy-26': plan([version({ steps })]) } });
       expect(primary()).toHaveAccessibleName('Schritt abschließen: Beschluss');
       await userEvent.click(primary());
       await answerDialog('Schritt abschließen?', 'Abbrechen');
@@ -1233,29 +1236,52 @@ describe('BudgetPlanComponent', () => {
       expect(view.error).toHaveBeenCalledWith('Nur ein Entwurf kann geändert werden.');
     });
 
-    it('§F/finance/budget/000826 §F/finance/budget/000838: creates the vote of the Gremium of the next step from the menu', async () => {
+    it('§F/finance/budget/000838: asks the Gremium of the next step for its decision', async () => {
       const view = await setup({ plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
-      expect(await openMenu()).toEqual(['Abstimmung anlegen', 'Zeile hinzufügen', 'Entwurf löschen']);
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung anlegen' }));
-      expect(view.api.createStepVote).toHaveBeenCalledWith('v0');
-      expect(view.success).toHaveBeenCalledWith('Abstimmung angelegt.');
+      expect(primary()).toHaveAccessibleName('Beschluss anfragen');
+      expect(await openMenu()).toEqual(['Zeile hinzufügen', 'Entwurf löschen']);
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(primary());
+      expect(view.api.requestStep).toHaveBeenCalledWith('v0');
+      expect(view.success).toHaveBeenCalledWith('Beschluss angefragt.');
     });
 
-    it('§F/finance/budget/000826: an unbalanced draft names the cause on the vote', async () => {
+    it('§F/finance/budget/000838: an unbalanced draft names the cause on the request', async () => {
       const draft = version({ steps: STEPS, lines: [line('fees', '100'), line('grants', '130')] });
       const view = await setup({ plans: { 'fy-26': plan([draft]) } });
-      await openMenu();
-      const item = screen.getByRole('menuitem', { name: 'Abstimmung anlegen' });
-      expect(item).toHaveAttribute('aria-disabled', 'true');
-      await userEvent.click(item);
-      expect(view.api.createStepVote).not.toHaveBeenCalled();
+      expect(primary()).toBeDisabled();
+      expect(primary()).toHaveAttribute('title', 'Der Plan ist nicht ausgeglichen.');
+      expect(view.api.requestStep).not.toHaveBeenCalled();
     });
 
-    it('§F/finance/budget/000826 §F/finance/budget/000838: a vote that waits for its result is the next action and opens the vote', async () => {
-      const prepared = await setup({ plans: { 'fy-26': withVote('draft') } });
-      expect(text(prepared.container.querySelector('.bp__stepper'))).toContain('Abstimmung geplant');
-      expect(primary()).toHaveAccessibleName('Zur Abstimmung');
+    it('§F/finance/budget/000838: a request that the server refuses names its cause', async () => {
+      const view = await setup({ plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
+      view.api.requestStep.mockReturnValueOnce(throwError(() => problem(409, 'plan_step_waits')));
+      await userEvent.click(primary());
+      expect(view.error).toHaveBeenCalledWith('Der Beschluss ist schon angefragt.');
+    });
+
+    it('§F/finance/budget/000838: a step that waits shows that it waits for a meeting of its Gremium', async () => {
+      const view = await setup({ plans: { 'fy-26': waiting() } });
+      expect(text(view.container.querySelector('.bp__stepper'))).toContain('Wartet auf eine Sitzung: StuPa');
+      expect(screen.queryByTestId('bp-primary')).toBeNull();
       expect(await openMenu()).toEqual(['Zurück in den Entwurf']);
+    });
+
+    it('§F/finance/budget/000838: a step that waits names each meeting with the plan on its agenda and links to it', async () => {
+      const view = await setup({ plans: { 'fy-26': waiting([MEETING, { ...MEETING, id: 'm2', title: 'Sondersitzung', date: null }]) } });
+      expect(text(view.container.querySelector('.bp__stepper'))).toContain(
+        'Auf der Tagesordnung: 12. Sitzung, 20.01.2026 · Sondersitzung',
+      );
+      expect(primary()).toHaveAccessibleName('Zur Sitzung');
+      expect(await openMenu()).toEqual(['Zur Sitzung „Sondersitzung“', 'Zurück in den Entwurf']);
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Zur Sitzung „Sondersitzung“' }));
+      expect(view.navigate).toHaveBeenCalledWith(['/meetings', 'm2']);
+      await userEvent.click(primary());
+      expect(view.navigate).toHaveBeenCalledWith(['/meetings', 'm1']);
+    });
+
+    it('§F/finance/budget/000838: the open vote of a step is the next action and opens the vote', async () => {
       const open = await setup({ plans: { 'fy-26': withVote('open') } });
       expect(text(open.container.querySelector('.bp__stepper'))).toContain('Abstimmung läuft');
       await userEvent.click(primary());
@@ -1272,35 +1298,24 @@ describe('BudgetPlanComponent', () => {
     it('§F/finance/budget/000838: a reader gets no action that moves the version', async () => {
       await setup({ plans: { 'fy-26': withVote('open') }, perms: ['budget.view'] });
       expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
-      await setup({ plans: { 'fy-26': withVote('closed') }, perms: ['budget.view'] });
+      await setup({ plans: { 'fy-26': waiting() }, perms: ['budget.view'] });
       expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
       await setup({ plans: { 'fy-26': withVote('open') }, perms: ['budget.view'], wide: false, phone: true });
       expect(await openMenu()).toEqual(['Zur Abstimmung']);
     });
 
-    it('§F/finance/budget/000826: after a refused vote the next action is a new vote, and the menu opens the old one', async () => {
-      const view = await setup({ plans: { 'fy-26': withVote('closed') } });
-      expect(text(view.container.querySelector('.bp__stepper'))).toContain('Abgelehnt');
-      expect(primary()).toHaveAccessibleName('Abstimmung anlegen');
-      expect(await openMenu()).toEqual(['Zur Abstimmung', 'Zurück in den Entwurf']);
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Zur Abstimmung' }));
-      expect(view.navigate).toHaveBeenCalledWith(['/voting', 'vote-1']);
-      await userEvent.click(primary());
-      expect(view.api.createStepVote).toHaveBeenCalledWith('v0');
-    });
-
-    it('§F/finance/budget/000826: a cancelled vote leaves the step to pass by hand or by a new vote', async () => {
+    it('§F/finance/budget/000826: a cancelled vote leaves the step waiting for a meeting', async () => {
       const view = await setup({ plans: { 'fy-26': withVote('cancelled') } });
-      expect(text(view.container.querySelector('.bp__stepper'))).not.toContain('Abstimmung');
-      expect(primary()).toHaveAccessibleName('Schritt abschließen: Beschluss');
-      expect(await openMenu()).toEqual(['Abstimmung anlegen', 'Zur Abstimmung', 'Zurück in den Entwurf']);
+      expect(text(view.container.querySelector('.bp__stepper'))).toContain('Wartet auf eine Sitzung: StuPa');
+      expect(await openMenu()).toEqual(['Zur Abstimmung', 'Zurück in den Entwurf']);
     });
 
-    it('§F/finance/budget/000826: offers no vote for a step without a Gremium or with Abstimmungen off', async () => {
+    it('§F/finance/budget/000838: offers no request for a step without a Gremium or with Abstimmungen off', async () => {
       await setup({ plans: { 'fy-26': plan([version({ state: 'in_progress', steps: passed(1) })]) } });
+      expect(primary()).toHaveAccessibleName('Schritt abschließen: Genehmigung');
       expect(await openMenu()).toEqual(['Zurück in den Entwurf']);
       await userEvent.keyboard('{Escape}');
-      await setup({ votingOff: true, plans: { 'fy-26': withVote('open', 'draft') } });
+      await setup({ votingOff: true, plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
       expect(primary()).toHaveAccessibleName('Schritt abschließen: Beschluss');
       expect(await openMenu()).toEqual(['Zeile hinzufügen', 'Entwurf löschen']);
     });

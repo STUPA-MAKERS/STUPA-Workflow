@@ -68,6 +68,7 @@ import {
   type PlanLineSet,
   type PlanState,
   type PlanStep,
+  type PlanMeeting,
   type PlanVersion,
   type Side,
 } from './budget-plan.api';
@@ -124,8 +125,9 @@ const ACTIONS = [
   'nachtrag',
   'add',
   'new',
-  'vote',
+  'request',
   'openVote',
+  'openMeeting',
   'setState',
 ] as const;
 type ActionId = (typeof ACTIONS)[number];
@@ -148,6 +150,7 @@ const WRITE_ERRORS: Readonly<Record<string, TranslationKey>> = {
   plan_no_step_left: 'budget.plan.error.stateInvalid',
   plan_step_no_gremium: 'budget.plan.error.stepNoGremium',
   plan_step_vote_runs: 'budget.plan.error.stepVoteRuns',
+  plan_step_waits: 'budget.plan.error.stepWaits',
   plan_step_has_vote: 'budget.plan.error.stepHasVote',
   plan_exists: 'budget.plan.error.exists',
   plan_draft_exists: 'budget.plan.error.draftExists',
@@ -396,7 +399,7 @@ export class BudgetPlanComponent {
     const version = this.version();
     return [
       { label: this.stateLabel('draft'), hint: null },
-      ...(version?.steps ?? []).map((step) => ({ label: step.name, hint: this.stepHint(step) })),
+      ...(version?.steps ?? []).map((step) => ({ label: step.name, hint: this.stepHint(step, version) })),
       { label: this.stateLabel('in_force'), hint: version?.inForceAt ? this.date(version.inForceAt) : null },
     ];
   });
@@ -515,21 +518,25 @@ export class BudgetPlanComponent {
   });
 
   /**
-   * The next action of a version that is not in force: the vote of the next step while it
-   * waits for its result, a new vote after a refused one, the step by hand, or "In Kraft
-   * setzen" after the last step.
+   * The next action of a version that is not in force: "In Kraft setzen" after the last
+   * step, the way to the open vote or to the meeting of a step that waits for its Gremium,
+   * the request for the decision of a Gremium, or the step by hand.
    */
   private openAction(
     version: PlanVersion,
     action: (id: string, label: string, icon: IconName, reason?: string | null) => PrimaryAction,
     t: (key: TranslationKey) => string,
-  ): PrimaryAction {
+  ): PrimaryAction | null {
     const next = nextStep(version);
     const blocked = this.notReady();
     if (!next) return action('inForce', t('budget.plan.action.inForce'), 'check', blocked);
-    if (this.voting() && voteRuns(next)) return action('openVote', t('budget.plan.action.openVote'), 'vote');
-    if (this.voting() && next.voteStatus === 'closed')
-      return action('vote', t('budget.plan.action.vote'), 'vote', blocked);
+    if (this.voting() && next.voteStatus === 'open') return action('openVote', t('budget.plan.action.openVote'), 'vote');
+    if (this.voting() && next.requestedAt) {
+      const meeting = version.meetings?.[0];
+      return meeting ? action(`openMeeting:${meeting.id}`, t('budget.plan.action.openMeeting'), 'users') : null;
+    }
+    if (this.voting() && next.gremiumId)
+      return action('request', t('budget.plan.action.request'), 'vote', version.state === 'draft' ? blocked : null);
     return action(
       'step',
       this.i18n.translate('budget.plan.action.step', { name: next.name }),
@@ -567,8 +574,9 @@ export class BudgetPlanComponent {
       ...(primary && this.phone()
         ? [{ id: primary.id, label: primary.label, icon: primary.icon, disabledReason: primary.reason }]
         : []),
-      ...item('vote', 'budget.plan.action.vote', 'vote', this.canVote(), state === 'draft' ? blocked : null),
+      ...item('request', 'budget.plan.action.request', 'vote', this.canRequest(), state === 'draft' ? blocked : null),
       ...item('openVote', 'budget.plan.action.openVote', 'link', !!this.linkedVote()),
+      ...this.meetingItems(primary?.id),
       ...item('backToDraft', 'budget.plan.action.backToDraft', 'undo', this.moves() && state === 'in_progress'),
       ...item('add', 'budget.plan.action.add', 'fileplus', this.editable() && this.addableNodes().length > 0),
       ...item('setState', 'budget.plan.action.setState', 'edit', this.canSetState()),
@@ -627,11 +635,29 @@ export class BudgetPlanComponent {
   });
 
   private readonly voting = computed(() => this.features.isOn('voting'));
-  /** The next step names a Gremium and has no vote that waits for its result. */
-  private readonly canVote = computed(() => {
+  /** The next step names a Gremium, and nobody asked for its decision yet. */
+  private readonly canRequest = computed(() => {
     const next = this.next();
-    return this.moves() && this.voting() && !!next?.gremiumId && !voteRuns(next);
+    return this.moves() && this.voting() && !!next?.gremiumId && !next.requestedAt;
   });
+
+  /** One menu entry per meeting that has the version on its agenda, without the one of the head. */
+  private meetingItems(primaryId: string | undefined): RowMenuItem[] {
+    const version = this.version();
+    const waits = !!version && version.state === 'in_progress' && !!nextStep(version)?.requestedAt;
+    return (waits ? (version.meetings ?? []) : [])
+      .map((meeting) => ({
+        id: `openMeeting:${meeting.id}`,
+        label: this.i18n.translate('budget.plan.action.openMeetingNamed', { name: this.meetingName(meeting) }),
+        icon: 'users' as const,
+      }))
+      .filter((entry) => entry.id !== primaryId);
+  }
+
+  /** A meeting as the page names it: its title and its date. */
+  private meetingName(meeting: PlanMeeting): string {
+    return meeting.date ? `${meeting.title}, ${this.date(meeting.date)}` : meeting.title;
+  }
 
   /** The person can move the shown version: the write right, an open year and a version. */
   private readonly moves = computed(() => this.canWrite() && !this.year()?.closedAt && !!this.version());
@@ -1026,7 +1052,8 @@ export class BudgetPlanComponent {
   /** Run an action of the head, of a menu or of the floating button. `row` is its Kostenstelle. */
   onAction(id: string, row: PlanRow | null = this.picked()): void {
     const version = this.version();
-    const action: ActionId | undefined = ACTIONS.find((a) => a === id);
+    const [name, target] = id.split(':');
+    const action: ActionId | undefined = ACTIONS.find((a) => a === name);
     if (!action || this.busy()) return;
     switch (action) {
       case 'createPlan':
@@ -1054,8 +1081,11 @@ export class BudgetPlanComponent {
       case 'new':
         this.createOpen.set(true);
         return;
-      case 'vote':
-        if (version) this.write(this.api.createStepVote(version.id), 'budget.plan.toast.vote');
+      case 'request':
+        if (version) this.write(this.api.requestStep(version.id), 'budget.plan.toast.request');
+        return;
+      case 'openMeeting':
+        void this.router.navigate(['/meetings', target]);
         return;
       case 'openVote':
         void this.router.navigate(['/voting', this.linkedVote()?.voteId]);
@@ -1485,24 +1515,21 @@ export class BudgetPlanComponent {
     return (change > 0 ? '+' : '−') + this.money(Math.abs(change) / 100);
   }
 
-  /** Under a step: the date it was passed, else the state of the vote of its Gremium. */
-  private stepHint(step: PlanStep): string | null {
+  /**
+   * Under a step: the date it was passed, else the open vote, else the meetings that have
+   * the plan on their agenda, else that the step waits for a meeting of its Gremium.
+   */
+  private stepHint(step: PlanStep, version: PlanVersion | null): string | null {
     if (step.passedAt)
       return step.byHand
         ? `${this.date(step.passedAt)} · ${this.i18n.translate('budget.plan.step.byHand')}`
         : this.date(step.passedAt);
-    switch (step.voteStatus) {
-      case 'draft':
-        return this.i18n.translate('budget.plan.vote.draft');
-      case 'open':
-        return this.i18n.translate('budget.plan.vote.open');
-      case 'closed':
-        return this.i18n.translate('budget.plan.vote.refused');
-      case 'cancelled':
-      case null:
-      case undefined:
-        return null;
-    }
+    if (step.voteStatus === 'open') return this.i18n.translate('budget.plan.vote.open');
+    if (!step.requestedAt || version?.state !== 'in_progress') return null;
+    const meetings = (version.meetings ?? []).map((meeting) => this.meetingName(meeting));
+    return meetings.length
+      ? this.i18n.translate('budget.plan.step.onAgenda', { meetings: meetings.join(' · ') })
+      : this.i18n.translate('budget.plan.step.waits', { gremium: step.gremiumName ?? '' });
   }
 
   private date(iso: string | null | undefined): string {

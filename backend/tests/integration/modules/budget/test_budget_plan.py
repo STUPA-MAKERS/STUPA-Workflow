@@ -1122,7 +1122,7 @@ async def _decide(
 async def test_a_step_waits_for_its_gremium_after_the_request(session: AsyncSession) -> None:
     """The request creates no vote, and the plan then waits for a meeting of the Gremium.
 
-    Rules: §F/finance/budget/000856, §F/finance/budget/000802.
+    Rules: §F/finance/budget/000838, §F/finance/budget/000802.
     """
     t = await _tree(session)
     gremium, other = await _gremium(session), await _gremium(session)
@@ -1176,7 +1176,7 @@ async def test_a_step_waits_for_its_gremium_after_the_request(session: AsyncSess
 async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSession) -> None:
     """The vote of a meeting of the Gremium decides the step, and the accepted vote passes it.
 
-    Rules: §F/finance/budget/000826, §F/finance/budget/000856, §F/finance/budget/000802.
+    Rules: §F/finance/budget/000826, §F/finance/budget/000838, §F/finance/budget/000802.
     """
     t = await _tree(session)
     gremium = await _gremium(session)
@@ -1224,7 +1224,7 @@ async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSes
 async def test_a_refused_vote_sends_the_version_back_to_the_draft(session: AsyncSession) -> None:
     """A refused vote opens each passed step again, and the version is a draft again.
 
-    Rules: §F/finance/budget/000826, §F/finance/budget/000856.
+    Rules: §F/finance/budget/000826, §F/finance/budget/000838.
     """
     t = await _tree(session)
     gremium = await _gremium(session)
@@ -1268,7 +1268,7 @@ async def test_a_refused_vote_sends_the_version_back_to_the_draft(session: Async
 async def test_a_plan_vote_opens_only_while_its_step_waits(session: AsyncSession) -> None:
     """The open of a plan vote needs a meeting and a step that waits for its Gremium.
 
-    Rule: §F/finance/budget/000856.
+    Rule: §F/finance/budget/000838.
     """
     t = await _tree(session)
     gremium, other = await _gremium(session), await _gremium(session)
@@ -1370,7 +1370,7 @@ async def test_a_step_with_a_vote_is_not_recorded_by_hand(session: AsyncSession)
 async def test_a_step_of_a_deleted_gremium_takes_no_request(session: AsyncSession) -> None:
     """A step whose Gremium is gone answers 422 plan_step_no_gremium to a request.
 
-    Rule: §F/finance/budget/000856.
+    Rule: §F/finance/budget/000838.
     """
     t = await _tree(session)
     gremium = await _gremium(session)

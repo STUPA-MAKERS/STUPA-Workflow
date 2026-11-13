@@ -303,7 +303,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000835](requirements/functional/finance/budget/000835_plan-version-delete.md) | A draft version can be deleted | draft |
 | [F/finance/budget/000836](requirements/functional/finance/budget/000836_fiscal-year-delete-with-plan.md) | A fiscal year with a decided plan cannot be deleted | draft |
 | [F/finance/budget/000837](requirements/functional/finance/budget/000837_plan-copy-from-year.md) | A new plan can copy the plan of another year | draft |
-| [F/finance/budget/000838](requirements/functional/finance/budget/000838_plan-step-vote.md) | The vote of a plan step is a vote of its Gremium | draft |
+| [F/finance/budget/000838](requirements/functional/finance/budget/000838_plan-step-vote.md) | The vote of a plan step runs in a meeting of its Gremium | draft |
 | [F/finance/budget/000839](requirements/functional/finance/budget/000839_plan-back-to-draft-ends-votes.md) | A version back in draft ends the votes of its steps | draft |
 | [F/finance/budget/000840](requirements/functional/finance/budget/000840_plan-page-confirmations.md) | The plan page asks before an action that binds or deletes | draft |
 | [F/finance/budget/000841](requirements/functional/finance/budget/000841_plan-step-named.md) | A request that records a step names the step | draft |

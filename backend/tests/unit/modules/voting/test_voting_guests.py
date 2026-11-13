@@ -170,7 +170,7 @@ async def test_close_fixes_attendance(
     )
     guest_rows = [result(*[uuid4() for _ in range(7)]), result()] if guests_vote else []
     db = fake_session(result(vote), result("yes", "yes", "no"), *guest_rows)
-    db.scalar_results = [None, 19] if guests_vote else [19, 7]
+    db.scalar_results = [None, 19] if guests_vote else [None, 19, 7]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.result == "passed"
     assert (vote.present_members, vote.present_guests) == (19, 7)

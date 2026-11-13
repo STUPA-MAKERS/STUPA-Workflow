@@ -1051,7 +1051,7 @@ describe('VoteCastComponent', () => {
     });
   });
 
-  describe('vote on a step of a Haushaltsplan (§F/finance/budget/000826, §F/finance/budget/000838)', () => {
+  describe('vote on a step of a Haushaltsplan (§F/finance/budget/000838)', () => {
     const planVote = (over: Partial<Vote> = {}) =>
       vote({ meetingId: null, agendaItemId: null, applicationId: null, planVersionId: 'pv1', status: 'draft', ...over });
 
@@ -1069,30 +1069,13 @@ describe('VoteCastComponent', () => {
       return screen.getAllByRole('menuitem').map((i) => i.textContent?.trim());
     };
 
-    it('starts the prepared vote from the menu', async () => {
-      const view = await withPlan(planVote());
-      expect(view.planOfVersionReadable).toHaveBeenCalledWith('pv1');
-      expect(await items()).toEqual(['Haushaltsplan öffnen', 'Abstimmung starten', 'Abstimmung löschen']);
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung starten' }));
-      expect(view.api['openVote']).toHaveBeenCalledWith('v1');
-      expect(view.toast.success).toHaveBeenCalledWith('Abstimmung gestartet.');
-      expect(view.page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'updated' });
-    });
-
-    it('closes the open vote from the menu', async () => {
-      const view = await withPlan(planVote({ status: 'open' }));
-      expect(await items()).toEqual(['Haushaltsplan öffnen', 'Abstimmung beenden']);
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung beenden' }));
-      expect(view.api['closeVote']).toHaveBeenCalledWith('v1');
-      expect(view.toast.success).toHaveBeenCalledWith('Abstimmung beendet.');
-    });
-
-    it('says why the vote cannot close', async () => {
-      const view = await withPlan(planVote({ status: 'open' }), { fail: true });
-      await items();
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung beenden' }));
-      expect(view.toast.error).toHaveBeenCalled();
-      expect(view.toast.success).not.toHaveBeenCalled();
+    it('offers no start and no end on the vote page, because the vote runs in its meeting', async () => {
+      await withPlan(planVote({ meetingId: 'm1' }));
+      expect(await items()).not.toContain('Starten');
+      await userEvent.keyboard('{Escape}');
+      TestBed.resetTestingModule();
+      await withPlan(planVote({ status: 'open' }));
+      expect(await items()).toEqual(['Haushaltsplan öffnen']);
     });
 
     it('opens the Haushaltsplan of the vote for a reader of the plan', async () => {
