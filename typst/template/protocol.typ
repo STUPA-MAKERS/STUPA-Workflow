@@ -632,11 +632,26 @@
     align: aligns,
     inset: if nested { 0pt } else { (x: 6pt) },
     column-gutter: if nested { 12pt } else { 0pt },
-    ..range(cols).map(k => {
-      set par(justify: false)
-      let cell = cells.at(k, default: ())
-      if nested { clamp(cell, 3, inline, inline-mode: true) } else { inline(cell) }
-    }),
+    ..if nested {
+      // The last cell with text takes the empty cells after it, so a note in a row
+      // (the reason for no offers) can use the room up to the right edge. Such a
+      // cell may take five lines (000881).
+      let filled = range(cols).filter(k => cells.at(k, default: ()).len() > 0)
+      let last = if filled.len() > 0 { filled.last() } else { cols - 1 }
+      range(last + 1).map(k => {
+        let cell = cells.at(k, default: ())
+        let wide = k == last and last < cols - 1
+        grid.cell(colspan: if wide { cols - last } else { 1 }, {
+          set par(justify: false)
+          clamp(cell, if wide { 6 } else { 3 }, inline, inline-mode: true)
+        })
+      })
+    } else {
+      range(cols).map(k => {
+        set par(justify: false)
+        inline(cells.at(k, default: ()))
+      })
+    },
   )
   let rule(w) = rect(width: 100%, height: w, fill: black, stroke: none)
   let row-gap = 20.33pt - 1.211 * size.normal

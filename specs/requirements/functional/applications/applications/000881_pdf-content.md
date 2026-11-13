@@ -28,7 +28,9 @@ the Antrag reads as one table. Each value cell must render its Markdown
 
 A value that would take 30 lines or more must show 29 lines and a line "…". A cell of the
 Kostenaufstellung (a position or an offer) that would take 3 lines or more must show 2 lines
-and a line "…". The Kostenaufstellung must have no rule above and no rule below, and no inset at
+and a line "…". The note "Keine Vergleichsangebote" of a position must use the offer column and
+the amount column together, and it is cut only at 6 lines or more: it then shows 5 lines and a
+line "…". The Kostenaufstellung must have no rule above and no rule below, and no inset at
 its sides: it starts at the text of the other values and ends at the right edge of the table.
 A dashed rule must stand between two rows of the Kostenaufstellung. The rule between two positions
 goes from the position column to the right edge, and so does the rule above the total. The rule between two offers of one position

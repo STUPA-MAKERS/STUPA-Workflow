@@ -405,3 +405,18 @@ def test_a_black_bar_sits_on_the_baseline(tmp_path: Path) -> None:
     baseline, cap = letters[-1], letters[0]
     assert round(0.5 * scale) <= bar[-1] - baseline <= round(2 * scale)
     assert round(1 * scale) <= cap - bar[0] <= round(3 * scale)
+
+
+def test_a_note_in_a_nested_table_takes_the_empty_cells_after_it(tmp_path: Path) -> None:
+    """§000881: the note uses the columns to its right and may take five lines."""
+    note = "Hinweis " * 80
+    source = (
+        '---\ntitle: "A"\ntyp: antrag\n---\n\n'
+        "> [!feld] Kosten\n>\n> | Position | Angebot | Betrag |\n> |---|---|---:|\n"
+        f"> | Bus | Eins | 1 |\n> | | {note} | |\n\n"
+    )
+    lines = _lines(_render(source, "protocol-stupa"), tmp_path)
+    notes = [line for line in lines if "Hinweis Hinweis" in line[3]]
+    assert len(notes) == 5
+    assert [line[3] for line in lines].count("…") == 1
+    assert len(notes[0][3].split()) >= 5
