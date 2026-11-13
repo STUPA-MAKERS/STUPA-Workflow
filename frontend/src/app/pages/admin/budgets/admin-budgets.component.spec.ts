@@ -236,6 +236,31 @@ describe('AdminBudgetsComponent', () => {
       expect(within(dialog).getByRole('combobox', { name: 'Gremium von Schritt 2' })).toHaveTextContent('Ohne Gremium');
     });
 
+    it('§F/finance/budget/000862: the form sets if new expense lines start deckungsfähig', async () => {
+      const view = await setup();
+      const dialog = await openEdit('VS-Mittel');
+      const sw = within(dialog).getByRole('switch', { name: 'Ausgaben standardmäßig deckungsfähig' });
+      expect(sw).not.toBeChecked();
+      await userEvent.click(sw);
+      await userEvent.click(button(dialog, 'Speichern'));
+      await waitFor(() =>
+        expect(view.api.updateNode).toHaveBeenCalledWith('vsm', expect.objectContaining({ planCoverableDefault: true })),
+      );
+    });
+
+    it('§F/finance/budget/000862: a budget without a plan has no such switch, and an unchanged one is not sent', async () => {
+      const view = await setup({ tree: of([{ ...VSM, planCoverableDefault: true }, QSM]) });
+      const none = await openEdit('QS-Mittel');
+      expect(within(none).queryByRole('switch', { name: 'Ausgaben standardmäßig deckungsfähig' })).toBeNull();
+      await userEvent.click(button(none, 'Abbrechen'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull());
+      const dialog = await openEdit('VS-Mittel');
+      expect(within(dialog).getByRole('switch', { name: 'Ausgaben standardmäßig deckungsfähig' })).toBeChecked();
+      await userEvent.click(button(dialog, 'Speichern'));
+      await waitFor(() => expect(view.api.updateNode).toHaveBeenCalled());
+      expect(view.api.updateNode.mock.calls[0][1]).not.toHaveProperty('planCoverableDefault');
+    });
+
     it('a budget without a plan shows no steps, and Abbrechen closes the form', async () => {
       const view = await setup();
       const dialog = await openEdit('QS-Mittel');

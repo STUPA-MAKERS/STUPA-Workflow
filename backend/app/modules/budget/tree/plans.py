@@ -440,6 +440,28 @@ class PlanOps(NodeOps, AllocationOps):
             line.blocked = _ZERO
         return cleared
 
+    @staticmethod
+    def _default_marks(
+        lines: Sequence[BudgetPlanLine], nodes: Sequence[Budget], top_id: UUID, titel_id: UUID
+    ) -> list[str]:
+        """Set "deckungsfähig" on the lines below a Titel that becomes expense.
+
+        The budget says that its expense lines start with the Vermerk. The line of the
+        Titel itself follows its request, so it is not a part of the call. The return
+        value names each line that got the Vermerk, for the audit entry.
+        """
+        parent_of = {n.id: n.parent_id for n in nodes}
+        below = [
+            line
+            for line in lines
+            if line.budget_id != titel_id
+            and plan_rules.titel_of(parent_of, top_id, line.budget_id) == titel_id
+            and not line.coverable
+        ]
+        for line in below:
+            line.coverable = True
+        return [str(line.budget_id) for line in below]
+
     async def _switch_years(self, top: Budget) -> list[FiscalYear]:
         """Return the open fiscal years of `top` that get a draft from the switch."""
         return [
@@ -818,14 +840,31 @@ class PlanOps(NodeOps, AllocationOps):
             and payload.side == "income"
             and (previous is None or previous.side != "income")
         )
-        wanted = self._wanted(payload, previous, giver, drop_marks=to_income)
+        asked = self._wanted(payload, previous, giver, drop_marks=to_income)
         own = self._line_for(version.id, node.id, lines)
         side_before = own.side
-        own.side = wanted.side
+        own.side = asked.side
         cleared = (
             self._clear_marks(list(lines.values()), nodes, top.id, node.id) if to_income else []
         )
         sides = self._sides(top, nodes, [*lines.values(), own])
+        to_expense = titel and asked.side == "expense" and side_before != "expense"
+        starts = plan_rules.starts_coverable(
+            bool(top.plan_coverable_default),
+            sides[node.id],
+            new=previous is None,
+            to_expense=to_expense,
+        )
+        wanted = (
+            asked.model_copy(update={"coverable": True})
+            if starts and "coverable" not in payload.model_fields_set
+            else asked
+        )
+        defaulted = (
+            self._default_marks(list(lines.values()), nodes, top.id, node.id)
+            if starts and to_expense
+            else []
+        )
         amount = plan_rules.summed_amounts(
             parent_of,
             {**{bid: line.amount for bid, line in lines.items()}, node.id: wanted.amount},
@@ -862,6 +901,7 @@ class PlanOps(NodeOps, AllocationOps):
                 "side": wanted.side,
                 "previousSide": side_before,
                 "clearedMarks": cleared,
+                "defaultedMarks": defaulted,
                 "note": wanted.note,
                 "transferable": wanted.transferable,
                 "coverable": wanted.coverable,

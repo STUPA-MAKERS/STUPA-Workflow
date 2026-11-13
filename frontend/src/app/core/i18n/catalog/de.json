@@ -1601,6 +1601,7 @@
   "admin.budgets.noGremium": "Ohne Gremium",
   "admin.budgets.plan": "Haushaltsplan",
   "admin.budgets.planSwitch": "Haushaltsplan führen",
+  "admin.budgets.coverableDefault": "Ausgaben standardmäßig deckungsfähig",
   "admin.budgets.steps": "Schritte bis zum Inkrafttreten",
   "admin.budgets.stepName": "Name von Schritt {number}",
   "admin.budgets.stepGremium": "Gremium von Schritt {number}",

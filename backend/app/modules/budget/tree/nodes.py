@@ -53,6 +53,7 @@ def _node_out(
         fiscalStartMonth=b.fiscal_start_month,
         fiscalStartDay=b.fiscal_start_day,
         planEnabled=bool(b.plan_enabled),
+        planCoverableDefault=bool(b.plan_coverable_default),
     )
 
 #: Fixed advisory-lock key of the keys of the top-level budgets (``"BUDGET_K"``).

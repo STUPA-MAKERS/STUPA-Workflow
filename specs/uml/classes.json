@@ -2303,6 +2303,12 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "plan_coverable_default",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,

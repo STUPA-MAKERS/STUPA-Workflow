@@ -373,6 +373,8 @@ export interface BudgetTreeNode {
   readonly fiscalStartDay: number;
   /** The plan switch of a top-level node: its years can have a Haushaltsplan. */
   readonly planEnabled?: boolean;
+  /** A plan line of the budget starts "deckungsfähig" when it becomes an expense line. */
+  readonly planCoverableDefault?: boolean;
   /**
    * For a top-level node the fiscal years with a plan version in force, for a node below
    * it the fiscal years whose version in force has a line for the node.
@@ -398,6 +400,8 @@ export interface BudgetNode {
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
   readonly planEnabled?: boolean;
+  /** A plan line of the budget starts "deckungsfähig" when it becomes an expense line. */
+  readonly planCoverableDefault?: boolean;
 }
 
 /** The problem code of a money mutation on a closed fiscal year (409). */
@@ -442,6 +446,7 @@ export interface BudgetNodeUpdate {
   readonly decisionGremiumId?: Uuid | null;
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
+  readonly planCoverableDefault?: boolean;
 }
 
 export interface FiscalYearCreate {

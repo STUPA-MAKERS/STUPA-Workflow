@@ -83,6 +83,11 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     #: subtree. A Python default backs up the server default, so a new instance
     #: carries a bool before the flush.
     plan_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    #: Setting of a top-level node: a plan line of its subtree starts with the Vermerk
+    #: "deckungsfähig" when it becomes an expense line.
+    plan_coverable_default: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
 
     __table_args__ = (
         UniqueConstraint("parent_id", "key", name="uq_budget_parent_key"),
