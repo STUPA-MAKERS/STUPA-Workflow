@@ -662,7 +662,7 @@ async def _default_on(t: Tree, on: bool = True) -> None:
 async def test_a_new_expense_line_starts_deckungsfaehig_when_the_budget_says_so(
     session: AsyncSession,
 ) -> None:
-    """§F/finance/budget/000862: a new line below an expense Titel starts with the Vermerk."""
+    """§F/finance/budget/000874: a new line below an expense Titel starts with the Vermerk."""
     t = await _tree(session)
     vid = _version(await _draft(t)).id
     plain = await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(5)))
@@ -687,7 +687,7 @@ async def test_a_new_expense_line_starts_deckungsfaehig_when_the_budget_says_so(
 async def test_the_lines_of_a_titel_start_deckungsfaehig_when_it_becomes_expense(
     session: AsyncSession,
 ) -> None:
-    """§F/finance/budget/000862: the Titel and each line below it get the Vermerk."""
+    """§F/finance/budget/000874: the Titel and each line below it get the Vermerk."""
     t = await _tree(session)
     await _default_on(t)
     vid = _version(await _draft(t, sides=False)).id
@@ -705,7 +705,7 @@ async def test_the_lines_of_a_titel_start_deckungsfaehig_when_it_becomes_expense
 
 
 async def test_the_default_changes_no_line_that_exists(session: AsyncSession) -> None:
-    """§F/finance/budget/000862: the setting and a copy leave the lines as they are."""
+    """§F/finance/budget/000874: the setting and a copy leave the lines as they are."""
     t = await _tree(session)
     plan = await _balanced_draft(t)
     vid = _version(plan).id

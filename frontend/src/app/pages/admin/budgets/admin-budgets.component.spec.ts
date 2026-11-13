@@ -236,7 +236,7 @@ describe('AdminBudgetsComponent', () => {
       expect(within(dialog).getByRole('combobox', { name: 'Gremium von Schritt 2' })).toHaveTextContent('Ohne Gremium');
     });
 
-    it('§F/finance/budget/000862: the form sets if new expense lines start deckungsfähig', async () => {
+    it('§F/finance/budget/000874: the form sets if new expense lines start deckungsfähig', async () => {
       const view = await setup();
       const dialog = await openEdit('VS-Mittel');
       const sw = within(dialog).getByRole('switch', { name: 'Ausgaben standardmäßig deckungsfähig' });
@@ -248,7 +248,7 @@ describe('AdminBudgetsComponent', () => {
       );
     });
 
-    it('§F/finance/budget/000862: a budget without a plan has no such switch, and an unchanged one is not sent', async () => {
+    it('§F/finance/budget/000874: a budget without a plan has no such switch, and an unchanged one is not sent', async () => {
       const view = await setup({ tree: of([{ ...VSM, planCoverableDefault: true }, QSM]) });
       const none = await openEdit('QS-Mittel');
       expect(within(none).queryByRole('switch', { name: 'Ausgaben standardmäßig deckungsfähig' })).toBeNull();

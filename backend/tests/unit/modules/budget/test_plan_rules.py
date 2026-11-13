@@ -194,7 +194,7 @@ def test_with_plan_fields() -> None:
 def test_starts_coverable(
     default: bool, side: str | None, new: bool, to_expense: bool, starts: bool
 ) -> None:
-    """§F/finance/budget/000862: the setting applies when a line becomes an expense line."""
+    """§F/finance/budget/000874: the setting applies when a line becomes an expense line."""
     assert (
         plan_rules.starts_coverable(default, side, new=new, to_expense=to_expense) is starts
     )
