@@ -15,31 +15,11 @@ because a folder of protocols then sorts by date. The caller passes the name thr
 
 from __future__ import annotations
 
-import re
-import unicodedata
 from datetime import date
-from itertools import accumulate
 
-TITLE_MAX = 80
-"""The longest title part in characters. A longer title is cut at a word."""
+from app.shared.filenames import TITLE_MAX, title_token
 
-_UNSAFE = frozenset('/\\:*?"<>|')
-"""Characters that Windows forbids in a file name. `/` and the backslash split paths."""
-
-
-def _clean_title(title: str | None) -> str:
-    """Return the title as one `_`-joined token, without unsafe characters."""
-    raw = unicodedata.normalize("NFC", title or "")
-    kept = "".join(
-        " " if c.isspace() or c in _UNSAFE else c
-        for c in raw
-        if c.isspace() or unicodedata.category(c) not in {"Cc", "Cf", "Cs", "Co", "Cn"}
-    )
-    words = kept.split()
-    joined = tuple(accumulate(words, lambda out, word: f"{out}_{word}"))
-    fitting = [part for part in joined if len(part) <= TITLE_MAX]
-    out = fitting[-1] if fitting else (words[0][:TITLE_MAX] if words else "")
-    return re.sub(r"_+", "_", out).strip("._-")
+__all__ = ["TITLE_MAX", "protocol_pdf_filename"]
 
 
 def protocol_pdf_filename(title: str | None, day: date, *, public: bool = False) -> str:
@@ -54,7 +34,7 @@ def protocol_pdf_filename(title: str | None, day: date, *, public: bool = False)
         For example `Protokoll_3._ordentliche_Sitzung_STUPA_2026-11-05.pdf`, or
         `Protokoll_2026-11-05_oeffentlich.pdf` without a title.
     """
-    stem = _clean_title(title)
+    stem = title_token(title)
     parts = (
         "Protokoll",
         *([stem] if stem else []),

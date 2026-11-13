@@ -47,6 +47,11 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.documents.cd_resolver import (
+    cd_render_config,
+    cd_variant_key_for_gremium,
+    resolve_cd_variant_by_key,
+)
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.service import MeetingService
@@ -72,11 +77,6 @@ from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient, TypstError
-from app.modules.documents.cd_resolver import (
-    cd_render_config,
-    cd_variant_key_for_gremium,
-    resolve_cd_variant_by_key,
-)
 from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.markdown import (
     ElectionLine,

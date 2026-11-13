@@ -176,12 +176,9 @@ def _plain(value: object) -> str:
         case str() | int() | float() | Decimal():
             return str(value)
         case list() | tuple():
-            return ", ".join(_plain(v) for v in value)  # pyright: ignore[reportUnknownVariableType]
+            return ", ".join(_plain(v) for v in value)
         case Mapping():
-            return ", ".join(
-                f"{k}: {_plain(v)}"
-                for k, v in value.items()  # pyright: ignore[reportUnknownVariableType]
-            )
+            return ", ".join(f"{k}: {_plain(v)}" for k, v in value.items())
         case _:
             return ""
 
@@ -196,7 +193,7 @@ def is_empty(value: object) -> bool:
         case list() | tuple():
             return not value
         case Mapping():
-            return all(is_empty(v) for v in value.values())  # pyright: ignore[reportUnknownVariableType]
+            return all(is_empty(v) for v in value.values())
         case _:
             return False
 
@@ -211,11 +208,7 @@ def _option(fdef: FormFieldDef, value: object) -> str:
 
 def _daterange(value: object) -> str:
     """Write a range `{from, to}` as `from – to`, or the half it has."""
-    ends = (
-        [value.get("from"), value.get("to")]  # pyright: ignore[reportUnknownMemberType]
-        if isinstance(value, Mapping)
-        else []
-    )
+    ends = [value.get("from"), value.get("to")] if isinstance(value, Mapping) else []
     days = [format_day(e) for e in ends if isinstance(e, str) and e.strip()]
     return " – ".join(days) if days else _plain(value)
 
@@ -233,7 +226,7 @@ def format_answer(fdef: FormFieldDef, value: object, currency: str) -> str:
             return _option(fdef, value)
         case "multiselect":
             items = value if isinstance(value, list) else [value]
-            return ", ".join(_option(fdef, v) for v in items)  # pyright: ignore[reportUnknownVariableType]
+            return ", ".join(_option(fdef, v) for v in items)
         case "currency" | "funding":
             return _money(value, currency) or _plain(value)
         case _:
@@ -264,26 +257,23 @@ def _visible(fdef: FormFieldDef, ctx: dict[str, object]) -> bool:
 def _table(label: str, value: object) -> list[str]:
     """Write a table answer as a GFM table, or as text when it is no list of rows."""
     rows = value if isinstance(value, list) else []
-    objects = [r for r in rows if isinstance(r, Mapping)]  # pyright: ignore[reportUnknownVariableType]
-    if not objects or len(objects) != len(rows):  # pyright: ignore[reportUnknownArgumentType]
+    objects = [r for r in rows if isinstance(r, Mapping)]
+    if not objects or len(objects) != len(rows):
         return [f"**{escape(label)}:** {escape(_plain(value))}", ""]
-    columns = list(dict.fromkeys(str(k) for r in objects for k in r))  # pyright: ignore[reportUnknownVariableType]
+    columns = list(dict.fromkeys(str(k) for r in objects for k in r))
     return [
         f"**{escape(label)}**",
         "",
         "| " + " | ".join(escape(c) for c in columns) + " |",
         "|" + "---|" * len(columns),
-        *(
-            "| " + " | ".join(escape(_plain(r.get(c))) for c in columns) + " |"  # pyright: ignore[reportUnknownMemberType]
-            for r in objects  # pyright: ignore[reportUnknownVariableType]
-        ),
+        *("| " + " | ".join(escape(_plain(r.get(c))) for c in columns) + " |" for r in objects),
         "",
     ]
 
 
 def _offers(position: Mapping[str, object]) -> list[Mapping[str, object]]:
     raw = position.get("offers")
-    return [o for o in raw if isinstance(o, Mapping)] if isinstance(raw, list) else []  # pyright: ignore[reportUnknownVariableType]
+    return [o for o in raw if isinstance(o, Mapping)] if isinstance(raw, list) else []
 
 
 def _preferred_value(position: Mapping[str, object]) -> Decimal:
@@ -319,18 +309,14 @@ def _position_rows(index: int, position: Mapping[str, object], currency: str) ->
 
 def positions_block(label: str, value: object, currency: str) -> list[str]:
     """Write the Kostenaufstellung as a table with the total of the preferred offers."""
-    positions = [p for p in value if isinstance(p, Mapping)] if isinstance(value, list) else []  # pyright: ignore[reportUnknownVariableType]
-    total = sum((_preferred_value(p) for p in positions), Decimal(0))  # pyright: ignore[reportUnknownArgumentType]
+    positions = [p for p in value if isinstance(p, Mapping)] if isinstance(value, list) else []
+    total = sum((_preferred_value(p) for p in positions), Decimal(0))
     return [
         f"## {escape(label)}",
         "",
         "| Position | Angebot | Betrag |",
         "|---|---|---:|",
-        *(
-            row
-            for n, p in enumerate(positions, start=1)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
-            for row in _position_rows(n, p, currency)  # pyright: ignore[reportUnknownArgumentType]
-        ),
+        *(row for n, p in enumerate(positions, start=1) for row in _position_rows(n, p, currency)),
         f"| **Summe** | | **{format_money(total, currency, LANG)}** |",
         "",
     ]
@@ -402,9 +388,7 @@ def _decision_lines(doc: ApplicationDoc) -> list[str]:
         else format_money(decision.approved_amount, doc.currency, LANG)
     )
     by = f" ({escape(decision.gremium_name)})" if decision.gremium_name else ""
-    conditions = [
-        f"{n}. {escape(text)}" for n, text in enumerate(decision.conditions, start=1)
-    ]
+    conditions = [f"{n}. {escape(text)}" for n, text in enumerate(decision.conditions, start=1)]
     return [
         "# Beschluss",
         "",
