@@ -2,7 +2,7 @@
 id: "000870"
 title: The move to a TOP records its time
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

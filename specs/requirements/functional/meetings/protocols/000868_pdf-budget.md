@@ -2,7 +2,7 @@
 id: "000868"
 title: A protocol holds at most 20 Anlagen
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

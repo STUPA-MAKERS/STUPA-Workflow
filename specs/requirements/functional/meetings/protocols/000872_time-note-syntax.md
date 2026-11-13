@@ -2,7 +2,7 @@
 id: "000872"
 title: A protocol text marks a time note
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

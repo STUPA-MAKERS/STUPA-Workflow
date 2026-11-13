@@ -2,7 +2,7 @@
 id: "000867"
 title: The PDF of a non-public TOP stays internal
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

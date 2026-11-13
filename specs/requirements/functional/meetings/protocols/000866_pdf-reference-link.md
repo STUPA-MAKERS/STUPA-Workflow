@@ -2,7 +2,7 @@
 id: "000866"
 title: The place of an embedded PDF links to its Anlage
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

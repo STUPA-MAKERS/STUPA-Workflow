@@ -2,7 +2,7 @@
 id: "000864"
 title: The protocol PDF appends each embedded PDF as an Anlage
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

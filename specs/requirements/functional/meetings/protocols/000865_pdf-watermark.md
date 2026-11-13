@@ -2,7 +2,7 @@
 id: "000865"
 title: Each page of an Anlage has a watermark
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

@@ -2,7 +2,7 @@
 id: "000862"
 title: A protocol text embeds a PDF
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

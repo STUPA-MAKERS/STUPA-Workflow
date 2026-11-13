@@ -2,7 +2,7 @@
 id: "000873"
 title: A toolbar tool inserts a time note
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

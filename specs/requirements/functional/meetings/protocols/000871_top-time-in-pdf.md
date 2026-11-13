@@ -2,7 +2,7 @@
 id: "000871"
 title: The protocol PDF shows the time above each TOP
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

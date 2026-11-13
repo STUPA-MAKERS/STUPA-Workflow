@@ -2,7 +2,7 @@
 id: "000869"
 title: An embedded PDF is checked on upload
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null

@@ -2,7 +2,7 @@
 id: "000863"
 title: An embedded PDF shows as a file badge
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 implementation: null
