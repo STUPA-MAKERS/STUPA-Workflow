@@ -9,7 +9,8 @@ export interface PlanRow {
   readonly parentId: Uuid | null;
   readonly name: string;
   readonly pathKey: string;
-  readonly side: Side;
+  /** The side of the Titel of the row in the version. `null` while the Titel has none. */
+  readonly side: Side | null;
   /** The Kostenstelle is active. An inactive one shows its mark. */
   readonly active: boolean;
   /** 0 for a direct child of the top-level Kostenstelle. */
@@ -48,9 +49,9 @@ const lineMap = (version: PlanVersion | null): ReadonlyMap<Uuid, PlanLine> =>
   new Map((version?.lines ?? []).map((l) => [l.budgetId, l] as const));
 
 /** The booked amount of a Kostenstelle in a fiscal year: income for the income side. */
-function actualOf(node: BudgetTreeNode, side: Side, fiscalYearId: Uuid | null): number | null {
+function actualOf(node: BudgetTreeNode, side: Side | null, fiscalYearId: Uuid | null): number | null {
   const view = node.byFiscalYear.find((a) => a.fiscalYearId === fiscalYearId);
-  if (!fiscalYearId) return null;
+  if (!fiscalYearId || !side) return null;
   return Number(side === 'income' ? (view?.income ?? 0) : (view?.expended ?? 0));
 }
 
@@ -61,20 +62,20 @@ export function planRows(source: PlanRowSource): readonly PlanRow[] {
   const prev = lineMap(source.prev);
   const rowsOf = (node: BudgetTreeNode, depth: number): readonly PlanRow[] => {
     const line = lines.get(node.id);
-    if (!line || !node.side) return [];
+    if (!line) return [];
     const below = node.children.flatMap((c) => rowsOf(c, depth + 1));
     const row: PlanRow = {
       id: node.id,
       parentId: depth === 0 ? null : node.parentId,
       name: line.name ?? node.name,
       pathKey: line.pathKey ?? node.pathKey,
-      side: node.side,
+      side: line.side,
       active: node.active,
       depth,
       amount: Number(line.amount),
       base: base.has(node.id) ? Number(base.get(node.id)?.amount) : null,
       prev: prev.has(node.id) ? Number(prev.get(node.id)?.amount) : null,
-      actual: actualOf(node, node.side, source.prevFiscalYearId),
+      actual: actualOf(node, line.side, source.prevFiscalYearId),
       note: line.note ?? '',
       transferable: line.transferable,
       coverable: line.coverable,
@@ -91,6 +92,13 @@ export function sideSum(rows: readonly PlanRow[], side: Side): number {
   return rows.filter((r) => r.depth === 0 && r.side === side).reduce((sum, r) => sum + r.amount, 0);
 }
 
+/** The group of a row in the list and the tables: its side, or the group of the Titel without one. */
+export type PlanGroup = Side | 'none';
+
+export function groupOf(row: Pick<PlanRow, 'side'>): PlanGroup {
+  return row.side ?? 'none';
+}
+
 /** Round to cents, so a sum of decimals compares exactly. */
 export function cents(value: number): number {
   return Math.round(value * 100);
@@ -101,7 +109,7 @@ export function addable(top: BudgetTreeNode, version: PlanVersion): readonly Bud
   const lines = lineMap(version);
   const below = (node: BudgetTreeNode): readonly BudgetTreeNode[] =>
     lines.has(node.id) ? node.children.flatMap(below) : [node];
-  return top.children.flatMap(below).filter((n) => !!n.side);
+  return top.children.flatMap(below);
 }
 
 /** The top-level Kostenstelle with only the Kostenstellen that have a line in the version. */

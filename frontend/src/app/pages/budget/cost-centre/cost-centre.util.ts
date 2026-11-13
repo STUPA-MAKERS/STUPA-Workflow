@@ -5,7 +5,6 @@ import type { BudgetTreeNode } from '../budget-tree.api';
 const ERRORS: Readonly<Record<string, TranslationKey>> = {
   budget_key_exists: 'budget.cc.error.keyExists',
   plan_side_missing: 'budget.cc.error.sideMissing',
-  side_in_plan: 'budget.cc.error.sideInPlan',
   plan_version_locked: 'budget.plan.error.locked',
   budget_has_children: 'budget.cc.error.hasChildren',
   budget_has_bookings: 'budget.cc.error.hasBookings',
@@ -46,11 +45,6 @@ export function levelKey(node: Pick<BudgetTreeNode, 'id' | 'parentId'>, top: Pic
 /** The label of the action that creates a node below `parentId`: a Titel directly below the Haushalt. */
 export function createKey(parentId: string, top: Pick<BudgetTreeNode, 'id'> | null): TranslationKey {
   return !parentId || parentId === top?.id ? 'budget.cc.createTitle' : 'budget.cc.create';
-}
-
-/** A Kostenstelle is a direct child of a budget that has the plan switch on, so it has a side. */
-export function hasSide(node: Pick<BudgetTreeNode, 'parentId'>, top: BudgetTreeNode | null): boolean {
-  return !!top?.planEnabled && node.parentId === top.id;
 }
 
 /** The node and each node below it, in tree order. */

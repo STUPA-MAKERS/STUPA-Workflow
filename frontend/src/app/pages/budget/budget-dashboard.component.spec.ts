@@ -1504,12 +1504,12 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(view.c.selectedKsId()).toBe('b-vs');
     });
 
-    it('shows every Kostenstelle while the plan of the year is a draft', async () => {
+    it('§F/finance/budget/000854: shows every Kostenstelle and edits by hand while the plan of the year is a draft', async () => {
       const view = await setup({ tree: PLAN_TREE, queryParams: { costCentre: 'b-800' } });
       view.http.expectOne(planUrl).flush(planOf('draft', []));
       expect(view.c.treeRows().map((r: { node: { id: string } }) => r.node.id)).toContain('b-900');
-      expect(view.c.sided()).toBe(true);
-      expect(view.c.byHand()).toBe(false);
+      expect(view.c.byHand()).toBe(true);
+      expect(view.c.allocatable()).toBe(true);
     });
 
     it('edits by hand in a year without a plan, and keeps the answer of a year that is no longer shown', async () => {
@@ -1539,7 +1539,7 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       await userEvent.type(dialog.querySelector('[name="ccName"] input') as HTMLElement, 'Labor');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
       const post = view.http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/budgets'));
-      expect(post.request.body).toEqual({ parentId: 'b-800', key: '820', name: 'Labor', side: null, currency: 'EUR' });
+      expect(post.request.body).toEqual({ parentId: 'b-800', key: '820', name: 'Labor', currency: 'EUR' });
       post.flush({ id: 'b-900' });
       view.http.expectOne(treeUrl).flush(TREE);
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kostenstelle anlegen' })).toBeNull());

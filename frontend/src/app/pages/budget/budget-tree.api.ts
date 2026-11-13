@@ -371,8 +371,6 @@ export interface BudgetTreeNode {
    *  uses it. */
   readonly fiscalStartMonth: number;
   readonly fiscalStartDay: number;
-  /** The side in a Haushaltsplan. `null` for a top-level node and without a plan. */
-  readonly side?: 'income' | 'expense' | null;
   /** The plan switch of a top-level node: its years can have a Haushaltsplan. */
   readonly planEnabled?: boolean;
   /**
@@ -399,7 +397,6 @@ export interface BudgetNode {
   readonly decisionGremiumSourceId?: Uuid | null;
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
-  readonly side?: 'income' | 'expense' | null;
   readonly planEnabled?: boolean;
 }
 
@@ -431,8 +428,6 @@ export interface BudgetNodeCreate {
   readonly color?: string | null;
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
-  /** The side of a direct child of a budget with a Haushaltsplan (422 `plan_side_missing` without). */
-  readonly side?: 'income' | 'expense' | null;
 }
 
 /** Partial update of a node. All fields are optional and ``color:""`` clears the color. */

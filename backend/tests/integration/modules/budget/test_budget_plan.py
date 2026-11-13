@@ -29,6 +29,7 @@ from app.modules.budget.plan_schemas import (
     PlanLineSet,
     PlanNodeCreate,
     PlanOut,
+    PlanStateByHand,
     PlanStateSet,
     PlanStepIn,
     PlanStepsSet,
@@ -79,7 +80,7 @@ class Tree:
     fy: FiscalYearOut
 
 
-async def _tree(session: AsyncSession, *, sides: bool = True, enabled: bool = True) -> Tree:
+async def _tree(session: AsyncSession, *, enabled: bool = True) -> Tree:
     svc = BudgetTreeService(session, actor="tester")
     key = f"P{uuid.uuid4().hex[:8]}"
     top = await svc.create_node(BudgetNodeCreate(key=key, name="VS-Mittel"))
@@ -88,10 +89,7 @@ async def _tree(session: AsyncSession, *, sides: bool = True, enabled: bool = Tr
     exp_a = await svc.create_node(BudgetNodeCreate(key="1", name="Fachschaften", parentId=exp.id))
     exp_b = await svc.create_node(BudgetNodeCreate(key="2", name="AKs", parentId=exp.id))
     fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
-    if sides:
-        await svc.set_side(inc.id, "income")
-        await svc.set_side(exp.id, "expense")
-    if sides and enabled:
+    if enabled:
         await svc.set_plan_switch(top.id, True)
     await session.commit()
     return Tree(svc, top, inc, exp, exp_a, exp_b, fy)
@@ -118,8 +116,20 @@ async def _allocations(session: AsyncSession, t: Tree) -> dict[uuid.UUID, Decima
     return {row.budget_id: row.allocated for row in rows}
 
 
-async def _draft(t: Tree) -> PlanOut:
-    """Replace the Stammplan in force of the switch by a fresh plan with a draft."""
+async def _sided(t: Tree, version_id: uuid.UUID) -> PlanOut:
+    """Give the two Titel of the tree their sides in a draft version."""
+    await t.svc.set_line(version_id, t.inc.id, PlanLineSet(side="income"))
+    out = await t.svc.set_line(version_id, t.exp.id, PlanLineSet(side="expense"))
+    await t.svc.session.commit()
+    return out
+
+
+async def _draft(t: Tree, *, sides: bool = True) -> PlanOut:
+    """Replace the draft of the switch by a fresh plan with a draft.
+
+    With `sides` the draft holds the lines of the two Titel, each with its side and
+    an Ansatz of 0.
+    """
     plan = await t.svc.session.scalar(
         select(BudgetPlan).where(BudgetPlan.fiscal_year_id == t.fy.id)
     )
@@ -127,7 +137,7 @@ async def _draft(t: Tree) -> PlanOut:
     await t.svc.session.commit()
     out = await t.svc.create_plan(t.top.id, t.fy.id, PlanCreate())
     await t.svc.session.commit()
-    return out
+    return await _sided(t, _version(out).id) if sides else out
 
 
 async def _balanced_draft(t: Tree) -> PlanOut:
@@ -173,96 +183,132 @@ async def _allocated(session: AsyncSession, fy_id: uuid.UUID) -> dict[uuid.UUID,
     return {row.budget_id: row.allocated for row in rows}
 
 
-async def test_side_goes_to_the_subtree_and_to_a_new_child(session: AsyncSession) -> None:
-    """The side of a direct child of the top level reaches each node below it.
+async def test_a_line_below_a_titel_has_the_side_of_the_titel(session: AsyncSession) -> None:
+    """The side of the line of a Titel reaches each line below it in the same version.
 
-    Rules: §F/finance/budget/000817, §F/finance/budget/000790.
-    """
-    t = await _tree(session, enabled=False)
-    sides = dict(
-        (await session.execute(select(Budget.id, Budget.side).where(Budget.id.in_(
-            [t.top.id, t.inc.id, t.exp.id, t.exp_a.id, t.exp_b.id]
-        )))).all()
-    )
-    assert sides == {
-        t.top.id: None, t.inc.id: "income", t.exp.id: "expense",
-        t.exp_a.id: "expense", t.exp_b.id: "expense",
-    }
-    child = await t.svc.create_node(BudgetNodeCreate(key="9", name="Neu", parentId=t.exp_a.id))
-    assert child.side == "expense"
-
-
-async def test_a_new_direct_child_of_a_planned_budget_needs_a_side(
-    session: AsyncSession,
-) -> None:
-    """The create takes the side and refuses a direct child without one.
-
-    Rule: §F/finance/budget/000829.
+    Rule: §F/finance/budget/000853.
     """
     t = await _tree(session)
-    with pytest.raises(ValidationProblem) as exc:
-        await t.svc.create_node(BudgetNodeCreate(key="9", name="Neu", parentId=t.top.id))
-    assert _code(exc) == "plan_side_missing"
-    made = await t.svc.create_node(
-        BudgetNodeCreate(key="9", name="Neu", parentId=t.top.id, side="income")
+    plan = await _draft(t, sides=False)
+    vid = _version(plan).id
+    plan = await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(5)))
+    assert {line.budget_id: line.side for line in _version(plan).lines} == {
+        t.exp.id: None, t.exp_a.id: None,
+    }
+    plan = await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="expense"))
+    assert {line.budget_id: line.side for line in _version(plan).lines} == {
+        t.exp.id: "expense", t.exp_a.id: "expense",
+    }
+    stored = dict(
+        (
+            await session.execute(
+                select(BudgetPlanLine.budget_id, BudgetPlanLine.side).where(
+                    BudgetPlanLine.version_id == vid
+                )
+            )
+        ).all()
     )
-    assert made.side == "income"
-    deep = await t.svc.create_node(BudgetNodeCreate(key="1", name="Tief", parentId=made.id))
-    assert deep.side == "income"
-    with pytest.raises(ValidationProblem) as off:
-        await t.svc.create_node(
-            BudgetNodeCreate(key="2", name="Tief", parentId=made.id, side="expense")
+    assert stored == {t.exp.id: "expense", t.exp_a.id: None}
+    assert _amounts(_version(plan)) == {t.exp.id: D(5), t.exp_a.id: D(5)}
+    tree_top = next(n for n in await t.svc.get_tree() if n.id == t.top.id)
+    assert "side" not in tree_top.model_dump(by_alias=True)
+
+
+async def test_a_node_is_created_without_a_side(session: AsyncSession) -> None:
+    """The tree holds no side, so the create of a node asks for none.
+
+    Rules: §F/finance/budget/000853, §F/finance/budget/000829.
+    """
+    t = await _tree(session)
+    made = await t.svc.create_node(BudgetNodeCreate(key="9", name="Neu", parentId=t.top.id))
+    assert "side" not in made.model_dump(by_alias=True)
+    with pytest.raises(ValueError, match="side"):
+        BudgetNodeCreate.model_validate(
+            {"key": "2", "name": "Tief", "parentId": str(made.id), "side": "expense"}
         )
-    assert _code(off) == "side_not_settable"
-    free = await _tree(session, enabled=False)
-    loose = await free.svc.create_node(BudgetNodeCreate(key="9", name="Neu", parentId=free.top.id))
-    assert loose.side is None
 
 
 async def test_side_is_refused_off_the_first_level(session: AsyncSession) -> None:
-    """A top-level node has no side, and a deeper node takes it from its parent.
+    """Only the line of a Titel takes a side.
 
-    Rules: §F/finance/budget/000790, §F/finance/budget/000817.
+    Rule: §F/finance/budget/000853.
     """
-    t = await _tree(session, sides=False)
-    for node in (t.top, t.exp_a):
-        with pytest.raises(ValidationProblem) as exc:
-            await t.svc.set_side(node.id, "income")
-        assert _code(exc) == "side_not_settable"
-
-
-async def test_side_cannot_change_below_a_planned_amount(session: AsyncSession) -> None:
-    """§F/finance/budget/000817: 409 side_in_plan when a plan line of the subtree has an Ansatz."""
     t = await _tree(session)
-    plan = await _draft(t)
-    assert (await t.svc.set_side(t.exp.id, "income")).side == "income"
-    await t.svc.set_side(t.exp.id, "expense")
-    await t.svc.set_line(_version(plan).id, t.exp_a.id, PlanLineSet(amount=D(5)))
-    assert (await t.svc.set_side(t.exp.id, "expense")).side == "expense"
-    with pytest.raises(ConflictError) as exc:
-        await t.svc.set_side(t.exp.id, "income")
-    assert _code(exc) == "side_in_plan"
+    vid = _version(await _draft(t)).id
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(side="income"))
+    assert _code(exc) == "side_not_settable"
+    await session.rollback()
+    with pytest.raises(ValidationProblem) as top:
+        await t.svc.set_line(vid, t.top.id, PlanLineSet(side="income"))
+    assert _code(top) == "plan_line_node_invalid"
 
 
-async def test_plan_switch_needs_a_top_level_node_with_sides(session: AsyncSession) -> None:
-    """422 plan_side_missing while a node below the top level has no side.
+async def test_a_side_changes_in_a_draft_with_its_amounts(session: AsyncSession) -> None:
+    """A Titel with an Ansatz changes its side in a draft, and only there.
 
-    Rules: §F/finance/budget/000817, §F/finance/budget/000814.
+    Rules: §F/finance/budget/000853, §F/finance/budget/000793.
     """
-    t = await _tree(session, sides=False)
+    t = await _tree(session)
+    plan = await _balanced_draft(t)
+    vid = _version(plan).id
+    moved = _version(await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="income")))
+    assert {line.budget_id: (line.side, line.amount) for line in moved.lines} == {
+        t.inc.id: ("income", D(100)),
+        t.exp.id: ("income", D(100)),
+        t.exp_a.id: ("income", D(60)),
+        t.exp_b.id: ("income", D(40)),
+    }
+    with pytest.raises(ValidationProblem) as unbalanced:
+        await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
+    assert _code(unbalanced) == "plan_not_balanced"
+    await session.rollback()
+    await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
+    await session.commit()
+    with pytest.raises(ConflictError) as locked:
+        await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="income"))
+    assert _code(locked) == "plan_version_locked"
+
+
+async def test_a_titel_without_a_side_keeps_the_version_in_the_draft(
+    session: AsyncSession,
+) -> None:
+    """A version leaves the draft only when each Titel has a side.
+
+    Rule: §F/finance/budget/000853.
+    """
+    t = await _tree(session)
+    await _steps(t, "Beschluss")
+    vid = _version(await _draft(t, sides=False)).id
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(0)))
+    await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(0)))
+    await session.commit()
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.pass_next_step(vid)
+    assert _code(exc) == "plan_side_missing"
+    assert [e.msg for e in exc.value.errors] == sorted([t.inc.path_key, t.exp.path_key])
+    await _steps(t)
+    with pytest.raises(ValidationProblem) as force:
+        await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
+    assert _code(force) == "plan_side_missing"
+    await _sided(t, vid)
+    done = _version(await t.svc.set_plan_state(vid, PlanStateSet(state="in_force")))
+    assert done.state == "in_force"
+
+
+async def test_plan_switch_needs_a_top_level_node(session: AsyncSession) -> None:
+    """§F/finance/budget/000814: only a top-level node has the plan switch."""
+    t = await _tree(session, enabled=False)
     with pytest.raises(ValidationProblem) as exc:
         await t.svc.set_plan_switch(t.exp.id, True)
     assert _code(exc) == "plan_top_level_only"
-    with pytest.raises(ValidationProblem) as exc:
-        await t.svc.set_plan_switch(t.top.id, True)
-    assert _code(exc) == "plan_side_missing"
     assert (await t.svc.set_plan_switch(t.top.id, False)).plan_enabled is False
 
 
-async def test_plan_switch_gives_open_years_a_stammplan(session: AsyncSession) -> None:
-    """Each open year gets a Stammplan in force from its allocations.
+async def test_plan_switch_gives_open_years_a_draft(session: AsyncSession) -> None:
+    """Each open year gets a draft from its allocations, and no allocation changes.
 
-    Rules: §F/finance/budget/000803, §F/finance/budget/000814.
+    Rules: §F/finance/budget/000854, §F/finance/budget/000803, §F/finance/budget/000814.
     """
     t = await _tree(session, enabled=False)
     closed = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2025))
@@ -270,49 +316,45 @@ async def test_plan_switch_gives_open_years_a_stammplan(session: AsyncSession) -
     await t.svc.set_allocation(t.exp.id, t.fy.id, AllocationSet(allocated=D(80)))
     await t.svc.set_allocation(t.exp_a.id, t.fy.id, AllocationSet(allocated=D(30)))
     await t.svc.set_fiscal_year_closed(t.top.id, closed.id, closed=True)
+    before = await _allocations(session, t)
 
-    preview = await t.svc.preview_plan_switch(t.top.id)
-    assert [(c.path_key, c.allocated, c.planned, c.year) for c in preview.changes] == [
-        (t.top.path_key, D(100), D(30), "2026"),
-        (t.exp.path_key, D(80), D(30), "2026"),
-    ]
-    with pytest.raises(ConflictError) as unconfirmed:
-        await t.svc.set_plan_switch(t.top.id, True)
-    assert _code(unconfirmed) == "plan_changes_allocations"
-    switched = await t.svc.set_plan_switch(t.top.id, True, confirm_changes=True)
+    switched = await t.svc.set_plan_switch(t.top.id, True)
     assert switched.plan_enabled is True
     await session.commit()
 
     plan = await t.svc.get_plan(t.top.id, t.fy.id)
-    stamm = _version(plan, 0)
-    assert (stamm.number, stamm.state, len(plan.versions)) == (0, "in_force", 1)
-    assert stamm.in_force_at is not None
-    assert _amounts(stamm) == {
+    first = _version(plan, 0)
+    assert (first.number, first.state, len(plan.versions)) == (0, "draft", 1)
+    assert first.in_force_at is None
+    assert _amounts(first) == {
         t.inc.id: D(0), t.exp.id: D(30), t.exp_a.id: D(30), t.exp_b.id: D(0),
     }
-    assert await _allocations(session, t) == {
-        t.top.id: D(30), t.inc.id: D(0), t.exp.id: D(30), t.exp_a.id: D(30), t.exp_b.id: D(0),
-    }
-    assert (await t.svc.preview_plan_switch(t.top.id)).changes == ()
-    assert {line.path_key for line in stamm.lines} == {
-        t.inc.path_key, t.exp.path_key, t.exp_a.path_key, t.exp_b.path_key,
-    }
+    assert {(line.side, line.name, line.path_key) for line in first.lines} == {(None, None, None)}
+    assert await _allocations(session, t) == before
     with pytest.raises(NotFoundError) as exc:
         await t.svc.get_plan(t.top.id, closed.id)
     assert _code(exc) == "plan_not_found"
 
-    before = await session.scalar(select(BudgetPlan.id).where(BudgetPlan.fiscal_year_id == t.fy.id))
+    kept = await session.scalar(select(BudgetPlan.id).where(BudgetPlan.fiscal_year_id == t.fy.id))
     await t.svc.set_plan_switch(t.top.id, True)
-    assert before == await session.scalar(
+    assert kept == await session.scalar(
         select(BudgetPlan.id).where(BudgetPlan.fiscal_year_id == t.fy.id)
     )
     tree_top = next(n for n in await t.svc.get_tree() if n.id == t.top.id)
     assert tree_top.plan_enabled is True
-    assert {c.side for c in tree_top.children} == {"income", "expense"}
+    entry = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_PLAN_SWITCH)
+            .where(AuditEntry.target_id == str(t.top.id))
+        )
+    ).one()
+    assert entry.data["createdPlans"] == [str(plan.id)]
+    assert "allocations" not in entry.data
 
 
 async def test_the_plan_switch_goes_off_only_without_a_decision(session: AsyncSession) -> None:
-    """Off deletes a Stammplan of the switch, and a plan with more refuses.
+    """Off deletes a draft of the switch, and a plan with more refuses.
 
     Rule: §F/finance/budget/000814.
     """
@@ -336,8 +378,7 @@ async def test_the_plan_switch_goes_off_only_without_a_decision(session: AsyncSe
         select(BudgetPlan.id).where(BudgetPlan.fiscal_year_id == t.fy.id)
     )
     assert second not in (None, first)
-    await t.svc.create_nachtrag(t.top.id, t.fy.id)
-    await session.commit()
+    await _in_force(t)
     with pytest.raises(ConflictError) as held:
         await t.svc.set_plan_switch(t.top.id, False)
     assert _code(held) == "plan_switch_has_plans"
@@ -384,7 +425,7 @@ async def test_create_plan(session: AsyncSession) -> None:
     with pytest.raises(ConflictError) as exc:
         await t.svc.create_plan(t.top.id, t.fy.id, PlanCreate())
     assert _code(exc) == "plan_exists"
-    plan = await _draft(t)
+    plan = await _draft(t, sides=False)
     stamm = _version(plan)
     assert (stamm.number, stamm.state, stamm.lines) == (0, "draft", ())
     assert await t.svc.plan_exists(t.fy.id)
@@ -404,6 +445,8 @@ async def test_create_plan_copies_the_plan_in_force_of_another_year(
         vid, t.exp_a.id, PlanLineSet(amount=D(60), note="je Fachschaft", transferable=True)
     )
     nxt = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2027))
+    await session.execute(delete(BudgetPlan).where(BudgetPlan.fiscal_year_id == nxt.id))
+    await session.commit()
     with pytest.raises(ValidationProblem) as exc:
         await t.svc.create_plan(t.top.id, nxt.id, PlanCreate(copyFromFiscalYearId=t.fy.id))
     assert _code(exc) == "plan_copy_source_invalid"
@@ -431,7 +474,7 @@ async def test_create_plan_copies_the_plan_in_force_of_another_year(
 async def test_a_parent_holds_the_sum_of_its_children(session: AsyncSession) -> None:
     """§F/finance/budget/000794: the Ansatz of a parent rises and falls with its children."""
     t = await _tree(session)
-    vid = _version(await _draft(t)).id
+    vid = _version(await _draft(t, sides=False)).id
     plan = await t.svc.set_line(vid, t.exp.id, PlanLineSet(amount=D(90), blocked=D(70)))
     assert _amounts(_version(plan)) == {t.exp.id: D(90)}
     plan = await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(60)))
@@ -456,7 +499,7 @@ async def test_delete_line_lowers_the_parent(session: AsyncSession) -> None:
     Rule: §F/finance/budget/000794.
     """
     t = await _tree(session)
-    vid = _version(await _draft(t)).id
+    vid = _version(await _draft(t, sides=False)).id
     await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(60)))
     await t.svc.set_line(vid, t.exp_b.id, PlanLineSet(amount=D(40)))
     plan = await t.svc.delete_line(vid, t.exp_b.id)
@@ -471,7 +514,7 @@ async def test_delete_node_lowers_the_parent_of_a_draft(session: AsyncSession) -
     Rules: §F/finance/budget/000794, §F/finance/budget/000820.
     """
     t = await _tree(session)
-    vid = _version(await _draft(t)).id
+    vid = _version(await _draft(t, sides=False)).id
     await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(60)))
     await t.svc.set_line(vid, t.exp_b.id, PlanLineSet(amount=D(40)))
     await session.commit()
@@ -515,12 +558,14 @@ async def test_a_side_sum_above_the_largest_amount_is_refused(session: AsyncSess
     """
     t = await _tree(session)
     more = await t.svc.create_node(
-        BudgetNodeCreate(key="9", name="Sonstiges", parentId=t.top.id, side="expense")
+        BudgetNodeCreate(key="9", name="Sonstiges", parentId=t.top.id)
     )
     gain = await t.svc.create_node(
-        BudgetNodeCreate(key="2", name="Spenden", parentId=t.top.id, side="income")
+        BudgetNodeCreate(key="2", name="Spenden", parentId=t.top.id)
     )
     vid = _version(await _draft(t)).id
+    await t.svc.set_line(vid, more.id, PlanLineSet(side="expense"))
+    await t.svc.set_line(vid, gain.id, PlanLineSet(side="income"))
     largest = D("9999999999.99")
     await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=largest))
     await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=largest))
@@ -598,9 +643,8 @@ async def test_set_line_checks_the_node_and_the_marks(session: AsyncSession) -> 
     )
     session.add(orphan)
     await session.commit()
-    with pytest.raises(ValidationProblem) as exc:
-        await t.svc.set_line(vid, orphan.id, PlanLineSet(amount=D(1)))
-    assert _code(exc) == "plan_side_missing"
+    plan = await t.svc.set_line(vid, orphan.id, PlanLineSet(amount=D(1)))
+    assert next(x for x in _version(plan).lines if x.budget_id == orphan.id).side is None
 
 
 async def test_delete_line(session: AsyncSession) -> None:
@@ -769,7 +813,8 @@ async def test_create_a_cost_centre_in_a_draft(session: AsyncSession) -> None:
         select(Budget).where(Budget.parent_id == t.exp.id, Budget.key == "3")
     )
     assert node is not None
-    assert (node.side, node.path_key.endswith("-8-3")) == ("expense", True)
+    assert node.path_key.endswith("-8-3")
+    assert next(x for x in _version(out).lines if x.budget_id == node.id).side == "expense"
     assert _amounts(_version(out))[node.id] == D(5)
     assert _amounts(_version(out))[t.exp.id] == D(105)
     direct = await t.svc.create_plan_node(
@@ -903,22 +948,28 @@ async def test_a_closed_year_refuses_plan_writes(session: AsyncSession) -> None:
         assert _code(exc) == "fiscal_year_closed"
 
 
-async def test_a_year_with_a_plan_refuses_a_direct_allocation(session: AsyncSession) -> None:
-    """§F/finance/budget/000798: 409 allocation_from_plan, and only while the plan switch is on."""
+async def test_a_year_with_a_plan_in_force_refuses_a_direct_allocation(
+    session: AsyncSession,
+) -> None:
+    """A year takes an allocation by hand until a version of its plan is in force.
+
+    Rules: §F/finance/budget/000798, §F/finance/budget/000854.
+    """
     t = await _tree(session)
+    by_hand = await t.svc.set_allocation(t.top.id, t.fy.id, AllocationSet(allocated=D(5)))
+    assert by_hand.allocated == D(5)
+    await session.commit()
+    await _in_force(t)
     with pytest.raises(ConflictError) as exc:
         await t.svc.set_allocation(t.exp.id, t.fy.id, AllocationSet(allocated=D(5)))
     assert _code(exc) == "allocation_from_plan"
     nxt = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2027))
-    await t.svc.set_allocation(t.top.id, nxt.id, AllocationSet(allocated=D(5)))
-    await t.svc.set_plan_switch(t.top.id, False)
-    await session.commit()
-    out = await t.svc.set_allocation(t.top.id, t.fy.id, AllocationSet(allocated=D(5)))
+    out = await t.svc.set_allocation(t.top.id, nxt.id, AllocationSet(allocated=D(5)))
     assert out.allocated == D(5)
 
 
 async def test_revert_of_a_first_allocation_respects_the_plan(session: AsyncSession) -> None:
-    """The revert of an allocation in a year with a plan answers 409 allocation_from_plan.
+    """The revert of an allocation in a year with a plan in force answers 409 allocation_from_plan.
 
     Rule: §F/finance/budget/000798.
     """
@@ -938,6 +989,11 @@ async def test_revert_of_a_first_allocation_respects_the_plan(session: AsyncSess
     ).first()
     assert entry is not None
     await t.svc.set_plan_switch(t.top.id, True)
+    await session.commit()
+    vid = _version(await t.svc.get_plan(t.top.id, t.fy.id)).id
+    await _sided(t, vid)
+    await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(5)))
+    await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
     await session.commit()
     with pytest.raises(ConflictError) as exc:
         await t.svc.revert_audit(entry, "tester")
@@ -982,12 +1038,15 @@ async def test_each_plan_change_is_audited(session: AsyncSession) -> None:
         "budget_plan_line_set",
         "budget_plan_line_set",
         "budget_plan_line_set",
+        "budget_plan_line_set",
+        "budget_plan_line_set",
         "budget_plan_state",
     ]
     assert {r.actor for r in rows} == {"tester"}
     assert rows[0].data["number"] == 0
-    assert rows[2].data["raised"] == {str(t.exp.id): "60.00"}
-    assert rows[2].data["blocked"] == "0.00"
+    assert (rows[1].data["side"], rows[1].data["previousSide"]) == ("income", None)
+    assert rows[4].data["raised"] == {str(t.exp.id): "60.00"}
+    assert rows[4].data["blocked"] == "0.00"
     assert rows[-1].data["allocations"][str(t.top.id)] == ["0.00", "100.00"]
     assert (rows[-1].data["before"], rows[-1].data["after"]) == ("draft", "in_force")
     assert rows[-1].data["versionId"] == str(plan.versions[0].id)
@@ -1219,7 +1278,7 @@ async def test_the_first_child_line_takes_the_ansatz_of_its_parent(session: Asyn
     other_vid = _version(await _draft(other)).id
     await other.svc.set_line(other_vid, other.exp.id, PlanLineSet(amount=D(90)))
     typed = _version(await other.svc.set_line(other_vid, other.exp_a.id, PlanLineSet(amount=D(5))))
-    assert _amounts(typed) == {other.exp.id: D(5), other.exp_a.id: D(5)}
+    assert _amounts(typed) == {other.inc.id: D(0), other.exp.id: D(5), other.exp_a.id: D(5)}
 
 
 async def test_a_line_request_changes_only_the_fields_it_names(session: AsyncSession) -> None:
@@ -1246,6 +1305,7 @@ async def test_a_draft_version_is_deleted(session: AsyncSession) -> None:
     Rules: §F/finance/budget/000835, §F/finance/budget/000793.
     """
     t = await _tree(session)
+    await _in_force(t)
     plan = await t.svc.create_nachtrag(t.top.id, t.fy.id)
     await session.commit()
     stamm, nachtrag = plan.versions
@@ -1278,12 +1338,13 @@ async def test_a_fiscal_year_with_a_decided_plan_is_not_deleted(session: AsyncSe
     Rules: §F/finance/budget/000836, §F/finance/budget/000801.
     """
     t = await _tree(session)
+    await _in_force(t)
     with pytest.raises(ConflictError) as decided:
         await t.svc.delete_fiscal_year(t.top.id, t.fy.id)
     assert _code(decided) == "fiscal_year_has_plan"
 
     later = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2027))
-    drafted = await t.svc.create_plan(t.top.id, later.id, PlanCreate())
+    drafted = await t.svc.get_plan(t.top.id, later.id)
     await session.commit()
     await t.svc.delete_fiscal_year(t.top.id, later.id)
     assert await session.get(BudgetPlan, drafted.id) is None
@@ -1304,7 +1365,7 @@ async def test_a_version_without_a_line_does_not_come_into_force(session: AsyncS
     Rule: §F/finance/budget/000792.
     """
     t = await _tree(session)
-    vid = _version(await _draft(t)).id
+    vid = _version(await _draft(t, sides=False)).id
     with pytest.raises(ValidationProblem) as empty:
         await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
     assert _code(empty) == "plan_empty"
@@ -1330,14 +1391,14 @@ async def test_a_version_in_force_does_not_come_into_force_again(session: AsyncS
 async def test_the_side_of_a_closed_year_does_not_change(session: AsyncSession) -> None:
     """The plan of a closed fiscal year keeps the side of each line.
 
-    Rules: §F/finance/budget/000801, §F/finance/budget/000817.
+    Rules: §F/finance/budget/000801, §F/finance/budget/000853.
     """
     t = await _tree(session)
+    vid = _version(await _draft(t)).id
     await t.svc.set_fiscal_year_closed(t.top.id, t.fy.id, closed=True)
     with pytest.raises(ConflictError) as closed:
-        await t.svc.set_side(t.exp.id, "income")
+        await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="income"))
     assert _code(closed) == "fiscal_year_closed"
-    assert (await t.svc.set_side(t.exp.id, "expense")).side == "expense"
 
 
 async def test_a_copy_gives_each_parent_the_sum_of_its_children(session: AsyncSession) -> None:
@@ -1418,6 +1479,7 @@ async def test_the_year_of_a_decided_plan_is_fixed(session: AsyncSession) -> Non
     Rule: §F/finance/budget/000836.
     """
     t = await _tree(session)
+    await _in_force(t)
     with pytest.raises(ConflictError) as decided:
         await t.svc.update_fiscal_year(t.top.id, t.fy.id, FiscalYearUpdate(year=2031))
     assert _code(decided) == "fiscal_year_has_plan"
@@ -1476,36 +1538,41 @@ async def test_a_request_passes_only_the_step_it_names(session: AsyncSession) ->
 async def test_an_income_side_takes_the_vermerke_off_the_draft_line(
     session: AsyncSession,
 ) -> None:
-    """A Kostenstelle that becomes income keeps no Vermerk in a draft.
+    """A Titel that becomes income keeps no Vermerk on its lines of the draft.
 
-    Rules: §F/finance/budget/000816, §F/finance/budget/000817.
+    Rules: §F/finance/budget/000816, §F/finance/budget/000853.
     """
     t = await _tree(session)
-    vid = _version(await _draft(t)).id
+    plan = await _draft(t)
+    vid = _version(plan).id
     await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(transferable=True, coverable=True))
     await session.commit()
-    await t.svc.set_side(t.exp.id, "income")
+    with pytest.raises(ValidationProblem) as marked:
+        await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="income", coverable=True))
+    assert _code(marked) == "plan_marks_income"
+    await session.rollback()
+    await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="income"))
     await session.commit()
     session.expire_all()
     line = next(
         ln for ln in _version(await t.svc.get_plan(t.top.id, t.fy.id)).lines
         if ln.budget_id == t.exp_a.id
     )
-    assert (line.transferable, line.coverable) == (False, False)
+    assert (line.side, line.transferable, line.coverable) == ("income", False, False)
     entry = (
         await session.scalars(
             select(AuditEntry)
             .where(
-                AuditEntry.action == AuditAction.BUDGET_SIDE_SET.value,
-                AuditEntry.target_id == str(t.exp.id),
+                AuditEntry.action == AuditAction.BUDGET_PLAN_LINE_SET.value,
+                AuditEntry.target_id == str(plan.id),
             )
             .order_by(AuditEntry.id.desc())
         )
     ).first()
     assert entry is not None
+    assert (entry.data["side"], entry.data["previousSide"]) == ("income", "expense")
     assert entry.data["clearedMarks"] == [
         {
-            "versionId": str(vid),
             "budgetId": str(t.exp_a.id),
             "pathKey": t.exp_a.path_key,
             "name": "Fachschaften",
@@ -1516,19 +1583,26 @@ async def test_an_income_side_takes_the_vermerke_off_the_draft_line(
     ]
 
 
-async def test_a_vermerk_of_a_decided_plan_keeps_the_side(session: AsyncSession) -> None:
-    """A Kostenstelle with a Vermerk in a decided version does not become income.
+async def test_a_decided_version_keeps_the_side_of_its_titel(session: AsyncSession) -> None:
+    """A version that left the draft keeps its sides, and a Nachtrag starts with them.
 
-    Rules: §F/finance/budget/000816, §F/finance/budget/000817.
+    Rules: §F/finance/budget/000853, §F/finance/budget/000793.
     """
     t = await _tree(session)
-    vid = _version(await _draft(t)).id
-    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(transferable=True))
-    await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
-    await session.commit()
+    vid = _version(await _in_force(t)).id
     with pytest.raises(ConflictError) as exc:
-        await t.svc.set_side(t.exp.id, "income")
-    assert _code(exc) == "side_in_plan"
+        await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="income"))
+    assert _code(exc) == "plan_version_locked"
+    await session.rollback()
+    nachtrag = _version(await t.svc.create_nachtrag(t.top.id, t.fy.id))
+    assert {line.budget_id: line.side for line in nachtrag.lines} == {
+        t.inc.id: "income", t.exp.id: "expense", t.exp_a.id: "expense", t.exp_b.id: "expense",
+    }
+    moved = _version(await t.svc.set_line(nachtrag.id, t.exp.id, PlanLineSet(side="income")))
+    assert next(x for x in moved.lines if x.budget_id == t.exp.id).side == "income"
+    await session.commit()
+    first = _version(await t.svc.get_plan(t.top.id, t.fy.id), 0)
+    assert next(x for x in first.lines if x.budget_id == t.exp.id).side == "expense"
 
 
 async def test_the_delete_of_a_budget_names_its_plans(session: AsyncSession) -> None:
@@ -1571,10 +1645,10 @@ async def test_plan_entries_keep_the_names_of_what_they_change(session: AsyncSes
             select(AuditEntry)
             .where(AuditEntry.action.like("budget_plan_%"))
             .order_by(AuditEntry.id.desc())
-            .limit(3)
+            .limit(5)
         )
     ).all()
-    removed, added, created = entries
+    removed, added, _expense, _income, created = entries
     assert (created.data["budget"], created.data["year"]) == (t.top.path_key, 2026)
     await _steps(t, "Beschluss")
     await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(5)))
@@ -1606,9 +1680,9 @@ async def test_plan_entries_keep_the_names_of_what_they_change(session: AsyncSes
         ("line", None),
         ("year", None),
         ("delete_version", None),
-        ("delete_year", "fiscal_year_has_allocations"),
-        ("allocation", "allocation_from_plan"),
-        ("switch", "plan_switch_has_plans"),
+        ("delete_year", None),
+        ("allocation", None),
+        ("switch", None),
         ("nachtrag", "plan_draft_exists"),
         ("state", "plan_not_balanced"),
         ("plan", "plan_exists"),
@@ -1619,7 +1693,7 @@ async def test_plan_entries_keep_the_names_of_what_they_change(session: AsyncSes
         ("step_vote", "plan_no_step_left"),
         ("draft", "plan_state_invalid"),
         ("plan_node", None),
-        ("delete_line", "plan_line_not_found"),
+        ("delete_line", None),
         ("revert", None),
     ],
 )
@@ -1670,7 +1744,7 @@ async def test_a_write_beside_a_plan_waits_for_the_lock_of_its_budget(
             case "reopen":
                 await svc.set_fiscal_year_closed(t.top.id, t.fy.id, closed=False)
             case "side":
-                await svc.set_side(t.exp.id, "expense")
+                await svc.set_line(vid, t.exp.id, PlanLineSet(side="expense"))
             case "steps":
                 await svc.set_plan_steps(t.top.id, PlanStepsSet(steps=()))
             case "line":
@@ -1682,7 +1756,7 @@ async def test_a_write_beside_a_plan_waits_for_the_lock_of_its_budget(
             case "delete_year":
                 await svc.delete_fiscal_year(t.top.id, t.fy.id)
             case "allocation":
-                await svc.set_allocation(t.exp_a.id, t.fy.id, AllocationSet(allocated=D(1)))
+                await svc.set_allocation(t.top.id, t.fy.id, AllocationSet(allocated=D(1)))
             case "switch":
                 await svc.set_plan_switch(t.top.id, False)
             case "nachtrag":
@@ -1743,7 +1817,7 @@ async def test_deletes_name_the_plan_data_that_goes_with_them(session: AsyncSess
     ]
     await session.commit()
     later = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2027))
-    drafted = await t.svc.create_plan(t.top.id, later.id, PlanCreate())
+    drafted = await t.svc.get_plan(t.top.id, later.id)
     await session.commit()
     await t.svc.delete_fiscal_year(t.top.id, later.id)
     year = (
@@ -1804,32 +1878,6 @@ async def test_a_key_taken_at_the_same_moment_is_a_conflict(
     assert _code(off) == "side_not_settable"
 
 
-async def test_the_preview_counts_with_sides_that_are_not_saved(session: AsyncSession) -> None:
-    """The form shows the changed allocations before it saves a side.
-
-    Rules: §F/finance/budget/000803, §F/finance/budget/000840.
-    """
-    t = await _tree(session, sides=False)
-    await t.svc.set_allocation(t.top.id, t.fy.id, AllocationSet(allocated=D(100)))
-    await t.svc.set_allocation(t.inc.id, t.fy.id, AllocationSet(allocated=D(20)))
-    await t.svc.set_allocation(t.exp.id, t.fy.id, AllocationSet(allocated=D(80)))
-    await t.svc.set_allocation(t.exp_a.id, t.fy.id, AllocationSet(allocated=D(30)))
-    await session.commit()
-    preview = await t.svc.preview_plan_switch(
-        t.top.id, {t.inc.id: "income", t.exp.id: "expense"}
-    )
-    await session.rollback()
-    assert [(c.path_key, c.allocated, c.planned) for c in preview.changes] == [
-        (t.top.path_key, D(100), D(30)),
-        (t.inc.path_key, D(20), D(0)),
-        (t.exp.path_key, D(80), D(30)),
-    ]
-    sides = (
-        await session.scalars(select(Budget.side).where(Budget.id.in_([t.inc.id, t.exp.id])))
-    ).all()
-    assert list(sides) == [None, None]
-
-
 async def test_a_plan_that_went_while_a_write_waited_is_not_found(
     session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1872,36 +1920,33 @@ async def test_a_version_that_went_while_a_write_waited_is_not_found(
     assert await t.svc.lock_plan_of_version(vid) is None
 
 
-async def test_an_allocation_that_waited_for_the_plan_switch_is_refused(
+async def test_an_allocation_that_waited_for_the_plan_is_refused(
     session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An allocation by hand checks the plan switch after it has the lock of the budget.
+    """An allocation by hand checks the plan after it has the lock of the budget.
 
-    The switch goes on while the allocation waits, so the allocation reads the switch
-    again and is refused: the Stammplan in force keeps the allocation it wrote.
+    The plan comes into force while the allocation waits, so the allocation reads the
+    plan again and is refused: the version in force keeps the allocation it wrote.
     Rules: §F/finance/budget/000842, §F/finance/budget/000798.
     """
-    t = await _tree(session, enabled=False)
-    await t.svc.set_allocation(t.top.id, t.fy.id, AllocationSet(allocated=D(100)))
-    await t.svc.set_allocation(t.exp.id, t.fy.id, AllocationSet(allocated=D(30)))
-    await t.svc.set_allocation(t.exp_a.id, t.fy.id, AllocationSet(allocated=D(30)))
-    await session.commit()
+    t = await _tree(session)
+    vid = _version(await _balanced_draft(t)).id
     lock = t.svc._lock_tree
 
-    async def switch_goes_on(budget_id: uuid.UUID | None) -> None:
+    async def plan_comes_into_force(budget_id: uuid.UUID | None) -> None:
         async with async_sessionmaker(session.bind, expire_on_commit=False)() as other:
-            await BudgetTreeService(other, actor="tester").set_plan_switch(
-                t.top.id, True, confirm_changes=True
+            await BudgetTreeService(other, actor="tester").set_plan_state(
+                vid, PlanStateSet(state="in_force")
             )
             await other.commit()
         await lock(budget_id)
 
-    monkeypatch.setattr(t.svc, "_lock_tree", switch_goes_on)
+    monkeypatch.setattr(t.svc, "_lock_tree", plan_comes_into_force)
     with pytest.raises(ConflictError) as refused:
         await t.svc.set_allocation(t.exp_a.id, t.fy.id, AllocationSet(allocated=D(20)))
     assert _code(refused) == "allocation_from_plan"
     await session.rollback()
-    assert (await _allocations(session, t))[t.exp_a.id] == D(30)
+    assert (await _allocations(session, t))[t.exp_a.id] == D(60)
 
 
 async def test_the_close_of_a_step_vote_locks_the_plan_before_the_audit_entry(
@@ -2074,7 +2119,6 @@ async def test_a_gremium_with_a_budget_is_not_deleted(session: AsyncSession) -> 
     )
     exp = await svc.create_node(BudgetNodeCreate(key="8", name="Ausgaben", parentId=top.id))
     fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
-    await svc.set_side(exp.id, "expense")
     await svc.set_plan_switch(top.id, True)
     await session.commit()
     admin = Principal(sub="admin", roles=["admin"])
@@ -2179,3 +2223,189 @@ async def test_the_read_of_a_version_beside_its_delete_is_no_error(
     shown = await t.svc.plan_of_version(vid)
     assert shown.fiscal_year_id == t.fy.id
     assert vid not in [version.id for version in shown.versions]
+
+
+def _by_hand(state: str, step: int | None = None) -> PlanStateByHand:
+    return PlanStateByHand.model_validate({"state": state, "step": step, "reason": "Altbestand"})
+
+
+async def test_a_state_by_hand_moves_forwards_and_backwards(session: AsyncSession) -> None:
+    """The newest version takes the draft, each step and the state in force by hand.
+
+    The steps before the chosen state are passed by hand, the steps after it are open,
+    and a version that leaves the state in force keeps the allocations.
+    Rules: §F/finance/budget/000855, §F/finance/budget/000802.
+    """
+    t = await _tree(session)
+    await _steps(t, "Beschluss", "Genehmigung")
+    plan = await _balanced_draft(t)
+    vid = _version(plan).id
+
+    second = _version(await t.svc.set_state_by_hand(vid, _by_hand("in_progress", 1)))
+    assert second.state == "in_progress"
+    assert [(s.name, s.passed_at is not None, s.by_hand) for s in second.steps] == [
+        ("Beschluss", True, True),
+        ("Genehmigung", False, False),
+    ]
+    assert await _allocations(session, t) == {}
+    await session.commit()
+    with pytest.raises(ConflictError) as same:
+        await t.svc.set_state_by_hand(vid, _by_hand("in_progress", 1))
+    assert _code(same) == "plan_state_invalid"
+    await session.rollback()
+
+    first = _version(await t.svc.set_state_by_hand(vid, _by_hand("in_progress", 0)))
+    assert [(s.passed_at, s.by_hand) for s in first.steps] == [(None, False), (None, False)]
+
+    force = _version(await t.svc.set_state_by_hand(vid, _by_hand("in_force")))
+    assert (force.state, force.in_force_at is not None) == ("in_force", True)
+    assert [s.by_hand for s in force.steps] == [True, True]
+    await session.commit()
+    written = await _allocations(session, t)
+    assert written[t.exp_a.id] == D(60)
+    with pytest.raises(ConflictError) as again:
+        await t.svc.set_state_by_hand(vid, _by_hand("in_force"))
+    assert _code(again) == "plan_state_invalid"
+    await session.rollback()
+
+    back = _version(await t.svc.set_state_by_hand(vid, _by_hand("in_progress", 1)))
+    assert (back.state, back.in_force_at) == ("in_progress", None)
+    assert [s.passed_at is not None for s in back.steps] == [True, False]
+    draft = _version(await t.svc.set_state_by_hand(vid, _by_hand("draft")))
+    assert (draft.state, draft.in_force_at) == ("draft", None)
+    assert [(s.passed_at, s.by_hand) for s in draft.steps] == [(None, False), (None, False)]
+    assert {(line.name, line.path_key) for line in draft.lines} == {(None, None)}
+    assert await _allocations(session, t) == written
+    await session.commit()
+    with pytest.raises(ConflictError) as drafted:
+        await t.svc.set_state_by_hand(vid, _by_hand("draft"))
+    assert _code(drafted) == "plan_state_invalid"
+    await session.rollback()
+
+    rows = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_PLAN_STATE_SET.value)
+            .where(AuditEntry.target_id == str(plan.id))
+            .order_by(AuditEntry.id)
+        )
+    ).all()
+    assert [(r.data["before"], r.data["after"], r.data["step"]) for r in rows] == [
+        ("draft", "in_progress", "Genehmigung"),
+        ("in_progress", "in_progress", "Beschluss"),
+        ("in_progress", "in_force", None),
+        ("in_force", "in_progress", "Genehmigung"),
+        ("in_progress", "draft", None),
+    ]
+    assert {(r.actor, r.data["reason"], r.data["versionId"]) for r in rows} == {
+        ("tester", "Altbestand", str(vid))
+    }
+    assert rows[2].data["allocations"][str(t.top.id)] == ["0.00", "100.00"]
+    assert rows[3].data["allocations"] == {}
+
+
+async def test_a_state_by_hand_checks_the_step_and_the_draft(session: AsyncSession) -> None:
+    """A wrong step answers 422, and a draft leaves the draft only with its checks.
+
+    Rules: §F/finance/budget/000855, §F/finance/budget/000853, §F/finance/budget/000801.
+    """
+    t = await _tree(session)
+    await _steps(t, "Beschluss")
+    vid = _version(await _draft(t, sides=False)).id
+    for state, step in (("in_progress", None), ("in_progress", 1), ("draft", 0), ("in_force", 0)):
+        with pytest.raises(ValidationProblem) as wrong:
+            await t.svc.set_state_by_hand(vid, _by_hand(state, step))
+        assert _code(wrong) == "plan_step_invalid"
+        await session.rollback()
+    with pytest.raises(ValidationProblem) as empty:
+        await t.svc.set_state_by_hand(vid, _by_hand("in_force"))
+    assert _code(empty) == "plan_empty"
+    await session.rollback()
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(0)))
+    await session.commit()
+    with pytest.raises(ValidationProblem) as sides:
+        await t.svc.set_state_by_hand(vid, _by_hand("in_progress", 0))
+    assert _code(sides) == "plan_side_missing"
+    await session.rollback()
+    with pytest.raises(NotFoundError):
+        await t.svc.set_state_by_hand(uuid.uuid4(), _by_hand("draft"))
+    await t.svc.set_fiscal_year_closed(t.top.id, t.fy.id, closed=True)
+    with pytest.raises(ConflictError) as closed:
+        await t.svc.set_state_by_hand(vid, _by_hand("in_force"))
+    assert _code(closed) == "fiscal_year_closed"
+
+
+async def test_only_the_newest_version_takes_a_state_by_hand(session: AsyncSession) -> None:
+    """An older version keeps its state, and the newest one replaces the version in force.
+
+    Rules: §F/finance/budget/000855, §F/finance/budget/000792.
+    """
+    t = await _tree(session)
+    stamm = _version(await _in_force(t))
+    nachtrag = _version(await t.svc.create_nachtrag(t.top.id, t.fy.id))
+    await session.commit()
+    with pytest.raises(ConflictError) as older:
+        await t.svc.set_state_by_hand(stamm.id, _by_hand("draft"))
+    assert _code(older) == "plan_state_invalid"
+    await session.rollback()
+    plan = await t.svc.set_state_by_hand(nachtrag.id, _by_hand("in_force"))
+    assert [v.state for v in plan.versions] == ["replaced", "in_force"]
+
+
+async def test_a_state_by_hand_ends_the_open_vote_of_the_version(session: AsyncSession) -> None:
+    """The vote of a step does not stay open when the state changes by hand.
+
+    Rules: §F/finance/budget/000855, §F/finance/budget/000838.
+    """
+    t = await _tree(session)
+    gremium = await _gremium(session)
+    await _steps(t, "Beschluss", gremium_id=gremium)
+    vid = _version(await _balanced_draft(t)).id
+    step = _version(await t.svc.create_step_vote(vid)).steps[0]
+    assert step.vote_id is not None
+    await VotingService(session).open(step.vote_id, now=datetime.now(UTC), actor="mgr")
+    await session.commit()
+    done = _version(await t.svc.set_state_by_hand(vid, _by_hand("in_force")))
+    await session.commit()
+    assert done.state == "in_force"
+    vote = await session.get_one(Vote, step.vote_id)
+    await session.refresh(vote)
+    assert vote.status == "cancelled"
+
+
+async def test_a_new_fiscal_year_gets_a_draft(session: AsyncSession) -> None:
+    """A later year gets a draft, as a copy of the latest plan in force before it.
+
+    Rules: §F/finance/budget/000854, §F/finance/budget/000837.
+    """
+    off = await _tree(session, enabled=False)
+    plain = await off.svc.create_fiscal_year(off.top.id, FiscalYearCreate(year=2027))
+    assert not await off.svc.plan_exists(plain.id)
+
+    t = await _tree(session)
+    before = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2025))
+    empty = _version(await t.svc.get_plan(t.top.id, before.id))
+    assert (empty.number, empty.state) == (0, "draft")
+    assert {(line.amount, line.side) for line in empty.lines} == {(D(0), None)}
+    assert len(empty.lines) == 4
+
+    await _in_force(t)
+    nxt = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2027))
+    plan = await t.svc.get_plan(t.top.id, nxt.id)
+    copy = _version(plan)
+    assert (copy.number, copy.state, len(plan.versions)) == (0, "draft", 1)
+    assert {line.budget_id: (line.side, line.amount) for line in copy.lines} == {
+        t.inc.id: ("income", D(100)),
+        t.exp.id: ("expense", D(100)),
+        t.exp_a.id: ("expense", D(60)),
+        t.exp_b.id: ("expense", D(40)),
+    }
+    assert await _allocated(session, nxt.id) == {}
+    entry = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_PLAN_VERSION_CREATE.value)
+            .where(AuditEntry.target_id == str(plan.id))
+        )
+    ).one()
+    assert entry.data["copiedFromFiscalYearId"] == str(t.fy.id)

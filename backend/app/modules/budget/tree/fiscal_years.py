@@ -84,7 +84,10 @@ class FiscalYearOps(BudgetTreeServiceBase):
         }
 
     async def create_fiscal_year(self, budget_id: UUID, payload: FiscalYearCreate) -> FiscalYearOut:
-        """Create a fiscal year. Its bounds derive from the budget start date."""
+        """Create a fiscal year. Its bounds derive from the budget start date.
+
+        A budget with the plan switch on gives the year its draft plan.
+        """
         await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
         start, end = self._fiscal_year_bounds(
@@ -106,6 +109,8 @@ class FiscalYearOps(BudgetTreeServiceBase):
             active=payload.active,
         )
         self.session.add(fy)
+        await self.session.flush()
+        await self._plan_for_new_year(top, fy)
         await self.session.commit()
         return _fy_out(fy, top.fiscal_start_month, top.fiscal_start_day)
 

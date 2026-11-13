@@ -27,11 +27,10 @@ import { problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget-tree.api';
-import { BudgetPlanApi, type Side } from '../plan/budget-plan.api';
 import { ColourFieldComponent } from './colour-field.component';
 import { costCentreError, keyProblem, NAME_MAX } from './cost-centre.util';
 
-type Field = 'key' | 'name' | 'color' | 'side' | 'viewGremiumId' | 'decisionGremiumId' | 'active';
+type Field = 'key' | 'name' | 'color' | 'viewGremiumId' | 'decisionGremiumId' | 'active';
 type Value = string | boolean | null;
 
 /** A change of one field of a Kostenstelle that the person made. */
@@ -52,8 +51,6 @@ function savedValue(node: BudgetTreeNode, field: Field): Value {
       return node.name;
     case 'color':
       return node.color?.trim() ?? '';
-    case 'side':
-      return node.side ?? null;
     case 'viewGremiumId':
       return node.viewGremiumId ?? null;
     case 'decisionGremiumId':
@@ -70,7 +67,7 @@ interface Saved<T> {
 }
 
 /**
- * The settings of one Kostenstelle in the Budget tab: key, name, side, colour, the switch
+ * The settings of one Kostenstelle in the Budget tab: key, name, colour, the switch
  * "Aktiv" and its two Gremien. Each field saves when the person leaves it; `saved` then
  * tells the page to read the tree again and a toast says that the change is saved. A failed
  * save shows its reason and the field takes the saved value again.
@@ -92,18 +89,13 @@ interface Saved<T> {
 })
 export class CostCentreSettingsComponent {
   private readonly api = inject(BudgetTreeApi);
-  private readonly planApi = inject(BudgetPlanApi);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
   readonly node = input.required<BudgetTreeNode>();
-  /** The Kostenstelle is a direct child of a budget with a Haushaltsplan, so it has a side. */
-  readonly sided = input(false);
   readonly gremiumOptions = input<readonly SelectOption[]>([]);
   /** A save ended. The value says whether the server took it: the page reads the tree in both cases. */
   readonly saved = output<boolean>();
-  /** The side changed, so the lines of a plan can differ: the plan page reads its plan again. */
-  readonly sideSaved = output<void>();
   /** The section went off the page: a component that is gone cannot emit. */
   private gone = false;
 
@@ -145,10 +137,9 @@ export class CostCentreSettingsComponent {
   }
 
   /** Tell the page that a save ended, or the page that shows after this one. */
-  private tell(side: boolean, taken = true): void {
+  private tell(taken = true): void {
     if (this.gone) return this.api.changed.next();
     this.saved.emit(taken);
-    if (side) this.sideSaved.emit();
   }
 
   /**
@@ -210,7 +201,6 @@ export class CostCentreSettingsComponent {
   readonly key = this.field('key', (node) => node.key);
   readonly name = this.field('name', (node) => node.name);
   readonly colour = this.field('color', (node) => node.color?.trim() ?? '');
-  readonly side = this.choice<Side | null>('side', (node) => node.side ?? null);
   readonly viewGremium = this.choice('viewGremiumId', (node) => node.viewGremiumId ?? '');
   readonly decisionGremium = this.choice('decisionGremiumId', (node) => node.decisionGremiumId ?? '');
   /** The state that the switch shows: the last press, else the saved state. */
@@ -223,10 +213,6 @@ export class CostCentreSettingsComponent {
   readonly nameError = computed(() =>
     this.name().trim().length > NAME_MAX ? this.i18n.translate('budget.cc.error.nameLong') : '',
   );
-  readonly sides = computed<SelectOption[]>(() => [
-    { value: 'income', label: this.i18n.translate('budget.plan.side.income') },
-    { value: 'expense', label: this.i18n.translate('budget.plan.side.expense') },
-  ]);
 
   /**
    * Save the key or the name when the person leaves the field. An empty text is not saved:
@@ -250,12 +236,6 @@ export class CostCentreSettingsComponent {
   saveGremium(field: 'viewGremiumId' | 'decisionGremiumId', value: string | null): void {
     (field === 'viewGremiumId' ? this.viewGremium : this.decisionGremium).set(value ?? '');
     this.change(field, value || null);
-  }
-
-  saveSide(side: string | null): void {
-    if (!side) return;
-    this.side.set(side as Side);
-    this.change('side', side);
   }
 
   /** Save the switch "Aktiv". It stays enabled, because a disabled control loses the keyboard focus. */
@@ -345,8 +325,6 @@ export class CostCentreSettingsComponent {
         return this.name.set(value as string);
       case 'color':
         return this.colour.set(value as string);
-      case 'side':
-        return this.side.set(value as Side | null);
       case 'viewGremiumId':
         return this.viewGremium.set((value as string | null) ?? '');
       case 'decisionGremiumId':
@@ -371,12 +349,11 @@ export class CostCentreSettingsComponent {
     const before = this.sent[key];
     this.sent = { ...this.sent, [key]: { value, seen: false } };
     this.running.set(true);
-    const request: Observable<unknown> =
-      field === 'side' ? this.planApi.setSide(id, value as Side) : this.api.updateNode(id, { [field]: value });
+    const request: Observable<unknown> = this.api.updateNode(id, { [field]: value });
     request
       .pipe(
         finalize(() => {
-          void [this.side(), this.viewGremium(), this.decisionGremium(), this.active()];
+          void [this.viewGremium(), this.decisionGremium(), this.active()];
           this.running.set(false);
           this.current = null;
           this.next();
@@ -386,7 +363,7 @@ export class CostCentreSettingsComponent {
       .subscribe({
         next: () => {
           this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
-          this.tell(field === 'side');
+          this.tell();
         },
         error: (err: unknown) => {
           this.toast.error(this.i18n.translate(costCentreError(problemCode(err))));
@@ -394,7 +371,7 @@ export class CostCentreSettingsComponent {
           const known = this.known(id, field);
           const waits = this.waiting().some((c) => c.id === id && c.field === field);
           if (this.node().id === id && known !== undefined && !waits) this.show(field, known);
-          this.tell(false, false);
+          this.tell(false);
         },
       });
   }

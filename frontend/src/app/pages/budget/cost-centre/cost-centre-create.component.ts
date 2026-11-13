@@ -38,8 +38,8 @@ export interface CostCentreCreated {
 
 /**
  * The dialog "Kostenstelle anlegen" of the Budget tab. It takes the parent, the key and the
- * name, and the side for a direct child of a budget with a Haushaltsplan. With `versionId`
- * it creates the Kostenstelle in that draft version together with its Ansatz.
+ * name. With `versionId` it creates the Kostenstelle in that draft version together with its
+ * Ansatz, and a Titel then also takes its side, because the plan line of a Titel holds it.
  */
 @Component({
   selector: 'app-cost-centre-create',
@@ -99,11 +99,8 @@ export class CostCentreCreateComponent {
   /** The new node is a Titel: it goes directly below the Haushalt. */
   readonly titled = computed(() => this.parentId() === this.top()?.id);
   readonly titleKey = computed(() => createKey(this.parentId(), this.top()));
-  /** A direct child of a budget with a Haushaltsplan needs a side. */
-  readonly sided = computed(() => {
-    const top = this.top();
-    return !!top?.planEnabled && this.parentId() === top.id;
-  });
+  /** A Titel that is created in a draft needs the side of its line. */
+  readonly sided = computed(() => !!this.versionId() && this.titled());
   /** The error under the key: only letters and digits, at most 64 characters. */
   readonly keyError = computed(() =>
     keyProblem(this.key().trim()) ? this.i18n.translate('budget.cc.error.keyInvalid') : '',
@@ -166,7 +163,6 @@ export class CostCentreCreateComponent {
       parentId: this.parentId() as Uuid,
       key: this.key().trim(),
       name: this.name().trim(),
-      side: this.sided() ? this.side() : null,
     };
     this.busy.set(true);
     const done = (result: CostCentreCreated): void => {
@@ -180,7 +176,7 @@ export class CostCentreCreateComponent {
     };
     if (version)
       this.planApi
-        .createNode(version as Uuid, { ...body, amount: this.amount() || '0' })
+        .createNode(version as Uuid, { ...body, side: this.sided() ? this.side() : null, amount: this.amount() || '0' })
         .subscribe({ next: (plan) => done({ id: null, plan }), error: failed });
     else
       this.api

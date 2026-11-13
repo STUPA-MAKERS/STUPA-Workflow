@@ -4,31 +4,25 @@ import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { TestBed } from '@angular/core/testing';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget-tree.api';
-import { BudgetPlanApi } from '../plan/budget-plan.api';
 import { node } from '../plan/budget-plan.fixtures';
 import { PALETTE } from '../budget-color.util';
 import { CostCentreSettingsComponent } from './cost-centre-settings.component';
 
-const KS = node({ id: 'ks', parentId: 'top', key: '800', name: 'Kultur', color: ' #112233 ', side: 'income' });
+const KS = node({ id: 'ks', parentId: 'top', key: '800', name: 'Kultur', color: ' #112233 ' });
 
-async function setup(over: Partial<BudgetTreeNode> = {}, fail = '', sided = true) {
+async function setup(over: Partial<BudgetTreeNode> = {}, fail = '') {
   TestBed.resetTestingModule();
   const answer = () => (fail ? throwError(() => ({ status: 409, error: { code: fail } })) : of({}));
   const api = { updateNode: jest.fn((_id: string, _patch: object) => answer()), changed: new Subject<void>() };
-  const planApi = { setSide: jest.fn((_id: string, _side: string) => answer()) };
   const saved = jest.fn();
-  const sideSaved = jest.fn();
   const view = await render(CostCentreSettingsComponent, {
-    inputs: { node: { ...KS, ...over }, sided, gremiumOptions: [{ value: 'g1', label: 'StuPa' }] },
-    on: { saved, sideSaved },
-    providers: [
-      { provide: BudgetTreeApi, useValue: api },
-      { provide: BudgetPlanApi, useValue: planApi },
-    ],
+    inputs: { node: { ...KS, ...over }, gremiumOptions: [{ value: 'g1', label: 'StuPa' }] },
+    on: { saved },
+    providers: [{ provide: BudgetTreeApi, useValue: api }],
   });
   const toast = TestBed.inject(ToastService);
   const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
-  return { ...view, api, planApi, saved, sideSaved, field, success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
+  return { ...view, api, saved, field, success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
 }
 
 /** Replace the text of a field and leave the field. */
@@ -46,16 +40,14 @@ async function pick(label: RegExp, option: string): Promise<void> {
 describe('CostCentreSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('shows the fields of the Kostenstelle, the side only with a Haushaltsplan', async () => {
+  it('§F/finance/budget/000831 §F/finance/budget/000853: shows the fields of the Kostenstelle and no side', async () => {
     const view = await setup();
     await waitFor(() => expect(view.field('Schlüssel').value).toBe('800'));
     expect(view.field('Name').value).toBe('Kultur');
-    expect(screen.getByRole('combobox', { name: /Seite/ })).toHaveTextContent('Einnahme');
+    expect(screen.queryByRole('combobox', { name: /Seite/ })).toBeNull();
     expect(view.field('Farbe als Hex-Wert').value).toBe('#112233');
     expect(screen.getByRole('combobox', { name: /Sichtbar für Gremium/ })).toHaveTextContent('Ohne Gremium');
     expect(screen.getByRole('combobox', { name: /Entscheidendes Gremium/ })).toHaveTextContent('Wie übergeordnet');
-    await setup({}, '', false);
-    expect(screen.queryByRole('combobox', { name: /Seite/ })).toBeNull();
   });
 
   it('§F/finance/budget/000831: saves a changed key or name when the person leaves the field', async () => {
@@ -63,7 +55,6 @@ describe('CostCentreSettingsComponent', () => {
     await retype(view.field('Name'), ' Kultur und Sport ');
     expect(view.api.updateNode).toHaveBeenCalledWith('ks', { name: 'Kultur und Sport' });
     expect(view.saved).toHaveBeenCalledTimes(1);
-    expect(view.sideSaved).not.toHaveBeenCalled();
     expect(view.success).toHaveBeenCalledWith('Gespeichert.');
     await retype(view.field('Schlüssel'), '800');
     expect(view.api.updateNode).toHaveBeenCalledTimes(1);
@@ -572,15 +563,12 @@ describe('CostCentreSettingsComponent', () => {
     ]);
   });
 
-  it('saves no side and no Gremium that did not change', async () => {
+  it('saves no Gremium that did not change', async () => {
     const view = await setup({ viewGremiumId: 'g1' });
     const settings = view.fixture.componentInstance;
-    settings.saveSide(null);
-    settings.saveSide(settings.node().side ?? null);
     settings.saveGremium('viewGremiumId', 'g1');
     settings.saveGremium('decisionGremiumId', null);
     settings.saveGremium('decisionGremiumId', '');
-    expect(view.planApi.setSide).not.toHaveBeenCalled();
     expect(view.api.updateNode).not.toHaveBeenCalled();
   });
 
@@ -601,29 +589,6 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.api.updateNode).toHaveBeenCalledTimes(1);
   });
 
-  it('§F/finance/budget/000795: saves another side through the plan API', async () => {
-    const view = await setup();
-    await pick(/Seite/, 'Einnahme');
-    expect(view.planApi.setSide).not.toHaveBeenCalled();
-    await pick(/Seite/, 'Ausgabe');
-    expect(view.planApi.setSide).toHaveBeenCalledWith('ks', 'expense');
-    expect(view.saved).toHaveBeenCalledTimes(1);
-    expect(view.sideSaved).toHaveBeenCalledTimes(1);
-    expect(view.success).toHaveBeenCalledWith('Gespeichert.');
-  });
-
-  it('§F/finance/budget/000795 §F/finance/budget/000816: a refused side shows its reason and the saved side again', async () => {
-    const view = await setup();
-    const pending = new Subject<object>();
-    view.planApi.setSide.mockReturnValueOnce(pending);
-    await pick(/Seite/, 'Ausgabe');
-    expect(screen.getByRole('combobox', { name: /Seite/ })).toHaveTextContent('Ausgabe');
-    pending.error({ status: 409, error: { code: 'side_in_plan' } });
-    expect(view.error).toHaveBeenCalledWith('Die Seite lässt sich nicht ändern, weil der Titel einen Ansatz oder einen Vermerk in einem Plan hat.');
-    await waitFor(() => expect(screen.getByRole('combobox', { name: /Seite/ })).toHaveTextContent('Einnahme'));
-    expect(view.sideSaved).not.toHaveBeenCalled();
-  });
-
   it('shows the reason of a refused save and takes the saved values again', async () => {
     const view = await setup({}, 'budget_key_exists');
     await retype(view.field('Schlüssel'), '900');
@@ -633,7 +598,7 @@ describe('CostCentreSettingsComponent', () => {
   });
 
   it('takes the empty colour again after a refused save of a Kostenstelle without one', async () => {
-    const view = await setup({ color: null, side: undefined }, 'x');
+    const view = await setup({ color: null }, 'x');
     await userEvent.click(screen.getByRole('button', { name: `Farbe ${PALETTE[0]}` }));
     expect(view.error).toHaveBeenCalledWith('Die Kostenstelle konnte nicht gespeichert werden.');
     await waitFor(() => expect(view.field('Farbe als Hex-Wert').value).toBe(''));

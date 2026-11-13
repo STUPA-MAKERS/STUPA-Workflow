@@ -10,7 +10,7 @@ from sqlalchemy import and_, select
 
 from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
-from app.modules.budget.plan_models import BudgetPlan
+from app.modules.budget.plan_models import BudgetPlan, BudgetPlanVersion
 from app.modules.budget.tree.service_base import _ZERO, BudgetTreeServiceBase
 from app.modules.budget.tree_models import Budget, BudgetAllocation
 from app.modules.budget.tree_schemas import AllocationOut, AllocationSet
@@ -31,16 +31,22 @@ class AllocationOps(BudgetTreeServiceBase):
         ).scalar_one_or_none()
 
     async def _refuse_planned(self, top: Budget, fiscal_year_id: UUID) -> None:
-        """Refuse a direct allocation change in a year with a Haushaltsplan.
+        """Refuse a direct allocation change in a year with a plan version in force.
 
-        The plan in force sets the allocations, and only a Nachtrag changes them. The
+        The plan in force sets the allocations, and only a Nachtrag changes them. A
+        year whose plan has no version in force keeps its allocations by hand. The
         rule applies while the plan switch of the top-level node is on.
 
         Raises:
             ConflictError: `allocation_from_plan` (409).
         """
         planned = top.plan_enabled and await self.session.scalar(
-            select(BudgetPlan.id).where(BudgetPlan.fiscal_year_id == fiscal_year_id)
+            select(BudgetPlanVersion.id)
+            .join(BudgetPlan, BudgetPlan.id == BudgetPlanVersion.plan_id)
+            .where(
+                BudgetPlan.fiscal_year_id == fiscal_year_id,
+                BudgetPlanVersion.state == "in_force",
+            )
         )
         if planned:
             raise ConflictError(

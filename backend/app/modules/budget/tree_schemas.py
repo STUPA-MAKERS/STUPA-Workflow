@@ -16,7 +16,6 @@ from uuid import UUID
 
 from pydantic import AfterValidator, Field, StringConstraints, model_validator
 
-from app.modules.budget.plan_rules import Side
 from app.shared.paging import Page
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
@@ -81,9 +80,6 @@ class BudgetNodeCreate(FrozenStrictCamelModel, frozen=True):
     #: 1..28: the cutoff must exist in EVERY month. Days 29 to 31 would raise a
     #: `date(...)` ValueError. The 500 that follows leaves the budget unusable.
     fiscal_start_day: int = Field(default=1, ge=1, le=28, alias="fiscalStartDay")
-    #: The side of a direct child of a top-level node. A node below takes the side of
-    #: its parent, and a top-level node has none.
-    side: Side | None = None
 
 
 class BudgetNodeUpdate(FrozenStrictCamelModel, frozen=True):
@@ -146,9 +142,7 @@ class BudgetNodeOut(FrozenCamelModel, frozen=True):
     )
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
-    #: The side in the Haushaltsplan and the plan switch of a top-level node. Read only
-    #: here: the plan routes change them.
-    side: Side | None = None
+    #: The plan switch of a top-level node. Read only here: the plan routes change it.
     plan_enabled: bool = Field(default=False, alias="planEnabled")
 
 
@@ -197,9 +191,7 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     )
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
-    #: The side in the Haushaltsplan and the plan switch of a top-level node. Read only
-    #: here: the plan routes change them.
-    side: Side | None = None
+    #: The plan switch of a top-level node. Read only here: the plan routes change it.
     plan_enabled: bool = Field(default=False, alias="planEnabled")
     #: The fiscal years in which the Haushaltsplan counts the node: for a top-level
     #: node the years with a version in force, for a node below it the years whose

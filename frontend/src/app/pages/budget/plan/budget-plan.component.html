@@ -29,10 +29,12 @@
             @for (group of plan() ? groups() : []; track group.side) {
               <p class="bp__group">
                 <span>{{ group.heading }}</span>
-                <span class="mono">{{ money(group.total) }}</span>
+                @if (group.total !== null) {
+                  <span class="mono">{{ money(group.total) }}</span>
+                }
               </p>
               @for (row of listRows(); track row.id) {
-                @if (row.side === group.side) {
+                @if (groupOf(row) === group.side) {
                   <div class="tn" [class.tn--on]="row.id === selId()" [style.--tn-depth]="row.depth + 1">
                     <span class="tn__chev" aria-hidden="true"></span>
                     <button
@@ -182,7 +184,7 @@
   </dl>
 
   @for (group of groups(); track group.side) {
-    @let sideRows = group.side === 'income' ? incomeRows() : expenseRows();
+    @let sideRows = rowsOf(group.side);
     <app-section class="bd__sec" size="lg" [heading]="group.heading">
       @if (sideRows.length) {
         <ng-container *ngTemplateOutlet="table; context: { $implicit: sideRows, nested: true }" />
@@ -251,9 +253,21 @@
 </ng-template>
 
 <ng-template #lineForm let-row let-cols="cols">
-  <div [class.bd__cols]="cols" [class.bp__stack]="!cols" [class.bd__cols--single]="cols && row.side === 'income'">
-    <app-section class="bd__sec" size="lg" [heading]="(row.hasChildren ? 'budget.plan.line.note' : 'budget.plan.line.heading') | t">
+  <div [class.bd__cols]="cols" [class.bp__stack]="!cols" [class.bd__cols--single]="cols && row.side !== 'expense'">
+    <app-section class="bd__sec" size="lg" [heading]="(row.hasChildren && row.depth > 0 ? 'budget.plan.line.note' : 'budget.plan.line.heading') | t">
       <div class="bp__form">
+        @if (row.depth === 0) {
+          <app-select
+            [name]="'line-side-' + row.id"
+            [label]="'budget.cc.side' | t"
+            [clearable]="false"
+            [required]="editable()"
+            [options]="sideOptions()"
+            [ngModel]="sideValue(row)"
+            (ngModelChange)="saveSide(row, $event)"
+            [disabled]="!editable()"
+          />
+        }
         @if (!row.hasChildren) {
           <app-currency-input
             [name]="'line-amount-' + row.id"
@@ -305,7 +319,7 @@
   @if (canWrite()) {
     @if (nodeOf(row.id); as node) {
       <app-section class="bd__sec" size="lg" [heading]="levelKey(node) | t">
-        <app-cost-centre-settings [node]="node" [sided]="sided(node)" [gremiumOptions]="gremiumOptions()" (saved)="reloadTree()" (sideSaved)="refreshPlan()" />
+        <app-cost-centre-settings [node]="node" [gremiumOptions]="gremiumOptions()" (saved)="reloadTree()" />
       </app-section>
     }
   }
@@ -396,6 +410,31 @@
   <div dialog-footer>
     <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" (click)="addLine($event)" [disabled]="!addId() || busy()">{{ 'budget.plan.action.add' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<app-dialog [open]="stateOpen()" [title]="'budget.plan.action.setState' | t" [closeLabel]="'action.close' | t" (closed)="stateOpen.set(false)">
+  <form id="bp-state-form" class="bp__addForm" (submit)="setStateByHand($event)">
+    <app-select
+      name="bpState"
+      [label]="'budget.plan.setState.state' | t"
+      [required]="true"
+      [clearable]="false"
+      [options]="stateOptions()"
+      [ngModel]="stateTarget()"
+      (ngModelChange)="stateTarget.set($event || '')"
+    />
+    <app-textarea [label]="'budget.plan.setState.reason' | t">
+      <textarea name="bpReason" rows="3" maxlength="2000" required [value]="stateReason()" (input)="stateReason.set($any($event.target).value)"></textarea>
+    </app-textarea>
+    @if (stateTarget() === 'in_force') {
+      <app-note kind="warn" icon="alert">{{ 'budget.plan.inForce.body' | t }}</app-note>
+    }
+    <button type="submit" hidden></button>
+  </form>
+  <div dialog-footer>
+    <app-button variant="text" (click)="stateOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="fill" data-testid="bp-state-save" (click)="setStateByHand($event)" [disabled]="!stateTarget() || !stateReason().trim() || busy()">{{ 'budget.plan.setState.confirm' | t }}</app-button>
   </div>
 </app-dialog>
 

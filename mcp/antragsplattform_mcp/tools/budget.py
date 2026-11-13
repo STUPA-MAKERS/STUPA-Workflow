@@ -43,9 +43,7 @@ async def create_budget(node: S.BudgetNodeCreate) -> dict:
 
     Set `gremiumId` on a top-level node only. After creation, `parentId` and
     `gremiumId` stay fixed. `decisionGremiumId` names the Gremium that decides on
-    spending from the node and its subtree. A direct child of a top-level node whose
-    plan switch is on needs a `side`, else 422 `plan_side_missing`. Requires
-    budget.structure.
+    spending from the node and its subtree. Requires budget.structure.
     """
     return await api().post("/budgets", json=dump_create(node))
 

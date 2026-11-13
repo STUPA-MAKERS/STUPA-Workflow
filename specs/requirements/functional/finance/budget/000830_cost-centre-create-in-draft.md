@@ -18,7 +18,8 @@ scope:
 
 `POST /budget-plan-versions/{id}/cost-centres` must create a Kostenstelle and its line
 in the draft version in one request. The body must hold the parent, the key, the name, the
-Ansatz and, for a direct child of the budget, the side. A failed request must leave no
+Ansatz and, for a direct child of the budget (a Titel), the side of its line (000853), else
+422 `plan_side_missing`. A side for a deeper node must answer 422 `side_not_settable`. A failed request must leave no
 Kostenstelle and no line. The request must answer 409 `plan_version_locked` for a
 version that is not a draft. The request needs `budget.structure`.
 

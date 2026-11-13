@@ -9,7 +9,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../../budget/budget-tree.api';
-import { BudgetPlanApi, type PlanSteps, type PlanSwitchChange } from '../../budget/plan/budget-plan.api';
+import { BudgetPlanApi, type PlanSteps } from '../../budget/plan/budget-plan.api';
 import { FY25, FY26, QSM, TOP, fy, node, plan, version } from '../../budget/plan/budget-plan.fixtures';
 import { AdminApiService } from '../admin-api.service';
 import { AdminBudgetsComponent } from './admin-budgets.component';
@@ -20,23 +20,14 @@ const STEPS = [
   { name: 'Beschluss', gremiumId: 'g1' },
   { name: 'Genehmigung', gremiumId: null },
 ];
-/** VS-Mittel with a side on each Kostenstelle directly below it. */
 const VSM: BudgetTreeNode = { ...TOP, children: TOP.children.filter((c) => c.id !== 'noside') };
-/** A budget without a plan: one Kostenstelle without a side, one with a side. */
+/** A budget without a plan, with two Titel. */
 const KSM: BudgetTreeNode = node({
   id: 'ksm',
   name: 'Kultur',
-  children: [node({ id: 'k1', parentId: 'ksm', name: 'Feste' }), node({ id: 'k2', parentId: 'ksm', name: 'Reisen', side: 'expense' })],
+  children: [node({ id: 'k1', parentId: 'ksm', name: 'Feste' }), node({ id: 'k2', parentId: 'ksm', name: 'Reisen' })],
 });
-const CHANGE: PlanSwitchChange = {
-  fiscalYearId: 'fy-26',
-  year: '2026/27',
-  budgetId: 'k1',
-  pathKey: 'KSM-K1',
-  name: 'Feste',
-  allocated: '100',
-  planned: '0',
-};
+
 
 interface Opts {
   tree?: Observable<readonly BudgetTreeNode[]>;
@@ -64,8 +55,6 @@ async function setup(opts: Opts = {}) {
     steps: jest.fn((id: string): Observable<PlanSteps> => of({ budgetId: id, steps: id === 'vsm' ? STEPS : [] })),
     setSteps: jest.fn(ok),
     setPlanSwitch: jest.fn(ok),
-    setSide: jest.fn(ok),
-    switchPreview: jest.fn((id: string) => of({ budgetId: id, changes: [] as readonly PlanSwitchChange[] })),
     plan: jest.fn((..._args: unknown[]): Observable<unknown> => refuse(404, 'plan_not_found')),
   };
   const view = await render(AdminBudgetsComponent, {
@@ -225,7 +214,7 @@ describe('AdminBudgetsComponent', () => {
   });
 
   describe('edit', () => {
-    it('§F/finance/budget/000827: a press on a row opens the form of the budget with its sides and steps', async () => {
+    it('§F/finance/budget/000827: a press on a row opens the form of the budget with its steps and without a side', async () => {
       await setup({ tree: of([{ ...VSM, color: ' #112233 ', viewGremiumId: 'g1', decisionGremiumId: 'g1' }]) });
       const dialog = await openEdit('VS-Mittel');
       await waitFor(() => expect(field(dialog, 'editKey').value).toBe('vsm'));
@@ -237,32 +226,30 @@ describe('AdminBudgetsComponent', () => {
       expect(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' })).toBeChecked();
       expect(within(dialog).getByRole('combobox', { name: 'Sichtbar für Gremium' })).toHaveTextContent('StuPa');
       expect(within(dialog).getByRole('combobox', { name: 'Entscheidendes Gremium' })).toHaveTextContent('StuPa');
-      for (const heading of ['Haushalt', 'Beginn des Haushaltsjahrs', 'Gremien', 'Haushaltsplan', 'Seite der Titel', 'Schritte bis zum Inkrafttreten'])
+      for (const heading of ['Haushalt', 'Beginn des Haushaltsjahrs', 'Gremien', 'Haushaltsplan', 'Schritte bis zum Inkrafttreten'])
         expect(within(dialog).getByRole('heading', { name: heading })).toBeInTheDocument();
-      expect(within(dialog).getByRole('combobox', { name: /Beiträge/ })).toHaveTextContent('Einnahme');
-      expect(within(dialog).getByRole('combobox', { name: /Zuschüsse/ })).toHaveTextContent('Ausgabe');
+      expect(within(dialog).queryByRole('heading', { name: 'Seite der Titel' })).toBeNull();
+      expect(within(dialog).queryByRole('combobox', { name: /Beiträge/ })).toBeNull();
       expect(labelled(dialog, 'Name von Schritt 1').value).toBe('Beschluss');
       expect(labelled(dialog, 'Name von Schritt 2').value).toBe('Genehmigung');
       expect(within(dialog).getByRole('combobox', { name: 'Gremium von Schritt 1' })).toHaveTextContent('StuPa');
       expect(within(dialog).getByRole('combobox', { name: 'Gremium von Schritt 2' })).toHaveTextContent('Ohne Gremium');
     });
 
-    it('a budget without a plan shows neither sides nor steps, and Abbrechen closes the form', async () => {
+    it('a budget without a plan shows no steps, and Abbrechen closes the form', async () => {
       const view = await setup();
       const dialog = await openEdit('QS-Mittel');
       expect(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' })).not.toBeChecked();
       expect(within(dialog).queryByRole('heading', { name: 'Schritte bis zum Inkrafttreten' })).toBeNull();
-      expect(within(dialog).queryByRole('heading', { name: 'Seite der Titel' })).toBeNull();
       await userEvent.click(button(dialog, 'Abbrechen'));
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull());
       expect(view.api.updateNode).not.toHaveBeenCalled();
     });
 
-    it('without an open form the form has no steps, no sides and no error', async () => {
+    it('without an open form the form has no steps and no error', async () => {
       const view = await setup();
       const page = view.fixture.componentInstance;
       expect(page.canAddStep()).toBe(true);
-      expect(page.sideNodes()).toEqual([]);
       expect(page.keyError()).toBe('');
       expect(page.nameError()).toBe('');
     });
@@ -325,7 +312,6 @@ describe('AdminBudgetsComponent', () => {
         { name: 'Anzeige', gremiumId: 'g1' },
       ]);
       expect(view.planApi.setPlanSwitch).not.toHaveBeenCalled();
-      expect(view.planApi.setSide).not.toHaveBeenCalled();
     });
 
     it('§F/finance/budget/000827: a step without a name shows what is missing, and ten steps take no eleventh', async () => {
@@ -363,7 +349,7 @@ describe('AdminBudgetsComponent', () => {
       expect(view.api.updateNode).not.toHaveBeenCalled();
     });
 
-    it('saves only the settings when the plan switch, the sides and the steps did not change', async () => {
+    it('saves only the settings when the plan switch and the steps did not change', async () => {
       const view = await setup();
       const dialog = await openEdit('VS-Mittel');
       await retype(field(dialog, 'editName'), ' VS ');
@@ -371,8 +357,6 @@ describe('AdminBudgetsComponent', () => {
       expect(view.api.updateNode).toHaveBeenCalledWith('vsm', { key: 'vsm', name: 'VS', color: '', active: true, viewGremiumId: null });
       expect(view.planApi.setPlanSwitch).not.toHaveBeenCalled();
       expect(view.planApi.setSteps).not.toHaveBeenCalled();
-      expect(view.planApi.setSide).not.toHaveBeenCalled();
-      expect(view.planApi.switchPreview).not.toHaveBeenCalled();
       expect(view.success).toHaveBeenCalledWith('Gespeichert.');
       expect(view.api.tree).toHaveBeenCalledTimes(2);
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull());
@@ -404,88 +388,31 @@ describe('AdminBudgetsComponent', () => {
       });
     });
 
-    it('§F/finance/budget/000795: a Kostenstelle without a side shows what is missing in the form, and the save sends its side first', async () => {
-      const view = await setup({ tree: of([TOP]) });
-      const dialog = await openEdit('VS-Mittel');
-      expect(within(dialog).getByRole('combobox', { name: /Ohne Seite/ })).toHaveAttribute('aria-required', 'true');
-      await userEvent.click(button(dialog, 'Speichern'));
-      expect(within(dialog).getByText('Pflichtfeld')).toBeInTheDocument();
-      expect(view.planApi.setSide).not.toHaveBeenCalled();
-      expect(view.api.updateNode).not.toHaveBeenCalled();
-      expect(view.error).not.toHaveBeenCalled();
-      await pick(dialog, /Ohne Seite/, 'Ausgabe');
-      expect(within(dialog).queryByText('Pflichtfeld')).toBeNull();
-      await pick(dialog, /Beiträge/, 'Ausgabe');
-      await userEvent.click(button(dialog, 'Speichern'));
-      expect(view.planApi.setSide.mock.calls).toEqual([
-        ['fees', 'expense'],
-        ['noside', 'expense'],
-      ]);
-      expect(view.planApi.setSide.mock.invocationCallOrder[1]).toBeLessThan(view.api.updateNode.mock.invocationCallOrder[0]);
-      expect(view.success).toHaveBeenCalledWith('Gespeichert.');
-    });
-
-    it('§F/finance/budget/000803: turning the plan on asks for the sides, shows the changed allocations and saves after the confirmation', async () => {
+    it('§F/finance/budget/000803: turning the plan on asks for nothing and saves the switch before the settings and the steps', async () => {
       const view = await setup();
-      view.planApi.switchPreview.mockReturnValue(of({ budgetId: 'ksm', changes: [CHANGE] }));
       const dialog = await openEdit('Kultur');
       await userEvent.click(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' }));
-      await waitFor(() => expect(within(dialog).getByRole('combobox', { name: /Reisen/ })).toHaveTextContent('Ausgabe'));
-      await userEvent.click(button(dialog, 'Speichern'));
-      expect(within(dialog).getByText('Pflichtfeld')).toBeInTheDocument();
-      expect(view.planApi.switchPreview).not.toHaveBeenCalled();
-      await pick(dialog, /Feste/, 'Einnahme');
+      expect(within(dialog).queryByRole('combobox', { name: /Feste/ })).toBeNull();
       await userEvent.click(button(dialog, 'Schritt hinzufügen'));
       await userEvent.type(labelled(dialog, 'Name von Schritt 1'), 'Beschluss');
       await userEvent.click(button(dialog, 'Speichern'));
-      expect(view.planApi.setSide).not.toHaveBeenCalled();
-      expect(view.planApi.switchPreview).toHaveBeenCalledWith('ksm', expect.objectContaining({ k1: 'income' }));
-      const confirm = await screen.findByRole('dialog', { name: 'Zuteilungen ändern?' });
-      expect(confirm).toHaveTextContent('Feste · 2026/27');
-      expect(confirm).toHaveTextContent('100 € → 0 €');
-      expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull();
-      expect(view.planApi.setPlanSwitch).not.toHaveBeenCalled();
-      await userEvent.click(button(confirm, 'Abbrechen'));
-      const again = await screen.findByRole('dialog', { name: 'Haushalt bearbeiten' });
-      await waitFor(() => expect(labelled(again, 'Name von Schritt 1').value).toBe('Beschluss'));
-      await userEvent.click(button(again, 'Speichern'));
-      expect(view.planApi.setSide).not.toHaveBeenCalled();
-      expect(view.planApi.switchPreview).toHaveBeenCalledTimes(2);
-      await userEvent.click(button(await screen.findByRole('dialog', { name: 'Zuteilungen ändern?' }), 'Haushaltsplan einschalten'));
-      expect(view.planApi.setSide.mock.calls).toEqual([['k1', 'income']]);
-      expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('ksm', true, true);
+      expect(screen.queryByRole('dialog', { name: 'Zuteilungen ändern?' })).toBeNull();
+      expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('ksm', true);
       expect(view.planApi.setSteps).toHaveBeenCalledWith('ksm', [{ name: 'Beschluss', gremiumId: null }]);
-      const order = [view.planApi.setSide, view.planApi.setPlanSwitch, view.api.updateNode, view.planApi.setSteps].map(
-        (m) => m.mock.invocationCallOrder[0],
-      );
+      const order = [view.planApi.setPlanSwitch, view.api.updateNode, view.planApi.setSteps].map((m) => m.mock.invocationCallOrder[0]);
       expect(order).toEqual([...order].sort((a, b) => a - b));
       expect(view.success).toHaveBeenCalledWith('Gespeichert.');
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Zuteilungen ändern?' })).toBeNull());
-      expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull();
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull());
     });
 
-    it('§F/finance/budget/000803: turning the plan on without a changed allocation saves at once', async () => {
-      const view = await setup();
-      const dialog = await openEdit('QS-Mittel');
-      await userEvent.click(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' }));
-      expect(within(dialog).queryByRole('heading', { name: 'Seite der Titel' })).toBeNull();
-      await userEvent.click(button(dialog, 'Speichern'));
-      expect(view.planApi.switchPreview).toHaveBeenCalledWith('qsm', {});
-      expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('qsm', true, true);
-      expect(view.planApi.setSteps).not.toHaveBeenCalled();
-      expect(screen.queryByRole('dialog', { name: 'Zuteilungen ändern?' })).toBeNull();
-    });
-
-    it('§F/finance/budget/000814: turning the plan off sends the switch and neither sides nor steps', async () => {
+    it('§F/finance/budget/000814: turning the plan off sends the switch and no steps', async () => {
       const view = await setup({ tree: of([TOP]) });
       const dialog = await openEdit('VS-Mittel');
       await userEvent.click(button(dialog, 'Schritt 1 entfernen'));
       await userEvent.click(within(dialog).getByRole('switch', { name: 'Haushaltsplan führen' }));
       await userEvent.click(button(dialog, 'Speichern'));
-      expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('vsm', false, false);
+      expect(view.planApi.setPlanSwitch).toHaveBeenCalledWith('vsm', false);
       expect(view.planApi.setSteps).not.toHaveBeenCalled();
-      expect(view.planApi.setSide).not.toHaveBeenCalled();
-      expect(view.planApi.switchPreview).not.toHaveBeenCalled();
     });
 
     it('§F/finance/budget/000814: names why the plan cannot go off, keeps the form and reads the budget again', async () => {
@@ -500,7 +427,7 @@ describe('AdminBudgetsComponent', () => {
       expect(screen.getByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeInTheDocument();
     });
 
-    it('names the cause of a refused save and of a failed preview', async () => {
+    it('names the cause of a refused save and of a refused plan switch', async () => {
       const view = await setup();
       const dialog = await openEdit('VS-Mittel');
       view.api.updateNode.mockReturnValueOnce(refuse(409, 'budget_key_exists'));
@@ -517,12 +444,13 @@ describe('AdminBudgetsComponent', () => {
       expect(view.error).toHaveBeenLastCalledWith('Ein Haushalt hat höchstens 10 Schritte.');
       await userEvent.click(button(dialog, 'Abbrechen'));
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Haushalt bearbeiten' })).toBeNull());
-      view.planApi.switchPreview.mockReturnValueOnce(refuse(500));
+      view.planApi.setPlanSwitch.mockReturnValueOnce(refuse(500));
+      const sent = view.api.updateNode.mock.calls.length;
       const other = await openEdit('QS-Mittel');
       await userEvent.click(within(other).getByRole('switch', { name: 'Haushaltsplan führen' }));
       await userEvent.click(button(other, 'Speichern'));
       expect(view.error).toHaveBeenLastCalledWith('Der Haushalt konnte nicht gespeichert werden.');
-      expect(view.planApi.setPlanSwitch).not.toHaveBeenCalled();
+      expect(view.api.updateNode).toHaveBeenCalledTimes(sent);
     });
 
     it('sends nothing a second time while a save runs', async () => {

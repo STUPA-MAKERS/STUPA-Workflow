@@ -12,43 +12,28 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, status
 
 from app.deps import Principal, require_principal
-from app.modules.budget.plan_rules import Side
 from app.modules.budget.plan_schemas import (
     PlanCreate,
     PlanLineSet,
     PlanNodeCreate,
     PlanOut,
+    PlanStateByHand,
     PlanStateSet,
     PlanStepPass,
     PlanStepsOut,
     PlanStepsSet,
     PlanSwitchOut,
-    PlanSwitchPreview,
     PlanSwitchSet,
-    SideOut,
-    SideSet,
 )
 from app.modules.budget.tree_router import ServiceDep, _errors, _require_node_view
 
 router = APIRouter(tags=["budget"])
 
 _STRUCTURE = [Depends(require_principal("budget.structure"))]
-
-
-@router.put(
-    "/budgets/{budget_id}/side",
-    response_model=SideOut,
-    dependencies=_STRUCTURE,
-    responses=_errors(401, 403, 404, 409, 422),
-)
-async def set_side(budget_id: UUID, payload: SideSet, service: ServiceDep) -> SideOut:
-    """Set the side of a direct child of a top-level cost center and of its subtree."""
-    out = await service.set_side(budget_id, payload.side)
-    await service.session.commit()
-    return out
+_SET_STATE = [Depends(require_principal("budget.plan.set_state"))]
 
 
 @router.put(
@@ -62,39 +47,11 @@ async def set_plan_switch(
 ) -> PlanSwitchOut:
     """Set the plan switch of a top-level cost center.
 
-    When the switch goes on, each open fiscal year without a plan gets a Stammplan in
-    force from its allocations.
+    When the switch goes on, each open fiscal year without a plan gets a draft from its
+    allocations.
     """
-    out = await service.set_plan_switch(
-        budget_id, payload.enabled, confirm_changes=payload.confirm_changes
-    )
+    out = await service.set_plan_switch(budget_id, payload.enabled)
     await service.session.commit()
-    return out
-
-
-@router.get(
-    "/budgets/{budget_id}/plan-switch/preview",
-    response_model=PlanSwitchPreview,
-    dependencies=_STRUCTURE,
-    responses=_errors(401, 403, 404, 422),
-)
-async def preview_plan_switch(
-    budget_id: UUID,
-    service: ServiceDep,
-    income: Annotated[list[UUID] | None, Query()] = None,
-    expense: Annotated[list[UUID] | None, Query()] = None,
-) -> PlanSwitchPreview:
-    """Return the allocations that change when the plan switch goes on.
-
-    `income` and `expense` name direct children whose side a form has not saved yet.
-    The preview counts with these sides and saves none of them.
-    """
-    sides: dict[UUID, Side] = {
-        **dict.fromkeys(income or (), "income"),
-        **dict.fromkeys(expense or (), "expense"),
-    }
-    out = await service.preview_plan_switch(budget_id, sides)
-    await service.session.rollback()
     return out
 
 
@@ -140,7 +97,7 @@ async def get_plan_of_version(
 async def create_plan(
     budget_id: UUID, fiscal_year_id: UUID, payload: PlanCreate, service: ServiceDep
 ) -> PlanOut:
-    """Create the Haushaltsplan of a fiscal year with a Stammplan in draft."""
+    """Create the Haushaltsplan of a fiscal year with its first version in draft."""
     out = await service.create_plan(budget_id, fiscal_year_id, payload)
     await service.session.commit()
     return out
@@ -197,6 +154,21 @@ async def delete_plan_line(version_id: UUID, budget_id: UUID, service: ServiceDe
 async def set_plan_state(version_id: UUID, payload: PlanStateSet, service: ServiceDep) -> PlanOut:
     """Bring a version into force, or move a version in progress back to draft."""
     out = await service.set_plan_state(version_id, payload)
+    await service.session.commit()
+    return out
+
+
+@router.put(
+    "/budget-plan-versions/{version_id}/state",
+    response_model=PlanOut,
+    dependencies=_SET_STATE,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def set_plan_state_by_hand(
+    version_id: UUID, payload: PlanStateByHand, service: ServiceDep
+) -> PlanOut:
+    """Set the state of the newest version of a plan by hand, with a reason."""
+    out = await service.set_state_by_hand(version_id, payload)
     await service.session.commit()
     return out
 

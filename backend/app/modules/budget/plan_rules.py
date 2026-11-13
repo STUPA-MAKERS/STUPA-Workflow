@@ -8,13 +8,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any, Literal, assert_never
 from uuid import UUID
 
 PlanState = Literal["draft", "in_progress", "in_force", "replaced"]
 #: The states a person can ask for. The platform sets the other two: `in_progress`
 #: with the first passed step, `replaced` when a later version comes into force.
 PlanTarget = Literal["draft", "in_force"]
+#: The states that a person with `budget.plan.set_state` sets by hand.
+ManualState = Literal["draft", "in_progress", "in_force"]
 Side = Literal["income", "expense"]
 
 _ZERO = Decimal(0)
@@ -171,15 +173,54 @@ def summed_amounts(
     return {node: total(node) for node in amounts}
 
 
-def is_plain_stammplan(versions: Sequence[tuple[int, str, Sequence[Any]]]) -> bool:
-    """Say if a plan holds nothing but a Stammplan in force that passed no step.
+def is_plain_draft(versions: Sequence[tuple[int, str]]) -> bool:
+    """Say if a plan holds nothing but its first version in draft.
 
-    `versions` holds `(number, state, steps)` of each version. Such a plan says the
-    same as the allocations, so the plan switch can go off and take it along.
+    `versions` holds `(number, state)` of each version. Such a plan has no decision, so
+    the plan switch can go off and take it along.
     """
     return len(versions) == 1 and all(
-        number == 0 and state == "in_force" and not steps for number, state, steps in versions
+        number == 0 and state == "draft" for number, state in versions
     )
+
+
+def steps_by_hand(
+    steps: Sequence[Mapping[str, Any]], passed: int, now: str
+) -> list[dict[str, Any]]:
+    """Return `steps` with the first `passed` steps passed and the others open.
+
+    A step that was passed before keeps its time and its vote. A step that this call
+    passes gets `now` and the mark `byHand`. A step after them loses its time and its
+    vote, because the version waits for it again.
+    """
+    return [
+        (
+            dict(step)
+            if step.get("passedAt") is not None
+            else {**step, "passedAt": now, "byHand": True}
+        )
+        if i < passed
+        else {"name": step["name"], "gremiumId": step.get("gremiumId"), "passedAt": None}
+        for i, step in enumerate(steps)
+    ]
+
+
+def manual_passed(state: ManualState, step: int | None, count: int) -> int | None:
+    """Return how many steps a state set by hand passes, or `None` for a wrong request.
+
+    `in_progress` names the step that the version waits for, by its place from 0, so
+    the steps before it are passed. `draft` passes none and `in_force` all of them, and
+    both take no step.
+    """
+    match state:
+        case "draft":
+            return 0 if step is None else None
+        case "in_force":
+            return count if step is None else None
+        case "in_progress":
+            return step if step is not None and 0 <= step < count else None
+        case _:  # pragma: no cover
+            assert_never(state)
 
 
 def first_child_of(
@@ -207,25 +248,39 @@ def allocation_changes(
     }
 
 
-def proposed_side(
-    parent_of: Mapping[UUID, UUID | None],
-    top_id: UUID,
-    sides: Mapping[UUID, Side],
-    node_id: UUID,
-) -> Side | None:
-    """Return the side that `sides` gives a node, or `None` when it names no side for it.
+def titel_of(
+    parent_of: Mapping[UUID, UUID | None], top_id: UUID, node_id: UUID
+) -> UUID | None:
+    """Return the Titel of a node: the direct child of the top-level node at or above it.
 
-    `sides` names direct children of the top-level node. A node below takes the side of
-    the direct child above it.
+    The top-level node and a node of a different tree have no Titel.
     """
     parent = parent_of.get(node_id)
     if node_id == top_id or parent is None:
         return None
-    return (
-        sides.get(node_id)
-        if parent == top_id
-        else proposed_side(parent_of, top_id, sides, parent)
-    )
+    return node_id if parent == top_id else titel_of(parent_of, top_id, parent)
+
+
+def side_of(
+    parent_of: Mapping[UUID, UUID | None],
+    top_id: UUID,
+    sides: Mapping[UUID, str | None],
+    node_id: UUID,
+) -> str | None:
+    """Return the side of a node in a version, or `None` when its Titel has none.
+
+    `sides` holds the side of the line of each Titel. A node below takes the side of
+    the Titel above it.
+    """
+    titel = titel_of(parent_of, top_id, node_id)
+    return sides.get(titel) if titel is not None else None
+
+
+def sides_of(
+    parent_of: Mapping[UUID, UUID | None], top_id: UUID, sides: Mapping[UUID, str | None]
+) -> dict[UUID, str | None]:
+    """Return the side of each node of a tree in a version (`side_of`)."""
+    return {node: side_of(parent_of, top_id, sides, node) for node in parent_of}
 
 
 def allocations_from_lines(
@@ -254,11 +309,10 @@ def allocations_from_lines(
 
 def with_plan_fields(
     forest: Sequence[dict[str, Any]],
-    side_of: Mapping[object, str | None],
     enabled_of: Mapping[object, bool],
     planned_in: Mapping[object, Sequence[object]],
 ) -> list[dict[str, Any]]:
-    """Add `side`, `plan_enabled` and `planned_in` to each node dict of a forest.
+    """Add `plan_enabled` and `planned_in` to each node dict of a forest.
 
     `planned_in` holds, for a top-level node, the fiscal years with a version in
     force, and for a node below it the fiscal years whose version in force has a line
@@ -267,10 +321,9 @@ def with_plan_fields(
     return [
         {
             **node,
-            "side": side_of.get(node["id"]),
             "plan_enabled": enabled_of.get(node["id"], False),
             "planned_in": tuple(planned_in.get(node["id"], ())),
-            "children": with_plan_fields(node["children"], side_of, enabled_of, planned_in),
+            "children": with_plan_fields(node["children"], enabled_of, planned_in),
         }
         for node in forest
     ]

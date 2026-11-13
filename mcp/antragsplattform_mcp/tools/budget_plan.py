@@ -1,6 +1,6 @@
 """Haushaltsplan tools.
 
-This group covers the side of a cost center, the plan switch and the steps of a budget,
+This group covers the plan switch and the steps of a budget,
 and the plan of a fiscal year with its versions, lines and state changes.
 """
 
@@ -18,42 +18,15 @@ group = ToolGroup()
 
 
 @group.tool
-async def set_budget_side(budget_id: str, side: Literal["income", "expense"]) -> dict:
-    """Set the side of a direct child of a top-level cost center and of its subtree.
-
-    The call gives 422 `side_not_settable` for any other node and 409 `side_in_plan`
-    when a plan line of the subtree has an Ansatz above 0, or when the side becomes
-    income and a line of a decided version holds a Vermerk. Requires budget.structure.
-    """
-    return await api().put(f"/budgets/{budget_id}/side", json={"side": side})
-
-
-@group.tool
-async def preview_plan_switch(budget_id: str) -> dict:
-    """List the allocations that change when the plan switch of a budget goes on.
-
-    The Stammplan takes each allocation as the Ansatz, and a cost center with children
-    holds the sum of its children. Call this before `set_plan_switch`. Requires
-    budget.structure.
-    """
-    return await api().get(f"/budgets/{budget_id}/plan-switch/preview")
-
-
-@group.tool
-async def set_plan_switch(budget_id: str, enabled: bool, confirm_changes: bool = False) -> dict:
+async def set_plan_switch(budget_id: str, enabled: bool) -> dict:
     """Set the plan switch of a top-level cost center.
 
-    On: each open fiscal year without a plan gets a Stammplan in force from its
-    allocations. The call gives 422 `plan_side_missing` while a cost center below has
-    no side, and 409 `plan_changes_allocations` when the Stammplan changes an
-    allocation and `confirm_changes` is false. Off: possible only while each plan is a
-    Stammplan in force without a decision, and it deletes those plans; otherwise 409
-    `plan_switch_has_plans`. Requires budget.structure.
+    On: each open fiscal year without a plan gets a draft from its allocations, and
+    no allocation changes. Off: possible only while each plan is one draft, and it
+    deletes those plans; otherwise 409 `plan_switch_has_plans`. Requires
+    budget.structure.
     """
-    return await api().put(
-        f"/budgets/{budget_id}/plan-switch",
-        json={"enabled": enabled, "confirmChanges": confirm_changes},
-    )
+    return await api().put(f"/budgets/{budget_id}/plan-switch", json={"enabled": enabled})
 
 
 @group.tool
@@ -131,11 +104,13 @@ async def delete_plan_version(version_id: str) -> dict:
 async def set_plan_line(version_id: str, budget_id: str, line: S.PlanLineSet) -> dict:
     """Set the line of one cost center in a draft version.
 
-    A field that you leave out keeps its value. A line makes the cost center part of
-    the plan of that year. A cost center with a child line holds the sum of its
-    children. The first child line of a parent takes the Ansatz of the parent when you
-    give no amount above 0. The call gives 422 `plan_amount_too_large` when a sum of
-    Ansätze passes 9,999,999,999.99. Requires budget.structure.
+    A field that you leave out keeps its value. A line makes the cost center part of the
+    plan of that year. `side` sets the side of a Titel, a direct child of the top-level
+    cost center; any other line gives 422 `side_not_settable`. A cost center with a
+    child line holds the sum of its children. The first child line of a parent takes the
+    Ansatz of the parent when you give no amount above 0. The call gives 422
+    `plan_amount_too_large` when a sum of Ansätze passes 9,999,999,999.99. Requires
+    budget.structure.
     """
     return await api().put(
         f"/budget-plan-versions/{version_id}/lines/{budget_id}", json=dump_patch(line)
@@ -167,7 +142,8 @@ async def pass_plan_step(version_id: str, step: int | None = None) -> dict:
     `step` names the step that you mean, by its place in the list from 0. Give it, so
     a repeated call does not pass the step after it: the call then gives 409
     `plan_step_not_next`. The first step needs a version with a line (422
-    `plan_empty`) that is balanced (422 `plan_not_balanced`) and whose side sums the
+    `plan_empty`) in which every Titel has a side (422 `plan_side_missing`), that is
+    balanced (422 `plan_not_balanced`) and whose side sums the
     platform can hold (422 `plan_amount_too_large`), and takes it out of the draft.
     The call gives 409 `plan_step_has_vote` while the step has a vote that is
     not cancelled, 409 `plan_not_enabled` while the plan switch of the budget is off

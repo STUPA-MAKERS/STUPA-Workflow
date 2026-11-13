@@ -113,7 +113,9 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
 
     A cost center belongs to the plan of a year when a version has a line for it.
     ``transferable``, ``coverable`` and ``blocked`` are the Vermerke of an expense
-    line. ``blocked`` is the blocked part of the Ansatz. ``name`` and ``path_key``
+    line. ``blocked`` is the blocked part of the Ansatz. ``side`` is ``income`` or
+    ``expense`` on the line of a Titel, a direct child of the top-level cost center,
+    and NULL on a line below a Titel, which has the side of its Titel. ``name`` and ``path_key``
     hold the name and the path key of the cost center at the decision, so a later
     rename does not change the text of a decided plan. They are NULL in a draft.
     """
@@ -128,6 +130,7 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     path_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    side: Mapped[str | None] = mapped_column(Text, nullable=True)
     transferable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     coverable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     blocked: Mapped[Decimal] = mapped_column(
@@ -140,5 +143,6 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
         ),
         CheckConstraint("amount >= 0", name="budget_plan_line_amount"),
         CheckConstraint("blocked >= 0 AND blocked <= amount", name="budget_plan_line_blocked"),
+        CheckConstraint("side IN ('income', 'expense')", name="budget_plan_line_side"),
         Index("ix_budget_plan_line_budget_id", "budget_id"),
     )

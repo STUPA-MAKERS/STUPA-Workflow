@@ -1,4 +1,4 @@
-"""Haushaltsplan: side, plan switch, versions, lines and state changes.
+"""Haushaltsplan: plan switch, versions, lines with their side and state changes.
 
 The decisions live in `app.modules.budget.plan_rules`. The methods here read the
 rows, ask the rules and write the result. They do not commit: the router commits
@@ -15,7 +15,7 @@ from decimal import Decimal
 from typing import Any, assert_never, cast
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, delete, func, or_, select, update
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.audit.actions import AuditAction
@@ -33,15 +33,13 @@ from app.modules.budget.plan_schemas import (
     PlanLineSet,
     PlanNodeCreate,
     PlanOut,
+    PlanStateByHand,
     PlanStateSet,
     PlanStepOut,
     PlanStepsOut,
     PlanStepsSet,
-    PlanSwitchChange,
     PlanSwitchOut,
-    PlanSwitchPreview,
     PlanVersionOut,
-    SideOut,
 )
 from app.modules.budget.tree.allocations import AllocationOps
 from app.modules.budget.tree.nodes import NodeOps
@@ -65,8 +63,9 @@ def _changes_out(changes: dict[UUID, tuple[Decimal, Decimal]]) -> dict[str, list
     }
 
 
-def _line_out(line: BudgetPlanLine) -> PlanLineOut:
+def _line_out(line: BudgetPlanLine, side: str | None) -> PlanLineOut:
     return PlanLineOut(
+        side=cast("Side | None", side),
         budgetId=line.budget_id,
         amount=line.amount.quantize(_CENT),
         note=line.note,
@@ -173,6 +172,7 @@ class PlanOps(NodeOps, AllocationOps):
                     gremiumId=step.get("gremiumId"),
                     gremiumName=names.get(step.get("gremiumId") or ""),
                     passedAt=step.get("passedAt"),
+                    byHand=bool(step.get("byHand")),
                     voteId=step.get("voteId"),
                     voteStatus=votes.get(step.get("voteId") or "", (None, None))[0],
                     voteResult=votes.get(step.get("voteId") or "", (None, None))[1],
@@ -187,6 +187,15 @@ class PlanOps(NodeOps, AllocationOps):
         versions = await self._versions(plan.id)
         lines = [await self._lines(v.id) for v in versions]
         of_budget = await self._budget_step_records(top_id)
+        parent_of = {n.id: n.parent_id for n in await self._subtree(await self._get_node(top_id))}
+        sides = [
+            plan_rules.sides_of(
+                parent_of,
+                top_id,
+                {line.budget_id: line.side for line in rows},
+            )
+            for rows in lines
+        ]
         steps = await self._steps_out(
             [of_budget if v.state == "draft" else list(v.steps or []) for v in versions]
         )
@@ -202,9 +211,9 @@ class PlanOps(NodeOps, AllocationOps):
                     createdAt=v.created_at,
                     inForceAt=v.in_force_at,
                     steps=shown,
-                    lines=tuple(_line_out(line) for line in rows),
+                    lines=tuple(_line_out(line, of.get(line.budget_id)) for line in rows),
                 )
-                for v, rows, shown in zip(versions, lines, steps, strict=True)
+                for v, rows, shown, of in zip(versions, lines, steps, sides, strict=True)
             ),
         )
 
@@ -362,258 +371,81 @@ class PlanOps(NodeOps, AllocationOps):
         await self.session.flush()
         return await self.get_plan_steps(top.id)
 
-    async def set_side(self, budget_id: UUID, side: Side) -> SideOut:
-        """Set the side of a direct child of a top-level node and of its subtree.
-
-        Raises:
-            ValidationProblem: `side_not_settable` (422) for a top-level node and for
-                a node that takes the side of its parent.
-            ConflictError: `side_in_plan` (409) when a plan line of the subtree has an
-                Ansatz above 0, or when the side becomes income and a line of a
-                version that left the draft holds a Vermerk, `fiscal_year_closed`
-                (409) when the plan of a closed fiscal year has a line of the subtree.
-        """
-        await self._lock_tree(budget_id)
-        node = await self._get_node(budget_id)
-        parent = await self._get_node(node.parent_id) if node.parent_id is not None else None
-        if parent is None or parent.parent_id is not None:
-            raise ValidationProblem(
-                "The side is set on a direct child of a top-level cost centre.",
-                code="side_not_settable",
-                errors=[{"field": "budgetId", "msg": "not a direct child of the top level"}],
-            )
-        subtree = await self._subtree(node)
-        planned = await self.session.scalar(
-            select(func.count())
-            .select_from(BudgetPlanLine)
-            .where(
-                BudgetPlanLine.budget_id.in_([n.id for n in subtree]),
-                BudgetPlanLine.amount > 0,
-            )
+    @staticmethod
+    def _sides(
+        top: Budget, nodes: Sequence[Budget], lines: Sequence[BudgetPlanLine]
+    ) -> dict[UUID, str | None]:
+        """Return the side of each node of the tree in the version of `lines`."""
+        return plan_rules.sides_of(
+            {n.id: n.parent_id for n in nodes},
+            top.id,
+            {line.budget_id: line.side for line in lines},
         )
-        if planned and node.side != side:
-            raise ConflictError(
-                "A plan line of this cost centre has an amount. The side cannot change.",
-                code="side_in_plan",
-            )
-        closed = await self.session.scalar(
-            select(func.count())
-            .select_from(BudgetPlanLine)
-            .join(BudgetPlanVersion, BudgetPlanVersion.id == BudgetPlanLine.version_id)
-            .join(BudgetPlan, BudgetPlan.id == BudgetPlanVersion.plan_id)
-            .join(FiscalYear, FiscalYear.id == BudgetPlan.fiscal_year_id)
-            .where(
-                BudgetPlanLine.budget_id.in_([n.id for n in subtree]),
-                FiscalYear.closed_at.is_not(None),
-            )
-        )
-        if closed and node.side != side:
-            raise ConflictError(
-                "A closed fiscal year plans this cost centre. The side cannot change.",
-                code="fiscal_year_closed",
-            )
-        ids = [n.id for n in subtree]
-        if side == "income" and node.side != side and await self._decided_marks(ids):
-            raise ConflictError(
-                "A decided plan holds a Vermerk of this cost centre. The side cannot change.",
-                code="side_in_plan",
-            )
-        before = node.side
-        for member in subtree:
-            member.side = side
-        cleared = await self._clear_marks(ids) if side == "income" else []
-        await self._audit(
-            AuditAction.BUDGET_SIDE_SET,
-            target_type="budget",
-            target_id=str(node.id),
-            data={
-                "pathKey": node.path_key,
-                "before": before,
-                "after": side,
-                "clearedMarks": cleared,
-            },
-        )
-        return SideOut(budgetId=node.id, side=side)
 
     @staticmethod
-    def _marked() -> ColumnElement[bool]:
-        """The condition of a line that holds a Vermerk or a gesperrt amount."""
-        return or_(
-            BudgetPlanLine.transferable.is_(True),
-            BudgetPlanLine.coverable.is_(True),
-            BudgetPlanLine.blocked > 0,
-        )
+    def _clear_marks(
+        lines: Sequence[BudgetPlanLine], nodes: Sequence[Budget], top_id: UUID, titel_id: UUID
+    ) -> list[dict[str, object]]:
+        """Take the Vermerke off the lines of a Titel that becomes income.
 
-    async def _decided_marks(self, budget_ids: list[UUID]) -> bool:
-        """Say if a version that left the draft holds a Vermerk of these cost centers.
-
-        A decided line does not change, and an income line holds no Vermerk, so such
-        a cost center keeps its side.
+        Only an expense line holds a Vermerk. The call clears the lines of the Titel
+        and of each cost center below it in one draft version. The return value names
+        each line and what it held, for the audit entry.
         """
-        found = await self.session.scalar(
-            select(BudgetPlanLine.id)
-            .join(BudgetPlanVersion, BudgetPlanVersion.id == BudgetPlanLine.version_id)
-            .where(
-                BudgetPlanLine.budget_id.in_(budget_ids),
-                BudgetPlanVersion.state != "draft",
-                self._marked(),
-            )
-            .limit(1)
-        )
-        return found is not None
-
-    async def _clear_marks(self, budget_ids: list[UUID]) -> list[dict[str, object]]:
-        """Take the Vermerke off the draft lines of cost centers that become income.
-
-        Only an expense line holds a Vermerk. The lines have an Ansatz of 0, so the
-        sums of the draft stay. The return value names each line and what it held,
-        for the audit entry.
-        """
-        lines = (
-            await self.session.scalars(
-                select(BudgetPlanLine)
-                .join(BudgetPlanVersion, BudgetPlanVersion.id == BudgetPlanLine.version_id)
-                .where(
-                    BudgetPlanLine.budget_id.in_(budget_ids),
-                    BudgetPlanVersion.state == "draft",
-                    self._marked(),
-                )
-                .order_by(BudgetPlanLine.version_id, BudgetPlanLine.budget_id)
-            )
-        ).all()
-        nodes = {
-            node.id: node
-            for node in await self.session.scalars(
-                select(Budget).where(Budget.id.in_([line.budget_id for line in lines]))
-            )
-        }
+        parent_of = {n.id: n.parent_id for n in nodes}
+        by_id = {n.id: n for n in nodes}
+        marked = [
+            line
+            for line in lines
+            if plan_rules.titel_of(parent_of, top_id, line.budget_id) == titel_id
+            and (line.transferable or line.coverable or (line.blocked or _ZERO) > 0)
+        ]
         cleared: list[dict[str, object]] = [
             {
-                "versionId": str(line.version_id),
                 "budgetId": str(line.budget_id),
-                "pathKey": nodes[line.budget_id].path_key,
-                "name": nodes[line.budget_id].name,
-                "transferable": line.transferable,
-                "coverable": line.coverable,
+                "pathKey": by_id[line.budget_id].path_key,
+                "name": by_id[line.budget_id].name,
+                "transferable": bool(line.transferable),
+                "coverable": bool(line.coverable),
                 "blocked": str(line.blocked),
             }
-            for line in lines
+            for line in marked
         ]
-        await self.session.execute(
-            update(BudgetPlanLine)
-            .where(BudgetPlanLine.id.in_([line.id for line in lines]))
-            .values(transferable=False, coverable=False, blocked=Decimal("0.00"))
-        )
+        for line in marked:
+            line.transferable = False
+            line.coverable = False
+            line.blocked = _ZERO
         return cleared
 
-    async def _stammplan_figures(
-        self, top: Budget, nodes: list[Budget], fy: FiscalYear
-    ) -> tuple[dict[UUID, Decimal], dict[UUID, tuple[Decimal, Decimal]]]:
-        """Return the Ansätze of the Stammplan of `fy` and the allocations it changes.
-
-        The Ansatz of a cost center is its allocation, and a parent holds the sum of
-        its children. The plan in force sets the allocations, so the second value
-        names each cost center whose allocation then differs, as `(before, after)`.
-        """
-        rows = (
-            await self.session.execute(
-                select(BudgetAllocation.budget_id, BudgetAllocation.allocated).where(
-                    BudgetAllocation.fiscal_year_id == fy.id
-                )
-            )
-        ).all()
-        allocated = {row.budget_id: row.allocated for row in rows}
-        amounts = plan_rules.summed_amounts(
-            {n.id: n.parent_id for n in nodes},
-            {n.id: allocated.get(n.id) or _ZERO for n in nodes if n.id != top.id},
-        )
-        target = plan_rules.allocations_from_lines(
-            [(n.id, n.parent_id, n.side) for n in nodes], amounts, top.id
-        )
-        return amounts, plan_rules.allocation_changes(allocated, target)
-
     async def _switch_years(self, top: Budget) -> list[FiscalYear]:
-        """Return the open fiscal years of `top` that get a Stammplan from the switch."""
+        """Return the open fiscal years of `top` that get a draft from the switch."""
         return [
             fy
             for fy in await self._fiscal_years_of(top.id)
             if fy.closed_at is None and not await self.plan_exists(fy.id)
         ]
 
-    async def preview_plan_switch(
-        self, budget_id: UUID, sides: Mapping[UUID, Side] | None = None
-    ) -> PlanSwitchPreview:
-        """Return the allocations that change when the plan switch goes on.
-
-        `sides` names the side that a form gives a direct child and has not saved yet.
-        The preview counts with it, so a person sees the changes before the first
-        write. The rows take these sides only in this session: the caller must roll
-        the session back and must not commit it.
-
-        Raises:
-            ValidationProblem: `plan_top_level_only` (422).
-        """
-        top = await self._plan_top(budget_id, "The plan switch belongs")
-        nodes = await self._subtree(top)
-        by_id = {n.id: n for n in nodes}
-        parent_of = {n.id: n.parent_id for n in nodes}
-        for node in nodes:
-            wanted = plan_rules.proposed_side(parent_of, top.id, sides or {}, node.id)
-            if wanted is not None:
-                node.side = wanted
-        figures = [
-            (fy, (await self._stammplan_figures(top, nodes, fy))[1])
-            for fy in await self._switch_years(top)
-        ]
-        return PlanSwitchPreview(
-            budgetId=top.id,
-            changes=tuple(
-                PlanSwitchChange(
-                    fiscalYearId=fy.id,
-                    year=tree_rules.fiscal_year_display(
-                        fy.year, top.fiscal_start_month, top.fiscal_start_day
-                    ),
-                    budgetId=node_id,
-                    pathKey=by_id[node_id].path_key,
-                    name=by_id[node_id].name,
-                    allocated=before.quantize(_CENT),
-                    planned=after.quantize(_CENT),
-                )
-                for fy, changes in figures
-                for node_id, (before, after) in sorted(
-                    changes.items(), key=lambda item: by_id[item[0]].path_key
-                )
-            ),
-        )
-
-    async def set_plan_switch(
-        self, budget_id: UUID, enabled: bool, *, confirm_changes: bool = False
-    ) -> PlanSwitchOut:
+    async def set_plan_switch(self, budget_id: UUID, enabled: bool) -> PlanSwitchOut:
         """Set the plan switch of a top-level node.
 
-        When the switch goes on, each open fiscal year without a plan gets a Stammplan
-        in force from its allocations, and that plan sets the allocations. A closed
-        year gets no plan. The switch goes off only while each plan of the budget is a
-        Stammplan in force that passed no step, and it deletes those plans, so a plan
-        and the allocations never differ.
+        When the switch goes on, each open fiscal year without a plan gets a
+        Haushaltsplan with one draft version from its allocations. The draft changes no
+        allocation, and no Titel in it has a side. A closed year gets no plan. The
+        switch goes off only while each plan of the budget is one draft, and it deletes
+        those plans, so no decision goes with it.
 
         Raises:
             ValidationProblem: `plan_top_level_only` (422) for a node below the top
-                level, `plan_side_missing` (422) when a node below it has no side.
-            ConflictError: `plan_changes_allocations` (409) when the Stammplan changes
-                an allocation and the request does not confirm it,
-                `plan_switch_has_plans` (409) when the switch goes off and a plan has
-                a decision, a draft or a closed fiscal year.
+                level.
+            ConflictError: `plan_switch_has_plans` (409) when the switch goes off and a
+                plan has a version that left the draft, a Nachtrag or a closed fiscal
+                year.
         """
         await self._lock_tree(budget_id)
         top = await self._plan_top(budget_id, "The plan switch belongs")
         if bool(top.plan_enabled) == enabled:
             return PlanSwitchOut(budgetId=top.id, planEnabled=enabled)
-        touched = await (
-            self._switch_on(top, confirm_changes=confirm_changes)
-            if enabled
-            else self._switch_off(top)
-        )
+        touched = await (self._switch_on(top) if enabled else self._switch_off(top))
         top.plan_enabled = enabled
         await self._audit(
             AuditAction.BUDGET_PLAN_SWITCH,
@@ -623,34 +455,14 @@ class PlanOps(NodeOps, AllocationOps):
         )
         return PlanSwitchOut(budgetId=top.id, planEnabled=enabled)
 
-    async def _switch_on(self, top: Budget, *, confirm_changes: bool) -> dict[str, Any]:
-        """Give each open fiscal year without a plan its Stammplan, for the audit data."""
+    async def _switch_on(self, top: Budget) -> dict[str, Any]:
+        """Give each open fiscal year without a plan its draft, for the audit data."""
         nodes = await self._subtree(top)
-        if any(n.side is None for n in nodes if n.id != top.id):
-            raise ValidationProblem(
-                "Each cost centre below the top level needs a side first.",
-                code="plan_side_missing",
-                errors=[{"field": "side", "msg": "a cost centre has no side"}],
-            )
-        years = await self._switch_years(top)
-        figures = [await self._stammplan_figures(top, nodes, fy) for fy in years]
-        if any(changes for _amounts, changes in figures) and not confirm_changes:
-            raise ConflictError(
-                "The Stammplan changes allocations. Confirm the changes.",
-                code="plan_changes_allocations",
-            )
         created = [
-            await self._stammplan_from_allocations(top, fy, nodes, amounts)
-            for fy, (amounts, _changes) in zip(years, figures, strict=True)
+            await self._draft_from_allocations(top, fy, nodes)
+            for fy in await self._switch_years(top)
         ]
-        return {
-            "createdPlans": [str(plan_id) for plan_id in created],
-            "allocations": {
-                str(fy.id): _changes_out(changes)
-                for fy, (_amounts, changes) in zip(years, figures, strict=True)
-                if changes
-            },
-        }
+        return {"createdPlans": [str(plan_id) for plan_id in created]}
 
     async def _switch_off(self, top: Budget) -> dict[str, Any]:
         """Delete the plans of a budget whose switch goes off, for the audit data.
@@ -666,14 +478,14 @@ class PlanOps(NodeOps, AllocationOps):
         ]
         plain = [
             fy.closed_at is None
-            and plan_rules.is_plain_stammplan(
-                [(v.number, v.state, v.steps or []) for v in await self._versions(plan.id)]
+            and plan_rules.is_plain_draft(
+                [(v.number, v.state) for v in await self._versions(plan.id)]
             )
             for fy, plan in plans
         ]
         if not all(plain):
             raise ConflictError(
-                "A Haushaltsplan of this cost centre has a decision or a draft.",
+                "A Haushaltsplan of this cost centre has a version that left the draft.",
                 code="plan_switch_has_plans",
             )
         deleted = {
@@ -688,18 +500,28 @@ class PlanOps(NodeOps, AllocationOps):
         await self.session.flush()
         return deleted
 
-    async def _stammplan_from_allocations(
-        self, top: Budget, fy: FiscalYear, nodes: list[Budget], amounts: dict[UUID, Decimal]
+    async def _draft_from_allocations(
+        self, top: Budget, fy: FiscalYear, nodes: list[Budget]
     ) -> UUID:
-        """Create the plan of `fy` with a Stammplan in force and write its allocations."""
-        plan = BudgetPlan(id=uuid.uuid4(), fiscal_year_id=fy.id)
-        version = BudgetPlanVersion(
-            id=uuid.uuid4(),
-            plan_id=plan.id,
-            number=0,
-            state="in_force",
-            in_force_at=datetime.now(UTC),
+        """Create the plan of `fy` with one draft version from the allocations.
+
+        The Ansatz of a cost center is its allocation, and a parent holds the sum of
+        its children. The allocations stay as they are.
+        """
+        rows = (
+            await self.session.execute(
+                select(BudgetAllocation.budget_id, BudgetAllocation.allocated).where(
+                    BudgetAllocation.fiscal_year_id == fy.id
+                )
+            )
+        ).all()
+        allocated = {row.budget_id: row.allocated for row in rows}
+        amounts = plan_rules.summed_amounts(
+            {n.id: n.parent_id for n in nodes},
+            {n.id: allocated.get(n.id) or _ZERO for n in nodes if n.id != top.id},
         )
+        plan = BudgetPlan(id=uuid.uuid4(), fiscal_year_id=fy.id)
+        version = BudgetPlanVersion(id=uuid.uuid4(), plan_id=plan.id, number=0, state="draft")
         self.session.add(plan)
         await self.session.flush()
         self.session.add(version)
@@ -711,16 +533,44 @@ class PlanOps(NodeOps, AllocationOps):
                     version_id=version.id,
                     budget_id=node.id,
                     amount=amounts[node.id],
-                    name=node.name,
-                    path_key=node.path_key,
                 )
                 for node in nodes
                 if node.id != top.id
             ]
         )
-        await self._write_allocations(fy.id, top, nodes, amounts)
         await self._audit_version(plan, version)
         return plan.id
+
+    async def _plan_for_new_year(self, top: Budget, fy: FiscalYear) -> None:
+        """Give a new fiscal year of a budget with the plan switch on its draft.
+
+        The draft copies the lines of the version in force of the latest fiscal year
+        before `fy` that has one. Without such a year the draft comes from the
+        allocations, so each Ansatz is 0 and no Titel has a side.
+        """
+        if not top.plan_enabled:
+            return
+        earlier = sorted(
+            (f for f in await self._fiscal_years_of(top.id) if f.year < fy.year),
+            key=lambda f: f.year,
+            reverse=True,
+        )
+        in_force = [
+            (f, version)
+            for f, plan in [(f, await self._plan_of(f.id)) for f in earlier]
+            if plan is not None
+            for version in await self._versions(plan.id)
+            if version.state == "in_force"
+        ]
+        if not in_force:
+            await self._draft_from_allocations(top, fy, await self._subtree(top))
+            return
+        source_year, source = in_force[0]
+        plan = BudgetPlan(id=uuid.uuid4(), fiscal_year_id=fy.id)
+        self.session.add(plan)
+        await self.session.flush()
+        version = await self._new_version(plan, 0, await self._lines(source.id), top)
+        await self._audit_version(plan, version, copied_from=source_year.id)
 
     async def get_plan(self, budget_id: UUID, fiscal_year_id: UUID) -> PlanOut:
         """Return the Haushaltsplan of a fiscal year with every version.
@@ -825,6 +675,7 @@ class PlanOps(NodeOps, AllocationOps):
                 budget_id=line.budget_id,
                 amount=line.amount,
                 note=line.note,
+                side=line.side,
                 transferable=line.transferable,
                 coverable=line.coverable,
                 blocked=line.blocked,
@@ -904,8 +755,8 @@ class PlanOps(NodeOps, AllocationOps):
             ConflictError: `fiscal_year_closed` (409), `plan_version_locked` (409) for
                 a version that is not a draft.
             ValidationProblem: `plan_line_node_invalid` (422) for the top-level node
-                or a node of a different tree, `plan_side_missing` (422),
-                `plan_marks_income` (422), `plan_blocked_above_amount` (422),
+                or a node of a different tree, `side_not_settable` (422) for a side on
+                a line below a Titel, `plan_marks_income` (422), `plan_blocked_above_amount` (422),
                 `plan_amount_too_large` (422) when the sum of a parent or of a side
                 passes the largest amount.
         """
@@ -932,13 +783,31 @@ class PlanOps(NodeOps, AllocationOps):
             if payload.amount == 0
             else None
         )
-        wanted = self._wanted(payload, previous, giver)
+        titel = node.parent_id == top.id
+        if payload.side is not None and not titel:
+            raise ValidationProblem(
+                "The side is set on the line of a Titel.",
+                code="side_not_settable",
+                errors=[{"field": "side", "msg": "not a direct child of the top level"}],
+            )
+        to_income = (
+            titel
+            and payload.side == "income"
+            and (previous is None or previous.side != "income")
+        )
+        wanted = self._wanted(payload, previous, giver, drop_marks=to_income)
+        own = self._line_for(version.id, node.id, lines)
+        side_before = own.side
+        own.side = wanted.side
+        cleared = (
+            self._clear_marks(list(lines.values()), nodes, top.id, node.id) if to_income else []
+        )
+        sides = self._sides(top, nodes, [*lines.values(), own])
         amount = plan_rules.summed_amounts(
             parent_of,
             {**{bid: line.amount for bid, line in lines.items()}, node.id: wanted.amount},
         )[node.id]
-        self._check_line(node, wanted, amount)
-        own = self._line_for(version.id, node.id, lines)
+        self._check_line(sides[node.id], wanted, amount)
         own.amount = amount
         own.note = wanted.note
         own.transferable = wanted.transferable
@@ -952,7 +821,9 @@ class PlanOps(NodeOps, AllocationOps):
             giver.blocked = _ZERO
         kept = {id(ln): ln for ln in (*lines.values(), own, *above)}
         raised = self._resum(list(kept.values()), parent_of)
-        self._refuse_large_side(top, nodes, {ln.budget_id: ln.amount for ln in kept.values()})
+        self._refuse_large_side(
+            top, nodes, {ln.budget_id: ln.amount for ln in kept.values()}, sides
+        )
         await self._audit(
             AuditAction.BUDGET_PLAN_LINE_SET,
             target_type="budget_plan",
@@ -965,6 +836,9 @@ class PlanOps(NodeOps, AllocationOps):
                 "name": node.name,
                 "amount": str(amount),
                 "previousAmount": before,
+                "side": wanted.side,
+                "previousSide": side_before,
+                "clearedMarks": cleared,
                 "note": wanted.note,
                 "transferable": wanted.transferable,
                 "coverable": wanted.coverable,
@@ -976,7 +850,11 @@ class PlanOps(NodeOps, AllocationOps):
 
     @staticmethod
     def _wanted(
-        payload: PlanLineSet, previous: BudgetPlanLine | None, giver: BudgetPlanLine | None
+        payload: PlanLineSet,
+        previous: BudgetPlanLine | None,
+        giver: BudgetPlanLine | None,
+        *,
+        drop_marks: bool = False,
     ) -> PlanLineSet:
         """Return the whole line that a request asks for.
 
@@ -984,16 +862,24 @@ class PlanOps(NodeOps, AllocationOps):
         child line of a parent takes the Ansatz and the blocked amount of the parent
         (`giver`), because the parent then holds the sum of its children and its own
         Ansatz would be lost. The caller passes no `giver` for a request that names an
-        Ansatz above 0.
+        Ansatz above 0. With `drop_marks` the line of a Titel that becomes income loses
+        the Vermerke that it held, because an income line holds none.
         """
         named = payload.model_fields_set
         kept = (
             {
                 "amount": previous.amount,
                 "note": previous.note,
-                "transferable": bool(previous.transferable),
-                "coverable": bool(previous.coverable),
-                "blocked": previous.blocked if previous.blocked is not None else _ZERO,
+                "side": previous.side,
+                **(
+                    {}
+                    if drop_marks
+                    else {
+                        "transferable": bool(previous.transferable),
+                        "coverable": bool(previous.coverable),
+                        "blocked": previous.blocked if previous.blocked is not None else _ZERO,
+                    }
+                ),
             }
             if previous is not None
             else {}
@@ -1028,21 +914,14 @@ class PlanOps(NodeOps, AllocationOps):
         return line
 
     @staticmethod
-    def _check_line(node: Budget, payload: PlanLineSet, amount: Decimal) -> None:
-        """Check a line against the side of its cost center and its Ansatz `amount`.
+    def _check_line(side: str | None, payload: PlanLineSet, amount: Decimal) -> None:
+        """Check a line against its side in the version and its Ansatz `amount`.
 
         Raises:
-            ValidationProblem: `plan_side_missing`, `plan_marks_income` or
-                `plan_blocked_above_amount` (422).
+            ValidationProblem: `plan_marks_income` or `plan_blocked_above_amount` (422).
         """
-        if node.side is None:
-            raise ValidationProblem(
-                "The cost centre has no side.",
-                code="plan_side_missing",
-                errors=[{"field": "side", "msg": "the cost centre has no side"}],
-            )
         marked = payload.transferable or payload.coverable or payload.blocked > 0
-        if node.side == "income" and marked:
+        if side == "income" and marked:
             raise ValidationProblem(
                 "A line of an income cost centre has no Vermerk.",
                 code="plan_marks_income",
@@ -1124,8 +1003,32 @@ class PlanOps(NodeOps, AllocationOps):
                 errors=[{"field": "state", "msg": "the version has no line"}],
             )
 
+    @staticmethod
+    def _require_sides(top: Budget, nodes: list[Budget], lines: list[BudgetPlanLine]) -> None:
+        """Refuse a version in which the line of a Titel has no side.
+
+        Raises:
+            ValidationProblem: `plan_side_missing` (422). It names each such Titel.
+        """
+        by_id = {n.id: n for n in nodes}
+        missing = sorted(
+            by_id[line.budget_id].path_key
+            for line in lines
+            if by_id[line.budget_id].parent_id == top.id and line.side is None
+        )
+        if missing:
+            raise ValidationProblem(
+                "A Titel of the plan has no side.",
+                code="plan_side_missing",
+                errors=[{"field": "side", "msg": path_key} for path_key in missing],
+            )
+
     def _require_balanced(
-        self, top: Budget, nodes: list[Budget], amounts: dict[UUID, Decimal]
+        self,
+        top: Budget,
+        nodes: list[Budget],
+        amounts: dict[UUID, Decimal],
+        sides: Mapping[UUID, str | None],
     ) -> None:
         """Refuse a version whose income Ansätze differ from its expense Ansätze.
 
@@ -1133,7 +1036,9 @@ class PlanOps(NodeOps, AllocationOps):
             ValidationProblem: `plan_not_balanced` (422), `plan_amount_too_large` (422)
                 when the sum of a side passes the largest amount.
         """
-        direct = [(n.side, amounts.get(n.id, _ZERO)) for n in nodes if n.parent_id == top.id]
+        direct = [
+            (sides.get(n.id), amounts.get(n.id, _ZERO)) for n in nodes if n.parent_id == top.id
+        ]
         income, expense = plan_rules.side_sums(direct)
         if not plan_rules.is_balanced(direct):
             raise ValidationProblem(
@@ -1143,11 +1048,14 @@ class PlanOps(NodeOps, AllocationOps):
                     {"field": "state", "msg": f"income {income} differs from expenses {expense}"}
                 ],
             )
-        self._refuse_large_side(top, nodes, amounts)
+        self._refuse_large_side(top, nodes, amounts, sides)
 
     @staticmethod
     def _refuse_large_side(
-        top: Budget, nodes: Sequence[Budget], amounts: Mapping[UUID, Decimal]
+        top: Budget,
+        nodes: Sequence[Budget],
+        amounts: Mapping[UUID, Decimal],
+        sides: Mapping[UUID, str | None],
     ) -> None:
         """Refuse a plan whose income or expense sum passes the largest amount.
 
@@ -1157,7 +1065,9 @@ class PlanOps(NodeOps, AllocationOps):
         Raises:
             ValidationProblem: `plan_amount_too_large` (422).
         """
-        direct = [(n.side, amounts.get(n.id, _ZERO)) for n in nodes if n.parent_id == top.id]
+        direct = [
+            (sides.get(n.id), amounts.get(n.id, _ZERO)) for n in nodes if n.parent_id == top.id
+        ]
         if max(plan_rules.side_sums(direct)) > plan_rules.MAX_AMOUNT:
             raise ValidationProblem(
                 "The sum of a side is above the largest amount.",
@@ -1172,6 +1082,25 @@ class PlanOps(NodeOps, AllocationOps):
         for line in lines:
             line.name = names[line.budget_id][0]
             line.path_key = names[line.budget_id][1]
+
+    async def _ready_to_leave_draft(
+        self, top: Budget, lines: list[BudgetPlanLine]
+    ) -> None:
+        """Check a draft that leaves the draft, and keep the names in its lines.
+
+        The version must have a line, each Titel a side, and the plan must be balanced.
+
+        Raises:
+            ValidationProblem: `plan_empty`, `plan_side_missing`, `plan_not_balanced` or
+                `plan_amount_too_large` (422).
+        """
+        nodes = await self._subtree(top)
+        self._require_lines(lines)
+        self._require_sides(top, nodes, lines)
+        amounts = {line.budget_id: line.amount for line in lines}
+        sides = self._sides(top, nodes, lines)
+        self._require_balanced(top, nodes, amounts, sides)
+        self._keep_names(lines, nodes)
 
     async def _open_step(
         self, version: BudgetPlanVersion, top: Budget
@@ -1199,11 +1128,7 @@ class PlanOps(NodeOps, AllocationOps):
         if index is None:
             raise ConflictError("The version has no step left.", code="plan_no_step_left")
         if first:
-            nodes = await self._subtree(top)
-            lines = await self._lines(version.id)
-            self._require_lines(lines)
-            self._require_balanced(top, nodes, {line.budget_id: line.amount for line in lines})
-            self._keep_names(lines, nodes)
+            await self._ready_to_leave_draft(top, await self._lines(version.id))
         return steps, index
 
     async def pass_next_step(
@@ -1473,14 +1398,29 @@ class PlanOps(NodeOps, AllocationOps):
                 "The version has a step that is not passed.", code="plan_state_invalid"
             )
         self._require_lines(lines)
-        nodes = await self._subtree(top)
-        amounts = {line.budget_id: line.amount for line in lines}
         if current == "draft":
-            self._require_balanced(top, nodes, amounts)
-            self._keep_names(lines, nodes)
+            await self._ready_to_leave_draft(top, lines)
+        return await self._take_force(version, plan, fy, top, lines)
+
+    async def _take_force(
+        self,
+        version: BudgetPlanVersion,
+        plan: BudgetPlan,
+        fy: FiscalYear,
+        top: Budget,
+        lines: list[BudgetPlanLine],
+    ) -> dict[UUID, tuple[Decimal, Decimal]]:
+        """Put a checked version in force: replace the one before, write the allocations."""
+        nodes = await self._subtree(top)
         await self._replace_in_force(plan.id)
         version.in_force_at = datetime.now(UTC)
-        return await self._write_allocations(fy.id, top, nodes, amounts)
+        return await self._write_allocations(
+            fy.id,
+            top,
+            nodes,
+            {line.budget_id: line.amount for line in lines},
+            self._sides(top, nodes, lines),
+        )
 
     async def _back_to_draft(
         self, version: BudgetPlanVersion, lines: list[BudgetPlanLine]
@@ -1501,6 +1441,110 @@ class PlanOps(NodeOps, AllocationOps):
             line.name = None
             line.path_key = None
         return {}
+
+    async def set_state_by_hand(self, version_id: UUID, payload: PlanStateByHand) -> PlanOut:
+        """Set the state of the newest version of a plan by hand.
+
+        The call sets the draft, a step that the version waits for, or the state in
+        force, without the steps and the votes between them. The steps before the
+        chosen state are passed by hand, the steps after it are open again, and the
+        open votes of the version end. A draft that leaves the draft passes the checks
+        of `_ready_to_leave_draft`. A version that comes into force replaces the version in
+        force and writes the allocations. A version that leaves the state in force
+        keeps the allocations, and the version that it replaced stays replaced.
+
+        Raises:
+            NotFoundError: The version does not exist (404).
+            ConflictError: `fiscal_year_closed` (409), `plan_not_enabled` (409),
+                `plan_state_invalid` (409) for a version that is not the newest one
+                and for a request that changes nothing.
+            ValidationProblem: `plan_step_invalid` (422) for a step that the version
+                does not have, or a step with a state that takes none, and
+                `plan_empty`, `plan_side_missing`, `plan_not_balanced` or
+                `plan_amount_too_large` (422) for a draft that leaves the draft.
+        """
+        await VotingService(self.session).lock_for_plan_version(version_id)
+        version, plan, fy, top = await self._version_context(version_id)
+        current = version.state
+        if version.number != max(v.number for v in await self._versions(plan.id)):
+            raise ConflictError(
+                "Only the newest version of a plan takes a state by hand.",
+                code="plan_state_invalid",
+            )
+        steps = (
+            await self._budget_step_records(top.id)
+            if current == "draft"
+            else list(version.steps or [])
+        )
+        passed = plan_rules.manual_passed(payload.state, payload.step, len(steps))
+        if passed is None:
+            raise ValidationProblem(
+                "The version has no such step.",
+                code="plan_step_invalid",
+                errors=[{"field": "step", "msg": "not a step of the version"}],
+            )
+        if payload.state == current and (
+            current != "in_progress" or plan_rules.next_step(steps) == passed
+        ):
+            raise ConflictError("The version has this state.", code="plan_state_invalid")
+        lines = await self._lines(version.id)
+        if current == "draft":
+            await self._ready_to_leave_draft(top, lines)
+        await VotingService(self.session).end_for_plan_version(version.id, actor=self.actor)
+        changed = await self._apply_by_hand(version, plan, fy, top, lines, payload.state)
+        version.steps = (
+            []
+            if payload.state == "draft"
+            else plan_rules.steps_by_hand(steps, passed, datetime.now(UTC).isoformat())
+        )
+        version.state = payload.state
+        await self._audit(
+            AuditAction.BUDGET_PLAN_STATE_SET,
+            target_type="budget_plan",
+            target_id=str(plan.id),
+            data={
+                "budget": top.path_key,
+                "year": fy.year,
+                "fiscalYearId": str(fy.id),
+                "versionId": str(version.id),
+                "number": version.number,
+                "before": current,
+                "after": payload.state,
+                "step": steps[passed]["name"] if payload.state == "in_progress" else None,
+                "reason": payload.reason,
+                "allocations": _changes_out(changed),
+            },
+        )
+        return await self._plan_out(plan, top.id)
+
+    async def _apply_by_hand(
+        self,
+        version: BudgetPlanVersion,
+        plan: BudgetPlan,
+        fy: FiscalYear,
+        top: Budget,
+        lines: list[BudgetPlanLine],
+        target: plan_rules.ManualState,
+    ) -> dict[UUID, tuple[Decimal, Decimal]]:
+        """Write what a state set by hand changes besides the steps.
+
+        Returns:
+            The allocations that a version that comes into force changed.
+        """
+        match target:
+            case "in_force":
+                return await self._take_force(version, plan, fy, top, lines)
+            case "in_progress":
+                version.in_force_at = None
+                return {}
+            case "draft":
+                version.in_force_at = None
+                for line in lines:
+                    line.name = None
+                    line.path_key = None
+                return {}
+            case _:  # pragma: no cover
+                assert_never(target)
 
     async def delete_version(self, version_id: UUID) -> None:
         """Delete a draft version, and the plan with it when it has no other version.
@@ -1540,8 +1584,8 @@ class PlanOps(NodeOps, AllocationOps):
             ConflictError: `fiscal_year_closed` (409), `plan_version_locked` (409),
                 `budget_key_exists` (409).
             ValidationProblem: `plan_line_node_invalid` (422) for a parent outside
-                the tree of the plan, `plan_side_missing` (422) for a direct child of
-                the budget without a side.
+                the tree of the plan, `plan_side_missing` (422) for a Titel without a
+                side, `side_not_settable` (422) for a side below a Titel.
         """
         version, _plan, _fy, top = await self._version_context(version_id)
         if version.state != "draft":
@@ -1559,14 +1603,13 @@ class PlanOps(NodeOps, AllocationOps):
             )
         if payload.side is not None and parent.id != top.id:
             raise ValidationProblem(
-                "The side is set on a direct child of a top-level cost centre.",
+                "The side is set on the line of a Titel.",
                 code="side_not_settable",
                 errors=[{"field": "side", "msg": "not a direct child of the top level"}],
             )
-        side = payload.side if parent.id == top.id else parent.side
-        if side is None:
+        if payload.side is None and parent.id == top.id:
             raise ValidationProblem(
-                "A cost centre directly below the budget needs a side.",
+                "A Titel needs a side.",
                 code="plan_side_missing",
                 errors=[{"field": "side", "msg": "the cost centre has no side"}],
             )
@@ -1582,7 +1625,6 @@ class PlanOps(NodeOps, AllocationOps):
             key=payload.key,
             path_key=tree_rules.compose_path_key(parent.path_key, payload.key),
             name=payload.name,
-            side=side,
         )
         self.session.add(node)
         try:
@@ -1600,7 +1642,13 @@ class PlanOps(NodeOps, AllocationOps):
             },
         )
         await self.session.flush()
-        return await self.set_line(version.id, node.id, PlanLineSet(amount=payload.amount))
+        return await self.set_line(
+            version.id,
+            node.id,
+            PlanLineSet(amount=payload.amount)
+            if payload.side is None
+            else PlanLineSet(amount=payload.amount, side=payload.side),
+        )
 
     async def _replace_in_force(self, plan_id: UUID) -> None:
         """Set the version in force of a plan to replaced, before a new one takes over.
@@ -1618,6 +1666,7 @@ class PlanOps(NodeOps, AllocationOps):
         top: Budget,
         nodes: list[Budget],
         amounts: dict[UUID, Decimal],
+        sides: Mapping[UUID, str | None],
     ) -> dict[UUID, tuple[Decimal, Decimal]]:
         """Write the allocation of each cost center from the plan that comes into force.
 
@@ -1625,7 +1674,7 @@ class PlanOps(NodeOps, AllocationOps):
             `(before, after)` for each cost center whose allocation changed.
         """
         target = plan_rules.allocations_from_lines(
-            [(n.id, n.parent_id, n.side) for n in nodes], amounts, top.id
+            [(n.id, n.parent_id, sides.get(n.id)) for n in nodes], amounts, top.id
         )
         existing = {
             alloc.budget_id: alloc

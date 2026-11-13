@@ -9,7 +9,14 @@ from uuid import UUID
 
 from pydantic import AfterValidator, Field, StrictBool, StringConstraints
 
-from app.modules.budget.plan_rules import MAX_AMOUNT, MAX_STEPS, PlanState, PlanTarget, Side
+from app.modules.budget.plan_rules import (
+    MAX_AMOUNT,
+    MAX_STEPS,
+    ManualState,
+    PlanState,
+    PlanTarget,
+    Side,
+)
 from app.modules.budget.tree_schemas import NodeName, visible_text
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
@@ -35,25 +42,10 @@ StepName = Annotated[
 ]
 
 
-class SideSet(FrozenStrictCamelModel, frozen=True):
-    """Set the side of a direct child of a top-level cost center."""
-
-    side: Side
-
-
-class SideOut(FrozenCamelModel, frozen=True):
-    """The side of a cost center after the change."""
-
-    budget_id: UUID = Field(alias="budgetId")
-    side: Side
-
-
 class PlanSwitchSet(FrozenStrictCamelModel, frozen=True):
     """Set the plan switch of a top-level cost center."""
 
     enabled: bool
-    #: The person saw the allocations that the Stammplan changes and agrees.
-    confirm_changes: bool = Field(default=False, alias="confirmChanges")
 
 
 class PlanSwitchOut(FrozenCamelModel, frozen=True):
@@ -64,32 +56,13 @@ class PlanSwitchOut(FrozenCamelModel, frozen=True):
 
 
 class PlanCreate(FrozenStrictCamelModel, frozen=True):
-    """Create the Haushaltsplan of a fiscal year with a Stammplan in draft.
+    """Create the Haushaltsplan of a fiscal year with its first version in draft.
 
     `copyFromFiscalYearId` names a fiscal year of the same top-level cost center. The
-    Stammplan then starts with the lines of the version in force of that year.
+    version then starts with the lines of the version in force of that year.
     """
 
     copy_from_fiscal_year_id: UUID | None = Field(default=None, alias="copyFromFiscalYearId")
-
-
-class PlanSwitchChange(FrozenCamelModel, frozen=True):
-    """One allocation that the Stammplan of the plan switch changes."""
-
-    fiscal_year_id: UUID = Field(alias="fiscalYearId")
-    year: str
-    budget_id: UUID = Field(alias="budgetId")
-    path_key: str = Field(alias="pathKey")
-    name: str
-    allocated: Decimal
-    planned: Decimal
-
-
-class PlanSwitchPreview(FrozenCamelModel, frozen=True):
-    """What the plan switch changes when it goes on."""
-
-    budget_id: UUID = Field(alias="budgetId")
-    changes: tuple[PlanSwitchChange, ...] = ()
 
 
 class PlanLineSet(FrozenStrictCamelModel, frozen=True):
@@ -97,9 +70,11 @@ class PlanLineSet(FrozenStrictCamelModel, frozen=True):
 
     A field that the request leaves out keeps the value of the line, so two requests
     that each change one field do not overwrite each other. A new line starts with
-    the defaults.
+    the defaults. `side` belongs to the line of a Titel, a direct child of the top-level
+    cost center.
     """
 
+    side: Side | None = None
     amount: Amount = Decimal("0.00")
     note: str | None = Field(default=None, max_length=4000)
     transferable: StrictBool = False
@@ -111,6 +86,22 @@ class PlanStateSet(FrozenStrictCamelModel, frozen=True):
     """Bring a version into force, or move a version in progress back to draft."""
 
     state: PlanTarget
+
+
+class PlanStateByHand(FrozenStrictCamelModel, frozen=True):
+    """Set the state of the newest version of a plan by hand.
+
+    `step` names the step that a version in `in_progress` waits for, by its place from
+    0. The other states take no step. `reason` says why the state is set by hand.
+    """
+
+    state: ManualState
+    step: int | None = Field(default=None, ge=0, lt=MAX_STEPS)
+    reason: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=2000),
+        AfterValidator(visible_text),
+    ]
 
 
 class PlanStepIn(FrozenStrictCamelModel, frozen=True):
@@ -139,6 +130,8 @@ class PlanStepOut(FrozenCamelModel, frozen=True):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     gremium_name: str | None = Field(default=None, alias="gremiumName")
     passed_at: datetime | None = Field(default=None, alias="passedAt")
+    #: A person with `budget.plan.set_state` recorded the step, without a decision.
+    by_hand: bool = Field(default=False, alias="byHand")
     #: The vote of the Gremium on this step, and its status and result. A deleted
     #: vote leaves the id without a status.
     vote_id: UUID | None = Field(default=None, alias="voteId")
@@ -167,6 +160,9 @@ class PlanLineOut(FrozenCamelModel, frozen=True):
     """One line of a plan version."""
 
     budget_id: UUID = Field(alias="budgetId")
+    #: The side of the line in its version: the side of its Titel, `None` while the
+    #: Titel has none.
+    side: Side | None = None
     amount: Decimal
     note: str | None = None
     #: The name and the path key at the decision. `None` in a draft.

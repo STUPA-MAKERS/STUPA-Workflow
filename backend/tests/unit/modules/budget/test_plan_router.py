@@ -22,9 +22,7 @@ from app.modules.budget.plan_schemas import (
     PlanOut,
     PlanStepsOut,
     PlanSwitchOut,
-    PlanSwitchPreview,
     PlanVersionOut,
-    SideOut,
 )
 from app.modules.budget.tree_router import get_budget_tree_service
 
@@ -74,22 +72,13 @@ class _FakePlans:
     async def can_view_node(self, budget_id: uuid.UUID, member: object) -> bool:
         return self.visible
 
-    async def set_side(self, budget_id: uuid.UUID, side: str) -> SideOut:
-        self.calls.append(("side", side))
-        return SideOut(budgetId=budget_id, side="income")
-
-    async def set_plan_switch(
-        self, budget_id: uuid.UUID, enabled: bool, *, confirm_changes: bool
-    ) -> PlanSwitchOut:
-        self.calls.append(("switch", (enabled, confirm_changes)))
+    async def set_plan_switch(self, budget_id: uuid.UUID, enabled: bool) -> PlanSwitchOut:
+        self.calls.append(("switch", enabled))
         return PlanSwitchOut(budgetId=budget_id, planEnabled=enabled)
 
-    async def preview_plan_switch(
-        self, budget_id: uuid.UUID, sides: dict[uuid.UUID, str] | None = None
-    ) -> PlanSwitchPreview:
-        self.calls.append(("preview", budget_id))
-        self.calls.append(("preview_sides", sides))
-        return PlanSwitchPreview(budgetId=budget_id)
+    async def set_state_by_hand(self, version_id: uuid.UUID, payload: Any) -> PlanOut:
+        self.calls.append(("by_hand", (payload.state, payload.step, payload.reason)))
+        return _plan()
 
     async def delete_version(self, version_id: uuid.UUID) -> None:
         self.calls.append(("delete_version", version_id))
@@ -167,10 +156,7 @@ def client(fake: _FakePlans) -> TestClient:
 
 
 _WRITES: tuple[tuple[str, str, dict[str, Any] | None, tuple[str, Any]], ...] = (
-    ("PUT", f"/api/budgets/{_NODE}/side", {"side": "income"}, ("side", "income")),
-    ("PUT", f"/api/budgets/{_TOP}/plan-switch", {"enabled": True}, ("switch", (True, False))),
-    ("PUT", f"/api/budgets/{_TOP}/plan-switch", {"enabled": True, "confirmChanges": True},
-     ("switch", (True, True))),
+    ("PUT", f"/api/budgets/{_TOP}/plan-switch", {"enabled": True}, ("switch", True)),
     ("DELETE", f"/api/budget-plan-versions/{_VERSION}", None, ("delete_version", _VERSION)),
     ("POST", f"/api/budgets/{_TOP}/fiscal-years/{_FY}/plan", {}, ("create", None)),
     ("POST", f"/api/budgets/{_TOP}/fiscal-years/{_FY}/plan/versions", None, ("nachtrag", _FY)),
@@ -220,23 +206,48 @@ def test_write_route_needs_budget_structure(
     assert fake.session.commits == 0
 
 
-def test_preview_of_the_plan_switch(client: TestClient, fake: _FakePlans) -> None:
-    """The preview route returns the allocations that the switch changes.
-
-    Rule: §F/finance/budget/000803.
-    """
-    resp = client.get(f"/api/budgets/{_TOP}/plan-switch/preview")
-    assert resp.status_code == 200
-    assert resp.json() == {"budgetId": str(_TOP), "changes": []}
-    assert fake.calls == [("preview", _TOP), ("preview_sides", {})]
-    assert (fake.session.commits, fake.session.rollbacks) == (0, 1)
-    child, other = uuid.uuid4(), uuid.uuid4()
-    client.get(
-        f"/api/budgets/{_TOP}/plan-switch/preview", params={"income": child, "expense": other}
+def test_the_side_and_the_preview_routes_are_gone(client: TestClient, fake: _FakePlans) -> None:
+    """§F/finance/budget/000853: no route sets a side on a node or previews the switch."""
+    assert client.put(f"/api/budgets/{_NODE}/side", json={"side": "income"}).status_code == 404
+    assert client.get(f"/api/budgets/{_TOP}/plan-switch/preview").status_code in (404, 405)
+    refused = client.put(
+        f"/api/budgets/{_TOP}/plan-switch", json={"enabled": True, "confirmChanges": True}
     )
-    assert fake.calls[-1] == ("preview_sides", {child: "income", other: "expense"})
-    denied = _client(_FakePlans(), "budget.view").get(f"/api/budgets/{_TOP}/plan-switch/preview")
+    assert refused.status_code == 422
+    assert fake.calls == []
+
+
+def test_state_by_hand_needs_its_own_permission(fake: _FakePlans) -> None:
+    """§F/finance/budget/000855: only `budget.plan.set_state` sets a state by hand."""
+    url = f"/api/budget-plan-versions/{_VERSION}/state"
+    body = {"state": "in_progress", "step": 1, "reason": " Beschluss vom 3. März "}
+    denied = _client(fake, "budget.structure", "budget.book").put(url, json=body)
     assert denied.status_code == 403
+    assert denied.headers["content-type"].startswith("application/problem+json")
+    assert fake.calls == []
+    allowed = _client(fake, "budget.plan.set_state").put(url, json=body)
+    assert allowed.status_code == 200, allowed.text
+    assert fake.calls == [("by_hand", ("in_progress", 1, "Beschluss vom 3. März"))]
+    assert fake.session.commits == 1
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"state": "in_force"},
+        {"state": "in_force", "reason": "   "},
+        {"state": "replaced", "reason": "x"},
+        {"state": "in_progress", "step": -1, "reason": "x"},
+        {"state": "draft", "reason": "x", "more": 1},
+    ],
+)
+def test_state_by_hand_refuses_a_wrong_body(fake: _FakePlans, body: dict[str, Any]) -> None:
+    """§F/finance/budget/000855: the state by hand needs a state and a reason."""
+    resp = _client(fake, "budget.plan.set_state").put(
+        f"/api/budget-plan-versions/{_VERSION}/state", json=body
+    )
+    assert resp.status_code == 422
+    assert fake.calls == []
 
 
 @pytest.mark.parametrize(
@@ -276,7 +287,7 @@ def test_get_plan_with_the_full_view() -> None:
     body = resp.json()
     assert body["fiscalYearId"] == str(_FY)
     assert body["versions"][0]["lines"][0] == {
-        "budgetId": str(_NODE), "amount": "10.00", "note": None, "name": None,
+        "budgetId": str(_NODE), "side": None, "amount": "10.00", "note": None, "name": None,
         "pathKey": None, "transferable": False, "coverable": False, "blocked": "0",
     }
     assert fake.session.commits == 0

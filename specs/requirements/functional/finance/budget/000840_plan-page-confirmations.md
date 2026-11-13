@@ -16,7 +16,7 @@ scope:
 # The plan page asks before an action that binds or deletes
 
 The plan page must ask for a confirmation before each of these actions: "In Kraft setzen",
-"Schritt abschließen", "Zurück in den Entwurf", "Entwurf löschen", "Zeile entfernen" and
+"Zustand setzen" (000855), "Schritt abschließen", "Zurück in den Entwurf", "Entwurf löschen", "Zeile entfernen" and
 "Kostenstelle löschen". The dialog must name what the action changes. A cancelled dialog
 must change nothing. The page must send no second request while a request of an action
 runs.

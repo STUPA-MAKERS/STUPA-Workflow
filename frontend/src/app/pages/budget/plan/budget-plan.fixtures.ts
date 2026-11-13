@@ -1,5 +1,5 @@
 import type { BudgetTreeNode, FiscalYear } from '../budget-tree.api';
-import type { BudgetPlan, PlanLine, PlanVersion } from './budget-plan.api';
+import type { BudgetPlan, PlanLine, PlanVersion, Side } from './budget-plan.api';
 
 /** A tree node with every field set. */
 export function node(over: Partial<BudgetTreeNode> & { readonly id: string }): BudgetTreeNode {
@@ -41,19 +41,18 @@ export const TOP: BudgetTreeNode = node({
   name: 'VS-Mittel',
   planEnabled: true,
   children: [
-    node({ id: 'fees', parentId: 'vsm', name: 'Beiträge', side: 'income', byFiscalYear: [figures('fy-25', '90', '0')] }),
-    node({ id: 'other', parentId: 'vsm', name: 'Sonstige Einnahmen', side: 'income' }),
+    node({ id: 'fees', parentId: 'vsm', name: 'Beiträge', byFiscalYear: [figures('fy-25', '90', '0')] }),
+    node({ id: 'other', parentId: 'vsm', name: 'Sonstige Einnahmen' }),
     node({
       id: 'staff',
       parentId: 'vsm',
       name: 'Personal',
-      side: 'expense',
       children: [
-        node({ id: 'wages', parentId: 'staff', pathKey: 'STAFF-WAGES', name: 'Löhne', side: 'expense', byFiscalYear: [figures('fy-25', '0', '55')] }),
-        node({ id: 'fees2', parentId: 'staff', name: 'Honorare', side: 'expense' }),
+        node({ id: 'wages', parentId: 'staff', pathKey: 'STAFF-WAGES', name: 'Löhne', byFiscalYear: [figures('fy-25', '0', '55')] }),
+        node({ id: 'fees2', parentId: 'staff', name: 'Honorare' }),
       ],
     }),
-    node({ id: 'grants', parentId: 'vsm', name: 'Zuschüsse', side: 'expense' }),
+    node({ id: 'grants', parentId: 'vsm', name: 'Zuschüsse' }),
     node({ id: 'noside', parentId: 'vsm', name: 'Ohne Seite' }),
   ],
 });
@@ -74,8 +73,19 @@ export const fy = (id: string, year: number, over: Partial<FiscalYear> = {}): Fi
 export const FY25 = fy('fy-25', 2025);
 export const FY26 = fy('fy-26', 2026);
 
+/** The side that the server answers for a line: the side of its Titel. `noside` has none. */
+const SIDES: Readonly<Record<string, Side>> = {
+  fees: 'income',
+  other: 'income',
+  staff: 'expense',
+  wages: 'expense',
+  fees2: 'expense',
+  grants: 'expense',
+};
+
 export const line = (budgetId: string, amount: string, over: Partial<PlanLine> = {}): PlanLine => ({
   budgetId,
+  side: SIDES[budgetId] ?? null,
   amount,
   note: null,
   name: null,

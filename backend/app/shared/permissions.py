@@ -85,6 +85,10 @@ Keys that need a note:
   alle" shows the Termin to each signed-in person, "Öffentlich" also to a person without
   a sign-in. It is separate from `calendar.manage`, so no Termin is visible to all by
   accident.
+- `budget.plan.set_state`: set the state of a Haushaltsplan by hand: the draft, a step
+  or the state in force, without the decisions between them. The audit log records
+  each use with its reason. It stays SEPARATE from `budget.structure`, and no OAuth
+  scope carries it, so an agent token never sets a plan in force.
 - `admin.features`: switch the features of the platform on and off (/admin/features).
   A switch changes the platform for every person, so the key is separate from
   `admin.site`. No OAuth scope carries it, so an agent token never switches a feature.
@@ -111,6 +115,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "budget.structure",
     "budget.book",
     "budget.export",
+    "budget.plan.set_state",
     "application.export",
     "webhook.manage",
     "audit.read",

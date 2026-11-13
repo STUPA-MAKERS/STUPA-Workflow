@@ -416,15 +416,14 @@ class BudgetNodeCreate(WireModel, frozen=True):
         description="Gremium that decides on spending from this node (and from its "
         "subtree unless a descendant sets its own)",
     )
-    side: Literal["income", "expense"] | None = Field(
-        default=None,
-        description="Side in the Haushaltsplan. Only for a direct child of a top-level "
-        "node, and required there when the plan switch of that node is on. A node "
-        "further down takes the side of its parent.",
-    )
 
 
 class PlanLineSet(WireModel, frozen=True):
+    side: Literal["income", "expense"] | None = Field(
+        default=None,
+        description="The side of a Titel, a direct child of the top-level node. A "
+        "cost center further down takes the side of its Titel.",
+    )
     amount: str | None = Field(
         default=None,
         description="The Ansatz as a decimal string. Ignored for a cost center with a "
@@ -450,7 +449,7 @@ class PlanNodeCreate(WireModel, frozen=True):
     key: str
     name: str
     side: Literal["income", "expense"] | None = Field(
-        default=None, description="Required for a direct child of the top-level node"
+        default=None, description="The side of a Titel, a direct child of the top-level node"
     )
     amount: str = "0"
 

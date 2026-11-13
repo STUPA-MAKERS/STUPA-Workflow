@@ -240,7 +240,6 @@ class TreeViewOps(BudgetTreeServiceBase):
         )
         forest = plan_rules.with_plan_fields(
             plain,
-            {n.id: n.side for n in nodes},
             {n.id: bool(n.plan_enabled) for n in nodes},
             await self._planned_in(),
         )

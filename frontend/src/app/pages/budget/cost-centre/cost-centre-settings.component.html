@@ -21,16 +21,6 @@
       [name]="'cc-name-' + n.id"
     />
   </div>
-  @if (sided()) {
-    <app-select
-      [name]="'cc-side-' + n.id"
-      [label]="'budget.cc.side' | t"
-      [clearable]="false"
-      [options]="sides()"
-      [ngModel]="side()"
-      (ngModelChange)="saveSide($event)"
-    />
-  }
   <app-colour-field [(value)]="colour" [name]="'cc-colour-' + n.id" (picked)="saveColour($event)" />
   <app-switch [id]="'cc-active-' + n.id" [checked]="active()" (checkedChange)="saveActive($event)">
     <span>{{ 'budget.tree.active' | t }}</span>
