@@ -26,6 +26,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget-tree.api';
 import { BudgetPlanApi, type BudgetPlan, type Side } from '../plan/budget-plan.api';
+import { amountProblem } from '../plan/budget-plan.util';
 import { CostCentreSelectComponent } from '../cost-centre-select/cost-centre-select.component';
 import { costCentreError, keyProblem, NAME_MAX } from './cost-centre.util';
 
@@ -115,8 +116,17 @@ export class CostCentreCreateComponent {
       !this.nameError() &&
       !!this.parentId() &&
       (!this.sided() || !!this.side()) &&
-      !this.amountInvalid(),
+      !this.amountInvalid() &&
+      !this.amountError(),
   );
+  /** The error under the Ansatz: an Ansatz is not negative and not above the largest amount. */
+  readonly amountError = computed(() => {
+    const problem = amountProblem(this.amount() || '0');
+    if (!problem) return '';
+    return this.i18n.translate(
+      problem === 'negative' ? 'budget.plan.error.amountNegative' : 'budget.plan.error.amountTooLarge',
+    );
+  });
 
   /** Each opening starts with an empty form under the given parent. */
   constructor() {

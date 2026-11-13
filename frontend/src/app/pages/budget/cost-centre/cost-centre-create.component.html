@@ -38,12 +38,12 @@
       />
     }
     @if (versionId()) {
-      <app-currency-input name="ccAmount" [label]="amountLabel()" [ngModel]="amount()" (ngModelChange)="setAmount($event)" />
+      <app-currency-input name="ccAmount" [label]="amountLabel()" [ngModel]="amount()" [error]="amountError()" (ngModelChange)="setAmount($event)" />
     }
     <button type="submit" hidden></button>
   </form>
   <div dialog-footer>
     <app-button variant="text" (click)="closed.emit()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="submit($event)" [disabled]="!valid() || busy()" [loading]="busy()">{{ 'budget.cc.createSubmit' | t }}</app-button>
+    <app-button variant="fill" (click)="submit($event)" [disabled]="!valid() || busy()" [loading]="busy()">{{ 'budget.tree.create' | t }}</app-button>
   </div>
 </app-dialog>

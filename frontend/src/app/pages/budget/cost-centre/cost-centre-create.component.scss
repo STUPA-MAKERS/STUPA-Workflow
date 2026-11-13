@@ -8,6 +8,8 @@
   grid-template-columns: minmax(6rem, 10rem) minmax(0, 1fr);
   gap: var(--space-2);
 }
+// The key reads in the mono font like each key of the app. The input is inside the shared
+// field component, which has no input for the font.
 .ccc__key ::ng-deep input {
   font-family: var(--font-mono);
 }

@@ -1,5 +1,6 @@
-import { Subject, of, throwError } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
+import { Location } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/angular';
@@ -73,6 +74,7 @@ async function setup(opts: Opts = {}) {
     deleteNode: jest.fn((_id: string) => of(undefined)),
   };
   const gremien = jest.fn(() => (opts.gremienFail ? throwError(() => problem(500)) : of([{ id: 'g1', name: 'StuPa' }])));
+  const params = new BehaviorSubject(convertToParamMap(opts.query ?? {}));
   const view = await render(BudgetPlanComponent, {
     providers: [
       provideRouter([]),
@@ -81,15 +83,16 @@ async function setup(opts: Opts = {}) {
       { provide: AuthService, useValue: { can: (p: string) => perms.includes(p) } },
       { provide: FeatureService, useValue: { isOn: () => !opts.votingOff } },
       { provide: AdminApiService, useValue: { listGremienOptions: gremien } },
-      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.query ?? {}) } } },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params } },
     ],
   });
   const router = TestBed.inject(Router);
   const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+  const back = jest.spyOn(TestBed.inject(Location), 'back').mockImplementation(() => params.next(convertToParamMap({})));
   const toast = TestBed.inject(ToastService);
   const success = jest.spyOn(toast, 'success');
   const error = jest.spyOn(toast, 'error');
-  return { ...view, api, treeApi, gremien, router, navigate, success, error };
+  return { ...view, api, treeApi, gremien, router, navigate, success, error, params, back };
 }
 
 type View = Awaited<ReturnType<typeof setup>>;
@@ -188,7 +191,7 @@ describe('BudgetPlanComponent', () => {
 
     it('filters the list by the search text', async () => {
       const view = await setup();
-      const search = screen.getByPlaceholderText('Kostenstelle suchen');
+      const search = screen.getByPlaceholderText('Kostenstellen durchsuchen');
       await userEvent.type(search, 'löh');
       expect(texts(view, '.bd__tree .tn__name')).toEqual(['VS-Mittel', 'Löhne']);
       await userEvent.clear(search);
@@ -516,7 +519,7 @@ describe('BudgetPlanComponent', () => {
       expect(first).toHaveAttribute('aria-disabled', 'true');
       expect(first).toHaveAttribute('title', 'Der Plan ist nicht ausgeglichen.');
       await userEvent.keyboard('{Escape}');
-      await userEvent.type(screen.getByPlaceholderText('Kostenstelle suchen'), 'zusch');
+      await userEvent.type(screen.getByPlaceholderText('Kostenstellen durchsuchen'), 'zusch');
       expect(texts(view, '.bp__name')).toEqual(['Zuschüsse']);
     });
 
@@ -643,7 +646,7 @@ describe('BudgetPlanComponent', () => {
   });
 
   describe('steps', () => {
-    it('§F/finance/budget/000792 §F/finance/budget/000825 §F/finance/budget/000840: passes a step by hand after the confirmation', async () => {
+    it('§F/finance/budget/000792 §F/finance/budget/000825 §F/finance/budget/000840 §F/finance/budget/000841: passes a step by hand after the confirmation', async () => {
       const view = await setup({ plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
       expect(primary()).toHaveAccessibleName('Schritt abschließen: Beschluss');
       await userEvent.click(primary());
@@ -652,7 +655,7 @@ describe('BudgetPlanComponent', () => {
       await userEvent.click(primary());
       expect(await screen.findByText('Der Schritt „Beschluss“ gilt danach als abgeschlossen.')).toBeInTheDocument();
       await answerDialog('Schritt abschließen?', 'Abschließen');
-      expect(view.api.passNextStep).toHaveBeenCalledWith('v0');
+      expect(view.api.passNextStep).toHaveBeenCalledWith('v0', 0);
       expect(view.success).toHaveBeenCalledWith('Schritt abgeschlossen.');
     });
 
@@ -665,7 +668,7 @@ describe('BudgetPlanComponent', () => {
       expect(primary()).toBeEnabled();
     });
 
-    it('§F/finance/budget/000792: sets the version in force after its last step and reads the allocations again', async () => {
+    it('§F/finance/budget/000792 §F/finance/budget/000840: sets the version in force after its last step and reads the allocations again', async () => {
       const view = await setup({ plans: { 'fy-26': plan([version({ state: 'in_progress', steps: passed(2) })]) } });
       expect(primary()).toHaveAccessibleName('In Kraft setzen');
       await userEvent.click(primary());
@@ -705,7 +708,7 @@ describe('BudgetPlanComponent', () => {
 
     it('§F/finance/budget/000826 §F/finance/budget/000838: creates the vote of the Gremium of the next step from the menu', async () => {
       const view = await setup({ plans: { 'fy-26': plan([version({ steps: STEPS })]) } });
-      expect(await openMenu()).toEqual(['Abstimmung anlegen', 'Kostenstelle aufnehmen', 'Entwurf löschen']);
+      expect(await openMenu()).toEqual(['Abstimmung anlegen', 'Zeile hinzufügen', 'Entwurf löschen']);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung anlegen' }));
       expect(view.api.createStepVote).toHaveBeenCalledWith('v0');
       expect(view.success).toHaveBeenCalledWith('Abstimmung angelegt.');
@@ -723,8 +726,8 @@ describe('BudgetPlanComponent', () => {
 
     it('§F/finance/budget/000826 §F/finance/budget/000838: a vote that waits for its result is the next action and opens the vote', async () => {
       const prepared = await setup({ plans: { 'fy-26': withVote('draft') } });
-      expect(text(prepared.container.querySelector('.bp__stepper'))).toContain('Abstimmung vorbereitet');
-      expect(primary()).toHaveAccessibleName('Abstimmung öffnen');
+      expect(text(prepared.container.querySelector('.bp__stepper'))).toContain('Abstimmung geplant');
+      expect(primary()).toHaveAccessibleName('Zur Abstimmung');
       expect(await openMenu()).toEqual(['Zurück in den Entwurf']);
       const open = await setup({ plans: { 'fy-26': withVote('open') } });
       expect(text(open.container.querySelector('.bp__stepper'))).toContain('Abstimmung läuft');
@@ -736,8 +739,8 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ plans: { 'fy-26': withVote('closed') } });
       expect(text(view.container.querySelector('.bp__stepper'))).toContain('Abgelehnt');
       expect(primary()).toHaveAccessibleName('Abstimmung anlegen');
-      expect(await openMenu()).toEqual(['Abstimmung öffnen', 'Zurück in den Entwurf']);
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung öffnen' }));
+      expect(await openMenu()).toEqual(['Zur Abstimmung', 'Zurück in den Entwurf']);
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Zur Abstimmung' }));
       expect(view.navigate).toHaveBeenCalledWith(['/voting', 'vote-1']);
       await userEvent.click(primary());
       expect(view.api.createStepVote).toHaveBeenCalledWith('v0');
@@ -747,7 +750,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ plans: { 'fy-26': withVote('cancelled') } });
       expect(text(view.container.querySelector('.bp__stepper'))).not.toContain('Abstimmung');
       expect(primary()).toHaveAccessibleName('Schritt abschließen: Beschluss');
-      expect(await openMenu()).toEqual(['Abstimmung anlegen', 'Abstimmung öffnen', 'Zurück in den Entwurf']);
+      expect(await openMenu()).toEqual(['Abstimmung anlegen', 'Zur Abstimmung', 'Zurück in den Entwurf']);
     });
 
     it('§F/finance/budget/000826: offers no vote for a step without a Gremium or with Abstimmungen off', async () => {
@@ -756,7 +759,7 @@ describe('BudgetPlanComponent', () => {
       await userEvent.keyboard('{Escape}');
       await setup({ votingOff: true, plans: { 'fy-26': withVote('open', 'draft') } });
       expect(primary()).toHaveAccessibleName('Schritt abschließen: Beschluss');
-      expect(await openMenu()).toEqual(['Kostenstelle aufnehmen', 'Entwurf löschen']);
+      expect(await openMenu()).toEqual(['Zeile hinzufügen', 'Entwurf löschen']);
     });
 
     it('§F/finance/budget/000799: creates a Nachtrag from the version in force', async () => {
@@ -782,37 +785,35 @@ describe('BudgetPlanComponent', () => {
   describe('Kostenstellen', () => {
     it('§F/finance/budget/000819: takes a Kostenstelle into the draft with the picker', async () => {
       const view = await setup();
-      await choose('Kostenstelle aufnehmen');
-      const dialog = await screen.findByRole('dialog', { name: 'Kostenstelle aufnehmen' });
-      const add = within(dialog).getByRole('button', { name: 'Kostenstelle aufnehmen' });
+      await choose('Zeile hinzufügen');
+      const dialog = await screen.findByRole('dialog', { name: 'Zeile hinzufügen' });
+      const add = within(dialog).getByRole('button', { name: 'Zeile hinzufügen' });
       expect(add).toBeDisabled();
       await userEvent.click(dialog.querySelector('[data-cc-trigger]') as HTMLElement);
       const options = (await screen.findAllByRole('option')).map(text);
       expect(options.some((o) => o.includes('Sonstige Einnahmen'))).toBe(true);
       expect(options.some((o) => o.includes('Honorare'))).toBe(true);
       expect(options.some((o) => o.includes('Zuschüsse'))).toBe(false);
-      await userEvent.click(screen.getByRole('option', { name: /VS-Mittel/ }));
-      expect(add).toBeDisabled();
-      await userEvent.click(dialog.querySelector('[data-cc-trigger]') as HTMLElement);
+      expect(options.some((o) => o.includes('VS-Mittel'))).toBe(false);
       await userEvent.click(await screen.findByRole('option', { name: /Sonstige Einnahmen/ }));
       await userEvent.click(add);
       expect(view.api.setLine).toHaveBeenCalledWith('v0', 'other', {});
-      expect(view.success).toHaveBeenCalledWith('Kostenstelle aufgenommen.');
+      expect(view.success).toHaveBeenCalledWith('Zeile hinzugefügt.');
     });
 
     it('§F/finance/budget/000819: the add dialog closes without a write', async () => {
       const view = await setup();
-      await choose('Kostenstelle aufnehmen');
-      const dialog = await screen.findByRole('dialog', { name: 'Kostenstelle aufnehmen' });
+      await choose('Zeile hinzufügen');
+      const dialog = await screen.findByRole('dialog', { name: 'Zeile hinzufügen' });
       fireEvent.submit(dialog.querySelector('form') as HTMLFormElement);
       await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
       expect(view.api.setLine).not.toHaveBeenCalled();
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kostenstelle aufnehmen' })).toBeNull());
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Zeile hinzufügen' })).toBeNull());
     });
 
     it('§F/finance/budget/000819 §F/finance/budget/000840: removes a line after the confirmation and shows its parent', async () => {
       const view = await setup({ query: { costCentre: 'wages' } });
-      expect(await openMenu()).toEqual(['Kostenstelle aufnehmen', 'Zeile entfernen', 'Kostenstelle löschen', 'Entwurf löschen']);
+      expect(await openMenu()).toEqual(['Zeile entfernen', 'Kostenstelle löschen']);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Zeile entfernen' }));
       expect(await screen.findByText('„Löhne“ steht danach nicht mehr im Entwurf. Die Kostenstelle bleibt bestehen.')).toBeInTheDocument();
       await answerDialog('Zeile entfernen?', 'Entfernen');

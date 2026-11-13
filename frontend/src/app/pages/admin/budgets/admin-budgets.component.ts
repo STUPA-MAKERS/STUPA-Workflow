@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { type Observable, concat, defer, of } from 'rxjs';
-import { catchError, last, switchMap } from 'rxjs/operators';
+import { type Observable, concat, defer, forkJoin, of } from 'rxjs';
+import { catchError, last, map } from 'rxjs/operators';
 import {
   ButtonComponent,
   CellDirective,
@@ -28,11 +28,11 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { errorStatus, problemCode } from '@core/api/problem';
-import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { SimplifyPathPipe } from '@shared/budget-path';
 import { formatMoney } from '@shared/format-money';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
@@ -43,7 +43,8 @@ import { BudgetPlanApi, type PlanSwitchChange, type Side } from '../../budget/pl
 import { AdminApiService } from '../admin-api.service';
 import {
   type StepDraft,
-  clampCutoff,
+  cutoffProblem,
+  cutoffValue,
   cutoffLabel,
   fyBlockerKey,
   movedStep,
@@ -98,6 +99,7 @@ const MAX_STEPS = 10;
     NgTemplateOutlet,
     FormsModule,
     TranslatePipe,
+    SimplifyPathPipe,
     BreadcrumbsComponent,
     ButtonComponent,
     CellDirective,
@@ -129,6 +131,7 @@ export class AdminBudgetsComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** The backend stays authoritative; the gate only hides what the reader cannot do. */
   readonly canStructure = computed(() => this.auth.can('budget.structure'));
@@ -185,6 +188,8 @@ export class AdminBudgetsComponent {
       !!form.name.trim() &&
       form.name.trim().length <= NAME_MAX &&
       isColour(form.colour) &&
+      !cutoffProblem('day', form.day) &&
+      !cutoffProblem('month', form.month) &&
       (!form.plan ||
         (form.steps.every((s) => !!s.name.trim()) && this.sideNodes().every((n) => !!form.sides[n.id])))
     );
@@ -208,14 +213,18 @@ export class AdminBudgetsComponent {
   readonly fyEditError = computed(() => this.yearError(this.fyEditYear()));
   readonly fyEditActive = signal(true);
   readonly fyDelete = signal<FiscalYear | null>(null);
-  /** The year to delete has a Haushaltsplan that is only a draft: the delete takes it along. */
-  readonly fyDeleteDraft = signal(false);
+  /**
+   * The Haushaltsplan of each fiscal year of the list, by the id of the year: only a draft,
+   * or with a version that left the draft. A year without a plan has no entry.
+   */
+  private readonly fyPlans = signal<ReadonlyMap<string, 'draft' | 'decided'>>(new Map());
   readonly fyDeleteBody = computed(() => {
     const fy = this.fyDelete();
     if (!fy) return '';
-    return this.i18n.translate(this.fyDeleteDraft() ? 'budget.tree.fyDeleteConfirmDraft' : 'budget.tree.fyDeleteConfirm', {
-      year: fy.display,
-    });
+    return this.i18n.translate(
+      this.fyPlans().get(fy.id) === 'draft' ? 'budget.tree.fyDeleteConfirmDraft' : 'budget.tree.fyDeleteConfirm',
+      { year: fy.display },
+    );
   });
   /** The fiscal year to close, or to reopen when it is closed. */
   readonly fyCloseTarget = signal<FiscalYear | null>(null);
@@ -312,7 +321,7 @@ export class AdminBudgetsComponent {
   }
 
   patchTopCutoff(field: 'day' | 'month', value: string): void {
-    this.newTop.update((t) => ({ ...t, [field]: clampCutoff(field, value) }));
+    this.newTop.update((t) => ({ ...t, [field]: cutoffValue(value) }));
   }
 
   readonly topKeyError = computed(() =>
@@ -320,8 +329,22 @@ export class AdminBudgetsComponent {
   );
   readonly topValid = computed(() => {
     const t = this.newTop();
-    return !!t.key.trim() && !keyProblem(t.key.trim()) && !!t.name.trim() && t.name.trim().length <= NAME_MAX;
+    return (
+      !!t.key.trim() &&
+      !keyProblem(t.key.trim()) &&
+      !!t.name.trim() &&
+      t.name.trim().length <= NAME_MAX &&
+      !cutoffProblem('day', t.day) &&
+      !cutoffProblem('month', t.month)
+    );
   });
+
+  /** The error under the day or the month of the start of the fiscal year. */
+  cutoffError(field: 'day' | 'month', value: number): string {
+    return cutoffProblem(field, value)
+      ? this.i18n.translate(field === 'day' ? 'admin.budgets.error.day' : 'admin.budgets.error.month')
+      : '';
+  }
 
   createTop(event: Event): void {
     event.preventDefault();
@@ -386,7 +409,7 @@ export class AdminBudgetsComponent {
   }
 
   patchCutoff(field: 'day' | 'month', value: string): void {
-    this.patch({ [field]: clampCutoff(field, value) });
+    this.patch({ [field]: cutoffValue(value) });
   }
 
   private steps(change: (steps: readonly StepDraft[]) => readonly StepDraft[]): void {
@@ -410,12 +433,13 @@ export class AdminBudgetsComponent {
   }
 
   /**
-   * Save the edit form. A form with a missing field saves nothing and shows what is missing.
-   * The order is: each changed side, then the plan switch when it changed, then the settings
-   * of the budget, then the steps when they changed. When the switch goes on and the
-   * Stammplan changes an allocation, the save stops after the sides and shows the changes;
-   * `confirmed` says that the person agreed. A request goes out only after the one before it
-   * succeeded. The deciding Gremium goes out only on a change,
+   * Save the edit form. A form with a missing field saves nothing, shows what is missing and
+   * brings the first such field into view. When the switch goes on and the Stammplan changes
+   * an allocation, the form first reads these changes for the sides of the form and shows
+   * them, and it saves nothing before the person agreed; `confirmed` says that the person
+   * did. The order of the save is: each changed side, then the plan switch when it changed,
+   * then the settings of the budget, then the steps when they changed. A request goes out
+   * only after the one before it succeeded. The deciding Gremium goes out only on a change,
    * because each sent field is audited.
    */
   saveEdit(confirmed = false): void {
@@ -423,27 +447,38 @@ export class AdminBudgetsComponent {
     const form = this.form();
     if (!node || !form || this.busy()) return;
     this.showErrors.set(true);
-    if (!this.formValid()) return;
+    if (!this.formValid()) {
+      setTimeout(() => this.host.nativeElement.ownerDocument.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+      return;
+    }
     this.switchChanges.set(null);
-    const turnsOn = form.plan && !node.planEnabled;
+    this.busy.set(true);
+    const preview =
+      form.plan && !node.planEnabled && !confirmed
+        ? this.planApi.switchPreview(node.id, form.sides).pipe(map((p) => p.changes))
+        : of([]);
+    preview.subscribe({
+      next: (changes) => {
+        if (changes.length) {
+          this.busy.set(false);
+          this.switchChanges.set(changes);
+        } else this.saveSides(node, form);
+      },
+      error: (err: unknown) => this.saveFailed(err),
+    });
+  }
+
+  /** The first part of the save: each changed side, one after the other. */
+  private saveSides(node: BudgetTreeNode, form: EditForm): void {
     const sides = form.plan
       ? this.sideNodes().filter((n) => !!form.sides[n.id] && form.sides[n.id] !== this.savedSides[n.id])
       : [];
-    this.busy.set(true);
     concat(...sides.map((n) => defer(() => this.planApi.setSide(n.id, form.sides[n.id] as Side))), of(null))
-      .pipe(
-        last(),
-        switchMap(() => {
-          this.savedSides = { ...this.savedSides, ...Object.fromEntries(sides.map((n) => [n.id, form.sides[n.id]])) };
-          return turnsOn && !confirmed ? this.planApi.switchPreview(node.id) : of(null);
-        }),
-      )
+      .pipe(last())
       .subscribe({
-        next: (preview) => {
-          if (preview?.changes.length) {
-            this.busy.set(false);
-            this.switchChanges.set(preview.changes);
-          } else this.saveRest(node, form);
+        next: () => {
+          this.savedSides = { ...this.savedSides, ...Object.fromEntries(sides.map((n) => [n.id, form.sides[n.id]])) };
+          this.saveRest(node, form);
         },
         error: (err: unknown) => this.saveFailed(err),
       });
@@ -546,8 +581,29 @@ export class AdminBudgetsComponent {
         if (this.fyBudget()?.id !== budget.id) return;
         this.fiscalYears.set([...years].sort((a, b) => b.year - a.year));
         this.newFyYear.set(String(nextYear(years, new Date().getFullYear())));
+        this.loadFyPlans(budget, years);
       },
       error: () => this.fiscalYears.set([]),
+    });
+  }
+
+  /**
+   * Read the Haushaltsplan of each year, so the menu of a year knows before the press if
+   * the delete takes a draft along or is refused. A failed read leaves the year without an
+   * entry, and the server then decides.
+   */
+  private loadFyPlans(budget: BudgetTreeNode, years: readonly FiscalYear[]): void {
+    this.fyPlans.set(new Map());
+    if (!budget.planEnabled || !years.length) return;
+    forkJoin(
+      years.map((fy) =>
+        this.planApi.plan(budget.id, fy.id).pipe(
+          map((plan) => [fy.id, plan.versions.every((v) => v.state === 'draft') ? 'draft' : 'decided'] as const),
+          catchError(() => of(null)),
+        ),
+      ),
+    ).subscribe((entries) => {
+      if (this.fyBudget()?.id === budget.id) this.fyPlans.set(new Map(entries.filter((e) => e !== null)));
     });
   }
 
@@ -595,7 +651,11 @@ export class AdminBudgetsComponent {
             label: t('budget.tree.fyDelete'),
             icon: 'trash',
             danger: true,
-            disabledReason: fy.closedAt ? t('budget.fy.closedError') : null,
+            disabledReason: fy.closedAt
+              ? t('budget.fy.closedError')
+              : this.fyPlans().get(fy.id) === 'decided'
+                ? t('budget.tree.fyBlocked.plan')
+                : null,
           },
         ],
       },
@@ -609,16 +669,7 @@ export class AdminBudgetsComponent {
       this.fyCloseTarget.set(fy);
       return;
     }
-    this.fyDeleteDraft.set(false);
     this.fyDelete.set(fy);
-    const budget = this.fyBudget();
-    if (!budget?.planEnabled) return;
-    this.planApi
-      .plan(budget.id, fy.id as Uuid)
-      .pipe(catchError(() => of(null)))
-      .subscribe((plan) => {
-        if (this.fyDelete()?.id === fy.id) this.fyDeleteDraft.set(!!plan);
-      });
   }
 
   openFyEdit(fy: FiscalYear): void {
@@ -636,8 +687,11 @@ export class AdminBudgetsComponent {
     this.fyOpen.set(true);
   }
 
-  /** Run a write on one fiscal year. Both outcomes show the list of years again. */
-  private fyWrite(request: Observable<unknown>, toast: string, fallback: TranslationKey): void {
+  /**
+   * Run a write on one fiscal year. A success shows the list of years again. A refusal does
+   * so too, except for a form (`keepOpen`): it stays open with what the person typed.
+   */
+  private fyWrite(request: Observable<unknown>, toast: string, fallback: TranslationKey, keepOpen = false): void {
     if (this.busy()) return;
     this.busy.set(true);
     request.subscribe({
@@ -649,7 +703,7 @@ export class AdminBudgetsComponent {
       },
       error: (err: unknown) => {
         this.fyError(err, errorStatus(err) === 409 ? 'budget.tree.fyBlocked.generic' : fallback);
-        this.backToYears();
+        if (!keepOpen) this.backToYears();
       },
     });
   }
@@ -662,6 +716,7 @@ export class AdminBudgetsComponent {
       this.api.updateFiscalYear(budget.id, fy.id, { year: Number(this.fyEditYear()), active: this.fyEditActive() }),
       this.i18n.translate('budget.tree.toast.fySaved'),
       'budget.tree.toast.fyFailed',
+      true,
     );
   }
 

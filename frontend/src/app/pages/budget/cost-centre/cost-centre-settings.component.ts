@@ -69,11 +69,15 @@ export class CostCentreSettingsComponent {
   /**
    * Save the key or the name when the person leaves the field. An empty text is not saved:
    * the field shows the saved text again. A text with an error stays for the correction.
+   *
+   * The saved text comes back one turn later, because a field that is emptied and left in
+   * the same turn has not rendered the empty text yet, and a model that goes from the saved
+   * text to the saved text writes nothing into the field.
    */
   saveText(field: 'key' | 'name'): void {
     const value = this[field]().trim();
     const error = field === 'key' ? this.keyError() : this.nameError();
-    if (!value) this[field].set(this.node()[field]);
+    if (!value) setTimeout(() => this[field].set(this.node()[field]));
     else if (!error && value !== this.node()[field]) this.save({ [field]: value });
   }
 

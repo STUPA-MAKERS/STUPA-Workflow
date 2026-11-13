@@ -45,8 +45,8 @@ describe('BudgetPlanApi', () => {
   });
 
   it('calls the routes of the steps', () => {
-    api.passNextStep('v').subscribe();
-    expectCall('POST', '/api/budget-plan-versions/v/steps/next', {});
+    api.passNextStep('v', 1).subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/steps/next', { step: 1 });
     api.createStepVote('v').subscribe();
     expectCall('POST', '/api/budget-plan-versions/v/steps/next/vote', {});
     api.steps('t').subscribe();
@@ -66,7 +66,10 @@ describe('BudgetPlanApi', () => {
     expectCall('PUT', '/api/budgets/t/plan-switch', { enabled: true, confirmChanges: false });
     api.setPlanSwitch('t', true, true).subscribe();
     expectCall('PUT', '/api/budgets/t/plan-switch', { enabled: true, confirmChanges: true });
-    api.switchPreview('t').subscribe();
-    expectCall('GET', '/api/budgets/t/plan-switch/preview');
+    api.switchPreview('t', { a: 'income', b: 'expense', c: '' }).subscribe();
+    const preview = http.expectOne((r) => r.url === '/api/budgets/t/plan-switch/preview');
+    expect(preview.request.params.getAll('income')).toEqual(['a']);
+    expect(preview.request.params.getAll('expense')).toEqual(['b']);
+    preview.flush({ budgetId: 't', changes: [] });
   });
 });

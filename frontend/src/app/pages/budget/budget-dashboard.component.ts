@@ -57,8 +57,9 @@ import { defaultFiscalYearId } from './fiscal-year.util';
 import { CostCentreCreateComponent, type CostCentreCreated } from './cost-centre/cost-centre-create.component';
 import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
 import { activeOnly, costCentreError, hasSide } from './cost-centre/cost-centre.util';
+import { pageItemTitle } from '../../layout/page-title.service';
 import { BudgetPlanApi, type BudgetPlan } from './plan/budget-plan.api';
-import { inForce, memberIds, yearMembers } from './plan/budget-plan.util';
+import { amountProblem, inForce, memberIds, yearMembers } from './plan/budget-plan.util';
 import { AdminApiService } from '../admin/admin-api.service';
 import { problemCode } from '@core/api/problem';
 import { toggled } from '@shared/util/immutable';
@@ -230,7 +231,11 @@ export class BudgetDashboardComponent {
     const top = this.planTop();
     if (mode !== 'plan' || !top) return;
     void this.router.navigate(['/budget/plan'], {
-      queryParams: { budget: top.id, fy: top.id === this.selectedBudgetId() ? this.selectedFyId() : null },
+      queryParams: {
+        budget: top.id,
+        fy: top.id === this.selectedBudgetId() ? this.selectedFyId() : null,
+        costCentre: top.id === this.selectedBudgetId() && this.selectedKsId() !== top.id ? this.selectedKsId() || null : null,
+      },
     });
   }
 
@@ -649,6 +654,10 @@ export class BudgetDashboardComponent {
    * another.
    */
   constructor() {
+    pageItemTitle(() => {
+      const ks = this.current();
+      return ks?.parentId ? ks.name : null;
+    });
     this.appsKey
       .pipe(
         switchMap(({ ks, fy, bookings }) =>
@@ -793,8 +802,9 @@ export class BudgetDashboardComponent {
    * and another when it is followed later.
    *
    * A search hit is `?costCentre=…` alone, so the root comes from the cost centre itself when the URL does
-   * not name one. A URL that names a root whose years have not landed yet waits rather than settle
-   * for the first ready root, because the choice is latched.
+   * not name one. The choice is latched, so it waits until the years of every root have landed:
+   * the default is then the first root of the tree that has a year, and not the root whose
+   * years arrived first.
    */
   private resolveSelection(
     tops: readonly BudgetTreeNode[],
@@ -810,7 +820,7 @@ export class BudgetDashboardComponent {
     const qpBudget = qp.get('budget');
     const derived = ks && this.nodeById().get(ks) ? this.rootOf(ks) : null;
     const wanted = selectable(qpBudget) ? qpBudget : selectable(derived) ? derived : null;
-    if (wanted === null && (ks || qpBudget) && this.pendingFiscalYears() > 0) return null;
+    if (wanted === null && this.pendingFiscalYears() > 0) return null;
     const budgetId = wanted ?? withFy[0].id;
 
     const fys = this.fiscalYearsByBudget()[budgetId];
@@ -916,6 +926,13 @@ export class BudgetDashboardComponent {
     const value = this.allocationDraft();
     this.allocationDraft.set(null);
     if (!ks || value === null || value === '' || Number(value) === this.figures().allocated) return;
+    const problem = amountProblem(value);
+    if (problem) {
+      this.toast.error(
+        this.i18n.translate(problem === 'negative' ? 'budget.plan.error.amountNegative' : 'budget.plan.error.amountTooLarge'),
+      );
+      return;
+    }
     this.api.setAllocation(ks.id, this.selectedFyId() as Uuid, value).subscribe({
       next: () => {
         this.toast.success(this.i18n.translate('budget.cc.toast.allocated'));

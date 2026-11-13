@@ -8,6 +8,7 @@
       [ngModel]="key()"
       (ngModelChange)="key.set($event)"
       (focusout)="saveText('key')"
+      (keydown.enter)="saveText('key')"
       [name]="'cc-key-' + n.id"
     />
     <app-input
@@ -16,6 +17,7 @@
       [ngModel]="name()"
       (ngModelChange)="name.set($event)"
       (focusout)="saveText('name')"
+      (keydown.enter)="saveText('name')"
       [name]="'cc-name-' + n.id"
     />
   </div>

@@ -147,8 +147,8 @@ export class BudgetPlanApi {
   }
 
   /** Record the next step of a version as passed. */
-  passNextStep(versionId: Uuid): Observable<BudgetPlan> {
-    return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/steps/next`, {});
+  passNextStep(versionId: Uuid, step: number): Observable<BudgetPlan> {
+    return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/steps/next`, { step });
   }
 
   /** Create the draft vote of the Gremium of the next step. */
@@ -174,9 +174,11 @@ export class BudgetPlanApi {
   }
 
   /** The allocations that the Stammplan changes when the plan switch goes on. */
-  switchPreview(topId: Uuid): Observable<PlanSwitchPreview> {
+  switchPreview(topId: Uuid, sides: Readonly<Record<string, Side | ''>> = {}): Observable<PlanSwitchPreview> {
+    const of = (side: Side): string[] => Object.keys(sides).filter((id) => sides[id] === side);
     return this.http.get<PlanSwitchPreview>(`${this.base}/budgets/${topId}/plan-switch/preview`, {
       context: skipLoading(),
+      params: { income: of('income'), expense: of('expense') },
     });
   }
 

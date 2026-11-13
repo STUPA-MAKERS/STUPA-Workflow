@@ -1289,7 +1289,7 @@ describe('BudgetDashboardComponent', () => {
      * Only b-b has years so far, so it becomes the default; the later answer for b-a changes
      * nothing.
      */
-    it('waits for the years of the root the URL names', async () => {
+    it('without a URL the default is the first root of the tree, not the root whose years arrive first', async () => {
       const tree = [
         node({ id: 'b-a', key: 'A', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
         node({ id: 'b-b', key: 'B', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
@@ -1297,9 +1297,11 @@ describe('BudgetDashboardComponent', () => {
       const { c, http, fixture } = await bare();
       http.expectOne((r) => r.url.endsWith('/budgets')).flush(tree);
       http.expectOne((r) => r.url.endsWith('/budgets/b-b/fiscal-years')).flush([{ ...FY, budgetId: 'b-b' }]);
+      fixture.detectChanges();
+      expect(c.selectedBudgetId()).toBe('');
       http.expectOne((r) => r.url.endsWith('/budgets/b-a/fiscal-years')).flush([{ ...FY, budgetId: 'b-a' }]);
       fixture.detectChanges();
-      expect(c.selectedBudgetId()).toBe('b-b');
+      expect(c.selectedBudgetId()).toBe('b-a');
     });
 
     it('selects nothing until a root with a fiscal year is loaded', async () => {
@@ -1412,10 +1414,10 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       view.c.setMode(null);
       expect(navigate).not.toHaveBeenCalled();
       view.c.setMode('plan');
-      expect(navigate).toHaveBeenCalledWith(['/budget/plan'], { queryParams: { budget: 'b-vs', fy: 'fy-1' } });
+      expect(navigate).toHaveBeenCalledWith(['/budget/plan'], { queryParams: { budget: 'b-vs', fy: 'fy-1', costCentre: null } });
       view.c.selectedBudgetId.set('other');
       view.c.setMode('plan');
-      expect(navigate).toHaveBeenLastCalledWith(['/budget/plan'], { queryParams: { budget: 'b-vs', fy: null } });
+      expect(navigate).toHaveBeenLastCalledWith(['/budget/plan'], { queryParams: { budget: 'b-vs', fy: null, costCentre: null } });
     });
 
     it('§F/finance/budget/000804: puts the view switch below the title on a phone', async () => {

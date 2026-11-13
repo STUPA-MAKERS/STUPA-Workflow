@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NgTemplateOutlet } from '@angular/common';
+import { Location, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { type Observable, forkJoin, of } from 'rxjs';
@@ -107,6 +107,23 @@ type Ask =
   | { readonly kind: 'step'; readonly name: string }
   | { readonly kind: 'removeLine' | 'deleteNode'; readonly row: PlanRow };
 
+/** The actions of the head, of the menus and of the floating button. */
+const ACTIONS = [
+  'createPlan',
+  'inForce',
+  'backToDraft',
+  'deleteDraft',
+  'step',
+  'removeLine',
+  'deleteNode',
+  'nachtrag',
+  'add',
+  'new',
+  'vote',
+  'openVote',
+] as const;
+type ActionId = (typeof ACTIONS)[number];
+
 /** The texts of the confirmation dialog of an {@link Ask}. */
 interface AskView {
   readonly title: string;
@@ -135,6 +152,7 @@ const WRITE_ERRORS: Readonly<Record<string, TranslationKey>> = {
   plan_line_node_invalid: 'budget.plan.error.lineNode',
   plan_amount_too_large: 'budget.plan.error.amountTooLarge',
   plan_empty: 'budget.plan.error.empty',
+  plan_step_not_next: 'budget.plan.error.stepNotNext',
   plan_in_progress: 'budget.plan.error.inProgress',
   fiscal_year_closed: 'budget.fy.closedError',
 };
@@ -201,6 +219,8 @@ export class BudgetPlanComponent {
   private readonly features = inject(FeatureService);
   private readonly adminApi = inject(AdminApiService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly location = inject(Location);
 
   readonly wide = mediaQuery(MEDIA.wide);
   readonly phone = mediaQuery(MEDIA.phone);
@@ -215,6 +235,8 @@ export class BudgetPlanComponent {
   private readonly versionId = signal('');
   /** The number of the version that the URL names, until the plan is loaded. */
   private wantedVersion: number | null = null;
+  /** The bottom sheet is its own history entry, so "back" closes it. */
+  private sheetPushed = false;
   /**
    * The selected Kostenstelle; '' is the top-level one, so the detail shows the plan.
    * Beside the list the detail shows it, on a narrow screen the bottom sheet does.
@@ -381,11 +403,10 @@ export class BudgetPlanComponent {
     const version = this.version();
     return top && version ? addable(top, version) : [];
   });
-  /** The budget with the Kostenstellen that can enter the draft, for the picker. */
-  readonly addNodes = computed<readonly BudgetTreeNode[]>(() => {
-    const top = this.top();
-    return top ? [{ ...top, children: this.addableNodes().map((n) => ({ ...n, children: [] })) }] : [];
-  });
+  /** The Kostenstellen that can enter the draft, for the picker. The budget has no line. */
+  readonly addNodes = computed<readonly BudgetTreeNode[]>(() =>
+    this.addableNodes().map((n) => ({ ...n, children: [], byFiscalYear: [] })),
+  );
 
   readonly columns = computed<ColumnDef[]>(() => {
     const money = (key: string, label: string, width = MONEY_COL): ColumnDef => ({ key, label, align: 'end', width });
@@ -478,6 +499,12 @@ export class BudgetPlanComponent {
     );
   }
 
+  /**
+   * The action in the head of the detail. The head of a Kostenstelle holds only the actions
+   * on that Kostenstelle, so the step of the plan shows while the plan itself is selected.
+   */
+  readonly headPrimary = computed(() => (this.sel() ? null : this.primary()));
+
   /** The step whose vote the page links to. */
   private readonly linkedVote = computed(() => {
     const version = this.version();
@@ -485,6 +512,8 @@ export class BudgetPlanComponent {
   });
 
   readonly menu = computed<readonly RowMenuSection[]>(() => {
+    const row = this.sel();
+    if (row) return this.rowMenu(row);
     const primary = this.primary();
     const state = this.version()?.state;
     const blocked = this.notReady();
@@ -508,11 +537,7 @@ export class BudgetPlanComponent {
       this.editable() && this.versions().length > 0
         ? [{ id: 'deleteDraft', label: this.i18n.translate('budget.plan.action.deleteDraft'), icon: 'trash', danger: true }]
         : [];
-    return [
-      ...(items.length ? [{ items }] : []),
-      ...this.rowMenu(this.sel()),
-      ...(draft.length ? [{ items: draft }] : []),
-    ];
+    return [...(items.length ? [{ items }] : []), ...(draft.length ? [{ items: draft }] : [])];
   });
 
   /** The ⋮ menu of the bottom sheet: the actions on its Kostenstelle. */
@@ -535,6 +560,12 @@ export class BudgetPlanComponent {
   private readonly canVote = computed(() => {
     const next = this.next();
     return !!this.primary() && this.voting() && !!next?.gremiumId && !voteRuns(next);
+  });
+
+  /** The vote of the next step is a draft or open, so "back to draft" ends it. */
+  private readonly voteWaits = computed(() => {
+    const next = this.next();
+    return !!next && voteRuns(next);
   });
 
   /** The texts of the confirmation that is open. */
@@ -562,7 +593,7 @@ export class BudgetPlanComponent {
           title: t('budget.plan.backToDraft.title'),
           body: t('budget.plan.backToDraft.body'),
           confirmLabel: t('budget.plan.action.backToDraft'),
-          danger: false,
+          danger: this.voteWaits(),
         };
       case 'deleteDraft':
         return {
@@ -602,14 +633,34 @@ export class BudgetPlanComponent {
     const wanted = Number(qp.get('version') ?? '');
     this.wantedVersion = qp.get('version') !== null && Number.isInteger(wanted) ? wanted : null;
     pageItemTitle(() => this.picked()?.name ?? null);
-    const fromVote = qp.get('planVersion');
-    if (fromVote) this.openVersion(fromVote as Uuid);
-    else this.loadTree(qp.get('budget'), qp.get('fy'));
+    this.start();
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      const id = params.get('costCentre') ?? '';
+      if (id === this.selId()) return;
+      this.flushEdits();
+      this.sheetPushed = false;
+      this.selId.set(id);
+    });
     if (this.canWrite())
       this.adminApi.listGremienOptions().subscribe({
         next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
         error: () => this.gremiumOptions.set([]),
       });
+  }
+
+  /** Load the page from its URL: the plan of a version, else the budget and the year. */
+  private start(): void {
+    const qp = this.route.snapshot.queryParamMap;
+    const fromVote = qp.get('planVersion');
+    if (fromVote) this.openVersion(fromVote as Uuid);
+    else this.loadTree(qp.get('budget'), qp.get('fy'));
+  }
+
+  /** The action of the load error: read the page again. */
+  retry(): void {
+    this.error.set(false);
+    this.loading.set(true);
+    this.start();
   }
 
   /** A link from the vote of a step names only the version: read its plan, then show it. */
@@ -625,7 +676,7 @@ export class BudgetPlanComponent {
 
   /** Read the tree, then select the wanted budget and year, else the first budget. */
   private loadTree(wantedTop: string | null, wantedFy: string | null): void {
-    this.treeApi.tree().pipe(takeUntilDestroyed()).subscribe({
+    this.treeApi.tree().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (tree) => {
         this.tree.set(tree);
         const tops = this.tops();
@@ -713,15 +764,36 @@ export class BudgetPlanComponent {
     this.selectId((row as PlanRow).id);
   }
 
-  /** Select a Kostenstelle, '' for the plan. Beside the list the heading of the detail takes the focus. */
+  /**
+   * Select a Kostenstelle, '' for the plan. Beside the list the heading of the detail takes
+   * the focus. On a narrow screen the bottom sheet is a history entry of its own, so "back"
+   * closes the sheet and does not leave the page, and its close button goes back to the
+   * entry before it.
+   */
   selectId(id: string): void {
+    if (!this.wide() && !id && this.sheetPushed) {
+      this.location.back();
+      return;
+    }
+    const opensSheet = !this.wide() && !!id && !this.selId();
+    this.flushEdits();
     this.selId.set(id);
-    this.syncUrl();
+    this.syncUrl(!opensSheet);
+    this.sheetPushed = opensSheet;
     if (this.wide()) setTimeout(() => this.host.nativeElement.querySelector<HTMLElement>('#bp-title')?.focus());
   }
 
+  /** Save each amount that a person typed and did not leave yet, before its field goes. */
+  private flushEdits(): void {
+    for (const key of Object.keys(this.edits())) {
+      const [id, field] = key.split(':');
+      const row = this.rows().find((r) => r.id === id);
+      if (row) this.saveAmount(row, field === 'blocked' ? 'blocked' : 'amount');
+    }
+  }
+
   /** The URL names the budget, the year, the chosen version and the Kostenstelle. */
-  private syncUrl(): void {
+  private syncUrl(replaceUrl = true): void {
     const chosen = this.versions().find((v) => v.id === this.versionId());
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -731,7 +803,7 @@ export class BudgetPlanComponent {
         version: chosen ? chosen.number : null,
         costCentre: this.selId() || null,
       },
-      replaceUrl: true,
+      replaceUrl,
     });
   }
 
@@ -750,22 +822,23 @@ export class BudgetPlanComponent {
   /** Run an action of the head, of a menu or of the floating button. `row` is its Kostenstelle. */
   onAction(id: string, row: PlanRow | null = this.picked()): void {
     const version = this.version();
-    if (this.busy()) return;
-    switch (id) {
+    const action: ActionId | undefined = ACTIONS.find((a) => a === id);
+    if (!action || this.busy()) return;
+    switch (action) {
       case 'createPlan':
         this.createPlan(false);
         return;
       case 'inForce':
       case 'backToDraft':
       case 'deleteDraft':
-        this.ask.set({ kind: id });
+        this.ask.set({ kind: action });
         return;
       case 'step':
         this.ask.set({ kind: 'step', name: this.next()?.name ?? '' });
         return;
       case 'removeLine':
       case 'deleteNode':
-        if (row) this.ask.set({ kind: id, row });
+        if (row) this.ask.set({ kind: action, row });
         return;
       case 'nachtrag':
         this.write(this.api.createNachtrag(this.topId() as Uuid, this.fyId() as Uuid), 'budget.plan.toast.nachtrag');
@@ -783,8 +856,6 @@ export class BudgetPlanComponent {
       case 'openVote':
         void this.router.navigate(['/voting', this.linkedVote()?.voteId]);
         return;
-      default:
-        return;
     }
   }
 
@@ -799,7 +870,10 @@ export class BudgetPlanComponent {
         this.write(this.api.setState(version.id, 'in_force'), 'budget.plan.toast.inForce', () => this.readTree());
         return;
       case 'step':
-        this.write(this.api.passNextStep(version.id), 'budget.plan.toast.step');
+        this.write(
+          this.api.passNextStep(version.id, Math.max(version.steps.findIndex((s) => !s.passedAt), 0)),
+          'budget.plan.toast.step',
+        );
         return;
       case 'backToDraft':
         this.write(this.api.setState(version.id, 'draft'), 'budget.plan.toast.state');
@@ -871,11 +945,6 @@ export class BudgetPlanComponent {
         this.toast.error(this.i18n.translate(costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed')));
       },
     });
-  }
-
-  /** The picker of "Kostenstelle aufnehmen" chose a Kostenstelle. The budget itself has no line. */
-  pickAdd(id: string): void {
-    this.addId.set(id === this.topId() ? '' : id);
   }
 
   /** Take the chosen Kostenstelle into the draft with an Ansatz of 0 €. */
@@ -957,6 +1026,7 @@ export class BudgetPlanComponent {
     after: (() => void) | null = null,
     locks = true,
   ): void {
+    if (locks && this.busy()) return;
     if (locks) this.busy.set(true);
     request.subscribe({
       next: (plan) => {
@@ -1025,7 +1095,9 @@ export class BudgetPlanComponent {
         return this.i18n.translate('budget.plan.vote.open');
       case 'closed':
         return this.i18n.translate('budget.plan.vote.refused');
-      default:
+      case 'cancelled':
+      case null:
+      case undefined:
         return null;
     }
   }

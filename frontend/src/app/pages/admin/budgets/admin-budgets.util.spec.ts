@@ -1,13 +1,10 @@
-import { clampCutoff, cutoffLabel, fyBlockerKey, movedStep, nextYear, stepsToSave, yearProblem } from './admin-budgets.util';
+import { cutoffLabel, cutoffProblem, cutoffValue, fyBlockerKey, movedStep, nextYear, stepsToSave, yearProblem } from './admin-budgets.util';
 
 describe('AdminBudgetsUtil', () => {
-  it('keeps a part of the start of the fiscal year in its range', () => {
-    expect(clampCutoff('day', '31')).toBe(28);
-    expect(clampCutoff('day', '0')).toBe(1);
-    expect(clampCutoff('day', 'x')).toBe(1);
-    expect(clampCutoff('day', 14.7)).toBe(14);
-    expect(clampCutoff('month', '13')).toBe(12);
-    expect(clampCutoff('month', '-2')).toBe(1);
+  it('reads a part of the start of the fiscal year as a whole number and names a value out of its range', () => {
+    expect(['31', 'x', '', 14.7].map(cutoffValue)).toEqual([31, 0, 0, 14]);
+    expect([0, 1, 28, 29].map((v) => cutoffProblem('day', v))).toEqual([true, false, false, true]);
+    expect([-2, 1, 12, 13].map((v) => cutoffProblem('month', v))).toEqual([true, false, false, true]);
   });
 
   it('writes the start of the fiscal year as day and month', () => {

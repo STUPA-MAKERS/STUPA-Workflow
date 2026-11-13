@@ -33,6 +33,8 @@
 .ab__pair--even {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+// The key reads in the mono font like each key of the app. The input is inside the shared
+// field component, which has no input for the font.
 .ab__keyField ::ng-deep input {
   font-family: var(--font-mono);
 }

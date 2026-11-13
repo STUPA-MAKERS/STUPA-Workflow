@@ -11,10 +11,14 @@ export interface StepDraft {
 /** The start day must exist in every month (the server takes 1 to 28). */
 const MAX_DAY = 28;
 
-/** A part of the start of the fiscal year as a whole number in its range: month 1 to 12, day 1 to 28. */
-export function clampCutoff(field: 'day' | 'month', value: string | number): number {
-  const n = Math.trunc(Number(value)) || 1;
-  return Math.min(field === 'month' ? 12 : MAX_DAY, Math.max(1, n));
+/** The whole number a person typed in a part of the start of the fiscal year, 0 for none. */
+export function cutoffValue(value: string | number): number {
+  return Math.trunc(Number(value)) || 0;
+}
+
+/** A part of the start of the fiscal year is outside its range: month 1 to 12, day 1 to 28. */
+export function cutoffProblem(field: 'day' | 'month', value: number): boolean {
+  return value < 1 || value > (field === 'month' ? 12 : MAX_DAY);
 }
 
 /** "01.03.": the start of the fiscal year of a budget. */

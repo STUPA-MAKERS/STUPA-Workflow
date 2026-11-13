@@ -224,7 +224,7 @@ describe('CostCentreSelectComponent', () => {
     const { field, tick, user, view } = await setup();
     await user.click(field());
     await tick();
-    const search = screen.getByRole('combobox', { name: 'Kostenstelle suchen' });
+    const search = screen.getByRole('combobox', { name: 'Kostenstellen durchsuchen' });
     expect(search).toHaveFocus();
     await user.type(search, 'erst');
     const options = screen
@@ -261,7 +261,7 @@ describe('CostCentreSelectComponent', () => {
     field().focus();
     await user.keyboard('{ArrowDown}');
     await tick();
-    const search = screen.getByRole('combobox', { name: 'Kostenstelle suchen' });
+    const search = screen.getByRole('combobox', { name: 'Kostenstellen durchsuchen' });
     const active = () =>
       document.getElementById(search.getAttribute('aria-activedescendant') ?? '');
     expect(active()).toHaveTextContent('Erstsemesterwoche');

@@ -36,6 +36,9 @@
   gap: var(--space-3);
 }
 
+// The plan tables hold up to five amount columns beside the name. The shared table has one
+// cell padding for each page, so the columns get the narrower padding here, else the name
+// column is too narrow for a Kostenstelle at the list width of the tab.
 :host .bp__table ::ng-deep .dt__table th,
 :host .bp__table ::ng-deep .dt__table td {
   padding-inline: var(--space-2);
@@ -54,7 +57,10 @@
   margin-inline-start: auto;
 }
 
-:host {
+// Beside the list the page fills the frame and its panes scroll. On a narrow screen the
+// page scrolls, so the host keeps the height of its content and the last card ends above
+// the bottom bar.
+:host:has(> .bd--wide) {
   flex: 1 1 0;
   min-height: 0;
 }
@@ -63,6 +69,8 @@
   justify-content: space-between;
   gap: var(--space-2);
   margin: var(--space-3) 0 2px;
+  // The heading starts where the names of the tree rows start: the inset of a row, the
+  // column of its chevron and the gap behind it.
   padding: 0 var(--space-3) 0 calc(4px + 1.75rem + var(--space-1));
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);

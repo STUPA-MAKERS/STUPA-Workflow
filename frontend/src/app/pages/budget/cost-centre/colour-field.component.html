@@ -9,7 +9,6 @@
         [style.background]="c"
         [attr.aria-pressed]="value() === c"
         [attr.aria-label]="'budget.tree.colorPick' | t: { color: c }"
-        [title]="c"
         (click)="pick(c)"
       ></button>
     }
@@ -24,7 +23,7 @@
     <app-input
       class="cf__hex"
       [ariaLabel]="'budget.tree.colorHex' | t"
-      placeholder="#rrggbb"
+      [placeholder]="'budget.tree.colorHexPlaceholder' | t"
       [error]="invalid() ? ('budget.tree.colorInvalid' | t) : ''"
       [ngModel]="value()"
       (ngModelChange)="value.set($event.trim())"

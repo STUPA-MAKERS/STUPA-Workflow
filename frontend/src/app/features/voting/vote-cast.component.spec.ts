@@ -1075,7 +1075,7 @@ describe('VoteCastComponent', () => {
       expect(await items()).toEqual(['Haushaltsplan öffnen', 'Abstimmung starten', 'Abstimmung löschen']);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung starten' }));
       expect(view.api['openVote']).toHaveBeenCalledWith('v1');
-      expect(view.toast.success).toHaveBeenCalledWith('Abstimmung gestartet');
+      expect(view.toast.success).toHaveBeenCalledWith('Abstimmung gestartet.');
       expect(view.page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'updated' });
     });
 
@@ -1084,7 +1084,7 @@ describe('VoteCastComponent', () => {
       expect(await items()).toEqual(['Haushaltsplan öffnen', 'Abstimmung beenden']);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung beenden' }));
       expect(view.api['closeVote']).toHaveBeenCalledWith('v1');
-      expect(view.toast.success).toHaveBeenCalledWith('Abstimmung beendet');
+      expect(view.toast.success).toHaveBeenCalledWith('Abstimmung beendet.');
     });
 
     it('says why the vote cannot close', async () => {

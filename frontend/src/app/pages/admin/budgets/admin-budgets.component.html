@@ -87,6 +87,7 @@
         type="number"
         [label]="'budget.tree.day' | t"
         [ngModel]="day"
+        [error]="cutoffError('day', day)"
         (ngModelChange)="top ? patchTopCutoff('day', $event) : patchCutoff('day', $event)"
         [name]="top ? 'topDay' : 'editDay'"
       />
@@ -94,6 +95,7 @@
         type="number"
         [label]="'budget.tree.month' | t"
         [ngModel]="month"
+        [error]="cutoffError('month', month)"
         (ngModelChange)="top ? patchTopCutoff('month', $event) : patchCutoff('month', $event)"
         [name]="top ? 'topMonth' : 'editMonth'"
       />
@@ -241,7 +243,7 @@
   <ul class="rowgroup ab__changes">
     @for (c of switchChanges() ?? []; track c.fiscalYearId + c.budgetId) {
       <li class="ab__change">
-        <span class="ab__changeName">{{ c.name }} · {{ c.year }}</span>
+        <span class="ab__changeName"><span class="mono">{{ c.pathKey | simplifyPath }}</span> {{ c.name }} · {{ c.year }}</span>
         <span class="mono">{{ money(c.allocated) }} → {{ money(c.planned) }}</span>
       </li>
     }
