@@ -307,6 +307,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000839](requirements/functional/finance/budget/000839_plan-back-to-draft-ends-votes.md) | A version back in draft ends the votes of its steps | draft |
 | [F/finance/budget/000840](requirements/functional/finance/budget/000840_plan-page-confirmations.md) | The plan page asks before an action that binds or deletes | draft |
 | [F/finance/budget/000841](requirements/functional/finance/budget/000841_plan-step-named.md) | A request that records a step names the step | draft |
+| [F/finance/budget/000842](requirements/functional/finance/budget/000842_plan-write-lock.md) | A write beside a Haushaltsplan takes the lock of its budget | draft |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | approved |

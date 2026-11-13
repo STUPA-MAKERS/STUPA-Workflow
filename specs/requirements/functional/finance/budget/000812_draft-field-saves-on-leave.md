@@ -22,10 +22,11 @@ A field of a draft line must save its value when the person leaves the field: th
 the Erläuterung, the gesperrt amount and each Vermerk. The request must hold only the
 changed field, and the platform must keep each field of the line that a request does not
 name. The plan page must then show the new sums and the new balance. A refused save must
-show its cause and the saved value again. The table must not have a save button.
+show its cause and the saved value again. The table must not have a save button. A saved field must not show a toast, because the new
+sums show the save.
 
 Reason: A draft does not bind, and a value that is saved at once is not lost when the tab
 closes. Two fields that save one after the other must not overwrite each other.
 
 Test: The component tests leave a changed field and read the request, and a refused save shows
-the saved value again. The backend test sends two requests that each name one field.
+the saved value again, and a saved field shows no toast. The backend test sends two requests that each name one field.

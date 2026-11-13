@@ -20,7 +20,7 @@ The plan page must show the state of the version with the step display of the ui
 steps must be "Entwurf", each step of the version by its name, and "In Kraft". A passed
 step must show a check mark and its date. A draft must show the steps of its budget. A step
 with a vote that is not accepted must show the state of that vote: "Abstimmung
-vorbereitet", "Abstimmung läuft" or "Abgelehnt".
+geplant", "Abstimmung läuft" or "Abgelehnt".
 
 Reason: The person must see which steps the version has passed and which steps remain.
 
