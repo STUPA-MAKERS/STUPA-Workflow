@@ -73,7 +73,8 @@ TYPICAL FLOWS:
   `plan_version_id`). Then `set_plan_state("in_force")` writes the
   allocations. `create_plan_nachtrag` starts a change, `delete_plan_version` drops a draft.
   The side of a Titel, a cost center directly below the budget, is the `side` of its
-  line in the draft (`set_plan_line`).
+  line in the draft (`set_plan_line`). With `planCoverableDefault` of the budget
+  (`update_budget`) a line gets `coverable` when it becomes an expense line.
 - Invoices (#invoices): `list_invoices`/`get_invoice`/`create_invoice`/`update_invoice`/
   `delete_invoice`. To attach an original PDF: `parse_invoice(file_path)` (ZUGFeRD/Factur-X →
   extracted fields + `fileToken`) or `upload_invoice_file(file_path)`, then pass `fileToken`

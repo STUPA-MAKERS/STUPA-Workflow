@@ -650,6 +650,79 @@ async def test_set_line_checks_the_node_and_the_marks(session: AsyncSession) -> 
     assert next(x for x in _version(plan).lines if x.budget_id == orphan.id).side is None
 
 
+def _coverable(plan: PlanOut) -> dict[uuid.UUID, bool]:
+    return {line.budget_id: line.coverable for line in _version(plan).lines}
+
+
+async def _default_on(t: Tree, on: bool = True) -> None:
+    out = await t.svc.update_node(t.top.id, BudgetNodeUpdate(planCoverableDefault=on))
+    assert out.plan_coverable_default is on
+
+
+async def test_a_new_expense_line_starts_deckungsfaehig_when_the_budget_says_so(
+    session: AsyncSession,
+) -> None:
+    """§F/finance/budget/000874: a new line below an expense Titel starts with the Vermerk."""
+    t = await _tree(session)
+    vid = _version(await _draft(t)).id
+    plain = await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(5)))
+    assert _coverable(plain)[t.exp_a.id] is False
+    await _default_on(t)
+    named = await t.svc.set_line(vid, t.exp_b.id, PlanLineSet(amount=D(5), coverable=False))
+    assert _coverable(named)[t.exp_b.id] is False
+    await t.svc.delete_line(vid, t.exp_b.id)
+    again = await t.svc.set_line(vid, t.exp_b.id, PlanLineSet(amount=D(5)))
+    assert _coverable(again)[t.exp_b.id] is True
+    income = await t.svc.create_plan_node(
+        vid, PlanNodeCreate(parentId=t.inc.id, key="9", name="Spenden", amount=D(1))
+    )
+    new = next(x for x in _version(income).lines if x.budget_id not in _coverable(again))
+    assert new.coverable is False
+    off = await t.svc.set_line(vid, t.exp_b.id, PlanLineSet(coverable=False))
+    kept = await t.svc.set_line(vid, t.exp_b.id, PlanLineSet(amount=D(7)))
+    assert _coverable(off)[t.exp_b.id] is False
+    assert _coverable(kept)[t.exp_b.id] is False
+
+
+async def test_the_lines_of_a_titel_start_deckungsfaehig_when_it_becomes_expense(
+    session: AsyncSession,
+) -> None:
+    """§F/finance/budget/000874: the Titel and each line below it get the Vermerk."""
+    t = await _tree(session)
+    await _default_on(t)
+    vid = _version(await _draft(t, sides=False)).id
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(5)))
+    before = await t.svc.set_line(vid, t.inc.id, PlanLineSet(side="income"))
+    assert not any(_coverable(before).values())
+    after = await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="expense"))
+    assert _coverable(after) == {t.exp_a.id: True, t.inc.id: False, t.exp.id: True}
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(coverable=False))
+    same = await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="expense"))
+    assert _coverable(same)[t.exp_a.id] is False
+    await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="income"))
+    back = await t.svc.set_line(vid, t.exp.id, PlanLineSet(side="expense", coverable=False))
+    assert _coverable(back) == {t.exp_a.id: True, t.inc.id: False, t.exp.id: False}
+
+
+async def test_the_default_changes_no_line_that_exists(session: AsyncSession) -> None:
+    """§F/finance/budget/000874: the setting and a copy leave the lines as they are."""
+    t = await _tree(session)
+    plan = await _balanced_draft(t)
+    vid = _version(plan).id
+    await _default_on(t)
+    assert not any(_coverable(await t.svc.get_plan(t.top.id, t.fy.id)).values())
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(coverable=True))
+    await _default_on(t, on=False)
+    assert _coverable(await t.svc.get_plan(t.top.id, t.fy.id))[t.exp_a.id] is True
+    await _default_on(t)
+    await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
+    await session.commit()
+    nachtrag = await t.svc.create_nachtrag(t.top.id, t.fy.id)
+    assert _coverable(nachtrag) == {
+        t.inc.id: False, t.exp.id: False, t.exp_a.id: True, t.exp_b.id: False,
+    }
+
+
 async def test_delete_line(session: AsyncSession) -> None:
     """A draft loses a line, but not while a child has one, and a PUT adds it again.
 

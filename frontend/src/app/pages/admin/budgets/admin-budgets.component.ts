@@ -64,6 +64,8 @@ interface EditForm {
   readonly day: number;
   readonly month: number;
   readonly plan: boolean;
+  /** New expense lines of the plan start with the Vermerk "deckungsfähig". */
+  readonly coverable: boolean;
   readonly steps: readonly StepDraft[];
 }
 
@@ -376,6 +378,7 @@ export class AdminBudgetsComponent {
       day: budget.fiscalStartDay,
       month: budget.fiscalStartMonth,
       plan: !!budget.planEnabled,
+      coverable: !!budget.planCoverableDefault,
       steps: [],
     });
     this.loadSteps();
@@ -473,6 +476,7 @@ export class AdminBudgetsComponent {
             : {}),
           ...(form.day !== node.fiscalStartDay ? { fiscalStartDay: form.day } : {}),
           ...(form.month !== node.fiscalStartMonth ? { fiscalStartMonth: form.month } : {}),
+          ...(form.coverable !== !!node.planCoverableDefault ? { planCoverableDefault: form.coverable } : {}),
         }),
       ),
       ...(form.plan && !sameSteps && this.stepsState() === 'ok' ? [defer(() => this.planApi.setSteps(node.id, steps))] : []),

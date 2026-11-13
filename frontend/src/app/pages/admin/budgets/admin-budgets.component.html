@@ -154,6 +154,9 @@
       </app-section>
       <app-section [heading]="'admin.budgets.plan' | t">
         <app-switch [checked]="f.plan" (checkedChange)="patch({ plan: $event })">{{ 'admin.budgets.planSwitch' | t }}</app-switch>
+        @if (f.plan) {
+          <app-switch [checked]="f.coverable" (checkedChange)="patch({ coverable: $event })">{{ 'admin.budgets.coverableDefault' | t }}</app-switch>
+        }
       </app-section>
       @if (f.plan) {
         <app-section [heading]="'admin.budgets.steps' | t">

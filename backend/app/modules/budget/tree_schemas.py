@@ -53,6 +53,8 @@ _REQUIRED_NODE_FIELDS = frozenset(
         "fiscal_start_month",
         "fiscalStartDay",
         "fiscal_start_day",
+        "planCoverableDefault",
+        "plan_coverable_default",
     }
 )
 
@@ -104,6 +106,9 @@ class BudgetNodeUpdate(FrozenStrictCamelModel, frozen=True):
     fiscal_start_month: int | None = Field(default=None, ge=1, le=12, alias="fiscalStartMonth")
     #: 1..28: see `BudgetNodeCreate`. The cutoff must exist in every month.
     fiscal_start_day: int | None = Field(default=None, ge=1, le=28, alias="fiscalStartDay")
+    #: A plan line of the budget starts "deckungsfähig" when it becomes an expense line.
+    #: It makes sense at the top level only.
+    plan_coverable_default: bool | None = Field(default=None, alias="planCoverableDefault")
 
     @model_validator(mode="before")
     @classmethod
@@ -144,6 +149,8 @@ class BudgetNodeOut(FrozenCamelModel, frozen=True):
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
     #: The plan switch of a top-level node. Read only here: the plan routes change it.
     plan_enabled: bool = Field(default=False, alias="planEnabled")
+    #: A plan line of the budget starts "deckungsfähig" when it becomes an expense line.
+    plan_coverable_default: bool = Field(default=False, alias="planCoverableDefault")
 
 
 class AllocationView(FrozenCamelModel, frozen=True):
@@ -193,6 +200,8 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
     #: The plan switch of a top-level node. Read only here: the plan routes change it.
     plan_enabled: bool = Field(default=False, alias="planEnabled")
+    #: A plan line of the budget starts "deckungsfähig" when it becomes an expense line.
+    plan_coverable_default: bool = Field(default=False, alias="planCoverableDefault")
     #: The fiscal years in which the Haushaltsplan counts the node: for a top-level
     #: node the years with a version in force, for a node below it the years whose
     #: version in force has a line for it.

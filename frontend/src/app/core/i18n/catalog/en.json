@@ -1613,6 +1613,7 @@
   "admin.budgets.noGremium": "No committee",
   "admin.budgets.plan": "Budget plan",
   "admin.budgets.planSwitch": "Keep a budget plan",
+  "admin.budgets.coverableDefault": "Expenses coverable by default",
   "admin.budgets.steps": "Steps until the plan is in force",
   "admin.budgets.stepName": "Name of step {number}",
   "admin.budgets.stepGremium": "Committee of step {number}",
