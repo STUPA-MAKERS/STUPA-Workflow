@@ -3,8 +3,7 @@
 A read follows the read rule of the cost center: the full budget view or the gremium
 scope of the top-level node. Each write needs ``budget.structure``. A write in a
 closed fiscal year gives 409 ``fiscal_year_closed``. The service methods do not
-commit, so each write route commits after the method returns. The vote of a step is
-the exception: the voting service commits the vote it creates.
+commit, so each write route commits after the method returns.
 """
 
 from __future__ import annotations
@@ -225,19 +224,18 @@ async def pass_next_plan_step(
 
 
 @router.post(
-    "/budget-plan-versions/{version_id}/steps/next/vote",
+    "/budget-plan-versions/{version_id}/steps/next/request",
     response_model=PlanOut,
-    status_code=status.HTTP_201_CREATED,
     dependencies=_STRUCTURE,
     responses=_errors(401, 403, 404, 409, 422),
 )
-async def create_plan_step_vote(version_id: UUID, service: ServiceDep) -> PlanOut:
-    """Create the draft vote of the Gremium of the next step.
+async def request_plan_step(version_id: UUID, service: ServiceDep) -> PlanOut:
+    """Ask the Gremium of the next step for its decision.
 
-    The vote opens and closes through the vote routes, with the manage right of that
-    Gremium. An accepted vote passes the step.
+    The request creates no vote. The step waits for a meeting of the Gremium, which
+    takes the plan as an agenda item and votes on it. An accepted vote passes the step.
     """
-    out = await service.create_step_vote(version_id)
+    out = await service.request_step(version_id)
     await service.session.commit()
     return out
 

@@ -562,7 +562,7 @@ async def test_close_meeting_poll_fixes_the_attendance() -> None:
     """The close of a meeting poll stores 4 present members and 2 admitted guests."""
     vote = _pvote(meeting_id=uuid4())
     db = fake_session(result(vote), result('["o1"]'))
-    db.scalar_results = [4, 2]
+    db.scalar_results = [None, 4, 2]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.tally.present_members == 4
     assert out.tally.present_guests == 2
@@ -583,7 +583,7 @@ async def test_close_meeting_poll_with_guests_counts_them_as_eligible() -> None:
         result(),
         result(),
     )
-    db.scalar_results = [3]
+    db.scalar_results = [None, 3]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.tally.eligible == 4
     assert vote.eligible_count == 4

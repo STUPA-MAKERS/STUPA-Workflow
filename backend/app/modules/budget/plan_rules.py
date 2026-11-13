@@ -71,6 +71,27 @@ def with_step_passed(
     ]
 
 
+def with_step_requested(
+    steps: Sequence[Mapping[str, Any]], index: int, requested_at: str
+) -> list[dict[str, Any]]:
+    """Return `steps` with the decision of the step at `index` asked for at `requested_at`."""
+    return [
+        {**step, "requestedAt": requested_at} if i == index else dict(step)
+        for i, step in enumerate(steps)
+    ]
+
+
+def waiting_gremium(state: str, steps: Sequence[Mapping[str, Any]]) -> str | None:
+    """Return the id of the Gremium that a version waits for, or `None`.
+
+    A version waits when it is in progress and the decision of its next step was asked
+    for. A meeting of that Gremium then takes the plan as an agenda item.
+    """
+    index = next_step(steps) if state == "in_progress" else None
+    step = steps[index] if index is not None else {}
+    return step.get("gremiumId") if step.get("requestedAt") else None
+
+
 def with_step_vote(
     steps: Sequence[Mapping[str, Any]], index: int, vote_id: str
 ) -> list[dict[str, Any]]:
@@ -86,27 +107,8 @@ def vote_decides_next(steps: Sequence[Mapping[str, Any]], vote_id: str) -> bool:
     return index is not None and steps[index].get("voteId") == vote_id
 
 
-#: The options of the vote of a step: the Gremium accepts or refuses the plan.
-STEP_VOTE_OPTIONS: tuple[str, ...] = ("yes", "no", "abstain")
-
-
-def step_vote_config(quorum_percent: int | None) -> dict[str, Any]:
-    """Return the config of the vote of a step, with the quorum of its Gremium."""
-    return {
-        "options": list(STEP_VOTE_OPTIONS),
-        "majorityRule": "simple",
-        "secret": True,
-        "tieBreak": "rejected",
-        **(
-            {}
-            if quorum_percent is None
-            else {"quorum": {"type": "percent", "value": quorum_percent}}
-        ),
-    }
-
-
-def step_vote_question(budget: str, year: str, number: int, step: str) -> str:
-    """Return the question of the vote of a step, such as `Haushaltsplan VS 2026: ...`.
+def step_title(budget: str, year: str, number: int, step: str) -> str:
+    """Return the title of the agenda item of a step, such as `Haushaltsplan VS 2026: ...`.
 
     The first version is the Haushaltsplan itself, so only a Nachtrag is named.
     """

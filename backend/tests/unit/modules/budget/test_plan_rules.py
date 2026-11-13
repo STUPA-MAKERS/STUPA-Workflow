@@ -82,24 +82,31 @@ def test_step_vote() -> None:
     assert not plan_rules.vote_decides_next([], "v1")
 
 
-def test_step_vote_config_and_question() -> None:
-    """The vote of a step is secret, simple, refused on a tie and names its plan.
+def test_step_request_and_title() -> None:
+    """A version waits for the Gremium of its next step after the request.
 
-    Rule: §F/finance/budget/000838.
+    Rule: §F/finance/budget/000856.
     """
-    assert plan_rules.step_vote_config(None) == {
-        "options": ["yes", "no", "abstain"],
-        "majorityRule": "simple",
-        "secret": True,
-        "tieBreak": "rejected",
-    }
-    assert plan_rules.step_vote_config(50)["quorum"] == {"type": "percent", "value": 50}
+    gremium = uuid.uuid4()
+    steps = plan_rules.step_snapshot([("Vorberatung", None), ("Beschluss", gremium)])
+    assert plan_rules.waiting_gremium("in_progress", steps) is None
+    first = plan_rules.with_step_requested(steps, 0, "2026-11-13T10:00:00+00:00")
+    assert plan_rules.waiting_gremium("in_progress", first) is None
+    assert "requestedAt" not in steps[0]
+    passed = plan_rules.with_step_passed(steps, 0, "2026-11-13T10:00:00+00:00")
+    asked = plan_rules.with_step_requested(passed, 1, "2026-11-13T11:00:00+00:00")
+    assert plan_rules.waiting_gremium("in_progress", passed) is None
+    assert plan_rules.waiting_gremium("in_progress", asked) == str(gremium)
+    assert plan_rules.waiting_gremium("draft", asked) is None
+    assert plan_rules.waiting_gremium("in_force", asked) is None
+    done = plan_rules.with_step_passed(asked, 1, "2026-11-13T12:00:00+00:00")
+    assert plan_rules.waiting_gremium("in_progress", done) is None
     assert (
-        plan_rules.step_vote_question("VS-Mittel", "2026", 0, "Beschluss")
+        plan_rules.step_title("VS-Mittel", "2026", 0, "Beschluss")
         == "Haushaltsplan VS-Mittel 2026: Beschluss"
     )
     assert (
-        plan_rules.step_vote_question("VS-Mittel", "2026", 2, "Beschluss")
+        plan_rules.step_title("VS-Mittel", "2026", 2, "Beschluss")
         == "Haushaltsplan VS-Mittel 2026, 2. Nachtrag: Beschluss"
     )
 

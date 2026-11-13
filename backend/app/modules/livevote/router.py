@@ -18,6 +18,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, WebSock
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
+from app.modules.budget.plan_schemas import WaitingPlanOut
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.livevote.broker import InMemoryBroker, MeetingBroker
@@ -626,7 +628,11 @@ async def open_meeting_vote(
     An open vote also needs the protokollant of the meeting (403), because the
     person who keeps the minutes runs the room. An application
     agenda item allows exactly one vote, because that vote fires the pass or fail
-    branch on close. A free-text agenda item allows several generic questions.
+    branch on close. An agenda item of a Haushaltsplan allows exactly one vote too: a
+    motion of the members, with the quorum of the Gremium. Its version must wait for
+    the Gremium of the meeting (409 ``plan_step_not_waiting``), and an accepted vote
+    passes the step while a refused vote sends the version back to the draft. A
+    free-text agenda item allows several generic questions.
     ``eligibleGroup`` is the Gremium of the meeting. The server derives the quorum
     denominator from the roster (members with ``vote.cast``) and never from client
     input. The route broadcasts ``vote_opened``, or ``meeting_state`` for a draft.
@@ -656,13 +662,14 @@ async def open_meeting_vote(
         await service.assert_can_run_votes(meeting_id, principal)
     assert_vote_window(meeting, draft=payload.draft)
     item = await agenda.item(meeting_id, payload.agenda_item_id)
+    plan_version_id: UUID | None = getattr(item, "plan_version_id", None)
     source = (
         await repeat_source(service.session, meeting_id, item.id, payload.repeat_of)
         if payload.repeat_of is not None
         else None
     )
     if (
-        item.application_id is not None
+        (item.application_id is not None or plan_version_id is not None)
         and source is None
         and await service.agenda_item_has_vote(item.id)
     ):
@@ -671,6 +678,10 @@ async def open_meeting_vote(
             code="agenda_decision_vote_exists",
         )
     built = await build_meeting_vote(service, meeting, item, payload)
+    if plan_version_id is not None:
+        await BudgetTreeService(service.session, actor=principal.sub).waiting_plan(
+            plan_version_id, meeting.gremium_id
+        )
     if item.application_id is not None:
         moved_on = (
             source is not None and await assert_reopenable(service.session, source) is not None
@@ -680,10 +691,13 @@ async def open_meeting_vote(
             await reopen_application(service.session, source, actor=principal.sub)
         if not moved_on or reopens:
             await assert_application_votable(service, meeting, item.application_id)
+    of_plan = built.model_copy(update={"plan_version_id": plan_version_id})
     create = (
-        built.model_copy(update={"repeat_of_id": source.id, "attempt": (source.attempt or 1) + 1})
+        of_plan.model_copy(
+            update={"repeat_of_id": source.id, "attempt": (source.attempt or 1) + 1}
+        )
         if source is not None
-        else built
+        else of_plan
     )
     vote = await voting.create_internal(
         item.application_id,
@@ -830,6 +844,29 @@ async def list_assignable(
     return await agenda.assignable(meeting_id)
 
 
+@router.get(
+    "/meetings/{meeting_id}/agenda/assignable-plans",
+    response_model=list[WaitingPlanOut],
+    responses=_errors(401, 403, 404),
+)
+async def list_assignable_plans(
+    meeting_id: UUID, agenda: AgendaDep, service: ServiceDep, principal: ReaderDep
+) -> list[WaitingPlanOut]:
+    """The plan versions that wait for this Gremium and are not yet on the agenda.
+
+    Only a person who can edit the agenda reads them (403), because the list names
+    plans that the Gremium did not see yet.
+    """
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to edit the agenda")
+    on_agenda = {item.plan_version_id for item in await agenda.list(meeting_id)}
+    waiting = await BudgetTreeService(agenda.session, actor=principal.sub).waiting_plans(
+        meeting.gremium_id
+    )
+    return [plan for plan in waiting if plan.plan_version_id not in on_agenda]
+
+
 @router.post(
     "/meetings/{meeting_id}/agenda",
     response_model=list[AgendaItemOut],
@@ -843,7 +880,12 @@ async def add_agenda_item(
     principal: ReaderDep,
     request: Request,
 ) -> list[AgendaItemOut]:
-    """Add an agenda item: an application, a free-text item or a to-do card.
+    """Add an agenda item: an application, a free-text item, a to-do card or a plan.
+
+    With ``planVersionId`` the version of the Haushaltsplan must wait for the decision
+    of the Gremium of the meeting (409 ``plan_step_not_waiting``); a second item of the
+    same version answers 409 ``plan_already_on_agenda``. The item takes the budget, the
+    fiscal year, the version and the step as its title.
 
     Only the meeting lead or an admin may edit the agenda. A closed meeting answers
     409 ``meeting_closed``. With ``todoId`` the card must be readable (404), live
@@ -871,6 +913,19 @@ async def add_agenda_item(
         await todos.link_agenda_item(card, item.id, principal)
         await agenda.session.commit()
         await publish_pings(todo_broker(request.app.state), todos.pings.drain())
+        return await agenda.list(meeting_id)
+    if payload.plan_version_id is not None:
+        plan = await BudgetTreeService(agenda.session, actor=principal.sub).waiting_plan(
+            payload.plan_version_id, meeting.gremium_id
+        )
+        await agenda.add_plan_in_tx(
+            meeting_id,
+            plan_version_id=plan.plan_version_id,
+            title=plan.title,
+            non_public=payload.non_public,
+            actor=principal.sub,
+        )
+        await agenda.session.commit()
         return await agenda.list(meeting_id)
     return await agenda.add(
         meeting_id,

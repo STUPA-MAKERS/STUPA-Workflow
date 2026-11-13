@@ -48,9 +48,12 @@ from app.modules.budget.tree_schemas import (
     FiscalYearUpdate,
 )
 from app.modules.gremien.models import Gremium
+from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.search.service import SearchService
 from app.modules.voting.models import Vote
+from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
+from app.shared.config_schemas import VoteConfig
 from app.shared.errors import AppError, ConflictError, NotFoundError, ValidationProblem
 
 pytestmark = pytest.mark.integration
@@ -1059,6 +1062,50 @@ async def _gremium(session: AsyncSession) -> uuid.UUID:
     return gremium.id
 
 
+_MOTION = {
+    "options": ["yes", "no", "abstain"],
+    "majorityRule": "simple",
+    "secret": True,
+    "tieBreak": "rejected",
+}
+
+
+async def _prepare(
+    session: AsyncSession, vid: uuid.UUID, gremium: uuid.UUID, *, status: str = "live"
+) -> uuid.UUID:
+    """Put the plan on the agenda of a meeting of the Gremium and prepare its vote."""
+    meeting = Meeting(id=uuid.uuid4(), gremium_id=gremium, title="Sitzung", status=status)
+    session.add(meeting)
+    await session.flush()
+    item = MeetingAgendaItem(
+        id=uuid.uuid4(), meeting_id=meeting.id, plan_version_id=vid, title="Haushaltsplan"
+    )
+    session.add(item)
+    await session.commit()
+    vote = await VotingService(session).create_internal(
+        None,
+        VoteCreateInternal(
+            config=VoteConfig.model_validate(_MOTION),
+            eligibleGroup=gremium,
+            question="Haushaltsplan",
+            eligibleCount=1,
+            planVersionId=vid,
+        ),
+        meeting_id=meeting.id,
+        agenda_item_id=item.id,
+        planned_ok=True,
+        actor="mgr",
+    )
+    return vote.id
+
+
+async def _ask(session: AsyncSession, t: Tree, vid: uuid.UUID, gremium: uuid.UUID) -> uuid.UUID:
+    """Ask for the decision of the next step and prepare its vote in a live meeting."""
+    await t.svc.request_step(vid)
+    await session.commit()
+    return await _prepare(session, vid, gremium)
+
+
 async def _decide(
     session: AsyncSession, vote_id: uuid.UUID, gremium: uuid.UUID, choice: str
 ) -> None:
@@ -1072,41 +1119,85 @@ async def _decide(
     await voting.close(vote_id, Principal(sub="mgr", roles=["admin"]))
 
 
-async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSession) -> None:
-    """The step offers a vote of its Gremium, and the accepted vote passes it.
+async def test_a_step_waits_for_its_gremium_after_the_request(session: AsyncSession) -> None:
+    """The request creates no vote, and the plan then waits for a meeting of the Gremium.
 
-    Rules: §F/finance/budget/000826, §F/finance/budget/000838, §F/finance/budget/000802.
+    Rules: §F/finance/budget/000856, §F/finance/budget/000802.
+    """
+    t = await _tree(session)
+    gremium, other = await _gremium(session), await _gremium(session)
+    await _steps(t, "Beschluss", "Genehmigung", gremium_id=gremium)
+    vid = _version(await _balanced_draft(t)).id
+    with pytest.raises(ConflictError) as draft:
+        await t.svc.waiting_plan(vid, gremium)
+    assert _code(draft) == "plan_step_not_waiting"
+    assert await t.svc.waiting_plans(gremium) == []
+
+    asked = _version(await t.svc.request_step(vid))
+    await session.commit()
+    step = asked.steps[0]
+    assert (asked.state, step.passed_at, step.vote_id) == ("in_progress", None, None)
+    assert step.requested_at is not None
+    assert (await session.scalars(select(Vote).where(Vote.plan_version_id == vid))).all() == []
+    with pytest.raises(ConflictError) as twice:
+        await t.svc.request_step(vid)
+    assert _code(twice) == "plan_step_waits"
+    await session.rollback()
+
+    (waiting,) = await t.svc.waiting_plans(gremium)
+    assert waiting == await t.svc.waiting_plan(vid, gremium)
+    assert (waiting.plan_version_id, waiting.budget_name) == (vid, "VS-Mittel")
+    assert (waiting.fiscal_year, waiting.number, waiting.step) == ("2026", 0, "Beschluss")
+    assert waiting.title == "Haushaltsplan VS-Mittel 2026: Beschluss"
+    assert await t.svc.waiting_plans(other) == []
+    with pytest.raises(ConflictError) as foreign:
+        await t.svc.waiting_plan(vid, other)
+    assert _code(foreign) == "plan_step_not_waiting"
+    with pytest.raises(NotFoundError):
+        await t.svc.waiting_plan(uuid.uuid4(), gremium)
+    await session.rollback()
+
+    entry = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_PLAN_STEP_REQUEST)
+            .where(AuditEntry.data["versionId"].astext == str(vid))
+        )
+    ).one()
+    assert (entry.data["budget"], entry.data["year"]) == (t.top.path_key, 2026)
+    assert (entry.data["step"], entry.data["gremiumId"]) == ("Beschluss", str(gremium))
+
+    year = await session.get_one(FiscalYear, t.fy.id)
+    year.closed_at = datetime.now(UTC)
+    await session.commit()
+    assert await t.svc.waiting_plans(gremium) == []
+
+
+async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSession) -> None:
+    """The vote of a meeting of the Gremium decides the step, and the accepted vote passes it.
+
+    Rules: §F/finance/budget/000826, §F/finance/budget/000856, §F/finance/budget/000802.
     """
     t = await _tree(session)
     gremium = await _gremium(session)
     await _steps(t, "Beschluss", "Genehmigung", gremium_id=gremium)
     vid = _version(await _balanced_draft(t)).id
+    vote_id = await _ask(session, t, vid, gremium)
+    prepared = _version(await t.svc.get_plan(t.top.id, t.fy.id))
+    assert prepared.steps[0].vote_id is None
+    assert [(m.title, m.status) for m in prepared.meetings] == [("Sitzung", "live")]
 
-    asked = _version(await t.svc.create_step_vote(vid))
-    step = asked.steps[0]
-    assert (asked.state, step.passed_at, step.vote_status) == ("in_progress", None, "draft")
-    assert step.vote_id is not None
-    vote = await session.get(Vote, step.vote_id)
-    assert vote is not None
-    assert (vote.plan_version_id, vote.eligible_group) == (vid, str(gremium))
-    assert (vote.application_id, vote.meeting_id) == (None, None)
-    assert vote.question == "Haushaltsplan VS-Mittel 2026: Beschluss"
-    assert "quorum" not in vote.config or vote.config["quorum"] is None
-    with pytest.raises(ConflictError) as twice:
-        await t.svc.create_step_vote(vid)
-    assert _code(twice) == "plan_step_vote_runs"
-    await session.rollback()
-
-    shown = await VotingService(session).get(step.vote_id)
+    shown = await VotingService(session).get(vote_id)
     assert shown.plan_version_id == vid
     assert (await t.svc.plan_of_version(vid)).fiscal_year_id == t.fy.id
     with pytest.raises(NotFoundError):
         await t.svc.plan_of_version(uuid.uuid4())
 
-    await _decide(session, step.vote_id, gremium, "yes")
+    await _decide(session, vote_id, gremium, "yes")
     done = _version(await t.svc.get_plan(t.top.id, t.fy.id))
     assert [s.passed_at is not None for s in done.steps] == [True, False]
-    assert (done.steps[0].vote_status, done.steps[0].vote_result) == ("closed", "passed")
+    assert (done.steps[0].vote_id, done.steps[0].vote_status) == (vote_id, "closed")
+    assert done.steps[0].vote_result == "passed"
     entry = (
         await session.scalars(
             select(AuditEntry)
@@ -1114,50 +1205,118 @@ async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSes
             .where(AuditEntry.data["versionId"].astext == str(vid))
         )
     ).one()
-    assert (entry.data["voteId"], entry.actor) == (str(step.vote_id), "mgr")
-    asked_entry = (
+    assert (entry.data["voteId"], entry.actor) == (str(vote_id), "mgr")
+    opened = (
         await session.scalars(
             select(AuditEntry)
             .where(AuditEntry.action == AuditAction.BUDGET_PLAN_STEP_VOTE)
             .where(AuditEntry.data["versionId"].astext == str(vid))
         )
     ).one()
-    assert asked_entry.data["voteId"] == str(step.vote_id)
-    assert (asked_entry.data["budget"], asked_entry.data["year"]) == (t.top.path_key, 2026)
+    assert (opened.data["voteId"], opened.actor) == (str(vote_id), "mgr")
+    assert (opened.data["budget"], opened.data["year"]) == (t.top.path_key, 2026)
 
     with pytest.raises(ValidationProblem) as no_gremium:
-        await t.svc.create_step_vote(vid)
+        await t.svc.request_step(vid)
     assert _code(no_gremium) == "plan_step_no_gremium"
 
 
-async def test_a_refused_vote_leaves_the_step_open(session: AsyncSession) -> None:
-    """§F/finance/budget/000826: a refused vote passes nothing, and the step takes a new vote."""
+async def test_a_refused_vote_sends_the_version_back_to_the_draft(session: AsyncSession) -> None:
+    """A refused vote opens each passed step again, and the version is a draft again.
+
+    Rules: §F/finance/budget/000826, §F/finance/budget/000856.
+    """
     t = await _tree(session)
     gremium = await _gremium(session)
+    await t.svc.set_plan_steps(
+        t.top.id,
+        PlanStepsSet(
+            steps=(PlanStepIn(name="Vorberatung"), PlanStepIn(name="Beschluss", gremiumId=gremium))
+        ),
+    )
+    await session.commit()
+    vid = _version(await _balanced_draft(t)).id
+    await t.svc.pass_next_step(vid)
+    await session.commit()
+    vote_id = await _ask(session, t, vid, gremium)
+    beside = await _prepare(session, vid, gremium, status="planned")
+    await _decide(session, vote_id, gremium, "no")
+
+    refused = _version(await t.svc.get_plan(t.top.id, t.fy.id))
+    assert refused.state == "draft"
+    assert [(s.passed_at, s.requested_at, s.vote_id) for s in refused.steps] == [
+        (None, None, None),
+        (None, None, None),
+    ]
+    assert len(refused.meetings) == 2
+    closed = await session.get_one(Vote, vote_id)
+    assert (closed.status, closed.result) == ("closed", "rejected")
+    assert await session.get(Vote, beside) is None
+    entry = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_PLAN_STATE)
+            .where(AuditEntry.data["versionId"].astext == str(vid))
+        )
+    ).one()
+    assert (entry.data["before"], entry.data["after"]) == ("in_progress", "draft")
+    assert (entry.data["voteId"], entry.actor) == (str(vote_id), "mgr")
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(60), note="neu"))
+    await session.commit()
+
+
+async def test_a_plan_vote_opens_only_while_its_step_waits(session: AsyncSession) -> None:
+    """The open of a plan vote needs a meeting and a step that waits for its Gremium.
+
+    Rule: §F/finance/budget/000856.
+    """
+    t = await _tree(session)
+    gremium, other = await _gremium(session), await _gremium(session)
     await _steps(t, "Beschluss", gremium_id=gremium)
     vid = _version(await _balanced_draft(t)).id
-    first = _version(await t.svc.create_step_vote(vid)).steps[0]
-    assert first.vote_id is not None
-    await _decide(session, first.vote_id, gremium, "no")
-    refused = _version(await t.svc.get_plan(t.top.id, t.fy.id))
-    assert (refused.state, refused.steps[0].passed_at) == ("in_progress", None)
-    assert (refused.steps[0].vote_status, refused.steps[0].vote_result) == ("closed", "rejected")
+    voting = VotingService(session)
+    now = datetime.now(UTC)
 
-    second = _version(await t.svc.create_step_vote(vid)).steps[0]
-    assert second.vote_id not in (None, first.vote_id)
-    assert second.vote_status == "draft"
-    await session.delete(await session.get(Vote, second.vote_id))
-    row = await session.get(Gremium, gremium)
-    assert row is not None
-    row.quorum_percent = 50
+    early = await _prepare(session, vid, gremium)
+    with pytest.raises(ConflictError) as not_asked:
+        await voting.open(early, now=now, actor="mgr")
+    assert _code(not_asked) == "plan_step_not_waiting"
+    await session.rollback()
+
+    await t.svc.request_step(vid)
     await session.commit()
-    gone = _version(await t.svc.get_plan(t.top.id, t.fy.id)).steps[0]
-    assert (gone.vote_id, gone.vote_status) == (second.vote_id, None)
-    third = _version(await t.svc.create_step_vote(vid)).steps[0]
-    assert third.vote_id not in (first.vote_id, second.vote_id)
-    vote = await session.get(Vote, third.vote_id)
-    assert vote is not None
-    assert vote.config["quorum"] == {"type": "percent", "value": 50}
+    foreign = await _prepare(session, vid, other)
+    with pytest.raises(ConflictError) as wrong:
+        await voting.open(foreign, now=now, actor="mgr")
+    assert _code(wrong) == "plan_step_not_waiting"
+    await session.rollback()
+
+    alone = await voting.create_internal(
+        None,
+        VoteCreateInternal(
+            config=VoteConfig.model_validate(_MOTION),
+            eligibleGroup=gremium,
+            question="Haushaltsplan",
+            eligibleCount=1,
+            planVersionId=vid,
+        ),
+        actor="mgr",
+    )
+    with pytest.raises(ConflictError) as no_meeting:
+        await voting.open(alone.id, now=now, actor="mgr")
+    assert _code(no_meeting) == "plan_step_not_waiting"
+    await session.rollback()
+
+    await voting.open(early, now=now, actor="mgr")
+    second = await _prepare(session, vid, gremium)
+    with pytest.raises(ConflictError) as runs:
+        await voting.open(second, now=now, actor="mgr")
+    assert _code(runs) == "plan_step_vote_runs"
+    await session.rollback()
+    await voting.cancel(early, actor="mgr")
+    await voting.open(second, now=now, actor="mgr")
+    step = _version(await t.svc.get_plan(t.top.id, t.fy.id)).steps[0]
+    assert (step.vote_id, step.vote_status) == (second, "open")
 
 
 async def test_back_to_draft_ends_the_votes_of_the_version(session: AsyncSession) -> None:
@@ -1170,16 +1329,18 @@ async def test_back_to_draft_ends_the_votes_of_the_version(session: AsyncSession
     await _steps(t, "Beschluss", gremium_id=gremium)
     vid = _version(await _balanced_draft(t)).id
 
-    draft = _version(await t.svc.create_step_vote(vid)).steps[0].vote_id
-    assert draft is not None
+    draft = await _ask(session, t, vid, gremium)
     await t.svc.set_plan_state(vid, PlanStateSet(state="draft"))
     await session.commit()
     assert await session.get(Vote, draft) is None
     back = _version(await t.svc.get_plan(t.top.id, t.fy.id))
-    assert (back.state, back.steps[0].vote_id, back.steps[0].passed_at) == ("draft", None, None)
+    assert (back.state, back.steps[0].requested_at, back.steps[0].passed_at) == (
+        "draft",
+        None,
+        None,
+    )
 
-    opened = _version(await t.svc.create_step_vote(vid)).steps[0].vote_id
-    assert opened is not None
+    opened = await _ask(session, t, vid, gremium)
     await VotingService(session).open(opened, now=datetime.now(UTC), actor="mgr")
     await t.svc.set_plan_state(vid, PlanStateSet(state="draft"))
     await session.commit()
@@ -1194,29 +1355,22 @@ async def test_a_step_with_a_vote_is_not_recorded_by_hand(session: AsyncSession)
     gremium = await _gremium(session)
     await _steps(t, "Beschluss", gremium_id=gremium)
     vid = _version(await _balanced_draft(t)).id
-    vote_id = _version(await t.svc.create_step_vote(vid)).steps[0].vote_id
-    assert vote_id is not None
-    with pytest.raises(ConflictError) as planned:
-        await t.svc.pass_next_step(vid)
-    assert _code(planned) == "plan_step_has_vote"
-    await _decide(session, vote_id, gremium, "no")
-    with pytest.raises(ConflictError) as refused:
-        await t.svc.pass_next_step(vid)
-    assert _code(refused) == "plan_step_has_vote"
-
-    again = _version(await t.svc.create_step_vote(vid)).steps[0].vote_id
-    assert again is not None
+    vote_id = await _ask(session, t, vid, gremium)
     voting = VotingService(session)
-    await voting.open(again, now=datetime.now(UTC), actor="mgr")
-    await voting.cancel(again, actor="mgr")
+    await voting.open(vote_id, now=datetime.now(UTC), actor="mgr")
+    with pytest.raises(ConflictError) as running:
+        await t.svc.pass_next_step(vid)
+    assert _code(running) == "plan_step_has_vote"
+    await session.rollback()
+    await voting.cancel(vote_id, actor="mgr")
     passed = _version(await t.svc.pass_next_step(vid))
     assert passed.steps[0].passed_at is not None
 
 
-async def test_a_step_of_a_deleted_gremium_takes_no_vote(session: AsyncSession) -> None:
-    """A step whose Gremium is gone answers 422 plan_step_no_gremium to a vote.
+async def test_a_step_of_a_deleted_gremium_takes_no_request(session: AsyncSession) -> None:
+    """A step whose Gremium is gone answers 422 plan_step_no_gremium to a request.
 
-    Rule: §F/finance/budget/000838.
+    Rule: §F/finance/budget/000856.
     """
     t = await _tree(session)
     gremium = await _gremium(session)
@@ -1228,29 +1382,38 @@ async def test_a_step_of_a_deleted_gremium_takes_no_vote(session: AsyncSession) 
     version.steps = [{**version.steps[0], "passedAt": None}, version.steps[1]]
     await session.commit()
     with pytest.raises(ValidationProblem) as gone:
-        await t.svc.create_step_vote(vid)
+        await t.svc.request_step(vid)
     assert _code(gone) == "plan_step_no_gremium"
 
 
-async def test_a_vote_passes_only_the_step_it_decides(session: AsyncSession) -> None:
+async def test_a_vote_decides_only_the_step_it_belongs_to(session: AsyncSession) -> None:
     """§F/finance/budget/000826: the close of a vote never fails for the state of the plan."""
     t = await _tree(session)
     gremium = await _gremium(session)
     await _steps(t, "Beschluss", gremium_id=gremium)
     vid = _version(await _balanced_draft(t)).id
     assert not await t.svc.pass_step_by_vote(uuid.uuid4(), uuid.uuid4())
+    assert not await t.svc.refuse_step_by_vote(uuid.uuid4(), uuid.uuid4())
 
-    first = _version(await t.svc.create_step_vote(vid)).steps[0]
-    assert first.vote_id is not None
+    first = await _ask(session, t, vid, gremium)
     assert not await t.svc.pass_step_by_vote(vid, uuid.uuid4())
+    assert not await t.svc.refuse_step_by_vote(vid, uuid.uuid4())
+    await session.commit()
 
     with pytest.raises(ConflictError) as running:
         await t.svc.set_fiscal_year_closed(t.top.id, t.fy.id, closed=True)
     assert _code(running) == "plan_in_progress"
+    await session.rollback()
+    voting = VotingService(session)
+    now = datetime.now(UTC)
+    await voting.open(first, now=now, actor="mgr")
     year = await session.get_one(FiscalYear, t.fy.id)
-    year.closed_at = datetime.now(UTC)
+    year.closed_at = now
     await session.commit()
-    await _decide(session, first.vote_id, gremium, "yes")
+    assert not await t.svc.refuse_step_by_vote(vid, first)
+    await session.commit()
+    await voting.cast(first, Principal(sub="v1", groups={vote_group_key(gremium)}), "yes", now=now)
+    await voting.close(first, Principal(sub="mgr", roles=["admin"]))
     year.closed_at = None
     await session.commit()
     kept = _version(await t.svc.get_plan(t.top.id, t.fy.id))
@@ -1690,7 +1853,7 @@ async def test_plan_entries_keep_the_names_of_what_they_change(session: AsyncSes
         ("create_node", None),
         ("create_year", None),
         ("step", "plan_no_step_left"),
-        ("step_vote", "plan_no_step_left"),
+        ("step_request", "plan_no_step_left"),
         ("draft", "plan_state_invalid"),
         ("plan_node", None),
         ("delete_line", None),
@@ -1725,8 +1888,8 @@ async def test_a_write_beside_a_plan_waits_for_the_lock_of_its_budget(
         match write:
             case "step":
                 await svc.pass_next_step(vid)
-            case "step_vote":
-                await svc.create_step_vote(vid)
+            case "step_request":
+                await svc.request_step(vid)
             case "draft":
                 await svc.set_plan_state(vid, PlanStateSet(state="draft"))
             case "plan_node":
@@ -1964,8 +2127,7 @@ async def test_the_close_of_a_step_vote_locks_the_plan_before_the_audit_entry(
     gremium = await _gremium(session)
     await _steps(t, "Beschluss", gremium_id=gremium)
     vid = _version(await _balanced_draft(t)).id
-    step = _version(await t.svc.create_step_vote(vid)).steps[0]
-    assert step.vote_id is not None
+    vote_id = await _ask(session, t, vid, gremium)
     order: list[str] = []
     lock, record = BudgetTreeService.lock_plan_of_version, voting.audit_record
 
@@ -1979,7 +2141,7 @@ async def test_the_close_of_a_step_vote_locks_the_plan_before_the_audit_entry(
 
     monkeypatch.setattr(BudgetTreeService, "lock_plan_of_version", locked)
     monkeypatch.setattr(voting, "audit_record", recorded)
-    await _decide(session, step.vote_id, gremium, "yes")
+    await _decide(session, vote_id, gremium, "yes")
     assert order.index("lock") < order.index(str(AuditAction.VOTE_CLOSE))
 
 
@@ -2422,14 +2584,13 @@ async def test_a_state_by_hand_ends_the_open_vote_of_the_version(session: AsyncS
     gremium = await _gremium(session)
     await _steps(t, "Beschluss", gremium_id=gremium)
     vid = _version(await _balanced_draft(t)).id
-    step = _version(await t.svc.create_step_vote(vid)).steps[0]
-    assert step.vote_id is not None
-    await VotingService(session).open(step.vote_id, now=datetime.now(UTC), actor="mgr")
+    vote_id = await _ask(session, t, vid, gremium)
+    await VotingService(session).open(vote_id, now=datetime.now(UTC), actor="mgr")
     await session.commit()
     done = _version(await t.svc.set_state_by_hand(vid, _by_hand("in_force")))
     await session.commit()
     assert done.state == "in_force"
-    vote = await session.get_one(Vote, step.vote_id)
+    vote = await session.get_one(Vote, vote_id)
     await session.refresh(vote)
     assert vote.status == "cancelled"
 

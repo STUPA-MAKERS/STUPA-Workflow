@@ -1209,19 +1209,27 @@ class VotingService:
         A poll of a Gremium opens only with its end at least one hour ahead. The audit
         entry records ``guestsVote``, because a vote with guests has no quorum.
 
+        A vote on a version of a Haushaltsplan opens only in a meeting, and only while
+        the next step of the version waits for the Gremium of the vote. The step then
+        keeps the id of the vote.
+
         Raises:
             ConflictError: The vote is not in ``draft``, its meeting is not ``live``,
-                or its Gremium does not decide the vote state of the application.
+                its Gremium does not decide the vote state of the application, or the
+                plan does not wait for it (``plan_step_not_waiting``,
+                ``plan_step_vote_runs``).
         """
         meeting_id = await self.session.scalar(select(Vote.meeting_id).where(Vote.id == vote_id))
         if meeting_id is not None:
             await self._lock_live_meeting(meeting_id)
+        await self._lock_plan_votes(vote_id)
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "draft":
             raise ConflictError(f"vote is {vote.status}, cannot open.", code="vote_not_draft")
         if await self.vote_gremium_mismatch(vote):
             raise vote_gremium_mismatch_error()
         await poll_mod.PollService(self).check_open(vote, now)
+        await self._take_plan_step(vote, actor)
         config = self._config(vote)
         if eligible_count is not None:
             vote.eligible_count = eligible_count
@@ -1892,6 +1900,40 @@ class VotingService:
         await plans.lock_plan_of_version(plan_version_id)
         return plans
 
+    async def _lock_plan_votes(self, vote_id: UUID) -> None:
+        """Lock the draft and open votes of the plan version of a vote, when it has one.
+
+        The open and the close of a plan vote call this before they lock their own
+        vote, so each write to the votes of one version locks them in the same order.
+        """
+        plan_version_id = await self.session.scalar(
+            select(Vote.plan_version_id).where(Vote.id == vote_id)
+        )
+        if plan_version_id is not None:
+            await self.lock_for_plan_version(plan_version_id)
+
+    async def _take_plan_step(self, vote: Vote, actor: str | None) -> None:
+        """Bind a plan vote that opens to the step that waits for its Gremium.
+
+        Raises:
+            ConflictError: The vote has no meeting or the plan does not wait for the
+                Gremium of the vote (``plan_step_not_waiting``), or another vote of
+                the step is open (``plan_step_vote_runs``).
+        """
+        plan_version_id: UUID | None = getattr(vote, "plan_version_id", None)
+        if plan_version_id is None:
+            return
+        if vote.meeting_id is None:
+            raise ConflictError(
+                "The vote of a plan step opens only in a meeting.",
+                code="plan_step_not_waiting",
+            )
+        from app.modules.budget.tree.service import BudgetTreeService
+
+        await BudgetTreeService(self.session, actor=actor).take_step_vote(
+            plan_version_id, vote.id, UUID(vote.eligible_group)
+        )
+
     async def lock_for_plan_version(self, plan_version_id: UUID) -> None:
         """Lock the draft and open votes of a plan version, before its plan row.
 
@@ -2097,7 +2139,7 @@ class VotingService:
         and ``tie`` are fail-closed and fire ``fail``. A generic resolution question has
         no application and fires no branch. It only holds the result for the protocol.
         A passed vote on a version of a Haushaltsplan passes the step of that version
-        in the same commit; a refused vote leaves the step open.
+        in the same commit; a refused vote sends the version back to the draft.
         The audit entry holds aggregates only, never a voter. The status event of a
         fired branch carries the decision for the timeline and the revert.
 
@@ -2105,6 +2147,7 @@ class VotingService:
             ConflictError: The vote is not open, or the quorum is not met before the
                 window expired.
         """
+        await self._lock_plan_votes(vote_id)
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
             raise ConflictError(f"vote is {vote.status}, cannot close.", code="vote_not_open")
@@ -2161,8 +2204,12 @@ class VotingService:
             vote.result_branch_transition_id = staged.transition.id
             if decision is not None:
                 decision.status_event_id = staged.status_event_id
-        if plans is not None and plan_version_id is not None and result_value == "passed":
-            await plans.pass_step_by_vote(plan_version_id, vote.id)
+        if plans is not None and plan_version_id is not None:
+            await self.session.flush()
+            if result_value == "passed":
+                await plans.pass_step_by_vote(plan_version_id, vote.id)
+            else:
+                await plans.refuse_step_by_vote(plan_version_id, vote.id)
         await self.session.commit()
 
         new_state_id = (
