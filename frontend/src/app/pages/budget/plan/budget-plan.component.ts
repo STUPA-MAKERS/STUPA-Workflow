@@ -724,12 +724,18 @@ export class BudgetPlanComponent {
     else this.loadTree(qp.get('budget'), qp.get('fy'));
   }
 
-  /** The action of the load error: read the page again. */
+  /**
+   * The action of the load error: read the page again. A budget that the person chose
+   * on the page stays the wanted one, because the URL still names the budget before it
+   * until the fiscal years of the new one are read.
+   */
   retry(): void {
+    const wanted = this.topId();
     this.error.set(false);
     this.loading.set(true);
     this.topId.set('');
-    this.start();
+    if (wanted) this.loadTree(wanted, null);
+    else this.start();
   }
 
   /** A link from the vote of a step names only the version: read its plan, then show it. */
