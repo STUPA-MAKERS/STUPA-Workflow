@@ -8,6 +8,7 @@ updated: 2026-11-13
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_an_accepted_vote_of_the_gremium_passes_its_step"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_step_of_a_deleted_gremium_takes_no_vote"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_read_of_a_version_beside_its_delete_is_no_error"
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_step_vote_config_and_question"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
   - "frontend/src/app/features/voting/vote-cast.component.spec.ts:VoteCastComponent"
@@ -49,4 +50,5 @@ Gremium.
 Test: The backend tests create the vote of a step with and without a Gremium, a second vote
 beside a running one, and read the config and the question. The vote page tests read the link to
 the plan with and without the read right. The plan page test opens the menu of a version
-with a vote as a person without `budget.structure`.
+with a vote as a person without `budget.structure`. One backend test deletes the version
+from a second session during the read of its plan and reads the answer.
