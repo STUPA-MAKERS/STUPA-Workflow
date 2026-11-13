@@ -190,26 +190,39 @@ class BudgetTreeServiceBase:
         if fy is not None:
             self._refuse_closed(fy)
 
-    async def _lock_plans(self, top_id: UUID) -> None:
-        """Lock the row of a top-level budget for a write that a Haushaltsplan depends on.
+    async def _lock_tree(self, budget_id: UUID | None) -> None:
+        """Lock the top-level budget above a cost center, before a write in its tree.
 
-        Each write that changes a plan takes this lock first, and so does each write
-        beside it that a plan depends on: a fiscal year, a side, the steps, the plan
-        switch and the delete of a cost center. Two such writes on one budget then run
-        one after the other, and the second reads what the first left. The lock comes
-        before the lock of a plan row and before the audit entry, so no two writes
-        wait for each other.
+        Each write in the tree of a budget takes this lock first: a write of a plan, and
+        each write that a plan depends on or that reads what such a write changes (a
+        cost center, a key, a side, an allocation, a fiscal year, the steps, the plan
+        switch). Two writes on one budget then run one after the other, and the second
+        reads what the first left: the statement reads the row of the budget again, so
+        its plan switch is the one that the write before left. A caller reads its own
+        rows after this lock, never before. The lock comes before the lock of a plan
+        row and before the audit entry, so no two writes wait for each other.
+
+        The statement finds the top level by the parent chain, because the parent of a
+        cost center never changes and its path key can. The lock is `FOR NO KEY
+        UPDATE`, because a new row that points at the budget (a booking, a line) must
+        not wait for it. A cost center that does not exist locks no row.
         """
-        await self.session.execute(
-            select(Budget.id).where(Budget.id == top_id).with_for_update(of=Budget)
+        if budget_id is None:
+            return
+        up = (
+            select(Budget.id, Budget.parent_id)
+            .where(Budget.id == budget_id)
+            .cte("up", recursive=True)
         )
-
-    async def _lock_plans_of(self, node: Budget) -> None:
-        """Take the lock of `_lock_plans` for the top-level budget of a node."""
+        chain = up.union_all(
+            select(Budget.id, Budget.parent_id).where(Budget.id == up.c.parent_id)
+        )
+        top = select(chain.c.id).where(chain.c.parent_id.is_(None)).scalar_subquery()
         await self.session.execute(
-            select(Budget.id)
-            .where(Budget.path_key == node.path_key.split(_SEP, 1)[0], Budget.parent_id.is_(None))
-            .with_for_update(of=Budget)
+            select(Budget)
+            .where(Budget.id == top)
+            .with_for_update(of=Budget, key_share=True)
+            .execution_options(populate_existing=True)
         )
 
     async def _top_level(self, node: Budget) -> Budget:

@@ -22,7 +22,8 @@ async def set_budget_side(budget_id: str, side: Literal["income", "expense"]) ->
     """Set the side of a direct child of a top-level cost center and of its subtree.
 
     The call gives 422 `side_not_settable` for any other node and 409 `side_in_plan`
-    when a plan line of the subtree has an Ansatz above 0. Requires budget.structure.
+    when a plan line of the subtree has an Ansatz above 0, or when the side becomes
+    income and a line of a decided version holds a Vermerk. Requires budget.structure.
     """
     return await api().put(f"/budgets/{budget_id}/side", json={"side": side})
 

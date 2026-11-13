@@ -188,6 +188,7 @@ class NodeOps(BudgetTreeServiceBase):
                 errors=[{"field": "key", "msg": "must be alphanumeric (no '-')"}],
             )
 
+        await self._lock_tree(payload.parent_id)
         parent = await self._get_node(payload.parent_id) if payload.parent_id is not None else None
         if parent is None and payload.gremium_id is not None:
             gremium = (
@@ -286,6 +287,7 @@ class NodeOps(BudgetTreeServiceBase):
         revert uses the new values to detect a later edit and answers 409 instead of
         overwriting the changes of another user.
         """
+        await self._lock_tree(budget_id)
         node = await self._get_node(budget_id)
         dumped = payload.model_dump(exclude_unset=True)
         new_key = dumped.get("key")
@@ -406,8 +408,8 @@ class NodeOps(BudgetTreeServiceBase):
         that ever had an allocation could never be deleted. A reset to 0 keeps
         the row, and no separate action removes an allocation.
         """
+        await self._lock_tree(budget_id)
         node = await self._get_node(budget_id)
-        await self._lock_plans_of(node)
         child = (
             await self.session.execute(
                 select(Budget.id).where(Budget.parent_id == budget_id).limit(1)

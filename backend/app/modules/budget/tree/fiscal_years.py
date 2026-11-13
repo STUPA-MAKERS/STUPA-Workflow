@@ -85,6 +85,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
 
     async def create_fiscal_year(self, budget_id: UUID, payload: FiscalYearCreate) -> FiscalYearOut:
         """Create a fiscal year. Its bounds derive from the budget start date."""
+        await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
         start, end = self._fiscal_year_bounds(
             payload.year, top.fiscal_start_month, top.fiscal_start_day
@@ -121,7 +122,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
                 closed fiscal year, `fiscal_year_has_plan` (409) for a year change
                 while the Haushaltsplan of the year has a version that left the draft.
         """
-        await self._lock_plans(budget_id)
+        await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
         provided = payload.model_dump(exclude_unset=True)
@@ -191,7 +192,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
                 (`fiscal_year_has_plan`) (409). A plan that is only a draft goes with
                 the year, and the audit entry says so.
         """
-        await self._lock_plans(budget_id)
+        await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
         fy = await self._own_fiscal_year(top, fiscal_year_id)
         self._refuse_closed(fy)
@@ -303,7 +304,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
                 Haushaltsplan passes its steps, because a vote that ends after the
                 close could not pass its step.
         """
-        await self._lock_plans(budget_id)
+        await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
         fy = await self._own_fiscal_year(top, fiscal_year_id)
         if closed and "in_progress" in await self._plan_states(fiscal_year_id):

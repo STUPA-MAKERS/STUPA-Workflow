@@ -27,7 +27,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 from sqlalchemy import and_, delete, func, or_, select, update
@@ -73,6 +73,9 @@ from app.modules.voting.schemas import (
 from app.shared.config_schemas import ElectionConfig, PollConfig, VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.paging import DEFAULT_LIMIT, Page
+
+if TYPE_CHECKING:
+    from app.modules.budget.tree.service import BudgetTreeService
 
 #: The problem code of a second cast (REST 409 and the live-vote error frame).
 ALREADY_VOTED = "already_voted"
@@ -1872,6 +1875,23 @@ class VotingService:
             data={**self._audit_refs(vote), "reason": reason, "previousStatus": previous},
         )
 
+    async def _locked_plan(
+        self, plan_version_id: UUID | None, principal: Principal
+    ) -> BudgetTreeService | None:
+        """Lock the plan of a step vote and return the budget service, else `None`.
+
+        The close holds the vote and takes the lock of the budget and of the plan here,
+        before it writes its audit entry. A plan write takes the same order, because
+        the other order ends in a deadlock that Postgres breaks with an error.
+        """
+        if plan_version_id is None:
+            return None
+        from app.modules.budget.tree.service import BudgetTreeService
+
+        plans = BudgetTreeService(self.session, actor=principal.sub)
+        await plans.lock_plan_of_version(plan_version_id)
+        return plans
+
     async def lock_for_plan_version(self, plan_version_id: UUID) -> None:
         """Lock the draft and open votes of a plan version, before its plan row.
 
@@ -2103,6 +2123,8 @@ class VotingService:
         closed_at = now or datetime.now(UTC)
         eligible = await self._fix_attendance(vote, config)
 
+        plan_version_id: UUID | None = getattr(vote, "plan_version_id", None)
+        plans = await self._locked_plan(plan_version_id, principal)
         vote.status = "closed"
         vote.result = result_value
         vote.closed_at = closed_at
@@ -2139,13 +2161,8 @@ class VotingService:
             vote.result_branch_transition_id = staged.transition.id
             if decision is not None:
                 decision.status_event_id = staged.status_event_id
-        plan_version_id: UUID | None = getattr(vote, "plan_version_id", None)
-        if plan_version_id is not None and result_value == "passed":
-            from app.modules.budget.tree.service import BudgetTreeService
-
-            await BudgetTreeService(self.session, actor=principal.sub).pass_step_by_vote(
-                plan_version_id, vote.id
-            )
+        if plans is not None and plan_version_id is not None and result_value == "passed":
+            await plans.pass_step_by_vote(plan_version_id, vote.id)
         await self.session.commit()
 
         new_state_id = (

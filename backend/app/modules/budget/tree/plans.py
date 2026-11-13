@@ -231,14 +231,24 @@ class PlanOps(NodeOps, AllocationOps):
                 select(BudgetPlan).where(BudgetPlan.id == version.plan_id).with_for_update()
             )
         ).one_or_none()
-        if plan is None:
+        fresh = await self._version_again(version_id)
+        if plan is None or fresh is None:
             raise NotFoundError(f"plan version {version_id} not found")
-        await self.session.refresh(version)
         fy = await self._get_fiscal_year(plan.fiscal_year_id)
         self._refuse_closed(fy)
         top = await self._get_node(fy.budget_id)
         self._require_enabled(top)
-        return version, plan, fy, top
+        return fresh, plan, fy, top
+
+    async def _version_again(self, version_id: UUID) -> BudgetPlanVersion | None:
+        """Read a version again after the locks, `None` when a write before deleted it."""
+        return (
+            await self.session.scalars(
+                select(BudgetPlanVersion)
+                .where(BudgetPlanVersion.id == version_id)
+                .execution_options(populate_existing=True)
+            )
+        ).one_or_none()
 
     async def _lock_top_of_plan(self, plan_id: UUID) -> None:
         """Lock the top-level budget of a plan, when the plan still exists."""
@@ -248,7 +258,7 @@ class PlanOps(NodeOps, AllocationOps):
             .where(BudgetPlan.id == plan_id)
         )
         if top_id is not None:
-            await self._lock_plans(top_id)
+            await self._lock_tree(top_id)
 
     @staticmethod
     def _require_enabled(top: Budget) -> None:
@@ -300,11 +310,15 @@ class PlanOps(NodeOps, AllocationOps):
                 (422) for a Gremium that does not exist.
             ConflictError: `plan_not_enabled` (409) when the plan switch is off.
         """
-        await self._lock_plans(budget_id)
+        await self._lock_tree(budget_id)
         top = await self._plan_top(budget_id, "The plan steps belong")
         self._require_enabled(top)
         wanted = {step.gremium_id for step in payload.steps if step.gremium_id is not None}
-        known = await self.session.scalars(select(Gremium.id).where(Gremium.id.in_(wanted)))
+        known = await self.session.scalars(
+            select(Gremium.id)
+            .where(Gremium.id.in_(wanted))
+            .with_for_update(read=True, key_share=True)
+        )
         found = set(known.all())
         if wanted - found:
             raise ValidationProblem(
@@ -355,9 +369,11 @@ class PlanOps(NodeOps, AllocationOps):
             ValidationProblem: `side_not_settable` (422) for a top-level node and for
                 a node that takes the side of its parent.
             ConflictError: `side_in_plan` (409) when a plan line of the subtree has an
-                Ansatz above 0, `fiscal_year_closed` (409) when the plan of a closed
-                fiscal year has a line of the subtree.
+                Ansatz above 0, or when the side becomes income and a line of a
+                version that left the draft holds a Vermerk, `fiscal_year_closed`
+                (409) when the plan of a closed fiscal year has a line of the subtree.
         """
+        await self._lock_tree(budget_id)
         node = await self._get_node(budget_id)
         parent = await self._get_node(node.parent_id) if node.parent_id is not None else None
         if parent is None or parent.parent_id is not None:
@@ -366,7 +382,6 @@ class PlanOps(NodeOps, AllocationOps):
                 code="side_not_settable",
                 errors=[{"field": "budgetId", "msg": "not a direct child of the top level"}],
             )
-        await self._lock_plans(parent.id)
         subtree = await self._subtree(node)
         planned = await self.session.scalar(
             select(func.count())
@@ -466,10 +481,18 @@ class PlanOps(NodeOps, AllocationOps):
                 .order_by(BudgetPlanLine.version_id, BudgetPlanLine.budget_id)
             )
         ).all()
+        nodes = {
+            node.id: node
+            for node in await self.session.scalars(
+                select(Budget).where(Budget.id.in_([line.budget_id for line in lines]))
+            )
+        }
         cleared: list[dict[str, object]] = [
             {
                 "versionId": str(line.version_id),
                 "budgetId": str(line.budget_id),
+                "pathKey": nodes[line.budget_id].path_key,
+                "name": nodes[line.budget_id].name,
                 "transferable": line.transferable,
                 "coverable": line.coverable,
                 "blocked": str(line.blocked),
@@ -582,7 +605,7 @@ class PlanOps(NodeOps, AllocationOps):
                 `plan_switch_has_plans` (409) when the switch goes off and a plan has
                 a decision, a draft or a closed fiscal year.
         """
-        await self._lock_plans(budget_id)
+        await self._lock_tree(budget_id)
         top = await self._plan_top(budget_id, "The plan switch belongs")
         if bool(top.plan_enabled) == enabled:
             return PlanSwitchOut(budgetId=top.id, planEnabled=enabled)
@@ -655,6 +678,7 @@ class PlanOps(NodeOps, AllocationOps):
             )
         deleted = {
             "deletedPlans": [str(plan.id) for _fy, plan in plans],
+            "deletedYears": [fy.year for fy, _plan in plans],
             "deletedVersions": [
                 str(version.id) for _fy, plan in plans for version in await self._versions(plan.id)
             ],
@@ -737,7 +761,7 @@ class PlanOps(NodeOps, AllocationOps):
             ValidationProblem: `plan_copy_source_invalid` (422) when the source year
                 has no version in force or belongs to a different top-level node.
         """
-        await self._lock_plans(budget_id)
+        await self._lock_tree(budget_id)
         top, fy = await self._plan_year(budget_id, fiscal_year_id)
         self._require_enabled(top)
         self._refuse_closed(fy)
@@ -843,7 +867,7 @@ class PlanOps(NodeOps, AllocationOps):
                 a version before `in_force` exists, `plan_not_in_force` (409) when no
                 version is in force.
         """
-        await self._lock_plans(budget_id)
+        await self._lock_tree(budget_id)
         top, fy = await self._plan_year(budget_id, fiscal_year_id)
         self._require_enabled(top)
         self._refuse_closed(fy)
@@ -1193,6 +1217,8 @@ class PlanOps(NodeOps, AllocationOps):
             target_type="budget_plan",
             target_id=str(plan.id),
             data={
+                "budget": top.path_key,
+                "year": fy.year,
                 "fiscalYearId": str(fy.id),
                 "versionId": str(version.id),
                 "number": version.number,
@@ -1260,6 +1286,8 @@ class PlanOps(NodeOps, AllocationOps):
             target_type="budget_plan",
             target_id=str(plan.id),
             data={
+                "budget": top.path_key,
+                "year": fy.year,
                 "fiscalYearId": str(fy.id),
                 "versionId": str(version.id),
                 "number": version.number,
@@ -1307,8 +1335,7 @@ class PlanOps(NodeOps, AllocationOps):
         await self.session.scalars(
             select(BudgetPlan.id).where(BudgetPlan.id == version.plan_id).with_for_update()
         )
-        await self.session.refresh(version)
-        return version
+        return await self._version_again(version_id)
 
     async def pass_step_by_vote(self, version_id: UUID, vote_id: UUID) -> bool:
         """Pass the next step of a version for its accepted vote, and say if it did.
@@ -1357,6 +1384,8 @@ class PlanOps(NodeOps, AllocationOps):
             target_type="budget_plan",
             target_id=str(plan.id),
             data={
+                "budget": top.path_key,
+                "year": fy.year,
                 "fiscalYearId": str(fy.id),
                 "versionId": str(version.id),
                 "number": version.number,

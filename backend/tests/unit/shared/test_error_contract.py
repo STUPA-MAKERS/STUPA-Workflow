@@ -216,7 +216,7 @@ def _db_error_app(sqlstate: str) -> TestClient:
 
 @pytest.mark.parametrize("sqlstate", ["22021", "22P05"])
 def test_a_text_that_the_database_refuses_is_a_422(sqlstate: str) -> None:
-    """A NUL character in a text or in a JSONB value is an input error, not a 500."""
+    """§S/shared/api/000843: a NUL character in a text or a JSONB value is an input error."""
     resp = _db_error_app(sqlstate).get("/write")
     assert resp.status_code == 422
     assert resp.headers["content-type"].startswith("application/problem+json")

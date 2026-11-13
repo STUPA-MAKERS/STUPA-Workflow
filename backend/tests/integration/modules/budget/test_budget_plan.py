@@ -1465,6 +1465,8 @@ async def test_an_income_side_takes_the_vermerke_off_the_draft_line(
         {
             "versionId": str(vid),
             "budgetId": str(t.exp_a.id),
+            "pathKey": t.exp_a.path_key,
+            "name": "Fachschaften",
             "transferable": True,
             "coverable": True,
             "blocked": "0.00",
@@ -1532,42 +1534,109 @@ async def test_plan_entries_keep_the_names_of_what_they_change(session: AsyncSes
     ).all()
     removed, added, created = entries
     assert (created.data["budget"], created.data["year"]) == (t.top.path_key, 2026)
+    await _steps(t, "Beschluss")
+    await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(5)))
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(5)))
+    await t.svc.pass_next_step(vid)
+    await t.svc.set_plan_state(vid, PlanStateSet(state="draft"))
+    back, step = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action.like("budget_plan_st%"))
+            .order_by(AuditEntry.id.desc())
+            .limit(2)
+        )
+    ).all()
+    assert (step.data["budget"], step.data["year"]) == (t.top.path_key, 2026)
+    assert (back.data["budget"], back.data["year"]) == (t.top.path_key, 2026)
     assert (added.data["pathKey"], added.data["name"]) == (t.exp_a.path_key, "Fachschaften")
     assert (removed.data["pathKey"], removed.data["amount"]) == (t.exp_a.path_key, None)
 
 
-@pytest.mark.parametrize("write", ["delete_node", "close", "side", "steps", "step", "year"])
+@pytest.mark.parametrize(
+    ("write", "answer"),
+    [
+        ("delete_node", None),
+        ("close", None),
+        ("reopen", None),
+        ("side", None),
+        ("steps", None),
+        ("line", None),
+        ("year", None),
+        ("delete_version", None),
+        ("delete_year", "fiscal_year_has_allocations"),
+        ("allocation", "allocation_from_plan"),
+        ("switch", "plan_switch_has_plans"),
+        ("nachtrag", "plan_draft_exists"),
+        ("state", "plan_not_balanced"),
+        ("plan", "plan_exists"),
+        ("rename", None),
+        ("create_node", None),
+        ("create_year", None),
+    ],
+)
 async def test_a_write_beside_a_plan_waits_for_the_lock_of_its_budget(
-    session: AsyncSession, write: str
+    session: AsyncSession, write: str, answer: str | None
 ) -> None:
     """Each write that a plan depends on takes the lock of the top-level budget first.
 
     Two such writes at the same moment then run one after the other, and none ends in
-    a deadlock or in a state that the rules forbid.
-    Rules: §F/finance/budget/000793, §F/finance/budget/000801, §F/finance/budget/000820.
+    a deadlock or in a state that the rules forbid. A write that its rule refuses
+    answers with the code of that rule after the wait.
+    Rules: §F/finance/budget/000842, §F/finance/budget/000793, §F/finance/budget/000801,
+    §F/finance/budget/000820.
     """
     t = await _tree(session)
     vid = _version(await _draft(t)).id
     await session.commit()
     maker = async_sessionmaker(session.bind, expire_on_commit=False)
 
-    async def run() -> None:
+    async def write_in(svc: BudgetTreeService) -> None:
+        match write:
+            case "delete_node":
+                await svc.delete_node(t.exp_b.id)
+            case "close":
+                await svc.set_fiscal_year_closed(t.top.id, t.fy.id, closed=True)
+            case "reopen":
+                await svc.set_fiscal_year_closed(t.top.id, t.fy.id, closed=False)
+            case "side":
+                await svc.set_side(t.exp.id, "expense")
+            case "steps":
+                await svc.set_plan_steps(t.top.id, PlanStepsSet(steps=()))
+            case "line":
+                await svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(1)))
+            case "year":
+                await svc.update_fiscal_year(t.top.id, t.fy.id, FiscalYearUpdate(year=2031))
+            case "delete_version":
+                await svc.delete_version(vid)
+            case "delete_year":
+                await svc.delete_fiscal_year(t.top.id, t.fy.id)
+            case "allocation":
+                await svc.set_allocation(t.exp_a.id, t.fy.id, AllocationSet(allocated=D(1)))
+            case "switch":
+                await svc.set_plan_switch(t.top.id, False)
+            case "nachtrag":
+                await svc.create_nachtrag(t.top.id, t.fy.id)
+            case "state":
+                await svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(1)))
+                await svc.set_plan_state(vid, PlanStateSet(state="in_force"))
+            case "plan":
+                await svc.create_plan(t.top.id, t.fy.id, PlanCreate())
+            case "rename":
+                await svc.update_node(t.top.id, BudgetNodeUpdate(key=f"N{uuid.uuid4().hex[:8]}"))
+            case "create_node":
+                await svc.create_node(BudgetNodeCreate(key="9", name="Neu", parentId=t.exp.id))
+            case _:
+                await svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2040))
+
+    async def run() -> str | None:
         async with maker() as other:
-            svc = BudgetTreeService(other, actor="tester")
-            match write:
-                case "delete_node":
-                    await svc.delete_node(t.exp_b.id)
-                case "close":
-                    await svc.set_fiscal_year_closed(t.top.id, t.fy.id, closed=True)
-                case "side":
-                    await svc.set_side(t.exp.id, "expense")
-                case "steps":
-                    await svc.set_plan_steps(t.top.id, PlanStepsSet(steps=()))
-                case "step":
-                    await svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(1)))
-                case _:
-                    await svc.update_fiscal_year(t.top.id, t.fy.id, FiscalYearUpdate(year=2031))
+            try:
+                await write_in(BudgetTreeService(other, actor="tester"))
+            except AppError as refused:
+                return refused.code
             await other.commit()
+            return None
 
     async with maker() as holder:
         await holder.execute(
@@ -1577,7 +1646,7 @@ async def test_a_write_beside_a_plan_waits_for_the_lock_of_its_budget(
         await asyncio.sleep(0.3)
         assert not task.done()
         await holder.commit()
-    await asyncio.wait_for(task, 10)
+    assert await asyncio.wait_for(task, 10) == answer
 
 
 async def test_deletes_name_the_plan_data_that_goes_with_them(session: AsyncSession) -> None:
@@ -1635,6 +1704,7 @@ async def test_deletes_name_the_plan_data_that_goes_with_them(session: AsyncSess
     ).first()
     assert off is not None
     assert off.data["deletedVersions"] == [str(stamm.versions[0].id)]
+    assert off.data["deletedYears"] == [2026]
 
 
 async def test_a_key_taken_at_the_same_moment_is_a_conflict(
@@ -1642,7 +1712,7 @@ async def test_a_key_taken_at_the_same_moment_is_a_conflict(
 ) -> None:
     """A key that another request took after the read answers 409, not a 500.
 
-    Rules: §F/finance/budget/000246, §F/finance/budget/000817.
+    Rules: §F/finance/budget/000246, §F/finance/budget/000817, §F/finance/budget/000842.
     """
     t = await _tree(session)
     vid = _version(await _draft(t)).id
@@ -1695,7 +1765,7 @@ async def test_a_plan_that_went_while_a_write_waited_is_not_found(
 ) -> None:
     """A write that waited for the lock while its plan was deleted answers 404.
 
-    Rule: §F/finance/budget/000793.
+    Rules: §F/finance/budget/000842, §F/finance/budget/000793.
     """
     t = await _tree(session)
     plan = await _draft(t)
@@ -1709,3 +1779,111 @@ async def test_a_plan_that_went_while_a_write_waited_is_not_found(
     monkeypatch.setattr(t.svc, "_lock_top_of_plan", plan_goes)
     with pytest.raises(NotFoundError):
         await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(1)))
+
+
+async def test_a_version_that_went_while_a_write_waited_is_not_found(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A write that waited while its draft was deleted answers 404, and so does a vote.
+
+    Rule: §F/finance/budget/000842.
+    """
+    t = await _tree(session)
+    vid = _version(await _draft(t)).id
+    await session.commit()
+
+    async def version_goes(_plan_id: uuid.UUID) -> None:
+        await session.execute(delete(BudgetPlanVersion).where(BudgetPlanVersion.id == vid))
+
+    monkeypatch.setattr(t.svc, "_lock_top_of_plan", version_goes)
+    with pytest.raises(NotFoundError):
+        await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(1)))
+    await session.rollback()
+    assert await t.svc.lock_plan_of_version(vid) is None
+
+
+async def test_an_allocation_that_waited_for_the_plan_switch_is_refused(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An allocation by hand checks the plan switch after it has the lock of the budget.
+
+    The switch goes on while the allocation waits, so the allocation reads the switch
+    again and is refused: the Stammplan in force keeps the allocation it wrote.
+    Rules: §F/finance/budget/000842, §F/finance/budget/000798.
+    """
+    t = await _tree(session, enabled=False)
+    await t.svc.set_allocation(t.top.id, t.fy.id, AllocationSet(allocated=D(100)))
+    await t.svc.set_allocation(t.exp.id, t.fy.id, AllocationSet(allocated=D(30)))
+    await t.svc.set_allocation(t.exp_a.id, t.fy.id, AllocationSet(allocated=D(30)))
+    await session.commit()
+    lock = t.svc._lock_tree
+
+    async def switch_goes_on(budget_id: uuid.UUID | None) -> None:
+        async with async_sessionmaker(session.bind, expire_on_commit=False)() as other:
+            await BudgetTreeService(other, actor="tester").set_plan_switch(
+                t.top.id, True, confirm_changes=True
+            )
+            await other.commit()
+        await lock(budget_id)
+
+    monkeypatch.setattr(t.svc, "_lock_tree", switch_goes_on)
+    with pytest.raises(ConflictError) as refused:
+        await t.svc.set_allocation(t.exp_a.id, t.fy.id, AllocationSet(allocated=D(20)))
+    assert _code(refused) == "allocation_from_plan"
+    await session.rollback()
+    assert (await _allocations(session, t))[t.exp_a.id] == D(30)
+
+
+async def test_the_close_of_a_step_vote_locks_the_plan_before_the_audit_entry(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The close of a step vote holds the lock of the plan before it writes an entry.
+
+    A plan write holds the lock of its budget and then writes its entry, so the close
+    takes the same order and the two never wait for each other.
+    Rule: §F/finance/budget/000842.
+    """
+    import app.modules.voting.service as voting
+
+    t = await _tree(session)
+    gremium = await _gremium(session)
+    await _steps(t, "Beschluss", gremium_id=gremium)
+    vid = _version(await _balanced_draft(t)).id
+    step = _version(await t.svc.create_step_vote(vid)).steps[0]
+    assert step.vote_id is not None
+    order: list[str] = []
+    lock, record = BudgetTreeService.lock_plan_of_version, voting.audit_record
+
+    async def locked(svc: BudgetTreeService, version_id: uuid.UUID) -> BudgetPlanVersion | None:
+        order.append("lock")
+        return await lock(svc, version_id)
+
+    async def recorded(*args: object, **kwargs: object) -> object:
+        order.append(str(kwargs["action"]))
+        return await record(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(BudgetTreeService, "lock_plan_of_version", locked)
+    monkeypatch.setattr(voting, "audit_record", recorded)
+    await _decide(session, step.vote_id, gremium, "yes")
+    assert order.index("lock") < order.index(str(AuditAction.VOTE_CLOSE))
+
+
+async def test_the_audit_log_names_a_plan_and_a_budget(session: AsyncSession) -> None:
+    """The audit log shows a plan as its budget and year, and a budget by its name.
+
+    Rule: §F/finance/budget/000802.
+    """
+    from app.modules.audit_log.service import AuditLogService
+
+    t = await _tree(session)
+    plan = await t.svc.get_plan(t.top.id, t.fy.id)
+    log = AuditLogService(session)
+    labels = await log.resolve_target_labels(
+        [("budget_plan", str(plan.id)), ("budget", str(t.exp_a.id))]
+    )
+    assert labels[("budget", str(t.exp_a.id))] == "Fachschaften"
+    assert "2026" in labels[("budget_plan", str(plan.id))]
+    assert "VS-Mittel" in labels[("budget_plan", str(plan.id))]
+    names = await log.resolve_data_ids([{"planId": str(plan.id), "budgetId": str(t.exp_a.id)}])
+    assert names[str(t.exp_a.id)] == "Fachschaften"
+    assert "2026" in names[str(plan.id)]

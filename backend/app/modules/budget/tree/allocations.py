@@ -56,7 +56,7 @@ class AllocationOps(BudgetTreeServiceBase):
         double over-allocation gets through.
         """
         await self.session.execute(
-            select(Budget.id).where(Budget.id == budget_id).with_for_update()
+            select(Budget.id).where(Budget.id == budget_id).with_for_update(key_share=True)
         )
 
     async def _children_alloc_sum(
@@ -102,6 +102,7 @@ class AllocationOps(BudgetTreeServiceBase):
                 budget, the children sum exceeds the parent allocation, or the
                 new allocation falls below the sum already given to children.
         """
+        await self._lock_tree(budget_id)
         node = await self._get_node(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
         top = await self._top_level(node)
