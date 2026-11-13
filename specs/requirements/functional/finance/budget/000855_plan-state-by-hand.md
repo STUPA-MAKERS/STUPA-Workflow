@@ -2,7 +2,7 @@
 id: "000855"
 title: A person with an own permission sets the state of a plan by hand
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 tests:

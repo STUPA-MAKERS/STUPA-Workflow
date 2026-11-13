@@ -316,9 +316,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000850](requirements/functional/finance/budget/000850_cost-centre-text-saved-on-close.md) | A typed text of a Kostenstelle is saved when its section goes off the page | draft |
 | [F/finance/budget/000851](requirements/functional/finance/budget/000851_tree-read-order.md) | A budget page drops the answer of an older tree read | draft |
 | [F/finance/budget/000852](requirements/functional/finance/budget/000852_budget-law-terms.md) | The budget pages use the words Haushalt, Titel, Ansatz and Haushaltsplan | approved |
-| [F/finance/budget/000853](requirements/functional/finance/budget/000853_plan-line-side.md) | The side of a Titel is a part of its plan line | draft |
-| [F/finance/budget/000854](requirements/functional/finance/budget/000854_plan-starts-as-draft.md) | A Haushaltsplan starts as a draft | draft |
-| [F/finance/budget/000855](requirements/functional/finance/budget/000855_plan-state-by-hand.md) | A person with an own permission sets the state of a plan by hand | draft |
+| [F/finance/budget/000853](requirements/functional/finance/budget/000853_plan-line-side.md) | The side of a Titel is a part of its plan line | approved |
+| [F/finance/budget/000854](requirements/functional/finance/budget/000854_plan-starts-as-draft.md) | A Haushaltsplan starts as a draft | approved |
+| [F/finance/budget/000855](requirements/functional/finance/budget/000855_plan-state-by-hand.md) | A person with an own permission sets the state of a plan by hand | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | approved |

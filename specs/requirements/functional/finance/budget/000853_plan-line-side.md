@@ -2,7 +2,7 @@
 id: "000853"
 title: The side of a Titel is a part of its plan line
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 tests:
