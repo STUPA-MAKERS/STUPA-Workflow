@@ -58,7 +58,9 @@ async def update_budget(budget_id: str, patch: S.BudgetNodeUpdate) -> dict:
     come from the flags of the flow states, not from the cost center.
     `decisionGremiumId` sets the deciding Gremium (null clears it; the node then
     inherits from its ancestors). An unknown Gremium gives 422
-    `decision_gremium_invalid`. Requires budget.structure.
+    `decision_gremium_invalid`, and an unknown `viewGremiumId` gives 422
+    `view_gremium_invalid`. A key that a sibling has gives 409 `budget_key_exists`.
+    Requires budget.structure.
     """
     return await api().patch(f"/budgets/{budget_id}", json=dump_patch(patch))
 

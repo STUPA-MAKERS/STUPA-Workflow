@@ -415,7 +415,7 @@ async def test_delete_gremium_ok() -> None:
     assert sess.committed == 1
     lock = str(sess.statements[0])
     assert "FROM gremium" in lock and "FOR UPDATE" in lock
-    board, cards, comments = (str(sess.statements[i]) for i in (3, 4, 5))
+    board, cards, comments = (str(sess.statements[i]) for i in (4, 5, 6))
     assert "FROM todo_board" in board and "FOR UPDATE" in board
     assert "FROM todo_card" in cards and "FOR UPDATE" in cards
     assert "ORDER BY todo_card.id" in cards
@@ -576,7 +576,7 @@ async def test_delete_gremium_locks_and_checks_everything_before_the_first_write
         ),
     ]
     assert all(loose.id not in call[1] for call in spy.calls if call[0] == "votes")
-    lock = str(sess.statements[6])
+    lock = str(sess.statements[7])
     assert "FOR UPDATE" in lock and "meeting.gremium_id" in lock
     assert "ORDER BY meeting.id" in lock
     assert row in sess.deleted

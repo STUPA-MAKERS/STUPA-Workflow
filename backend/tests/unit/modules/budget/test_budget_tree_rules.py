@@ -19,6 +19,7 @@ def test_is_valid_key() -> None:
     assert r.is_valid_key("800")
     assert not r.is_valid_key("VS-800")
     assert not r.is_valid_key("")
+    assert not r.is_valid_key("AB\n")
     assert r.is_valid_key("A" * r._KEY_MAX)
     assert not r.is_valid_key("A" * (r._KEY_MAX + 1))
 

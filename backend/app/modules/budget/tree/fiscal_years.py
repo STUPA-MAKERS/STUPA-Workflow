@@ -118,13 +118,14 @@ class FiscalYearOps(BudgetTreeServiceBase):
         dates. The active flag stays free: it only picks the default year.
 
         Raises:
+            NotFoundError: The fiscal year is not one of this budget (404).
             ConflictError: `fiscal_year_closed` (409) for a year change on a
                 closed fiscal year, `fiscal_year_has_plan` (409) for a year change
                 while the Haushaltsplan of the year has a version that left the draft.
         """
         await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
-        fy = await self._get_fiscal_year(fiscal_year_id)
+        fy = await self._own_fiscal_year(top, fiscal_year_id)
         provided = payload.model_dump(exclude_unset=True)
         new_year = provided.get("year", fy.year)
         if new_year != fy.year:

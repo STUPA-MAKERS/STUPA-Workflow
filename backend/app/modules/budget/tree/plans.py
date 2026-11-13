@@ -738,14 +738,16 @@ class PlanOps(NodeOps, AllocationOps):
         """Return the Haushaltsplan that holds a version, for a link from its vote.
 
         Raises:
-            NotFoundError: The version does not exist (404).
+            NotFoundError: The version does not exist (404). A version that a delete
+                takes away between the two reads counts as one that does not exist.
         """
-        version = await self.session.get(BudgetPlanVersion, version_id)
-        if version is None:
+        plan = await self.session.scalar(
+            select(BudgetPlan)
+            .join(BudgetPlanVersion, BudgetPlanVersion.plan_id == BudgetPlan.id)
+            .where(BudgetPlanVersion.id == version_id)
+        )
+        if plan is None:
             raise NotFoundError(f"plan version {version_id} not found")
-        plan = (
-            await self.session.scalars(select(BudgetPlan).where(BudgetPlan.id == version.plan_id))
-        ).one()
         fy = await self._get_fiscal_year(plan.fiscal_year_id)
         return await self._plan_out(plan, fy.budget_id)
 

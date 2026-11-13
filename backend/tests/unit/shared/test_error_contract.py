@@ -224,6 +224,7 @@ def test_a_text_that_the_database_refuses_is_a_422(sqlstate: str) -> None:
 
 
 def test_another_database_error_stays_a_bare_500() -> None:
+    """§S/shared/api/000843: each other error of the database stays a 500."""
     resp = _db_error_app("40P01").get("/write")
     assert resp.status_code == 500
     assert resp.json()["code"] == "internal_error"

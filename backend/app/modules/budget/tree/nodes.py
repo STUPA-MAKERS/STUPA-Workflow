@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import cast
+from typing import Literal, cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -146,20 +146,27 @@ class NodeOps(BudgetTreeServiceBase):
             "lowered": {str(bid): f"{total:.2f}" for bid, total in lowered.items()},
         }
 
-    async def _check_decision_gremium(self, gremium_id: UUID | None) -> None:
-        """Refuse a deciding Gremium that does not exist.
+    async def _check_gremium(
+        self, gremium_id: UUID | None, field: Literal["decisionGremiumId", "viewGremiumId"]
+    ) -> None:
+        """Refuse a deciding or a viewing Gremium that does not exist.
 
         Raises:
-            ValidationProblem: `decision_gremium_invalid` (422).
+            ValidationProblem: `decision_gremium_invalid` or `view_gremium_invalid`
+                (422).
         """
         if gremium_id is None:
             return
         found = await self.session.scalar(select(Gremium.id).where(Gremium.id == gremium_id))
         if found is None:
             raise ValidationProblem(
-                "decisionGremiumId is not the id of a Gremium.",
-                code="decision_gremium_invalid",
-                errors=[{"field": "decisionGremiumId", "msg": "unknown gremium"}],
+                f"{field} is not the id of a Gremium.",
+                code=(
+                    "decision_gremium_invalid"
+                    if field == "decisionGremiumId"
+                    else "view_gremium_invalid"
+                ),
+                errors=[{"field": field, "msg": "unknown gremium"}],
             )
 
     async def _decision_view(self, node: Budget) -> tuple[UUID | None, UUID | None]:
@@ -206,7 +213,7 @@ class NodeOps(BudgetTreeServiceBase):
                 f"budget key {payload.key!r} already exists under this parent",
                 code="budget_key_exists",
             )
-        await self._check_decision_gremium(payload.decision_gremium_id)
+        await self._check_gremium(payload.decision_gremium_id, "decisionGremiumId")
         direct = parent is not None and parent.parent_id is None
         if payload.side is not None and not direct:
             raise ValidationProblem(
@@ -293,7 +300,9 @@ class NodeOps(BudgetTreeServiceBase):
         new_key = dumped.get("key")
         provided = {field: value for field, value in dumped.items() if field != "key"}
         if "decision_gremium_id" in provided:
-            await self._check_decision_gremium(provided["decision_gremium_id"])
+            await self._check_gremium(provided["decision_gremium_id"], "decisionGremiumId")
+        if "view_gremium_id" in provided:
+            await self._check_gremium(provided["view_gremium_id"], "viewGremiumId")
         stichtag_changed = (
             "fiscal_start_month" in provided
             and provided["fiscal_start_month"] != node.fiscal_start_month
@@ -336,6 +345,11 @@ class NodeOps(BudgetTreeServiceBase):
 
         The descendants are fetched by path prefix before the node is renamed.
 
+        The flush comes before the audit entry. A request that takes the same key at
+        the same moment holds the unique index until its commit, and two top-level
+        budgets share no lock of a tree, so the wait for that index must not hold the
+        lock of the audit log.
+
         Raises:
             ValidationProblem: The new key segment is invalid (422).
             ConflictError: A sibling already uses the key (409).
@@ -368,6 +382,13 @@ class NodeOps(BudgetTreeServiceBase):
         node.path_key = new_path
         for d in descendants:
             d.path_key = new_path + d.path_key[len(old_path) :]
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            raise ConflictError(
+                f"budget key {new_key!r} already exists under this parent",
+                code="budget_key_exists",
+            ) from exc
 
     async def _plans_of_top(self, node: Budget) -> dict[str, object]:
         """Return the plans that go with a top-level budget, as audit data.

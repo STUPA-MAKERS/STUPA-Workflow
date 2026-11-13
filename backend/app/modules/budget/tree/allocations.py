@@ -49,7 +49,7 @@ class AllocationOps(BudgetTreeServiceBase):
             )
 
     async def _lock_budget(self, budget_id: UUID) -> None:
-        """Lock the budget row pessimistically (``SELECT … FOR UPDATE``).
+        """Lock the budget row pessimistically (``SELECT … FOR NO KEY UPDATE``).
 
         The lock serializes concurrent sibling allocations. They all lock the
         same parent row. Read-sum, validate and write then stay atomic, so no

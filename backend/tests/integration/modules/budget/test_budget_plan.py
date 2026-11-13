@@ -975,7 +975,7 @@ async def _decide(
 async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSession) -> None:
     """The step offers a vote of its Gremium, and the accepted vote passes it.
 
-    Rules: §F/finance/budget/000826, §F/finance/budget/000838.
+    Rules: §F/finance/budget/000826, §F/finance/budget/000838, §F/finance/budget/000802.
     """
     t = await _tree(session)
     gremium = await _gremium(session)
@@ -1023,6 +1023,7 @@ async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSes
         )
     ).one()
     assert asked_entry.data["voteId"] == str(step.vote_id)
+    assert (asked_entry.data["budget"], asked_entry.data["year"]) == (t.top.path_key, 2026)
 
     with pytest.raises(ValidationProblem) as no_gremium:
         await t.svc.create_step_vote(vid)
@@ -1573,6 +1574,12 @@ async def test_plan_entries_keep_the_names_of_what_they_change(session: AsyncSes
         ("rename", None),
         ("create_node", None),
         ("create_year", None),
+        ("step", "plan_no_step_left"),
+        ("step_vote", "plan_no_step_left"),
+        ("draft", "plan_state_invalid"),
+        ("plan_node", None),
+        ("delete_line", "plan_line_not_found"),
+        ("revert", None),
     ],
 )
 async def test_a_write_beside_a_plan_waits_for_the_lock_of_its_budget(
@@ -1588,11 +1595,33 @@ async def test_a_write_beside_a_plan_waits_for_the_lock_of_its_budget(
     """
     t = await _tree(session)
     vid = _version(await _draft(t)).id
+    await t.svc.update_node(t.exp_b.id, BudgetNodeUpdate(name="Arbeitskreise"))
+    renamed = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action == AuditAction.BUDGET_NODE_UPDATE.value)
+            .where(AuditEntry.target_id == str(t.exp_b.id))
+        )
+    ).one()
     await session.commit()
     maker = async_sessionmaker(session.bind, expire_on_commit=False)
 
     async def write_in(svc: BudgetTreeService) -> None:
         match write:
+            case "step":
+                await svc.pass_next_step(vid)
+            case "step_vote":
+                await svc.create_step_vote(vid)
+            case "draft":
+                await svc.set_plan_state(vid, PlanStateSet(state="draft"))
+            case "plan_node":
+                await svc.create_plan_node(
+                    vid, PlanNodeCreate(parentId=t.exp.id, key="9", name="Neu")
+                )
+            case "delete_line":
+                await svc.delete_line(vid, t.inc.id)
+            case "revert":
+                await svc.revert_audit(await svc.session.get_one(AuditEntry, renamed.id), "tester")
             case "delete_node":
                 await svc.delete_node(t.exp_b.id)
             case "close":
@@ -1887,3 +1916,135 @@ async def test_the_audit_log_names_a_plan_and_a_budget(session: AsyncSession) ->
     names = await log.resolve_data_ids([{"planId": str(plan.id), "budgetId": str(t.exp_a.id)}])
     assert names[str(t.exp_a.id)] == "Fachschaften"
     assert "2026" in names[str(plan.id)]
+
+
+async def test_a_kostenstelle_that_went_while_a_write_waited_is_not_found(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A write that waited for the lock while its Kostenstelle was deleted answers 404.
+
+    Rule: §F/finance/budget/000842.
+    """
+    t = await _tree(session, enabled=False)
+    lock = t.svc._lock_tree
+
+    async def node_goes(budget_id: uuid.UUID | None) -> None:
+        await lock(budget_id)
+        await session.execute(delete(Budget).where(Budget.id == t.exp_b.id))
+
+    monkeypatch.setattr(t.svc, "_lock_tree", node_goes)
+    with pytest.raises(NotFoundError):
+        await t.svc.update_node(t.exp_b.id, BudgetNodeUpdate(name="Weg"))
+    await session.rollback()
+    with pytest.raises(NotFoundError):
+        await t.svc.set_allocation(t.exp_b.id, t.fy.id, AllocationSet(allocated=D(1)))
+    await session.rollback()
+    with pytest.raises(NotFoundError):
+        await t.svc.create_node(BudgetNodeCreate(key="1", name="Kind", parentId=t.exp_b.id))
+
+
+async def test_a_key_that_another_request_holds_is_a_conflict(session: AsyncSession) -> None:
+    """Two top-level budgets that take one key at the same moment: one answers 409.
+
+    Two top-level budgets share no lock of a tree. The second request waits for the
+    unique index before its audit entry and then answers 409, not a 500.
+    Rules: §F/finance/budget/000246, §F/finance/budget/000842.
+    """
+    from sqlalchemy import update
+
+    one, two = await _tree(session, enabled=False), await _tree(session, enabled=False)
+    key = f"K{uuid.uuid4().hex[:8]}"
+    maker = async_sessionmaker(session.bind, expire_on_commit=False)
+
+    async def run() -> str | None:
+        async with maker() as other:
+            try:
+                await BudgetTreeService(other, actor="tester").update_node(
+                    two.top.id, BudgetNodeUpdate(key=key)
+                )
+            except AppError as refused:
+                return refused.code
+            return None
+
+    async with maker() as holder:
+        await holder.execute(
+            update(Budget).where(Budget.id == one.top.id).values(key=key, path_key=key)
+        )
+        task = asyncio.create_task(run())
+        await asyncio.sleep(0.3)
+        assert not task.done()
+        await holder.commit()
+    assert await asyncio.wait_for(task, 10) == "budget_key_exists"
+    with pytest.raises(ValidationProblem):
+        await one.svc.update_node(one.top.id, BudgetNodeUpdate(key="AB\n"))
+    with pytest.raises(ValidationProblem):
+        await one.svc.create_node(BudgetNodeCreate(key="AB\n", name="Zeilenende"))
+
+
+async def test_the_gremium_of_the_view_must_exist(session: AsyncSession) -> None:
+    """An unknown Gremium of the view answers 422, a Gremium is saved.
+
+    Rule: §F/finance/budget/000259.
+    """
+    t = await _tree(session, enabled=False)
+    gremium = await _gremium(session)
+    saved = await t.svc.update_node(t.exp.id, BudgetNodeUpdate(viewGremiumId=gremium))
+    assert saved.view_gremium_id == gremium
+    with pytest.raises(ValidationProblem) as unknown:
+        await t.svc.update_node(t.exp.id, BudgetNodeUpdate(viewGremiumId=uuid.uuid4()))
+    assert _code(unknown) == "view_gremium_invalid"
+    cleared = await t.svc.update_node(t.exp.id, BudgetNodeUpdate(viewGremiumId=None))
+    assert cleared.view_gremium_id is None
+
+
+async def test_a_year_changes_only_through_its_own_budget(session: AsyncSession) -> None:
+    """A fiscal year reached through another budget answers 404 and stays as it is.
+
+    Rule: §F/finance/budget/000845.
+    """
+    own, other = await _tree(session, enabled=False), await _tree(session, enabled=False)
+    with pytest.raises(NotFoundError):
+        await other.svc.update_fiscal_year(other.top.id, own.fy.id, FiscalYearUpdate(year=2040))
+    with pytest.raises(NotFoundError):
+        await other.svc.update_fiscal_year(
+            other.top.id, own.fy.id, FiscalYearUpdate(active=False)
+        )
+    with pytest.raises(NotFoundError):
+        await other.svc.set_fiscal_year_closed(other.top.id, own.fy.id, closed=True)
+    with pytest.raises(NotFoundError):
+        await other.svc.delete_fiscal_year(other.top.id, own.fy.id)
+    await session.rollback()
+    year = await session.get_one(FiscalYear, own.fy.id)
+    await session.refresh(year)
+    assert (year.year, year.active, year.closed_at) == (2026, own.fy.active, None)
+
+
+async def test_a_gremium_with_a_budget_is_not_deleted(session: AsyncSession) -> None:
+    """The delete of a Gremium with a budget answers 409, and the budget and its plan stay.
+
+    Rule: §F/finance/budget/000844.
+    """
+    from app.modules.admin.service import ConfigService
+
+    gremium = await _gremium(session)
+    svc = BudgetTreeService(session, actor="tester")
+    top = await svc.create_node(
+        BudgetNodeCreate(key=f"G{uuid.uuid4().hex[:8]}", name="Gremium", gremiumId=gremium)
+    )
+    exp = await svc.create_node(BudgetNodeCreate(key="8", name="Ausgaben", parentId=top.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    await svc.set_side(exp.id, "expense")
+    await svc.set_plan_switch(top.id, True)
+    await session.commit()
+    admin = Principal(sub="admin", roles=["admin"])
+    with pytest.raises(ConflictError) as refused:
+        await ConfigService(session).delete_gremium(gremium, admin)
+    assert _code(refused) == "gremium_has_budget"
+    await session.rollback()
+    assert (await svc.get_plan(top.id, fy.id)).fiscal_year_id == fy.id
+    assert await session.get(Budget, exp.id) is not None
+    await session.execute(delete(Budget).where(Budget.id == exp.id))
+    await session.execute(delete(Budget).where(Budget.id == top.id))
+    await session.commit()
+    await ConfigService(session).delete_gremium(gremium, admin)
+    assert await session.get(Gremium, gremium) is None

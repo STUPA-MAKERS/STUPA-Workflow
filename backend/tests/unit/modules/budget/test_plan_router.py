@@ -381,6 +381,18 @@ def test_the_node_schemas_refuse_what_they_cannot_store() -> None:
         PlanLineSet.model_validate({"transferable": "yes"})
 
 
+def test_an_amount_of_minus_zero_is_zero() -> None:
+    """An amount of "-0" has no sign in the answer and in the audit entry.
+
+    Rule: §F/finance/budget/000794.
+    """
+    from app.modules.budget.plan_schemas import PlanLineSet
+
+    line = PlanLineSet.model_validate({"amount": "-0", "blocked": "-0.00"})
+    assert (str(line.amount), str(line.blocked)) == ("0.00", "0.00")
+    assert str(PlanLineSet.model_validate({"amount": "7"}).amount) == "7.00"
+
+
 @pytest.mark.parametrize("name", ["​", " ​  ", "⁠﻿"])
 def test_a_name_needs_a_visible_character(name: str) -> None:
     """A name of zero-width characters is empty for a reader.

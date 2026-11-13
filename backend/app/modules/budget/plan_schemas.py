@@ -19,11 +19,12 @@ VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
 _CENT = Decimal("0.01")
 
 #: An amount of a plan line. The validator gives every amount two decimal places, so a
-#: response never shows "7" or "1E+3" for an amount that the database holds as 7.00.
+#: response never shows "7" or "1E+3" for an amount that the database holds as 7.00. It
+#: drops the sign of a negative zero, because the database holds 0.00 for "-0".
 Amount = Annotated[
     Decimal,
     Field(ge=0, le=MAX_AMOUNT, allow_inf_nan=False, decimal_places=2),
-    AfterValidator(lambda value: value.quantize(_CENT)),
+    AfterValidator(lambda value: abs(value.quantize(_CENT))),
 ]
 
 #: The name of a step, without blanks around it. A name of blanks only is empty.

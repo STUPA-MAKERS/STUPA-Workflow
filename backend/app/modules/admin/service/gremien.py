@@ -239,7 +239,10 @@ class GremiumOps(ConfigServiceBase):
         pre-check runs first, so no audit entry is written for a doomed delete. A
         gremium that decides a running vote (``application.vote_gremium_id``) is
         refused too, because the application would stay in its vote state without a
-        deciding gremium.
+        deciding gremium. A gremium that a budget belongs to is refused as well,
+        because ``budget.gremium_id`` is CASCADE: the delete would take the cost
+        centres, the bookings and the Haushaltsplan along without the rules of the
+        budget delete and without an audit entry for them.
 
         The to-do comment file rows are locked before the first audit entry, because
         ``finalize_scan`` of an infected file locks its row first and then waits for
@@ -260,8 +263,9 @@ class GremiumOps(ConfigServiceBase):
                 (``meeting_finalized``, 403).
             ConflictError: An application of this gremium or of one of its
                 application types still exists, the gremium decides the running vote of an
-                application (`gremium_decides_vote`), or a vote of the gremium
-                is open (`open_vote`) (409).
+                application (`gremium_decides_vote`), a budget belongs to the
+                gremium (`gremium_has_budget`), or a vote of the gremium is open
+                (`open_vote`) (409).
         """
         row = await self.session.scalar(
             select(Gremium)
@@ -297,6 +301,16 @@ class GremiumOps(ConfigServiceBase):
                 "The Gremium decides a running vote of an application. Move the "
                 "application out of its vote state first.",
                 code="gremium_decides_vote",
+            )
+        from app.modules.budget.tree_models import Budget
+
+        budget = await self.session.scalar(
+            select(Budget.id).where(Budget.gremium_id == gremium_id).limit(1)
+        )
+        if budget is not None:
+            raise ConflictError(
+                "A budget belongs to the Gremium. Delete the budget first.",
+                code="gremium_has_budget",
             )
         comment_ids = await self._lock_gremium_todos(gremium_id)
         files = FilesService(self.session, storage=self.storage)
