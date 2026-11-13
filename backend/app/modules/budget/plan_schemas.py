@@ -187,7 +187,7 @@ class PlanMeetingOut(FrozenCamelModel, frozen=True):
 
 
 class WaitingPlanOut(FrozenCamelModel, frozen=True):
-    """A plan version that waits for the decision of a Gremium, for an agenda."""
+    """A plan version that an agenda can take, for a decision or for a reading."""
 
     plan_version_id: UUID = Field(alias="planVersionId")
     budget_name: str = Field(alias="budgetName")
@@ -198,6 +198,8 @@ class WaitingPlanOut(FrozenCamelModel, frozen=True):
     step: str
     #: The title that the agenda item of the plan takes.
     title: str
+    #: A draft that an agenda takes for a reading, without a decision (spec 000876).
+    reading: bool = False
 
 
 class PlanVersionOut(FrozenCamelModel, frozen=True):

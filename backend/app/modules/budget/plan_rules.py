@@ -107,6 +107,10 @@ def vote_decides_next(steps: Sequence[Mapping[str, Any]], vote_id: str) -> bool:
     return index is not None and steps[index].get("voteId") == vote_id
 
 
+#: The step name of an agenda item that reads a draft, without a decision.
+READING = "Lesung"
+
+
 def step_title(budget: str, year: str, number: int, step: str) -> str:
     """Return the title of the agenda item of a step, such as `Haushaltsplan VS 2026: ...`.
 

@@ -326,6 +326,20 @@ class MediaService:
         if len(data) > self.max_document_bytes:
             raise PayloadTooLargeError(f"PDF exceeds {self.max_document_bytes} bytes.")
         await scan_or_raise(data, self.settings or get_settings())
+        return await self.add_document(data, filename)
+
+    async def add_document(self, data: bytes, filename: str | None) -> MarkdownDocumentOut:
+        """Check and store one PDF that the platform made itself, without a virus scan.
+
+        The protocol stores the PDF of a Haushaltsplan with this call (spec 000876).
+
+        Raises:
+            ServiceUnavailableError: The storage is off or failed (503).
+            UnsupportedMediaTypeError: No readable PDF (415).
+            PayloadTooLargeError: Over 100 pages (413).
+        """
+        if self.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
         checked = await self._checked(data)
         document_id = uuid.uuid4()
         row = MarkdownDocument(

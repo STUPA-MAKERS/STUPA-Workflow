@@ -296,7 +296,7 @@ async def test_finalize_renders_stores_and_mails() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
-        results=[result(proto), result(), result("a@x.de", "b@x.de"), result()],
+        results=[result(proto), result(), result(), result("a@x.de", "b@x.de"), result()],
     )
     out = await _service(
         session, storage=storage, typst=typst, mail_queue=mail
@@ -389,7 +389,7 @@ async def test_finalize_uploads_and_mails_only_after_commit() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
-        results=[result(proto), result(), result("a@x.de"), result()],
+        results=[result(proto), result(), result(), result("a@x.de"), result()],
     )
     await _service(
         session, storage=storage, typst=typst, mail_queue=mail
@@ -501,7 +501,7 @@ async def test_finalize_members_receive_without_extra_recipients() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),
+            result(proto), result(),
             result(),
             result("a@x.de", "b@x.de"),
         ],
@@ -661,7 +661,7 @@ async def test_finalize_from_rendering_completes() -> None:
     proto = _protocol(status="rendering")
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
-        results=[result(proto), result(), result("a@x.de"), result()],
+        results=[result(proto), result(), result(), result("a@x.de"), result()],
     )
     out = await _service(
         session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=FakeMailQueue()
@@ -682,7 +682,7 @@ async def test_finalize_recipients_union_members_plus_maillist() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium(recipients=["extra@y.de", "member@x.de"])},
         results=[
-            result(proto),
+            result(proto), result(),
             result(),
             result("member@x.de"),
         ],

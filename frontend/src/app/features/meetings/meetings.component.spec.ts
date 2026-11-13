@@ -1591,6 +1591,11 @@ describe('MeetingsComponent — methods', () => {
       expect(session.canAddVote(AGENDA_ITEM({ id: 't-x', applicationId: 'app-1' }) as never)).toBe(false);
       expect(session.canAddVote(AGENDA_ITEM({ id: 't-x', applicationId: null, planVersionId: 'pv-1' }) as never)).toBe(false);
       expect(session.canAddVote(AGENDA_ITEM({ id: 't-y', applicationId: null, planVersionId: 'pv-1' }) as never)).toBe(true);
+      expect(
+        session.canAddVote(
+          AGENDA_ITEM({ id: 't-y', applicationId: null, planVersionId: 'pv-1', planReading: true }) as never,
+        ),
+      ).toBe(false);
     });
 
     it('casts a ballot and records the local choice', async () => {

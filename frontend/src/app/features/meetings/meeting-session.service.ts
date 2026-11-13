@@ -443,8 +443,9 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  /** An application TOP and a plan TOP hold exactly one vote. A freetext TOP holds any number. */
+  /** An application TOP and a plan TOP hold exactly one vote, a draft plan for a reading none. A freetext TOP holds any number. */
   canAddVote(item: AgendaItem): boolean {
+    if (item.planReading) return false;
     return !(item.applicationId || item.planVersionId) || this.votesForTop(item.id).length === 0;
   }
 

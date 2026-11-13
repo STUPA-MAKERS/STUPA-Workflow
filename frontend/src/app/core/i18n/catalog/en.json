@@ -886,6 +886,7 @@
   "meetings.agenda.dialogTitle": "Add agenda item",
   "meetings.agenda.kind": "Kind of agenda item",
   "meetings.agenda.planSub": "Budget plan",
+  "meetings.agenda.planReadingSub": "Draft for a reading",
   "meetings.agenda.searchApplication": "Search application",
   "meetings.agenda.assignableLabel": "Assignable applications",
   "meetings.agenda.noAssignable": "No assignable applications",

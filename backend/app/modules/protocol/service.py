@@ -55,6 +55,7 @@ from app.modules.files.cd_resolver import (
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.service import MeetingService
+from app.modules.media.models import MarkdownDocument
 from app.modules.media.service import MediaService
 from app.modules.meetings.agenda_service import agenda_order, title_of
 from app.modules.meetings.keepers import agenda_positions, keeper_periods, principal_names
@@ -97,6 +98,7 @@ from app.modules.protocol.markdown import (
     top_time_note,
     votes_in_body,
 )
+from app.modules.protocol.plan_anlage import attach_plans, plan_reference, with_plan_reference
 from app.modules.protocol.public import (
     PublicAttendance,
     PublicDecision,
@@ -705,6 +707,9 @@ class ProtocolService:
 
         mail_public = await self._mails_public(protocol)
         gremium = await self.session.get(Gremium, protocol.gremium_id)
+        await attach_plans(
+            self.session, self.storage, self.typst, protocol.meeting_id, now.date()
+        )
         uploads, mail_pdf = (
             await self._render_both(protocol, mail_public=mail_public)
             if mail_public or bool(getattr(gremium, "protocols_public", False))
@@ -1282,7 +1287,9 @@ class ProtocolService:
         """Build the block of an agenda item from its body and its non-cancelled votes.
 
         A vote whose snippet is already in the body gets no second box, and a repeated
-        vote gets its mark line, in the body or below its own box.
+        vote gets its mark line, in the body or below its own box. An item of a
+        Haushaltsplan ends with the reference to the PDF of the plan, once the finalize
+        stored it (spec 000876).
         """
         stripped = item.body.strip() if item.body and item.body.strip() else ""
         raw = black_out(stripped) if public else stripped
@@ -1302,13 +1309,22 @@ class ProtocolService:
         body = replace_vote_blocks(raw, _election_pairs(views, tz)) if public else raw
         plain = [_snippet(view, "Beschlussfrage", public=public, tz=tz) for view in views]
         found = votes_in_body(body, plain)
-        marked = mark_vote_blocks(
+        voted = mark_vote_blocks(
             body,
             [
                 (snippet, marks[vote.id])
                 for vote, snippet, in_text in zip(votes, plain, found, strict=True)
                 if in_text and vote.id in marks
             ],
+        )
+        document_id = getattr(item, "plan_document_id", None)
+        document = (
+            await self.session.get(MarkdownDocument, document_id)
+            if document_id is not None
+            else None
+        )
+        marked = with_plan_reference(
+            voted, plan_reference(document.name, document.id) if document is not None else None
         )
         snippets = [
             f"{snippet}\n> {marks[vote.id]}" if vote.id in marks else snippet

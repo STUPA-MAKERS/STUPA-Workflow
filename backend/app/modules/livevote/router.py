@@ -15,13 +15,16 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, WebSocket
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
+from app.modules.budget.access import has_budget_read
 from app.modules.budget.plan_schemas import WaitingPlanOut
 from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
+from app.modules.gremien.gremium_roles import gremium_reader_ids
 from app.modules.livevote.broker import InMemoryBroker, MeetingBroker
 from app.modules.livevote.connection import (
     WS_FORBIDDEN,
@@ -844,6 +847,13 @@ async def list_assignable(
     return await agenda.assignable(meeting_id)
 
 
+async def _budget_scope(session: AsyncSession, principal: Principal) -> set[UUID] | None:
+    """Return the Gremien that give the person a view of budgets, or ``None`` for all."""
+    return (
+        None if has_budget_read(principal) else await gremium_reader_ids(session, principal.sub)
+    )
+
+
 @router.get(
     "/meetings/{meeting_id}/agenda/assignable-plans",
     response_model=list[WaitingPlanOut],
@@ -852,7 +862,10 @@ async def list_assignable(
 async def list_assignable_plans(
     meeting_id: UUID, agenda: AgendaDep, service: ServiceDep, principal: ReaderDep
 ) -> list[WaitingPlanOut]:
-    """The plan versions that wait for this Gremium and are not yet on the agenda.
+    """The plan versions that the agenda can take and that are not yet on it.
+
+    These are the versions that wait for this Gremium, and the drafts of the budgets
+    that the person can read, for a reading without a decision (spec 000876).
 
     Only a person who can edit the agenda reads them (403), because the list names
     plans that the Gremium did not see yet.
@@ -861,10 +874,10 @@ async def list_assignable_plans(
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
     on_agenda = {item.plan_version_id for item in await agenda.list(meeting_id)}
-    waiting = await BudgetTreeService(agenda.session, actor=principal.sub).waiting_plans(
-        meeting.gremium_id
-    )
-    return [plan for plan in waiting if plan.plan_version_id not in on_agenda]
+    budget = BudgetTreeService(agenda.session, actor=principal.sub)
+    waiting = await budget.waiting_plans(meeting.gremium_id)
+    drafts = await budget.reading_plans(await _budget_scope(agenda.session, principal))
+    return [plan for plan in (*waiting, *drafts) if plan.plan_version_id not in on_agenda]
 
 
 @router.post(
@@ -883,7 +896,8 @@ async def add_agenda_item(
     """Add an agenda item: an application, a free-text item, a to-do card or a plan.
 
     With ``planVersionId`` the version of the Haushaltsplan must wait for the decision
-    of the Gremium of the meeting (409 ``plan_step_not_waiting``); a second item of the
+    of the Gremium of the meeting (409 ``plan_step_not_waiting``), or be a draft of a
+    budget that the person can read (403), for a reading; a second item of the
     same version answers 409 ``plan_already_on_agenda``. The item takes the budget, the
     fiscal year, the version and the step as its title.
 
@@ -915,9 +929,10 @@ async def add_agenda_item(
         await publish_pings(todo_broker(request.app.state), todos.pings.drain())
         return await agenda.list(meeting_id)
     if payload.plan_version_id is not None:
-        plan = await BudgetTreeService(agenda.session, actor=principal.sub).waiting_plan(
-            payload.plan_version_id, meeting.gremium_id
-        )
+        budget = BudgetTreeService(agenda.session, actor=principal.sub)
+        plan = await budget.reading_plan(
+            payload.plan_version_id, await _budget_scope(agenda.session, principal)
+        ) or await budget.waiting_plan(payload.plan_version_id, meeting.gremium_id)
         await agenda.add_plan_in_tx(
             meeting_id,
             plan_version_id=plan.plan_version_id,

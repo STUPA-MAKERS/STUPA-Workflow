@@ -468,14 +468,15 @@ export class MeetingPageComponent {
 
   /**
    * "Beschlussfrage hinzufügen": an application item and the item of a
-   * Haushaltsplan hold one vote, free text any number.
+   * Haushaltsplan hold one vote, free text any number. A draft of a plan is on the agenda
+   * for a reading and takes no vote.
    * A planned meeting prepares the vote as a draft; so does a live meeting while another
    * vote is open (the dialog then only prepares).
    */
   protected readonly canAddVote = computed(() => {
     const m = this.meeting();
     const t = this.top();
-    if (!t || !m.canManageVotes || this.locked() || m.status === 'closed') return false;
+    if (!t || !m.canManageVotes || this.locked() || m.status === 'closed' || t.planReading) return false;
     return !(t.applicationId || t.planVersionId) || this.votes().length === 0;
   });
 

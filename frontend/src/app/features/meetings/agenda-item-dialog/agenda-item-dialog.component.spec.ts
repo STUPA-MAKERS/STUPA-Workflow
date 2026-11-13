@@ -156,6 +156,32 @@ describe('AgendaItemDialogComponent', () => {
     expect(added).toHaveBeenCalled();
   });
 
+  /** §F/finance/budget/000876: a draft is a row for a reading, and the row says so. */
+  it('lists a draft of a Haushaltsplan for a reading', async () => {
+    const { http, fixture, added } = await setup();
+    http.expectOne('/api/meetings/m-1/agenda/assignable-plans').flush([
+      {
+        planVersionId: 'pv-2',
+        budgetName: 'VS-Mittel',
+        fiscalYear: '2027',
+        number: 0,
+        step: 'Lesung',
+        title: 'Haushaltsplan VS-Mittel 2027: Lesung',
+        reading: true,
+      },
+    ]);
+    flushApps(http, fixture);
+    const rows = within(screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ })).getAllByRole('radio');
+    expect(rows[0]).toHaveAccessibleName(/Haushaltsplan VS-Mittel 2027: Lesung/);
+    expect(screen.getByText('Entwurf zur Lesung')).toBeInTheDocument();
+    await userEvent.click(rows[0]);
+    await userEvent.click(submitButton());
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ planVersionId: 'pv-2', nonPublic: false });
+    req.flush([]);
+    expect(added).toHaveBeenCalled();
+  });
+
   it('lists only the applications when the plans cannot be read', async () => {
     const { http, fixture } = await setup();
     http

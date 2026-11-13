@@ -108,6 +108,23 @@ class BudgetPlanStep(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
+class BudgetPlanVoteSnapshot(CreatedAtMixin, Base):
+    """The file of a plan version as it was when a vote on it opened (spec 000876).
+
+    ``document`` holds what the render service needs for the PDF: ``source``,
+    ``config`` and the file ``name``. The protocol of the meeting prints it as its
+    Anlage, so a change of the draft after a refused vote does not change the record.
+    The row has no key to the version, because it must outlive a deleted draft.
+    """
+
+    __tablename__ = "budget_plan_vote_snapshot"
+
+    vote_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("vote.id", ondelete="CASCADE"), primary_key=True
+    )
+    document: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
 class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
     """Ansatz of one cost center in one plan version.
 

@@ -183,7 +183,7 @@ export class AgendaItemDialogComponent {
     ...this.plans().map((p) => ({
       id: p.planVersionId,
       title: p.title,
-      sub: this.i18n.translate('meetings.agenda.planSub'),
+      sub: this.i18n.translate(p.reading ? 'meetings.agenda.planReadingSub' : 'meetings.agenda.planSub'),
       plan: true,
     })),
     ...this.assignable().map((a) => ({
