@@ -167,8 +167,9 @@ async def pass_plan_step(version_id: str, step: int | None = None) -> dict:
     `step` names the step that you mean, by its place in the list from 0. Give it, so
     a repeated call does not pass the step after it: the call then gives 409
     `plan_step_not_next`. The first step needs a version with a line (422
-    `plan_empty`) that is balanced (422 `plan_not_balanced`) and takes it out of the
-    draft. The call gives 409 `plan_step_has_vote` while the step has a vote that is
+    `plan_empty`) that is balanced (422 `plan_not_balanced`) and whose side sums the
+    platform can hold (422 `plan_amount_too_large`), and takes it out of the draft.
+    The call gives 409 `plan_step_has_vote` while the step has a vote that is
     not cancelled, 409 `plan_not_enabled` while the plan switch of the budget is off
     and 409 `fiscal_year_closed` for a closed year. Requires budget.structure.
     """

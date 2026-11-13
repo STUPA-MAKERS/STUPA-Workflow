@@ -529,6 +529,10 @@ async def test_a_side_sum_above_the_largest_amount_is_refused(session: AsyncSess
         await t.svc.set_line(vid, more.id, PlanLineSet(amount=D(1)))
     assert _code(at_line) == "plan_amount_too_large"
     await session.rollback()
+    with pytest.raises(ValidationProblem) as at_income:
+        await t.svc.set_line(vid, gain.id, PlanLineSet(amount=D(1)))
+    assert _code(at_income) == "plan_amount_too_large"
+    await session.rollback()
     await t.svc.set_line(vid, more.id, PlanLineSet(amount=D(0)))
     await t.svc.set_line(vid, gain.id, PlanLineSet(amount=D(0)))
     for node in (more, gain):

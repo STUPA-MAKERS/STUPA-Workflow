@@ -1186,7 +1186,8 @@ class PlanOps(NodeOps, AllocationOps):
             ConflictError: `plan_state_invalid` (409) for a version in force or
                 replaced, `plan_no_step_left` (409) when the version has no step that
                 is not passed.
-            ValidationProblem: `plan_empty` or `plan_not_balanced` (422) for a draft.
+            ValidationProblem: `plan_empty`, `plan_not_balanced` or
+                `plan_amount_too_large` (422) for a draft.
         """
         if version.state not in plan_rules.OPEN_STATES:
             raise ConflictError(
@@ -1219,7 +1220,8 @@ class PlanOps(NodeOps, AllocationOps):
                 hand while the step has a vote that is not cancelled,
                 `plan_step_not_next` (409) when `expected` names a step that is not
                 the next one, so two requests for one step pass one step.
-            ValidationProblem: `plan_not_balanced` (422) at the first step.
+            ValidationProblem: `plan_not_balanced` or `plan_amount_too_large` (422) at
+                the first step.
         """
         version, plan, fy, top = await self._version_context(version_id)
         steps, index = await self._open_step(version, top)
@@ -1284,8 +1286,8 @@ class PlanOps(NodeOps, AllocationOps):
             ConflictError: `fiscal_year_closed` (409), `plan_state_invalid` (409),
                 `plan_no_step_left` (409), `plan_step_vote_runs` (409) when the vote
                 of the step is a draft or open.
-            ValidationProblem: `plan_not_balanced` (422) for a draft,
-                `plan_step_no_gremium` (422) for a step without a Gremium.
+            ValidationProblem: `plan_not_balanced` or `plan_amount_too_large` (422) for
+                a draft, `plan_step_no_gremium` (422) for a step without a Gremium.
         """
         version, plan, fy, top = await self._version_context(version_id)
         steps, index = await self._open_step(version, top)
@@ -1396,8 +1398,8 @@ class PlanOps(NodeOps, AllocationOps):
         Raises:
             NotFoundError: The version does not exist (404).
             ConflictError: `fiscal_year_closed` (409), `plan_state_invalid` (409).
-            ValidationProblem: `plan_not_balanced` (422) for a draft that comes into
-                force, `plan_empty` (422) for a version without a line.
+            ValidationProblem: `plan_not_balanced` or `plan_amount_too_large` (422) for
+                a draft that comes into force, `plan_empty` (422) for a version without a line.
         """
         if payload.state == "draft":
             await VotingService(self.session).lock_for_plan_version(version_id)
@@ -1453,7 +1455,8 @@ class PlanOps(NodeOps, AllocationOps):
 
         Raises:
             ConflictError: `plan_state_invalid` (409).
-            ValidationProblem: `plan_not_balanced` or `plan_empty` (422).
+            ValidationProblem: `plan_not_balanced`, `plan_amount_too_large` or
+                `plan_empty` (422).
         """
         current = version.state
         if current not in plan_rules.OPEN_STATES:
