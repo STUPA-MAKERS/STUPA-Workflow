@@ -251,3 +251,14 @@
 .mdv .mdv__doc-pages::before {
   content: '· ';
 }
+// Very high contrast: every surface is the page colour, so the badge keeps the text colour
+// and shows its edge in that colour.
+:root[data-very-high-contrast='on'] .mdv .mdv__doc {
+  background: transparent;
+  border: 2px solid currentColor;
+}
+:root[data-very-high-contrast='on'] .mdv .mdv__doc-icon,
+:root[data-very-high-contrast='on'] .mdv .mdv__doc-kind,
+:root[data-very-high-contrast='on'] .mdv .mdv__doc-pages {
+  color: inherit;
+}
