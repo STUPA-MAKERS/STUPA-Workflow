@@ -7,13 +7,14 @@ request never accepts it. It appears in out DTOs only.
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, StringConstraints, model_validator
+from pydantic import AfterValidator, Field, StringConstraints, model_validator
 
 from app.modules.budget.plan_rules import Side
 from app.shared.paging import Page
@@ -25,8 +26,23 @@ from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 _MAX_AMOUNT = Decimal("9999999999.99")
 
 
+def visible_text(value: str) -> str:
+    """Refuse a text without a visible character.
+
+    A zero-width space is no blank for `strip`, so a name of such characters would
+    pass the length check and show as an empty name.
+    """
+    if all(unicodedata.category(char)[0] in "ZC" for char in value):
+        raise ValueError("the text has no visible character")
+    return value
+
+
 #: The name of a cost center, without blanks around it. A name of blanks only is empty.
-NodeName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+NodeName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
+    AfterValidator(visible_text),
+]
 
 #: The fields of `BudgetNodeUpdate` whose column holds no NULL.
 _REQUIRED_NODE_FIELDS = frozenset(

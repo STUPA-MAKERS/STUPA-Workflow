@@ -190,6 +190,28 @@ class BudgetTreeServiceBase:
         if fy is not None:
             self._refuse_closed(fy)
 
+    async def _lock_plans(self, top_id: UUID) -> None:
+        """Lock the row of a top-level budget for a write that a Haushaltsplan depends on.
+
+        Each write that changes a plan takes this lock first, and so does each write
+        beside it that a plan depends on: a fiscal year, a side, the steps, the plan
+        switch and the delete of a cost center. Two such writes on one budget then run
+        one after the other, and the second reads what the first left. The lock comes
+        before the lock of a plan row and before the audit entry, so no two writes
+        wait for each other.
+        """
+        await self.session.execute(
+            select(Budget.id).where(Budget.id == top_id).with_for_update(of=Budget)
+        )
+
+    async def _lock_plans_of(self, node: Budget) -> None:
+        """Take the lock of `_lock_plans` for the top-level budget of a node."""
+        await self.session.execute(
+            select(Budget.id)
+            .where(Budget.path_key == node.path_key.split(_SEP, 1)[0], Budget.parent_id.is_(None))
+            .with_for_update(of=Budget)
+        )
+
     async def _top_level(self, node: Budget) -> Budget:
         """Return the top-level budget of a node.
 

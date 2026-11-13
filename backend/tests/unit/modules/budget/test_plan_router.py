@@ -379,3 +379,21 @@ def test_the_node_schemas_refuse_what_they_cannot_store() -> None:
         BudgetNodeCreate.model_validate({"key": "1", "name": " "})
     with pytest.raises(ValidationError):
         PlanLineSet.model_validate({"transferable": "yes"})
+
+
+@pytest.mark.parametrize("name", ["​", " ​  ", "⁠﻿"])
+def test_a_name_needs_a_visible_character(name: str) -> None:
+    """A name of zero-width characters is empty for a reader.
+
+    Rules: §F/finance/budget/000823, §F/finance/budget/000831.
+    """
+    from pydantic import ValidationError
+
+    from app.modules.budget.plan_schemas import PlanStepIn
+    from app.modules.budget.tree_schemas import BudgetNodeUpdate
+
+    with pytest.raises(ValidationError):
+        PlanStepIn(name=name)
+    with pytest.raises(ValidationError):
+        BudgetNodeUpdate(name=name)
+    assert PlanStepIn(name=" Beschluss​ ").name == "Beschluss​"

@@ -275,7 +275,9 @@ class AuditLogService(AuditService):
             ),
         )
         plans = await self._plan_labels(by_type.get("budget_plan", frozenset()))
+        budgets = await self._budget_labels(by_type.get("budget", frozenset()))
         pairs = (
+            *((("budget", key), label) for key, label in budgets.items()),
             *((("budget_plan", key), label) for key, label in plans.items()),
             *((("application", str(i)), _application_title(data)) for i, data in applications),
             *_type_label_pairs(types, form_ids, type_ids),
@@ -289,6 +291,15 @@ class AuditLogService(AuditService):
             *((("site_config", str(i)), f"Version {version}") for i, version in site_configs),
         )
         return {key: label for key, label in pairs if label}
+
+    async def _budget_labels(self, budget_ids: frozenset[uuid.UUID]) -> dict[str, str]:
+        """Return the name of each cost center, by its id."""
+        from app.modules.budget.tree_models import Budget
+
+        rows = await self._rows_for(
+            budget_ids, select(Budget.id, Budget.name).where(Budget.id.in_(budget_ids))
+        )
+        return {str(budget_id): name for budget_id, name in rows}
 
     async def _plan_labels(self, plan_ids: frozenset[uuid.UUID]) -> dict[str, str]:
         """Return `<budget> <year>` for each Haushaltsplan, by its id."""
@@ -380,8 +391,10 @@ class AuditLogService(AuditService):
                 BudgetPlanVersion.id.in_(candidates)
             ),
         )
+        plans = await self._plan_labels(candidates)
         return _first_wins(
             (
+                *plans.items(),
                 *((str(i), version_name(number)) for i, number in versions),
                 *((str(i), _application_title(data)) for i, data in applications),
                 *((str(i), name) for rows in named for i, name in rows),

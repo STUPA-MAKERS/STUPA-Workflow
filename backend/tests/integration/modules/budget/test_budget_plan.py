@@ -7,6 +7,7 @@ guards of the allocation, the revert and the delete of a cost center.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -14,7 +15,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.audit.actions import AuditAction
@@ -1449,6 +1450,134 @@ async def test_an_income_side_takes_the_vermerke_off_the_draft_line(
         if ln.budget_id == t.exp_a.id
     )
     assert (line.transferable, line.coverable) == (False, False)
+    entry = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(
+                AuditEntry.action == AuditAction.BUDGET_SIDE_SET.value,
+                AuditEntry.target_id == str(t.exp.id),
+            )
+            .order_by(AuditEntry.id.desc())
+        )
+    ).first()
+    assert entry is not None
+    assert entry.data["clearedMarks"] == [
+        {
+            "versionId": str(vid),
+            "budgetId": str(t.exp_a.id),
+            "transferable": True,
+            "coverable": True,
+            "blocked": "0.00",
+        }
+    ]
+
+
+async def test_a_vermerk_of_a_decided_plan_keeps_the_side(session: AsyncSession) -> None:
+    """A Kostenstelle with a Vermerk in a decided version does not become income.
+
+    Rules: §F/finance/budget/000816, §F/finance/budget/000817.
+    """
+    t = await _tree(session)
+    vid = _version(await _draft(t)).id
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(transferable=True))
+    await t.svc.set_plan_state(vid, PlanStateSet(state="in_force"))
+    await session.commit()
+    with pytest.raises(ConflictError) as exc:
+        await t.svc.set_side(t.exp.id, "income")
+    assert _code(exc) == "side_in_plan"
+
+
+async def test_the_delete_of_a_budget_names_its_plans(session: AsyncSession) -> None:
+    """The audit entry of a deleted budget names each plan that goes with it.
+
+    Rule: §F/finance/budget/000802.
+    """
+    svc = BudgetTreeService(session, actor="tester")
+    top = await svc.create_node(BudgetNodeCreate(key=f"D{uuid.uuid4().hex[:8]}", name="Leer"))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    await svc.set_plan_switch(top.id, True)
+    await session.commit()
+    plan = await svc.get_plan(top.id, fy.id)
+    await svc.delete_node(top.id)
+    entry = (
+        await session.scalars(
+            select(AuditEntry).where(
+                AuditEntry.action == AuditAction.BUDGET_NODE_DELETE.value,
+                AuditEntry.target_id == str(top.id),
+            )
+        )
+    ).one()
+    assert entry.data["deletedPlans"] == [
+        {"planId": str(plan.id), "year": 2026, "versionIds": [str(plan.versions[0].id)]}
+    ]
+
+
+async def test_plan_entries_keep_the_names_of_what_they_change(session: AsyncSession) -> None:
+    """A plan entry names the budget, the year and the Kostenstelle, so it reads after a delete.
+
+    Rule: §F/finance/budget/000802.
+    """
+    t = await _tree(session)
+    vid = _version(await _draft(t)).id
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(5)))
+    await t.svc.delete_line(vid, t.exp_a.id)
+    await session.commit()
+    entries = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.action.like("budget_plan_%"))
+            .order_by(AuditEntry.id.desc())
+            .limit(3)
+        )
+    ).all()
+    removed, added, created = entries
+    assert (created.data["budget"], created.data["year"]) == (t.top.path_key, 2026)
+    assert (added.data["pathKey"], added.data["name"]) == (t.exp_a.path_key, "Fachschaften")
+    assert (removed.data["pathKey"], removed.data["amount"]) == (t.exp_a.path_key, None)
+
+
+@pytest.mark.parametrize("write", ["delete_node", "close", "side", "steps", "step", "year"])
+async def test_a_write_beside_a_plan_waits_for_the_lock_of_its_budget(
+    session: AsyncSession, write: str
+) -> None:
+    """Each write that a plan depends on takes the lock of the top-level budget first.
+
+    Two such writes at the same moment then run one after the other, and none ends in
+    a deadlock or in a state that the rules forbid.
+    Rules: §F/finance/budget/000793, §F/finance/budget/000801, §F/finance/budget/000820.
+    """
+    t = await _tree(session)
+    vid = _version(await _draft(t)).id
+    await session.commit()
+    maker = async_sessionmaker(session.bind, expire_on_commit=False)
+
+    async def run() -> None:
+        async with maker() as other:
+            svc = BudgetTreeService(other, actor="tester")
+            match write:
+                case "delete_node":
+                    await svc.delete_node(t.exp_b.id)
+                case "close":
+                    await svc.set_fiscal_year_closed(t.top.id, t.fy.id, closed=True)
+                case "side":
+                    await svc.set_side(t.exp.id, "expense")
+                case "steps":
+                    await svc.set_plan_steps(t.top.id, PlanStepsSet(steps=()))
+                case "step":
+                    await svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(1)))
+                case _:
+                    await svc.update_fiscal_year(t.top.id, t.fy.id, FiscalYearUpdate(year=2031))
+            await other.commit()
+
+    async with maker() as holder:
+        await holder.execute(
+            select(Budget.id).where(Budget.id == t.top.id).with_for_update()
+        )
+        task = asyncio.create_task(run())
+        await asyncio.sleep(0.3)
+        assert not task.done()
+        await holder.commit()
+    await asyncio.wait_for(task, 10)
 
 
 async def test_deletes_name_the_plan_data_that_goes_with_them(session: AsyncSession) -> None:
@@ -1513,7 +1642,7 @@ async def test_a_key_taken_at_the_same_moment_is_a_conflict(
 ) -> None:
     """A key that another request took after the read answers 409, not a 500.
 
-    Rule: §F/finance/budget/000828.
+    Rules: §F/finance/budget/000246, §F/finance/budget/000817.
     """
     t = await _tree(session)
     vid = _version(await _draft(t)).id
@@ -1559,3 +1688,24 @@ async def test_the_preview_counts_with_sides_that_are_not_saved(session: AsyncSe
         await session.scalars(select(Budget.side).where(Budget.id.in_([t.inc.id, t.exp.id])))
     ).all()
     assert list(sides) == [None, None]
+
+
+async def test_a_plan_that_went_while_a_write_waited_is_not_found(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A write that waited for the lock while its plan was deleted answers 404.
+
+    Rule: §F/finance/budget/000793.
+    """
+    t = await _tree(session)
+    plan = await _draft(t)
+    vid = _version(plan).id
+    await session.commit()
+    await t.svc._lock_top_of_plan(uuid.uuid4())
+
+    async def plan_goes(plan_id: uuid.UUID) -> None:
+        await session.execute(delete(BudgetPlan).where(BudgetPlan.id == plan_id))
+
+    monkeypatch.setattr(t.svc, "_lock_top_of_plan", plan_goes)
+    with pytest.raises(NotFoundError):
+        await t.svc.set_line(vid, t.inc.id, PlanLineSet(amount=D(1)))

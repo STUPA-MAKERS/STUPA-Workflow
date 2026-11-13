@@ -61,6 +61,7 @@ from app.shared.errors import (
     UnsupportedMediaTypeError,
     ValidationProblem,
 )
+from tests._support.auth_fakes import is_plan_lock
 from tests._support.identity_rows import sub_ref
 
 
@@ -121,8 +122,17 @@ class _Session:
         text = str(stmt).lower()
         return "pg_advisory_xact_lock" in text or "audit_entry" in text
 
+    @staticmethod
+    def _is_plan_lock(stmt: Any) -> bool:
+        """Report whether a statement is the lock of the plans of a budget.
+
+        The stub holds no row to lock, and the lock returns nothing that the service
+        reads, so the test queue leaves it out.
+        """
+        return is_plan_lock(stmt)
+
     async def execute(self, stmt: Any) -> _R:
-        if self._is_audit_stmt(stmt):
+        if self._is_audit_stmt(stmt) or self._is_plan_lock(stmt):
             return _R()
         return self._results.pop(0) if self._results else _R()
 

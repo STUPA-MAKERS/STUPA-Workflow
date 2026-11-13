@@ -22,7 +22,7 @@ from app.modules.budget.tree.service_base import (
     _json_safe,
     _subtree_ids,
 )
-from app.modules.budget.tree_models import Budget, BudgetExpense
+from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import BudgetNodeCreate, BudgetNodeOut, BudgetNodeUpdate
 from app.modules.gremien.models import Gremium
@@ -367,6 +367,33 @@ class NodeOps(BudgetTreeServiceBase):
         for d in descendants:
             d.path_key = new_path + d.path_key[len(old_path) :]
 
+    async def _plans_of_top(self, node: Budget) -> dict[str, object]:
+        """Return the plans that go with a top-level budget, as audit data.
+
+        The delete of a budget takes its fiscal years and their plans along by the
+        foreign key, so the entry names each plan with its year and its versions.
+        """
+        if node.parent_id is not None:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(BudgetPlan.id, FiscalYear.year, BudgetPlanVersion.id)
+                .join(FiscalYear, FiscalYear.id == BudgetPlan.fiscal_year_id)
+                .join(BudgetPlanVersion, BudgetPlanVersion.plan_id == BudgetPlan.id)
+                .where(FiscalYear.budget_id == node.id)
+                .order_by(FiscalYear.year, BudgetPlanVersion.number)
+            )
+        ).all()
+        plans = {
+            plan_id: {
+                "planId": str(plan_id),
+                "year": year,
+                "versionIds": [str(v) for p, _y, v in rows if p == plan_id],
+            }
+            for plan_id, year, _version in rows
+        }
+        return {"deletedPlans": list(plans.values())} if plans else {}
+
     async def delete_node(self, budget_id: UUID) -> None:
         """Delete a cost center.
 
@@ -380,6 +407,7 @@ class NodeOps(BudgetTreeServiceBase):
         the row, and no separate action removes an allocation.
         """
         node = await self._get_node(budget_id)
+        await self._lock_plans_of(node)
         child = (
             await self.session.execute(
                 select(Budget.id).where(Budget.parent_id == budget_id).limit(1)
@@ -428,7 +456,12 @@ class NodeOps(BudgetTreeServiceBase):
             AuditAction.BUDGET_NODE_DELETE,
             target_type="budget",
             target_id=str(budget_id),
-            data={"pathKey": node.path_key, "name": node.name, "draftLines": left},
+            data={
+                "pathKey": node.path_key,
+                "name": node.name,
+                "draftLines": left,
+                **await self._plans_of_top(node),
+            },
         )
         await self.session.delete(node)
         await self.session.commit()

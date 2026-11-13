@@ -133,7 +133,8 @@ async def set_plan_line(version_id: str, budget_id: str, line: S.PlanLineSet) ->
     A field that you leave out keeps its value. A line makes the cost center part of
     the plan of that year. A cost center with a child line holds the sum of its
     children. The first child line of a parent takes the Ansatz of the parent when you
-    give no amount above 0. Requires budget.structure.
+    give no amount above 0. The call gives 422 `plan_amount_too_large` when a sum of
+    Ansätze passes 9,999,999,999.99. Requires budget.structure.
     """
     return await api().put(
         f"/budget-plan-versions/{version_id}/lines/{budget_id}", json=dump_patch(line)

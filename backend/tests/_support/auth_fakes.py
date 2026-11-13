@@ -33,6 +33,15 @@ class FakeResult:
         return self._items[0] if self._items else None
 
 
+def is_plan_lock(stmt: Any) -> bool:
+    """Report whether a statement is the lock of the plans of a budget.
+
+    Only that lock names its table (`FOR UPDATE OF`). The generic SQL text leaves the
+    `OF` out, so the check reads the lock argument of the statement.
+    """
+    return bool(getattr(getattr(stmt, "_for_update_arg", None), "of", None))
+
+
 class FakeSession:
     """Stub for `AsyncSession` that returns the queued results in order.
 
@@ -53,7 +62,12 @@ class FakeSession:
         self.rolled_back = 0
 
     async def execute(self, _stmt: Any) -> FakeResult:
-        if not self._results:
+        """Serve the next queued result.
+
+        The lock of the plans of a budget (`FOR UPDATE OF`) takes none: the fake
+        holds no row to lock, and the service reads nothing from that statement.
+        """
+        if not self._results or is_plan_lock(_stmt):
             return FakeResult()
         return self._results.pop(0)
 

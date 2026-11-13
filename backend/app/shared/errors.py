@@ -323,18 +323,20 @@ async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
     return _problem_response(problem, extra)
 
 
-#: SQLSTATE `character_not_in_repertoire`: Postgres refuses a text with a NUL character.
-_SQLSTATE_BAD_TEXT = "22021"
+#: SQLSTATE `character_not_in_repertoire` and `untranslatable_character`: Postgres refuses
+#: a NUL character in a text column and in a JSONB column.
+_SQLSTATES_BAD_TEXT = frozenset({"22021", "22P05"})
 
 
 async def _db_error_handler(request: Request, exc: DBAPIError) -> JSONResponse:
     """Answer 422 for a text that the database cannot hold, else the bare 500.
 
     A NUL character passes the JSON parser and the length checks, and only Postgres
-    refuses it. That is an input error of the caller, not a fault of the server.
+    refuses it: 22021 in a text column and 22P05 in a JSONB column, which the audit
+    entry of a write is. That is an input error of the caller, not a fault of the server.
     """
     state = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
-    if state == _SQLSTATE_BAD_TEXT:
+    if state in _SQLSTATES_BAD_TEXT:
         return _validation_problem(
             request,
             detail="A text holds a character that cannot be stored.",

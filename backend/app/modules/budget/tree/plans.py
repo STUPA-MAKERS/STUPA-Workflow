@@ -15,7 +15,7 @@ from decimal import Decimal
 from typing import Any, assert_never, cast
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import ColumnElement, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.audit.actions import AuditAction
@@ -225,17 +225,30 @@ class PlanOps(NodeOps, AllocationOps):
         version = await self.session.get(BudgetPlanVersion, version_id)
         if version is None:
             raise NotFoundError(f"plan version {version_id} not found")
+        await self._lock_top_of_plan(version.plan_id)
         plan = (
             await self.session.scalars(
                 select(BudgetPlan).where(BudgetPlan.id == version.plan_id).with_for_update()
             )
-        ).one()
+        ).one_or_none()
+        if plan is None:
+            raise NotFoundError(f"plan version {version_id} not found")
         await self.session.refresh(version)
         fy = await self._get_fiscal_year(plan.fiscal_year_id)
         self._refuse_closed(fy)
         top = await self._get_node(fy.budget_id)
         self._require_enabled(top)
         return version, plan, fy, top
+
+    async def _lock_top_of_plan(self, plan_id: UUID) -> None:
+        """Lock the top-level budget of a plan, when the plan still exists."""
+        top_id = await self.session.scalar(
+            select(FiscalYear.budget_id)
+            .join(BudgetPlan, BudgetPlan.fiscal_year_id == FiscalYear.id)
+            .where(BudgetPlan.id == plan_id)
+        )
+        if top_id is not None:
+            await self._lock_plans(top_id)
 
     @staticmethod
     def _require_enabled(top: Budget) -> None:
@@ -287,6 +300,7 @@ class PlanOps(NodeOps, AllocationOps):
                 (422) for a Gremium that does not exist.
             ConflictError: `plan_not_enabled` (409) when the plan switch is off.
         """
+        await self._lock_plans(budget_id)
         top = await self._plan_top(budget_id, "The plan steps belong")
         self._require_enabled(top)
         wanted = {step.gremium_id for step in payload.steps if step.gremium_id is not None}
@@ -352,6 +366,7 @@ class PlanOps(NodeOps, AllocationOps):
                 code="side_not_settable",
                 errors=[{"field": "budgetId", "msg": "not a direct child of the top level"}],
             )
+        await self._lock_plans(parent.id)
         subtree = await self._subtree(node)
         planned = await self.session.scalar(
             select(func.count())
@@ -382,35 +397,91 @@ class PlanOps(NodeOps, AllocationOps):
                 "A closed fiscal year plans this cost centre. The side cannot change.",
                 code="fiscal_year_closed",
             )
+        ids = [n.id for n in subtree]
+        if side == "income" and node.side != side and await self._decided_marks(ids):
+            raise ConflictError(
+                "A decided plan holds a Vermerk of this cost centre. The side cannot change.",
+                code="side_in_plan",
+            )
         before = node.side
         for member in subtree:
             member.side = side
-        if side == "income":
-            await self._clear_marks([n.id for n in subtree])
+        cleared = await self._clear_marks(ids) if side == "income" else []
         await self._audit(
             AuditAction.BUDGET_SIDE_SET,
             target_type="budget",
             target_id=str(node.id),
-            data={"pathKey": node.path_key, "before": before, "after": side},
+            data={
+                "pathKey": node.path_key,
+                "before": before,
+                "after": side,
+                "clearedMarks": cleared,
+            },
         )
         return SideOut(budgetId=node.id, side=side)
 
-    async def _clear_marks(self, budget_ids: list[UUID]) -> None:
+    @staticmethod
+    def _marked() -> ColumnElement[bool]:
+        """The condition of a line that holds a Vermerk or a gesperrt amount."""
+        return or_(
+            BudgetPlanLine.transferable.is_(True),
+            BudgetPlanLine.coverable.is_(True),
+            BudgetPlanLine.blocked > 0,
+        )
+
+    async def _decided_marks(self, budget_ids: list[UUID]) -> bool:
+        """Say if a version that left the draft holds a Vermerk of these cost centers.
+
+        A decided line does not change, and an income line holds no Vermerk, so such
+        a cost center keeps its side.
+        """
+        found = await self.session.scalar(
+            select(BudgetPlanLine.id)
+            .join(BudgetPlanVersion, BudgetPlanVersion.id == BudgetPlanLine.version_id)
+            .where(
+                BudgetPlanLine.budget_id.in_(budget_ids),
+                BudgetPlanVersion.state != "draft",
+                self._marked(),
+            )
+            .limit(1)
+        )
+        return found is not None
+
+    async def _clear_marks(self, budget_ids: list[UUID]) -> list[dict[str, object]]:
         """Take the Vermerke off the draft lines of cost centers that become income.
 
         Only an expense line holds a Vermerk. The lines have an Ansatz of 0, so the
-        sums of the draft stay.
+        sums of the draft stay. The return value names each line and what it held,
+        for the audit entry.
         """
+        lines = (
+            await self.session.scalars(
+                select(BudgetPlanLine)
+                .join(BudgetPlanVersion, BudgetPlanVersion.id == BudgetPlanLine.version_id)
+                .where(
+                    BudgetPlanLine.budget_id.in_(budget_ids),
+                    BudgetPlanVersion.state == "draft",
+                    self._marked(),
+                )
+                .order_by(BudgetPlanLine.version_id, BudgetPlanLine.budget_id)
+            )
+        ).all()
+        cleared: list[dict[str, object]] = [
+            {
+                "versionId": str(line.version_id),
+                "budgetId": str(line.budget_id),
+                "transferable": line.transferable,
+                "coverable": line.coverable,
+                "blocked": str(line.blocked),
+            }
+            for line in lines
+        ]
         await self.session.execute(
             update(BudgetPlanLine)
-            .where(
-                BudgetPlanLine.budget_id.in_(budget_ids),
-                BudgetPlanLine.version_id.in_(
-                    select(BudgetPlanVersion.id).where(BudgetPlanVersion.state == "draft")
-                ),
-            )
+            .where(BudgetPlanLine.id.in_([line.id for line in lines]))
             .values(transferable=False, coverable=False, blocked=Decimal("0.00"))
         )
+        return cleared
 
     async def _stammplan_figures(
         self, top: Budget, nodes: list[Budget], fy: FiscalYear
@@ -511,10 +582,10 @@ class PlanOps(NodeOps, AllocationOps):
                 `plan_switch_has_plans` (409) when the switch goes off and a plan has
                 a decision, a draft or a closed fiscal year.
         """
+        await self._lock_plans(budget_id)
         top = await self._plan_top(budget_id, "The plan switch belongs")
         if bool(top.plan_enabled) == enabled:
             return PlanSwitchOut(budgetId=top.id, planEnabled=enabled)
-        await self._lock_budget(top.id)
         touched = await (
             self._switch_on(top, confirm_changes=confirm_changes)
             if enabled
@@ -666,10 +737,10 @@ class PlanOps(NodeOps, AllocationOps):
             ValidationProblem: `plan_copy_source_invalid` (422) when the source year
                 has no version in force or belongs to a different top-level node.
         """
+        await self._lock_plans(budget_id)
         top, fy = await self._plan_year(budget_id, fiscal_year_id)
         self._require_enabled(top)
         self._refuse_closed(fy)
-        await self._lock_budget(top.id)
         if await self.plan_exists(fy.id):
             raise ConflictError("This fiscal year has a Haushaltsplan.", code="plan_exists")
         source = (
@@ -737,6 +808,16 @@ class PlanOps(NodeOps, AllocationOps):
         self.session.add_all(copies)
         return version
 
+    async def _plan_names(self, plan: BudgetPlan) -> dict[str, object]:
+        """Return the path key of the budget and the year of a plan, as audit data.
+
+        An entry keeps them, because the ids of a plan that is deleted later resolve
+        to no name.
+        """
+        fy = await self._get_fiscal_year(plan.fiscal_year_id)
+        top = await self._get_node(fy.budget_id)
+        return {"budget": top.path_key, "year": fy.year}
+
     async def _audit_version(
         self, plan: BudgetPlan, version: BudgetPlanVersion, *, copied_from: UUID | None = None
     ) -> None:
@@ -745,6 +826,7 @@ class PlanOps(NodeOps, AllocationOps):
             target_type="budget_plan",
             target_id=str(plan.id),
             data={
+                **await self._plan_names(plan),
                 "fiscalYearId": str(plan.fiscal_year_id),
                 "versionId": str(version.id),
                 "number": version.number,
@@ -761,10 +843,10 @@ class PlanOps(NodeOps, AllocationOps):
                 a version before `in_force` exists, `plan_not_in_force` (409) when no
                 version is in force.
         """
+        await self._lock_plans(budget_id)
         top, fy = await self._plan_year(budget_id, fiscal_year_id)
         self._require_enabled(top)
         self._refuse_closed(fy)
-        await self._lock_budget(top.id)
         plan = await self._plan_of(fy.id)
         if plan is None:
             raise NotFoundError("This fiscal year has no Haushaltsplan.", code="plan_not_found")
@@ -851,6 +933,8 @@ class PlanOps(NodeOps, AllocationOps):
                 "versionId": str(version.id),
                 "number": version.number,
                 "budgetId": str(node.id),
+                "pathKey": node.path_key,
+                "name": node.name,
                 "amount": str(amount),
                 "previousAmount": before,
                 "note": wanted.note,
@@ -985,6 +1069,12 @@ class PlanOps(NodeOps, AllocationOps):
                 "versionId": str(version.id),
                 "number": version.number,
                 "budgetId": str(budget_id),
+                **{
+                    key: value
+                    for n in nodes
+                    if n.id == budget_id
+                    for key, value in (("pathKey", n.path_key), ("name", n.name))
+                },
                 "amount": None,
                 "previousAmount": str(line.amount),
                 "raised": {str(k): str(v) for k, v in raised.items()},
@@ -1213,6 +1303,7 @@ class PlanOps(NodeOps, AllocationOps):
         version = await self.session.get(BudgetPlanVersion, version_id)
         if version is None:
             return None
+        await self._lock_top_of_plan(version.plan_id)
         await self.session.scalars(
             select(BudgetPlan.id).where(BudgetPlan.id == version.plan_id).with_for_update()
         )
@@ -1360,7 +1451,7 @@ class PlanOps(NodeOps, AllocationOps):
             ConflictError: `fiscal_year_closed` (409), `plan_not_enabled` (409),
                 `plan_version_locked` (409) for a version that is not a draft.
         """
-        version, plan, fy, _top = await self._version_context(version_id)
+        version, plan, fy, top = await self._version_context(version_id)
         if version.state != "draft":
             raise ConflictError(
                 "Only a draft version can be deleted.", code="plan_version_locked"
@@ -1371,6 +1462,8 @@ class PlanOps(NodeOps, AllocationOps):
             target_type="budget_plan",
             target_id=str(plan.id),
             data={
+                "budget": top.path_key,
+                "year": fy.year,
                 "fiscalYearId": str(fy.id),
                 "versionId": str(version.id),
                 "number": version.number,

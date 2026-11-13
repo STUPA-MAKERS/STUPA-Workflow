@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import AfterValidator, Field, StrictBool, StringConstraints
 
 from app.modules.budget.plan_rules import MAX_AMOUNT, MAX_STEPS, PlanState, PlanTarget, Side
-from app.modules.budget.tree_schemas import NodeName
+from app.modules.budget.tree_schemas import NodeName, visible_text
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 VoteStatus = Literal["draft", "open", "closed", "cancelled"]
@@ -27,7 +27,11 @@ Amount = Annotated[
 ]
 
 #: The name of a step, without blanks around it. A name of blanks only is empty.
-StepName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+StepName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=120),
+    AfterValidator(visible_text),
+]
 
 
 class SideSet(FrozenStrictCamelModel, frozen=True):

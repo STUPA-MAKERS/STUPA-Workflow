@@ -214,9 +214,10 @@ def _db_error_app(sqlstate: str) -> TestClient:
     return TestClient(app, raise_server_exceptions=False)
 
 
-def test_a_text_that_the_database_refuses_is_a_422() -> None:
-    """A NUL character in a text is an input error of the caller, not a 500."""
-    resp = _db_error_app("22021").get("/write")
+@pytest.mark.parametrize("sqlstate", ["22021", "22P05"])
+def test_a_text_that_the_database_refuses_is_a_422(sqlstate: str) -> None:
+    """A NUL character in a text or in a JSONB value is an input error, not a 500."""
+    resp = _db_error_app(sqlstate).get("/write")
     assert resp.status_code == 422
     assert resp.headers["content-type"].startswith("application/problem+json")
     assert resp.json()["code"] == "validation_error"
