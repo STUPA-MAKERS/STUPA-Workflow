@@ -1915,6 +1915,9 @@ class VotingService:
     async def _take_plan_step(self, vote: Vote, actor: str | None) -> None:
         """Bind a plan vote that opens to the step that waits for its Gremium.
 
+        The open also keeps the file of the plan as it is now, because the protocol of
+        the meeting shows the plan that the Gremium decided on (spec 000876).
+
         Raises:
             ConflictError: The vote has no meeting or the plan does not wait for the
                 Gremium of the vote (``plan_step_not_waiting``), or another vote of
@@ -1930,9 +1933,9 @@ class VotingService:
             )
         from app.modules.budget.tree.service import BudgetTreeService
 
-        await BudgetTreeService(self.session, actor=actor).take_step_vote(
-            plan_version_id, vote.id, UUID(vote.eligible_group)
-        )
+        budget = BudgetTreeService(self.session, actor=actor)
+        await budget.take_step_vote(plan_version_id, vote.id, UUID(vote.eligible_group))
+        await budget.keep_vote_snapshot(plan_version_id, vote.id, datetime.now(UTC).date())
 
     async def lock_for_plan_version(self, plan_version_id: UUID) -> None:
         """Lock the draft and open votes of a plan version, before its plan row.

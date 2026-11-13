@@ -56,7 +56,13 @@ from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
 from app.shared.config_schemas import VoteConfig
-from app.shared.errors import AppError, ConflictError, NotFoundError, ValidationProblem
+from app.shared.errors import (
+    AppError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationProblem,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -1299,6 +1305,85 @@ async def _decide(
         vote_id, Principal(sub="v1", groups={vote_group_key(gremium)}), choice, now=now
     )
     await voting.close(vote_id, Principal(sub="mgr", roles=["admin"]))
+
+
+async def test_the_open_of_a_vote_keeps_the_file_of_the_plan(session: AsyncSession) -> None:
+    """The protocol gets the plan as the vote saw it, also after a change or a delete.
+
+    Rule: §F/finance/budget/000876.
+    """
+    today = date(2026, 11, 13)
+    t = await _tree(session)
+    gremium = await _gremium(session)
+    await _steps(t, "Beschluss", gremium_id=gremium)
+    vid = _version(await _balanced_draft(t)).id
+    live = await t.svc.plan_file_for_protocol(vid, (), today)
+    assert live is not None
+    assert (live.name, live.config["plan"]["mark"]) == (  # type: ignore[index]
+        "Haushaltsplan_VS-Mittel_2026_Entwurf.pdf", "Entwurf",
+    )
+    assert await t.svc.plan_file_for_protocol(None, (), today) is None
+
+    vote_id = await _ask(session, t, vid, gremium)
+    await _decide(session, vote_id, gremium, "no")
+    await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D("11.11")))
+    await session.commit()
+    kept = await t.svc.plan_file_for_protocol(vid, (vote_id, uuid.uuid4()), today)
+    now = await t.svc.plan_file_for_protocol(vid, (), today)
+    assert kept is not None and now is not None
+    assert kept.name == "Haushaltsplan_VS-Mittel_2026.pdf"
+    assert "60,00" in str(kept.config) and "11,11" not in str(kept.config)
+    assert "Beschluss" in str(kept.config["plan"])
+    assert "11,11" in str(now.config)
+    assert kept.source.startswith("---")
+
+    await t.svc.keep_vote_snapshot(vid, vote_id, today)
+    await session.commit()
+    again = await t.svc.plan_file_for_protocol(vid, (vote_id,), today)
+    assert again is not None and "11,11" in str(again.config)
+    gone = await t.svc.plan_file_for_protocol(None, (vote_id,), today)
+    assert gone is not None and gone.name == again.name
+
+
+async def test_a_reader_gets_the_drafts_for_a_reading(session: AsyncSession) -> None:
+    """An agenda offers the drafts that its Gremium decides and that the person can read.
+
+    Rule: §F/finance/budget/000876.
+    """
+    t = await _tree(session)
+    other = await _tree(session)
+    foreign = await _tree(session)
+    gremium = await _gremium(session)
+    await _steps(t, "Beschluss", gremium_id=gremium)
+    await _steps(other, "Beschluss", gremium_id=gremium)
+    top = await session.get(Budget, t.top.id)
+    assert top is not None
+    top.view_gremium_id = gremium
+    await session.commit()
+    vid = _version(await t.svc.get_plan(t.top.id, t.fy.id)).id
+    other_vid = _version(await other.svc.get_plan(other.top.id, other.fy.id)).id
+    foreign_vid = _version(await foreign.svc.get_plan(foreign.top.id, foreign.fy.id)).id
+
+    assert await t.svc.plan_budget_ids(gremium) == {t.top.id, other.top.id}
+    assert await t.svc.plan_budget_ids(uuid.uuid4()) == frozenset()
+    every = {p.plan_version_id: p for p in await t.svc.reading_plans(gremium, None)}
+    assert set(every) == {vid, other_vid}
+    assert (every[vid].reading, every[vid].step, every[vid].title) == (
+        True, "Lesung", "Haushaltsplan VS-Mittel 2026: Lesung",
+    )
+    assert [p.plan_version_id for p in await t.svc.reading_plans(gremium, {gremium})] == [vid]
+    assert await t.svc.reading_plans(gremium, set()) == []
+    assert await t.svc.reading_plans(uuid.uuid4(), None) == []
+
+    mine = await t.svc.reading_plan(vid, gremium, {gremium})
+    assert mine is not None and mine.plan_version_id == vid
+    assert (await t.svc.reading_plan(other_vid, gremium, None)) is not None
+    assert await t.svc.reading_plan(foreign_vid, gremium, None) is None
+    with pytest.raises(ForbiddenError):
+        await t.svc.reading_plan(other_vid, gremium, {gremium})
+    forced = _version(await _in_force(foreign)).id
+    assert await t.svc.reading_plan(forced, gremium, None) is None
+    assert await t.svc.reading_plan(uuid.uuid4(), gremium, None) is None
 
 
 async def test_a_step_waits_for_its_gremium_after_the_request(session: AsyncSession) -> None:

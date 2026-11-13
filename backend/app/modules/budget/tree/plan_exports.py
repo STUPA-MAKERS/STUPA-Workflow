@@ -2,19 +2,38 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import date
 from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.budget import tree_rules
-from app.modules.budget.plan_export import ExportHead, PlanExport, build_export
-from app.modules.budget.plan_schemas import PlanLineOut, PlanOut, PlanVersionOut
+from app.modules.budget import plan_rules, tree_rules
+from app.modules.budget.plan_export import (
+    ExportHead,
+    PlanExport,
+    PlanFile,
+    build_export,
+    plan_file,
+    plan_file_of,
+)
+from app.modules.budget.plan_models import (
+    BudgetPlan,
+    BudgetPlanStep,
+    BudgetPlanVersion,
+    BudgetPlanVoteSnapshot,
+)
+from app.modules.budget.plan_schemas import (
+    PlanLineOut,
+    PlanOut,
+    PlanVersionOut,
+    WaitingPlanOut,
+)
 from app.modules.budget.tree.plans import PlanOps
 from app.modules.budget.tree.view import TreeViewOps
 from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.files.cd_resolver import ResolvedCdVariant, resolve_cd_variant_of_gremium
-from app.shared.errors import NotFoundError
+from app.shared.errors import ForbiddenError, NotFoundError
 
 
 def _before(plan: PlanOut, version: PlanVersionOut) -> tuple[PlanLineOut, ...]:
@@ -103,3 +122,135 @@ class PlanExportOps(PlanOps, TreeViewOps):
             prev=_in_force(await self._plan_in(before)),
             prev_fiscal_year_id=before.id if before else None,
         )
+
+    async def keep_vote_snapshot(self, version_id: UUID, vote_id: UUID, today: date) -> None:
+        """Keep the file of a version as it is when a vote on it opens (spec 000876).
+
+        A vote that opens again replaces its file.
+
+        Raises:
+            NotFoundError: The version does not exist (404).
+        """
+        export = await self.plan_export(version_id, today)
+        await self.session.merge(
+            BudgetPlanVoteSnapshot(vote_id=vote_id, document=plan_file(export).record)
+        )
+        await self.session.flush()
+
+    async def plan_file_for_protocol(
+        self, version_id: UUID | None, vote_ids: Collection[UUID], today: date
+    ) -> PlanFile | None:
+        """Return the file of a version as the protocol of a meeting appends it.
+
+        A vote among ``vote_ids`` that kept a file gives the file of the vote that
+        opened last, so a later change or the delete of the draft does not reach the
+        protocol. Without one, the version gives its state of now.
+
+        Returns:
+            The file, or ``None`` when no vote kept one and ``version_id`` is ``None``.
+        """
+        kept = (
+            await self.session.scalars(
+                select(BudgetPlanVoteSnapshot.document)
+                .where(BudgetPlanVoteSnapshot.vote_id.in_(vote_ids))
+                .order_by(BudgetPlanVoteSnapshot.created_at.desc())
+                .limit(1)
+            )
+        ).one_or_none()
+        if kept is not None:
+            return plan_file_of(kept)
+        return (
+            plan_file(await self.plan_export(version_id, today))
+            if version_id is not None
+            else None
+        )
+
+    def _reading_out(
+        self, version: BudgetPlanVersion, fy: FiscalYear, top: Budget
+    ) -> WaitingPlanOut:
+        year = tree_rules.fiscal_year_display(fy.year, top.fiscal_start_month, top.fiscal_start_day)
+        return WaitingPlanOut(
+            planVersionId=version.id,
+            budgetName=top.name,
+            fiscalYear=year,
+            number=version.number,
+            step=plan_rules.READING,
+            title=plan_rules.step_title(top.name, year, version.number, plan_rules.READING),
+            reading=True,
+        )
+
+    async def _drafts(
+        self, version_id: UUID | None = None
+    ) -> list[tuple[BudgetPlanVersion, FiscalYear, Budget]]:
+        rows = (
+            await self.session.execute(
+                select(BudgetPlanVersion, FiscalYear, Budget)
+                .join(BudgetPlan, BudgetPlan.id == BudgetPlanVersion.plan_id)
+                .join(FiscalYear, FiscalYear.id == BudgetPlan.fiscal_year_id)
+                .join(Budget, Budget.id == FiscalYear.budget_id)
+                .where(
+                    BudgetPlanVersion.state == "draft",
+                    FiscalYear.closed_at.is_(None),
+                    Budget.plan_enabled.is_(True),
+                    *([BudgetPlanVersion.id == version_id] if version_id is not None else []),
+                )
+                .order_by(Budget.name, FiscalYear.year, BudgetPlanVersion.number)
+            )
+        ).all()
+        return [(version, fy, top) for version, fy, top in rows]
+
+    async def plan_budget_ids(self, gremium_id: UUID) -> frozenset[UUID]:
+        """Return the budgets with a plan that this Gremium decides in a step (spec 000876)."""
+        return frozenset(
+            await self.session.scalars(
+                select(BudgetPlanStep.budget_id)
+                .join(Budget, Budget.id == BudgetPlanStep.budget_id)
+                .where(BudgetPlanStep.gremium_id == gremium_id, Budget.plan_enabled.is_(True))
+            )
+        )
+
+    async def reading_plans(
+        self, gremium_id: UUID, member_gremium_ids: set[UUID] | None
+    ) -> list[WaitingPlanOut]:
+        """List the drafts that an agenda of this Gremium can take for a reading (spec 000876).
+
+        These are the drafts of the budgets whose plan the Gremium decides in a step.
+        ``member_gremium_ids`` is ``None`` for a person with the full view of the
+        budgets. Any other person gets the drafts of the budgets that the Gremien give
+        a view of.
+        """
+        decided = await self.plan_budget_ids(gremium_id)
+        visible = (
+            None
+            if member_gremium_ids is None
+            else await self.visible_budget_ids(member_gremium_ids)
+        )
+        return [
+            self._reading_out(version, fy, top)
+            for version, fy, top in await self._drafts()
+            if top.id in decided and (visible is None or top.id in visible)
+        ]
+
+    async def reading_plan(
+        self, version_id: UUID, gremium_id: UUID, member_gremium_ids: set[UUID] | None
+    ) -> WaitingPlanOut | None:
+        """Return a draft that this person can put on an agenda of this Gremium for a reading.
+
+        Returns:
+            The draft, or ``None`` when the version is no draft of an open year, or the
+            Gremium decides the plan of its budget in no step.
+
+        Raises:
+            ForbiddenError: The person cannot read the budget of the draft (403).
+        """
+        found = await self._drafts(version_id)
+        if not found:
+            return None
+        version, fy, top = found[0]
+        if top.id not in await self.plan_budget_ids(gremium_id):
+            return None
+        if member_gremium_ids is not None and top.id not in await self.visible_budget_ids(
+            member_gremium_ids
+        ):
+            raise ForbiddenError("no access to this cost centre")
+        return self._reading_out(version, fy, top)

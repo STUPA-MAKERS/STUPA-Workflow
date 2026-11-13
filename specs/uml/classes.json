@@ -330,6 +330,13 @@
       "to": "BudgetPlan"
     },
     {
+      "column": "vote_id",
+      "from": "BudgetPlanVoteSnapshot",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Vote"
+    },
+    {
       "column": "variant_id",
       "from": "CdVariantLogo",
       "multiplicity": "*",
@@ -545,6 +552,13 @@
       "multiplicity": "*",
       "onDelete": "SET NULL",
       "to": "BudgetPlanVersion"
+    },
+    {
+      "column": "plan_document_id",
+      "from": "MeetingAgendaItem",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "MarkdownDocument"
     },
     {
       "column": "meeting_id",
@@ -2722,6 +2736,33 @@
     {
       "attributes": [
         {
+          "name": "vote_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "document",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetPlanVoteSnapshot",
+      "module": "budget",
+      "name": "BudgetPlanVoteSnapshot",
+      "path": "backend/app/modules/budget/plan_models.py",
+      "table": "budget_plan_vote_snapshot"
+    },
+    {
+      "attributes": [
+        {
           "name": "key",
           "nullable": false,
           "primaryKey": false,
@@ -4312,6 +4353,12 @@
         },
         {
           "name": "plan_version_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "plan_document_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"

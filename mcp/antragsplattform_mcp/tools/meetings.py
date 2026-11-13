@@ -376,10 +376,13 @@ async def list_assignable_agenda_items(meeting_id: str) -> dict:
 
 @group.tool
 async def list_assignable_agenda_plans(meeting_id: str) -> dict:
-    """List the versions of a Haushaltsplan that wait for the Gremium of the meeting.
+    """List the versions of a Haushaltsplan that the agenda of the meeting can take.
 
-    Each row has `planVersionId`, `budgetName`, `fiscalYear`, `number`, `step` and the
-    `title` of the agenda item. Requires write access to the meeting.
+    The answer has `decides` (the Gremium of the meeting decides a plan in a step) and
+    `plans`: the versions that wait for the Gremium and the drafts for a reading
+    (`reading: true`). Each row has `planVersionId`, `budgetName`, `fiscalYear`,
+    `number`, `step` and the `title` of the agenda item. Requires write access to the
+    meeting.
     """
     return await api().get(f"/meetings/{meeting_id}/agenda/assignable-plans")
 

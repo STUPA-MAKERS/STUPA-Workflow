@@ -491,6 +491,39 @@ def pdf_config(export: PlanExport) -> dict[str, object]:
     }
 
 
+@dataclass(frozen=True, slots=True)
+class PlanFile:
+    """What the render service needs for the PDF of a version, and the name of the file."""
+
+    source: str
+    config: Mapping[str, object]
+    name: str
+
+    @property
+    def record(self) -> dict[str, object]:
+        """The file as one JSON object, for a snapshot."""
+        return {"source": self.source, "config": dict(self.config), "name": self.name}
+
+
+def plan_file(export: PlanExport) -> PlanFile:
+    """Return the PDF request of an export."""
+    return PlanFile(
+        source=pdf_source(export),
+        config=pdf_config(export),
+        name=export_filename(export.head, "pdf"),
+    )
+
+
+def plan_file_of(record: Mapping[str, object]) -> PlanFile:
+    """Read a file back from the JSON object of a snapshot."""
+    config = record.get("config")
+    return PlanFile(
+        source=str(record.get("source", "")),
+        config=config if isinstance(config, Mapping) else {},
+        name=str(record.get("name", "Haushaltsplan.pdf")),
+    )
+
+
 def _slug(text: str) -> str:
     """Return `text` with only ASCII letters, digits and `-`, for a file name."""
     plain = text.translate(_UMLAUTS)

@@ -78,7 +78,7 @@ import type {
   DecisionProposal,
   AltchaChallenge,
   AssignableApplication,
-  WaitingPlan,
+  AssignablePlans,
   Attendance,
   AttendanceStatus,
   SelfAttendanceStatus,
@@ -922,9 +922,9 @@ export class ApiClient {
     );
   }
 
-  /** GET /meetings/{id}/agenda/assignable-plans — the plans that wait for the Gremium (meeting lead). */
-  listAssignablePlans(meetingId: Uuid): Observable<WaitingPlan[]> {
-    return this.http.get<WaitingPlan[]>(`${this.base}/meetings/${meetingId}/agenda/assignable-plans`, {
+  /** GET /meetings/{id}/agenda/assignable-plans — the plans that the agenda can take (meeting lead). */
+  listAssignablePlans(meetingId: Uuid): Observable<AssignablePlans> {
+    return this.http.get<AssignablePlans>(`${this.base}/meetings/${meetingId}/agenda/assignable-plans`, {
       context: skipLoading(),
     });
   }
