@@ -42,14 +42,14 @@ Each person who can read the plan can load both files. Each version exports, a d
 Both files must hold:
 
 - the head: the name of the Haushalt, the fiscal year, the version ("Haushaltsplan" or
-  "Nachtrag n"), its state and the date of the export. A version that is not in force
+  "Nachtrag n") and its state. The XLSX file also holds the date of the export. A version that is not in force
   must show its state on each page of the PDF and in the head of the sheet: "Entwurf"
   for a draft, and for a version in progress the name of the step that it waits for,
   for example "Genehmigung Rektorat";
 - the lines in the order of the plan, Einnahmen first and then Ausgaben, each with its
   sum, and then the balance of the two sums;
 - per line: the key, the name, the Ansatz, the Ansatz and the Ist of the year before
-  (Finanzordnung § 4 (3)), the Vermerke ("übertragbar", "deckungsfähig"), the blocked
+  (Finanzordnung § 4 (3); both only under 000889), the Vermerke ("übertragbar", "deckungsfähig"), the blocked
   amount and the note;
 - for a Nachtrag: the Ansatz of the version before it and the change.
 

@@ -776,6 +776,12 @@ async def test_a_version_exports_with_the_year_before_and_the_version_before(
     await t.svc.set_line(draft.id, t.exp_a.id, PlanLineSet(amount=D(70)))
     third = await t.svc.plan_export(draft.id, today)
     assert (third.head.fiscal_year, third.head.prev_year) == ("2027", "2026")
+    assert (first.head.prev_decided, third.head.prev_decided) == (False, True)
+    later = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2028))
+    await session.commit()
+    later_draft = _version(await t.svc.get_plan(t.top.id, later.id))
+    after_draft = await t.svc.plan_export(later_draft.id, today)
+    assert (after_draft.head.prev_year, after_draft.head.prev_decided) == ("2027", False)
     rows = {r.name: (r.amount, r.prev, r.actual) for g in third.groups for r in g.rows}
     assert rows["Fachschaften"] == (D(70), D(60), D(25))
     assert rows["Beiträge"] == (D(100), D(100), D(0))

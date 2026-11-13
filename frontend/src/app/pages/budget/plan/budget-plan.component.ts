@@ -456,7 +456,7 @@ export class BudgetPlanComponent {
     const own = money('amount', this.amountLabel(), this.tableFields() ? FIELD_COL : MONEY_COL);
     const rest = this.nachtrag()
       ? [money('base', this.baseLabel())]
-      : this.prevYear()
+      : this.canCopy()
         ? [
             money('prev', this.i18n.translate('budget.plan.col.amount', { year: prev })),
             money('actual', this.i18n.translate('budget.plan.col.actual', { year: prev })),
@@ -1054,7 +1054,7 @@ export class BudgetPlanComponent {
     );
   }
 
-  /** The year before has a plan in force, so the new plan can start as its copy. */
+  /** The year before has a plan in force: the new plan can start as its copy, and the page shows its Ansatz and its Ist. */
   readonly canCopy = computed(() => inForce(this.prevPlan()?.versions ?? []) !== null);
 
   /** Run an action of the head, of a menu or of the floating button. `row` is its Kostenstelle. */

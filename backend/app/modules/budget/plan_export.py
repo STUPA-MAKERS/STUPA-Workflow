@@ -151,6 +151,8 @@ class ExportHead:
     exported_on: date
     #: The name of the first step that a version in progress has not passed.
     step: str | None = None
+    #: The year before has a plan in force, so the file shows its Ansatz and its Ist.
+    prev_decided: bool = True
 
     @property
     def version(self) -> str:
@@ -335,10 +337,11 @@ def _columns(
 ) -> tuple[Cell, ...]:
     """Return the cells of one row, with only the columns that the version has.
 
-    A Nachtrag has the version before and the change. A year with a year before has
-    the Ansatz and the booked amount of that year.
+    A Nachtrag has the version before and the change. A year whose year before has
+    a plan in force has the Ansatz and the booked amount of that year (spec 000889),
+    because without a plan both columns hold nothing to compare.
     """
-    has_prev = export.head.prev_year is not None
+    has_prev = export.head.prev_year is not None and export.head.prev_decided
     return tuple(
         cell
         for on, cell in (

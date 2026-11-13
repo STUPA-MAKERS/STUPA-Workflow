@@ -235,7 +235,7 @@
         <dt class="bd__figLabel">{{ baseLabel() }}</dt>
         <dd class="bd__figValue mono">{{ money(row.base) }}</dd>
       </div>
-    } @else if (prevYear(); as prev) {
+    } @else if (canCopy() && prevYear(); as prev) {
       <div class="bd__fig">
         <dt class="bd__figLabel">{{ 'budget.plan.col.amount' | t: { year: prev.display } }}</dt>
         <dd class="bd__figValue mono">{{ money(row.prev) }}</dd>
