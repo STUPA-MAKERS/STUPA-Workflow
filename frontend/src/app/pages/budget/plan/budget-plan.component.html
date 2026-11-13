@@ -266,24 +266,27 @@
           />
         }
         <app-textarea [label]="'budget.plan.line.note' | t" [grow]="true">
-          <textarea
-            rows="3"
-            maxlength="4000"
-            [name]="'line-note-' + row.id"
-            [value]="row.note"
-            [disabled]="!editable()"
-            (blur)="saveNote(row, $event)"
-          ></textarea>
+          @for (line of [row]; track line.id) {
+            <textarea
+              rows="3"
+              maxlength="4000"
+              [name]="'line-note-' + line.id"
+              [value]="noteValue(line)"
+              [disabled]="!editable()"
+              (input)="editNote(line, $event)"
+              (blur)="saveNote(line)"
+            ></textarea>
+          }
         </app-textarea>
       </div>
     </app-section>
     @if (row.side === 'expense') {
       <app-section class="bd__sec" size="lg" [heading]="'budget.plan.marks.heading' | t">
         <div class="bp__switches">
-          <app-switch [id]="'bp-transfer-' + row.id" [checked]="row.transferable" (checkedChange)="saveLine(row, { transferable: $event })" [disabled]="!editable()">
+          <app-switch [id]="'bp-transfer-' + row.id" [checked]="mark(row, 'transferable')" (checkedChange)="saveMark(row, 'transferable', $event)" [disabled]="!editable()">
             <span>{{ 'budget.plan.marks.transferable' | t }}</span>
           </app-switch>
-          <app-switch [id]="'bp-cover-' + row.id" [checked]="row.coverable" (checkedChange)="saveLine(row, { coverable: $event })" [disabled]="!editable()">
+          <app-switch [id]="'bp-cover-' + row.id" [checked]="mark(row, 'coverable')" (checkedChange)="saveMark(row, 'coverable', $event)" [disabled]="!editable()">
             <span>{{ 'budget.plan.marks.coverable' | t }}</span>
           </app-switch>
           <app-currency-input

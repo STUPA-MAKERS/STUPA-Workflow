@@ -41,7 +41,7 @@
       [label]="'budget.tree.viewGremium' | t"
       [placeholder]="'budget.tree.viewGremiumNone' | t"
       [options]="gremien()"
-      [ngModel]="n.viewGremiumId ?? ''"
+      [ngModel]="viewGremium()"
       (ngModelChange)="saveGremium('viewGremiumId', $event)"
     />
     <app-select
@@ -49,7 +49,7 @@
       [label]="'budget.tree.decisionGremium' | t"
       [placeholder]="'budget.tree.decisionGremiumNone' | t"
       [options]="gremien()"
-      [ngModel]="n.decisionGremiumId ?? ''"
+      [ngModel]="decisionGremium()"
       (ngModelChange)="saveGremium('decisionGremiumId', $event)"
     />
   </div>

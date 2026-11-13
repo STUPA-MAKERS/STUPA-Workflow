@@ -23,6 +23,23 @@ describe('cacheInterceptor', () => {
 
   afterEach(() => mock.verify());
 
+  /** A page that reads again after its save gets the state after that save. */
+  it('§NF/performance/loading/000847: does not join or store a read that started before a write', () => {
+    const seen: unknown[] = [];
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    http.patch('/api/things/1', {}).subscribe();
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    const reads = mock.match('/api/things');
+    expect(reads).toHaveLength(2);
+    mock.expectOne('/api/things/1').flush({});
+    reads[1].flush(['new']);
+    reads[0].flush(['old']);
+    expect(seen).toEqual([['new'], ['old']]);
+    http.get('/api/things', { context: cached(60_000) }).subscribe((b) => seen.push(b));
+    expect(seen[2]).toEqual(['new']);
+    mock.expectOne('/api/things').flush(['new']);
+  });
+
   describe('listContext', () => {
     /**
      * A page switch shows the list at once, and the list corrects itself a moment later, instead of

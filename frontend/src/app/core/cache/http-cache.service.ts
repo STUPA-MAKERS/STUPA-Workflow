@@ -22,6 +22,17 @@ interface Entry {
 @Injectable({ providedIn: 'root' })
 export class HttpCacheService {
   private readonly entries = new Map<string, Entry>();
+  private writes = 0;
+
+  /**
+   * The count of the writes so far. A read that started before a write may hold an answer
+   * from before it, so the interceptor does not join such a read and does not store its
+   * answer. Any write counts, not only one to a related path: one request more costs less
+   * than a wrong list.
+   */
+  get epoch(): number {
+    return this.writes;
+  }
 
   /**
    * Read a fresh entry, or `undefined` when it is missing or older than `ttlMs`.
@@ -56,6 +67,7 @@ export class HttpCacheService {
    * `/api/budget-transfers` just because the names start the same way.
    */
   invalidate(path: string): void {
+    this.writes += 1;
     for (const key of [...this.entries.keys()]) {
       const [keyPath] = key.split('?');
       const related =

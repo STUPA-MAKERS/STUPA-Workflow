@@ -4,7 +4,7 @@ import { Location, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { type Observable, forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, finalize } from 'rxjs/operators';
 import {
   ButtonComponent,
   CellDirective,
@@ -256,7 +256,7 @@ export class BudgetPlanComponent {
   readonly addId = signal('');
   readonly createOpen = signal(false);
   readonly gremiumOptions = signal<readonly SelectOption[]>([]);
-  /** The amounts a person typed and did not leave yet, by row id and field. */
+  /** The amounts and the Erläuterung a person typed and did not leave yet, by row id and field. */
   private readonly edits = signal<Readonly<Record<string, string>>>({});
 
   readonly modeOptions = computed(() => [
@@ -711,10 +711,12 @@ export class BudgetPlanComponent {
   /**
    * Select a top-level Kostenstelle and load its fiscal years. The plan and the years of the
    * budget before go off the page at once, so no action of the old plan stands under the name
-   * of the new budget. The years of a budget that the person left before the answer do not
+   * of the new budget. The selected Kostenstelle of the budget before goes too, because the
+   * URL would else name a Kostenstelle beside a budget and a year that are not its own. The years of a budget that the person left before the answer do not
    * come onto the page.
    */
   pickTop(id: string, wantedFy: string | null = null): void {
+    if (this.topId() && this.topId() !== id) this.selId.set('');
     this.topId.set(id);
     this.years.set([]);
     this.fyId.set('');
@@ -749,10 +751,13 @@ export class BudgetPlanComponent {
     const prev = this.prevYear();
     const place = this.place();
     const sent = this.send();
-    forkJoin({
-      plan: this.readPlan(top, id as Uuid),
-      prev: prev ? this.readPlan(top, prev.id) : of(null),
-    }).subscribe({
+    this.ended(
+      forkJoin({
+        plan: this.readPlan(top, id as Uuid),
+        prev: prev ? this.readPlan(top, prev.id) : of(null),
+      }),
+      sent,
+    ).subscribe({
       next: ({ plan, prev: before }) => {
         if (this.place() !== place) return;
         this.prevPlan.set(before);
@@ -779,11 +784,33 @@ export class BudgetPlanComponent {
   /** The number of the last request for a plan, and of the request whose plan the page shows. */
   private lastSent = 0;
   private lastShown = 0;
+  /** The numbers of the requests without an answer. */
+  private open: readonly number[] = [];
+  /** An answer came in another order than its request went out. */
+  private mixed = false;
 
   /** Number a request for a plan at the moment it goes out. */
   private send(): number {
     this.lastSent += 1;
+    this.open = [...this.open, this.lastSent];
     return this.lastSent;
+  }
+
+  /**
+   * A numbered request ended. The number of a request is the order in which the page sent
+   * it, and the server can take two requests in the other order. So after answers that came
+   * in another order than their requests, the page reads the plan once more when no request
+   * is on its way: that read holds the saved plan.
+   */
+  private ended<T>(request: Observable<T>, sent: number): Observable<T> {
+    return request.pipe(
+      finalize(() => {
+        this.open = this.open.filter((n) => n !== sent);
+        if (this.open.length || !this.mixed) return;
+        this.mixed = false;
+        this.refreshPlan();
+      }),
+    );
   }
 
   /**
@@ -792,6 +819,7 @@ export class BudgetPlanComponent {
    * would then show an amount that is no longer the saved one.
    */
   private newest(sent: number): boolean {
+    this.mixed = this.mixed || sent < this.lastShown || this.open.some((n) => n < sent);
     if (sent < this.lastShown) return false;
     this.lastShown = sent;
     return true;
@@ -805,7 +833,7 @@ export class BudgetPlanComponent {
   refreshPlan(): void {
     const place = this.place();
     const sent = this.send();
-    this.readPlan(this.topId() as Uuid, this.fyId() as Uuid).subscribe({
+    this.ended(this.readPlan(this.topId() as Uuid, this.fyId() as Uuid), sent).subscribe({
       next: (plan) => {
         if (this.place() === place && this.newest(sent)) this.load.set(plan ? { kind: 'plan', plan } : { kind: 'none' });
       },
@@ -862,12 +890,13 @@ export class BudgetPlanComponent {
     if (this.wide()) setTimeout(() => this.host.nativeElement.querySelector<HTMLElement>('#bp-title')?.focus());
   }
 
-  /** Save each amount that a person typed and did not leave yet, before its field goes. */
+  /** Save each amount and each Erläuterung that a person typed and did not leave yet, before its field goes. */
   private flushEdits(): void {
     for (const key of Object.keys(this.edits())) {
       const [id, field] = key.split(':');
       const row = this.rows().find((r) => r.id === id);
-      if (row) this.saveAmount(row, field === 'blocked' ? 'blocked' : 'amount');
+      if (row && field === 'note') this.saveNote(row);
+      else if (row) this.saveAmount(row, field === 'blocked' ? 'blocked' : 'amount');
     }
   }
 
@@ -1007,8 +1036,8 @@ export class BudgetPlanComponent {
   /** A setting of a Kostenstelle changed: the names and sides of the rows come from the tree. */
   reloadTree(plan: BudgetPlan | null = null): void {
     const place = this.place();
-    const sent = this.send();
-    this.treeApi.tree().subscribe({
+    const sent = plan ? this.send() : 0;
+    (plan ? this.ended(this.treeApi.tree(), sent) : this.treeApi.tree()).subscribe({
       next: (tree) => {
         this.tree.set(tree);
         if (plan && this.place() === place && this.newest(sent)) this.load.set({ kind: 'plan', plan });
@@ -1054,7 +1083,12 @@ export class BudgetPlanComponent {
    * Save the changed fields of a line. The request holds only these fields, so two saves
    * of one line that follow each other do not overwrite each other.
    */
-  saveLine(row: PlanRow, change: PlanLineSet, refused: (() => void) | null = null): void {
+  saveLine(
+    row: PlanRow,
+    change: PlanLineSet,
+    refused: (() => void) | null = null,
+    saved: (() => void) | null = null,
+  ): void {
     const version = this.version();
     const same =
       (change.amount === undefined || Number(change.amount) === row.amount) &&
@@ -1062,8 +1096,29 @@ export class BudgetPlanComponent {
       (change.note === undefined || (change.note ?? '') === row.note) &&
       (change.transferable === undefined || change.transferable === row.transferable) &&
       (change.coverable === undefined || change.coverable === row.coverable);
-    if (!version || !this.editable() || same) return;
-    this.write(this.api.setLine(version.id, row.id, change), null, null, false, refused);
+    if (!version || !this.editable() || same) return saved?.();
+    this.write(this.api.setLine(version.id, row.id, change), null, saved, false, refused);
+  }
+
+  /** The presses of the Vermerk switches whose save runs, by line and Vermerk. */
+  private readonly marks = signal<Readonly<Record<string, boolean>>>({});
+
+  /** The state a Vermerk switch shows: the press whose save runs, else the saved state. */
+  mark(row: PlanRow, field: 'transferable' | 'coverable'): boolean {
+    return this.marks()[`${row.id}:${field}`] ?? row[field];
+  }
+
+  /**
+   * Save a Vermerk. The switch follows the press while the save runs and the saved state
+   * after it. A switch that followed only the saved state would keep the press after a
+   * refused save, because the saved state is then the same as before the press and writes
+   * nothing into the switch.
+   */
+  saveMark(row: PlanRow, field: 'transferable' | 'coverable', value: boolean): void {
+    const key = `${row.id}:${field}`;
+    const ended = (): void => this.marks.update((m) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== key)));
+    this.marks.update((m) => ({ ...m, [key]: value }));
+    this.saveLine(row, { [field]: value }, ended, ended);
   }
 
   /** The amount a field shows: the text a person types, else the saved amount. */
@@ -1104,10 +1159,41 @@ export class BudgetPlanComponent {
     this.saveAmount(row);
   }
 
-  saveNote(row: PlanRow, event: Event): void {
-    const field = event.target as HTMLTextAreaElement;
-    this.saveLine(row, { note: field.value.trim() || null }, () => field.setRangeText(row.note, 0, field.value.length));
+  /**
+   * The Erläuterung a field shows: the text a person types, else the saved text. A version
+   * that takes no change shows only the saved text.
+   */
+  noteValue(row: PlanRow): string {
+    return (this.editable() ? this.edits()[`${row.id}:note`] : undefined) ?? row.note;
   }
+
+  /** Keep the Erläuterung a person types, so the answer of a save does not replace it. */
+  editNote(row: PlanRow, event: Event): void {
+    const text = (event.target as HTMLTextAreaElement).value;
+    this.edits.update((e) => ({ ...e, [`${row.id}:note`]: text }));
+  }
+
+  /**
+   * The Erläuterung lost the focus: save the typed text. The field keeps the typed text
+   * until the save ends, and a text that the person typed in the meantime stays. A refused
+   * save shows the saved text again.
+   */
+  saveNote(row: PlanRow): void {
+    const key = `${row.id}:note`;
+    const text = this.edits()[key];
+    if (text === undefined || this.noteSent[key] === text) return;
+    const without = (texts: Readonly<Record<string, string>>): Readonly<Record<string, string>> =>
+      Object.fromEntries(Object.entries(texts).filter(([k, v]) => k !== key || v !== text));
+    const ended = (): void => {
+      this.noteSent = without(this.noteSent);
+      this.edits.update(without);
+    };
+    this.noteSent = { ...this.noteSent, [key]: text };
+    this.saveLine(row, { note: text.trim() || null }, ended, ended);
+  }
+
+  /** The Erläuterung whose save runs, by line, so a second leave of the field sends no second request. */
+  private noteSent: Readonly<Record<string, string>> = {};
 
   /**
    * Run a plan write and show the plan it answers. `after` runs after the answer. A failed
@@ -1126,7 +1212,7 @@ export class BudgetPlanComponent {
     const place = this.place();
     const shown = this.versionId();
     const sent = this.send();
-    request.subscribe({
+    this.ended(request, sent).subscribe({
       next: (plan) => {
         if (locks) this.busy.set(false);
         if (this.place() !== place) return;
