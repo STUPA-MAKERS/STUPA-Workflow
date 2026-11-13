@@ -28,6 +28,8 @@ from app.modules.site_config.models import CdVariant, CdVariantLogo
 from app.shared.errors import ServiceUnavailableError
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.modules.files.storage import ObjectStorage
@@ -64,6 +66,23 @@ async def cd_variant_key_for_gremium(db: AsyncSession, gremium: Gremium | None) 
     if gremium is None or gremium.cd_variant_id is None:
         return None
     return await db.scalar(select(CdVariant.key).where(CdVariant.id == gremium.cd_variant_id))
+
+
+async def resolve_cd_variant_of_gremium(
+    db: AsyncSession, storage: ObjectStorage | None, gremium_id: UUID | None
+) -> ResolvedCdVariant | None:
+    """Resolve the corporate design that a Gremium holds now.
+
+    Returns:
+        The resolved variant, or ``None`` when no Gremium is given or it holds none.
+
+    Raises:
+        ServiceUnavailableError: The variant holds an uploaded logo and the
+            object storage is off or unreachable.
+    """
+    gremium = await db.get(Gremium, gremium_id) if gremium_id is not None else None
+    key = await cd_variant_key_for_gremium(db, gremium)
+    return await resolve_cd_variant_by_key(db, storage, key)
 
 
 async def resolve_cd_variant_by_key(

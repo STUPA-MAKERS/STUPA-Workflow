@@ -10,6 +10,7 @@ import {
   CellDirective,
   type ColumnDef,
   ConfirmDialogComponent,
+  downloadBlob,
   CurrencyInputComponent,
   DataTableComponent,
   DialogComponent,
@@ -65,6 +66,7 @@ import {
   BudgetPlanApi,
   type BudgetPlan,
   type ManualState,
+  type PlanExportFormat,
   type PlanLineSet,
   type PlanState,
   type PlanStep,
@@ -129,6 +131,8 @@ const ACTIONS = [
   'openVote',
   'openMeeting',
   'setState',
+  'exportPdf',
+  'exportXlsx',
 ] as const;
 type ActionId = (typeof ACTIONS)[number];
 
@@ -581,11 +585,15 @@ export class BudgetPlanComponent {
       ...item('add', 'budget.plan.action.add', 'fileplus', this.editable() && this.addableNodes().length > 0),
       ...item('setState', 'budget.plan.action.setState', 'edit', this.canSetState()),
     ];
+    const files: RowMenuItem[] = [
+      ...item('exportPdf', 'budget.plan.action.exportPdf', 'download', !!this.version()),
+      ...item('exportXlsx', 'budget.plan.action.exportXlsx', 'download', !!this.version()),
+    ];
     const draft: RowMenuItem[] =
       this.editable() && this.versions().length > 0
         ? [{ id: 'deleteDraft', label: this.i18n.translate('budget.plan.action.deleteDraft'), icon: 'trash', danger: true }]
         : [];
-    return [...(items.length ? [{ items }] : []), ...(draft.length ? [{ items: draft }] : [])];
+    return [items, files, draft].filter((section) => section.length > 0).map((section) => ({ items: section }));
   });
 
   /** The ⋮ menu of the bottom sheet: the actions on its Kostenstelle. */
@@ -1095,7 +1103,30 @@ export class BudgetPlanComponent {
         this.stateReason.set('');
         this.stateOpen.set(true);
         return;
+      case 'exportPdf':
+        this.exportFile('pdf');
+        return;
+      case 'exportXlsx':
+        this.exportFile('xlsx');
+        return;
     }
+  }
+
+  /** Load the shown version as a file and hand it to the browser under the name of the server. */
+  private exportFile(format: PlanExportFormat): void {
+    const version = this.version();
+    if (!version) return;
+    this.busy.set(true);
+    this.api.exportVersion(version.id, format).subscribe({
+      next: (file) => {
+        downloadBlob(file.blob, file.filename);
+        this.busy.set(false);
+      },
+      error: () => {
+        this.busy.set(false);
+        this.toast.error(this.i18n.translate('budget.dash.exportError'));
+      },
+    });
   }
 
   /** Save the state of the dialog "Zustand setzen". A version in force sets the allocations, so the tree is read again. */

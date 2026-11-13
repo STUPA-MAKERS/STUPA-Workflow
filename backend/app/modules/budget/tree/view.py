@@ -242,6 +242,7 @@ class TreeViewOps(BudgetTreeServiceBase):
             plain,
             {n.id: bool(n.plan_enabled) for n in nodes},
             await self._planned_in(),
+            {n.id: bool(n.plan_coverable_default) for n in nodes},
         )
         scoped = (
             forest

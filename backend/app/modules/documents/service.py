@@ -40,7 +40,7 @@ from app.modules.documents.application_markdown import (
     anlage_link,
     build_application_document,
 )
-from app.modules.documents.cd_resolver import (
+from app.modules.files.cd_resolver import (
     cd_render_config,
     cd_variant_key_for_gremium,
     resolve_cd_variant_by_key,

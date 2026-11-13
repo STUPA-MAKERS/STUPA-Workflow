@@ -381,7 +381,7 @@
       "to": "applications"
     },
     {
-      "count": 15,
+      "count": 17,
       "from": "budget",
       "to": "audit"
     },
@@ -391,7 +391,7 @@
       "to": "auth"
     },
     {
-      "count": 4,
+      "count": 6,
       "from": "budget",
       "to": "files"
     },
@@ -411,7 +411,12 @@
       "to": "meetings"
     },
     {
-      "count": 30,
+      "count": 1,
+      "from": "budget",
+      "to": "pdf"
+    },
+    {
+      "count": 34,
       "from": "budget",
       "to": "shared"
     },
@@ -561,7 +566,7 @@
       "to": "applications"
     },
     {
-      "count": 5,
+      "count": 4,
       "from": "documents",
       "to": "files"
     },
@@ -571,7 +576,7 @@
       "to": "forms"
     },
     {
-      "count": 2,
+      "count": 1,
       "from": "documents",
       "to": "gremien"
     },
@@ -591,14 +596,9 @@
       "to": "pdf"
     },
     {
-      "count": 10,
+      "count": 9,
       "from": "documents",
       "to": "shared"
-    },
-    {
-      "count": 2,
-      "from": "documents",
-      "to": "site_config"
     },
     {
       "count": 1,
@@ -616,9 +616,19 @@
       "to": "auth"
     },
     {
-      "count": 12,
+      "count": 1,
+      "from": "files",
+      "to": "gremien"
+    },
+    {
+      "count": 13,
       "from": "files",
       "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "files",
+      "to": "site_config"
     },
     {
       "count": 1,
@@ -996,12 +1006,12 @@
       "to": "auth"
     },
     {
-      "count": 2,
+      "count": 1,
       "from": "protocol",
       "to": "documents"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "protocol",
       "to": "files"
     },

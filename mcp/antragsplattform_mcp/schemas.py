@@ -468,6 +468,8 @@ class BudgetNodeUpdate(WireModel, frozen=True):
     )
     fiscalStartMonth: int | None = None
     fiscalStartDay: int | None = None
+    #: Top level only: a plan line starts deckungsfähig when it becomes an expense line.
+    planCoverableDefault: bool | None = None
     decisionGremiumId: str | None = Field(
         default=None,
         description="Deciding Gremium of this node. A descendant without an own value "

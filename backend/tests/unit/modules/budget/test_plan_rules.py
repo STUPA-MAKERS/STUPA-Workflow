@@ -165,12 +165,39 @@ def test_with_plan_fields() -> None:
     out = plan_rules.with_plan_fields(forest, {1: True}, {1: ["fy"], 2: ["fy"]})
     assert out == [
         {
-            "id": 1, "plan_enabled": True, "planned_in": ("fy",),
+            "id": 1, "plan_enabled": True, "plan_coverable_default": False,
+            "planned_in": ("fy",),
             "children": [
-                {"id": 2, "plan_enabled": False, "planned_in": ("fy",), "children": []}
+                {
+                    "id": 2, "plan_enabled": False, "plan_coverable_default": False,
+                    "planned_in": ("fy",), "children": [],
+                }
             ],
         }
     ]
+    marked = plan_rules.with_plan_fields(forest, {}, {}, {1: True})
+    assert marked[0]["plan_coverable_default"] is True
+    assert marked[0]["children"][0]["plan_coverable_default"] is False
+
+
+@pytest.mark.parametrize(
+    ("default", "side", "new", "to_expense", "starts"),
+    [
+        (True, "expense", True, False, True),
+        (True, "expense", False, True, True),
+        (True, "expense", False, False, False),
+        (True, "income", True, False, False),
+        (True, None, True, False, False),
+        (False, "expense", True, True, False),
+    ],
+)
+def test_starts_coverable(
+    default: bool, side: str | None, new: bool, to_expense: bool, starts: bool
+) -> None:
+    """§F/finance/budget/000874: the setting applies when a line becomes an expense line."""
+    assert (
+        plan_rules.starts_coverable(default, side, new=new, to_expense=to_expense) is starts
+    )
 
 
 def test_first_child_of() -> None:

@@ -220,7 +220,7 @@ async def test_the_protocol_appends_the_antrag_as_it_was_at_the_close_of_the_top
     assert "\n".join(field_row("Version", ["`1`"])) in internal_antrag
     assert _IBAN in internal_antrag and "Luis Meyer" in internal_antrag
     assert "[!feld] Status" not in internal_antrag and "# Beschluss" not in internal_antrag
-    assert "[!unterschrift]" not in internal_antrag  # § 000887
+    assert "[!unterschrift]" not in internal_antrag  # § 000888
     assert _IBAN not in public_antrag and "Luis Meyer" not in public_antrag
     assert "\n".join(field_row("IBAN", [BAR])) in public_antrag
     assert "\n".join(field_row("Antragsteller", [BAR])) in public_antrag

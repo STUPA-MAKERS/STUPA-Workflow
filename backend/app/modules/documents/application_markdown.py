@@ -129,7 +129,7 @@ class ApplicationDoc:
         redact_applicant: The applicant prints as a black bar.
         files: The names of the attached files.
         decision: The valid decision, or `None`.
-        signatures: The PDF ends with the signature section (spec 000887).
+        signatures: The PDF ends with the signature section (spec 000888).
     """
 
     title: str
@@ -435,7 +435,7 @@ def _other_lines(doc: ApplicationDoc) -> list[str]:
     return ["# Weitere Angaben", "", *rows] if rows else []
 
 
-#: The signature rows of the Antrag PDF: the label and the signer (spec 000887).
+#: The signature rows of the Antrag PDF: the label and the signer (spec 000888).
 SIGNATURES: Final[tuple[tuple[str, str], ...]] = (
     ("Sachlich richtig", "Finanzreferent:in"),
     ("Ausführungsermächtigt", "Haushaltsbeauftragte:r"),

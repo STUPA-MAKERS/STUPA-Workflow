@@ -167,7 +167,7 @@ export class FormEditorComponent {
   protected readonly description = signal<I18nMap>({ de: '', en: '' });
   /** "With budget": the application may select a pot (application_type.has_budget). */
   protected readonly hasBudget = signal(false);
-  /** The Antrag PDF of this type ends with the signature section (spec 000887). */
+  /** The Antrag PDF of this type ends with the signature section (spec 000888). */
   protected readonly pdfSignatures = signal(false);
   /** Comparison-offers rule: required + minimum count. */
   protected readonly cmpRequired = signal(false);

@@ -688,7 +688,7 @@ export interface ApplicationTypeFull {
   readonly name: I18nMap;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget: boolean;
-  /** The Antrag PDF ends with the signature section (spec 000887). */
+  /** The Antrag PDF ends with the signature section (spec 000888). */
   readonly pdfSignatures?: boolean;
   readonly comparisonOffers?: ComparisonOffers | null;
   /** DSGVO retention in months. null = the global default. */

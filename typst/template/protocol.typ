@@ -167,15 +167,17 @@
     } else if t == "bar" {
       // A blacked-out segment (000687, 000688): one fixed width, so the bar does not
       // tell the length. The black word "geschwärzt" on the black bar is the text
-      // that a screen reader and a copy of the text get.
+      // that a screen reader and a copy of the text get. The word is placed, so it
+      // gives the box no baseline: the bottom of the bar is the baseline of the box,
+      // and the bar reaches from 0.12em under the line to above the cap height.
       box(
         width: 4.5em,
-        height: 0.8em,
-        baseline: 0.1em,
+        height: 1em,
+        baseline: 0.12em,
         fill: black,
         radius: 1pt,
         clip: true,
-        align(center + horizon, text(fill: black, size: 0.55em)[geschwärzt]),
+        place(center + horizon, text(fill: black, size: 0.55em)[geschwärzt]),
       )
     } else if t == "sym" {
       math.equation(block: false, alt: n.v, math-symbols.at(n.v, default: n.v))
@@ -508,7 +510,7 @@
   })
 }
 
-// The value of a signature row (an Antrag, 000887): room to sign by hand, then a
+// The value of a signature row (an Antrag, 000888): room to sign by hand, then a
 // short line for the date and a long line for the signature, each with its caption.
 #let sign-area(role) = {
   let slot(caption) = {

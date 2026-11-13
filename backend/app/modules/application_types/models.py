@@ -32,7 +32,7 @@ class ApplicationType(UUIDPkMixin, CreatedAtMixin, Base):
     key: Mapped[str] = mapped_column(Text, unique=True)
     name_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     has_budget: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    #: The Antrag PDF of this type ends with the signature section (spec 000887).
+    #: The Antrag PDF of this type ends with the signature section (spec 000888).
     pdf_signatures: Mapped[bool] = mapped_column(Boolean, server_default="false")
     comparison_offers: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     #: GDPR retention in months until the anonymization. NULL = the global default

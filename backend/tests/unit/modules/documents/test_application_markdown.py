@@ -138,7 +138,7 @@ def test_document_has_the_parts_in_order() -> None:
 
 
 def test_the_signature_section_ends_the_document_only_with_the_switch() -> None:
-    """§000887: two rows to sign by hand, after the decision."""
+    """§000888: two rows to sign by hand, after the decision."""
     assert "[!unterschrift]" not in build_application_document(_doc())
     md = build_application_document(_doc(signatures=True))
     first = "> [!unterschrift] Sachlich richtig\n>\n> Finanzreferent:in\n"

@@ -1,4 +1,4 @@
-"""Antragsart: the switch for the signature section of the Antrag PDF (spec 000887).
+"""Antragsart: the switch for the signature section of the Antrag PDF (spec 000888).
 
 ``application_type`` gets ``pdf_signatures``, off for every existing type.
 
@@ -6,7 +6,7 @@ Idempotent. A fresh database already has the column from the ``create_all`` base
 (0001).
 
 Revision ID: c41d7e9a2b63
-Revises: 5b1e0c7d9a24
+Revises: 9c4d1e7a52b3
 Create Date: 2026-11-13 22:00:00
 """
 
@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "c41d7e9a2b63"
-down_revision: str | None = "5b1e0c7d9a24"
+down_revision: str | None = "9c4d1e7a52b3"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

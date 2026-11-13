@@ -218,7 +218,7 @@ async def test_the_switch_of_the_antragsart_adds_the_signature_section(
     maker: async_sessionmaker[AsyncSession],
     seed: GuestSeed,
 ) -> None:
-    """§000887: no signature section without the switch, two rows with it."""
+    """§000888: no signature section without the switch, two rows with it."""
     app_id = await _create(maker, seed)
     typst = FakeTypst()
     reader = _client(migrated, settings, monkeypatch, typst, _READER)

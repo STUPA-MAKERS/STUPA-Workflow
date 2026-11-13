@@ -48,12 +48,12 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.documents.cd_resolver import (
+from app.modules.documents.service import ANLAGE_MARK, ApplicationPdfService, anlage_reference
+from app.modules.files.cd_resolver import (
     cd_render_config,
     cd_variant_key_for_gremium,
     resolve_cd_variant_by_key,
 )
-from app.modules.documents.service import ANLAGE_MARK, ApplicationPdfService, anlage_reference
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.service import MeetingService

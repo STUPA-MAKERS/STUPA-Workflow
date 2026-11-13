@@ -313,8 +313,9 @@ def with_plan_fields(
     forest: Sequence[dict[str, Any]],
     enabled_of: Mapping[object, bool],
     planned_in: Mapping[object, Sequence[object]],
+    coverable_of: Mapping[object, bool] | None = None,
 ) -> list[dict[str, Any]]:
-    """Add `plan_enabled` and `planned_in` to each node dict of a forest.
+    """Add `plan_enabled`, `plan_coverable_default` and `planned_in` to each node dict.
 
     `planned_in` holds, for a top-level node, the fiscal years with a version in
     force, and for a node below it the fiscal years whose version in force has a line
@@ -324,8 +325,19 @@ def with_plan_fields(
         {
             **node,
             "plan_enabled": enabled_of.get(node["id"], False),
+            "plan_coverable_default": (coverable_of or {}).get(node["id"], False),
             "planned_in": tuple(planned_in.get(node["id"], ())),
-            "children": with_plan_fields(node["children"], enabled_of, planned_in),
+            "children": with_plan_fields(node["children"], enabled_of, planned_in, coverable_of),
         }
         for node in forest
     ]
+
+
+def starts_coverable(default: bool, side: str | None, *, new: bool, to_expense: bool) -> bool:
+    """Say if a line gets the Vermerk "deckungsfähig" from the setting of its budget.
+
+    The setting applies at the moment a line becomes an expense line: a new line below
+    an expense Titel, or a line of a Titel that gets the side expense. It changes no
+    line at any other time, so a person can take the Vermerk off one line.
+    """
+    return default and side == "expense" and (new or to_expense)

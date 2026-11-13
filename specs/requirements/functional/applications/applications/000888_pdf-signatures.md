@@ -1,5 +1,5 @@
 ---
-id: "000887"
+id: "000888"
 title: The Antrag PDF of an Antragsart can end with a signature section
 kind: functional
 status: approved

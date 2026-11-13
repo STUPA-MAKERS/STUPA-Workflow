@@ -498,7 +498,7 @@ def test_a_section_heading_in_front_of_field_rows_is_the_title_of_the_table() ->
 
 
 def test_a_signature_row_is_a_field_row_with_its_signer() -> None:
-    """§000887: a signature row joins the field table and names the signer."""
+    """§000888: a signature row joins the field table and names the signer."""
     blocks = conv(
         "# Unterschriften\n\n"
         "> [!unterschrift] Sachlich richtig\n>\n> Finanzreferent:in\n\n"
