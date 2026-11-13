@@ -817,6 +817,21 @@ describe('MeetingPageComponent', () => {
       expect(screen.queryByRole('button', { name: 'Abstimmung öffnen' })).toBeNull();
     });
 
+    /** §F/finance/budget/000838: the item of a Haushaltsplan holds one vote, like an application item. */
+    it('offers one vote on the item of a Haushaltsplan', async () => {
+      const top = { ...AGENDA[0], planVersionId: 'pv-1' };
+      const { fixture, http } = await setup({ top, meeting: meeting({ votes: [] }) }, [MEDIA.wide]);
+      http.match((r) => r.url.endsWith('/budget-plan-versions/pv-1/plan')).forEach((r) => r.flush({}));
+      expect(screen.getByRole('button', { name: 'Abstimmung öffnen' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();
+      fixture.componentRef.setInput(
+        'meeting',
+        meeting({ votes: [vote({ agendaItemId: top.id, status: 'closed', result: 'passed' })] }),
+      );
+      fixture.detectChanges();
+      expect(screen.queryByRole('button', { name: 'Abstimmung öffnen' })).toBeNull();
+    });
+
     it('offers no vote before the opening, after the close, when locked or without the right', async () => {
       const { fixture } = await setup({ meeting: meeting({ status: 'closed' }) });
       expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();

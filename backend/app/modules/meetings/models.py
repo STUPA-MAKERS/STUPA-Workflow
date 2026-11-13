@@ -150,6 +150,12 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     todo_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("todo_card.id", ondelete="SET NULL"), nullable=True
     )
+    #: The version of a Haushaltsplan that this item decides (an item of kind plan).
+    #: The item has no application, and its `title` names the budget, the fiscal year,
+    #: the version and the step. A deleted version leaves a free-text item.
+    plan_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget_plan_version.id", ondelete="SET NULL"), nullable=True
+    )
     #: Markdown body of this agenda item. It flows into the final protocol.
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, server_default="0")
@@ -174,6 +180,13 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
             "todo_id",
             unique=True,
             postgresql_where=text("todo_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_agenda_meeting_plan_version",
+            "meeting_id",
+            "plan_version_id",
+            unique=True,
+            postgresql_where=text("plan_version_id IS NOT NULL"),
         ),
     )
 

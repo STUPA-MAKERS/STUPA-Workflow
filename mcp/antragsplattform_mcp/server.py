@@ -67,8 +67,10 @@ TYPICAL FLOWS:
   year, and each year starts with a draft. `get_budget_plan` reads the versions
   (Stammplan, then each Nachtrag). Edit a draft with `set_plan_line`, `delete_plan_line`
   and `create_plan_cost_centre`; a cost center with children holds the sum of its children.
-  `pass_plan_step` or `create_plan_step_vote` pass the steps of the budget
-  (`get_plan_steps`/`set_plan_steps`), then `set_plan_state("in_force")` writes the
+  The budget has its steps (`get_plan_steps`/`set_plan_steps`): `pass_plan_step` passes
+  one by hand, `request_plan_step` asks its Gremium, which votes on the plan as an agenda
+  item of a meeting (`list_assignable_agenda_plans`, `add_agenda_item` with
+  `plan_version_id`). Then `set_plan_state("in_force")` writes the
   allocations. `create_plan_nachtrag` starts a change, `delete_plan_version` drops a draft.
   The side of a Titel, a cost center directly below the budget, is the `side` of its
   line in the draft (`set_plan_line`).

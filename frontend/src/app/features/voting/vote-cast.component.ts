@@ -224,13 +224,13 @@ export class VoteCastComponent implements OnDestroy {
   });
 
   /**
-   * The poll of a Gremium, or the vote on a step of a Haushaltsplan (both without a
-   * meeting), that the person may manage: "Starten" while it is a draft, "beenden" while
-   * it is open. A vote of a meeting runs in its meeting.
+   * The poll of a Gremium (without a meeting) that the person may manage: "Starten" while
+   * it is a draft, "beenden" while it is open. A vote of a meeting runs in its meeting, and
+   * so does the vote on a step of a Haushaltsplan.
    */
   readonly pollAction = computed<'start' | 'close' | null>(() => {
     const vote = this.loaded();
-    const standalone = !!vote && (vote.kind === 'poll' || !!vote.planVersionId) && !vote.meetingId;
+    const standalone = !!vote && vote.kind === 'poll' && !vote.meetingId;
     if (!vote || !standalone || vote.canManage !== true) return null;
     if (vote.status === 'draft') return 'start';
     return vote.status === 'open' ? 'close' : null;
@@ -340,24 +340,23 @@ export class VoteCastComponent implements OnDestroy {
     }
   }
 
-  /** The menu item of a poll action: "Starten" or "Umfrage beenden", for a plan vote "Abstimmung …". */
+  /** The menu item of a poll action: "Starten" or "Umfrage beenden". */
   private pollMenuItem(action: 'start' | 'close'): RowMenuItem {
-    const plan = !!this.loaded()?.planVersionId;
     switch (action) {
       case 'start':
-        return { id: 'start', label: this.i18n.translate(plan ? 'voting.plan.start' : 'poll.action.start'), icon: 'play' };
+        return { id: 'start', label: this.i18n.translate('poll.action.start'), icon: 'play' };
       case 'close':
-        return { id: 'close', label: this.i18n.translate(plan ? 'voting.plan.close' : 'poll.action.close'), icon: 'square' };
+        return { id: 'close', label: this.i18n.translate('poll.action.close'), icon: 'square' };
     }
   }
 
-  /** The toast after a poll action: its own text for the vote of a Haushaltsplan. */
-  private pollToast(action: 'start' | 'close', plan: boolean): TranslationKey {
+  /** The toast after a poll action. */
+  private pollToast(action: 'start' | 'close'): TranslationKey {
     switch (action) {
       case 'start':
-        return plan ? 'voting.plan.started' : 'poll.toast.started';
+        return 'poll.toast.started';
       case 'close':
-        return plan ? 'voting.plan.closed' : 'poll.toast.closed';
+        return 'poll.toast.closed';
     }
   }
 
@@ -371,7 +370,7 @@ export class VoteCastComponent implements OnDestroy {
     call.subscribe({
       next: () => {
         this.pollBusy.set(false);
-        this.toast.success(this.i18n.translate(this.pollToast(action, !!vote.planVersionId)));
+        this.toast.success(this.i18n.translate(this.pollToast(action)));
         this.page?.notify({ id: vote.id, kind: 'updated' });
         this.reload();
       },

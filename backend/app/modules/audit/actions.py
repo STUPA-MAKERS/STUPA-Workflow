@@ -245,6 +245,7 @@ class AuditAction(StrEnum):
     BUDGET_PLAN_STATE_SET = "budget_plan_state_set"
     BUDGET_PLAN_STEPS_SET = "budget_plan_steps_set"
     BUDGET_PLAN_STEP = "budget_plan_step"
+    BUDGET_PLAN_STEP_REQUEST = "budget_plan_step_request"
     BUDGET_PLAN_STEP_VOTE = "budget_plan_step_vote"
     BUDGET_PLAN_LINE_SET = "budget_plan_line_set"
     BACKUP_CREATE = "backup_create"

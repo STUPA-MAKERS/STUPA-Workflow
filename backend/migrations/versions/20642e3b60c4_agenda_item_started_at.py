@@ -12,7 +12,7 @@ EXISTS``.
 The downgrade drops the column. The times are lost.
 
 Revision ID: 20642e3b60c4
-Revises: fea8282a392b
+Revises: 31e525795fd9
 Create Date: 2026-11-13 19:00:00.000000
 """
 
@@ -23,7 +23,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "20642e3b60c4"
-down_revision: str | None = "fea8282a392b"
+down_revision: str | None = "31e525795fd9"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

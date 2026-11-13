@@ -16,7 +16,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
-import type { AgendaItem, AssignableApplication, Meeting, Uuid } from '@core/api/models';
+import type { AgendaItem, AssignableApplication, Meeting, Uuid, WaitingPlan } from '@core/api/models';
 import { TodosApiService, type TodoBoard } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -52,6 +52,15 @@ export type AgendaItemKind = 'application' | 'todo' | 'freetext';
  */
 export type AgendaEmptyCase = 'none' | 'noMatch';
 
+/** A row of the list "Antrag": an application in a vote state, or a Haushaltsplan that waits. */
+export interface AgendaDecisionOption {
+  readonly id: Uuid;
+  readonly title: string;
+  /** The flow state of the application, or "Haushaltsplan". */
+  readonly sub: string;
+  readonly plan: boolean;
+}
+
 /** An open card of the gremium board, as a row of the to-do list. */
 export interface AgendaTodoOption {
   readonly id: Uuid;
@@ -65,7 +74,9 @@ export interface AgendaTodoOption {
  * free-text item.
  *
  * The application list is `GET …/agenda/assignable`: the applications of the meeting
- * Gremium in a vote state that are not on an agenda yet. The to-do list is the gremium
+ * Gremium in a vote state that are not on an agenda yet. The same list offers the
+ * versions of a Haushaltsplan that wait for the decision of the Gremium
+ * (`GET …/agenda/assignable-plans`), before the applications. The to-do list is the gremium
  * board of the meeting (`GET /todos/boards?gremiumId=` and the board read): its cards
  * outside the done column that are not on this agenda yet. It loads on the first switch
  * to "To-Do", and the kind shows only with `todo.write` in the gremium. The server makes
@@ -117,6 +128,8 @@ export class AgendaItemDialogComponent {
 
   readonly kind = signal<AgendaItemKind>('freetext');
   readonly assignable = signal<AssignableApplication[]>([]);
+  /** The versions of a Haushaltsplan that wait for the Gremium of the meeting. */
+  readonly plans = signal<WaitingPlan[]>([]);
   readonly loading = signal(false);
   readonly todosLoading = signal(false);
   readonly query = signal('');
@@ -165,20 +178,36 @@ export class AgendaItemDialogComponent {
     return pick !== null && this.shownTodos().some((c) => c.id === pick) ? pick : null;
   });
 
-  /** The applications whose title holds the search text. */
-  readonly shown = computed<AssignableApplication[]>(() => {
+  /** The waiting plans, then the applications, each as a row of the list. */
+  private readonly decisions = computed<AgendaDecisionOption[]>(() => [
+    ...this.plans().map((p) => ({
+      id: p.planVersionId,
+      title: p.title,
+      sub: this.i18n.translate('meetings.agenda.planSub'),
+      plan: true,
+    })),
+    ...this.assignable().map((a) => ({
+      id: a.applicationId,
+      title: a.title ?? '',
+      sub: resolveI18n(a.stateLabel, this.i18n.uiLocale()),
+      plan: false,
+    })),
+  ]);
+
+  /** The plans and the applications whose title holds the search text. */
+  readonly shown = computed<AgendaDecisionOption[]>(() => {
     const needle = this.query().trim().toLocaleLowerCase();
-    const rows = this.assignable();
-    return needle ? rows.filter((a) => (a.title ?? '').toLocaleLowerCase().includes(needle)) : rows;
+    const rows = this.decisions();
+    return needle ? rows.filter((a) => a.title.toLocaleLowerCase().includes(needle)) : rows;
   });
 
   /**
-   * The picked application, but only while the list shows it. A search that filters
-   * the pick out of the list leaves no row checked, so the submit must not send it.
+   * The picked row, but only while the list shows it. A search that filters the pick out
+   * of the list leaves no row checked, so the submit must not send it.
    */
-  readonly visiblePick = computed<Uuid | null>(() => {
+  readonly visiblePick = computed<AgendaDecisionOption | null>(() => {
     const pick = this.pick();
-    return pick !== null && this.shown().some((a) => a.applicationId === pick) ? pick : null;
+    return this.shown().find((a) => a.id === pick) ?? null;
   });
 
   /** The search text of the current kind, trimmed. */
@@ -191,7 +220,7 @@ export class AgendaItemDialogComponent {
    * while a search text is set, because clearing the search would show nothing either.
    */
   readonly emptyCase = computed<AgendaEmptyCase>(() => {
-    const all = this.kind() === 'todo' ? (this.todos() ?? []).length : this.assignable().length;
+    const all = this.kind() === 'todo' ? (this.todos() ?? []).length : this.decisions().length;
     return all && this.activeQuery() ? 'noMatch' : 'none';
   });
 
@@ -224,7 +253,12 @@ export class AgendaItemDialogComponent {
     this.todoQuery.set('');
     this.todoPick.set(null);
     this.assignable.set([]);
+    this.plans.set([]);
     this.loading.set(true);
+    this.api.listAssignablePlans(this.meeting().id).subscribe({
+      next: (rows) => this.plans.set(rows),
+      error: () => this.plans.set([]),
+    });
     this.api.listAssignableApplications(this.meeting().id).subscribe({
       next: (rows) => {
         this.loading.set(false);
@@ -288,16 +322,6 @@ export class AgendaItemDialogComponent {
   }
 
   /**
-   * The flow state of an assignable application, as the muted second line of its row.
-   * The board shows it in the accent, but the accent means "done" or "live" (see
-   * `status-kind.util.ts`), and an application that waits for its agenda item is
-   * neither.
-   */
-  stateOf(a: AssignableApplication): string {
-    return resolveI18n(a.stateLabel, this.i18n.uiLocale());
-  }
-
-  /**
    * A click on the "Nicht öffentlich" row outside its label and its switch toggles the
    * switch, so the whole row is the target. The label and the switch toggle it
    * themselves, so a click on them is left alone.
@@ -345,7 +369,9 @@ export class AgendaItemDialogComponent {
     const kind = this.kind();
     const req =
       kind === 'application' && pick !== null
-        ? this.api.addAgendaItem(meetingId, pick, this.nonPublic())
+        ? pick.plan
+          ? this.api.addAgendaPlan(meetingId, pick.id, this.nonPublic())
+          : this.api.addAgendaItem(meetingId, pick.id, this.nonPublic())
         : kind === 'todo' && todo !== null
           ? this.api.addAgendaTodo(meetingId, todo, this.nonPublic())
           : this.api.addAgendaFreetext(

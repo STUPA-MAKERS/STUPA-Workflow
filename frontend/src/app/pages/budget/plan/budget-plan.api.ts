@@ -30,12 +30,22 @@ export interface PlanStep {
   readonly gremiumId: Uuid | null;
   readonly gremiumName?: string | null;
   readonly passedAt?: string | null;
+  /** The time a person asked for the decision of the Gremium. The step then waits for a meeting. */
+  readonly requestedAt?: string | null;
   /** A person recorded the step by hand, without a decision. */
   readonly byHand?: boolean;
   /** The vote of the Gremium on this step. A deleted vote leaves the id without a status. */
   readonly voteId?: Uuid | null;
   readonly voteStatus?: 'draft' | 'open' | 'closed' | 'cancelled' | null;
   readonly voteResult?: string | null;
+}
+
+/** A meeting that has a version of a plan on its agenda. */
+export interface PlanMeeting {
+  readonly id: Uuid;
+  readonly title: string;
+  readonly date?: string | null;
+  readonly status: string;
 }
 
 /** The steps of a top-level Kostenstelle. */
@@ -77,6 +87,8 @@ export interface PlanVersion {
   readonly inForceAt: string | null;
   /** The steps of the version. A draft shows the steps of its budget. */
   readonly steps: readonly PlanStep[];
+  /** The meetings that have the version on their agenda, the newest first. */
+  readonly meetings?: readonly PlanMeeting[];
   readonly lines: readonly PlanLine[];
 }
 
@@ -155,9 +167,9 @@ export class BudgetPlanApi {
     return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/steps/next`, { step });
   }
 
-  /** Create the draft vote of the Gremium of the next step. */
-  createStepVote(versionId: Uuid): Observable<BudgetPlan> {
-    return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/steps/next/vote`, {});
+  /** Ask the Gremium of the next step for its decision. The step then waits for a meeting. */
+  requestStep(versionId: Uuid): Observable<BudgetPlan> {
+    return this.http.post<BudgetPlan>(`${this.versionUrl(versionId)}/steps/next/request`, {});
   }
 
   /** Create a Kostenstelle and its line in a draft version. */

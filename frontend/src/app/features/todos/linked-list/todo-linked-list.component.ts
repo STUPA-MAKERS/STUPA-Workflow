@@ -32,6 +32,8 @@ export interface LinkedLead {
   readonly sub: string;
   /** The router link. The row opens it in a new tab. */
   readonly link: readonly unknown[];
+  /** The query parameters of the link. */
+  readonly queryParams?: Readonly<Record<string, string>>;
 }
 
 /**

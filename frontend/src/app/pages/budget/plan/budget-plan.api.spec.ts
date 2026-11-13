@@ -47,8 +47,8 @@ describe('BudgetPlanApi', () => {
   it('calls the routes of the steps', () => {
     api.passNextStep('v', 1).subscribe();
     expectCall('POST', '/api/budget-plan-versions/v/steps/next', { step: 1 });
-    api.createStepVote('v').subscribe();
-    expectCall('POST', '/api/budget-plan-versions/v/steps/next/vote', {});
+    api.requestStep('v').subscribe();
+    expectCall('POST', '/api/budget-plan-versions/v/steps/next/request', {});
     api.steps('t').subscribe();
     expectCall('GET', '/api/budgets/t/plan-steps');
     const steps = [{ name: 'Beschluss', gremiumId: 'g' }];

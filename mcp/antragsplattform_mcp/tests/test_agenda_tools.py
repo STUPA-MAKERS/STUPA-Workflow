@@ -106,3 +106,11 @@ def test_http_error_keeps_status_prefix(monkeypatch: pytest.MonkeyPatch) -> None
     with pytest.raises(ApiError) as exc:
         asyncio.run(api.post("/meetings/m1/agenda", json={"title": "x"}))
     assert str(exc.value) == "409: meeting_closed"
+
+
+def test_add_agenda_item_sends_the_plan_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§F/finance/budget/000838: a waiting plan goes on the agenda by its version."""
+    fake = _PostApi()
+    monkeypatch.setattr(_common, "_client", fake)
+    asyncio.run(meetings.add_agenda_item("m1", plan_version_id="pv1"))
+    assert fake.calls == [("/meetings/m1/agenda", {"planVersionId": "pv1"})]
