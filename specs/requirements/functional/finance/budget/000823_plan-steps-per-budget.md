@@ -24,7 +24,7 @@ scope:
 
 A top-level Kostenstelle with the plan switch on must hold an ordered list of plan steps.
 Each step must have a name of 1 to 120 characters with at least one visible character and
-can name one Gremium, else 422. The page "Budgets" must name a name above 120 characters at
+can name one Gremium, else 422. The page "Haushalte" must name a name above 120 characters at
 its field and must not send it. A person with
 `budget.structure` must set the list (`PUT /budgets/{id}/plan-steps`). The list can be
 empty and must hold at most 10 steps. A Gremium that does not exist must answer 422

@@ -433,6 +433,14 @@ describe('BudgetDashboardComponent', () => {
   });
 
   describe('figures', () => {
+    it('§F/finance/budget/000852: the amount of a year is the Ansatz in a Haushalt with a Haushaltsplan', async () => {
+      const view = await setup({ tree: [{ ...TREE[0], planEnabled: true }] });
+      view.http.match((r) => r.url.endsWith('/plan')).forEach((r) => r.flush(null));
+      const figs = within(view.container.querySelector('.bd__figs') as HTMLElement);
+      expect(figs.getByText('Ansatz')).toBeInTheDocument();
+      expect(figs.queryByText('Zuteilung')).toBeNull();
+    });
+
     it('shows all six figures, Beantragt and Einnahmen included', async () => {
       const view = await setup();
       const figs = within(view.container.querySelector('.bd__figs') as HTMLElement);
@@ -1128,7 +1136,7 @@ describe('BudgetDashboardComponent', () => {
     fixture.detectChanges();
     expect(container.querySelector('.bd__empty')).toBeTruthy();
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
-    expect(screen.getByText('Noch keine Budgetdaten')).toBeTruthy();
+    expect(screen.getByText('Noch keine Haushaltsdaten')).toBeTruthy();
   });
 
   /** Without a year every figure reads as zero, so the tree would show 0 € for a round trip. */
@@ -1322,14 +1330,14 @@ describe('BudgetDashboardComponent', () => {
       const view = await setup({ fys: [] });
       expect(view.container.querySelector('.bd__empty')).toBeTruthy();
       expect(screen.getByText('Kein Haushaltsjahr angelegt')).toBeTruthy();
-      expect(screen.queryByText('Noch keine Budgetdaten')).toBeNull();
+      expect(screen.queryByText('Noch keine Haushaltsdaten')).toBeNull();
       const link = screen.getByRole('link', { name: 'Haushaltsjahr anlegen' });
       expect(link.getAttribute('href')).toBe('/admin/budgets');
     });
 
     it('keeps the "nothing is configured" wording when there is no cost centre at all', async () => {
       const view = await setup({ tree: [], fys: [] });
-      expect(screen.getByText('Noch keine Budgetdaten')).toBeTruthy();
+      expect(screen.getByText('Noch keine Haushaltsdaten')).toBeTruthy();
       expect(screen.queryByText('Kein Haushaltsjahr angelegt')).toBeNull();
       expect(view.container.querySelector('.bd__empty')).toBeTruthy();
     });
@@ -1452,6 +1460,9 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(screen.queryByRole('combobox', { name: /Seite/ })).toBeNull();
       expect(screen.getByRole('heading', { name: 'Zuteilung' })).toBeInTheDocument();
       expect(view.container.querySelector('[name="allocation-b-800"]')).not.toBeNull();
+      expect(screen.getByRole('heading', { name: 'Titel' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Kostenstelle' })).toBeNull();
+      expect(screen.getByRole('heading', { name: 'Auslastung' })).toBeInTheDocument();
       await userEvent.click(within(view.container.querySelector('.bd__head') as HTMLElement).getByRole('button', { name: 'Weitere Aktionen' }));
       expect((await screen.findAllByRole('menuitem')).map((i) => i.textContent?.trim())).toEqual(['Buchungen ansehen', 'Kostenstelle löschen']);
     });
@@ -1556,7 +1567,7 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(view.c.selectedKsId()).toBe('b-vs');
       view.c.refreshTree();
       view.http.expectOne(treeUrl).flush({}, { status: 500, statusText: 'Error' });
-      expect(error).toHaveBeenCalledWith('Die Budget-Statistik konnte nicht geladen werden.');
+      expect(error).toHaveBeenCalledWith('Die Haushaltsstatistik konnte nicht geladen werden.');
     });
 
     it('§F/finance/budget/000831: a failed tree read after a refused save of the section says nothing', async () => {

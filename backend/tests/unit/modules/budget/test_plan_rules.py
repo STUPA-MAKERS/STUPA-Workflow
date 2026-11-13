@@ -95,13 +95,18 @@ def test_step_vote_config_and_question() -> None:
     }
     assert plan_rules.step_vote_config(50)["quorum"] == {"type": "percent", "value": 50}
     assert (
-        plan_rules.step_vote_question("VS-Mittel", "2026", "Stammplan", "Beschluss")
-        == "Haushaltsplan VS-Mittel 2026, Stammplan: Beschluss"
+        plan_rules.step_vote_question("VS-Mittel", "2026", 0, "Beschluss")
+        == "Haushaltsplan VS-Mittel 2026: Beschluss"
+    )
+    assert (
+        plan_rules.step_vote_question("VS-Mittel", "2026", 2, "Beschluss")
+        == "Haushaltsplan VS-Mittel 2026, 2. Nachtrag: Beschluss"
     )
 
 
 def test_version_name() -> None:
-    assert plan_rules.version_name(0) == "Stammplan"
+    """§F/finance/budget/000852: the first version is named Haushaltsplan."""
+    assert plan_rules.version_name(0) == "Haushaltsplan"
     assert plan_rules.version_name(2) == "2. Nachtrag"
 
 

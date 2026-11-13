@@ -1339,7 +1339,7 @@ class PlanOps(NodeOps, AllocationOps):
                     tree_rules.fiscal_year_display(
                         fy.year, top.fiscal_start_month, top.fiscal_start_day
                     ),
-                    plan_rules.version_name(version.number),
+                    version.number,
                     step["name"],
                 ),
                 eligibleCount=await MeetingRules(self.session).vote_eligible_count(gremium_id),

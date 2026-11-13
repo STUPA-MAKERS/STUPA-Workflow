@@ -28,7 +28,7 @@ import { BudgetTreeApi, type BudgetTreeNode } from '../budget-tree.api';
 import { BudgetPlanApi, type BudgetPlan, type Side } from '../plan/budget-plan.api';
 import { amountProblem } from '../plan/budget-plan.util';
 import { CostCentreSelectComponent } from '../cost-centre-select/cost-centre-select.component';
-import { costCentreError, keyProblem, NAME_MAX } from './cost-centre.util';
+import { costCentreError, createKey, keyProblem, NAME_MAX } from './cost-centre.util';
 
 /** What the dialog created: the id of the Kostenstelle, or the plan that now holds its line. */
 export interface CostCentreCreated {
@@ -96,6 +96,9 @@ export class CostCentreCreateComponent {
     { value: 'income', label: this.i18n.translate('budget.plan.side.income') },
     { value: 'expense', label: this.i18n.translate('budget.plan.side.expense') },
   ]);
+  /** The new node is a Titel: it goes directly below the Haushalt. */
+  readonly titled = computed(() => this.parentId() === this.top()?.id);
+  readonly titleKey = computed(() => createKey(this.parentId(), this.top()));
   /** A direct child of a budget with a Haushaltsplan needs a side. */
   readonly sided = computed(() => {
     const top = this.top();
@@ -168,7 +171,7 @@ export class CostCentreCreateComponent {
     this.busy.set(true);
     const done = (result: CostCentreCreated): void => {
       this.busy.set(false);
-      this.toast.success(this.i18n.translate('budget.cc.toast.created'));
+      this.toast.success(this.i18n.translate(this.titled() ? 'budget.cc.toast.createdTitle' : 'budget.cc.toast.created'));
       this.created.emit(result);
     };
     const failed = (err: unknown): void => {

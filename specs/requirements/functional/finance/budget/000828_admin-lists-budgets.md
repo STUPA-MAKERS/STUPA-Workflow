@@ -16,7 +16,7 @@ scope:
 
 # Verwaltung lists only the budgets
 
-The page of Verwaltung for the Kostenstellen must have the name "Budgets" and the path
+The page of Verwaltung for the Kostenstellen must have the name "Haushalte" and the path
 `/admin/budgets`. It must list only the top-level Kostenstellen, each with the start of its
 fiscal year and with "Mit Haushaltsplan" or "Ohne Haushaltsplan". It must not show a
 Kostenstelle below a budget. The page must keep the creation of a budget, the edit form of

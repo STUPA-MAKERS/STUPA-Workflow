@@ -178,8 +178,8 @@ describe('BudgetPlanComponent', () => {
       expect(texts(view, '.bp__group')).toEqual(['Einnahmen100 €', 'Ausgaben100 €']);
       expect(texts(view, '.bd__tree .tn__name')).toEqual(['VS-Mittel', 'Beiträge', 'Personal', 'Löhne', 'Zuschüsse']);
       expect(screen.getByRole('button', { name: /Haushaltsjahr/ })).toHaveTextContent('HHJ 2026/27');
-      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
-      expect(screen.queryByRole('button', { name: /^Budget/ })).toBeNull();
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Haushaltsplan');
+      expect(screen.queryByRole('button', { name: /^Haushalt:/ })).toBeNull();
       expect(view.container.querySelector('.bd__tree [title]')).toBeNull();
       expect(await axe(view.container)).toHaveNoViolations();
     });
@@ -260,7 +260,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before } });
       const income = view.container.querySelectorAll('app-data-table')[0] as HTMLElement;
       expect(within(income).getAllByRole('columnheader').map(text)).toEqual([
-        'Kostenstelle',
+        'Titel',
         'Ansatz 2026/27',
         'Ansatz 2025/26',
         'Ist 2025/26',
@@ -274,7 +274,7 @@ describe('BudgetPlanComponent', () => {
     it('has no columns of the year before in the first year', async () => {
       const view = await setup({ years: [FY26] });
       const income = view.container.querySelectorAll('app-data-table')[0] as HTMLElement;
-      expect(within(income).getAllByRole('columnheader').map(text)).toEqual(['Kostenstelle', 'Ansatz 2026/27', 'Änderung']);
+      expect(within(income).getAllByRole('columnheader').map(text)).toEqual(['Titel', 'Ansatz 2026/27', 'Änderung']);
     });
 
     it('§F/finance/budget/000809: shows a Nachtrag beside the version before it', async () => {
@@ -284,13 +284,13 @@ describe('BudgetPlanComponent', () => {
       expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: 1. Nachtrag');
       const expense = view.container.querySelectorAll('app-data-table')[1] as HTMLElement;
       expect(within(expense).getAllByRole('columnheader').map(text)).toEqual([
-        'Kostenstelle',
+        'Titel',
         'Ansatz 1. Nachtrag',
-        'Ansatz Stammplan',
+        'Ansatz Haushaltsplan',
         'Änderung',
       ]);
       expect(text(expense)).toContain('+15 €');
-      await pickChip(/^Version/, 'Stammplan');
+      await pickChip(/^Version/, 'Haushaltsplan');
       expect(view.navigate).toHaveBeenLastCalledWith(
         [],
         expect.objectContaining({ queryParams: { budget: 'vsm', fy: 'fy-26', version: 0, costCentre: null } }),
@@ -307,7 +307,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ plans: { 'fy-26': plan([stamm, nachtrag]) }, query: { costCentre: 'grants' } });
       const figures = text(view.container.querySelector('.bd__figs'));
       expect(figures).toContain('Ansatz 1. Nachtrag45 €');
-      expect(figures).toContain('Ansatz Stammplan30 €');
+      expect(figures).toContain('Ansatz Haushaltsplan30 €');
       expect(figures).toContain('Änderung+15 €');
     });
 
@@ -339,7 +339,7 @@ describe('BudgetPlanComponent', () => {
       const now = version({ id: 'v1', number: 1, state: 'in_force' });
       await setup({ plans: { 'fy-26': plan([old, now]) } });
       expect(primary()).toHaveAccessibleName('Nachtrag anlegen');
-      await pickChip(/^Version/, 'Stammplan');
+      await pickChip(/^Version/, 'Haushaltsplan');
       expect(screen.getByText('Diese Version ist durch einen Nachtrag ersetzt.')).toBeInTheDocument();
       expect(screen.queryByTestId('bp-primary')).toBeNull();
     });
@@ -357,7 +357,7 @@ describe('BudgetPlanComponent', () => {
       const second = node({ id: 'two', name: 'Zweiter', planEnabled: true });
       const view = await setup({ tree: [TOP, second] });
       view.treeApi.listFiscalYears.mockReturnValueOnce(throwError(() => problem(500)));
-      await pickChip(/^Budget/, 'Zweiter');
+      await pickChip(/^Haushalt:/, 'Zweiter');
       expect(view.container.querySelector('app-load-error')).not.toBeNull();
     });
 
@@ -394,10 +394,10 @@ describe('BudgetPlanComponent', () => {
     it('takes the budget and the year of the URL and names the budget on its chip', async () => {
       const second = node({ id: 'two', name: 'Zweiter', planEnabled: true });
       const view = await setup({ tree: [TOP, second], query: { budget: 'two', fy: 'fy-25' } });
-      expect(screen.getByRole('button', { name: /^Budget/ })).toHaveTextContent('Budget: Zweiter');
+      expect(screen.getByRole('button', { name: /^Haushalt:/ })).toHaveTextContent('Haushalt: Zweiter');
       expect(screen.getByRole('button', { name: /Haushaltsjahr/ })).toHaveTextContent('HHJ 2025/26');
       expect(view.api.plan).toHaveBeenCalledWith('two', 'fy-25');
-      await pickChip(/^Budget/, 'VS-Mittel');
+      await pickChip(/^Haushalt:/, 'VS-Mittel');
       expect(view.treeApi.listFiscalYears).toHaveBeenLastCalledWith('vsm');
       await pickChip(/Haushaltsjahr/, 'HHJ 2025/26');
       expect(view.api.plan).toHaveBeenLastCalledWith('vsm', 'fy-25');
@@ -407,7 +407,7 @@ describe('BudgetPlanComponent', () => {
       const stamm = version({ state: 'in_force' });
       const nachtrag = version({ id: 'v1', number: 1 });
       await setup({ plans: { 'fy-26': plan([stamm, nachtrag]) }, query: { version: '0' } });
-      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Haushaltsplan');
       await setup({ plans: { 'fy-26': plan([stamm, nachtrag]) }, query: { version: 'x' } });
       expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: 1. Nachtrag');
     });
@@ -417,7 +417,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ plans: { 'fy-25': old, 'fy-26': plan() }, query: { planVersion: 'old' } });
       expect(view.api.planOfVersion).toHaveBeenCalledWith('old');
       expect(screen.getByRole('button', { name: /Haushaltsjahr/ })).toHaveTextContent('HHJ 2025/26');
-      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Haushaltsplan');
       const gone = await setup({ plans: { 'fy-25': old, 'fy-26': plan() }, query: { planVersion: 'zzz' } });
       expect(gone.api.planOfVersion).toHaveBeenCalledWith('zzz');
       expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: 1. Nachtrag');
@@ -475,7 +475,7 @@ describe('BudgetPlanComponent', () => {
       read.next(plan([version({ id: 'late', number: 3 })], 'fy-25'));
       read.complete();
       view.fixture.detectChanges();
-      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Haushaltsplan');
       const old = new Subject<BudgetPlan>();
       view.api.plan.mockReturnValueOnce(old);
       view.fixture.componentInstance.reloadPlan();
@@ -483,7 +483,7 @@ describe('BudgetPlanComponent', () => {
       old.next(plan([version({ id: 'old', number: 4 })]));
       old.complete();
       view.fixture.detectChanges();
-      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Haushaltsplan');
       const failed = new Subject<BudgetPlan>();
       view.api.plan.mockReturnValueOnce(failed);
       await pickChip(/Haushaltsjahr/, 'HHJ 2025/26');
@@ -498,7 +498,7 @@ describe('BudgetPlanComponent', () => {
       saved.next(plan([version({ id: 'late', number: 3 })]));
       view.fixture.detectChanges();
       expect(screen.getByRole('button', { name: /Haushaltsjahr/ })).toHaveTextContent('HHJ 2025/26');
-      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Haushaltsplan');
     });
 
     it('§F/finance/budget/000812: a late answer keeps the version that the person chose, and a new read keeps it in the URL', async () => {
@@ -507,10 +507,10 @@ describe('BudgetPlanComponent', () => {
       const saved = new Subject<BudgetPlan>();
       view.api.setLine.mockReturnValueOnce(saved);
       await typeAmount(input(view, 'amount-fees'), '12');
-      await pickChip(/^Version/, 'Stammplan');
+      await pickChip(/^Version/, 'Haushaltsplan');
       saved.next(both);
       view.fixture.detectChanges();
-      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Haushaltsplan');
       view.fixture.componentInstance.reloadPlan();
       expect(view.navigate).toHaveBeenLastCalledWith(
         [],
@@ -531,7 +531,7 @@ describe('BudgetPlanComponent', () => {
       await pickChip(/Haushaltsjahr/, 'HHJ 2025/26');
       tree.next([TOP, second]);
       view.fixture.detectChanges();
-      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Haushaltsplan');
       const years = new Subject<FiscalYear[]>();
       const failed = new Subject<FiscalYear[]>();
       view.treeApi.listFiscalYears.mockReturnValueOnce(years).mockReturnValueOnce(failed);
@@ -599,7 +599,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ years: [fy('fy-26', 2026, { closedAt: '2027-03-02T00:00:00Z' })] });
       expect(screen.queryByTestId('bp-primary')).toBeNull();
       expect(input(view, 'amount-grants')).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Kostenstelle anlegen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /^(Titel|Kostenstelle) anlegen$/ })).toBeNull();
     });
   });
 
@@ -627,7 +627,7 @@ describe('BudgetPlanComponent', () => {
     it('§F/finance/budget/000810: a phone edits a line in the bottom sheet, with the actions of its Kostenstelle', async () => {
       const view = await setup({ wide: false, phone: true });
       expect(view.container.querySelector('.bp__field')).toBeNull();
-      expect(screen.getByRole('button', { name: /^Budget/ })).toHaveTextContent('Budget: VS-Mittel');
+      expect(screen.getByRole('button', { name: /^Haushalt:/ })).toHaveTextContent('Haushalt: VS-Mittel');
       await userEvent.click(tableRow('Zuschüsse'));
       const sheet = await screen.findByRole('dialog', { name: 'Zuschüsse' });
       expect(text(sheet)).toContain('GRANTS · Ausgabe');
@@ -856,7 +856,7 @@ describe('BudgetPlanComponent', () => {
       await waitFor(() => expect(input(decided, 'line-amount-grants')).toBeDisabled());
       expect(input(decided, 'line-note-grants')).toBeDisabled();
       expect(screen.getByRole('switch', { name: 'Übertragbar' })).toBeDisabled();
-      expect(screen.queryByRole('button', { name: 'Kostenstelle anlegen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /^(Titel|Kostenstelle) anlegen$/ })).toBeNull();
       const reader = await setup({ perms: ['budget.view'] });
       expect(screen.queryByTestId('bp-primary')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
@@ -1317,6 +1317,19 @@ describe('BudgetPlanComponent', () => {
       expect(view.api.deleteLine).toHaveBeenCalledWith('v0', 'wages');
       expect(view.success).toHaveBeenCalledWith('Zeile entfernt.');
       expect(screen.getByRole('heading', { level: 2, name: 'Personal' })).toBeInTheDocument();
+    });
+
+    it('§F/finance/budget/000852: a node below the Haushalt is a Titel, a node below it a Kostenstelle', async () => {
+      const view = await setup();
+      expect(screen.getByRole('button', { name: 'Titel anlegen' })).toBeInTheDocument();
+      view.fixture.componentInstance.selectId('grants');
+      view.fixture.detectChanges();
+      expect(await screen.findByRole('heading', { name: 'Titel' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Kostenstelle anlegen' })).toBeInTheDocument();
+      view.fixture.componentInstance.selectId('wages');
+      view.fixture.detectChanges();
+      expect(await screen.findByRole('heading', { name: 'Kostenstelle' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Titel' })).toBeNull();
     });
 
     it('§F/finance/budget/000829: the floating button opens the dialog of a new Kostenstelle below the shown one', async () => {

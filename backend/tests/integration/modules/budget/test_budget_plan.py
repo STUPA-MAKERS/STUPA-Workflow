@@ -1031,7 +1031,7 @@ async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSes
     assert vote is not None
     assert (vote.plan_version_id, vote.eligible_group) == (vid, str(gremium))
     assert (vote.application_id, vote.meeting_id) == (None, None)
-    assert vote.question == "Haushaltsplan VS-Mittel 2026, Stammplan: Beschluss"
+    assert vote.question == "Haushaltsplan VS-Mittel 2026: Beschluss"
     assert "quorum" not in vote.config or vote.config["quorum"] is None
     with pytest.raises(ConflictError) as twice:
         await t.svc.create_step_vote(vid)

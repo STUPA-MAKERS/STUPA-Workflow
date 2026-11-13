@@ -322,7 +322,7 @@ describe('AdminGremienComponent', () => {
     ],
     [
       { status: 409, error: { code: 'gremium_has_budget' } },
-      'Dem Gremium gehört ein Budget. Lösche zuerst das Budget.',
+      'Dem Gremium gehört ein Haushalt. Lösche zuerst den Haushalt.',
     ],
   ])('§F/finance/budget/000844: names the reason of a refused delete (%o)', async (err, message) => {
     const api = makeApi({ deleteGremium: jest.fn(() => throwError(() => err)) });

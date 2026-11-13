@@ -199,7 +199,7 @@
             </app-section>
           }
           @if (editable()) {
-            <app-section class="bd__sec" size="lg" [heading]="'budget.cc.heading' | t">
+            <app-section class="bd__sec" size="lg" [heading]="levelKey(ks) | t">
               <app-cost-centre-settings [node]="ks" [sided]="sided()" [gremiumOptions]="gremiumOptions()" (saved)="refreshTree(null, !$event)" />
             </app-section>
           }
@@ -226,7 +226,7 @@
             </app-section>
           }
 
-          <app-section class="bd__sec" size="lg" [heading]="'budget.usage.heading' | t">
+          <app-section class="bd__sec" size="lg" [heading]="'budget.usage.headingNode' | t">
             <div class="bd__usageCols" aria-hidden="true">
               <span class="bd__grow"></span>
               <span class="bd__c1">{{ 'budget.dash.fig.requested' | t }}</span>
@@ -486,5 +486,5 @@
 />
 
 @if (byHand()) {
-  <app-fab [label]="'budget.cc.create' | t" (activate)="createOpen.set(true)" />
+  <app-fab [label]="createKey() | t" (activate)="createOpen.set(true)" />
 }

@@ -1,4 +1,4 @@
-<app-dialog [open]="open()" [title]="'budget.cc.create' | t" [closeLabel]="'action.close' | t" (closed)="closed.emit()">
+<app-dialog [open]="open()" [title]="titleKey() | t" [closeLabel]="'action.close' | t" (closed)="closed.emit()">
   <form id="cc-create-form" class="ccc" (submit)="submit($event)">
     <app-cost-centre-select
       [nodes]="parentNodes()"

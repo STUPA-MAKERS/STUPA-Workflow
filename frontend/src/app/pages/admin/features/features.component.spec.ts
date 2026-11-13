@@ -49,7 +49,7 @@ async function setup(opts: { api?: Record<string, jest.Mock>; perms?: string[] }
 
 const sw = (name: string) => screen.getByRole('switch', { name: new RegExp(`^${name}`) });
 const save = () => screen.getByRole('button', { name: 'Speichern' });
-const NAMES = ['Boards', 'Kalender', 'Sitzungen', 'Abstimmungen', 'Budget', 'Rechnungen', 'Tickets'];
+const NAMES = ['Boards', 'Kalender', 'Sitzungen', 'Abstimmungen', 'Haushalt', 'Rechnungen', 'Tickets'];
 
 describe('enabledFeatures', () => {
   it('switches a feature off with the feature it needs', () => {
@@ -119,15 +119,15 @@ describe('FeaturesComponent', () => {
   /** Spec 000760: a switch that needs a feature that is off is locked and says why. */
   it('locks Rechnungen while Budget is off and keeps its stored switch', async () => {
     const { api, fixture } = await setup();
-    await userEvent.click(sw('Budget'));
+    await userEvent.click(sw('Haushalt'));
     fixture.detectChanges();
     expect(sw('Rechnungen')).toHaveAttribute('aria-checked', 'false');
     expect(sw('Rechnungen')).toBeDisabled();
-    expect(screen.getByText('Benötigt Budget')).toBeInTheDocument();
+    expect(screen.getByText('Benötigt Haushalt')).toBeInTheDocument();
     await userEvent.click(save());
     fixture.detectChanges();
     expect(api['putFeatures']).not.toHaveBeenCalled();
-    expect(screen.getByText(/Budget, Rechnungen/)).toBeInTheDocument();
+    expect(screen.getByText(/Haushalt, Rechnungen/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Ausschalten' }));
     expect(api['putFeatures']).toHaveBeenCalledWith({ ...ALL_ON, budget: false });
   });
@@ -145,7 +145,7 @@ describe('FeaturesComponent', () => {
     const { api, toast, features, fixture } = await setup({
       api: makeApi({ ...ALL_ON, budget: false }),
     });
-    await userEvent.click(sw('Budget'));
+    await userEvent.click(sw('Haushalt'));
     fixture.detectChanges();
     await userEvent.click(save());
     expect(api['putFeatures']).toHaveBeenCalledWith(ALL_ON);
@@ -157,7 +157,7 @@ describe('FeaturesComponent', () => {
 
   it('switches the features off in the navigation after the save', async () => {
     const { features, fixture } = await setup();
-    await userEvent.click(sw('Budget'));
+    await userEvent.click(sw('Haushalt'));
     await userEvent.click(save());
     fixture.detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Ausschalten' }));
