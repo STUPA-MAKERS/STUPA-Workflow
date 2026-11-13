@@ -91,6 +91,22 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.api.updateNode).not.toHaveBeenCalled();
   });
 
+  it('the switch waits while a save runs, so two presses never race', async () => {
+    const view = await setup();
+    const pending = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(pending);
+    const active = screen.getByRole('switch', { name: 'Aktiv' });
+    await userEvent.click(active);
+    view.fixture.detectChanges();
+    expect(active).toBeDisabled();
+    await userEvent.click(active);
+    expect(view.api.updateNode).toHaveBeenCalledTimes(1);
+    pending.next({});
+    pending.complete();
+    view.fixture.detectChanges();
+    expect(active).toBeEnabled();
+  });
+
   it('saves the colour, the Gremien and the switch', async () => {
     const view = await setup();
     await userEvent.click(screen.getByRole('button', { name: `Farbe ${PALETTE[0]}` }));

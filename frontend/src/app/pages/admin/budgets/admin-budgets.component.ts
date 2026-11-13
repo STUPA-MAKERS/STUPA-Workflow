@@ -91,6 +91,9 @@ const MAX_STEPS = 10;
  * Stammplan changes an allocation, the page shows the changes and asks first. The menu of a
  * row opens the fiscal years of the budget and deletes the budget.
  */
+/** The longest name of a step that the server takes. */
+const STEP_NAME_MAX = 120;
+
 @Component({
   selector: 'app-admin-budgets',
   standalone: true,
@@ -179,6 +182,12 @@ export class AdminBudgetsComponent {
   requiredError(value: string): string {
     return this.showErrors() && !value.trim() ? this.i18n.translate('admin.budgets.error.required') : '';
   }
+  /** The error under the name of a step: it is missing, or longer than the server takes. */
+  stepNameError(value: string): string {
+    return value.trim().length > STEP_NAME_MAX
+      ? this.i18n.translate('admin.budgets.error.stepNameLong')
+      : this.requiredError(value);
+  }
   readonly formValid = computed(() => {
     const form = this.form();
     return (
@@ -191,7 +200,7 @@ export class AdminBudgetsComponent {
       !cutoffProblem('day', form.day) &&
       !cutoffProblem('month', form.month) &&
       (!form.plan ||
-        (form.steps.every((s) => !!s.name.trim()) && this.sideNodes().every((n) => !!form.sides[n.id])))
+        (form.steps.every((s) => !!s.name.trim() && s.name.trim().length <= STEP_NAME_MAX) && this.sideNodes().every((n) => !!form.sides[n.id])))
     );
   });
 

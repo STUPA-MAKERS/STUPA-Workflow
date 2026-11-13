@@ -194,6 +194,7 @@
                 [ngModel]="allocationValue()"
                 (ngModelChange)="editAllocation($event)"
                 (focusout)="saveAllocation()"
+                (keydown.enter)="saveAllocation()"
               />
             </app-section>
           }

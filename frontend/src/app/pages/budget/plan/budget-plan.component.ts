@@ -207,6 +207,7 @@ const FIELD_COL = '10rem';
   ],
   templateUrl: './budget-plan.component.html',
   styleUrls: ['../budget-dashboard.component.scss', './budget-plan.component.scss'],
+  host: { '[class.pane-page]': 'wide()' },
 })
 export class BudgetPlanComponent {
   private readonly treeApi = inject(BudgetTreeApi);
@@ -660,6 +661,7 @@ export class BudgetPlanComponent {
   retry(): void {
     this.error.set(false);
     this.loading.set(true);
+    this.topId.set('');
     this.start();
   }
 
@@ -970,7 +972,7 @@ export class BudgetPlanComponent {
       (change.transferable === undefined || change.transferable === row.transferable) &&
       (change.coverable === undefined || change.coverable === row.coverable);
     if (!version || !this.editable() || same) return;
-    this.write(this.api.setLine(version.id, row.id, change), 'budget.tree.toast.saved', null, false);
+    this.write(this.api.setLine(version.id, row.id, change), null, null, false);
   }
 
   /** The amount a field shows: the text a person types, else the saved amount. */
@@ -1022,7 +1024,7 @@ export class BudgetPlanComponent {
    */
   private write(
     request: Observable<BudgetPlan>,
-    toast: TranslationKey,
+    toast: TranslationKey | null,
     after: (() => void) | null = null,
     locks = true,
   ): void {
@@ -1033,7 +1035,7 @@ export class BudgetPlanComponent {
         if (locks) this.busy.set(false);
         this.versionId.set('');
         this.load.set({ kind: 'plan', plan });
-        this.toast.success(this.i18n.translate(toast));
+        if (toast) this.toast.success(this.i18n.translate(toast));
         after?.();
         this.syncUrl();
       },

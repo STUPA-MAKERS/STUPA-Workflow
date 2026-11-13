@@ -374,6 +374,22 @@ describe('BudgetPlanComponent', () => {
       expect(view.container.querySelector('app-load-error')).not.toBeNull();
     });
 
+    it('the retry of a failed read of the fiscal years reads them again', async () => {
+      const view = await setup();
+      expect(view.container.querySelector('app-load-error')).toBeNull();
+      view.treeApi.listFiscalYears.mockReturnValueOnce(throwError(() => problem(500)));
+      view.fixture.componentInstance.retry();
+      view.fixture.detectChanges();
+      const failed = view.debugElement.query(By.directive(LoadErrorComponent));
+      expect(failed).not.toBeNull();
+      const reads = view.treeApi.listFiscalYears.mock.calls.length;
+      failed.triggerEventHandler('retry');
+      view.fixture.detectChanges();
+      expect(view.treeApi.listFiscalYears).toHaveBeenCalledTimes(reads + 1);
+      expect(view.container.querySelector('app-load-error')).toBeNull();
+      expect(texts(view, '.bp__name').length).toBeGreaterThan(0);
+    });
+
     it('takes the budget and the year of the URL and names the budget on its chip', async () => {
       const second = node({ id: 'two', name: 'Zweiter', planEnabled: true });
       const view = await setup({ tree: [TOP, second], query: { budget: 'two', fy: 'fy-25' } });
@@ -545,7 +561,7 @@ describe('BudgetPlanComponent', () => {
       await typeAmount(field, '45,5');
       expect(view.api.setLine).toHaveBeenCalledTimes(1);
       expect(view.api.setLine).toHaveBeenCalledWith('v0', 'grants', { amount: '45.5' });
-      expect(view.success).toHaveBeenCalledWith('Gespeichert.');
+      expect(view.success).not.toHaveBeenCalled();
       expect(screen.queryByRole('heading', { level: 2, name: 'Zuschüsse' })).toBeNull();
     });
 

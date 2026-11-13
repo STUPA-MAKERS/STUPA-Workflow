@@ -4330,11 +4330,12 @@
   "admin.budgets.switch.confirm": "Haushaltsplan einschalten",
   "budget.tree.fyYearInvalid": "Ein Jahr von 1900 bis 2200.",
   "budget.tree.fyDeleteConfirmDraft": "Das Haushaltsjahr {year} wird mit dem Entwurf seines Haushaltsplans gelöscht. Das lässt sich nicht rückgängig machen.",
-  "budget.tree.fyBlocked.plan": "Das Haushaltsjahr hat einen Haushaltsplan, der beschlossen oder in Arbeit ist. Es lässt sich nicht löschen.",
+  "budget.tree.fyBlocked.plan": "Das Haushaltsjahr hat einen Haushaltsplan, der beschlossen oder in Arbeit ist. Es lässt sich deshalb weder ändern noch löschen.",
   "admin.audit.action.budget_plan_version_delete": "Entwurf einer Planversion gelöscht",
   "admin.budgets.error.day": "Ein Tag von 1 bis 28.",
   "admin.budgets.error.month": "Ein Monat von 1 bis 12.",
-  "budget.plan.error.stepNotNext": "Dieser Schritt ist schon abgeschlossen.",
+  "admin.budgets.error.stepNameLong": "Höchstens 120 Zeichen.",
+  "budget.plan.error.stepNotNext": "Dieser Schritt ist nicht mehr der nächste Schritt. Die Seite zeigt jetzt den aktuellen Stand.",
   "budget.plan.noLines": "Keine Kostenstellen",
   "budget.tree.colorHexPlaceholder": "#rrggbb"
 }

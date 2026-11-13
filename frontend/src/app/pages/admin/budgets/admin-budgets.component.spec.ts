@@ -690,6 +690,19 @@ describe('AdminBudgetsComponent', () => {
       expect(view.error).toHaveBeenLastCalledWith('Aktion fehlgeschlagen.');
     });
 
+    it('§F/finance/budget/000823: a step name above 120 characters shows its limit and is not saved', async () => {
+      const view = await setup();
+      const dialog = await openEdit('VS-Mittel');
+      const name = labelled(dialog, 'Name von Schritt 1');
+      await userEvent.clear(name);
+      await userEvent.click(name);
+      await userEvent.paste('x'.repeat(121));
+      expect(within(dialog).getByText('Höchstens 120 Zeichen.')).toBeInTheDocument();
+      await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.api.updateNode).not.toHaveBeenCalled();
+      expect(view.planApi.setSteps).not.toHaveBeenCalled();
+    });
+
     it('§F/finance/budget/000836: deletes a fiscal year after the confirmation, and says when the draft of its plan goes with it', async () => {
       const view = await setup({ tree: of([VSM, QSM]) });
       view.planApi.plan.mockImplementation((_budget: unknown, year: unknown) => (year === 'fy-26' ? of(plan()) : refuse(404, 'plan_not_found')));
@@ -749,7 +762,7 @@ describe('AdminBudgetsComponent', () => {
         await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' });
       };
       await del('fiscal_year_has_plan');
-      expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr hat einen Haushaltsplan, der beschlossen oder in Arbeit ist. Es lässt sich nicht löschen.');
+      expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr hat einen Haushaltsplan, der beschlossen oder in Arbeit ist. Es lässt sich deshalb weder ändern noch löschen.');
       await del('fiscal_year_has_bookings');
       expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr hat Buchungen. Lösche sie zuerst oder buche sie in ein anderes Jahr um.');
       await del('zzz');

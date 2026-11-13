@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import type { Observable } from 'rxjs';
+import { finalize, type Observable } from 'rxjs';
 import {
   InputComponent,
   SelectFieldComponent,
@@ -100,8 +100,13 @@ export class CostCentreSettingsComponent {
     this.run(this.api.updateNode(this.node().id, patch));
   }
 
+  /** A save runs. A second press of the switch then waits, so two writes of one field
+   *  never race and the last press is the one that counts. */
+  readonly saving = signal(false);
+
   private run(request: Observable<unknown>): void {
-    request.subscribe({
+    this.saving.set(true);
+    request.pipe(finalize(() => this.saving.set(false))).subscribe({
       next: () => {
         this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
         this.saved.emit();

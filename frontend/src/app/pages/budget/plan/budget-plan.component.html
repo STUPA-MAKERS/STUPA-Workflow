@@ -106,7 +106,7 @@
           }
           @case ('error') {
             <app-load-error [message]="'budget.plan.loadError' | t" (retry)="reloadPlan()" />
-            <app-empty-state plain icon="cal" fill [heading]="'budget.plan.none.title' | t" />
+            <app-empty-state plain icon="cal" fill [heading]="'budget.plan.loadError' | t" />
           }
           @case ('none') {
             @if (year()) {
@@ -156,7 +156,7 @@
       }
     }
     @if (menu().length) {
-      <app-row-menu class="bd__more" [sections]="menu()" (selected)="onAction($event.id)" />
+      <app-row-menu class="bd__more" [sections]="menu()" [loading]="busy()" (selected)="onAction($event.id)" />
     }
   </div>
 </ng-template>
@@ -243,7 +243,7 @@
         <dd class="bd__figValue mono">{{ money(row.actual) }}</dd>
       </div>
     }
-    <div class="bd__fig">
+    <div class="bd__fig" [class.bp__figWide]="nachtrag()">
       <dt class="bd__figLabel">{{ 'budget.plan.col.change' | t }}</dt>
       <dd class="bd__figValue mono">{{ changeText(row) }}</dd>
     </div>
@@ -251,7 +251,7 @@
 </ng-template>
 
 <ng-template #lineForm let-row let-cols="cols">
-  <div [class.bd__cols]="cols" [class.bd__cols--single]="cols && row.side === 'income'">
+  <div [class.bd__cols]="cols" [class.bp__stack]="!cols" [class.bd__cols--single]="cols && row.side === 'income'">
     <app-section class="bd__sec" size="lg" [heading]="(row.hasChildren ? 'budget.plan.line.note' : 'budget.plan.line.heading') | t">
       <div class="bp__form">
         @if (!row.hasChildren) {
@@ -353,7 +353,7 @@
   </app-data-table>
 </ng-template>
 
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [contentScrolls]="true" [heading]="sheetRow()?.name ?? ''" [open]="!!sheetRow()" (closed)="selectId('')">
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="sheetRow()?.name ?? ''" [open]="!!sheetRow()" (closed)="selectId('')">
   @if (sheetMenu().length) {
     <app-row-menu sheet-actions [sections]="sheetMenu()" (selected)="onAction($event.id, sheetRow())" />
   }

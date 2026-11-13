@@ -1600,11 +1600,20 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       await userEvent.tab();
       await retype('400');
       view.http.expectNone(put);
+      await userEvent.click(field());
+      await userEvent.keyboard('{Enter}');
+      view.http.expectNone(put);
       await retype('450');
       const req = view.http.expectOne(put);
       expect(req.request.body).toEqual({ allocated: '450' });
       req.flush({});
       expect(success).toHaveBeenCalledWith('Zuteilung gespeichert.');
+      view.http.expectOne(treeUrl).flush(TREE);
+      await userEvent.clear(field());
+      await userEvent.type(field(), '460{Enter}');
+      const byEnter = view.http.expectOne(put);
+      expect(byEnter.request.body).toEqual({ allocated: '460' });
+      byEnter.flush({});
       view.http.expectOne(treeUrl).flush(TREE);
     });
 

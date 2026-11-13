@@ -57,13 +57,6 @@
   margin-inline-start: auto;
 }
 
-// Beside the list the page fills the frame and its panes scroll. On a narrow screen the
-// page scrolls, so the host keeps the height of its content and the last card ends above
-// the bottom bar.
-:host:has(> .bd--wide) {
-  flex: 1 1 0;
-  min-height: 0;
-}
 .bp__group {
   display: flex;
   justify-content: space-between;
@@ -103,6 +96,13 @@
 }
 
 .bp__addForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+// The sections of the sheet stand below each other with the gap of the sheet.
+.bp__stack {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);

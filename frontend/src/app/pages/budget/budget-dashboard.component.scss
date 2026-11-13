@@ -10,6 +10,12 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+// Beside the list the panes are the only visible child. The dialogs and sheets of the page
+// are flex children without a height, and a gap for each would end the panes above the
+// place where the panes of the other list pages end.
+:host(.pane-page) {
+  gap: 0;
+}
 
 .bd__title {
   margin: 0;
@@ -510,8 +516,14 @@
   width: 5.5em;
 }
 
-/* Very high contrast (spec 000605): a colour swatch of a cost centre is white. */
+/* Very high contrast (spec 000605): each surface has a white edge of 2 px, and a colour
+   swatch of a cost centre is white. */
 @include d.host-on(veryHigh) {
+  .bd__sheet,
+  .bd__figs {
+    border: 2px solid #ffffff;
+  }
+
   .tn__swatch,
   .bd__keySwatch {
     background: #ffffff !important;

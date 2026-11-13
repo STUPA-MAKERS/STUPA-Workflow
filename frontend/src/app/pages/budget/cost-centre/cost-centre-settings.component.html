@@ -32,7 +32,7 @@
     />
   }
   <app-colour-field [(value)]="colour" [name]="'cc-colour-' + n.id" (picked)="saveColour($event)" />
-  <app-switch [id]="'cc-active-' + n.id" [checked]="n.active" (checkedChange)="save({ active: $event })">
+  <app-switch [id]="'cc-active-' + n.id" [checked]="n.active" [disabled]="saving()" (checkedChange)="save({ active: $event })">
     <span>{{ 'budget.tree.active' | t }}</span>
   </app-switch>
   <div class="ccs__pair ccs__pair--even">

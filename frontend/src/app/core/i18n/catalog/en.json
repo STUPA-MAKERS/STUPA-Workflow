@@ -4330,11 +4330,12 @@
   "admin.budgets.switch.confirm": "Switch on budget plan",
   "budget.tree.fyYearInvalid": "A year from 1900 to 2200.",
   "budget.tree.fyDeleteConfirmDraft": "Fiscal year {year} is deleted with the draft of its budget plan. This cannot be undone.",
-  "budget.tree.fyBlocked.plan": "The fiscal year has a budget plan that is decided or in progress. It cannot be deleted.",
+  "budget.tree.fyBlocked.plan": "The fiscal year has a budget plan that is decided or in progress. So it can be neither changed nor deleted.",
   "admin.audit.action.budget_plan_version_delete": "Draft of a plan version deleted",
   "admin.budgets.error.day": "A day from 1 to 28.",
   "admin.budgets.error.month": "A month from 1 to 12.",
-  "budget.plan.error.stepNotNext": "This step is already completed.",
+  "admin.budgets.error.stepNameLong": "At most 120 characters.",
+  "budget.plan.error.stepNotNext": "This step is no longer the next step. The page now shows the current state.",
   "budget.plan.noLines": "No cost centres",
   "budget.tree.colorHexPlaceholder": "#rrggbb"
 }

@@ -184,7 +184,7 @@
                     class="ab__stepName"
                     [label]="'admin.budgets.stepName' | t: { number: i + 1 }"
                     [required]="true"
-                    [error]="requiredError(step.name)"
+                    [error]="stepNameError(step.name)"
                     [ngModel]="step.name"
                     (ngModelChange)="patchStep(i, { name: $event })"
                     [name]="'stepName' + i"
