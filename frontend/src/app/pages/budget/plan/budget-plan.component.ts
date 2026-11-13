@@ -59,7 +59,7 @@ import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../budget-t
 import { CostCentreCreateComponent, type CostCentreCreated } from '../cost-centre/cost-centre-create.component';
 import { CostCentreSettingsComponent } from '../cost-centre/cost-centre-settings.component';
 import { CostCentreSelectComponent } from '../cost-centre-select/cost-centre-select.component';
-import { costCentreError, createKey, findNode, levelKey } from '../cost-centre/cost-centre.util';
+import { costCentreError, createKey, findNode, levelKey, withDescendants } from '../cost-centre/cost-centre.util';
 import { defaultFiscalYearId } from '../fiscal-year.util';
 import {
   BudgetPlanApi,
@@ -804,8 +804,14 @@ export class BudgetPlanComponent {
     });
   }
 
-  /** Select a fiscal year and load its plan and the plan of the year before. */
+  /**
+   * Select a fiscal year and load its plan and the plan of the year before. A Kostenstelle
+   * of the URL that is not in the tree of the budget goes off the page and off the URL,
+   * because the page has nothing to open for it.
+   */
   pickYear(id: string): void {
+    const budget = this.top();
+    if (this.selId() && budget && !withDescendants(budget).some((n) => n.id === this.selId())) this.selId.set('');
     this.fyId.set(id);
     this.versionId.set('');
     this.syncUrl();

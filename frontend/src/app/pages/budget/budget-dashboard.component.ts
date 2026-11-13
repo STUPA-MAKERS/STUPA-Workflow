@@ -821,6 +821,11 @@ export class BudgetDashboardComponent {
    * One resolver for both entry points, so a deep link cannot mean one thing on arrival
    * and another when it is followed later.
    *
+   * A root that the URL names waits for its years too, so the root of the cost centre does not
+   * take its place only because its years landed first.
+   * A cost centre of the URL that is not below the chosen root is dropped: the root itself is
+   * shown, so the page never names a cost centre beside a budget that is not its own.
+   *
    * A search hit is `?costCentre=…` alone, so the root comes from the cost centre itself when the URL does
    * not name one. The choice is latched, so it waits until the years of every root have landed:
    * the default is then the first root of the tree that has a year, and not the root whose
@@ -840,14 +845,15 @@ export class BudgetDashboardComponent {
     const qpBudget = qp.get('budget');
     const derived = ks && this.nodeById().get(ks) ? this.rootOf(ks) : null;
     const wanted = selectable(qpBudget) ? qpBudget : selectable(derived) ? derived : null;
-    if (wanted === null && this.pendingFiscalYears() > 0) return null;
+    const named = !!qpBudget && !!this.nodeById().get(qpBudget) && !selectable(qpBudget);
+    if ((wanted === null || named) && this.pendingFiscalYears() > 0) return null;
     const budgetId = wanted ?? withFy[0].id;
 
     const fys = this.fiscalYearsByBudget()[budgetId];
     const fy = qp.get('fy');
     return {
       budgetId,
-      ksId: ks && this.nodeById().get(ks) ? ks : budgetId,
+      ksId: ks && derived === budgetId ? ks : budgetId,
       fyId: fy && fys.some((f) => f.id === fy) ? fy : defaultFiscalYearId(fys),
     };
   }

@@ -863,6 +863,22 @@ describe('BudgetDashboardComponent', () => {
       view.http.expectNone((r) => r.url.endsWith('/applications'));
     });
 
+    it('shows the budget of the URL when its Kostenstelle is below another budget', async () => {
+      const tree = [TREE[0], node({ id: 'b-qs', key: 'QS', name: 'QS-Mittel', byFiscalYear: [alloc({ fiscalYearId: 'qs-26' })] })];
+      setViewport(true);
+      const view = await render(BudgetDashboardComponent, {
+        providers: providers({}, new BehaviorSubject(convertToParamMap({ budget: 'b-qs', costCentre: 'b-800' }))),
+      });
+      const http = TestBed.inject(HttpTestingController);
+      http.expectOne((r) => r.url.endsWith('/budgets')).flush(tree);
+      http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
+      http.expectOne((r) => r.url.endsWith('/budgets/b-qs/fiscal-years')).flush([{ ...FY, id: 'qs-26', budgetId: 'b-qs' }]);
+      const c = view.fixture.componentInstance as unknown as Inst;
+      expect(c.selectedBudgetId()).toBe('b-qs');
+      expect(c.selectedKsId()).toBe('b-qs');
+      http.match(() => true).forEach((r) => r.flush([]));
+    });
+
     /**
      * The other root has only a 2026 year, so a 2027 selection shows nothing there and a pick falls
      * back to its first year. The other root shows its 2027 figures in the tree.
