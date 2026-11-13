@@ -20,13 +20,14 @@ scope:
 # A typed text of a Kostenstelle is saved when its section goes off the page
 
 A key or a name that the person typed in the section "Kostenstelle" (000831) and did not
-leave must be saved when the section goes off the page, for example by Back on a phone. The
-page must read the tree again after this save, on the tab Bewirtschaftung and on the tab
-Planung.
+leave must be saved when the section goes off the page, for example by Back on a phone or
+by Back to the other tab of the budget. The budget page that shows when this save ends, the
+tab Bewirtschaftung or the tab Planung, must then read the tree again.
 
 Reason: A press that closes the detail does not always take the focus out of the field, and
-the typed text would else be lost without a message.
+the typed text would else be lost without a message. The page that opens reads its tree in
+the moment in which the save goes out, so its first tree can hold the text before.
 
 Test: The component tests take the section off the page with a typed name and with a typed
-key and read the request and the call of the page. One test of each page reads the tree
-after that call.
+key and read the request and the message for the page that shows. One test of each page
+reads the tree after that message.

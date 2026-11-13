@@ -20,7 +20,8 @@ the person makes during a save must be saved after it, for the Kostenstelle that
 made it for. This holds when changes for more than one Kostenstelle wait, and when the change
 sets the field back to the value before. A field that holds its saved value must send
 nothing, also when the person selected another Kostenstelle in the meantime, and a value
-that another person set back must be saved again. A save, refused or not, must not change
+that another person set back must be saved again. The third of three changes of a field
+that go back and forth must be saved. A save, refused or not, must not change
 the text that the person types in another field or in a field of another Kostenstelle, and
 a refused save must not change a control whose later choice waits. The switch "Aktiv" must
 stay enabled and keep the keyboard focus while a save runs, and a switch or a select must
@@ -37,4 +38,5 @@ switch during a save and then the switch of another Kostenstelle, refuse a save 
 Kostenstelle before, set a select back while its save runs, save a name again that the tree
 took back, refuse a save while a later press of the switch waits, and select another
 Kostenstelle while a press that is back at the saved state and a field without a change
-wait.
+wait. One test presses the switch a third time while the tree holds the state of the first
+press.

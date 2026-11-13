@@ -13,6 +13,7 @@ tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_copy_gives_each_parent_the_sum_of_its_children"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_first_child_line_takes_the_ansatz_of_its_parent"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_sum_above_the_largest_amount_is_refused"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_side_sum_above_the_largest_amount_is_refused"
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_summed_amounts_give_each_parent_the_sum_of_its_children"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
   - "frontend/src/app/pages/budget/cost-centre/cost-centre-create.component.spec.ts:CostCentreCreateComponent"
@@ -32,7 +33,9 @@ must hold an Ansatz from 0 € and an optional Erläuterung. A Kostenstelle with
 has a line in the version must hold the sum of the Ansätze of those children as its Ansatz.
 The platform must set that sum on each level after each change and each removal of a line,
 after the delete of a child Kostenstelle and in each new version that copies lines. The
-platform must answer 422 `plan_amount_too_large` when a sum passes 9 999 999 999,99 €. A
+platform must answer 422 `plan_amount_too_large` when a sum passes 9 999 999 999,99 €: the
+sum of a parent, and the sum of the income side or of the expense side of the plan, at the
+change of a line and when the version leaves the draft. A
 person must not set the Ansatz of such a Kostenstelle: the platform must ignore an amount
 that a request gives for it, and the plan must show no Ansatz field for it. When the sum
 falls below the gesperrt amount of the parent, the platform must lower that amount to the
@@ -49,4 +52,5 @@ above or below the sum of its children. The first child takes the Ansatz of its 
 the split of a Kostenstelle loses no planned amount.
 
 Test: The tests change, remove and copy lines of children on two levels and read the Ansatz of
-each parent. The plan page shows no Ansatz field for a parent.
+each parent. One test gives a side a sum above the largest amount at a line and at the state
+change. The plan page shows no Ansatz field for a parent.
