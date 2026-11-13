@@ -1223,9 +1223,12 @@ async def test_the_export_logo_comes_from_the_active_branding(session: AsyncSess
         "mime": "image/png",
         "size": len(png),
     }
-    active = (
+    found = (
         await session.scalars(select(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)))
-    ).one()
+    ).first()
+    assert await active_export_logo(session) is None
+    active = found or SiteConfigVersion(version=10**8 + 7, active=True, branding={})
+    session.add(active)
     kept = dict(active.branding)
     try:
         active.branding = {**kept, "logos": {}}
@@ -1235,7 +1238,10 @@ async def test_the_export_logo_comes_from_the_active_branding(session: AsyncSess
         await session.commit()
         assert await active_export_logo(session) == ExportLogo("export-logo.png", png)
     finally:
-        active.branding = kept
+        if found is None:
+            await session.delete(active)
+        else:
+            active.branding = kept
         await session.commit()
 
 
