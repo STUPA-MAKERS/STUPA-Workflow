@@ -1372,7 +1372,6 @@ class ProtocolService:
             return {}
         pdfs = ApplicationPdfService(
             self.session,
-            storage=self.storage,
             typst=self.typst,
             settings=self.settings or get_settings(),
         )

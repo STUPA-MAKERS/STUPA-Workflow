@@ -40,18 +40,17 @@ from app.modules.documents.application_markdown import (
     anlage_link,
     build_application_document,
 )
-from app.modules.files.cd_resolver import (
-    cd_render_config,
-    cd_variant_key_for_gremium,
-    resolve_cd_variant_by_key,
-)
 from app.modules.files.models import Attachment
-from app.modules.files.storage import ObjectStorage
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.gremien.models import Gremium
 from app.modules.media.refs import document_path
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.pdf.typst_client import TypstClient, TypstError
+from app.modules.site_config.export_logo import (
+    active_export_logo,
+    export_render_assets,
+    export_render_config,
+)
 from app.modules.voting.models import Vote
 from app.settings import Settings
 from app.shared.errors import BadRequestError, NotFoundError, ServiceUnavailableError
@@ -131,14 +130,12 @@ class ApplicationPdfService:
 
     Attributes:
         session: The database session of the request.
-        storage: The object storage, for the uploaded logos of the design.
         typst: The client of the render service, or `None` when it is not configured.
         settings: The settings, for the local time zone.
     """
 
     session: AsyncSession
     _: KW_ONLY
-    storage: ObjectStorage | None
     typst: TypstClient | None
     settings: Settings
 
@@ -255,7 +252,6 @@ class ApplicationPdfService:
             title=_title(out.data),
             type_name=await self._type_name(app.type_id),
             gremium_name=gremium.name if gremium is not None else None,
-            cd_variant=await cd_variant_key_for_gremium(self.session, gremium),
             state_label=resolve_i18n(out.state.label, LANG) if out.state is not None else None,
             received_on=self._received_on(app),
             applicant=applicant,
@@ -323,7 +319,6 @@ class ApplicationPdfService:
             title=_title(data),
             type_name=await self._type_name(app.type_id),
             gremium_name=gremium.name if gremium is not None else None,
-            cd_variant=await cd_variant_key_for_gremium(self.session, gremium),
             state_label=None,
             received_on=self._received_on(app),
             applicant=(applicant.name or None) if applicant is not None else None,
@@ -408,7 +403,7 @@ class ApplicationPdfService:
             return None
 
     async def render(self, doc: ApplicationDoc) -> bytes:
-        """Render a document in the design of its Gremium.
+        """Render a document with the export logo of the branding (spec 000891).
 
         Raises:
             ServiceUnavailableError: The render service is not configured or failed for
@@ -417,16 +412,13 @@ class ApplicationPdfService:
         """
         if self.typst is None:
             raise ServiceUnavailableError("PDF rendering is not available.")
-        cd = await resolve_cd_variant_by_key(self.session, self.storage, doc.cd_variant)
-        variant = f"protocol-{doc.cd_variant}" if doc.cd_variant in {"stupa", "asta"} else None
-        config = cd_render_config(cd) if cd else None
-        assets = dict(cd.assets) if cd else None
+        logo = await active_export_logo(self.session)
         try:
             return await self.typst.render_pdf(
                 build_application_document(doc),
-                variant=variant,
-                config=config,
-                assets=assets or None,
+                variant=None,
+                config=export_render_config(logo, footer=True),
+                assets=export_render_assets(logo),
             )
         except TypstError as exc:
             if not exc.retryable:

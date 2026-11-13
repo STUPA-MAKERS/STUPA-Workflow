@@ -235,7 +235,7 @@ async def test_the_vote_opening_fixes_the_version(
         app_id = await _application(session, seed, zweck="v1")
         await _versions_at(session, app_id, start)
         _, (item,) = await _meeting(session, seed, [(app_id, False, None)])
-        pdfs = ApplicationPdfService(session, storage=None, typst=None, settings=get_settings())
+        pdfs = ApplicationPdfService(session, typst=None, settings=get_settings())
         assert await pdfs.frozen_version(item) is None
 
         await _edit(session, app_id, "v2", start + timedelta(hours=2))

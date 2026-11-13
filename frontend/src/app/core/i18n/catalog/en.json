@@ -2048,6 +2048,8 @@
   "admin.brand.logo.wordmark": "Wordmark",
   "admin.brand.logo.imagemark": "Image mark",
   "admin.brand.logo.favicon": "Favicon",
+  "admin.brand.logo.export": "PDF exports",
+  "admin.brand.logo.none": "No logo",
   "admin.brand.logo.default": "Default",
   "admin.brand.accent.group": "Accent colour",
   "admin.brand.accent.pick": "Pick a colour",

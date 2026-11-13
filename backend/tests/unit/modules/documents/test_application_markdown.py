@@ -10,6 +10,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+import pytest
+
+from app.modules.documents import service as documents_service
 from app.modules.documents.application_markdown import (
     BAR,
     NOT_VISIBLE,
@@ -23,6 +26,7 @@ from app.modules.documents.application_markdown import (
     is_empty,
 )
 from app.modules.documents.router import application_pdf_filename
+from app.modules.site_config.export_logo import ExportLogo
 from app.shared.config_schemas import FormFieldDef
 
 
@@ -102,7 +106,6 @@ def _doc(**kwargs: Any) -> ApplicationDoc:
         "title": "Exkursion *Stuttgart*",
         "type_name": "Finanzantrag",
         "gremium_name": "Studierendenparlament",
-        "cd_variant": "stupa",
         "state_label": "Bewilligt",
         "received_on": date(2026, 11, 10),
         "applicant": "Max Muster",
@@ -337,3 +340,42 @@ def test_more_field_types() -> None:
     assert row("Obj", "x: 1, Ja") in md
     assert row("Rng", "`frei`") in md
     assert row("Cond", "sichtbar") in md
+
+
+class _RecordingTypst:
+    """Record the variant, the config and the assets of each render."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str | None, Any, Any]] = []
+
+    async def render_pdf(
+        self, markdown: str, *, variant: str | None, config: Any, assets: Any
+    ) -> bytes:
+        self.calls.append((variant, config, assets))
+        return b"%PDF"
+
+
+async def test_the_pdf_carries_the_export_logo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rule: §F/administration/admin/000891. The export logo is the only logo of the Antrag.
+
+    It goes in the footer, and without one the render gets empty logo lists, so the render
+    service adds no logo of its own.
+    """
+    logos: list[ExportLogo | None] = [ExportLogo("export-logo.png", b"png"), None]
+
+    async def export_logo(_session: object) -> ExportLogo | None:
+        return logos.pop(0)
+
+    monkeypatch.setattr(documents_service, "active_export_logo", export_logo)
+    typst = _RecordingTypst()
+    pdfs = documents_service.ApplicationPdfService(
+        object(),  # type: ignore[arg-type]
+        typst=typst,  # type: ignore[arg-type]
+        settings=object(),  # type: ignore[arg-type]
+    )
+    await pdfs.render(_doc())
+    await pdfs.render(_doc())
+    assert typst.calls == [
+        (None, {"logos": [], "footer_logos": ["export-logo.png"]}, {"export-logo.png": b"png"}),
+        (None, {"logos": [], "footer_logos": []}, None),
+    ]

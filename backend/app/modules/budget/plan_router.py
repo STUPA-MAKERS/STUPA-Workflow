@@ -34,8 +34,12 @@ from app.modules.budget.plan_schemas import (
 )
 from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_router import ServiceDep, _errors, _require_node_view
-from app.modules.files.cd_resolver import cd_render_config
 from app.modules.pdf.typst_client import TypstError, build_typst_client
+from app.modules.site_config.export_logo import (
+    active_export_logo,
+    export_render_assets,
+    export_render_config,
+)
 from app.shared.errors import BadRequestError, ServiceUnavailableError
 from app.shared.filenames import content_disposition
 from app.shared.xlsx import XLSX_MEDIA_TYPE, build_table_workbook
@@ -160,23 +164,22 @@ async def export_plan_pdf(
 ) -> Response:
     """Return a version of a Haushaltsplan as a PDF, for each reader of the plan.
 
-    The PDF carries the logos of the corporate design of the Gremium of the budget.
+    The PDF carries the export logo of the branding.
 
-    Rule: §F/finance/budget/000875.
+    Rules: §F/finance/budget/000875, §F/administration/admin/000891.
 
     Raises:
         BadRequestError: `render_failed` (400) when the render service refuses the plan.
         ServiceUnavailableError: The render service does not answer (503).
     """
     export = await _export_of(service, principal, version_id, "pdf")
-    design = await service.plan_design(version_id)
-    logos = cd_render_config(design) if design else {}
+    logo = await active_export_logo(service.session)
     try:
         pdf = await build_typst_client(settings).render_pdf(
             plan_export.pdf_source(export),
             variant="plan",
-            config={**logos, **plan_export.pdf_config(export)},
-            assets=(design.assets or None) if design else None,
+            config={**export_render_config(logo, footer=False), **plan_export.pdf_config(export)},
+            assets=export_render_assets(logo),
         )
     except TypstError as exc:
         if not exc.retryable:

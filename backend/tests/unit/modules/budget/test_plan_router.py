@@ -30,8 +30,8 @@ from app.modules.budget.plan_schemas import (
     PlanVersionOut,
 )
 from app.modules.budget.tree_router import get_budget_tree_service
-from app.modules.files.cd_resolver import ResolvedCdVariant
 from app.modules.pdf.typst_client import TypstError
+from app.modules.site_config.export_logo import ExportLogo
 from app.shared.xlsx import XLSX_MEDIA_TYPE
 
 _TOP = uuid.uuid4()
@@ -78,6 +78,7 @@ class _Tx:
 
     def __init__(self) -> None:
         self.commits = 0
+        self.export_logo: ExportLogo | None = None
         self.rollbacks = 0
 
     async def commit(self) -> None:
@@ -92,7 +93,6 @@ class _FakePlans:
         self.calls: list[tuple[str, Any]] = []
         self.session = _Tx()
         self.visible = visible
-        self.design: ResolvedCdVariant | None = None
 
     async def can_view_node(self, budget_id: uuid.UUID, member: object) -> bool:
         return self.visible
@@ -163,9 +163,6 @@ class _FakePlans:
         self.calls.append(("export", version_id))
         head = ExportHead("VS-Mittel", "2026", None, 0, "draft", today)
         return build_export(head, _ExportTop(), _plan().versions[0].lines)
-
-    async def plan_design(self, version_id: uuid.UUID) -> ResolvedCdVariant | None:
-        return self.design
 
 
 def _client(fake: _FakePlans, *permissions: str) -> TestClient:
@@ -504,7 +501,11 @@ def audited(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     async def no_gremien(_service: object, _sub: str) -> set[uuid.UUID]:
         return set()
 
+    async def export_logo(session: _Tx) -> ExportLogo | None:
+        return session.export_logo
+
     monkeypatch.setattr(plan_router, "audit_record", record)
+    monkeypatch.setattr(plan_router, "active_export_logo", export_logo)
     monkeypatch.setattr("app.modules.budget.tree_router._member_gremium_ids", no_gremien)
     return entries
 
@@ -541,27 +542,24 @@ def test_a_reader_of_the_plan_loads_the_pdf_file(
     assert variant == "plan"
     assert config["plan"]["mark"] == "Entwurf"
     assert [e["target_id"] for e in audited] == ["haushaltsplan.pdf"]
-    assert "logos" not in config
+    assert (config["logos"], config["footer_logos"]) == ([], [])
     assert typst.assets == [None]
 
 
-def test_the_pdf_carries_the_design_of_the_gremium(
+def test_the_pdf_carries_the_export_logo(
     monkeypatch: pytest.MonkeyPatch, audited: list[dict[str, Any]]
 ) -> None:
-    """Rule: §F/finance/budget/000875. The logos of the Gremium go to the render service."""
+    """Rule: §F/administration/admin/000891. The export logo is the only logo of the plan."""
     typst = _Typst()
     monkeypatch.setattr(plan_router, "build_typst_client", lambda settings: typst)
     fake = _FakePlans()
-    fake.design = ResolvedCdVariant(("ASTA", "own.png"), ("own.png",), {"own.png": b"png"})
+    fake.session.export_logo = ExportLogo("export-logo.png", b"png")
     resp = _client(fake).get(f"/api/budget-plan-versions/{_VERSION}/export.pdf")
     assert resp.status_code == 200, resp.text
     ((_source, _variant, config),) = typst.requests
-    assert (config["logos"], config["footer_logos"]) == (["ASTA", "own.png"], ["own.png"])
+    assert (config["logos"], config["footer_logos"]) == (["export-logo.png"], [])
     assert config["plan"]["title"] == "Haushaltsplan VS-Mittel 2026"
-    assert typst.assets == [{"own.png": b"png"}]
-    fake.design = ResolvedCdVariant(("ASTA",), (), {})
-    _client(fake).get(f"/api/budget-plan-versions/{_VERSION}/export.pdf")
-    assert typst.assets[1] is None
+    assert typst.assets == [{"export-logo.png": b"png"}]
 
 
 @pytest.mark.parametrize("extension", ["xlsx", "pdf"])
