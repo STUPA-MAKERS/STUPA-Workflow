@@ -28,7 +28,8 @@ the Antrag reads as one table. Each value cell must render its Markdown
 
 A value that would take 30 lines or more must show 29 lines and a line "…". A cell of the
 Kostenaufstellung (a position or an offer) that would take 3 lines or more must show 2 lines
-and a line "…". The Kostenaufstellung must have no rule above and no rule below.
+and a line "…". The Kostenaufstellung must have no rule above and no rule below, and no inset at
+its sides: it starts at the text of the other values and ends at the right edge of the table.
 
 The version, each date, an IBAN and each amount must print in the monospace font. The names of
 the attached files must print in the monospace font, one name per line, without list markers.

@@ -595,15 +595,21 @@
   }
 })
 
+// The side inset of the cells of a field table.
+#let field-inset = 6pt
+
 // A GFM table. Nested in a field row (an Antrag, `nested: true`), it has no top
-// and no bottom rule, and each cell is cut at three lines (000881).
+// and no bottom rule, each cell is cut at three lines, and it has no inset at its
+// sides: it starts at the text of the other values and ends at the right edge of
+// the field table (000881).
 #let table-block(n, nested: false) = {
   let aligns = n.align.map(a => if a == "center" { center } else if a == "right" { right } else { left })
   let cols = n.head.len()
   let row(cells) = grid(
     columns: (1fr,) * cols,
     align: aligns,
-    inset: (x: 6pt),
+    inset: if nested { 0pt } else { (x: 6pt) },
+    column-gutter: if nested { 12pt } else { 0pt },
     ..range(cols).map(k => {
       set par(justify: false)
       let cell = cells.at(k, default: ())
@@ -613,7 +619,7 @@
   let rule(w) = rect(width: 100%, height: w, fill: black, stroke: none)
   // booktabs at \arraystretch 1.5: \toprule .08em, \midrule .05em,
   // \bottomrule .08em, 20.33pt from row to row.
-  block(width: 100%, breakable: false, {
+  pad(right: if nested { -field-inset } else { 0pt }, block(width: 100%, breakable: false, {
     if not nested {
       rule(0.876pt)
       v(6.45pt)
@@ -630,7 +636,7 @@
       v(5.46pt)
       rule(0.876pt)
     }
-  })
+  }))
 }
 
 // A paragraph of one uploaded image: centered, at most the text width and
@@ -781,7 +787,7 @@
         } else { () }
         grid(
           columns: (45mm, 1fr),
-          inset: (x: 6pt, y: 4pt),
+          inset: (x: field-inset, y: 4pt),
           align: left + top,
           ..if not joined { (grid.hline(stroke: 0.876pt),) },
           ..band,
