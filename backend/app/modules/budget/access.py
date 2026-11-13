@@ -7,7 +7,7 @@ that scope covers the tree, not the invoice and booking lists.
 
 The gremium scope opens the subtree of a node for the Gremium in its
 ``view_gremium_id``, and a top-level node with a plan for each Gremium that decides
-its plan in a step (spec 000888).
+its plan in a step (spec 000890).
 
 The global search and the to-do links ask this gate too, so a hit or a link never
 shows more than the lists show.
@@ -42,7 +42,7 @@ def viewed_by(gremium_ids: Collection[UUID]) -> ColumnElement[bool]:
 
     A node matches with one of the Gremien in its ``view_gremium_id``. A top-level node
     with a plan matches too when one of the Gremien decides its plan in a step, because
-    the members of such a Gremium read the whole Haushalt (spec 000888).
+    the members of such a Gremium read the whole Haushalt (spec 000890).
     """
     return or_(
         Budget.view_gremium_id.in_(gremium_ids),

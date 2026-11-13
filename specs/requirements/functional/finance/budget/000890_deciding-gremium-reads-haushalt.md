@@ -1,8 +1,8 @@
 ---
-id: "000888"
+id: "000890"
 title: A Gremium that decides a plan reads the Haushalt
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 tests:

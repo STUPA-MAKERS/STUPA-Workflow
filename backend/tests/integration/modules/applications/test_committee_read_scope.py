@@ -311,7 +311,7 @@ async def test_pool_substitute_reads_like_a_member(session: AsyncSession) -> Non
 async def test_a_gremium_that_decides_the_plan_reads_the_haushalt(session: AsyncSession) -> None:
     """A member of a Gremium in a plan step reads the Haushalt like its view Gremium.
 
-    Rule: §F/finance/budget/000888.
+    Rule: §F/finance/budget/000890.
     """
     sc = await _seed(session)
     tag = uuid.uuid4().hex[:8]

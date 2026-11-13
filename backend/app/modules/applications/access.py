@@ -285,7 +285,7 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
 
     1. the ``view_gremium_id`` of the cost center of the application and of each of
        its ancestors (the ``path_key`` prefixes, as ``can_view_node`` reads them), and
-       each Gremium that decides the plan of its Haushalt in a step (spec 000888);
+       each Gremium that decides the plan of its Haushalt in a step (spec 000890);
     2. the deciding Gremium of the current vote state (``application.vote_gremium_id``);
     3. the Gremium of each meeting that voted on the application.
 
