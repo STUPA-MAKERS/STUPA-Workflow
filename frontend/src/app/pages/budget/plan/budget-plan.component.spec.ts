@@ -18,9 +18,12 @@ import { BudgetPlanApi, type BudgetPlan, type PlanStep } from './budget-plan.api
 import { BudgetPlanComponent } from './budget-plan.component';
 import { FY25, FY26, QSM, TOP, fy, line, node, plan, version } from './budget-plan.fixtures';
 
-function setViewport(wide: boolean, phone = false): void {
+function setViewport(wide: boolean, phone = false, roomy = wide): void {
   window.matchMedia = ((query: string) => ({
-    matches: (wide && query.includes('min-width: 1200px')) || (phone && query === '(max-width: 767.98px)'),
+    matches:
+      (wide && query.includes('min-width: 1200px')) ||
+      (roomy && query.includes('min-width: 1340px')) ||
+      (phone && query === '(max-width: 767.98px)'),
     media: query,
     onchange: null,
     addEventListener: () => undefined,
@@ -41,6 +44,8 @@ interface Opts {
   perms?: readonly string[];
   wide?: boolean;
   phone?: boolean;
+  /** The window is wide and has no room for the column "Änderung" beside the year before. */
+  tight?: boolean;
   query?: Record<string, string>;
   /** The feature Abstimmungen is off. */
   votingOff?: boolean;
@@ -52,7 +57,7 @@ interface Opts {
 
 async function setup(opts: Opts = {}) {
   TestBed.resetTestingModule();
-  setViewport(opts.wide ?? true, opts.phone);
+  setViewport(opts.wide ?? true, opts.phone, (opts.wide ?? true) && !opts.tight);
   const plans = opts.plans ?? { 'fy-26': plan() };
   const perms = opts.perms ?? ['budget.view', 'budget.structure'];
   const answer = (p: BudgetPlan = plans['fy-26'] ?? plan()) => of(p);
@@ -270,6 +275,21 @@ describe('BudgetPlanComponent', () => {
       const cells = within(income).getAllByRole('row').at(-1) as HTMLElement;
       expect(text(cells)).toContain('80 €');
       expect(text(cells)).toContain('+20 €');
+    });
+
+    it('§F/finance/budget/000808: a wide window below 1340 px has no column "Änderung" beside the year before', async () => {
+      const before = plan([version({ id: 'p', state: 'in_force', lines: [line('fees', '80'), line('grants', '30')] })], 'fy-25');
+      const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before }, tight: true });
+      const income = view.container.querySelectorAll('app-data-table')[0] as HTMLElement;
+      expect(within(income).getAllByRole('columnheader').map(text)).toEqual([
+        'Titel',
+        'Ansatz 2026/27',
+        'Ansatz 2025/26',
+        'Ist 2025/26',
+      ]);
+      const first = await setup({ years: [FY26], tight: true });
+      const alone = first.container.querySelectorAll('app-data-table')[0] as HTMLElement;
+      expect(within(alone).getAllByRole('columnheader').map(text)).toEqual(['Titel', 'Ansatz 2026/27', 'Änderung']);
     });
 
     it('has no columns of the year before in the first year', async () => {

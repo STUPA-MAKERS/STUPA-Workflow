@@ -166,6 +166,8 @@ const WRITE_ERRORS: Readonly<Record<string, TranslationKey>> = {
   fiscal_year_closed: 'budget.fy.closedError',
 };
 
+/** From this width, a wide plan table shows the column "Änderung" beside the year before. */
+const ROOMY = '(min-width: 1340px)';
 const MONEY_COL = '6.75rem';
 const FIELD_COL = '10rem';
 /** The first Ansatz that the narrow amount field of a table cuts. */
@@ -239,6 +241,13 @@ export class BudgetPlanComponent {
 
   readonly wide = mediaQuery(MEDIA.wide);
   readonly phone = mediaQuery(MEDIA.phone);
+  /**
+   * The window has room for every column of the tables. Between the wide breakpoint and
+   * this width, the table of a plan with the two columns of the year before drops the
+   * column "Änderung", because the name column else keeps about 110 px and a name or a
+   * Vermerk of a deep Kostenstelle breaks into lines of one or two letters.
+   */
+  readonly roomy = mediaQuery(ROOMY);
 
   readonly loading = signal(true);
   readonly error = signal(false);
@@ -446,11 +455,12 @@ export class BudgetPlanComponent {
             money('actual', this.i18n.translate('budget.plan.col.actual', { year: prev })),
           ]
         : [];
+    const tight = this.wide() && !this.roomy() && rest.length > 1;
     return [
       { key: 'node', label: this.i18n.translate('budget.plan.col.title'), card: 'title' },
       own,
       ...rest,
-      money('change', this.i18n.translate('budget.plan.col.change')),
+      ...(tight ? [] : [money('change', this.i18n.translate('budget.plan.col.change'))]),
     ];
   });
   readonly rowId = (row: unknown): string => (row as PlanRow).id;
