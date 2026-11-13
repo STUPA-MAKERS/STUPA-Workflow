@@ -2,7 +2,7 @@
 id: "000891"
 title: Exported PDFs carry the export logo of the branding
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 tests:
