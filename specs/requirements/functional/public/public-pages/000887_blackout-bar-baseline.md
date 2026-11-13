@@ -2,7 +2,7 @@
 id: "000887"
 title: A black bar in the PDF sits on the baseline of its line
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-13
 tests:
