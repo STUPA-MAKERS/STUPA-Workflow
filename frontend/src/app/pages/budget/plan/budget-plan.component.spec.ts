@@ -439,19 +439,30 @@ describe('BudgetPlanComponent', () => {
       view.fixture.detectChanges();
       expect(settings()).toBe(first);
       expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('77 €');
-      view.api.plan.mockReturnValueOnce(throwError(() => problem(500)));
+      const failed = new Subject<BudgetPlan>();
+      view.api.plan.mockReturnValueOnce(failed).mockReturnValueOnce(throwError(() => problem(500)));
       first.sideSaved.emit();
-      view.api.plan.mockReturnValueOnce(throwError(() => problem(404, 'plan_not_found')));
-      first.sideSaved.emit();
+      failed.error(problem(500));
       view.fixture.detectChanges();
-      expect(settings()).toBe(first);
+      expect(view.container.querySelector('.bd__sheetBody app-load-error')).not.toBeNull();
+      await pickChip(/Haushaltsjahr/, 'HHJ 2026/27');
       const other = new Subject<BudgetPlan>();
-      view.api.plan.mockReturnValueOnce(other);
-      first.sideSaved.emit();
+      const gone = new Subject<BudgetPlan>();
+      view.api.plan.mockReturnValueOnce(other).mockReturnValueOnce(gone);
+      view.fixture.componentInstance.refreshPlan();
+      view.fixture.componentInstance.refreshPlan();
+      const reads = view.api.plan.mock.calls.length;
       await pickChip(/Haushaltsjahr/, 'HHJ 2025/26');
       other.next(plan([version({ lines: [line('fees', '55')] })]));
+      gone.error(problem(500));
       view.fixture.detectChanges();
       expect(view.container.textContent).not.toContain('55 €');
+      expect(view.api.plan.mock.calls.length).toBeGreaterThan(reads);
+      expect(view.container.querySelector('.bd__sheetBody app-load-error')).toBeNull();
+      view.api.plan.mockReturnValueOnce(throwError(() => problem(404, 'plan_not_found')));
+      view.fixture.componentInstance.refreshPlan();
+      view.fixture.detectChanges();
+      expect(screen.getByText('Kein Haushaltsplan')).toBeInTheDocument();
     });
 
     it('§F/finance/budget/000812: an answer for another year does not come onto the page', async () => {
@@ -495,6 +506,37 @@ describe('BudgetPlanComponent', () => {
         [],
         expect.objectContaining({ queryParams: expect.objectContaining({ fy: 'fy-26', version: 0 }) }),
       );
+    });
+
+    it('§F/finance/budget/000812: the answer of a new Kostenstelle and the years of a budget that the person left stay off the page', async () => {
+      const second = node({ id: 'two', name: 'Zweiter', planEnabled: true });
+      const view = await setup({
+        tree: [TOP, second],
+        plans: { 'fy-25': plan([version({ state: 'in_force' })], 'fy-25'), 'fy-26': plan() },
+      });
+      const page = view.fixture.componentInstance;
+      const tree = new Subject<BudgetTreeNode[]>();
+      view.treeApi.tree.mockReturnValueOnce(tree);
+      page.onCreated({ id: null, plan: plan([version({ id: 'late', number: 3 })]) });
+      await pickChip(/Haushaltsjahr/, 'HHJ 2025/26');
+      tree.next([TOP, second]);
+      view.fixture.detectChanges();
+      expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Stammplan');
+      const years = new Subject<FiscalYear[]>();
+      const failed = new Subject<FiscalYear[]>();
+      view.treeApi.listFiscalYears.mockReturnValueOnce(years).mockReturnValueOnce(failed);
+      page.pickTop('two');
+      page.pickTop('two');
+      view.fixture.detectChanges();
+      expect(screen.queryByRole('button', { name: /^Version/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      expect(screen.queryByTestId('bp-primary')).toBeNull();
+      page.pickTop('vsm');
+      years.next([fy('other', 2040)]);
+      failed.error(problem(500));
+      view.fixture.detectChanges();
+      expect(screen.getByRole('button', { name: /Haushaltsjahr/ })).toHaveTextContent('HHJ 2026/27');
+      expect(view.container.querySelector('app-load-error')).toBeNull();
     });
 
     it('shows the plan read error with a retry', async () => {
@@ -766,6 +808,53 @@ describe('BudgetPlanComponent', () => {
       view.api.setLine.mockReturnValueOnce(throwError(() => problem(500, 'zzz')));
       await typeAmount(input(view, 'amount-grants'), '2');
       expect(view.error).toHaveBeenLastCalledWith('Die Änderung konnte nicht gespeichert werden.');
+    });
+
+    it('§F/finance/budget/000812: a refused field keeps the line open and shows the saved text again', async () => {
+      const view = await setup({ query: { costCentre: 'grants' } });
+      const sheet = () => view.container.querySelector('.bp__lineFigs');
+      const open = sheet();
+      const pending = new Subject<BudgetPlan>();
+      view.api.plan.mockReturnValueOnce(pending);
+      view.api.setLine.mockReturnValueOnce(throwError(() => problem(422, 'plan_blocked_above_amount')));
+      const note = view.container.querySelector<HTMLTextAreaElement>('[name="line-note-grants"]') as HTMLTextAreaElement;
+      await userEvent.type(note, 'Neu');
+      await userEvent.tab();
+      view.fixture.detectChanges();
+      expect(view.error).toHaveBeenCalledWith('Der gesperrte Betrag liegt über dem Ansatz.');
+      expect(sheet()).toBe(open);
+      expect(view.container.querySelector('app-skeleton')).toBeNull();
+      expect(note.value).toBe('');
+      pending.next(plan());
+      view.fixture.detectChanges();
+      expect(sheet()).toBe(open);
+    });
+
+    it('§F/finance/budget/000812: an answer that is older than the plan on the page does not replace it', async () => {
+      const view = await setup({ query: { costCentre: 'fees' } });
+      const read = new Subject<BudgetPlan>();
+      view.api.plan.mockReturnValueOnce(read);
+      view.fixture.componentInstance.refreshPlan();
+      view.api.setLine.mockReturnValueOnce(of(plan([version({ lines: [line('fees', '777')] })])));
+      await typeAmount(input(view, 'line-amount-fees'), '777');
+      read.next(plan([version({ lines: [line('fees', '1')] })]));
+      view.fixture.detectChanges();
+      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('777 €');
+      const first = new Subject<BudgetPlan>();
+      view.api.setLine.mockReturnValueOnce(first).mockReturnValueOnce(of(plan([version({ lines: [line('fees', '9')] })])));
+      await typeAmount(input(view, 'line-amount-fees'), '8');
+      await typeAmount(input(view, 'line-amount-fees'), '9');
+      first.next(plan([version({ lines: [line('fees', '8')] })]));
+      view.fixture.detectChanges();
+      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('9 €');
+      const tree = new Subject<BudgetTreeNode[]>();
+      view.treeApi.tree.mockReturnValueOnce(tree);
+      view.fixture.componentInstance.onCreated({ id: null, plan: plan([version({ lines: [line('fees', '5')] })]) });
+      view.api.setLine.mockReturnValueOnce(of(plan([version({ lines: [line('fees', '6')] })])));
+      await typeAmount(input(view, 'line-amount-fees'), '6');
+      tree.next([TOP, QSM]);
+      view.fixture.detectChanges();
+      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('6 €');
     });
   });
 

@@ -33,9 +33,9 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
 /**
  * The message of a refused gremium delete. The delete applies the rules of the meeting
  * delete to every meeting of the gremium: an open vote gives 409 `open_vote`, a final
- * protocol without `meeting.delete_finalized` gives 403 `meeting_finalized`. Any other
- * A Gremium that a budget belongs to gives 409 `gremium_has_budget`. Any other
- * refusal keeps the generic message.
+ * protocol without `meeting.delete_finalized` gives 403 `meeting_finalized`. A Gremium
+ * that a budget belongs to gives 409 `gremium_has_budget`. Any other refusal keeps the
+ * generic message.
  */
 function deleteErrorKey(err: unknown): TranslationKey {
   switch (problemCode(err)) {

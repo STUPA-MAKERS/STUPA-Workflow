@@ -708,16 +708,27 @@ export class BudgetPlanComponent {
     });
   }
 
-  /** Select a top-level Kostenstelle and load its fiscal years. */
+  /**
+   * Select a top-level Kostenstelle and load its fiscal years. The plan and the years of the
+   * budget before go off the page at once, so no action of the old plan stands under the name
+   * of the new budget. The years of a budget that the person left before the answer do not
+   * come onto the page.
+   */
   pickTop(id: string, wantedFy: string | null = null): void {
     this.topId.set(id);
+    this.years.set([]);
+    this.fyId.set('');
+    this.versionId.set('');
+    this.load.set({ kind: 'loading' });
     this.treeApi.listFiscalYears(id as Uuid).subscribe({
       next: (years) => {
+        if (this.topId() !== id) return;
         this.years.set(years);
         this.loading.set(false);
         this.pickYear(years.find((y) => y.id === wantedFy)?.id ?? defaultFiscalYearId(years));
       },
       error: () => {
+        if (this.topId() !== id) return;
         this.error.set(true);
         this.loading.set(false);
       },
@@ -737,6 +748,7 @@ export class BudgetPlanComponent {
     const top = this.topId() as Uuid;
     const prev = this.prevYear();
     const place = this.place();
+    const sent = this.send();
     forkJoin({
       plan: this.readPlan(top, id as Uuid),
       prev: prev ? this.readPlan(top, prev.id) : of(null),
@@ -744,7 +756,7 @@ export class BudgetPlanComponent {
       next: ({ plan, prev: before }) => {
         if (this.place() !== place) return;
         this.prevPlan.set(before);
-        this.load.set(plan ? { kind: 'plan', plan } : { kind: 'none' });
+        if (this.newest(sent)) this.load.set(plan ? { kind: 'plan', plan } : { kind: 'none' });
         const wanted = plan?.versions.find((v) => v.number === this.wantedVersion);
         this.wantedVersion = null;
         if (wanted) this.pickVersion(wanted.id);
@@ -764,17 +776,42 @@ export class BudgetPlanComponent {
     return `${this.topId()}|${this.fyId()}`;
   }
 
+  /** The number of the last request for a plan, and of the request whose plan the page shows. */
+  private lastSent = 0;
+  private lastShown = 0;
+
+  /** Number a request for a plan at the moment it goes out. */
+  private send(): number {
+    this.lastSent += 1;
+    return this.lastSent;
+  }
+
+  /**
+   * Report whether the answer of a request may come onto the page. An answer is older than
+   * the plan on the page when a request that went out later is already answered, and it
+   * would then show an amount that is no longer the saved one.
+   */
+  private newest(sent: number): boolean {
+    if (sent < this.lastShown) return false;
+    this.lastShown = sent;
+    return true;
+  }
+
   /**
    * Read the plan again without the loading state, so an open line stays open and keeps
-   * its scroll position and its focus.
+   * its scroll position and its focus. A failed read starts the full read, which shows its
+   * error with a retry, so the page never keeps a plan that it could not read again.
    */
   refreshPlan(): void {
     const place = this.place();
+    const sent = this.send();
     this.readPlan(this.topId() as Uuid, this.fyId() as Uuid).subscribe({
       next: (plan) => {
-        if (plan && this.place() === place) this.load.set({ kind: 'plan', plan });
+        if (this.place() === place && this.newest(sent)) this.load.set(plan ? { kind: 'plan', plan } : { kind: 'none' });
       },
-      error: () => undefined,
+      error: () => {
+        if (this.place() === place) this.reloadPlan();
+      },
     });
   }
 
@@ -969,10 +1006,12 @@ export class BudgetPlanComponent {
 
   /** A setting of a Kostenstelle changed: the names and sides of the rows come from the tree. */
   reloadTree(plan: BudgetPlan | null = null): void {
+    const place = this.place();
+    const sent = this.send();
     this.treeApi.tree().subscribe({
       next: (tree) => {
         this.tree.set(tree);
-        if (plan) this.load.set({ kind: 'plan', plan });
+        if (plan && this.place() === place && this.newest(sent)) this.load.set({ kind: 'plan', plan });
       },
       error: () => this.reloadPlan(),
     });
@@ -1015,7 +1054,7 @@ export class BudgetPlanComponent {
    * Save the changed fields of a line. The request holds only these fields, so two saves
    * of one line that follow each other do not overwrite each other.
    */
-  saveLine(row: PlanRow, change: PlanLineSet): void {
+  saveLine(row: PlanRow, change: PlanLineSet, refused: (() => void) | null = null): void {
     const version = this.version();
     const same =
       (change.amount === undefined || Number(change.amount) === row.amount) &&
@@ -1024,7 +1063,7 @@ export class BudgetPlanComponent {
       (change.transferable === undefined || change.transferable === row.transferable) &&
       (change.coverable === undefined || change.coverable === row.coverable);
     if (!version || !this.editable() || same) return;
-    this.write(this.api.setLine(version.id, row.id, change), null, null, false);
+    this.write(this.api.setLine(version.id, row.id, change), null, null, false, refused);
   }
 
   /** The amount a field shows: the text a person types, else the saved amount. */
@@ -1066,12 +1105,13 @@ export class BudgetPlanComponent {
   }
 
   saveNote(row: PlanRow, event: Event): void {
-    this.saveLine(row, { note: (event.target as HTMLTextAreaElement).value.trim() || null });
+    const field = event.target as HTMLTextAreaElement;
+    this.saveLine(row, { note: field.value.trim() || null }, () => field.setRangeText(row.note, 0, field.value.length));
   }
 
   /**
    * Run a plan write and show the plan it answers. `after` runs after the answer. A failed
-   * write reloads the saved plan. A write that `locks` takes no second action while it runs;
+   * write runs `refused` and reads the saved plan again. A write that `locks` takes no second action while it runs;
    * the save of a field does not lock, so a second field can save beside it.
    */
   private write(
@@ -1079,29 +1119,40 @@ export class BudgetPlanComponent {
     toast: TranslationKey | null,
     after: (() => void) | null = null,
     locks = true,
+    refused: (() => void) | null = null,
   ): void {
     if (locks && this.busy()) return;
     if (locks) this.busy.set(true);
     const place = this.place();
     const shown = this.versionId();
+    const sent = this.send();
     request.subscribe({
       next: (plan) => {
         if (locks) this.busy.set(false);
         if (this.place() !== place) return;
         if (this.versionId() === shown) this.versionId.set('');
-        this.load.set({ kind: 'plan', plan });
+        if (this.newest(sent)) this.load.set({ kind: 'plan', plan });
         if (toast) this.toast.success(this.i18n.translate(toast));
         after?.();
         this.syncUrl();
       },
-      error: (err: unknown) => this.fail(err),
+      error: (err: unknown) => {
+        refused?.();
+        this.fail(err, !locks);
+      },
     });
   }
 
-  private fail(err: unknown): void {
+  /**
+   * Show the cause of a failed write and the saved plan again. After the save of a field
+   * the read is the quiet one: the line stays open, and the next field keeps its focus and
+   * the text that the person types in it.
+   */
+  private fail(err: unknown, quiet = false): void {
     this.busy.set(false);
     this.toast.error(this.i18n.translate(WRITE_ERRORS[problemCode(err)] ?? 'budget.plan.error.failed'));
-    this.reloadPlan();
+    if (quiet) this.refreshPlan();
+    else this.reloadPlan();
   }
 
   reloadPlan(): void {

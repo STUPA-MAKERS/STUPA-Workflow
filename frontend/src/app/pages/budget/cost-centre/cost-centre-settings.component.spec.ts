@@ -71,6 +71,22 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.api.updateNode).toHaveBeenLastCalledWith('ks', { key: '810' });
   });
 
+  it('§F/finance/budget/000831: keeps the text a person types while the page reads the tree again', async () => {
+    const view = await setup();
+    await userEvent.clear(view.field('Schlüssel'));
+    await userEvent.type(view.field('Schlüssel'), '59');
+    view.fixture.componentRef.setInput('node', { ...KS });
+    view.fixture.detectChanges();
+    await userEvent.type(view.field('Schlüssel'), '8');
+    expect(view.field('Schlüssel').value).toBe('598');
+    view.fixture.componentRef.setInput('node', { ...KS, name: 'Kultur und Sport' });
+    view.fixture.detectChanges();
+    await waitFor(() => expect(view.field('Name').value).toBe('Kultur und Sport'));
+    expect(view.field('Schlüssel').value).toBe('598');
+    await userEvent.tab();
+    expect(view.api.updateNode).toHaveBeenCalledWith('ks', { key: '598' });
+  });
+
   it('§F/finance/budget/000831: takes the saved text again for an empty field and saves nothing', async () => {
     const view = await setup();
     await retype(view.field('Schlüssel'), '  ');
@@ -93,20 +109,40 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.api.updateNode).not.toHaveBeenCalled();
   });
 
-  it('the switch waits while a save runs, so two presses never race', async () => {
+  it('§F/finance/budget/000831: the switch keeps the focus, and a press while a save runs waits for it', async () => {
+    const view = await setup();
+    const pending = new Subject<object>();
+    view.api.updateNode.mockReturnValueOnce(pending);
+    const active = screen.getByRole('switch', { name: 'Aktiv' });
+    active.focus();
+    await userEvent.keyboard(' ');
+    view.fixture.detectChanges();
+    expect(active).toBeEnabled();
+    expect(document.activeElement).toBe(active);
+    expect(active).toHaveAttribute('aria-checked', 'false');
+    await userEvent.keyboard(' ');
+    expect(active).toHaveAttribute('aria-checked', 'true');
+    expect(view.api.updateNode).toHaveBeenCalledTimes(1);
+    pending.next({});
+    pending.complete();
+    expect(view.api.updateNode.mock.calls.map((call) => call[1])).toEqual([{ active: false }, { active: true }]);
+    await userEvent.keyboard(' ');
+    await userEvent.keyboard(' ');
+    expect(view.api.updateNode).toHaveBeenCalledTimes(4);
+  });
+
+  it('§F/finance/budget/000831: a refused switch shows the saved state again', async () => {
     const view = await setup();
     const pending = new Subject<object>();
     view.api.updateNode.mockReturnValueOnce(pending);
     const active = screen.getByRole('switch', { name: 'Aktiv' });
     await userEvent.click(active);
     view.fixture.detectChanges();
-    expect(active).toBeDisabled();
-    await userEvent.click(active);
-    expect(view.api.updateNode).toHaveBeenCalledTimes(1);
-    pending.next({});
-    pending.complete();
+    expect(active).toHaveAttribute('aria-checked', 'false');
+    pending.error({ status: 409, error: { code: 'x' } });
     view.fixture.detectChanges();
-    expect(active).toBeEnabled();
+    expect(active).toHaveAttribute('aria-checked', 'true');
+    expect(view.api.updateNode).toHaveBeenCalledTimes(1);
   });
 
   it('saves the colour, the Gremien and the switch', async () => {

@@ -473,8 +473,9 @@
   }
 }
 
-// On a phone a large amount breaks inside its tile and is not cut or laid over the next one.
-@include bp.phone {
+// Below the wide layout a large amount breaks inside its tile and is not cut or laid over
+// the next one.
+@include bp.below-wide {
   .bd__figValue {
     white-space: normal;
     overflow-wrap: anywhere;

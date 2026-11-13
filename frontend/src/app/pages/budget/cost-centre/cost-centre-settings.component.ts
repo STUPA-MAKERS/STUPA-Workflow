@@ -51,10 +51,24 @@ export class CostCentreSettingsComponent {
   /** The side changed, so the lines of a plan can differ: the plan page reads its plan again. */
   readonly sideSaved = output<void>();
 
-  readonly key = linkedSignal(() => this.node().key);
-  readonly name = linkedSignal(() => this.node().name);
-  readonly colour = linkedSignal(() => this.node().color?.trim() ?? '');
-  readonly side = linkedSignal<Side | null>(() => this.node().side ?? null);
+  /**
+   * The saved values. A field follows its saved value and not the node object: the page
+   * reads the tree again after each save and gives a new object with the same values, and
+   * a field that followed the object would then drop the text that the person types in it.
+   */
+  private readonly savedKey = computed(() => this.node().key);
+  private readonly savedName = computed(() => this.node().name);
+  private readonly savedColour = computed(() => this.node().color?.trim() ?? '');
+  private readonly savedSide = computed<Side | null>(() => this.node().side ?? null);
+  private readonly savedActive = computed(() => this.node().active);
+  readonly key = linkedSignal(() => this.savedKey());
+  readonly name = linkedSignal(() => this.savedName());
+  readonly colour = linkedSignal(() => this.savedColour());
+  readonly side = linkedSignal<Side | null>(() => this.savedSide());
+  /** The state that the switch shows: the last press, else the saved state. */
+  readonly active = linkedSignal(() => this.savedActive());
+  /** The state that the last request for the switch holds. */
+  private readonly sentActive = linkedSignal(() => this.savedActive());
   readonly gremien = computed<SelectOption[]>(() => [...this.gremiumOptions()]);
   /** The error under the key: only letters and digits, at most 64 characters. */
   readonly keyError = computed(() =>
@@ -102,13 +116,30 @@ export class CostCentreSettingsComponent {
     this.run(this.api.updateNode(this.node().id, patch));
   }
 
-  /** A save runs. A second press of the switch then waits, so two writes of one field
-   *  never race and the last press is the one that counts. */
+  /** A save runs. */
   readonly saving = signal(false);
+
+  /**
+   * Save the switch "Aktiv". A press while a save runs waits for it, so two writes never
+   * race and the last press is the one that counts. The switch stays enabled, because a
+   * disabled control loses the keyboard focus.
+   */
+  saveActive(active: boolean): void {
+    this.active.set(active);
+    if (this.saving() || active === this.sentActive()) return;
+    this.sentActive.set(active);
+    this.save({ active });
+  }
+
+  /** A save ended: send the press of the switch that waited for it. */
+  private ended(): void {
+    this.saving.set(false);
+    this.saveActive(this.active());
+  }
 
   private run(request: Observable<unknown>, side = false): void {
     this.saving.set(true);
-    request.pipe(finalize(() => this.saving.set(false))).subscribe({
+    request.pipe(finalize(() => this.ended())).subscribe({
       next: () => {
         this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
         this.saved.emit();
@@ -120,6 +151,8 @@ export class CostCentreSettingsComponent {
         this.name.set(this.node().name);
         this.colour.set(this.node().color?.trim() ?? '');
         this.side.set(this.node().side ?? null);
+        this.active.set(this.node().active);
+        this.sentActive.set(this.node().active);
         this.saved.emit();
       },
     });
