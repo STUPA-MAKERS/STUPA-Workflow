@@ -6,6 +6,7 @@ import {
   ElementRef,
   computed,
   inject,
+  Injector,
   input,
   model,
   output,
@@ -56,7 +57,7 @@ import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { JoinQrComponent } from '../public-join/join-qr.component';
 import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
-import { topApplicationLead } from '../top-application-lead.util';
+import { topLead } from '../top-application-lead.util';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
 import { pageItemTitle } from '../../../layout/page-title.service';
@@ -270,9 +271,9 @@ export class MeetingPageComponent {
 
   /**
    * The row of the application of the open item, the first row of the linked list above
-   * the sheet (`topApplicationLead`).
+   * the sheet (`topLead`), or the row of its Haushaltsplan.
    */
-  protected readonly applicationLead = computed(() => topApplicationLead(this.top(), this.i18n));
+  protected readonly applicationLead = topLead(this.top, inject(Injector), this.i18n);
 
   /** "Studierendenparlament · Di, 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {
@@ -466,7 +467,8 @@ export class MeetingPageComponent {
   });
 
   /**
-   * "Beschlussfrage hinzufügen": an application item holds one vote, free text any number.
+   * "Beschlussfrage hinzufügen": an application item and the item of a
+   * Haushaltsplan hold one vote, free text any number.
    * A planned meeting prepares the vote as a draft; so does a live meeting while another
    * vote is open (the dialog then only prepares).
    */
@@ -474,7 +476,7 @@ export class MeetingPageComponent {
     const m = this.meeting();
     const t = this.top();
     if (!t || !m.canManageVotes || this.locked() || m.status === 'closed') return false;
-    return !t.applicationId || this.votes().length === 0;
+    return !(t.applicationId || t.planVersionId) || this.votes().length === 0;
   });
 
   /** The add button of an application item: open the vote, or only prepare it. */

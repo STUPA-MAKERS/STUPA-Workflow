@@ -215,7 +215,7 @@ export class VoteOpenDialogComponent {
     KINDS.map((v) => ({ value: v, label: this.i18n.translate(`meetings.vote.kind.${v}`) })),
   );
   /** An election and a poll are only possible on a free-text item. */
-  readonly electionAllowed = computed(() => !this.item()?.applicationId);
+  readonly electionAllowed = computed(() => !this.item()?.applicationId && !this.item()?.planVersionId);
   readonly isElection = computed(() => this.kind() === 'election');
   readonly isPoll = computed(() => this.kind() === 'poll');
 
@@ -275,8 +275,8 @@ export class VoteOpenDialogComponent {
   readonly guestsAllowed = computed(
     () => this.meeting().publicJoin && this.meeting().guestsMode === 'vote',
   );
-  /** A non-public item never lets guests vote. */
-  readonly guestsLocked = computed(() => !!this.item()?.nonPublic);
+  /** A non-public item and the item of a Haushaltsplan never let guests vote. */
+  readonly guestsLocked = computed(() => !!this.item()?.nonPublic || !!this.item()?.planVersionId);
   /** "TOP 3 · Zuschuss Erstsemester-Party WS 26/27". */
   readonly subtitle = computed(() => {
     const it = this.item();
@@ -313,7 +313,7 @@ export class VoteOpenDialogComponent {
     this.questionEdited = false;
     this.question.set(it.applicationId ? this.prefill(it) : (it.title ?? ''));
     this.majorityRule.set('simple');
-    this.guestsVote.set(this.guestsAllowed() && !it.nonPublic);
+    this.guestsVote.set(this.guestsAllowed() && !it.nonPublic && !it.planVersionId);
     this.submitting.set(false);
     this.kind.set('motion');
     this.seats.set(1);

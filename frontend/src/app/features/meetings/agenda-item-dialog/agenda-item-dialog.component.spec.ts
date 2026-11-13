@@ -131,6 +131,41 @@ describe('AgendaItemDialogComponent', () => {
     expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
   });
 
+  /** §F/finance/budget/000838: a waiting plan is a row of the list "Antrag", before the applications. */
+  it('lists a waiting Haushaltsplan before the applications and puts it on the agenda', async () => {
+    const { http, fixture, added } = await setup();
+    http.expectOne('/api/meetings/m-1/agenda/assignable-plans').flush([
+      {
+        planVersionId: 'pv-1',
+        budgetName: 'VS-Mittel',
+        fiscalYear: '2026',
+        number: 0,
+        step: 'Beschluss',
+        title: 'Haushaltsplan VS-Mittel 2026: Beschluss',
+      },
+    ]);
+    flushApps(http, fixture);
+    const rows = within(screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ })).getAllByRole('radio');
+    expect(rows).toHaveLength(4);
+    expect(rows[0]).toHaveAccessibleName(/Haushaltsplan VS-Mittel 2026: Beschluss/);
+    await userEvent.click(rows[0]);
+    await userEvent.click(submitButton());
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ planVersionId: 'pv-1', nonPublic: false });
+    req.flush([]);
+    expect(added).toHaveBeenCalled();
+  });
+
+  it('lists only the applications when the plans cannot be read', async () => {
+    const { http, fixture } = await setup();
+    http
+      .expectOne('/api/meetings/m-1/agenda/assignable-plans')
+      .flush({}, { status: 403, statusText: 'Forbidden' });
+    flushApps(http, fixture);
+    const group = screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ });
+    expect(within(group).getAllByRole('radio')).toHaveLength(3);
+  });
+
   /** The dialog sends one request at a time. */
   it('adds a free-text item', async () => {
     const { http, fixture, cmp, added } = await setup();

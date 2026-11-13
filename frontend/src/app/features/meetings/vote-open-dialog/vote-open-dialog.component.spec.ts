@@ -210,6 +210,18 @@ describe('VoteOpenDialogComponent', () => {
       );
     });
 
+    /** §F/finance/budget/000838: guests never vote on a Haushaltsplan. */
+    it('keeps guests out of the item of a Haushaltsplan, and offers only a decision', async () => {
+      const { http, submit } = await open(PUBLIC, { ...FREE_TOP, planVersionId: 'pv-1' });
+      expect(screen.queryByRole('radiogroup', { name: 'Art der Abstimmung' })).toBeNull();
+      const sw = screen.getByRole('switch', { name: 'Gäste stimmen mit ab' });
+      expect(sw).toHaveAttribute('aria-checked', 'false');
+      await submit();
+      expect(http.expectOne('/api/meetings/m-1/votes').request.body).toEqual(
+        expect.objectContaining({ guestsVote: false }),
+      );
+    });
+
     it('has no switch when guests only watch', async () => {
       const { http, submit } = await open({ ...PUBLIC, guestsMode: 'watch' } as Meeting);
       expect(screen.queryByRole('switch', { name: 'Gäste stimmen mit ab' })).toBeNull();

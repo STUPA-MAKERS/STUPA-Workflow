@@ -1214,10 +1214,6 @@ class PlanOps(NodeOps, AllocationOps):
             else None
         )
 
-    async def _vote_runs(self, vote_id: str | None) -> bool:
-        """Say if the vote of a step is a draft or open, so the step waits for it."""
-        return await self._vote_status(vote_id) in ("draft", "open")
-
     async def request_step(self, version_id: UUID) -> PlanOut:
         """Ask the Gremium of the next step for its decision.
 

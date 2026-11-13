@@ -9,6 +9,7 @@ import {
   input,
   model,
   output,
+  type Signal,
   signal,
   untracked,
   viewChild,
@@ -49,7 +50,7 @@ import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-lis
 import { voteResultResolver } from '../vote-result/vote-result';
 import { hasOpenBlackout } from '../../../shared/markdown/markdown.util';
 import { applyRawFormat, insertRawTable } from './raw-format';
-import { topApplicationLead } from '../top-application-lead.util';
+import { topLead } from '../top-application-lead.util';
 
 /** The autosave state of the text of the open item. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -360,10 +361,15 @@ export class TopSheetComponent {
     this.bodyChange.emit({ itemId: t.id, body: value });
   }
 
-  /** "TOP 3 · Antrag", or "TOP 3" for a free-text item ("Freitext" says nothing). */
+  /** "TOP 3 · Antrag", "TOP 3 · Haushaltsplan", or "TOP 3" for a free-text item. */
   protected kindLine(t: AgendaItem): string {
     const top = this.i18n.translate('meetings.agenda.top', { n: this.topIndex() + 1 });
-    return t.applicationId ? `${top} · ${this.i18n.translate('meetings.agenda.kindApplication')}` : top;
+    const kind = t.applicationId
+      ? 'meetings.agenda.kindApplication'
+      : t.planVersionId
+        ? 'meetings.agenda.planSub'
+        : null;
+    return kind ? `${top} · ${this.i18n.translate(kind)}` : top;
   }
 
   /**
@@ -387,10 +393,8 @@ export class TopSheetComponent {
     return this.follow() && m.status === 'live' && !!m.currentAgendaItemId && this.top()?.id === m.currentAgendaItemId;
   });
 
-  /** The row of the application, the first row of the linked list (`topApplicationLead`). */
-  protected readonly applicationLead = computed<LinkedLead | null>(() =>
-    topApplicationLead(this.top(), this.i18n),
-  );
+  /** The row of the application, the first row of the linked list (`topLead`). */
+  protected readonly applicationLead: Signal<LinkedLead | null> = topLead(this.top, this.injector, this.i18n);
 
   /** The keeper line of a closed meeting: every minute-taker with the TOPs they wrote. */
   protected readonly keepers = computed(() =>
