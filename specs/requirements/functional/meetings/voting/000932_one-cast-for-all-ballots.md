@@ -27,7 +27,8 @@ scope:
 A person with voting delegations must cast one choice for a vote. The cast must write the own
 ballot and one ballot for each delegator, all with this choice. A person without an own ballot
 must cast one choice for all represented members. A separate delegation ballot must answer 409
-`vote_as_unit` while the own ballot of the person is open.
+`vote_as_unit` while the own ballot of the person is open. The ballot must show the number of
+voting rights that the cast exercises, and the names of the represented members.
 
 Reason: A member with transferred votes must vote in unity. A secret ballot has no link to its
 voter, so the server cannot compare two separate casts.

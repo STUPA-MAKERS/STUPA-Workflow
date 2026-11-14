@@ -172,10 +172,16 @@ describe('ParticipantVoteService', () => {
   it('gives the row of the represented member and its state', () => {
     const { svc, set } = setup({
       votes: [vote({ representedCast: true })],
-      status: { ...STATUS, exercising: true, delegatedByName: 'Jonas Weber' },
+      status: {
+        ...STATUS,
+        exercising: true,
+        delegatedByName: 'Jonas Weber',
+        delegatedByNames: ['Jonas Weber'],
+      },
     });
     set(row());
     expect(svc.proxyName()).toBe('Jonas Weber');
+    expect(svc.proxyCount()).toBe(1);
     expect(svc.proxyCast()).toBe(true);
   });
 
@@ -183,6 +189,7 @@ describe('ParticipantVoteService', () => {
     const { svc, set } = setup({ status: { ...STATUS, exercising: true, delegatedByName: null } });
     set(row());
     expect(svc.proxyName()).toBe('?');
+    expect(svc.proxyCount()).toBe(0);
   });
 
   it('says who holds the voting right when the person handed it over', () => {

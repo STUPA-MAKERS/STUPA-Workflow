@@ -77,16 +77,16 @@
 
 @if (proxy) {
   @let name = proxyName() ?? '';
-  <app-section class="ballot__row" [level]="2" [heading]="'voting.ballot.proxy' | t: { name }">
+  <app-section class="ballot__row" [level]="2" [heading]="proxyHeading()">
     @if (dateMode()) {
       <ng-container
         [ngTemplateOutlet]="dates"
-        [ngTemplateOutletContext]="{ row: 'proxy', cast: proxy.cast, label: ('voting.ballot.proxy' | t: { name }) }"
+        [ngTemplateOutletContext]="{ row: 'proxy', cast: proxy.cast, label: proxyHeading() }"
       />
     } @else if (candidateMode()) {
       <ng-container
         [ngTemplateOutlet]="cands"
-        [ngTemplateOutletContext]="{ row: 'proxy', cast: proxy.cast, label: ('voting.ballot.proxy' | t: { name }) }"
+        [ngTemplateOutletContext]="{ row: 'proxy', cast: proxy.cast, label: proxyHeading() }"
       />
     } @else {
     <div class="ballot__proxy">

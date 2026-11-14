@@ -77,6 +77,9 @@ export class ParticipantVoteService {
     return d.delegatedByName || '?';
   });
 
+  /** How many members the person represents in this vote. */
+  readonly proxyCount = computed(() => this.delegation()?.delegatedByNames?.length ?? 0);
+
   readonly proxyCast = computed(() => this.loaded()?.representedCast === true);
 
   /** Why the person holds no ballot in the open vote, or `null`. */

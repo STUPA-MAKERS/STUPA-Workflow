@@ -98,8 +98,8 @@ function castBallot(choice: BallotPick | null): MyBallot {
  * change afterwards. Nothing here offers a change: once the server accepted the
  * ballot, the row locks and says "Danke! Deine Stimme: Ja".
  *
- * - A person who represents members casts once: the own row says "Deine Stimme, auch für
- *   <names>", and the server writes one ballot for each of them. A person without an own
+ * - A person who represents members casts once: the own row says "Deine Stimme, 3
+ *   Stimmrechte, auch für <names>", and the server writes one ballot for each of them. A person without an own
  *   ballot (an external or a pool substitute), or one whose own ballot was in before the
  *   delegation came, gets the row "Als Vertretung für <names>" (`asDelegation`).
  * - A secret vote never shows the choice after the cast, only that the ballot is in.
@@ -150,6 +150,8 @@ export class BallotComponent {
   readonly own = input<MyBallot | null>(NOT_CAST);
   /** The names of the members the person represents, joined. `null`: nobody. */
   readonly proxyName = input<string | null>(null);
+  /** How many members the person represents. 0: not known, the rows name no number. */
+  readonly proxyCount = input(0);
   /** The represented ballot as the server knows it (`representedCast`). */
   readonly proxyCast = input(false);
   readonly caster = input.required<BallotCaster>();
@@ -237,12 +239,26 @@ export class BallotComponent {
   protected readonly named = computed(
     () => this.layout() === 'phone' || this.compact() || !!this.proxyName(),
   );
-  /** "Deine Stimme", or "Deine Stimme, auch für Anna, Ben" for the one cast. */
-  protected readonly ownHeading = computed(() =>
-    this.unit()
-      ? this.i18n.translate('voting.ballot.ownWith', { name: this.proxyName() ?? '' })
-      : this.i18n.translate('voting.ballot.own'),
-  );
+  /**
+   * "Deine Stimme", or "Deine Stimme, 3 Stimmrechte, auch für Anna, Ben" for the one cast:
+   * the number of voting rights that the cast exercises, the own one included.
+   */
+  protected readonly ownHeading = computed(() => {
+    if (!this.unit()) return this.i18n.translate('voting.ballot.own');
+    const name = this.proxyName() ?? '';
+    const count = this.proxyCount();
+    return count > 0
+      ? this.i18n.translate('voting.ballot.ownWithCount', { name, count: count + 1 })
+      : this.i18n.translate('voting.ballot.ownWith', { name });
+  });
+  /** "Als Vertretung für Anna", or "2 Stimmrechte als Vertretung für Anna, Ben". */
+  protected readonly proxyHeading = computed(() => {
+    const name = this.proxyName() ?? '';
+    const count = this.proxyCount();
+    return count > 1
+      ? this.i18n.translate('voting.ballot.proxyCount', { name, count })
+      : this.i18n.translate('voting.ballot.proxy', { name });
+  });
 
   /** The row the button acts on now, or `null` when every row is cast. */
   protected readonly target = computed<BallotRow | null>(() => {

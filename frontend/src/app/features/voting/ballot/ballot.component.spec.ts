@@ -8,6 +8,7 @@ import { BallotComponent, type BallotCaster } from './ballot.component';
 interface SetupOpts {
   own?: MyBallot | null;
   proxyName?: string | null;
+  proxyCount?: number;
   proxyCast?: boolean;
   secret?: boolean;
   caster?: BallotCaster;
@@ -26,6 +27,7 @@ async function setup(opts: SetupOpts = {}) {
       options: ['yes', 'no', 'abstain'],
       own: opts.own === undefined ? { cast: false, choice: null } : opts.own,
       proxyName: opts.proxyName ?? null,
+      proxyCount: opts.proxyCount ?? 0,
       proxyCast: opts.proxyCast ?? false,
       secret: opts.secret ?? false,
       caster,
@@ -150,10 +152,12 @@ describe('BallotComponent', () => {
 
   /** §F/meetings/voting/000932: one cast for the own ballot and the represented members. */
   it('casts once for the own ballot and the represented members', async () => {
-    const { caster } = await setup({ proxyName: 'Anna Beispiel, Jonas Weber' });
+    const { caster } = await setup({ proxyName: 'Anna Beispiel, Jonas Weber', proxyCount: 2 });
     const user = userEvent.setup();
     expect(
-      screen.getByRole('heading', { name: 'Deine Stimme, auch für Anna Beispiel, Jonas Weber' }),
+      screen.getByRole('heading', {
+        name: 'Deine Stimme, 3 Stimmrechte, auch für Anna Beispiel, Jonas Weber',
+      }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /Als Vertretung/ })).not.toBeInTheDocument();
     await user.click(choice('Ja'));
@@ -176,6 +180,15 @@ describe('BallotComponent', () => {
     await user.click(confirmButton());
     expect(caster).toHaveBeenCalledWith('no', true);
     expect(screen.getByText('Für Jonas Weber abgegeben: Nein')).toBeInTheDocument();
+  });
+
+  it('names the number of voting rights of a person without an own ballot', async () => {
+    await setup({ own: null, proxyName: 'Anna Beispiel, Jonas Weber', proxyCount: 2 });
+    expect(
+      screen.getByRole('group', {
+        name: '2 Stimmrechte als Vertretung für Anna Beispiel, Jonas Weber',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('keeps the represented row locked next to an open own row', async () => {

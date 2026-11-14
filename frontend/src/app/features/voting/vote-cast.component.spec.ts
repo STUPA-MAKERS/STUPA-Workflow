@@ -366,7 +366,9 @@ describe('VoteCastComponent', () => {
       },
     });
     const unit = within(
-      screen.getByRole('group', { name: 'Deine Stimme, auch für Anna Beispiel, Jonas Weber' }),
+      screen.getByRole('group', {
+        name: 'Deine Stimme, 3 Stimmrechte, auch für Anna Beispiel, Jonas Weber',
+      }),
     );
     expect(screen.queryByRole('group', { name: /Als Vertretung/ })).not.toBeInTheDocument();
     await userEvent.click(unit.getByRole('button', { name: 'Nein' }));

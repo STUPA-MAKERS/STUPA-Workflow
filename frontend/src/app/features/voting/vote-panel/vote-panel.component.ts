@@ -72,6 +72,7 @@ export class VotePanelComponent {
   /** The own ballot, or `null` when the person may not cast one. */
   readonly own = input<MyBallot | null>(null);
   readonly proxyName = input<string | null>(null);
+  readonly proxyCount = input(0);
   readonly proxyCast = input(false);
   readonly caster = input.required<BallotCaster>();
   /**
