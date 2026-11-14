@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import type { AgendaItem, Meeting, MeetingVote } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
+import { pickOption } from '../../../../testing/select';
 import { type VoteDialogSource, VoteOpenDialogComponent } from './vote-open-dialog.component';
 
 const MEETING = { id: 'm-1', title: '34. Sitzung', status: 'live', isProtokollant: true, votes: [] } as unknown as Meeting;
@@ -72,13 +73,14 @@ describe('VoteOpenDialogComponent', () => {
   });
 
   it('names the item and prefills the question of an application item', async () => {
-    await setup();
+    const { cmp } = await setup();
     const dialog = screen.getByRole('dialog', { name: 'Abstimmung öffnen' });
     expect(dialog).toHaveAccessibleDescription('TOP 3 · Zuschuss Party');
     expect(screen.getByLabelText('Beschlussfrage')).toHaveValue(
       'Soll der Antrag „Zuschuss Party“ wie beschrieben gefördert werden?',
     );
-    expect(screen.getByRole('radio', { name: 'Einfach' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('combobox', { name: 'Mehrheitsregel' })).toHaveTextContent('Einfache Mehrheit');
+    expect(cmp.majorityRule()).toBe('simple');
     expect(screen.queryByRole('switch', { name: 'Geheime Abstimmung' })).toBeNull();
   });
 
@@ -86,7 +88,10 @@ describe('VoteOpenDialogComponent', () => {
     const { http, opened, toasts } = await setup();
     expect(screen.queryByText(/Stimmengleichheit/)).toBeNull();
     expect(screen.queryByText(/änderbar/)).toBeNull();
-    await userEvent.click(screen.getByRole('radio', { name: 'Zwei Drittel' }));
+    await pickOption(
+      screen.getByRole('combobox', { name: 'Mehrheitsregel' }),
+      'Zweidrittelmehrheit der Stimmen',
+    );
     const question = screen.getByLabelText('Beschlussfrage');
     await userEvent.clear(question);
     await userEvent.type(question, '  Fördern wir?  ');
@@ -353,7 +358,9 @@ describe('VoteOpenDialogComponent', () => {
       });
       expect(screen.getByRole('dialog', { name: 'Abstimmung bearbeiten' })).toBeInTheDocument();
       expect(screen.getByLabelText('Beschlussfrage')).toHaveValue('Fördern wir die Party?');
-      expect(screen.getByRole('radio', { name: 'Absolut' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('combobox', { name: 'Mehrheitsregel' })).toHaveTextContent(
+        'Absolute Mehrheit der Stimmen',
+      );
       expect(screen.queryByRole('button', { name: 'Vorbereiten' })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       const req = http.expectOne('/api/meetings/m-1/votes/v-5');
