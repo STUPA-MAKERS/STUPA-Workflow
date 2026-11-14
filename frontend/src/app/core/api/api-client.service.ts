@@ -68,7 +68,7 @@ import type {
   HandoverMode,
   LogoutOut,
   MagicLinkVerifyResult,
-  type MajorityRule,
+  MajorityRule,
   EmailLoginRequest,
   ApplicantApplications,
   ApplicationObserver,
