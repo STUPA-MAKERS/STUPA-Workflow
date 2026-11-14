@@ -1,7 +1,7 @@
 import { errorToasts } from '../../../../../testing/load-error';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { AdminApiService } from '../../admin-api.service';
 import type { CdVariantOption, Gremium, GremiumDefaults } from '../../admin.models';
 import { GremiumDialogComponent, parseRecipients } from './gremium-dialog.component';
@@ -215,6 +215,56 @@ describe('GremiumDialogComponent', () => {
   it('reads no defaults for a stored Gremium', async () => {
     const stored = await setup(STUPA);
     expect(stored.api.getGremiumDefaults).not.toHaveBeenCalled();
+  });
+
+  /** §F/administration/admin/000906 */
+  it('keeps what the admin changed before the defaults arrive', async () => {
+    const answer = new Subject<GremiumDefaults>();
+    const api = makeApi({ getGremiumDefaults: jest.fn(() => answer) });
+    const { fixture } = await setup(null, api);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cmp = fixture.componentInstance as any;
+    cmp.patch('quorumPercent', 10);
+    cmp.patch('repeatQuorumPercent', 5);
+    cmp.patch('guestsMayVote', true);
+    cmp.patch('allowVoteDelegation', true);
+    cmp.patch('delegationLeadMinutes', 7);
+    cmp.patchMinPresent('abc');
+    answer.next({
+      quorumPercent: 40,
+      repeatQuorumPercent: 25,
+      guestsMayVote: false,
+      allowVoteDelegation: false,
+      delegationLeadMinutes: 120,
+    });
+    expect(cmp.form()).toEqual(
+      expect.objectContaining({
+        quorumPercent: 10,
+        repeatQuorumPercent: 5,
+        guestsMayVote: true,
+        allowVoteDelegation: true,
+        delegationLeadMinutes: 7,
+        quorumMinPresent: null,
+      }),
+    );
+  });
+
+  /** §F/administration/admin/000906 */
+  it('drops the defaults that arrive after the dialog closed', async () => {
+    const answer = new Subject<GremiumDefaults>();
+    const api = makeApi({ getGremiumDefaults: jest.fn(() => answer) });
+    const { fixture } = await setup(null, api);
+    fixture.componentRef.setInput('open', false);
+    fixture.detectChanges();
+    answer.next({
+      quorumPercent: 40,
+      repeatQuorumPercent: 25,
+      guestsMayVote: true,
+      allowVoteDelegation: true,
+      delegationLeadMinutes: 120,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((fixture.componentInstance as any).form().quorumPercent).toBeNull();
   });
 
   it('survives a failed read of the defaults', async () => {
