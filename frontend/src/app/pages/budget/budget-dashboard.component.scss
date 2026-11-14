@@ -501,6 +501,11 @@
 }
 
 // Skeleton: bars in the real containers, sized like the content they stand for.
+/* The view switch Ist/Planung: as high as a medium button (size="control"). */
+.bd__skSeg {
+  height: var(--control-height);
+  border-radius: 999px;
+}
 .bd__skSearch {
   height: var(--control-height-lg);
   border-radius: 999px;
@@ -528,6 +533,16 @@
 }
 .bd__skFig {
   width: 5.5em;
+}
+.bd__skNum {
+  width: 3.5rem;
+}
+.bd__skNum--short {
+  width: 2.25rem;
+}
+.bd__skUsage {
+  height: 6px;
+  border-radius: 999px;
 }
 
 /* Very high contrast (spec 000605): each surface has a white edge of 2 px, and a colour

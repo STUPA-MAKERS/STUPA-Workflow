@@ -20,10 +20,72 @@
     [errorText]="(section === 'texts' ? 'admin.texts.loadFailed' : 'admin.brand.loadFailed') | t"
     (retry)="loadConfig()"
   >
+    <!-- The skeleton has the sections and fields of the loaded page (§ 000893). -->
     <ng-template #loading>
-      <div class="br__cols">
-        <app-skeleton variant="lines" [count]="6" [label]="'common.loading' | t" />
-        <app-skeleton variant="lines" [count]="6" />
+      <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
+      <div class="br__cols skel-in" aria-hidden="true">
+        @if (section === 'texts') {
+          <div class="br__col">
+            <app-section class="br__sec" [level]="2" [heading]="'admin.brand.texts' | t">
+              @for (key of freetexts; track key) {
+                <span class="skel-box br__skArea"></span>
+              }
+            </app-section>
+            <app-section class="br__sec" [level]="2" [heading]="'admin.brand.submitted.group' | t">
+              @for (kind of submittedKinds; track kind) {
+                <span class="skel-box br__skArea"></span>
+              }
+            </app-section>
+            <app-section class="br__sec" [level]="2" [heading]="'admin.brand.statement.group' | t">
+              <span class="skel-box br__skArea br__skArea--tall"></span>
+            </app-section>
+          </div>
+          <div class="br__col">
+            <app-section class="br__sec" [level]="2" [heading]="'admin.brand.footer' | t">
+              <span class="skel-box br__skField"></span>
+            </app-section>
+            <app-section class="br__sec" [level]="2" [heading]="'admin.brand.legal' | t">
+              <span class="skel-box br__skField"></span>
+            </app-section>
+          </div>
+        } @else {
+          <div class="br__col">
+            <app-section class="br__sec" [level]="2" [heading]="'admin.brand.appName.group' | t">
+              <div class="br__nameRow">
+                <span class="skel-box br__skField"></span>
+                <span class="skel-box br__skField"></span>
+              </div>
+            </app-section>
+            <app-section class="br__sec" [level]="2" [heading]="'admin.brand.accent.group' | t">
+              <div class="br__accent">
+                <span class="skel-box br__swatch"></span>
+                <span class="skel-box br__skField br__skHex"></span>
+              </div>
+            </app-section>
+            <app-section class="br__sec" [level]="2" [heading]="'admin.brand.avatars.group' | t">
+              <span class="br__skSwitch">
+                <span class="br__skSwitchLabel">{{ 'admin.brand.avatars.gravatar' | t }}</span>
+                <span class="skel-box br__skToggle"></span>
+              </span>
+            </app-section>
+          </div>
+          <div class="br__col">
+            <app-section class="br__sec" [level]="2" [heading]="'admin.brand.logos' | t">
+              <ul class="rowgroup br__logos">
+                @for (slot of logoSlots; track slot) {
+                  <li class="br__logo">
+                    <span class="skel-box br__thumb" [class.br__thumb--wide]="slot === 'wordmark'"></span>
+                    <span class="br__logoText">
+                      <span class="br__logoName">{{ slotLabel(slot) }}</span>
+                      <span class="br__logoFile"><span class="skel-text skel-text--muted br__skFile"></span></span>
+                    </span>
+                    <span class="skel-box br__skButton"></span>
+                  </li>
+                }
+              </ul>
+            </app-section>
+          </div>
+        }
       </div>
     </ng-template>
     <ng-template #content>

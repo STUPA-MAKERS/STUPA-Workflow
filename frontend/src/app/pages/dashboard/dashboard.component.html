@@ -56,7 +56,10 @@
 
   <div class="dash__todayBody" appScrollFade="y">
     @if (meetingsLoading()) {
-      <app-skeleton variant="rows" [count]="2" [label]="'dashboard.loading' | t" />
+      <!-- The common loaded state: the next meetings, a row each with its date block. -->
+      <app-section class="dash__block skel-in" [level]="2" [heading]="'dashboard.today.upcoming' | t">
+        <app-skeleton variant="items" [count]="3" [lead]="true" [grouped]="true" [label]="'dashboard.loading' | t" />
+      </app-section>
     }
 
     @for (c of live(); track c.meeting.id) {
@@ -242,7 +245,7 @@
       }
     </div>
   } @else if (phone() && loadingOf(t)) {
-    <app-skeleton variant="rows" [count]="4" [label]="'dashboard.loading' | t" />
+    <app-skeleton class="skel-in" variant="items" [count]="4" [grouped]="true" [label]="'dashboard.loading' | t" />
   } @else if (phone()) {
     <div class="rowgroup">
       @for (r of rowsOf(t); track r.id) {
