@@ -138,5 +138,5 @@ class ExportLogo(UUIDPkMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         UniqueConstraint("singleton", name="uq_export_logo_singleton"),
-        CheckConstraint("singleton", name="ck_export_logo_singleton"),
+        CheckConstraint("singleton", name="singleton"),
     )
