@@ -57,6 +57,9 @@ LEAD_SUB = "lead-pub"
 ALTCHA_SECRET = "altcha-secret-public-meeting-000000"
 
 
+WHEN = {"date": "2026-11-01", "startTime": "18:00"}
+
+
 @pytest.fixture
 async def maker(
     migrated: tuple[str, str], engine: Any
@@ -1004,13 +1007,17 @@ async def test_guest_mode_follows_the_switch_of_the_gremium(
     with TestClient(ctx.app) as lead:
         resp = lead.patch(f"/api/meetings/{off.meeting_id}", json={"guestsMode": "vote"})
         assert resp.status_code == 422 and resp.json()["code"] == "guests_vote_off"
-        created = lead.post("/api/meetings", json={"gremiumId": str(off.gremium_id), "title": "A"})
+        created = lead.post(
+            "/api/meetings", json={"gremiumId": str(off.gremium_id), "title": "A", **WHEN}
+        )
         assert created.status_code == 200, created.text
         assert created.json()["guestsMode"] == "watch"
         assert created.json()["guestsVoteAllowed"] is False
         allowed = lead.patch(f"/api/meetings/{on.meeting_id}", json={"guestsMode": "vote"})
         assert allowed.status_code == 200 and allowed.json()["guestsMode"] == "vote"
-        created = lead.post("/api/meetings", json={"gremiumId": str(on.gremium_id), "title": "B"})
+        created = lead.post(
+            "/api/meetings", json={"gremiumId": str(on.gremium_id), "title": "B", **WHEN}
+        )
         assert created.status_code == 200, created.text
         assert created.json()["guestsMode"] == "vote"
         assert created.json()["guestsVoteAllowed"] is True
@@ -1027,7 +1034,9 @@ async def test_meeting_kind_place_and_form(
     """
     s = await seed(maker, status="live", public_join=False)
     with TestClient(ctx.app) as lead:
-        plain = lead.post("/api/meetings", json={"gremiumId": str(s.gremium_id), "title": "A"})
+        plain = lead.post(
+            "/api/meetings", json={"gremiumId": str(s.gremium_id), "title": "A", **WHEN}
+        )
         assert plain.status_code == 200, plain.text
         body = plain.json()
         assert (body["kind"], body["location"], body["form"]) == ("ordinary", None, "presence")
@@ -1036,6 +1045,7 @@ async def test_meeting_kind_place_and_form(
             json={
                 "gremiumId": str(s.gremium_id),
                 "title": "B",
+                **WHEN,
                 "kind": "repeat",
                 "location": "Raum 9-108",
                 "form": "hybrid",
