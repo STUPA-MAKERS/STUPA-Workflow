@@ -2,7 +2,7 @@
 id: "000892"
 title: Every PDF carries the footer graphic of the branding
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 tests:
