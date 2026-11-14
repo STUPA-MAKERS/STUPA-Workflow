@@ -12,6 +12,9 @@ pages. The rules here follow the pytex protocol variant (`protocol-stupa`,
 * The variant selects the default logos. A `logos` or `footer_logos` config
   key replaces them. An entry is a vendored logo name or the file name of an
   uploaded asset.
+* A `footer_graphic` config key names the graphic at the foot of each page: a
+  vendored name or an asset. An empty value means no graphic. Without the key
+  the page carries the Skyline.
 * An `unterschriften` list closes the document with one signature line per
   role.
 * A `keepers` list names every period of a protocol keeper. It replaces the
@@ -309,6 +312,19 @@ def _logo(entry: str, assets: Collection[str]) -> dict[str, str]:
     raise ConversionError(f"unknown logo {entry!r}: neither a vendored logo nor an uploaded asset")
 
 
+def _footer_graphic(
+    options: Mapping[str, object], assets: Collection[str]
+) -> dict[str, str] | None:
+    """Return the footer graphic of each page: the key, else the Skyline; empty is none."""
+    match options.get("footer_graphic", "Skyline"):
+        case str() as name if name:
+            return _logo(name, assets)
+        case None | "":
+            return None
+        case _:
+            raise ConversionError("footer_graphic must be a name or empty")
+
+
 def _logo_list(options: Mapping[str, object], key: str) -> list[str] | None:
     match options.get(key):
         case list() as items:
@@ -479,6 +495,7 @@ def build_document(
         "title": _title(options),
         "logos": [_logo(n, assets) for n in title_names],
         "footer_logos": [_logo(n, assets) for n in footer_names],
+        "footer_graphic": _footer_graphic(options, assets),
         "data": _data_lines(options, keepers),
         "body": blocks,
         "numbered": _scalar(options, "typ").lower() not in _UNNUMBERED_TYPES,

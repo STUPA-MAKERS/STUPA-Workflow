@@ -1288,17 +1288,21 @@ export const LOGO_ACCEPT_MIME: readonly string[] = [
 ] as const;
 export const LOGO_MAX_SIZE_MB = 2;
 
+/** A slot of the PDF branding: the export logo or the footer graphic (specs 000891, 000892). */
+export type PdfSlot = 'logo' | 'footer';
+
 /**
- * The export logo of every exported PDF except the protocol (spec 000891). Its bytes go
- * to the PDF renderer only, never to the browser, so SVG and PDF are allowed here, and
- * the page shows no preview of it.
+ * A graphic of the PDF branding. `builtin` is the default (the STUPA logo, the Skyline);
+ * an upload has its name, type and size. Its bytes go to the PDF renderer only, never to
+ * the browser, so SVG and PDF are allowed here, and the page shows no preview of it.
  */
-export interface ExportLogo {
-  readonly fileName: string;
-  readonly mime: string;
-  readonly size: number;
+export interface PdfAsset {
+  readonly builtin: boolean;
+  readonly fileName: string | null;
+  readonly mime: string | null;
+  readonly size: number | null;
 }
-export const EXPORT_LOGO_ACCEPT_MIME: readonly string[] = [
+export const PDF_ASSET_ACCEPT_MIME: readonly string[] = [
   'image/png',
   'image/jpeg',
   'image/webp',

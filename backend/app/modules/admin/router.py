@@ -60,7 +60,6 @@ from app.modules.admin.schemas import (
     CdVariantOptionOut,
     CdVariantOut,
     CdVariantUpdate,
-    ExportLogoOut,
     FlowVersionCreate,
     FlowVersionOut,
     GremiumAdminOut,
@@ -87,6 +86,7 @@ from app.modules.admin.schemas import (
     MeetingSettingsUpdate,
     MergePreviewOut,
     MergeResultOut,
+    PdfAssetOut,
     PrincipalMergeIn,
     PrincipalOut,
     PrincipalRevokeIn,
@@ -106,12 +106,13 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.service.cd_variants import SquareLogoRef
-from app.modules.admin.service.export_logo import ExportLogoService
+from app.modules.admin.service.pdf_branding import PdfBrandingService
 from app.modules.admin.site_config_service import ManifestScheme, SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
 from app.modules.auth.login_settings import LoginSettingsService
 from app.modules.auth.policy import can_view_gremium
 from app.modules.delegations.mails import DelegationMailer, get_delegation_mailer
+from app.modules.files.pdf_branding import PdfSlot
 from app.modules.gremien.gremium_roles import GremiumRoleService
 from app.modules.gremien.role_schemas import (
     GremiumMembershipOut,
@@ -190,16 +191,16 @@ def get_cd_variant_service(
     return CdVariantService(session, storage=storage, settings=settings)
 
 
-def get_export_logo_service(
+def get_pdf_branding_service(
     session: DbSession, request: Request, settings: SettingsDep
-) -> ExportLogoService:
-    """Build the export-logo service. Without MinIO the upload and the file answer 503."""
+) -> PdfBrandingService:
+    """Build the PDF branding service. Without MinIO the upload and the file answer 503."""
     storage = getattr(request.app.state, "object_storage", None)
-    return ExportLogoService(session, storage=storage, settings=settings)
+    return PdfBrandingService(session, storage=storage, settings=settings)
 
 
 ServiceDep = Annotated[ConfigService, Depends(get_config_service)]
-ExportLogoServiceDep = Annotated[ExportLogoService, Depends(get_export_logo_service)]
+PdfBrandingServiceDep = Annotated[PdfBrandingService, Depends(get_pdf_branding_service)]
 SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
 GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_service)]
 OidcMappingServiceDep = Annotated[OidcMappingService, Depends(get_oidc_mapping_service)]
@@ -1430,59 +1431,80 @@ async def put_site_config(
 
 
 @router.get(
-    "/export-logo",
-    response_model=ExportLogoOut | None,
+    "/pdf-assets/{slot}",
+    response_model=PdfAssetOut | None,
     dependencies=[_SITE],
-    responses=_errors(401, 403),
+    responses=_errors(401, 403, 422),
 )
-async def get_export_logo(service: ExportLogoServiceDep) -> ExportLogoOut | None:
-    """Read the export logo of the branding, or `null` when none is set (spec 000891)."""
-    return await service.get()
+async def get_pdf_asset(slot: PdfSlot, service: PdfBrandingServiceDep) -> PdfAssetOut | None:
+    """Read a graphic of the PDF branding, or `null` when the slot is empty.
+
+    `logo` is the export logo (spec 000891), `footer` the footer graphic (spec 000892).
+    """
+    return await service.get(slot)
 
 
 @router.put(
-    "/export-logo",
-    response_model=ExportLogoOut,
+    "/pdf-assets/{slot}",
+    response_model=PdfAssetOut,
     dependencies=[Depends(_enforce_cd_logo_body)],
     responses=_errors(401, 403, 413, 415, 422, 503),
 )
-async def put_export_logo(
-    service: ExportLogoServiceDep,
+async def put_pdf_asset(
+    slot: PdfSlot,
+    service: PdfBrandingServiceDep,
     principal: SiteAdmin,
     file: Annotated[UploadFile, File()],
-) -> ExportLogoOut:
-    """Upload the export logo of every exported PDF except the protocol (spec 000891).
+) -> PdfAssetOut:
+    """Upload a graphic of the PDF branding.
 
     The server decides the type from the magic bytes: PNG, JPEG, WebP, SVG or PDF. SVG
     and PDF pass, because these bytes reach the render service and never the browser.
     """
     data = await file.read()
-    out, replaced_key = await service.upload(data, filename=file.filename, actor=principal.sub)
+    out, old_key = await service.upload(slot, data, filename=file.filename, actor=principal.sub)
     await service.session.commit()
-    await service.remove_object(replaced_key)
+    await service.remove_object(old_key)
     return out
 
 
-@router.delete("/export-logo", status_code=204, responses=_errors(401, 403, 404))
-async def delete_export_logo(service: ExportLogoServiceDep, principal: SiteAdmin) -> None:
-    """Remove the export logo; the exported PDFs then carry no logo."""
-    key = await service.delete(principal.sub)
+@router.post(
+    "/pdf-assets/{slot}/default",
+    response_model=PdfAssetOut,
+    responses=_errors(401, 403, 422),
+)
+async def reset_pdf_asset(
+    slot: PdfSlot, service: PdfBrandingServiceDep, principal: SiteAdmin
+) -> PdfAssetOut:
+    """Set the built-in graphic of the slot again: the STUPA logo or the Skyline."""
+    out, old_key = await service.reset(slot, principal.sub)
+    await service.session.commit()
+    await service.remove_object(old_key)
+    return out
+
+
+@router.delete("/pdf-assets/{slot}", status_code=204, responses=_errors(401, 403, 404, 422))
+async def delete_pdf_asset(
+    slot: PdfSlot, service: PdfBrandingServiceDep, principal: SiteAdmin
+) -> None:
+    """Empty the slot; the PDFs then carry no graphic there."""
+    key = await service.delete(slot, principal.sub)
     await service.session.commit()
     await service.remove_object(key)
 
 
 @router.get(
-    "/export-logo/file",
+    "/pdf-assets/{slot}/file",
     dependencies=[_SITE],
-    responses=_errors(401, 403, 404, 503),
+    responses=_errors(401, 403, 404, 422, 503),
 )
-async def get_export_logo_file(service: ExportLogoServiceDep) -> Response:
-    """Download the export logo, always as an attachment.
+async def get_pdf_asset_file(slot: PdfSlot, service: PdfBrandingServiceDep) -> Response:
+    """Download the upload of the slot, always as an attachment.
 
     Hardening: the route does not echo the stored type, because a stored SVG would
     render inline in the app origin and run script.
     """
-    data, name = await service.file_bytes()
+    data, name = await service.file_bytes(slot)
     return Response(
         content=data,
         media_type="application/octet-stream",

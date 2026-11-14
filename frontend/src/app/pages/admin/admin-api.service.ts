@@ -44,7 +44,8 @@ import {
   type LoginSettings,
   type AuditPage,
   type Branding,
-  type ExportLogo,
+  type PdfAsset,
+  type PdfSlot,
   type CdLogoSlot,
   type CdVariant,
   type CdVariantCreateBody,
@@ -1572,33 +1573,47 @@ export class AdminApiService {
     });
   }
 
-  /** The mock export logo: the mock keeps no file, only its data. */
-  private mockExportLogo: ExportLogo | null = null;
+  /** The mock PDF branding: the mock keeps no file, only its data. */
+  private readonly mockPdfAssets: Record<PdfSlot, PdfAsset | null> = {
+    logo: { builtin: true, fileName: null, mime: null, size: null },
+    footer: { builtin: true, fileName: null, mime: null, size: null },
+  };
 
-  /** GET /admin/export-logo — the export logo, or `null` (spec 000891). */
-  getExportLogo(): Observable<ExportLogo | null> {
-    if (this.mock) return of(this.mockExportLogo);
-    return this.http.get<ExportLogo | null>(`${this.base}/admin/export-logo`);
+  /** GET /admin/pdf-assets/{slot} — the graphic of the slot, or `null` (specs 000891, 000892). */
+  getPdfAsset(slot: PdfSlot): Observable<PdfAsset | null> {
+    if (this.mock) return of(this.mockPdfAssets[slot]);
+    return this.http.get<PdfAsset | null>(`${this.base}/admin/pdf-assets/${slot}`);
   }
 
-  /** PUT /admin/export-logo — multipart upload that replaces the export logo. */
-  uploadExportLogo(file: File): Observable<ExportLogo> {
+  /** PUT /admin/pdf-assets/{slot} — multipart upload that replaces the graphic. */
+  uploadPdfAsset(slot: PdfSlot, file: File): Observable<PdfAsset> {
     if (this.mock) {
-      this.mockExportLogo = { fileName: file.name, mime: file.type, size: file.size };
-      return of(this.mockExportLogo);
+      const asset = { builtin: false, fileName: file.name, mime: file.type, size: file.size };
+      this.mockPdfAssets[slot] = asset;
+      return of(asset);
     }
     const form = new FormData();
     form.append('file', file);
-    return this.http.put<ExportLogo>(`${this.base}/admin/export-logo`, form);
+    return this.http.put<PdfAsset>(`${this.base}/admin/pdf-assets/${slot}`, form);
   }
 
-  /** DELETE /admin/export-logo — the exports then carry no logo. */
-  deleteExportLogo(): Observable<void> {
+  /** POST /admin/pdf-assets/{slot}/default — the built-in graphic again. */
+  resetPdfAsset(slot: PdfSlot): Observable<PdfAsset> {
     if (this.mock) {
-      this.mockExportLogo = null;
+      const asset = { builtin: true, fileName: null, mime: null, size: null };
+      this.mockPdfAssets[slot] = asset;
+      return of(asset);
+    }
+    return this.http.post<PdfAsset>(`${this.base}/admin/pdf-assets/${slot}/default`, {});
+  }
+
+  /** DELETE /admin/pdf-assets/{slot} — the PDFs then carry no graphic there. */
+  deletePdfAsset(slot: PdfSlot): Observable<void> {
+    if (this.mock) {
+      this.mockPdfAssets[slot] = null;
       return of(undefined);
     }
-    return this.http.delete<void>(`${this.base}/admin/export-logo`);
+    return this.http.delete<void>(`${this.base}/admin/pdf-assets/${slot}`);
   }
 
   getSiteConfig(): Observable<SiteConfig> {

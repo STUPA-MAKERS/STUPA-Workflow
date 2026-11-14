@@ -240,52 +240,70 @@
                       }
                     </li>
                   }
-                  <li
-                    class="br__logo"
-                    [class.br__logo--drop]="exportDrop()"
-                    (dragover)="onExportDragOver($event)"
-                    (dragleave)="exportDrop.set(false)"
-                    (drop)="onExportDrop($event)"
-                  >
-                    <app-file-picker #exportFile [accept]="exportAccept" (picked)="onExportLogoSelected($event)" />
-                    <span class="br__thumb br__thumb--none"><app-icon [name]="exportLogo() ? 'file' : 'image'" /></span>
-                    <span class="br__logoText">
-                      <span class="br__logoName">{{ 'admin.brand.logo.export' | t }}</span>
-                      @if (exportLogo(); as logo) {
-                        <span class="br__logoFile mono">{{ logo.fileName }} · {{ size(logo.size) }}</span>
-                      } @else {
-                        <span class="br__logoFile br__logoFile--default">{{ 'admin.brand.logo.none' | t }}</span>
+                  @for (slot of pdfSlots; track slot) {
+                    <li
+                      class="br__logo"
+                      [class.br__logo--drop]="pdfDrop() === slot"
+                      (dragover)="onPdfDragOver(slot, $event)"
+                      (dragleave)="pdfDrop.set(null)"
+                      (drop)="onPdfDrop(slot, $event)"
+                    >
+                      <app-file-picker #pdfFile [accept]="pdfAccept" (picked)="onPdfAssetSelected(slot, $event)" />
+                      @let asset = pdfAssets()[slot];
+                      <span class="br__thumb br__thumb--none"><app-icon [name]="asset && !asset.builtin ? 'file' : 'image'" /></span>
+                      <span class="br__logoText">
+                        <span class="br__logoName">{{ pdfLabel(slot) }}</span>
+                        @if (!asset) {
+                          <span class="br__logoFile br__logoFile--default">{{ pdfNone(slot) }}</span>
+                        } @else if (asset.builtin) {
+                          <span class="br__logoFile br__logoFile--default">{{ 'admin.brand.logo.default' | t }}</span>
+                        } @else {
+                          <span class="br__logoFile mono">{{ asset.fileName }} · {{ size(asset.size ?? 0) }}</span>
+                        }
+                      </span>
+                      @if (asset) {
+                        <app-button
+                          variant="text"
+                          size="sm"
+                          [iconOnly]="true"
+                          [ariaLabel]="('admin.brand.replaceLogo' | t) + ': ' + pdfLabel(slot)"
+                          [title]="'admin.brand.replaceLogo' | t"
+                          (click)="pdfFile.open()"
+                          ><app-icon name="upload"
+                        /></app-button>
                       }
-                    </span>
-                    @if (exportLogo()) {
-                      <app-button
-                        variant="text"
-                        size="sm"
-                        [iconOnly]="true"
-                        [ariaLabel]="('admin.brand.replaceLogo' | t) + ': ' + ('admin.brand.logo.export' | t)"
-                        [title]="'admin.brand.replaceLogo' | t"
-                        (click)="exportFile.open()"
-                        ><app-icon name="upload"
-                      /></app-button>
-                      <app-button
-                        variant="text"
-                        size="sm"
-                        [iconOnly]="true"
-                        [ariaLabel]="('admin.brand.removeLogo' | t) + ': ' + ('admin.brand.logo.export' | t)"
-                        [title]="'admin.brand.removeLogo' | t"
-                        (click)="removeExportLogo()"
-                        ><app-icon name="trash"
-                      /></app-button>
-                    } @else {
-                      <app-button
-                        variant="outlined"
-                        size="sm"
-                        [ariaLabel]="('admin.brand.pick' | t) + ': ' + ('admin.brand.logo.export' | t)"
-                        (click)="exportFile.open()"
-                        >{{ 'admin.brand.pick' | t }}</app-button
-                      >
-                    }
-                  </li>
+                      @if (!asset?.builtin) {
+                        <app-button
+                          variant="text"
+                          size="sm"
+                          [iconOnly]="true"
+                          [ariaLabel]="('admin.brand.pdf.reset' | t) + ': ' + pdfLabel(slot)"
+                          [title]="'admin.brand.pdf.reset' | t"
+                          (click)="resetPdfAsset(slot)"
+                          ><app-icon name="undo"
+                        /></app-button>
+                      }
+                      @if (asset) {
+                        <app-button
+                          variant="text"
+                          size="sm"
+                          [iconOnly]="true"
+                          [ariaLabel]="('admin.brand.pdf.remove' | t) + ': ' + pdfLabel(slot)"
+                          [title]="'admin.brand.pdf.remove' | t"
+                          (click)="removePdfAsset(slot)"
+                          ><app-icon name="trash"
+                        /></app-button>
+                      } @else {
+                        <app-button
+                          variant="outlined"
+                          size="sm"
+                          [ariaLabel]="('admin.brand.pick' | t) + ': ' + pdfLabel(slot)"
+                          (click)="pdfFile.open()"
+                          >{{ 'admin.brand.pick' | t }}</app-button
+                        >
+                      }
+                    </li>
+                  }
                 </ul>
               </app-section>
 

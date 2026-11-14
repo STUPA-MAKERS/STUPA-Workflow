@@ -1,7 +1,7 @@
 """Config tables of the admin module.
 
 The module owns ``site_config_version``, the corporate-design tables ``cd_variant``
-with ``cd_variant_logo``, and ``export_logo``.
+with ``cd_variant_logo``, and ``pdf_asset``.
 """
 
 from __future__ import annotations
@@ -118,25 +118,28 @@ class SiteConfigVersion(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
-class ExportLogo(UUIDPkMixin, CreatedAtMixin, Base):
-    """The export logo of the branding: the one logo of every exported PDF (spec 000891).
+class PdfAsset(UUIDPkMixin, CreatedAtMixin, Base):
+    """A graphic of the PDF branding (specs 000891, 000892), one row per slot.
 
-    The table holds at most one row: ``singleton`` is always true and unique. The bytes
-    live in the object storage under ``object_key``; they reach the render service only,
-    never the browser, so SVG and PDF are allowed. ``mime`` is the sniffed type.
-    ``created_by`` holds the OIDC ``sub`` of the uploader, so it carries no PII.
+    ``slot`` is ``logo`` (the export logo) or ``footer`` (the graphic at the foot of
+    each page). A row names either an upload (``object_key`` with its file name, sniffed
+    ``mime`` and ``size``) or a built-in graphic of the render service (``builtin``,
+    for example ``STUPA``), never both. No row means no graphic. The bytes reach the
+    render service only, never the browser, so SVG and PDF are allowed. ``created_by``
+    holds the OIDC ``sub`` of the uploader, so it carries no PII.
     """
 
-    __tablename__ = "export_logo"
+    __tablename__ = "pdf_asset"
 
-    singleton: Mapped[bool] = mapped_column(Boolean, server_default="true")
-    object_key: Mapped[str] = mapped_column(Text)
-    file_name: Mapped[str] = mapped_column(Text)
-    mime: Mapped[str] = mapped_column(Text)
-    size: Mapped[int] = mapped_column(Integer)
+    slot: Mapped[str] = mapped_column(Text, unique=True)
+    builtin: Mapped[str | None] = mapped_column(Text, nullable=True)
+    object_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mime: Mapped[str | None] = mapped_column(Text, nullable=True)
+    size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        UniqueConstraint("singleton", name="uq_export_logo_singleton"),
-        CheckConstraint("singleton", name="singleton"),
+        CheckConstraint("slot IN ('logo', 'footer')", name="slot"),
+        CheckConstraint("(builtin IS NULL) <> (object_key IS NULL)", name="source"),
     )

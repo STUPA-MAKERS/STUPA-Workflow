@@ -18,8 +18,8 @@ from sqlalchemy import select
 
 from app.modules.budget.plan_export import PlanFile
 from app.modules.budget.tree.service import BudgetTreeService
-from app.modules.files.export_logo import (
-    active_export_logo,
+from app.modules.files.pdf_branding import (
+    active_pdf_branding,
     export_render_assets,
     export_render_config,
 )
@@ -66,13 +66,13 @@ async def _render(
         BadRequestError: typst reported a permanent error (400).
         ServiceUnavailableError: typst failed for a short time (503).
     """
-    logo = await active_export_logo(session, storage)
+    branding = await active_pdf_branding(session, storage)
     try:
         return await typst.render_pdf(
             file.source,
             variant="plan",
-            config={**export_render_config(logo, footer=False), **file.config},
-            assets=export_render_assets(logo),
+            config={**export_render_config(branding, footer=False), **file.config},
+            assets=export_render_assets(branding),
         )
     except TypstError as exc:
         if not exc.retryable:

@@ -7,6 +7,7 @@ from typing import Any, cast
 import pytest
 
 from app.modules.budget.plan_export import PlanFile
+from app.modules.files.pdf_branding import PdfBranding
 from app.modules.pdf.typst_client import TypstError
 from app.modules.protocol import plan_anlage
 from app.shared.errors import BadRequestError, ServiceUnavailableError
@@ -33,11 +34,11 @@ async def _render(*, retryable: bool) -> bytes:
 
 
 @pytest.fixture(autouse=True)
-def _no_export_logo(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def none(_session: object, _storage: object) -> None:
-        return None
+def _no_pdf_branding(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def none(_session: object, _storage: object) -> PdfBranding:
+        return PdfBranding()
 
-    monkeypatch.setattr(plan_anlage, "active_export_logo", none)
+    monkeypatch.setattr(plan_anlage, "active_pdf_branding", none)
 
 
 @pytest.mark.asyncio

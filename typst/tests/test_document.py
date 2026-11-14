@@ -135,6 +135,17 @@ def test_makers_footer_takes_the_right_aligned_logo() -> None:
     assert doc["footer_logos"] == [{"name": "MAKERS-RAlign"}]
 
 
+def test_the_footer_graphic_is_the_skyline_an_asset_or_none() -> None:
+    assert build_document("x", variant=None)["footer_graphic"] == {"name": "Skyline"}
+    doc = build_document("x", variant=None, config={"footer_graphic": "f.svg"}, assets=["f.svg"])
+    assert doc["footer_graphic"] == {"asset": "f.svg"}
+    assert (
+        build_document("x", variant=None, config={"footer_graphic": ""})["footer_graphic"] is None
+    )
+    with pytest.raises(ConversionError, match="footer_graphic"):
+        build_document("x", variant=None, config={"footer_graphic": 3})
+
+
 def test_unknown_logo_and_variant() -> None:
     with pytest.raises(ConversionError, match="unknown logo"):
         build_document("x", variant=None, config={"logos": ["missing.png"]})

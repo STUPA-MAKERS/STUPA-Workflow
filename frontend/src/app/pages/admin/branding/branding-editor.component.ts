@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { map, type Observable } from 'rxjs';
 import { BrandingService, DEFAULT_LOGOS } from '@core/branding/branding.service';
 import { I18nService, baseLocale } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -45,8 +46,9 @@ import { AdminApiService } from '../admin-api.service';
 import {
   type Branding,
   type FooterLink,
-  EXPORT_LOGO_ACCEPT_MIME,
-  type ExportLogo,
+  PDF_ASSET_ACCEPT_MIME,
+  type PdfAsset,
+  type PdfSlot,
   LOGO_ACCEPT_MIME,
   LOGO_MAX_SIZE_MB,
   type LogoSlot,
@@ -123,11 +125,12 @@ export class BrandingEditorComponent {
 
   protected readonly accept = LOGO_ACCEPT_MIME.join(',');
   protected readonly logoSlots: readonly LogoSlot[] = ['wordmark', 'imagemark', 'favicon'];
-  protected readonly exportAccept = EXPORT_LOGO_ACCEPT_MIME.join(',');
-  /** The export logo of the PDFs (spec 000891). It saves at once, not with the draft. */
-  protected readonly exportLogo = signal<ExportLogo | null>(null);
-  /** A file is dragged over the export logo row. */
-  protected readonly exportDrop = signal(false);
+  protected readonly pdfAccept = PDF_ASSET_ACCEPT_MIME.join(',');
+  protected readonly pdfSlots: readonly PdfSlot[] = ['logo', 'footer'];
+  /** The PDF branding (specs 000891, 000892). It saves at once, not with the draft. */
+  protected readonly pdfAssets = signal<Record<PdfSlot, PdfAsset | null>>({ logo: null, footer: null });
+  /** The PDF slot that a file is dragged over. */
+  protected readonly pdfDrop = signal<PdfSlot | null>(null);
   protected readonly freetexts = FREETEXTS;
   protected readonly submittedKinds: readonly SubmittedKind[] = ['internal', 'external'];
 
@@ -175,10 +178,12 @@ export class BrandingEditorComponent {
   constructor() {
     this.loadConfig();
     if (this.section === 'branding') {
-      this.api.getExportLogo().subscribe({
-        next: (logo) => this.exportLogo.set(logo),
-        error: () => this.exportLogo.set(null),
-      });
+      for (const slot of this.pdfSlots) {
+        this.api.getPdfAsset(slot).subscribe({
+          next: (asset) => this.setPdfAsset(slot, asset),
+          error: () => this.setPdfAsset(slot, null),
+        });
+      }
     }
     inject(DestroyRef).onDestroy(() => this.brand.previewAccent(undefined));
   }
@@ -373,26 +378,38 @@ export class BrandingEditorComponent {
     reader.readAsDataURL(file);
   }
 
-  protected onExportLogoSelected(files: File[]): void {
+  private setPdfAsset(slot: PdfSlot, asset: PdfAsset | null): void {
+    this.pdfAssets.update((all) => ({ ...all, [slot]: asset }));
+  }
+
+  protected pdfLabel(slot: PdfSlot): string {
+    return this.i18n.translate(`admin.brand.pdf.${slot}` as TranslationKey);
+  }
+
+  protected pdfNone(slot: PdfSlot): string {
+    return this.i18n.translate(`admin.brand.pdf.none.${slot}` as TranslationKey);
+  }
+
+  protected onPdfAssetSelected(slot: PdfSlot, files: File[]): void {
     const file = files[0];
-    if (file) this.uploadExportLogo(file);
+    if (file) this.uploadPdfAsset(slot, file);
   }
 
-  protected onExportDragOver(event: DragEvent): void {
+  protected onPdfDragOver(slot: PdfSlot, event: DragEvent): void {
     event.preventDefault();
-    this.exportDrop.set(true);
+    this.pdfDrop.set(slot);
   }
 
-  protected onExportDrop(event: DragEvent): void {
+  protected onPdfDrop(slot: PdfSlot, event: DragEvent): void {
     event.preventDefault();
-    this.exportDrop.set(false);
+    this.pdfDrop.set(null);
     const file = event.dataTransfer?.files?.[0];
-    if (file) this.uploadExportLogo(file);
+    if (file) this.uploadPdfAsset(slot, file);
   }
 
-  /** Check the type and the size, then upload the export logo at once. */
-  private uploadExportLogo(file: File): void {
-    if (!EXPORT_LOGO_ACCEPT_MIME.includes(file.type)) {
+  /** Check the type and the size, then upload the graphic at once. */
+  private uploadPdfAsset(slot: PdfSlot, file: File): void {
+    if (!PDF_ASSET_ACCEPT_MIME.includes(file.type)) {
       this.toast.error(this.i18n.translate('admin.brand.badType'));
       return;
     }
@@ -400,19 +417,21 @@ export class BrandingEditorComponent {
       this.toast.error(this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }));
       return;
     }
-    this.api.uploadExportLogo(file).subscribe({
-      next: (logo) => {
-        this.exportLogo.set(logo);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
-      },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
-    });
+    this.savePdfAsset(slot, this.api.uploadPdfAsset(slot, file));
   }
 
-  protected removeExportLogo(): void {
-    this.api.deleteExportLogo().subscribe({
-      next: () => {
-        this.exportLogo.set(null);
+  protected resetPdfAsset(slot: PdfSlot): void {
+    this.savePdfAsset(slot, this.api.resetPdfAsset(slot));
+  }
+
+  protected removePdfAsset(slot: PdfSlot): void {
+    this.savePdfAsset(slot, this.api.deletePdfAsset(slot).pipe(map(() => null)));
+  }
+
+  private savePdfAsset(slot: PdfSlot, request: Observable<PdfAsset | null>): void {
+    request.subscribe({
+      next: (asset) => {
+        this.setPdfAsset(slot, asset);
         this.toast.success(this.i18n.translate('admin.common.saved'));
       },
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),

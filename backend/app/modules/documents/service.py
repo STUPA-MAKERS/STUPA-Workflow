@@ -40,12 +40,12 @@ from app.modules.documents.application_markdown import (
     anlage_link,
     build_application_document,
 )
-from app.modules.files.export_logo import (
-    active_export_logo,
+from app.modules.files.models import Attachment
+from app.modules.files.pdf_branding import (
+    active_pdf_branding,
     export_render_assets,
     export_render_config,
 )
-from app.modules.files.models import Attachment
 from app.modules.files.storage import ObjectStorage
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.gremien.models import Gremium
@@ -131,7 +131,7 @@ class ApplicationPdfService:
 
     Attributes:
         session: The database session of the request.
-        storage: The object storage, for the export logo.
+        storage: The object storage, for the PDF branding.
         typst: The client of the render service, or `None` when it is not configured.
         settings: The settings, for the local time zone.
     """
@@ -406,7 +406,7 @@ class ApplicationPdfService:
             return None
 
     async def render(self, doc: ApplicationDoc) -> bytes:
-        """Render a document with the export logo of the branding (spec 000891).
+        """Render a document with the export logo and the footer graphic (specs 000891, 000892).
 
         Raises:
             ServiceUnavailableError: The render service is not configured or failed for
@@ -415,13 +415,13 @@ class ApplicationPdfService:
         """
         if self.typst is None:
             raise ServiceUnavailableError("PDF rendering is not available.")
-        logo = await active_export_logo(self.session, self.storage)
+        branding = await active_pdf_branding(self.session, self.storage)
         try:
             return await self.typst.render_pdf(
                 build_application_document(doc),
                 variant=None,
-                config=export_render_config(logo, footer=True),
-                assets=export_render_assets(logo),
+                config=export_render_config(branding, footer=True),
+                assets=export_render_assets(branding),
             )
         except TypstError as exc:
             if not exc.retryable:
