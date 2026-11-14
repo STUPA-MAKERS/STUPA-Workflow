@@ -62,6 +62,8 @@ def _gremium(*, allow: bool = True) -> SimpleNamespace:
         allow_vote_delegation=allow,
         delegation_lead_minutes=0,
         delegation_allow_external=False,
+        delegation_max_per_delegate=2,
+        delegation_in_elections=False,
     )
 
 
@@ -252,7 +254,7 @@ async def test_lead_entry_refuses_a_second_delegation_409() -> None:
         result(["vote.cast"]),
         result(b.id),
         result(),
-        result((a.id, uuid4(), False)),
+        result((a.id, uuid4(), False, False)),
     )
     with pytest.raises(ConflictError, match="already delegated"):
         await _svc(db).create(_lead_payload(a, b), _actor())

@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     ForeignKey,
     Index,
     Integer,
@@ -18,6 +19,11 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
+
+#: The most delegations of one delegate in one meeting, for a Gremium without its own value.
+DEFAULT_DELEGATION_MAX_PER_DELEGATE = 2
+#: The upper end of the setting ``delegation_max_per_delegate``.
+MAX_DELEGATIONS_PER_DELEGATE = 20
 
 
 class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
@@ -41,6 +47,17 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     delegation_lead_minutes: Mapped[int] = mapped_column(Integer, server_default="0")
     #: Allow delegation to users outside gremium & substitute pool.
     delegation_allow_external: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    #: The most delegations that one delegate holds in one meeting. A pool seat does
+    #: not count.
+    delegation_max_per_delegate: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_DELEGATION_MAX_PER_DELEGATE),
+        default=DEFAULT_DELEGATION_MAX_PER_DELEGATE,
+    )
+    #: An election takes the ballot of a delegation. Off: an election refuses it.
+    delegation_in_elections: Mapped[bool] = mapped_column(
+        Boolean, server_default="false", default=False
+    )
     #: Default quorum for the votes of this gremium. It is the percentage of
     #: eligible voters that must take part, from 0 to 100. NULL = no default.
     quorum_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -58,6 +75,13 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     protocols_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
     #: Extra addresses that get the final protocol in addition to the members.
     protocol_recipients: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
+
+    __table_args__ = (
+        CheckConstraint(
+            f"delegation_max_per_delegate BETWEEN 1 AND {MAX_DELEGATIONS_PER_DELEGATE}",
+            name="delegation_max_per_delegate",
+        ),
+    )
 
 
 class GremiumRole(UUIDPkMixin, Base):

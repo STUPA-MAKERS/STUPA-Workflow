@@ -29,6 +29,7 @@ const NO_DEFAULTS: GremiumDefaults = {
   guestsMayVote: false,
   allowVoteDelegation: false,
   delegationLeadMinutes: 0,
+  delegationMaxPerDelegate: 2,
 };
 
 function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
@@ -102,11 +103,14 @@ describe('GremiumDialogComponent', () => {
     expect(api.getGremiumMailRecipients).toHaveBeenCalledWith('g-1');
   });
 
-  /** The switches are the guest ballot, delegation, delegation to externals and the public page. */
+  /**
+   * The switches are the guest ballot, delegation, delegation to externals, delegation in
+   * elections and the public page.
+   */
   it('has no switch to change a ballot after casting', async () => {
     await setup(STUPA);
     expect(screen.queryByText(/Stimme nach Abgabe/)).toBeNull();
-    expect(screen.getAllByRole('switch')).toHaveLength(4);
+    expect(screen.getAllByRole('switch')).toHaveLength(5);
   });
 
   /** The quorum is a percent, so 150 becomes 100. */
@@ -134,6 +138,8 @@ describe('GremiumDialogComponent', () => {
       allowVoteDelegation: true,
       delegationLeadMinutes: 30,
       delegationAllowExternal: true,
+      delegationMaxPerDelegate: 2,
+      delegationInElections: false,
       quorumPercent: 100,
       quorumMinPresent: 1000,
       repeatQuorumPercent: null,
@@ -172,6 +178,8 @@ describe('GremiumDialogComponent', () => {
       allowVoteDelegation: true,
       delegationLeadMinutes: 0,
       delegationAllowExternal: false,
+      delegationMaxPerDelegate: 2,
+      delegationInElections: false,
       quorumPercent: 40,
       quorumMinPresent: null,
       repeatQuorumPercent: null,
@@ -191,10 +199,13 @@ describe('GremiumDialogComponent', () => {
           guestsMayVote: false,
           allowVoteDelegation: true,
           delegationLeadMinutes: 120,
+          delegationMaxPerDelegate: 3,
         }),
       ),
     });
     await setup(null, api);
+    expect(screen.getByRole('spinbutton', { name: 'Höchstzahl Delegationen je Person' })).toHaveValue(3);
+    await userEvent.click(screen.getByRole('switch', { name: 'Delegationen auch bei Wahlen' }));
     expect(screen.getByRole('spinbutton', { name: 'Quorum (%)' })).toHaveValue(40);
     expect(screen.getByRole('spinbutton', { name: 'Quorum der Wiederholungssitzung (%)' })).toHaveValue(25);
     expect(screen.getByRole('spinbutton', { name: /Vorlauf/ })).toHaveValue(120);
@@ -207,6 +218,8 @@ describe('GremiumDialogComponent', () => {
         guestsMayVote: false,
         allowVoteDelegation: true,
         delegationLeadMinutes: 120,
+        delegationMaxPerDelegate: 3,
+        delegationInElections: true,
       }),
     );
   });
@@ -229,6 +242,7 @@ describe('GremiumDialogComponent', () => {
     cmp.patch('guestsMayVote', true);
     cmp.patch('allowVoteDelegation', true);
     cmp.patch('delegationLeadMinutes', 7);
+    cmp.patchMax(5);
     cmp.patchMinPresent('abc');
     answer.next({
       quorumPercent: 40,
@@ -236,6 +250,7 @@ describe('GremiumDialogComponent', () => {
       guestsMayVote: false,
       allowVoteDelegation: false,
       delegationLeadMinutes: 120,
+      delegationMaxPerDelegate: 4,
     });
     expect(cmp.form()).toEqual(
       expect.objectContaining({
@@ -244,6 +259,7 @@ describe('GremiumDialogComponent', () => {
         guestsMayVote: true,
         allowVoteDelegation: true,
         delegationLeadMinutes: 7,
+        delegationMaxPerDelegate: 5,
         quorumMinPresent: null,
       }),
     );
@@ -262,6 +278,7 @@ describe('GremiumDialogComponent', () => {
       guestsMayVote: true,
       allowVoteDelegation: true,
       delegationLeadMinutes: 120,
+      delegationMaxPerDelegate: 4,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((fixture.componentInstance as any).form().quorumPercent).toBeNull();

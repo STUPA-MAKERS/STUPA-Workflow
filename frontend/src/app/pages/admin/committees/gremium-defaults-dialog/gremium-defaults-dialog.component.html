@@ -50,6 +50,13 @@
             [ngModel]="f.delegationLeadMinutes"
             (ngModelChange)="patchLead($event)"
           />
+          <app-input
+            type="number"
+            [label]="'admin.gremien.delegationMax' | t"
+            name="delegationMaxPerDelegate"
+            [ngModel]="f.delegationMaxPerDelegate"
+            (ngModelChange)="patchMax($event)"
+          />
           <button type="submit" hidden></button>
         </form>
       }

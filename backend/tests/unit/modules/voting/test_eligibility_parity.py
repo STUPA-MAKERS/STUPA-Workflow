@@ -74,9 +74,7 @@ def _vote(**over: Any) -> SimpleNamespace:
     return SimpleNamespace(**base)
 
 
-async def _resolve(
-    sub: str, gremium_perms: list[str] | None, global_perms: set[str]
-) -> Principal:
+async def _resolve(sub: str, gremium_perms: list[str] | None, global_perms: set[str]) -> Principal:
     """Resolve a principal through the real RBAC resolver against a fake session.
 
     The queue mirrors the query order of `resolve_principal`: role assignments, then
@@ -134,9 +132,7 @@ async def test_quorum_roster_equals_cast_gate() -> None:
     """The invariant: the set the quorum counts equals the set the gate admits."""
     rows = [(sub, perms) for sub, perms, _ in _ROSTER if perms is not None]
     counted = await MeetingService(fake_session(result(*rows))).vote_eligible_count(GID)
-    admitted = [
-        sub for sub, gp, glob in _ROSTER if await _casts(await _resolve(sub, gp, glob))
-    ]
+    admitted = [sub for sub, gp, glob in _ROSTER if await _casts(await _resolve(sub, gp, glob))]
     assert admitted == ["admin", "member", "manager", "protokoll"]
     assert len(admitted) == counted == 4
 
@@ -156,9 +152,7 @@ async def test_forged_oidc_group_claim_never_reaches_the_roster() -> None:
         oidc_groups=[rbac.vote_group_key(GID)],
     )
     row.id = "forger"  # type: ignore[assignment]
-    db = auth_fakes.fake_session(
-        auth_fakes.result(), auth_fakes.result(), auth_fakes.result()
-    )
+    db = auth_fakes.fake_session(auth_fakes.result(), auth_fakes.result(), auth_fakes.result())
     principal = await rbac.resolve_principal(db, row, NOW)
     assert rbac.vote_group_key(GID) not in principal.groups
     assert await _casts(principal) is False
@@ -196,8 +190,6 @@ async def test_agent_token_cannot_cast_a_delegated_ballot() -> None:
         groups=set(),
         scope_permissions=frozenset({"vote.manage"}),
     )
-    db = fake_session(result(vote), result((False, True, "delegator-1")))
+    db = fake_session(result(vote), result((False, True, False, "delegator-1", uuid.uuid4())))
     with pytest.raises(ForbiddenError, match="human"):
-        await VotingService(db).cast(
-            vote.id, agent, "yes", now=NOW, as_delegation=True
-        )
+        await VotingService(db).cast(vote.id, agent, "yes", now=NOW, as_delegation=True)

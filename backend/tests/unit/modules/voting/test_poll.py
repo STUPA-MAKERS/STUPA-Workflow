@@ -41,6 +41,7 @@ from tests.unit.modules.voting.test_voting_service_unit import (  # noqa: F401 -
     NOW,
     _FakeFlow,
     _patch_flow,
+    _persons,
     _vote,
     _voter,
 )
@@ -340,9 +341,10 @@ async def test_get_closed_date_poll_counts_the_yes_answers() -> None:
     assert out.tally.quorum_met is True
 
 
-async def test_get_open_poll_hides_the_count() -> None:
+async def test_get_open_poll_hides_the_count(monkeypatch: pytest.MonkeyPatch) -> None:
     vote = _pvote()
     db = fake_session(result(vote), result('["o1"]'), result('["o1"]'))
+    monkeypatch.setattr(VotingService, "voters", _persons(1))
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
     assert out.tally.counts == {}

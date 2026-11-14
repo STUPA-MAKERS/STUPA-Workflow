@@ -119,6 +119,20 @@
               (ngModelChange)="patch('delegationAllowExternal', $event)"
               >{{ 'admin.gremien.delegationExternal' | t }}</app-switch
             >
+            <app-input
+              type="number"
+              [label]="'admin.gremien.delegationMax' | t"
+              name="delegationMaxPerDelegate"
+              [ngModel]="form().delegationMaxPerDelegate"
+              (ngModelChange)="patchMax($event)"
+            />
+            <app-switch
+              class="gd__switch"
+              name="delegationInElections"
+              [ngModel]="form().delegationInElections"
+              (ngModelChange)="patch('delegationInElections', $event)"
+              >{{ 'admin.gremien.delegationInElections' | t }}</app-switch
+            >
           </div>
         }
       </div>

@@ -552,7 +552,7 @@ async def test_guest_votes_without_quorum_and_late_admission(
         ok = a.post(
             f"/api/public/meetings/{code}/votes/{vote['id']}/ballot", json={"choice": "yes"}
         )
-        assert ok.status_code == 200 and ok.json() == {"status": "cast"}
+        assert ok.status_code == 200 and ok.json() == {"status": "cast", "ballots": 1}
         dup = a.post(
             f"/api/public/meetings/{code}/votes/{vote['id']}/ballot", json={"choice": "no"}
         )

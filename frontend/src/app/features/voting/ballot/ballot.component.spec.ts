@@ -8,6 +8,7 @@ import { BallotComponent, type BallotCaster } from './ballot.component';
 interface SetupOpts {
   own?: MyBallot | null;
   proxyName?: string | null;
+  proxyCount?: number;
   proxyCast?: boolean;
   secret?: boolean;
   caster?: BallotCaster;
@@ -26,6 +27,7 @@ async function setup(opts: SetupOpts = {}) {
       options: ['yes', 'no', 'abstain'],
       own: opts.own === undefined ? { cast: false, choice: null } : opts.own,
       proxyName: opts.proxyName ?? null,
+      proxyCount: opts.proxyCount ?? 0,
       proxyCast: opts.proxyCast ?? false,
       secret: opts.secret ?? false,
       caster,
@@ -40,7 +42,7 @@ async function setup(opts: SetupOpts = {}) {
 
 /** The large choices of the own row. */
 const choice = (name: string) =>
-  within(screen.getByRole('group', { name: 'Deine Stimme' })).getByRole('button', {
+  within(screen.getByRole('group', { name: /^Deine Stimme/ })).getByRole('button', {
     name: new RegExp(`^${name}$`),
   });
 const confirmButton = () => screen.getByRole('button', { name: /abgeben/ });
@@ -148,12 +150,28 @@ describe('BallotComponent', () => {
     expect(castFailed).toHaveBeenCalledWith({ asDelegation: false, alreadyVoted: false, error: {} });
   });
 
-  /** The own row stays open, and the button moves to it. */
-  it('casts the represented ballot with asDelegation', async () => {
-    const { caster } = await setup({ proxyName: 'Jonas Weber' });
+  /** §F/meetings/voting/000932: one cast for the own ballot and the represented members. */
+  it('casts once for the own ballot and the represented members', async () => {
+    const { caster } = await setup({ proxyName: 'Anna Beispiel, Jonas Weber', proxyCount: 2 });
     const user = userEvent.setup();
-    expect(screen.getByRole('heading', { name: 'Deine Stimme' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Als Vertretung für Jonas Weber' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        name: 'Deine Stimme, 3 Stimmrechte, auch für Anna Beispiel, Jonas Weber',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Als Vertretung/ })).not.toBeInTheDocument();
+    await user.click(choice('Ja'));
+    expect(confirmButton()).toHaveTextContent('Stimme abgeben: Ja');
+    await user.click(confirmButton());
+    expect(caster).toHaveBeenCalledTimes(1);
+    expect(caster).toHaveBeenCalledWith('yes', false);
+    expect(screen.queryByRole('heading', { name: /Als Vertretung/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /abgeben/ })).not.toBeInTheDocument();
+  });
+
+  it('casts the represented ballot with asDelegation for a person without an own ballot', async () => {
+    const { caster } = await setup({ own: null, proxyName: 'Jonas Weber' });
+    const user = userEvent.setup();
     const proxyGroup = screen.getByRole('group', { name: 'Als Vertretung für Jonas Weber' });
     const proxyNo = proxyGroup.querySelectorAll('button')[1];
     await user.click(proxyNo);
@@ -162,11 +180,22 @@ describe('BallotComponent', () => {
     await user.click(confirmButton());
     expect(caster).toHaveBeenCalledWith('no', true);
     expect(screen.getByText('Für Jonas Weber abgegeben: Nein')).toBeInTheDocument();
+  });
+
+  it('names the number of voting rights of a person without an own ballot', async () => {
+    await setup({ own: null, proxyName: 'Anna Beispiel, Jonas Weber', proxyCount: 2 });
+    expect(
+      screen.getByRole('group', {
+        name: '2 Stimmrechte als Vertretung für Anna Beispiel, Jonas Weber',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the represented row locked next to an open own row', async () => {
+    await setup({ proxyName: 'Jonas Weber', proxyCast: true });
+    expect(screen.getByRole('heading', { name: 'Deine Stimme' })).toBeInTheDocument();
+    expect(screen.getByText('Für Jonas Weber abgegeben.')).toBeInTheDocument();
     expect(confirmButton()).toHaveTextContent('Stimme abgeben');
-    await user.click(choice('Ja'));
-    await user.click(confirmButton());
-    expect(caster).toHaveBeenLastCalledWith('yes', false);
-    expect(screen.queryByRole('button', { name: /abgeben/ })).not.toBeInTheDocument();
   });
 
   it('moves the button to the proxy row once the own ballot is in', async () => {
@@ -183,7 +212,7 @@ describe('BallotComponent', () => {
   });
 
   it('never shows the choice of a secret ballot', async () => {
-    const { caster } = await setup({ secret: true, proxyName: 'Jonas Weber' });
+    const { caster } = await setup({ secret: true });
     const user = userEvent.setup();
     await user.click(choice('Nein'));
     await user.click(confirmButton());
@@ -191,6 +220,11 @@ describe('BallotComponent', () => {
     expect(screen.getByText('Danke! Deine Stimme ist abgegeben.')).toBeInTheDocument();
     expect(screen.queryByText(/Deine Stimme: Nein/)).not.toBeInTheDocument();
     expect(choice('Nein')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('never shows the choice of a secret represented ballot', async () => {
+    await setup({ secret: true, own: { cast: true, choice: null }, proxyName: 'Jonas Weber' });
+    const user = userEvent.setup();
     const proxyYes = screen.getByRole('group', { name: /Vertretung/ }).querySelector('button');
     await user.click(proxyYes as HTMLElement);
     await user.click(confirmButton());
@@ -276,15 +310,26 @@ describe('BallotComponent', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
-  /** The own row is cast and the represented row has no pick yet, so there is no confirm. */
-  it('puts the rows side by side and shows the confirm only after a pick (columns)', async () => {
-    const { fixture, caster } = await setup({ compact: true, columns: true, proxyName: 'Jonas Weber' });
+  it('shows the confirm only after a pick (columns)', async () => {
+    const { fixture, caster } = await setup({ compact: true, columns: true });
     const user = userEvent.setup();
     expect(fixture.nativeElement).toHaveClass('ballot--columns');
     expect(screen.queryByRole('button', { name: /abgeben/ })).toBeNull();
     await user.click(choice('Ja'));
     await user.click(confirmButton());
     expect(caster).toHaveBeenCalledWith('yes', false);
+    expect(screen.queryByRole('button', { name: /abgeben/ })).toBeNull();
+  });
+
+  /** The own row is cast and the represented row has no pick yet, so there is no confirm. */
+  it('puts the rows side by side when the delegation came after the own ballot (columns)', async () => {
+    await setup({
+      compact: true,
+      columns: true,
+      own: { cast: true, choice: 'yes' },
+      proxyName: 'Jonas Weber',
+    });
+    const user = userEvent.setup();
     expect(screen.queryByRole('button', { name: /abgeben/ })).toBeNull();
     const proxy = screen.getByRole('group', { name: 'Als Vertretung für Jonas Weber' });
     await user.click(within(proxy).getByRole('button', { name: 'Nein' }));

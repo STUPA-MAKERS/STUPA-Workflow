@@ -22,12 +22,12 @@ import {
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { AdminApiService } from '../../admin-api.service';
 import type { GremiumDefaults } from '../../admin.models';
-import { MAX_DELEGATION_LEAD_MINUTES, percentOrNull } from '../gremium-dialog/gremium-dialog.component';
+import { MAX_DELEGATION_LEAD_MINUTES, delegationMaxOf, percentOrNull } from '../gremium-dialog/gremium-dialog.component';
 
 /**
  * "Vorgaben für neue Gremien": the values that the form of a new Gremium starts with
  * (§ 000906): the quorum, the quorum of a Wiederholungssitzung, the guest ballot, the
- * vote delegation and its lead time. A save changes no Gremium that exists.
+ * vote delegation, its lead time and the most delegations per person. A save changes no Gremium that exists.
  */
 @Component({
   selector: 'app-gremium-defaults-dialog',
@@ -100,6 +100,10 @@ export class GremiumDefaultsDialogComponent {
         ? Math.min(MAX_DELEGATION_LEAD_MINUTES, Math.max(0, n))
         : 0,
     });
+  }
+
+  protected patchMax(value: number | string | null): void {
+    this.patch({ delegationMaxPerDelegate: delegationMaxOf(value) });
   }
 
   protected close(): void {

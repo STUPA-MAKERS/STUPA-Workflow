@@ -222,6 +222,14 @@ export class AdminGremienComponent {
               label: t('admin.gremien.delegationExternal'),
               value: yesNo(g.delegationAllowExternal),
             },
+            {
+              label: t('admin.gremien.delegationMax'),
+              value: String(g.delegationMaxPerDelegate ?? 2),
+            },
+            {
+              label: t('admin.gremien.delegationInElections'),
+              value: yesNo(g.delegationInElections),
+            },
           ]
         : []),
       {

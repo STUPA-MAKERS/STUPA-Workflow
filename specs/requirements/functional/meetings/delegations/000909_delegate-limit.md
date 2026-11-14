@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/integration/modules/delegations/test_delegate_limit_live.py:test_one_delegation_more_than_the_limit_conflicts"
+  - "backend/tests/unit/modules/delegations/test_delegations_service_cov.py:test_create_over_the_limit_conflict"
+implementation:
+  - backend/app/modules/delegations/service.py
+  - backend/app/modules/gremien/models.py
+  - backend/app/modules/admin/schemas.py
+  - backend/migrations/versions/d81b6e42a9f3_delegation_limit.py
+  - frontend/src/app/pages/admin/committees/gremium-dialog/gremium-dialog.component.ts
 scope:
   - backend/app/modules/delegations
   - backend/app/modules/gremien

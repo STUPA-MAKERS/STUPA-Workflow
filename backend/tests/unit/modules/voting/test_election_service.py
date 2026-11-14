@@ -43,6 +43,7 @@ from tests.unit.modules.voting.test_voting_service_unit import (  # noqa: F401 -
     NOW,
     _FakeFlow,
     _patch_flow,
+    _persons,
     _vote,
     _voter,
 )
@@ -158,9 +159,10 @@ async def test_get_closed_election_counts_ballots_and_candidates() -> None:
     assert out.config.options == ["c1", "c2", "c3", "abstain"]
 
 
-async def test_get_open_election_hides_the_counts() -> None:
+async def test_get_open_election_hides_the_counts(monkeypatch: pytest.MonkeyPatch) -> None:
     vote = _evote()
     db = fake_session(result(vote), result(), result('["c1"]'))
+    monkeypatch.setattr(VotingService, "voters", _persons(1))
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
     assert out.tally.counts == {}

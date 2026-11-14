@@ -19,6 +19,10 @@ from app.modules.applications.models import (
     MAX_CONFIRM_TTL_HOURS,
 )
 from app.modules.auth.models import MAX_SESSION_DAYS
+from app.modules.gremien.models import (
+    DEFAULT_DELEGATION_MAX_PER_DELEGATE,
+    MAX_DELEGATIONS_PER_DELEGATE,
+)
 from app.modules.gremien.role_schemas import ROLE_KEY_PATTERN
 from app.modules.meetings.models import MAX_LEAD_MINUTES
 from app.modules.site_config.branding import (
@@ -144,6 +148,15 @@ class GremiumOut(FrozenCamelModel, frozen=True):
     delegation_allow_external: bool = Field(
         default=False, serialization_alias="delegationAllowExternal"
     )
+    #: The most delegations that one delegate holds in one meeting.
+    delegation_max_per_delegate: int = Field(
+        default=DEFAULT_DELEGATION_MAX_PER_DELEGATE,
+        serialization_alias="delegationMaxPerDelegate",
+    )
+    #: An election takes the ballot of a delegation.
+    delegation_in_elections: bool = Field(
+        default=False, serialization_alias="delegationInElections"
+    )
     #: Default quorum as a percentage of the eligible voters, from 0 to 100.
     #: A None value means no quorum.
     quorum_percent: int | None = Field(default=None, serialization_alias="quorumPercent")
@@ -184,6 +197,13 @@ class GremiumCreate(FrozenCamelModel, frozen=True):
         default=0, alias="delegationLeadMinutes", ge=0, le=60 * 24 * 30
     )
     delegation_allow_external: bool = Field(default=False, alias="delegationAllowExternal")
+    delegation_max_per_delegate: int = Field(
+        default=DEFAULT_DELEGATION_MAX_PER_DELEGATE,
+        alias="delegationMaxPerDelegate",
+        ge=1,
+        le=MAX_DELEGATIONS_PER_DELEGATE,
+    )
+    delegation_in_elections: bool = Field(default=False, alias="delegationInElections")
     quorum_percent: int | None = Field(default=None, alias="quorumPercent", ge=0, le=100)
     quorum_min_present: int | None = Field(default=None, alias="quorumMinPresent", ge=1, le=1000)
     repeat_quorum_percent: int | None = Field(
@@ -206,6 +226,10 @@ class GremiumUpdate(FrozenCamelModel, frozen=True):
         default=None, alias="delegationLeadMinutes", ge=0, le=60 * 24 * 30
     )
     delegation_allow_external: bool | None = Field(default=None, alias="delegationAllowExternal")
+    delegation_max_per_delegate: int | None = Field(
+        default=None, alias="delegationMaxPerDelegate", ge=1, le=MAX_DELEGATIONS_PER_DELEGATE
+    )
+    delegation_in_elections: bool | None = Field(default=None, alias="delegationInElections")
     quorum_percent: int | None = Field(default=None, alias="quorumPercent", ge=0, le=100)
     quorum_min_present: int | None = Field(default=None, alias="quorumMinPresent", ge=1, le=1000)
     repeat_quorum_percent: int | None = Field(
@@ -924,6 +948,9 @@ class GremiumDefaults(FrozenStrictCamelModel, frozen=True):
     guests_may_vote: bool = Field(alias="guestsMayVote")
     allow_vote_delegation: bool = Field(alias="allowVoteDelegation")
     delegation_lead_minutes: int = Field(alias="delegationLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
+    delegation_max_per_delegate: int = Field(
+        alias="delegationMaxPerDelegate", ge=1, le=MAX_DELEGATIONS_PER_DELEGATE
+    )
 
 
 class GuestSettingsUpdate(FrozenStrictCamelModel, frozen=True):

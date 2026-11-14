@@ -425,6 +425,9 @@ class BallotAccepted(FrozenCamelModel, frozen=True):
     """
 
     status: Literal["cast"] = "cast"
+    #: The number of ballots that the cast wrote: the own ballot and one for each
+    #: represented member.
+    ballots: int = 1
 
 
 class VoteClosed(FrozenCamelModel, frozen=True):

@@ -242,6 +242,8 @@ class GremiumCreate(WireModel, frozen=True):
     allowVoteDelegation: bool = False
     delegationLeadMinutes: int = 0
     delegationAllowExternal: bool = False
+    delegationMaxPerDelegate: int = Field(default=2, ge=1, le=20)
+    delegationInElections: bool = False
     quorumPercent: int | None = Field(default=None, ge=0, le=100)
     repeatQuorumPercent: int | None = Field(
         default=None,
@@ -270,6 +272,8 @@ class GremiumUpdate(WireModel, frozen=True):
     allowVoteDelegation: bool | None = None
     delegationLeadMinutes: int | None = None
     delegationAllowExternal: bool | None = None
+    delegationMaxPerDelegate: int | None = Field(default=None, ge=1, le=20)
+    delegationInElections: bool | None = None
     quorumPercent: int | None = None
     repeatQuorumPercent: int | None = None
     guestsMayVote: bool | None = None

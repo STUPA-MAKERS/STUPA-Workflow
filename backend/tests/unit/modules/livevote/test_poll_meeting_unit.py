@@ -21,7 +21,12 @@ from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.voting.schemas import PollResultOut, TallyOut, VoteClosed, VoteOut
 from app.shared.config_schemas import PollConfig
 from tests.unit.modules.livevote.test_election_meeting_unit import setup  # noqa: F401
-from tests.unit.modules.livevote.test_livevote_cov import _QueueSession, _vote_row, res
+from tests.unit.modules.livevote.test_livevote_cov import (
+    _persons_by_vote,
+    _QueueSession,
+    _vote_row,
+    res,
+)
 from tests.unit.modules.livevote.test_public_meeting_lead_unit import _meeting
 
 _POLL = PollConfig.model_validate(
@@ -151,10 +156,11 @@ async def test_votes_for_reads_a_closed_poll() -> None:
     assert item.poll_result is not None and item.poll_result.top == ["o1"]
 
 
-async def test_votes_for_hides_the_count_of_a_running_poll() -> None:
+async def test_votes_for_hides_the_count_of_a_running_poll(monkeypatch: pytest.MonkeyPatch) -> None:
     mid = uuid4()
     row = _poll_row(meeting_id=mid, status="open", result=None)
     sess = _QueueSession(executes=[res(row), res((mid, 3)), res(), res((row.id, '["o1"]'))])
+    monkeypatch.setattr(MeetingService, "_voters_by_vote", _persons_by_vote(1))
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
     assert item.voted == 1
     assert item.poll_result is None

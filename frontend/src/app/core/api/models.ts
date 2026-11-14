@@ -1491,6 +1491,8 @@ export type BallotChoice = string | readonly string[] | Readonly<Record<string, 
  *  changes after the cast: a second cast gives 409 `already_voted`. */
 export interface BallotResult {
   readonly status: 'cast';
+  /** The ballots that the cast wrote: the own one and one for each represented member. */
+  readonly ballots?: number;
 }
 
 /**

@@ -832,21 +832,24 @@ describe('mockApiInterceptor', () => {
       expect(s.delegatedByName).toBeTruthy();
     });
 
+    /** §F/meetings/voting/000932: the own cast counts for the represented member too. */
     it('POST /votes/{id}/ballot keeps the ballots and refuses a second one', async () => {
-      const cast = (body: unknown) =>
-        firstValueFrom(http.post<{ status: string }>('/api/votes/vote-ballots/ballot', body));
-      expect((await cast({ choice: 'no' })).status).toBe('cast');
+      const cast = (body: unknown, id = 'vote-ballots') =>
+        firstValueFrom(http.post<{ status: string; ballots: number }>(`/api/votes/${id}/ballot`, body));
+      expect(await cast({ choice: 'no' })).toEqual({ status: 'cast', ballots: 2 });
       await expect(cast({ choice: 'yes' })).rejects.toMatchObject({
         status: 409,
         error: { code: 'already_voted' },
       });
-      expect((await cast({ asDelegation: true })).status).toBe('cast');
+      await expect(cast({ asDelegation: true })).rejects.toMatchObject({ status: 409 });
       const v = await get<{ myBallot: { cast: boolean; choice: string }; representedCast: boolean; tally: { voted: number } }>(
         '/api/votes/vote-ballots',
       );
       expect(v.myBallot).toEqual({ cast: true, choice: 'no' });
       expect(v.representedCast).toBe(true);
       expect(v.tally.voted).toBe(10);
+      expect(await cast({ asDelegation: true }, 'vote-proxy-first')).toEqual({ status: 'cast', ballots: 1 });
+      expect(await cast({ choice: 'yes' }, 'vote-proxy-first')).toEqual({ status: 'cast', ballots: 1 });
     });
 
     it('POST /votes/{id}/ballot without a body still counts', async () => {

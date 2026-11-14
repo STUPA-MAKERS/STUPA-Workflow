@@ -31,6 +31,7 @@ from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.schemas import DelegationCreate, SubstituteCreate
 from app.modules.delegations.service import (
     DelegationService,
+    Represented,
     meeting_start_utc,
     voting_delegation_check,
 )
@@ -44,6 +45,7 @@ from app.shared.errors import (
 )
 from tests._support.flow_fakes import fake_session, result
 
+PID = uuid4()
 NOW = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
 GREMIUM_ID = uuid4()
 MEETING_ID = uuid4()
@@ -91,6 +93,8 @@ def _gremium(
         allow_vote_delegation=allow,
         delegation_lead_minutes=lead,
         delegation_allow_external=external,
+        delegation_max_per_delegate=2,
+        delegation_in_elections=False,
     )
 
 
@@ -134,45 +138,36 @@ def test_meeting_start_utc_midnight_without_time() -> None:
 
 async def test_check_no_meeting_is_normal_without_query() -> None:
     db = fake_session()
-    assert await voting_delegation_check(db, "me", None, str(GREMIUM_ID), NOW) == (
-        False,
-        None,
-    )
+    assert await voting_delegation_check(db, "me", None, str(GREMIUM_ID), NOW) == (False, ())
     assert db.statements == []
 
 
 async def test_check_non_uuid_group_is_normal() -> None:
     db = fake_session()
-    assert await voting_delegation_check(db, "me", MEETING_ID, "stupa", NOW) == (
-        False,
-        None,
-    )
+    assert await voting_delegation_check(db, "me", MEETING_ID, "stupa", NOW) == (False, ())
 
 
 async def test_check_outgoing_voting_blocked() -> None:
     """Block the own vote of a delegator with a voting delegation.
 
-    A row has the shape (is_delegator, delegate_voting, delegator_sub).
+    A row has the shape (is_delegator, delegate_voting, pool_seat, delegator_sub, delegator_id).
     """
-    db = fake_session(result((True, True, "me")))
-    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (True, None)
+    db = fake_session(result((True, True, False, "me", PID)))
+    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (True, ())
 
 
 async def test_check_incoming_voting_exercised() -> None:
     """Return the `delegator_sub` of an incoming voting delegation for the delegated vote."""
-    db = fake_session(result((False, True, "delegator-1")))
+    db = fake_session(result((False, True, False, "delegator-1", PID)))
     assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (
         False,
-        "delegator-1",
+        (Represented(sub="delegator-1", principal_id=PID, pool=False),),
     )
 
 
 async def test_check_nonvoting_rows_are_neutral() -> None:
-    db = fake_session(result((True, False, "me"), (False, False, "other")))
-    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (
-        False,
-        None,
-    )
+    db = fake_session(result((True, False, False, "me", PID), (False, False, False, "other", PID)))
+    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (False, ())
 
 
 def _happy_db(
@@ -183,7 +178,7 @@ def _happy_db(
     delegate: SimpleNamespace | None = None,
     pool_ids: list[Any] | None = None,
     member_ids: list[Any] | None = None,
-    existing: list[tuple[Any, Any, bool]] | None = None,
+    existing: list[tuple[Any, Any, bool, bool]] | None = None,
 ) -> Any:
     """Script the fake session for a successful create.
 
@@ -375,7 +370,7 @@ async def test_create_double_outgoing_409() -> None:
     """Refuse a second outgoing delegation with 409, because the own row exists."""
     db = _happy_db()
     me, delegate = db._me, db._delegate
-    db._results[6] = result((me.id, uuid4(), False))
+    db._results[6] = result((me.id, uuid4(), False, False))
     with pytest.raises(ConflictError, match="already delegated"):
         await _svc(db).create(_payload(delegate.id), _actor())
 
@@ -384,7 +379,7 @@ async def test_create_chain_when_actor_is_recipient_422() -> None:
     """Refuse a chain with 422 when somebody delegates to the caller."""
     db = _happy_db()
     me, delegate = db._me, db._delegate
-    db._results[6] = result((uuid4(), me.id, False))
+    db._results[6] = result((uuid4(), me.id, False, False))
     with pytest.raises(ValidationProblem, match="delegate on"):
         await _svc(db).create(_payload(delegate.id), _actor())
 
@@ -393,18 +388,31 @@ async def test_create_chain_when_recipient_delegated_away_422() -> None:
     """Refuse a chain with 422 when the recipient delegated as well."""
     db = _happy_db()
     delegate = db._delegate
-    db._results[6] = result((delegate.id, uuid4(), False))
+    db._results[6] = result((delegate.id, uuid4(), False, False))
     with pytest.raises(ValidationProblem, match="delegated their own"):
         await _svc(db).create(_payload(delegate.id), _actor())
 
 
-async def test_create_second_voting_delegation_to_same_recipient_409() -> None:
-    """Refuse a second voting delegation to the same recipient with 409."""
+async def test_create_over_the_limit_of_the_gremium_409() -> None:
+    """Refuse a delegation to a recipient who holds the most delegations with 409."""
     db = _happy_db()
     delegate = db._delegate
-    db._results[6] = result((uuid4(), delegate.id, True))
-    with pytest.raises(ConflictError, match="carries"):
+    db._results[6] = result(
+        (uuid4(), delegate.id, False, True), (uuid4(), delegate.id, False, False)
+    )
+    with pytest.raises(ConflictError, match="holds the most"):
         await _svc(db, voting=True).create(_payload(delegate.id, voting=True), _actor())
+
+
+def test_counted_in_keeps_only_pool_seats_in_an_election() -> None:
+    """An election without the gremium switch counts a pool seat and no delegation."""
+    seat = Represented(sub="seat", principal_id=PID, pool=True)
+    transfer = Represented(sub="deg", principal_id=PID, pool=False)
+    election = SimpleNamespace(kind="election")
+    both = (seat, transfer)
+    assert delegations_service.counted_in(election, both, in_elections=False) == (seat,)
+    assert delegations_service.counted_in(election, both, in_elections=True) == both
+    assert delegations_service.counted_in(SimpleNamespace(), both, in_elections=False) == both
 
 
 def _joined_row(

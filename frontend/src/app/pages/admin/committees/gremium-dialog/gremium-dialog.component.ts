@@ -38,6 +38,17 @@ import {
 
 /** The largest lead time in minutes that the server accepts (30 days). */
 export const MAX_DELEGATION_LEAD_MINUTES = 60 * 24 * 30;
+/** The limits of `delegationMaxPerDelegate` (`MAX_DELEGATIONS_PER_DELEGATE` of the backend). */
+export const MAX_DELEGATIONS_PER_DELEGATE = 20;
+export const DEFAULT_DELEGATIONS_PER_DELEGATE = 2;
+
+/** The most delegations per person: empty or invalid gives the default, else 1 to 20. */
+export function delegationMaxOf(value: number | string | null): number {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) && String(value ?? '').trim() !== ''
+    ? Math.min(MAX_DELEGATIONS_PER_DELEGATE, Math.max(1, n))
+    : DEFAULT_DELEGATIONS_PER_DELEGATE;
+}
 
 /** The form state of a gremium. */
 export interface GremiumForm {
@@ -50,6 +61,10 @@ export interface GremiumForm {
   readonly delegationLeadMinutes: number;
   /** Allow a delegation to a person outside the gremium and the pool. */
   readonly delegationAllowExternal: boolean;
+  /** The most delegations that one person holds in one meeting. */
+  readonly delegationMaxPerDelegate: number;
+  /** An election takes the ballot of a delegation. */
+  readonly delegationInElections: boolean;
   /** Default quorum in percent of the eligible voters. `null` = no quorum. */
   readonly quorumPercent: number | null;
   /** The least number of present persons for the quorum. `null` = no least number. */
@@ -72,6 +87,8 @@ export function emptyGremiumForm(): GremiumForm {
     allowVoteDelegation: false,
     delegationLeadMinutes: 0,
     delegationAllowExternal: false,
+    delegationMaxPerDelegate: DEFAULT_DELEGATIONS_PER_DELEGATE,
+    delegationInElections: false,
     quorumPercent: null,
     quorumMinPresent: null,
     repeatQuorumPercent: null,
@@ -235,6 +252,8 @@ export class GremiumDialogComponent {
       allowVoteDelegation: g.allowVoteDelegation,
       delegationLeadMinutes: g.delegationLeadMinutes ?? 0,
       delegationAllowExternal: g.delegationAllowExternal ?? false,
+      delegationMaxPerDelegate: g.delegationMaxPerDelegate ?? DEFAULT_DELEGATIONS_PER_DELEGATE,
+      delegationInElections: g.delegationInElections ?? false,
       quorumPercent: g.quorumPercent ?? null,
       quorumMinPresent: g.quorumMinPresent ?? null,
       repeatQuorumPercent: g.repeatQuorumPercent ?? null,
@@ -278,6 +297,9 @@ export class GremiumDialogComponent {
           ...(f.delegationLeadMinutes === empty.delegationLeadMinutes
             ? { delegationLeadMinutes: d.delegationLeadMinutes }
             : {}),
+          ...(f.delegationMaxPerDelegate === empty.delegationMaxPerDelegate
+            ? { delegationMaxPerDelegate: d.delegationMaxPerDelegate }
+            : {}),
         }));
       },
       error: () => {},
@@ -295,6 +317,10 @@ export class GremiumDialogComponent {
       'delegationLeadMinutes',
       Number.isFinite(n) ? Math.min(MAX_DELEGATION_LEAD_MINUTES, Math.max(0, n)) : 0,
     );
+  }
+
+  protected patchMax(value: number | string | null): void {
+    this.patch('delegationMaxPerDelegate', delegationMaxOf(value));
   }
 
   /** Least number of present persons: empty gives `null`, else a whole number from 1. */
@@ -379,6 +405,8 @@ export class GremiumDialogComponent {
       allowVoteDelegation: f.allowVoteDelegation,
       delegationLeadMinutes: f.delegationLeadMinutes,
       delegationAllowExternal: f.delegationAllowExternal,
+      delegationMaxPerDelegate: f.delegationMaxPerDelegate,
+      delegationInElections: f.delegationInElections,
       quorumPercent: f.quorumPercent,
       quorumMinPresent: f.quorumMinPresent,
       repeatQuorumPercent: f.repeatQuorumPercent,
