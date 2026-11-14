@@ -2375,7 +2375,7 @@ function transferPage(items: unknown[] = [TRANSFER], total = items.length) {
   return { items, total, limit: 20, offset: 0 };
 }
 
-/** Pick "Übertrag" in the "Art" chip. */
+/** Pick "Umschichtung" in the "Art" chip. */
 function pickTransfers(ctx: Awaited<ReturnType<typeof setup>>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (ctx.fixture.componentInstance as any).setKind('transfer');
@@ -2407,7 +2407,7 @@ describe('ExpensesComponent — transfers tab', () => {
   it('shows an empty state and reports a failed load', async () => {
     const ctx = await setup();
     await openTransfers(ctx, transferPage([], 0));
-    expect(screen.getByText('Keine Überträge gefunden.')).toBeInTheDocument();
+    expect(screen.getByText('Keine Umschichtungen gefunden.')).toBeInTheDocument();
     ctx.http.verify();
   });
 
@@ -2427,14 +2427,14 @@ describe('ExpensesComponent — transfers tab', () => {
     expect(c.listBusy()).toBe(false);
   });
 
-  it('offers "Übertrag" in the "Art" chip and leaves it for another kind', async () => {
+  it('offers "Umschichtung" in the "Art" chip and leaves it for another kind', async () => {
     const ctx = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = ctx.fixture.componentInstance as any;
     expect(c.kindOptions().map((o: { value: string }) => o.value)).toEqual(['', 'expense', 'income', 'transfer']);
     await openTransfers(ctx);
     expect(c.kindValue()).toBe('transfer');
-    expect(c.kindChipLabel()).toBe('Art: Übertrag');
+    expect(c.kindChipLabel()).toBe('Art: Umschichtung');
     expect(c.activeFilterCount()).toBe(1);
     c.setKind('income');
     expect(c.tab()).toBe('bookings');
@@ -2604,7 +2604,7 @@ describe('ExpensesComponent — transfers tab', () => {
       .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET')
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
     ctx.detectChanges();
-    expect(screen.getByText('Keine Überträge gefunden.')).toBeInTheDocument();
+    expect(screen.getByText('Keine Umschichtungen gefunden.')).toBeInTheDocument();
     ctx.http.verify();
   });
 
@@ -2882,7 +2882,7 @@ describe('ExpensesComponent (list/detail)', () => {
     cmp.onHeaderMenu({ id: 'transfer', label: '' });
     expect(cmp.transferOpen()).toBe(true);
     expect(cmp.formMode()).toBe('transfer-create');
-    expect(cmp.formTitle()).toBe('Übertrag buchen');
+    expect(cmp.formTitle()).toBe('Umschichtung buchen');
     cmp.onHeaderMenu({ id: 'select', label: '' });
     expect(cmp.selecting()).toBe(true);
     cmp.onHeaderMenu({ id: 'export', label: '' });
@@ -2902,7 +2902,7 @@ describe('ExpensesComponent (list/detail)', () => {
     cmp.openTransferEdit(TRANSFER);
     expect(cmp.editing()).toBeNull();
     expect(cmp.formMode()).toBe('transfer-edit');
-    expect(cmp.formTitle()).toBe('Übertrag bearbeiten');
+    expect(cmp.formTitle()).toBe('Umschichtung bearbeiten');
     expect(cmp.detailView()).toBe('form');
     expect(cmp.detailOpen()).toBe(true);
     cmp.closeDetail();
