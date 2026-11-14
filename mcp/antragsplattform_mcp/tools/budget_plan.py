@@ -148,8 +148,9 @@ async def rename_plan_line(version_id: str, budget_id: str, rename: S.PlanLineRe
 async def delete_plan_line(version_id: str, budget_id: str) -> dict:
     """Remove the line of one cost center from a draft version.
 
-    The call gives 422 `plan_line_has_children` while a child has a line. Requires
-    budget.structure.
+    The call gives 422 `plan_line_has_children` while a child has a line, and 409
+    `plan_line_has_bookings` while the cost center has a booking in the fiscal year of the
+    plan: set the amount of that line to 0 instead. Requires budget.structure.
     """
     return await api().delete(f"/budget-plan-versions/{version_id}/lines/{budget_id}")
 

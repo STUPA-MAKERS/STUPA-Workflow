@@ -56,6 +56,12 @@ class PlanSwitchOut(FrozenCamelModel, frozen=True):
     plan_enabled: bool = Field(alias="planEnabled")
 
 
+class PlanReadableOut(FrozenCamelModel, frozen=True):
+    """Whether the principal reads the Haushaltsplan of a version."""
+
+    readable: bool
+
+
 class PlanCreate(FrozenStrictCamelModel, frozen=True):
     """Create the Haushaltsplan of a fiscal year with its first version in draft.
 

@@ -1208,14 +1208,15 @@ export class ApiClient {
   }
 
   /**
-   * GET /budget-plan-versions/{id}/plan — say if the reader may read the Haushaltsplan
-   * that holds this version. The vote of a step links to the plan only then.
+   * GET /budget-plan-versions/{id}/readable — say if the reader may read the
+   * Haushaltsplan that holds this version. The vote of a step links to the plan only
+   * then. The server answers 200 for a reader without the right too (§ 000928).
    */
   planOfVersionReadable(versionId: Uuid): Observable<boolean> {
     return this.http
-      .get<unknown>(`${this.base}/budget-plan-versions/${versionId}/plan`, { context: skipLoading() })
+      .get<{ readonly readable: boolean }>(`${this.base}/budget-plan-versions/${versionId}/readable`, { context: skipLoading() })
       .pipe(
-        map(() => true),
+        map((answer) => answer.readable),
         catchError(() => of(false)),
       );
   }

@@ -71,6 +71,33 @@ def _subtree_ids(node: Budget) -> Select[UUID]:
     )
 
 
+async def lock_tree(session: AsyncSession, budget_id: UUID | None) -> None:
+    """Lock the top-level budget above a cost center, for a write that reads its tree.
+
+    The statement finds the top level by the parent chain, because the parent of a
+    cost center never changes and its path key can. The lock is `FOR NO KEY UPDATE`,
+    because a new row that points at the budget (a booking, a line) must not wait for
+    it. A cost center that does not exist locks no row.
+    """
+    if budget_id is None:
+        return
+    up = (
+        select(Budget.id, Budget.parent_id)
+        .where(Budget.id == budget_id)
+        .cte("up", recursive=True)
+    )
+    chain = up.union_all(
+        select(Budget.id, Budget.parent_id).where(Budget.id == up.c.parent_id)
+    )
+    top = select(chain.c.id).where(chain.c.parent_id.is_(None)).scalar_subquery()
+    await session.execute(
+        select(Budget)
+        .where(Budget.id == top)
+        .with_for_update(of=Budget, key_share=True)
+        .execution_options(populate_existing=True)
+    )
+
+
 class BudgetTreeServiceBase:
     """Shared base for cost-center tree operations, bound to one session."""
 
@@ -208,23 +235,7 @@ class BudgetTreeServiceBase:
         UPDATE`, because a new row that points at the budget (a booking, a line) must
         not wait for it. A cost center that does not exist locks no row.
         """
-        if budget_id is None:
-            return
-        up = (
-            select(Budget.id, Budget.parent_id)
-            .where(Budget.id == budget_id)
-            .cte("up", recursive=True)
-        )
-        chain = up.union_all(
-            select(Budget.id, Budget.parent_id).where(Budget.id == up.c.parent_id)
-        )
-        top = select(chain.c.id).where(chain.c.parent_id.is_(None)).scalar_subquery()
-        await self.session.execute(
-            select(Budget)
-            .where(Budget.id == top)
-            .with_for_update(of=Budget, key_share=True)
-            .execution_options(populate_existing=True)
-        )
+        await lock_tree(self.session, budget_id)
 
     async def _top_level(self, node: Budget) -> Budget:
         """Return the top-level budget of a node.

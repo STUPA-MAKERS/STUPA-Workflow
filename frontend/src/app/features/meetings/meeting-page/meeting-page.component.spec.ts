@@ -821,7 +821,7 @@ describe('MeetingPageComponent', () => {
     it('offers one vote on the item of a Haushaltsplan', async () => {
       const top = { ...AGENDA[0], planVersionId: 'pv-1' };
       const { fixture, http } = await setup({ top, meeting: meeting({ votes: [] }) }, [MEDIA.wide]);
-      http.match((r) => r.url.endsWith('/budget-plan-versions/pv-1/plan')).forEach((r) => r.flush({}));
+      http.match((r) => r.url.endsWith('/budget-plan-versions/pv-1/readable')).forEach((r) => r.flush({ readable: true }));
       expect(screen.getByRole('button', { name: 'Abstimmung öffnen' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();
       fixture.componentRef.setInput(
@@ -836,7 +836,7 @@ describe('MeetingPageComponent', () => {
     it('offers no vote on a draft of a Haushaltsplan', async () => {
       const top = { ...AGENDA[0], planVersionId: 'pv-1', planReading: true };
       const { http } = await setup({ top, meeting: meeting({ votes: [] }) }, [MEDIA.wide]);
-      http.match((r) => r.url.endsWith('/budget-plan-versions/pv-1/plan')).forEach((r) => r.flush({}));
+      http.match((r) => r.url.endsWith('/budget-plan-versions/pv-1/readable')).forEach((r) => r.flush({ readable: true }));
       expect(screen.queryByRole('button', { name: 'Abstimmung öffnen' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();
     });

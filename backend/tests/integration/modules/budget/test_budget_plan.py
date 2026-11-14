@@ -37,6 +37,7 @@ from app.modules.budget.plan_schemas import (
     PlanVersionOut,
 )
 from app.modules.budget.tree.service import BudgetTreeService
+from app.modules.budget.tree.service_base import lock_tree
 from app.modules.budget.tree_models import Budget, BudgetAllocation, FiscalYear
 from app.modules.budget.tree_schemas import (
     AllocationSet,
@@ -802,6 +803,28 @@ async def test_a_version_exports_with_the_year_before_and_the_version_before(
     monkeypatch.setattr(t.svc, "get_tree", no_tree)
     with pytest.raises(NotFoundError):
         await t.svc.plan_export(draft.id, today)
+
+
+async def test_a_line_with_bookings_is_not_removed(session: AsyncSession) -> None:
+    """A Nachtrag keeps the line of a Kostenstelle with a booking in the year of the plan.
+
+    The Ansatz of that line can still go to 0, and a Kostenstelle without a booking
+    loses its line. Rule: §F/finance/budget/000929.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+    await t.svc.book_expense(
+        ExpenseCreate(budgetId=t.exp_a.id, fiscalYearId=t.fy.id, amount=D(25), description="x"),
+        actor="tester",
+    )
+    vid = _version(await t.svc.create_nachtrag(t.top.id, t.fy.id)).id
+    with pytest.raises(ConflictError) as held:
+        await t.svc.delete_line(vid, t.exp_a.id)
+    assert _code(held) == "plan_line_has_bookings"
+    zero = await t.svc.set_line(vid, t.exp_a.id, PlanLineSet(amount=D(0)))
+    assert _amounts(_version(zero))[t.exp_a.id] == D(0)
+    gone = await t.svc.delete_line(vid, t.exp_b.id)
+    assert t.exp_b.id not in _amounts(_version(gone))
 
 
 async def test_delete_line(session: AsyncSession) -> None:
@@ -2508,6 +2531,72 @@ async def test_a_year_changes_only_through_its_own_budget(session: AsyncSession)
     year = await session.get_one(FiscalYear, own.fy.id)
     await session.refresh(year)
     assert (year.year, year.active, year.closed_at) == (2026, own.fy.active, None)
+
+
+@pytest.mark.parametrize("field", ["viewGremiumId", "decisionGremiumId"])
+async def test_the_delete_of_a_gremium_waits_for_the_lock_of_a_tree_that_names_it(
+    session: AsyncSession, field: str
+) -> None:
+    """The delete of a Gremium takes the lock of each tree that names the Gremium first.
+
+    It waits for a write in that tree and then clears the field, and it ends in no error.
+    Rule: §F/finance/budget/000927.
+    """
+    from app.modules.admin.service import ConfigService
+
+    t = await _tree(session, enabled=False)
+    gremium = await _gremium(session)
+    await t.svc.update_node(t.exp.id, BudgetNodeUpdate.model_validate({field: gremium}))
+    await session.commit()
+    maker = async_sessionmaker(session.bind, expire_on_commit=False)
+
+    async def run() -> None:
+        async with maker() as other:
+            await ConfigService(other).delete_gremium(
+                gremium, Principal(sub="admin", roles=["admin"])
+            )
+
+    async with maker() as holder:
+        await lock_tree(holder, t.exp_a.id)
+        task = asyncio.create_task(run())
+        await asyncio.sleep(0.3)
+        assert not task.done()
+        await holder.commit()
+    await asyncio.wait_for(task, 10)
+    node = await session.get_one(Budget, t.exp.id)
+    await session.refresh(node)
+    assert (node.view_gremium_id, node.decision_gremium_id) == (None, None)
+    assert await session.get(Gremium, gremium) is None
+
+
+async def test_the_fiscal_year_writes_its_audit_entries(session: AsyncSession) -> None:
+    """The create and each change of a fiscal year write an audit entry.
+
+    Rule: §F/finance/budget/000930.
+    """
+    t = await _tree(session, enabled=False)
+    year = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2031))
+    await t.svc.update_fiscal_year(t.top.id, year.id, FiscalYearUpdate(year=2032))
+    await t.svc.update_fiscal_year(t.top.id, year.id, FiscalYearUpdate(active=False))
+    entries = (
+        await session.scalars(
+            select(AuditEntry)
+            .where(AuditEntry.target_type == "fiscal_year")
+            .where(AuditEntry.target_id == str(year.id))
+            .order_by(AuditEntry.id)
+        )
+    ).all()
+    assert [(e.action, e.data["year"], e.data["active"]) for e in entries] == [
+        (AuditAction.BUDGET_FISCAL_YEAR_CREATE.value, 2031, True),
+        (AuditAction.BUDGET_FISCAL_YEAR_UPDATE.value, 2032, True),
+        (AuditAction.BUDGET_FISCAL_YEAR_UPDATE.value, 2032, False),
+    ]
+    assert [e.data.get("previous") for e in entries] == [
+        None,
+        {"year": 2031, "active": True},
+        {"year": 2032, "active": True},
+    ]
+    assert {e.data["budgetId"] for e in entries} == {str(t.top.id)}
 
 
 async def test_a_gremium_with_a_budget_is_not_deleted(session: AsyncSession) -> None:

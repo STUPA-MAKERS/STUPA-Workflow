@@ -147,6 +147,7 @@ interface AskView {
 const WRITE_ERRORS: Readonly<Record<string, TranslationKey>> = {
   plan_blocked_above_amount: 'budget.plan.error.blockedAbove',
   plan_line_has_children: 'budget.plan.error.hasChildren',
+  plan_line_has_bookings: 'budget.plan.error.hasBookings',
   plan_not_balanced: 'budget.plan.error.notBalanced',
   plan_version_locked: 'budget.plan.error.locked',
   plan_state_invalid: 'budget.plan.error.stateInvalid',

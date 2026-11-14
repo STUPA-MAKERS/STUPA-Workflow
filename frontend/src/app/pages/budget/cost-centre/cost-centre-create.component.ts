@@ -21,6 +21,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { problemCode } from '@core/api/problem';
+import { closeOnBack } from '@shared/util/close-on-back';
 import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -130,6 +131,7 @@ export class CostCentreCreateComponent {
 
   /** Each opening starts with an empty form under the given parent. */
   constructor() {
+    closeOnBack(this.open, () => this.closed.emit());
     effect(() => {
       if (!this.open()) return;
       untracked(() => {

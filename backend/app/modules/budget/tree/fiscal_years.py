@@ -134,7 +134,8 @@ class FiscalYearOps(BudgetTreeServiceBase):
     async def create_fiscal_year(self, budget_id: UUID, payload: FiscalYearCreate) -> FiscalYearOut:
         """Create a fiscal year. Its bounds derive from the budget start date.
 
-        A budget with the plan switch on gives the year its draft plan.
+        A budget with the plan switch on gives the year its draft plan. The create
+        writes the audit entry `budget_fiscal_year_create`.
         """
         await self._lock_tree(budget_id)
         top = await self._require_top_level(budget_id)
@@ -159,6 +160,12 @@ class FiscalYearOps(BudgetTreeServiceBase):
         self.session.add(fy)
         await self.session.flush()
         await self._plan_for_new_year(top, fy)
+        await self._audit(
+            AuditAction.BUDGET_FISCAL_YEAR_CREATE,
+            target_type="fiscal_year",
+            target_id=str(fy.id),
+            data={"budgetId": str(top.id), "year": fy.year, "active": fy.active},
+        )
         await self.session.commit()
         return _fy_out(fy, top.fiscal_start_month, top.fiscal_start_day)
 
@@ -168,7 +175,8 @@ class FiscalYearOps(BudgetTreeServiceBase):
         """Update the year or the active flag. A year stays unique per top budget.
 
         The year of a closed fiscal year is fixed, because a new year moves its
-        dates. The active flag stays free: it only picks the default year.
+        dates. The active flag stays free: it only picks the default year. The change
+        writes the audit entry `budget_fiscal_year_update` with the values before.
 
         Raises:
             NotFoundError: The fiscal year is not one of this budget (404).
@@ -206,8 +214,20 @@ class FiscalYearOps(BudgetTreeServiceBase):
             ),
             **({"active": provided["active"]} if "active" in provided else {}),
         }
+        previous = {"year": fy.year, "active": fy.active}
         for name, value in changes.items():
             setattr(fy, name, value)
+        await self._audit(
+            AuditAction.BUDGET_FISCAL_YEAR_UPDATE,
+            target_type="fiscal_year",
+            target_id=str(fiscal_year_id),
+            data={
+                "budgetId": str(top.id),
+                "year": fy.year,
+                "active": fy.active,
+                "previous": previous,
+            },
+        )
         await self.session.commit()
         return _fy_out(fy, top.fiscal_start_month, top.fiscal_start_day)
 
