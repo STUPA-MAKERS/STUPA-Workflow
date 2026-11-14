@@ -100,10 +100,9 @@
 
 // A logo is decoration: the title data names the gremium in text. PDF/UA-1
 // needs an alt text or an artifact for each image, so a logo is an artifact.
-#let logo(entry, height) = {
-  let path = if "asset" in entry { "/assets/" + entry.asset } else { vendored-logos.at(entry.name) }
-  pdf.artifact(image(path, height: height))
-}
+#let logo-path(entry) = if "asset" in entry { "/assets/" + entry.asset } else { vendored-logos.at(entry.name) }
+
+#let logo(entry, height) = pdf.artifact(image(logo-path(entry), height: height))
 
 // A row of logos on one center line, `gap` apart (the tikz node chain).
 #let logo-row(entries, height, gap) = stack(
@@ -925,11 +924,18 @@
 
 // -- pages --------------------------------------------------------------------
 
-#let skyline = place(bottom + left, pdf.artifact(image(vendored-logos.Skyline, width: 1.5 * 210mm)))
+// The footer graphic of every page: the Skyline unless the data names another one,
+// and nothing when `footer_graphic` is none.
+#let footer-graphic(doc) = {
+  let entry = doc.at("footer_graphic", default: (name: "Skyline"))
+  if entry != none {
+    place(bottom + left, pdf.artifact(image(logo-path(entry), width: 1.5 * 210mm)))
+  }
+}
 
 #let title-page(doc) = page(
   margin: 2cm,
-  background: skyline,
+  background: footer-graphic(doc),
   foreground: none,
   {
     // The first logo sits 2cm from the left and 1.5cm from the top edge,
@@ -1044,7 +1050,7 @@
     margin: (top: 2cm + 5.18pt, rest: 2cm),
     header: none,
     footer: none,
-    background: skyline + footer-logos,
+    background: footer-graphic(doc) + footer-logos,
     foreground: frame,
   )
 

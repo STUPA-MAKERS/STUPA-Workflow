@@ -20,7 +20,7 @@ implementation:
   - backend/app/modules/budget/plan_export.py
   - backend/app/modules/budget/tree/plan_exports.py
   - backend/app/modules/budget/plan_router.py
-  - backend/app/modules/site_config/export_logo.py
+  - backend/app/modules/files/pdf_branding.py
   - backend/app/shared/xlsx.py
   - typst/template/plan.typ
   - typst/typst_service/document.py

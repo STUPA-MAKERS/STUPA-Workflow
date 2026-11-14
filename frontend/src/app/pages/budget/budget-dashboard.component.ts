@@ -656,6 +656,9 @@ export class BudgetDashboardComponent {
     { depth: 1, width: 60 },
   ];
 
+  /** Name widths (%) of the rows the skeleton draws in the use per child. */
+  readonly skeletonUsage: readonly number[] = [55, 70, 48, 40];
+
   readonly showSkeleton = computed(
     () => this.loading() || (!this.selectedFyId() && this.pendingFiscalYears() > 0),
   );

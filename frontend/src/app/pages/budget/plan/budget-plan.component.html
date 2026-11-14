@@ -2,7 +2,75 @@
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
   <app-load-error [message]="'budget.plan.loadError' | t" (retry)="retry()" />
 } @else if (loading()) {
-  <app-skeleton variant="rows" [count]="8" [label]="'budget.loading' | t" />
+  <!-- The skeleton uses the containers of the page, so nothing moves when the plan arrives. -->
+  <div class="bd skel-in" [class.bd--wide]="wide()" aria-busy="true">
+    <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
+    @if (wide()) {
+      <section class="ld-pane ld-pane--fill bd__pane" aria-hidden="true">
+        <app-page-header [pane]="true" [title]="'nav.budget' | t" />
+        <div class="bd__paneBody">
+          <span class="skel-box bd__skSeg"></span>
+          <span class="skel-box bd__skSearch"></span>
+          <div class="bd__chips">
+            <span class="skel-box bd__skChip"></span>
+          </div>
+          <div class="bd__tree">
+            <div class="tn">
+              <span class="tn__chev"></span>
+              <div class="tn__main">
+                <span class="tn__line">
+                  <span class="tn__name"><span class="skel-text bp__skRoot"></span></span>
+                  <span class="tn__amt"><span class="skel-text bd__skAmt"></span></span>
+                </span>
+              </div>
+            </div>
+            @for (group of skeletonGroups(); track group.heading) {
+              <p class="bp__group">
+                <span>{{ group.heading }}</span>
+                <span class="skel-text bd__skAmt"></span>
+              </p>
+              @for (w of group.rows; track $index) {
+                <div class="tn" style="--tn-depth: 1">
+                  <span class="tn__chev"></span>
+                  <div class="tn__main">
+                    <span class="tn__line">
+                      <span class="tn__name"><span class="skel-text" [style.width.%]="w"></span></span>
+                      <span class="tn__amt"><span class="skel-text bd__skAmt"></span></span>
+                    </span>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      </section>
+    } @else {
+      <div class="bd__top" aria-hidden="true">
+        <div class="bd__topRow">
+          <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
+        </div>
+        <span class="skel-box bd__skSeg"></span>
+        <span class="skel-box bd__skSearch"></span>
+        <div class="bd__chips">
+          <span class="skel-box bd__skChip bd__skChip--wide"></span>
+          <span class="skel-box bd__skChip"></span>
+        </div>
+      </div>
+    }
+    <div class="bd__sheet bd__main" aria-hidden="true">
+      @if (wide()) {
+        <header class="sheet-head bd__head">
+          <app-sheet-bar>
+            <h2 appSheetBarTitle class="sheet-title"><span class="skel-text bd__skTitle"></span></h2>
+          </app-sheet-bar>
+          <p class="sheet-line bd__line"><span class="skel-text skel-text--muted bd__skLine"></span></p>
+        </header>
+      }
+      <div class="bd__sheetBody">
+        <ng-container *ngTemplateOutlet="planSkeleton" />
+      </div>
+    </div>
+  </div>
 } @else {
   <div class="bd" [class.bd--wide]="wide()">
     @if (wide()) {
@@ -104,7 +172,10 @@
       <div class="bd__sheetBody" [class.bd__sheetBody--fab]="!!fab()" appScrollFade="y">
         @switch (load().kind) {
           @case ('loading') {
-            <app-skeleton variant="rows" [count]="6" [label]="'budget.loading' | t" />
+            <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
+            <div class="skel-in" aria-hidden="true">
+              <ng-container *ngTemplateOutlet="planSkeleton" />
+            </div>
           }
           @case ('error') {
             <app-load-error [message]="'budget.plan.loadError' | t" (retry)="reloadPlan()" />
@@ -161,6 +232,38 @@
       <app-row-menu class="bd__more" [sections]="menu()" [loading]="busy()" (selected)="onAction($event.id)" />
     }
   </div>
+</ng-template>
+
+<!-- The skeleton of a plan: its steps, its three figures and the tables of both sides. -->
+<ng-template #planSkeleton>
+  <div class="bp__skSteps">
+    @for (w of skeletonSteps; track $index) {
+      <span class="bp__skStep">
+        <span class="skel-box bp__skMarker"></span>
+        <span class="skel-text" [style.width.rem]="w"></span>
+      </span>
+    }
+  </div>
+  <dl class="bd__figs">
+    <div class="bd__fig">
+      <dt class="bd__figLabel">{{ 'budget.plan.income' | t }}</dt>
+      <dd class="bd__figValue"><span class="skel-text bd__skFig"></span></dd>
+    </div>
+    <div class="bd__fig">
+      <dt class="bd__figLabel">{{ 'budget.plan.expense' | t }}</dt>
+      <dd class="bd__figValue"><span class="skel-text bd__skFig"></span></dd>
+    </div>
+    <div class="bd__fig bd__fig--main bp__figWide">
+      <dt class="bd__figLabel">{{ 'budget.plan.difference' | t }}</dt>
+      <dd class="bd__figValue"><span class="skel-text skel-text--accent bd__skFig"></span></dd>
+      <dd class="bp__figNote"><span class="skel-text skel-text--muted bp__skNote"></span></dd>
+    </div>
+  </dl>
+  @for (group of skeletonGroups(); track group.heading) {
+    <app-section class="bd__sec" size="lg" [heading]="group.heading">
+      <app-data-table class="bp__table" surface="rowgroup" [loading]="true" [columns]="columns()" [rows]="[]" [skeletonRowCount]="group.rows.length" />
+    </app-section>
+  }
 </ng-template>
 
 <ng-template #planDetail let-v>

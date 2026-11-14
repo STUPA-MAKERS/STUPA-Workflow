@@ -138,6 +138,7 @@ _DATA_TABLES = (
     "todo_board",
     "ui_language",
     "ui_translation",
+    "pdf_asset",
 )
 
 

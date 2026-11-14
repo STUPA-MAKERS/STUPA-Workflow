@@ -165,3 +165,30 @@
     grid-auto-flow: row;
   }
 }
+
+/* The skeleton of the vertical stepper: the rows have the height, the gap and the 2rem
+   marker of `app-stepper orientation="vertical"`, so the figures below do not move. */
+.bp__skSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bp__skStep {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+  padding: var(--space-2) 14px;
+}
+.bp__skMarker {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+}
+.bp__skRoot {
+  width: 60%;
+}
+.bp__skNote {
+  width: 8em;
+}

@@ -1188,8 +1188,7 @@ export interface BackupList {
 /** The literal a restore has to carry. It is a machine token, never translated. */
 export const BACKUP_RESTORE_CONFIRMATION = 'RESTORE';
 
-/** `export` is the logo of every exported PDF except the protocol (spec 000891). */
-export type LogoSlot = 'wordmark' | 'imagemark' | 'favicon' | 'export';
+export type LogoSlot = 'wordmark' | 'imagemark' | 'favicon';
 
 export interface BrandingAsset {
   /** Data URL or server-side asset URL of the image mark. */
@@ -1288,11 +1287,27 @@ export const LOGO_ACCEPT_MIME: readonly string[] = [
   'image/vnd.microsoft.icon',
 ] as const;
 export const LOGO_MAX_SIZE_MB = 2;
-/** The export logo goes to the PDF renderer, which reads no ICO. */
-export const EXPORT_LOGO_ACCEPT_MIME: readonly string[] = [
+
+/** A slot of the PDF branding: the export logo or the footer graphic (specs 000891, 000892). */
+export type PdfSlot = 'logo' | 'footer';
+
+/**
+ * A graphic of the PDF branding. `builtin` is the default (the STUPA logo, the Skyline);
+ * an upload has its name, type and size. Its bytes go to the PDF renderer only, never to
+ * the browser, so SVG and PDF are allowed here, and the page shows no preview of it.
+ */
+export interface PdfAsset {
+  readonly builtin: boolean;
+  readonly fileName: string | null;
+  readonly mime: string | null;
+  readonly size: number | null;
+}
+export const PDF_ASSET_ACCEPT_MIME: readonly string[] = [
   'image/png',
   'image/jpeg',
   'image/webp',
+  'image/svg+xml',
+  'application/pdf',
 ] as const;
 
 /** Re-export so admin code imports only from `admin.models`. */

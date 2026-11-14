@@ -37,6 +37,19 @@ describe('AdminApiService — mock mode', () => {
     });
   });
 
+  it('keeps the PDF branding in mock mode: default, upload, reset, remove (specs 000891, 000892)', async () => {
+    const s = svc();
+    const builtin = { builtin: true, fileName: null, mime: null, size: null };
+    expect(await firstValueFrom(s.getPdfAsset('logo'))).toEqual(builtin);
+    const file = new File(['<svg/>'], 'f.svg', { type: 'image/svg+xml' });
+    const up = await firstValueFrom(s.uploadPdfAsset('footer', file));
+    expect(up).toEqual({ builtin: false, fileName: 'f.svg', mime: 'image/svg+xml', size: 6 });
+    expect(await firstValueFrom(s.getPdfAsset('footer'))).toEqual(up);
+    expect(await firstValueFrom(s.resetPdfAsset('footer'))).toEqual(builtin);
+    await firstValueFrom(s.deletePdfAsset('logo'));
+    expect(await firstValueFrom(s.getPdfAsset('logo'))).toBeNull();
+  });
+
   it('deletes a webhook and reports one delivery status per state in mock mode', async () => {
     const s = svc();
     const before = await firstValueFrom(s.listWebhooks());
@@ -126,6 +139,24 @@ describe('AdminApiService — real mode (contract)', () => {
   });
 
   afterEach(() => http.verify());
+
+  it('reads, uploads, resets and removes the PDF branding on its routes', () => {
+    s.getPdfAsset('logo').subscribe();
+    http.expectOne('/api/admin/pdf-assets/logo').flush(null);
+    s.uploadPdfAsset('footer', new File(['x'], 'f.svg')).subscribe();
+    const put = http.expectOne('/api/admin/pdf-assets/footer');
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body instanceof FormData).toBe(true);
+    put.flush({ builtin: false, fileName: 'f.svg', mime: 'image/svg+xml', size: 1 });
+    s.resetPdfAsset('footer').subscribe();
+    const reset = http.expectOne('/api/admin/pdf-assets/footer/default');
+    expect(reset.request.method).toBe('POST');
+    reset.flush({ builtin: true, fileName: null, mime: null, size: null });
+    s.deletePdfAsset('logo').subscribe();
+    const del = http.expectOne('/api/admin/pdf-assets/logo');
+    expect(del.request.method).toBe('DELETE');
+    del.flush(null);
+  });
 
   it('GETs config schemas from the documented path', () => {
     s.configSchemas().subscribe();

@@ -44,6 +44,8 @@ import {
   type LoginSettings,
   type AuditPage,
   type Branding,
+  type PdfAsset,
+  type PdfSlot,
   type CdLogoSlot,
   type CdVariant,
   type CdVariantCreateBody,
@@ -1569,6 +1571,53 @@ export class AdminApiService {
       params,
       responseType: 'blob',
     });
+  }
+
+  /** The mock PDF branding: the mock keeps no file, only its data. */
+  private readonly mockPdfAssets = signal<Readonly<Record<PdfSlot, PdfAsset | null>>>({
+    logo: { builtin: true, fileName: null, mime: null, size: null },
+    footer: { builtin: true, fileName: null, mime: null, size: null },
+  });
+
+  private setMockPdfAsset(slot: PdfSlot, asset: PdfAsset | null): void {
+    this.mockPdfAssets.update((all) => ({ ...all, [slot]: asset }));
+  }
+
+  /** GET /admin/pdf-assets/{slot} — the graphic of the slot, or `null` (specs 000891, 000892). */
+  getPdfAsset(slot: PdfSlot): Observable<PdfAsset | null> {
+    if (this.mock) return of(this.mockPdfAssets()[slot]);
+    return this.http.get<PdfAsset | null>(`${this.base}/admin/pdf-assets/${slot}`);
+  }
+
+  /** PUT /admin/pdf-assets/{slot} — multipart upload that replaces the graphic. */
+  uploadPdfAsset(slot: PdfSlot, file: File): Observable<PdfAsset> {
+    if (this.mock) {
+      const asset = { builtin: false, fileName: file.name, mime: file.type, size: file.size };
+      this.setMockPdfAsset(slot, asset);
+      return of(asset);
+    }
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.put<PdfAsset>(`${this.base}/admin/pdf-assets/${slot}`, form);
+  }
+
+  /** POST /admin/pdf-assets/{slot}/default — the built-in graphic again. */
+  resetPdfAsset(slot: PdfSlot): Observable<PdfAsset> {
+    if (this.mock) {
+      const asset = { builtin: true, fileName: null, mime: null, size: null };
+      this.setMockPdfAsset(slot, asset);
+      return of(asset);
+    }
+    return this.http.post<PdfAsset>(`${this.base}/admin/pdf-assets/${slot}/default`, {});
+  }
+
+  /** DELETE /admin/pdf-assets/{slot} — the PDFs then carry no graphic there. */
+  deletePdfAsset(slot: PdfSlot): Observable<void> {
+    if (this.mock) {
+      this.setMockPdfAsset(slot, null);
+      return of(undefined);
+    }
+    return this.http.delete<void>(`${this.base}/admin/pdf-assets/${slot}`);
   }
 
   getSiteConfig(): Observable<SiteConfig> {

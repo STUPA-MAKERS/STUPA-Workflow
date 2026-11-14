@@ -66,6 +66,19 @@ class CdVariantLogoOut(FrozenCamelModel, frozen=True):
     size: int | None = None
 
 
+class PdfAssetOut(FrozenCamelModel, frozen=True):
+    """A graphic of the PDF branding (specs 000891, 000892).
+
+    ``builtin`` marks the built-in default (the STUPA logo, the Skyline); an upload has
+    its name, sniffed type and size.
+    """
+
+    builtin: bool
+    file_name: str | None = Field(default=None, serialization_alias="fileName")
+    mime: str | None = None
+    size: int | None = None
+
+
 class CdVariantOut(FrozenCamelModel, frozen=True):
     """A CD variant with its logos, ordered by slot and position."""
 

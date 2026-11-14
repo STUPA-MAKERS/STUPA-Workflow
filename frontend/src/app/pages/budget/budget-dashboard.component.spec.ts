@@ -1171,6 +1171,23 @@ describe('BudgetDashboardComponent', () => {
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
+  it('§NF/performance/loading/000893: the skeleton has the two columns of the sheet and no amount', async () => {
+    const { http, fixture, container } = await bare();
+    fixture.detectChanges();
+    const busy = container.querySelector('[aria-busy="true"]') as HTMLElement;
+    const titles = [...busy.querySelectorAll('.section__title')].map((h) => h.textContent?.trim());
+    expect(titles.slice(0, 2)).toEqual(['Verteilung', 'Auslastung']);
+    expect(busy.querySelector('.bd__cols app-budget-pie .pie__totalSkel')).toBeTruthy();
+    expect(busy.querySelector('.pie__hole')?.textContent).not.toMatch(/\d/);
+    expect(busy.querySelectorAll('.bd__usage .bd__urow')).toHaveLength(4);
+    expect(busy.querySelector('.bd__skSeg')).toBeNull();
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([{ ...node({ id: 'b-vs', key: 'VS' }), planEnabled: true }]);
+    fixture.detectChanges();
+    expect(container.querySelector('[aria-busy="true"] .bd__skSeg')).toBeTruthy();
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
+    http.match((r) => r.url.endsWith('/plan')).forEach((r) => r.flush(null, { status: 404, statusText: 'Not Found' }));
+  });
+
   /**
    * The tree and the years are cached reads, which answer twice when the fresh answer differs. A
    * root that answers twice must not count as two, and an answer of an older tree round must not

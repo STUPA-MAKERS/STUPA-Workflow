@@ -209,3 +209,45 @@
     grid-row: 1 / span 2;
   }
 }
+
+/* The skeleton (§ 000893): the boxes take the height of the field, the text area, the switch
+   and the button they stand for, so the page does not move when the config arrives. */
+.br__skField {
+  height: var(--control-height-lg);
+  border-radius: var(--radius-field);
+}
+.br__skHex {
+  width: 11rem;
+}
+.br__skArea {
+  height: 5rem;
+  border-radius: var(--radius-field);
+}
+.br__skArea--tall {
+  height: 17rem;
+}
+.br__skSwitch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 2.75rem;
+}
+.br__skSwitchLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.br__skToggle {
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+}
+.br__skFile {
+  width: 4.5rem;
+}
+.br__skButton {
+  flex: none;
+  width: 4.5rem;
+  height: var(--control-height-sm);
+  border-radius: 999px;
+}

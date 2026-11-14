@@ -5,7 +5,14 @@
 
   <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'budget.tree.error' | t" (retry)="reload()">
     <ng-template #loading>
-      <app-skeleton variant="rows" [count]="4" [label]="'budget.tree.loading' | t" />
+      <app-data-table
+        surface="rowgroup"
+        [loading]="true"
+        [columns]="columns()"
+        [rows]="[]"
+        [skeletonRowCount]="2"
+        [loadingText]="'budget.tree.loading' | t"
+      />
     </ng-template>
     <ng-template #content>
   @if (!budgets().length) {
