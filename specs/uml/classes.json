@@ -7019,6 +7019,12 @@
           "type": "TEXT"
         },
         {
+          "name": "same_caster",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,
