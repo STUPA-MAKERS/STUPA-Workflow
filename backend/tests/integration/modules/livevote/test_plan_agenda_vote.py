@@ -19,7 +19,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pypdf import PdfWriter
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.deps import get_current_principal
@@ -138,9 +138,7 @@ async def test_a_plan_on_the_agenda_of_a_closed_meeting_is_refused(
     s = await seed(maker, status="closed", items=0)
     vid = await _waiting(maker, s.gremium_id)
     with TestClient(api) as client:
-        resp = client.post(
-            f"/api/meetings/{s.meeting_id}/agenda", json={"planVersionId": str(vid)}
-        )
+        resp = client.post(f"/api/meetings/{s.meeting_id}/agenda", json={"planVersionId": str(vid)})
     assert (resp.status_code, resp.json()["code"]) == (409, "meeting_closed"), resp.text
 
 
@@ -163,8 +161,10 @@ async def test_the_item_of_a_plan_takes_one_motion_of_the_members(
             "majorityRule": "simple",
         }
         for extra, code in (
-            ({"kind": "election", "seats": 1, "candidates": [{"name": "A"}, {"name": "B"}]},
-             "plan_item_motion_only"),
+            (
+                {"kind": "election", "seats": 1, "candidates": [{"name": "A"}, {"name": "B"}]},
+                "plan_item_motion_only",
+            ),
             (
                 {
                     "kind": "poll",
@@ -220,6 +220,8 @@ async def test_the_vote_of_the_meeting_decides_the_step(
         vote_id = uuid.UUID(vote["id"])
         async with maker() as session:
             await VotingService(session).open(vote_id, now=datetime.now(UTC), actor="mgr")
+            await session.execute(update(Vote).where(Vote.id == vote_id).values(eligible_count=1))
+            await session.commit()
         blocked = client.delete(f"/api/meetings/{s.meeting_id}/agenda/{item['id']}")
         assert blocked.status_code == 409
     async with maker() as session:

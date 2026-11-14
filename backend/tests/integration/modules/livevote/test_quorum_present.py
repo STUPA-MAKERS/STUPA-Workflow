@@ -19,9 +19,13 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.meetings.models import MeetingAttendance
 from app.modules.voting.models import Vote
+from app.modules.voting.schemas import VoteClosed
+from app.modules.voting.service import VotingService
+from app.shared.errors import ConflictError
 from tests.integration.modules.livevote.conftest import Seed, seed
 
 pytestmark = pytest.mark.integration
@@ -90,38 +94,48 @@ async def _world(
         return s, vote.id
 
 
+async def _close(maker: async_sessionmaker[AsyncSession], vote_id: uuid.UUID) -> VoteClosed:
+    """Close the vote by hand, as the minute taker does."""
+    async with maker() as session:
+        return await VotingService(session).close(vote_id, Principal(sub="mgr", roles=["admin"]))
+
+
 async def test_close_meets_the_quorum_by_present_members(
-    maker: async_sessionmaker[AsyncSession], api: FastAPI
+    maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Two of five are present (40 %): the vote closes without a ballot (§000900)."""
+    """Two of five are present (40 %): the vote closes without a ballot.
+
+    Rule: §F/meetings/voting/000900.
+    """
     _, vote_id = await _world(maker, present=2)
-    with TestClient(api) as client:
-        resp = client.post(f"/api/votes/{vote_id}/close")
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["tally"]["quorumMet"] is True
+    closed = await _close(maker, vote_id)
+    assert closed.tally.quorum_met is True
 
 
 async def test_close_misses_the_quorum_with_too_few_present(
-    maker: async_sessionmaker[AsyncSession], api: FastAPI
+    maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """One of five is present: the manual close answers 409 (§000900, §000380)."""
+    """One of five is present: the manual close is refused.
+
+    Rules: §F/meetings/voting/000900, §F/meetings/voting/000380.
+    """
     _, vote_id = await _world(maker, present=1)
-    with TestClient(api) as client:
-        resp = client.post(f"/api/votes/{vote_id}/close")
-    assert resp.status_code == 409, resp.text
+    with pytest.raises(ConflictError):
+        await _close(maker, vote_id)
 
 
 async def test_close_needs_the_least_number_of_present_members(
-    maker: async_sessionmaker[AsyncSession], api: FastAPI
+    maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """40 % are present, and the least number of three is not (§000901)."""
+    """40 % are present, and the least number of three is not.
+
+    Rule: §F/meetings/voting/000901.
+    """
     _, low = await _world(maker, present=2, min_present=3)
     _, enough = await _world(maker, present=3, min_present=3)
-    with TestClient(api) as client:
-        missed = client.post(f"/api/votes/{low}/close")
-        met = client.post(f"/api/votes/{enough}/close")
-    assert missed.status_code == 409, missed.text
-    assert met.status_code == 200, met.text
+    with pytest.raises(ConflictError):
+        await _close(maker, low)
+    assert (await _close(maker, enough)).tally.quorum_met is True
 
 
 async def test_meeting_vote_takes_the_presence_rules_of_the_gremium(
