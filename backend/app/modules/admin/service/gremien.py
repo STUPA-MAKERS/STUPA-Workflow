@@ -44,6 +44,14 @@ def _gremium_out(row: Gremium) -> GremiumOut:
     )
 
 
+def _apply_quorum(row: Gremium, payload: GremiumUpdate) -> None:
+    """Write the quorum fields that the patch sent; both can be cleared to null."""
+    if "quorum_percent" in payload.model_fields_set:
+        row.quorum_percent = payload.quorum_percent
+    if "quorum_min_present" in payload.model_fields_set:
+        row.quorum_min_present = payload.quorum_min_present
+
+
 class GremiumOps(ConfigServiceBase):
     """Gremium CRUD and the protocol recipient list."""
 
@@ -207,10 +215,7 @@ class GremiumOps(ConfigServiceBase):
             row.delegation_lead_minutes = payload.delegation_lead_minutes
         if payload.delegation_allow_external is not None:
             row.delegation_allow_external = payload.delegation_allow_external
-        if "quorum_percent" in payload.model_fields_set:
-            row.quorum_percent = payload.quorum_percent
-        if "quorum_min_present" in payload.model_fields_set:
-            row.quorum_min_present = payload.quorum_min_present
+        _apply_quorum(row, payload)
         publish = payload.protocols_public
         data: dict[str, object] | None = (
             {"field": "protocolsPublic", "old": bool(row.protocols_public), "new": publish}
