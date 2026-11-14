@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.budget.tree.service import BudgetTreeService
+from app.modules.budget.tree.service_base import _subtree_ids
 from app.modules.budget.tree_models import Budget
 from app.modules.budget.tree_schemas import (
     AllocationSet,
@@ -144,16 +145,47 @@ async def test_rename_key_recomputes_descendant_paths(session: AsyncSession) -> 
     top = await svc.create_node(BudgetNodeCreate(key=f"RK{_suffix()}", name="Top", gremiumId=g.id))
     mid = await svc.create_node(BudgetNodeCreate(key="800", name="Mid", parentId=top.id))
     leaf = await svc.create_node(BudgetNodeCreate(key="04", name="Leaf", parentId=mid.id))
-    assert leaf.path_key == f"{top.path_key}-800-04"
+    assert leaf.path_key == f"{top.path_key}-80004"
 
     out = await svc.update_node(mid.id, BudgetNodeUpdate(key="810", name="Mid"))
     assert out.path_key == f"{top.path_key}-810"
     leaf_row = await session.get(Budget, leaf.id)
-    assert leaf_row is not None and leaf_row.path_key == f"{top.path_key}-810-04"
+    assert leaf_row is not None and leaf_row.path_key == f"{top.path_key}-81004"
+    assert leaf_row.tree_path == f"{top.path_key}-810-04"
 
     await svc.create_node(BudgetNodeCreate(key="900", name="Sib", parentId=top.id))
     with pytest.raises(ConflictError):
         await svc.update_node(mid.id, BudgetNodeUpdate(key="900"))
+
+
+async def test_a_path_key_that_another_cost_centre_has_is_refused(session: AsyncSession) -> None:
+    """Two Kostenstellen never share a path key, and a subtree is found by the tree.
+
+    `80` with the child `133` and `801` with the child `33` would both be `…-80133`.
+    Rule: §F/finance/budget/000878.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"PK{_suffix()}", name="Top", gremiumId=g.id))
+    short = await svc.create_node(BudgetNodeCreate(key="80", name="Kurz", parentId=top.id))
+    long = await svc.create_node(BudgetNodeCreate(key="801", name="Lang", parentId=top.id))
+    leaf = await svc.create_node(BudgetNodeCreate(key="33", name="Blatt", parentId=long.id))
+    assert leaf.path_key == f"{top.path_key}-80133"
+
+    with pytest.raises(ConflictError) as created:
+        await svc.create_node(BudgetNodeCreate(key="133", name="Gleich", parentId=short.id))
+    assert created.value.code == "budget_path_key_exists"
+    kid = await svc.create_node(BudgetNodeCreate(key="5", name="Kind", parentId=short.id))
+    other = await svc.create_node(BudgetNodeCreate(key="7", name="Sieben", parentId=top.id))
+    await svc.create_node(BudgetNodeCreate(key="0133", name="Tief", parentId=other.id))
+    with pytest.raises(ConflictError) as renamed:
+        await svc.update_node(other.id, BudgetNodeUpdate(key="8"))
+    assert renamed.value.code == "budget_path_key_exists"
+
+    short_row = await session.get(Budget, short.id)
+    assert short_row is not None
+    below = set((await session.scalars(_subtree_ids(short_row))).all())
+    assert below == {short.id, kid.id}
 
 
 async def test_transfer(session: AsyncSession) -> None:
@@ -467,3 +499,37 @@ async def test_list_invoices_search_filter_pagination(session: AsyncSession) -> 
 
     empty = await svc.list_invoices_paged(q="zzzzzznope")
     assert empty.total == 0 and empty.items == []
+
+
+async def test_a_new_booking_takes_only_a_year_that_is_not_past(session: AsyncSession) -> None:
+    """A Haushalt without a plan gives each year that is not closed and not past.
+
+    The pairs name the current year, a booking into a past year is refused, and a
+    booking without a year takes the current one. Rule: §F/finance/budget/000879.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"BY{_suffix()}", name="Top", gremiumId=g.id))
+    this = date.today().year
+    past = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this - 1))
+    now = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this))
+    later = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this + 1))
+    closed = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this + 2))
+    await svc.set_fiscal_year_closed(top.id, closed.id, closed=True)
+
+    pairs = [p for p in await svc.choosable_pairs(None) if p.budget_id == top.id]
+    assert [(p.fiscal_year_id, p.current, p.budget_name) for p in pairs] == [
+        (now.id, True, "Top"), (later.id, False, "Top"),
+    ]
+    assert [p for p in await svc.choosable_pairs(set()) if p.budget_id == top.id] == []
+
+    def booking(fiscal_year_id: uuid.UUID | None) -> ExpenseCreate:
+        return ExpenseCreate(
+            budgetId=top.id, fiscalYearId=fiscal_year_id, amount=Decimal("5"), description="x"
+        )
+
+    with pytest.raises(ValidationProblem) as refused:
+        await svc.book_expense(booking(past.id), actor="tester")
+    assert refused.value.code == "fiscal_year_not_choosable"
+    assert (await svc.book_expense(booking(later.id), actor="tester")).fiscal_year_id == later.id
+    assert (await svc.book_expense(booking(None), actor="tester")).fiscal_year_id == now.id

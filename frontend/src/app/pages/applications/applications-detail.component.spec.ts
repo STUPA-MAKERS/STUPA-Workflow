@@ -991,8 +991,7 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   /**
-   * The fiscal-year list of the assigned cost centre loads first. The open dialog reloads the
-   * fiscal-year list of the current top budget. The refresh fetches the application and the aux
+   * The fiscal-year list of the assigned cost centre loads first, for the badge. The refresh fetches the application and the aux
    * data again.
    */
   it('assigns a budget (success → toast + refresh) and opens the dialog with the current value', async () => {
@@ -1010,7 +1009,6 @@ describe('ApplicationsDetailComponent', () => {
     cmp['openBudgetDialog']();
     expect(cmp['budgetDialogOpen']()).toBe(true);
     expect(cmp['budgetChoice']()).toBe('b1');
-    http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
 
     cmp['budgetChoice'].set('');
     cmp.assignBudget();

@@ -48,6 +48,7 @@ from app.modules.budget.tree_schemas import (
     BudgetNodeOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
+    BudgetYearOut,
     ExpenseCreate,
     ExpenseKind,
     ExpenseOut,
@@ -789,6 +790,27 @@ async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": content_disposition("attachment", name)},
     )
+
+
+@router.get(
+    "/budget-years",
+    response_model=list[BudgetYearOut],
+    responses=_errors(401, 403),
+)
+async def list_budget_years(
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> list[BudgetYearOut]:
+    """List the pairs of a budget and a fiscal year that a new booking can take.
+
+    A form asks for the pair before the cost center. A year is in the list when it is
+    not closed and not past, and in a budget with a plan only when its plan is in
+    force. The full view gives every budget. Without it the list holds the budgets
+    with a cost center that a Gremium of the principal reads.
+    """
+    if _has_full_view(principal):
+        return await service.choosable_pairs(None)
+    return await service.choosable_pairs(await _member_gremium_ids(service, principal.sub))
 
 
 @router.get(

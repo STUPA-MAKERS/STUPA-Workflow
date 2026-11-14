@@ -124,6 +124,19 @@ class HostComponent {
   };
 }
 
+/** The one pair the field offers: the new booking starts with it (spec 000879). */
+const PAIR = { budgetId: 'top', budgetName: 'Haushalt', fiscalYearId: 'fy', display: '2026', current: true };
+
+/** Answer each open request of the field of the pair, and let the form take the pair. */
+async function flushPairs(fixture: { detectChanges: () => void }): Promise<void> {
+  TestBed.inject(HttpTestingController)
+    .match((r) => r.url.endsWith('/budget-years'))
+    .forEach((r) => r.flush([PAIR]));
+  fixture.detectChanges();
+  await new Promise((r) => setTimeout(r));
+  fixture.detectChanges();
+}
+
 async function setup(mode: 'create' | 'edit', inputs: Record<string, unknown> = {}) {
   localStorage.setItem('ap.locale', 'de');
   CONFIG = { mode, expense: (inputs['expense'] as Expense | undefined) ?? EXPENSE, inputs };
@@ -144,6 +157,7 @@ async function setup(mode: 'create' | 'edit', inputs: Record<string, unknown> = 
   if (mode === 'create') host.dialogs.openCreate();
   else host.dialogs.openEdit(CONFIG.expense);
   view.fixture.detectChanges();
+  if (mode === 'create') await flushPairs(view.fixture);
   const form = view.fixture.debugElement.children[0].componentInstance as BookingFormComponent;
   return { view, http, dialogs: host.dialogs, form, ...host.handlers, user: userEvent.setup() };
 }
@@ -196,13 +210,14 @@ describe('BookingFormComponent', () => {
   });
 
   /**
-   * The sections follow the board, with no subtitle. Income has no application search. Opening the
-   * list asks for the years of the top budgets, for the free amounts.
+   * The sections follow the board, with no subtitle. Income has no application search. The pair
+   * gives the fiscal year, so a picked cost centre asks for no years.
    */
   it(
     'builds a new booking: kind, cost centre from the list, fiscal year and payment method',
     async () => {
-      const { dialogs, http, user, view } = await setup('create');
+      const { dialogs, user, view } = await setup('create');
+      expect(dialogs.newTopId()).toBe('top');
       expect(screen.getByRole('heading', { name: 'Buchung anlegen' })).toBeInTheDocument();
       for (const name of ['Zuordnung', 'Beleg', 'Zahlung'])
         expect(screen.getByRole('group', { name })).toBeInTheDocument();
@@ -219,22 +234,8 @@ describe('BookingFormComponent', () => {
       await tick();
       view.fixture.detectChanges();
       expect(pick.getAttribute('aria-expanded')).toBe('true');
-      http.expectOne((r) => r.url.endsWith('/budgets/top/fiscal-years')).flush([]);
       await user.click(screen.getByRole('option', { name: /Maschinenbau/ }));
       expect(dialogs.newBudgetId()).toBe('mb');
-      http
-        .expectOne((r) => r.url.endsWith('/budgets/top/fiscal-years'))
-        .flush([
-          {
-            id: 'fy',
-            budgetId: 'top',
-            year: 2026,
-            display: '2026',
-            startDate: '',
-            endDate: '',
-            active: true,
-          },
-        ]);
       expect(dialogs.newFiscalYearId()).toBe('fy');
 
       await user.click(screen.getByRole('radio', { name: 'Bar' }));
@@ -290,6 +291,8 @@ describe('BookingFormComponent', () => {
     view.fixture.detectChanges();
     await user.click(screen.getByRole('button', { name: 'Verknüpfung lösen' }));
     expect(dialogs.newApplicationId()).toBe('');
+    view.fixture.detectChanges();
+    await flushPairs(view.fixture);
   });
 
   it('submits a new booking with the fab and closes with the head', async () => {

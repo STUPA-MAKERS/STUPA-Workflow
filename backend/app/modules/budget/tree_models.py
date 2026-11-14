@@ -1,7 +1,8 @@
 """Hierarchical budgets and cost centers plus fiscal years.
 
 ``Budget`` is a tree node with a ``parent_id`` self-FK. The service maintains
-``path_key``, the composed key in the form ``VS-800-04``. ``FiscalYear``
+``tree_path`` (``VS-800-04``, the place in the tree) and ``path_key``
+(``VS-80004``, the key that a person reads). ``FiscalYear``
 belongs to a top-level budget (service check). ``BudgetAllocation`` is the
 top-down allocation ``Budget x FiscalYear``. Available equals allocated, with
 NO roll-up. Consumption rolls up from the approved applications. It is not
@@ -38,8 +39,13 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     """Cost-center node. A NULL ``parent_id`` marks the top level.
 
     Only the top level carries ``gremium_id``. The children inherit it
-    logically. ``key`` is the path segment. ``path_key`` is the composed key,
-    for example ``VS-800-04``. The self-FK uses ``ON DELETE RESTRICT``, so you
+    logically. ``key`` is the path segment. ``tree_path`` joins the keys from the
+    top level down with ``-`` (``VS-800-04``); every search for the nodes below a
+    node reads it, because its prefix is the ancestor. ``path_key`` is the key that
+    a person reads (``VS-80004``, ``tree_rules.path_key_of``); it does not say where
+    a level ends, so no query finds a subtree by it. A row that is written
+    without a tree path takes its path key, which is right for a top-level node.
+    The self-FK uses ``ON DELETE RESTRICT``, so you
     must delete the children first.
     """
 
@@ -53,6 +59,7 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     )
     key: Mapped[str] = mapped_column(Text)
     path_key: Mapped[str] = mapped_column(Text)
+    tree_path: Mapped[str] = mapped_column(Text)
     name: Mapped[str] = mapped_column(Text)
     currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
@@ -89,9 +96,14 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
         Boolean, default=False, server_default="false"
     )
 
+    def __init__(self, **fields: object) -> None:
+        """Make a node. Without a tree path it takes its path key."""
+        super().__init__(**{"tree_path": fields.get("path_key"), **fields})
+
     __table_args__ = (
         UniqueConstraint("parent_id", "key", name="uq_budget_parent_key"),
         UniqueConstraint("path_key", name="uq_budget_path_key"),
+        UniqueConstraint("tree_path", name="uq_budget_tree_path"),
         CheckConstraint("currency = 'EUR'", name="budget_currency_eur"),
         CheckConstraint(
             "fiscal_start_month BETWEEN 1 AND 12", name="budget_fiscal_start_month"

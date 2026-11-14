@@ -449,6 +449,17 @@ export interface BudgetNodeUpdate {
   readonly planCoverableDefault?: boolean;
 }
 
+/** A top-level budget with one fiscal year that a new booking can take (spec 000879). */
+export interface BudgetYear {
+  readonly budgetId: Uuid;
+  readonly budgetName: string;
+  readonly fiscalYearId: Uuid;
+  /** The fiscal year as text: ``YYYY`` or ``YYYY/YY``. */
+  readonly display: string;
+  /** The year that holds the date of today. */
+  readonly current: boolean;
+}
+
 export interface FiscalYearCreate {
   readonly year: number;
 }
@@ -534,6 +545,11 @@ export class BudgetTreeApi {
 
   deleteNode(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budgets/${id}`);
+  }
+
+  /** The pairs of a budget and a fiscal year that a new booking can take. */
+  listBudgetYears(): Observable<BudgetYear[]> {
+    return this.http.get<BudgetYear[]>(`${this.base}/budget-years`, { context: skipLoading() });
   }
 
   listFiscalYears(topId: Uuid): Observable<FiscalYear[]> {

@@ -434,22 +434,23 @@
   [closeLabel]="'action.close' | t"
   (closed)="budgetDialogOpen.set(false)"
 >
-  <app-cost-centre-select
-    [label]="'applications.budget.field' | t"
-    [allLabel]="'applications.budget.none' | t"
-    [nodes]="budgetTree()"
-    [value]="budgetChoice()"
-    [fiscalYearId]="fiscalChoice()"
-    (picked)="onBudgetPicked($event)"
-  />
-  @if (budgetChoice()) {
-    <app-select
-      class="ad__ccFy"
-      [label]="'applications.budget.fiscalYear' | t"
-      [options]="fiscalOptions()"
-      [ngModel]="fiscalChoice()"
-      (ngModelChange)="fiscalChoice.set($event)"
+  @if (budgetDialogOpen()) {
+    <app-budget-year-select
+      [fiscalYearId]="fiscalChoice()"
+      [preferBudgetId]="assignPreferTop()"
+      (picked)="onAssignPair($event)"
     />
+    @if (assignTopId()) {
+      <app-cost-centre-select
+        class="ad__ccFy"
+        [label]="'applications.budget.field' | t"
+        [allLabel]="'applications.budget.none' | t"
+        [nodes]="assignTree()"
+        [value]="budgetChoice()"
+        [fiscalYearId]="fiscalChoice()"
+        (picked)="budgetChoice.set($event)"
+      />
+    }
   }
   <div dialog-footer>
     <app-button variant="text" (click)="budgetDialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>

@@ -26,14 +26,14 @@ async def decision_gremium_of(
 ) -> tuple[UUID | None, UUID | None]:
     """Return the effective deciding Gremium of a node and the node that holds it.
 
-    One query loads the node and its ancestors through the `path_key` prefixes, as
+    One query loads the node and its ancestors through the prefixes of the tree path, as
     `can_view_node` does.
 
     Returns:
         `(gremium_id, source_node_id)`, or `(None, None)` when the node does not exist
         or no node on its path holds a value.
     """
-    path_key = await session.scalar(select(Budget.path_key).where(Budget.id == budget_id))
+    path_key = await session.scalar(select(Budget.tree_path).where(Budget.id == budget_id))
     if path_key is None:
         return None, None
     segments = path_key.split(_SEP)
@@ -41,7 +41,7 @@ async def decision_gremium_of(
     rows = (
         await session.execute(
             select(Budget.id, Budget.parent_id, Budget.decision_gremium_id).where(
-                Budget.path_key.in_(prefixes)
+                Budget.tree_path.in_(prefixes)
             )
         )
     ).all()

@@ -40,7 +40,7 @@ class _Session:
     def __init__(self, store: dict[UUID, Any], active_fy: tuple[UUID, ...]) -> None:
         self.store = store
         self.active_fy = [
-            SimpleNamespace(id=f, start_date=date(2026, 1, 1), end_date=date(2026, 12, 31))
+            SimpleNamespace(id=f, start_date=date.min, end_date=date.max)
             for f in active_fy
         ]
         self.committed = 0

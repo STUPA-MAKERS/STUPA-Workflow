@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { BudgetTransfer, BudgetTreeNode } from '../../budget/budget-tree.api';
 import { costCentreIndex } from '../../budget/expense-display.util';
-import { currentFiscalYear, defaultFiscalYear, ExpenseDialogsState } from '../expense-dialogs.state';
+import { currentFiscalYear, ExpenseDialogsState } from '../expense-dialogs.state';
 import { ExpenseSubBookingsState } from '../expense-sub-bookings.state';
 import { ExpenseTransfersState } from '../expense-transfers.state';
 import { ExpensesListState } from '../expenses-list.state';
@@ -114,6 +114,11 @@ class HostComponent {
   readonly costCentres = costCentreIndex(TREE);
 }
 
+const tick = () => new Promise((r) => setTimeout(r));
+
+/** The one pair the field offers: the new transfer starts with it (spec 000879). */
+const PAIR = { budgetId: 'top', budgetName: 'Haushalt', fiscalYearId: 'fy', display: '2026', current: true };
+
 async function setup(mode: 'create' | 'edit', layout: 'pane' | 'sheet' = 'pane') {
   localStorage.setItem('ap.locale', 'de');
   MODE = mode;
@@ -135,6 +140,12 @@ async function setup(mode: 'create' | 'edit', layout: 'pane' | 'sheet' = 'pane')
     host.dialogs.openTransfer();
   } else host.transfers.openEdit(TRANSFER);
   view.fixture.detectChanges();
+  if (mode === 'create') {
+    http.expectOne((r) => r.url.endsWith('/budget-years')).flush([PAIR]);
+    view.fixture.detectChanges();
+    await tick();
+    view.fixture.detectChanges();
+  }
   const form = view.fixture.debugElement.children[0].componentInstance as TransferFormComponent;
   return { view, http, host, form, user: userEvent.setup() };
 }
@@ -146,7 +157,6 @@ async function setup(mode: 'create' | 'edit', layout: 'pane' | 'sheet' = 'pane')
  */
 jest.setTimeout(15_000);
 
-const tick = () => new Promise((r) => setTimeout(r));
 const text = () => (document.body.textContent ?? '').replace(/\s+/g, ' ');
 
 describe('TransferFormComponent', () => {
@@ -165,21 +175,21 @@ describe('TransferFormComponent', () => {
   });
 
   /**
-   * Opening the list asks once for the years of the top budgets, for the free amounts. Without an
+   * The pair gives the fiscal year, so the legs ask for no years. Without an
    * amount the free amount shows as it is. The same cost centre twice is no pair. Without a
    * description the main action waits.
    */
   it('picks the two legs in the cost-centre list and shows the free amount before and after', async () => {
-    const { host, http, view, user } = await setup('create');
+    const { host, view, user } = await setup('create');
+    expect(host.dialogs.tTopId()).toBe('top');
+    expect(host.dialogs.tFiscalYearId()).toBe('fy');
     expect(screen.getByRole('heading', { name: 'Übertrag buchen' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Von → nach' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^Von Kostenstelle/ }));
     await tick();
     view.fixture.detectChanges();
-    http.expectOne((r) => r.url.endsWith('/budgets/top/fiscal-years')).flush([FY]);
     await user.click(screen.getByRole('option', { name: /Kultur/ }));
     expect(host.dialogs.tFromId()).toBe('kul');
-    http.expectOne((r) => r.url.endsWith('/budgets/top/fiscal-years')).flush([FY]);
     view.fixture.detectChanges();
     expect(text()).toMatch(/Frei danach ?11\.150,00 €/);
     host.dialogs.tToId.set('kul');
@@ -214,14 +224,13 @@ describe('TransferFormComponent', () => {
   });
 
   /** With nothing to swap the action does nothing. */
-  it('swaps a single leg: the target becomes the source and its years load', async () => {
-    const { host, http, view, user } = await setup('create');
+  it('swaps a single leg: the target becomes the source and the year stays', async () => {
+    const { host, view, user } = await setup('create');
     host.dialogs.tToId.set('sport');
     view.fixture.detectChanges();
     await user.click(screen.getByRole('button', { name: 'Tauschen' }));
     expect(host.dialogs.tFromId()).toBe('sport');
     expect(host.dialogs.tToId()).toBe('');
-    http.expectOne((r) => r.url.endsWith('/budgets/top/fiscal-years')).flush([FY]);
     expect(host.dialogs.tFiscalYearId()).toBe('fy');
     host.dialogs.tFromId.set('');
     host.dialogs.swapTransfer();
@@ -312,25 +321,5 @@ describe('currentFiscalYear', () => {
     expect(currentFiscalYear([fys[0]], today)?.id).toBe('a');
     expect(currentFiscalYear([fys[0], { ...fys[0], id: 'c' }], today)).toBeNull();
     expect(currentFiscalYear([])).toBeNull();
-  });
-});
-
-describe('defaultFiscalYear', () => {
-  it('takes the only active open year, else the active open one that holds today', () => {
-    const y = (id: string, start: number, active = true, closedAt: string | null = null) => ({
-      ...FY,
-      id,
-      startDate: `${start}-01-01`,
-      endDate: `${start}-12-31`,
-      active,
-      closedAt,
-    });
-    const today = new Date('2026-11-03T12:00:00Z');
-    expect(defaultFiscalYear([y('a', 2025)], today)?.id).toBe('a');
-    expect(defaultFiscalYear([y('a', 2025), y('b', 2026), y('c', 2027)], today)?.id).toBe('b');
-    expect(defaultFiscalYear([y('a', 2025), y('b', 2026, false)], today)?.id).toBe('a');
-    expect(defaultFiscalYear([y('a', 2025), y('b', 2026, true, '2026-10-01T00:00:00Z')], today)?.id).toBe('a');
-    expect(defaultFiscalYear([y('a', 2024), y('b', 2025)], today)).toBeNull();
-    expect(defaultFiscalYear([])).toBeNull();
   });
 });

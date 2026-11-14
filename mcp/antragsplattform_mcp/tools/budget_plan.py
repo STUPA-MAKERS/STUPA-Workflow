@@ -48,6 +48,18 @@ async def set_plan_steps(budget_id: str, steps: list[S.PlanStep]) -> dict:
 
 
 @group.tool
+async def list_budget_years() -> list:
+    """List the pairs of a budget and a fiscal year that a new booking can take.
+
+    A booking, a transfer and the assignment of an application take a cost center
+    only with a fiscal year of this list: not past, not closed, and with a plan in
+    force when the budget has plans. Another year gives 422
+    `fiscal_year_not_choosable`.
+    """
+    return await api().get("/budget-years")
+
+
+@group.tool
 async def get_budget_plan(budget_id: str, fiscal_year_id: str) -> dict:
     """Read the Haushaltsplan of a fiscal year with every version, its steps and lines.
 

@@ -120,7 +120,7 @@ function build(spec: Spec, parent: BudgetTreeNode | null): BudgetTreeNode {
     parentId: parent?.id ?? null,
     gremiumId: null,
     key: spec.key,
-    pathKey: parent ? `${parent.pathKey}-${spec.key}` : spec.key,
+    pathKey: parent ? `${parent.pathKey}${parent.parentId === null ? '-' : ''}${spec.key}` : spec.key,
     name: spec.name,
     currency: 'EUR',
     active: true,

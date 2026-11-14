@@ -22,7 +22,7 @@ _KEY_RE = re.compile(r"[A-Za-z0-9]+")
 _SEP = "-"
 _ZERO = Decimal(0)
 #: Length cap per path segment. It matches `max_length` in the schemas and bounds
-#: the free text in the `path_key` prefix comparisons.
+#: the free text in the `tree_path` prefix comparisons.
 _KEY_MAX = 64
 
 
@@ -34,18 +34,29 @@ def is_valid_key(key: str) -> bool:
     return len(key) <= _KEY_MAX and _KEY_RE.fullmatch(key) is not None
 
 
-def compose_path_key(parent_path: str | None, key: str) -> str:
-    """Compose the path key.
+def compose_tree_path(parent_path: str | None, key: str) -> str:
+    """Compose the tree path, the keys from the top level down with `-` between them.
 
-    A top-level node gets `key`. Any other node gets `<parent_path>-<key>`.
+    A top-level node gets `key`. Any other node gets `<parent_path>-<key>`. The tree
+    path says where a node is in the tree. No person reads it.
     """
     return key if parent_path is None else f"{parent_path}{_SEP}{key}"
+
+
+def path_key_of(tree_path: str) -> str:
+    """Give the path key that a person reads: `VSM-80133` for the tree path `VSM-801-33`.
+
+    The key of the top level, one hyphen, then the keys of each level with nothing
+    between them. The path key of a top-level node is its key.
+    """
+    top, _, below = tree_path.partition(_SEP)
+    return f"{top}{_SEP}{below.replace(_SEP, '')}" if below else top
 
 
 def is_descendant_path(ancestor_path: str, node_path: str) -> bool:
     """Check whether `node_path` lies strictly below `ancestor_path`.
 
-    The check follows the path-prefix convention (`VS` > `VS-800` > `VS-800-04`).
+    The check follows the prefix of the tree path (`VS` > `VS-800` > `VS-800-04`).
     The node itself does NOT count as a descendant.
     """
     return node_path.startswith(ancestor_path + _SEP)
@@ -143,8 +154,8 @@ def rollup_committed(
     amount stays untouched.
 
     Args:
-        node_paths: `(node_id, path_key)` of every tree node.
-        leaf_amounts: `(leaf_path_key, amount)` per bound application.
+        node_paths: `(node_id, tree_path)` of every tree node.
+        leaf_amounts: `(leaf_tree_path, amount)` per bound application.
 
     Returns:
         The bound sum per node id.
@@ -198,6 +209,18 @@ def pick_fiscal_year[T](candidates: Sequence[tuple[T, date, date]], today: date)
             return only
         case _:
             return None
+
+
+def is_choosable_year(
+    end: date, today: date, *, closed: bool, plan_in_force: bool | None
+) -> bool:
+    """Say if a new booking or assignment can take a fiscal year (spec 000879).
+
+    The year must not be closed and must not be past. `plan_in_force` is `None` for a
+    budget without a plan. For a budget with a plan it says if the plan of the year is
+    in force, because money moves only on a decided plan.
+    """
+    return not closed and end >= today and plan_in_force is not False
 
 
 def is_valid_fiscal_start(start_month: int, start_day: int) -> bool:
@@ -279,7 +302,7 @@ def _decision_from[K, G](
     )
 
 
-#: Field order of a node tuple: id, parent_id, gremium_id, key, path_key, name,
+#: Field order of a node tuple: id, parent_id, gremium_id, key, tree_path, name,
 #: currency, active, color, fiscal_start_month, fiscal_start_day, view_gremium_id,
 #: decision_gremium_id.
 NodeTuple = tuple[
@@ -386,7 +409,7 @@ def build_forest(
     fiscal year.
 
     `allocations` holds `(budget_id, fiscal_year_id, allocated)` rows, top-down.
-    `bound_rows` holds `(fiscal_year_id, leaf_path_key, amount)` per bound
+    `bound_rows` holds `(fiscal_year_id, leaf_tree_path, amount)` per bound
     application. `requested_rows`, `expended_rows` and `income_rows` use the same
     shape, one per in-flight application, per actual expense and per income.
     `gremium_id` filters the roots. `None` keeps every root.
@@ -415,7 +438,7 @@ def build_forest(
             "parent_id": parent_id,
             "gremium_id": n_gremium,
             "key": key,
-            "path_key": path,
+            "path_key": path_key_of(path),
             "name": name,
             "currency": currency,
             "active": active,

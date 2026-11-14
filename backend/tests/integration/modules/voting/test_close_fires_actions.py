@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Iterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -41,7 +41,7 @@ from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth.principal import Principal
-from app.modules.budget.tree_models import Budget
+from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.gremien.models import Gremium
@@ -88,6 +88,14 @@ async def _seed(
             secret=b"k",
         )
         session.add_all([app_type, budget, hook])
+        await session.commit()
+        year = datetime.now(UTC).year
+        session.add(
+            FiscalYear(
+                budget_id=budget.id, year=year,
+                start_date=date(year, 1, 1), end_date=date(year, 12, 31),
+            )
+        )
         await session.commit()
         await FormVersionWriter(session).create_form_version(
             app_type.id,

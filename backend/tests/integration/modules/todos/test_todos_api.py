@@ -348,8 +348,8 @@ async def test_votes_gremien_invoices_and_bookings_as_link_targets(
     lead, lead_id = await add_person(maker, "Lena")
     await add_member(maker, gid, lead_id, "todo.write", "vote.manage")
     async with maker() as session:
-        node = Budget(key=f"T{uuid.uuid4().hex[:6]}", path_key="", name="Kultur")
-        node.path_key = node.key
+        key = f"T{uuid.uuid4().hex[:6]}"
+        node = Budget(key=key, path_key=key, name="Kultur")
         session.add(node)
         await session.flush()
         fy = FiscalYear(

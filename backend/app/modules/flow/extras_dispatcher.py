@@ -32,8 +32,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import Budget, FiscalYear
-from app.modules.budget.tree_rules import _SEP, pick_fiscal_year
+from app.modules.budget.tree_rules import _SEP
 from app.modules.flow.context import committee_ids_for_sub
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.vote_gremium import fill_snapshot, in_budget_vote_state
@@ -197,8 +198,8 @@ class FlowExtrasActionDispatcher:
             subtree = (
                 (
                     or_(
-                        Budget.path_key == parent_path,
-                        Budget.path_key.like(parent_path + _SEP + "%"),
+                        Budget.tree_path == parent_path,
+                        Budget.tree_path.like(parent_path + _SEP + "%"),
                     ),
                 )
                 if parent_path is not None
@@ -335,14 +336,15 @@ class FlowExtrasActionDispatcher:
         deciding Gremium of the running vote comes from the current cost center
         (`application.vote_gremium_id`), and when the fiscal year is closed, because a closed
         fiscal year is frozen. The manual route gives 409 in both cases. It sets the current fiscal
-        year (`tree_rules.pick_fiscal_year`) only when it is unambiguous, otherwise it leaves it
-        open. The audit entry
+        year, and it skips the change when the budget has no current year that a booking can
+        take (`BudgetTreeService.choosable_years`, spec 000879). The audit entry
         mirrors `BudgetTreeService`, because every money mutation needs an audit trail.
 
         Returns:
             `True` after the assignment. The caller commits. `False` when the node is
-            missing, the application sits in a closed fiscal year, or the application
-            already has this cost center. Nothing changed in that case.
+            missing, the application sits in a closed fiscal year, the budget has no
+            current fiscal year that a booking can take, or the application already has
+            this cost center. Nothing changed in that case.
         """
         node = await session.get(Budget, budget_id)
         if node is None:
@@ -373,21 +375,22 @@ class FlowExtrasActionDispatcher:
                 node.id,
             )
             return False
-        app.budget_id = node.id
         top = await self._top_level(session, node)
-        open_years = (
-            await session.scalars(
-                select(FiscalYear).where(
-                    FiscalYear.budget_id == top.id,
-                    FiscalYear.active.is_(True),
-                    FiscalYear.closed_at.is_(None),
-                )
-            )
-        ).all()
         today = datetime.now(ZoneInfo(get_settings().local_timezone)).date()
-        picked = pick_fiscal_year([(f.id, f.start_date, f.end_date) for f in open_years], today)
-        if picked is not None:
-            app.fiscal_year_id = picked
+        current = [
+            f.id
+            for f in await BudgetTreeService(session).choosable_years(top)
+            if f.start_date <= today <= f.end_date
+        ]
+        if not current:
+            logger.warning(
+                "assignBudget: budget %s has no current fiscal year that a booking can "
+                "take — skipped",
+                node.id,
+            )
+            return False
+        app.budget_id = node.id
+        app.fiscal_year_id = current[0]
         await audit_record(
             session,
             actor=_FLOW_ACTOR,
@@ -426,10 +429,10 @@ async def _walk_up(session: AsyncSession, node: Budget, seen: frozenset[UUID]) -
 
 
 async def _parent_path(session: AsyncSession, parent_ref: object) -> str | None:
-    """Return the `path_key` of the `parentId` node, or `None` when it does not resolve."""
+    """Return the tree path of the `parentId` node, or `None` when it does not resolve."""
     parent_id = _parse_budget_uuid("assignBudgetFromApplicantGremium parentId", parent_ref)
     return (
-        await session.scalar(select(Budget.path_key).where(Budget.id == parent_id))
+        await session.scalar(select(Budget.tree_path).where(Budget.id == parent_id))
         if parent_id is not None
         else None
     )

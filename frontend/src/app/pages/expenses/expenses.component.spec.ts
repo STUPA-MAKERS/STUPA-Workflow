@@ -531,21 +531,17 @@ describe('ExpensesComponent (unit)', () => {
     cmp.loading.set(false);
   });
 
-  /**
-   * The fiscal-year load resolves child-1 to its top node top-1. Exactly one active fiscal year is
-   * preselected.
-   */
-  it('openCreate resets the dialog and loads fiscal years when a budget is preselected', () => {
+  /** The field of the pair gives the year, so the form asks for no fiscal years itself. */
+  it('openCreate resets the dialog and keeps a preselected budget', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.budgetId.set('child-1');
     cmp.openCreate();
     expect(cmp.createOpen()).toBe(true);
     expect(dlg(cmp).newKind()).toBe('expense');
     expect(dlg(cmp).newBudgetId()).toBe('child-1');
-    const req = http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'));
-    req.flush([FY_ACTIVE]);
-    expect(dlg(cmp).fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
-    expect(dlg(cmp).newFiscalYearId()).toBe('fy-active');
+    expect(dlg(cmp).newFiscalYearId()).toBe('');
+    expect(dlg(cmp).newTopId()).toBe('');
+    http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
   /** The dates stay empty; cost centre, year and every other field come from the booking. */
@@ -576,8 +572,8 @@ describe('ExpensesComponent (unit)', () => {
     expect(d.newPaymentDate()).toBe('');
     expect(d.newInvoiceDate()).toBe('');
     expect(d.newApplicationId()).toBe('');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, FY_OLD]);
     expect(d.newFiscalYearId()).toBe('fy-old');
+    http.expectNone((r) => r.url.includes('/fiscal-years'));
     http.expectNone((r) => r.url.endsWith('/invoices/inv-1'));
   });
 
@@ -616,17 +612,7 @@ describe('ExpensesComponent (unit)', () => {
     expect(dlg(cmp).newKind()).toBe('income');
     expect(dlg(cmp).newApplicationId()).toBe('');
     expect(dlg(cmp).newBudgetId()).toBe('child-1');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE]);
-  });
-
-  /** A late answer for another cost centre does not replace the years of the picked one. */
-  it('loadFiscalYears drops the answer for a cost centre that is no longer picked', () => {
-    const { cmp, http } = build({ tree: ROOT_TREE });
-    dlg(cmp).onPickBudget('child-1');
-    dlg(cmp).newBudgetId.set('');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE]);
-    expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
-    expect(dlg(cmp).newFiscalYearId()).toBe('');
+    http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
   it('openCreate without a preselected budget skips the fiscal-year load', () => {
@@ -634,50 +620,26 @@ describe('ExpensesComponent (unit)', () => {
     cmp.openCreate();
     expect(cmp.createOpen()).toBe(true);
     expect(dlg(cmp).newBudgetId()).toBe('');
-    expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
     http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
-  /** Two active years give no preselection. */
-  it('onPickBudget loads fiscal years; multiple active years are not auto-selected', () => {
+  /** A cost centre keeps the pair, and a pair of another budget drops the cost centre. */
+  it('onPickBudget keeps the pair, and onPickPair drops a cost centre of another budget', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    dlg(cmp).onPickBudget('child-1');
-    expect(dlg(cmp).newBudgetId()).toBe('child-1');
-    const secondActive: FiscalYear = { ...FY_ACTIVE, id: 'fy-2', display: '2026/27' };
-    http
-      .expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'))
-      .flush([FY_ACTIVE, secondActive, FY_OLD]);
-    expect(dlg(cmp).fiscalYearOptions().length).toBe(3);
-    expect(dlg(cmp).newFiscalYearId()).toBe('');
-  });
-
-  it('onPickBudget with empty id clears the fiscal-year selection without a request', () => {
-    const { cmp, http } = build({ tree: ROOT_TREE });
-    dlg(cmp).newFiscalYearId.set('fy-x');
-    dlg(cmp).fiscalYearOptions.set([{ value: 'fy-x', label: 'X' }]);
-    dlg(cmp).onPickBudget('');
-    expect(dlg(cmp).newBudgetId()).toBe('');
-    expect(dlg(cmp).newFiscalYearId()).toBe('');
-    expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
+    const d = dlg(cmp);
+    const pair = { budgetId: 'top-1', budgetName: 'VS', fiscalYearId: 'fy-active', display: '2026', current: true };
+    d.onPickPair(pair);
+    expect(d.newTopId()).toBe('top-1');
+    expect(d.newFiscalYearId()).toBe('fy-active');
+    d.onPickBudget('child-1');
+    expect(d.newBudgetId()).toBe('child-1');
+    expect(d.newFiscalYearId()).toBe('fy-active');
+    d.onPickPair({ ...pair, fiscalYearId: 'fy-next' });
+    expect(d.newBudgetId()).toBe('child-1');
+    d.onPickPair({ ...pair, budgetId: 'top-9', fiscalYearId: 'fy-9' });
+    expect(d.newBudgetId()).toBe('');
+    expect(d.newTopId()).toBe('top-9');
     http.expectNone((r) => r.url.includes('/fiscal-years'));
-  });
-
-  it('loadFiscalYears resets options on error', () => {
-    const { cmp, http } = build({ tree: ROOT_TREE });
-    dlg(cmp).fiscalYearOptions.set([{ value: 'x', label: 'X' }]);
-    dlg(cmp).onPickBudget('child-1');
-    http
-      .expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'))
-      .error(new ProgressEvent('err'));
-    expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
-  });
-
-  /** The top-node lookup returns null, so no request runs and the options stay empty. */
-  it('loadFiscalYears is skipped when the budget id is not in the tree', () => {
-    const { cmp, http } = build({ tree: ROOT_TREE });
-    dlg(cmp).onPickBudget('unknown-id');
-    http.expectNone((r) => r.url.includes('/fiscal-years'));
-    expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
   });
 
   /**
@@ -1176,63 +1138,36 @@ describe('ExpensesComponent (unit)', () => {
     expect(opts.every((o) => typeof o.label === 'string' && o.label.length > 0)).toBe(true);
   });
 
-  it('openTransfer seeds from the selected budget and loads its fiscal years', () => {
+  it('openTransfer seeds the source from the selected budget and asks for no fiscal years', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.budgetId.set('child-1');
     cmp.openTransfer();
     expect(cmp.transferOpen()).toBe(true);
     expect(cmp.tFromId()).toBe('child-1');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE]);
-    expect(dlg(cmp).transferFyOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
-    expect(cmp.tFiscalYearId()).toBe('fy-active');
-  });
-
-  it('openTransfer without a selected budget does not load fiscal years', () => {
-    const { cmp, http } = build({ tree: ROOT_TREE });
-    cmp.openTransfer();
-    expect(cmp.tFromId()).toBe('');
+    expect(cmp.tFiscalYearId()).toBe('');
+    expect(dlg(cmp).tTopId()).toBe('');
     http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
-  it('onTransferFrom reloads fiscal years for the new source budget', () => {
+  /** A transfer stays inside one pair: a leg of another budget goes. */
+  it('onTransferPair sets budget and year and drops the legs of another budget', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    cmp.tFiscalYearId.set('stale');
-    dlg(cmp).onTransferFrom('child-1');
+    const d = dlg(cmp);
+    const pair = { budgetId: 'top-1', budgetName: 'VS', fiscalYearId: 'fy-active', display: '2026', current: true };
+    d.onTransferFrom('child-1');
+    d.tToId.set('top-1');
+    d.onTransferPair(pair);
+    expect(d.tTopId()).toBe('top-1');
+    expect(cmp.tFiscalYearId()).toBe('fy-active');
     expect(cmp.tFromId()).toBe('child-1');
-    expect(cmp.tFiscalYearId()).toBe('');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE]);
-    expect(cmp.tFiscalYearId()).toBe('fy-active');
-  });
-
-  it('onTransferFrom with empty id clears the source without a request', () => {
-    const { cmp, http } = build({ tree: ROOT_TREE });
-    dlg(cmp).onTransferFrom('');
+    expect(d.tToId()).toBe('top-1');
+    d.onTransferPair({ ...pair, budgetId: 'top-9', fiscalYearId: 'fy-9' });
+    expect(cmp.tFromId()).toBe('');
+    expect(d.tToId()).toBe('');
+    expect(cmp.tFiscalYearId()).toBe('fy-9');
+    d.onTransferPair(pair);
     expect(cmp.tFromId()).toBe('');
     http.expectNone((r) => r.url.includes('/fiscal-years'));
-  });
-
-  /**
-   * An unknown budget has no top node, so no request runs. A known budget with an error resets the
-   * options.
-   */
-  it('loadTransferFy is skipped for an unknown budget and resets on error', () => {
-    const { cmp, http } = build({ tree: ROOT_TREE });
-    dlg(cmp).onTransferFrom('ghost');
-    http.expectNone((r) => r.url.includes('/fiscal-years'));
-    dlg(cmp).transferFyOptions.set([{ value: 'x', label: 'X' }]);
-    dlg(cmp).onTransferFrom('child-1');
-    http
-      .expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'))
-      .error(new ProgressEvent('err'));
-    expect(dlg(cmp).transferFyOptions()).toEqual([]);
-  });
-
-  it('loadTransferFy does not auto-select when there is no single active year', () => {
-    const { cmp, http } = build({ tree: ROOT_TREE });
-    dlg(cmp).onTransferFrom('child-1');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_OLD]);
-    expect(dlg(cmp).transferFyOptions().length).toBe(1);
-    expect(cmp.tFiscalYearId()).toBe('');
   });
 
   it('canSubmitTransfer requires distinct budgets, a year, a positive amount and a description', () => {
@@ -3446,19 +3381,6 @@ describe('ExpensesComponent (closed fiscal year)', () => {
   const CLOSED: FiscalYear = { ...FY_OLD, id: 'fy-closed', active: true, closedAt: '2026-03-01T00:00:00Z' };
   const closedText = 'Das Haushaltsjahr ist abgeschlossen.';
 
-  /** The closed year is active too, but only the open one counts for the preselection. */
-  it('offers no closed year for a booking or a transfer', () => {
-    const { cmp, http } = build({ tree: ROOT_TREE });
-    dlg(cmp).onPickBudget('child-1');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, CLOSED]);
-    expect(dlg(cmp).fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
-    expect(dlg(cmp).newFiscalYearId()).toBe('fy-active');
-    dlg(cmp).onTransferFrom('child-1');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, CLOSED]);
-    expect(dlg(cmp).transferFyOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
-    expect(dlg(cmp).tFiscalYearId()).toBe('fy-active');
-  });
-
   /** A frozen booking has no write action in its row menu. */
   it('marks a closed year and freezes its bookings in the detail', () => {
     const booking = { ...EXPENSE, budgetId: 'child-1', fiscalYearId: 'fy-closed' };
@@ -3477,14 +3399,14 @@ describe('ExpensesComponent (closed fiscal year)', () => {
     expect(ids).toContain('duplicate');
   });
 
-  it('duplicates a booking of a closed year into the active open year', () => {
+  /** The field of the pair starts with a year that can be chosen when the year of the copy cannot. */
+  it('duplicates a booking of a closed year with its cost centre and asks for no years', () => {
     const booking = { ...EXPENSE, budgetId: 'child-1', fiscalYearId: 'fy-closed' };
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.openDuplicate(booking);
     expect(dlg(cmp).newBudgetId()).toBe('child-1');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, CLOSED]);
-    expect(dlg(cmp).fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
-    expect(dlg(cmp).newFiscalYearId()).toBe('fy-active');
+    expect(dlg(cmp).newFiscalYearId()).toBe('fy-closed');
+    http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
   it('a reopened year drops out of the closed set on the next load', () => {

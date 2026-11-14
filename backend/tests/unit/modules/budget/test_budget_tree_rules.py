@@ -27,9 +27,17 @@ def test_is_valid_key() -> None:
     assert not r.is_valid_key("A" * (r._KEY_MAX + 1))
 
 
-def test_compose_path_key() -> None:
-    assert r.compose_path_key(None, "VS") == "VS"
-    assert r.compose_path_key("VS-800", "04") == "VS-800-04"
+def test_compose_tree_path() -> None:
+    assert r.compose_tree_path(None, "VS") == "VS"
+    assert r.compose_tree_path("VS", "800") == "VS-800"
+    assert r.compose_tree_path("VS-800", "04") == "VS-800-04"
+
+
+def test_the_path_key_has_one_hyphen() -> None:
+    assert r.path_key_of("VSM") == "VSM"
+    assert r.path_key_of("VSM-801") == "VSM-801"
+    assert r.path_key_of("VSM-801-33") == "VSM-80133"
+    assert r.path_key_of("VSM-8-01-33") == "VSM-80133"
 
 
 def test_descendant_paths() -> None:
@@ -257,3 +265,14 @@ def test_transfer_pair_changed() -> None:
     assert r.transfer_pair_changed(a, b, b, None)
     assert r.transfer_pair_changed(a, b, None, a)
     assert r.transfer_pair_changed(a, b, b, a)
+
+
+def test_a_year_is_choosable_when_it_is_open_not_past_and_decided() -> None:
+    """Rule: §F/finance/budget/000879."""
+    today = date(2026, 11, 14)
+    end = date(2026, 12, 31)
+    assert r.is_choosable_year(end, today, closed=False, plan_in_force=None)
+    assert r.is_choosable_year(today, today, closed=False, plan_in_force=True)
+    assert not r.is_choosable_year(end, today, closed=True, plan_in_force=None)
+    assert not r.is_choosable_year(date(2026, 11, 13), today, closed=False, plan_in_force=None)
+    assert not r.is_choosable_year(end, today, closed=False, plan_in_force=False)

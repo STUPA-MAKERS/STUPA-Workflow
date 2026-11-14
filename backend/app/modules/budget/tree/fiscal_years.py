@@ -15,7 +15,13 @@ from app.modules.budget import tree_rules
 from app.modules.budget.plan_models import BudgetPlan, BudgetPlanVersion
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase
 from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpense, FiscalYear
-from app.modules.budget.tree_schemas import FiscalYearCreate, FiscalYearOut, FiscalYearUpdate
+from app.modules.budget.tree_rules import _SEP
+from app.modules.budget.tree_schemas import (
+    BudgetYearOut,
+    FiscalYearCreate,
+    FiscalYearOut,
+    FiscalYearUpdate,
+)
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
@@ -54,6 +60,48 @@ class FiscalYearOps(BudgetTreeServiceBase):
         return [
             _fy_out(f, top.fiscal_start_month, top.fiscal_start_day)
             for f in await self._fiscal_years_of(top.id)
+        ]
+
+    async def choosable_pairs(self, member_gremium_ids: set[UUID] | None) -> list[BudgetYearOut]:
+        """List each top-level budget with each fiscal year that a booking can take.
+
+        `member_gremium_ids` is `None` for the full view. Otherwise the list holds
+        only the budgets with a cost center that one of the Gremien reads. The order
+        is the budget, then the year (spec 000879).
+        """
+        tops = (
+            await self.session.scalars(
+                select(Budget).where(Budget.parent_id.is_(None)).order_by(Budget.tree_path)
+            )
+        ).all()
+        seen = (
+            None
+            if member_gremium_ids is None
+            else {
+                path.split(_SEP, 1)[0]
+                for path in (
+                    await self.session.scalars(
+                        select(Budget.tree_path).where(
+                            Budget.id.in_(await self.visible_budget_ids(member_gremium_ids))
+                        )
+                    )
+                ).all()
+            }
+        )
+        today = self._today()
+        return [
+            BudgetYearOut(
+                budgetId=top.id,
+                budgetName=top.name,
+                fiscalYearId=fy.id,
+                display=tree_rules.fiscal_year_display(
+                    fy.year, top.fiscal_start_month, top.fiscal_start_day
+                ),
+                current=fy.start_date <= today <= fy.end_date,
+            )
+            for top in tops
+            if seen is None or top.tree_path in seen
+            for fy in await self.choosable_years(top)
         ]
 
     async def _root_of(self, node: Budget) -> Budget:

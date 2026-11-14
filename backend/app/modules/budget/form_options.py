@@ -34,7 +34,7 @@ async def budget_field_options(session: AsyncSession) -> list[FieldOption]:
                 Budget.color,
             )
             .where(Budget.active.is_(True), below_active_only())
-            .order_by(Budget.path_key)
+            .order_by(Budget.tree_path)
         )
     ).all()
     return [
@@ -57,5 +57,5 @@ def below_active_only() -> ColumnElement[bool]:
     """
     above = aliased(Budget)
     return ~exists().where(
-        above.active.is_(False), Budget.path_key.like(above.path_key + _SEP + "%")
+        above.active.is_(False), Budget.tree_path.like(above.tree_path + _SEP + "%")
     )

@@ -910,7 +910,7 @@ class LinkResolver:
                     Budget.path_key.ilike(pattern, escape="\\"),
                 )
             )
-            .order_by(Budget.path_key, Budget.id)
+            .order_by(Budget.tree_path, Budget.id)
             .limit(PER_KIND)
         )
         return list((await self.session.scalars(stmt)).all())

@@ -294,10 +294,10 @@ def test_draft_paths_follow_the_new_key_of_a_parent() -> None:
     parent_of = {top: None, titel: top, child: titel, other: top}
     key_of = {top: "VS", titel: "8", child: "1", other: "1"}
     assert plan_rules.draft_paths(top, "VS", parent_of, key_of, {}) == {
-        titel: "VS-8", child: "VS-8-1", other: "VS-1",
+        titel: "VS-8", child: "VS-81", other: "VS-1",
     }
     assert plan_rules.draft_paths(top, "VS", parent_of, key_of, {titel: "9", child: None}) == {
-        titel: "VS-9", child: "VS-9-1", other: "VS-1",
+        titel: "VS-9", child: "VS-91", other: "VS-1",
     }
 
 
@@ -313,3 +313,16 @@ def test_a_key_is_taken_by_a_sibling_now_or_in_the_draft() -> None:
     assert plan_rules.key_taken(a, "5", parent_of, key_of, {b: "5"})
     assert not plan_rules.key_taken(a, "3", parent_of, key_of, {})
     assert not plan_rules.key_taken(a, "1", parent_of, key_of, {a: "9"})
+
+
+def test_a_draft_must_not_give_two_cost_centres_one_path_key() -> None:
+    """A path key counts as taken when another Kostenstelle has it now or in the draft.
+
+    Rule: §F/finance/budget/000878.
+    """
+    one, two = uuid.uuid4(), uuid.uuid4()
+    now = {one: "VS-81", two: "VS-9"}
+    assert not plan_rules.path_key_clash(now, now)
+    assert not plan_rules.path_key_clash({one: "VS-82", two: "VS-9"}, now)
+    assert plan_rules.path_key_clash({one: "VS-9", two: "VS-91"}, now)
+    assert plan_rules.path_key_clash({one: "VS-7", two: "VS-7"}, now)
