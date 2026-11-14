@@ -1,0 +1,48 @@
+"""The export logo of the branding (spec 000891).
+
+export_logo holds at most one row: the logo of every exported PDF except the
+protocol. The bytes live in the object storage.
+
+Idempotent. A fresh database already has the table from the ``create_all`` baseline
+(0001).
+
+Revision ID: edaeff27b6a4
+Revises: c41d7e9a2b63
+Create Date: 2026-11-14 00:10:00
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+from alembic import op
+
+revision: str = "edaeff27b6a4"
+down_revision: str | None = "c41d7e9a2b63"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+
+def upgrade() -> None:
+    """Create the table."""
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS export_logo (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            created_at timestamptz NOT NULL DEFAULT now(),
+            singleton boolean NOT NULL DEFAULT true,
+            object_key text NOT NULL,
+            file_name text NOT NULL,
+            mime text NOT NULL,
+            size integer NOT NULL,
+            created_by text,
+            CONSTRAINT uq_export_logo_singleton UNIQUE (singleton),
+            CONSTRAINT ck_export_logo_singleton CHECK (singleton)
+        )
+        """
+    )
+
+
+def downgrade() -> None:
+    """Drop the table."""
+    op.execute("DROP TABLE IF EXISTS export_logo")

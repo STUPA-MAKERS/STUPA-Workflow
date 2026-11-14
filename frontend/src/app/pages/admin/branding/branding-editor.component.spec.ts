@@ -73,6 +73,7 @@ async function setupWithStub(
     getSiteConfig: jest.fn(() => of({ ...STUB_CFG, branding: emptyBranding() })),
     saveSiteConfig: jest.fn((b: Branding) => of({ version: 4, branding: b })),
     listConfigRevisions: jest.fn(() => of([])),
+    getExportLogo: jest.fn(() => of(null)),
     ...api,
   };
   const view = await render(BrandingEditorComponent, {
@@ -481,20 +482,52 @@ describe('BrandingEditorComponent', () => {
     expect(c.draft().logos.wordmark.mime).toBe('image/png');
   });
 
-  it('offers the export logo with no built-in logo and takes no ICO for it (spec 000891)', async () => {
-    const { toast, container, fixture } = await setupWithStub({});
+  it('uploads and removes the export logo at once, SVG and PDF too (spec 000891)', async () => {
+    const logo = { fileName: 'logo.svg', mime: 'image/svg+xml', size: 3 };
+    const api = {
+      getExportLogo: jest.fn(() => of(null)),
+      uploadExportLogo: jest.fn(() => of(logo)),
+      deleteExportLogo: jest.fn(() => of(undefined)),
+    };
+    const { toast, container, fixture } = await setupWithStub(api);
     expect(screen.getByRole('button', { name: 'Auswählen: PDF-Exporte' })).toBeInTheDocument();
     expect(screen.getByText('Kein Logo')).toBeInTheDocument();
-    const inputs = container.querySelectorAll<HTMLInputElement>('input[type="file"]');
-    expect(inputs[3].accept).toBe('image/png,image/jpeg,image/webp');
-    await userEvent.upload(inputs[3], new File(['x'], 'logo.ico', { type: 'image/x-icon' }), {
-      applyAccept: false,
-    });
+    const input = container.querySelectorAll<HTMLInputElement>('input[type="file"]')[3];
+    expect(input.accept).toBe('image/png,image/jpeg,image/webp,image/svg+xml,application/pdf');
+    await userEvent.upload(input, new File(['x'], 'logo.ico', { type: 'image/x-icon' }), { applyAccept: false });
     expect(toast.error).toHaveBeenCalledWith('Dateityp nicht erlaubt.');
+    expect(api.uploadExportLogo).not.toHaveBeenCalled();
+    await userEvent.upload(input, new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' }));
+    fixture.detectChanges();
+    expect(api.uploadExportLogo).toHaveBeenCalled();
+    expect(screen.getByText(/logo\.svg/)).toBeInTheDocument();
+    expect(container.querySelector('.br__logos img[src^="data:image/svg"]')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Logo entfernen: PDF-Exporte' }));
+    fixture.detectChanges();
+    expect(api.deleteExportLogo).toHaveBeenCalled();
+    expect(screen.getByText('Kein Logo')).toBeInTheDocument();
+  });
+
+  it('drops a file on the export logo row and keeps going when the read fails', async () => {
+    const api = {
+      getExportLogo: jest.fn(() => throwError(() => new Error('x'))),
+      uploadExportLogo: jest.fn(() => throwError(() => new Error('x'))),
+      deleteExportLogo: jest.fn(() => throwError(() => new Error('x'))),
+    };
+    const { toast, fixture } = await setupWithStub(api);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.onLogoSelected('export', [new File(['raw'], 'logo.png', { type: 'image/png' })]);
-    await waitFor(() => expect(c.draft().logos.export?.filename).toBe('logo.png'));
+    const prevented = jest.fn();
+    c.onExportDragOver({ preventDefault: prevented } as unknown as DragEvent);
+    expect(c.exportDrop()).toBe(true);
+    const big = new File([new Uint8Array(3 * 1024 * 1024)], 'big.pdf', { type: 'application/pdf' });
+    c.onExportDrop({ preventDefault: prevented, dataTransfer: { files: [big] } } as unknown as DragEvent);
+    expect(c.exportDrop()).toBe(false);
+    expect(api.uploadExportLogo).not.toHaveBeenCalled();
+    c.onExportLogoSelected([]);
+    c.onExportLogoSelected([new File(['%PDF'], 'a.pdf', { type: 'application/pdf' })]);
+    c.removeExportLogo();
+    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 
   it('creates the apply info map on first use', async () => {

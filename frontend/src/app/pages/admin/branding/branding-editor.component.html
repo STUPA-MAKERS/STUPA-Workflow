@@ -203,9 +203,9 @@
                       (dragleave)="onDragLeave()"
                       (drop)="onDrop(slot, $event)"
                     >
-                      <app-file-picker #logo [accept]="acceptOf(slot).join(',')" (picked)="onLogoSelected(slot, $event)" />
+                      <app-file-picker #logo [accept]="accept" (picked)="onLogoSelected(slot, $event)" />
                       @if (d.logos[slot]; as asset) {
-                        <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark' || slot === 'export'"><img [src]="asset.url" alt="" /></span>
+                        <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark'"><img [src]="asset.url" alt="" /></span>
                         <span class="br__logoText">
                           <span class="br__logoName">{{ slotLabel(slot) }}</span>
                           <span class="br__logoFile mono">{{ asset.filename }} · {{ size(asset.size) }}</span>
@@ -229,16 +229,10 @@
                           ><app-icon name="trash"
                         /></app-button>
                       } @else {
-                        @if (defaultLogo(slot); as builtIn) {
-                          <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark'"><img [src]="builtIn" alt="" /></span>
-                        } @else {
-                          <span class="br__thumb br__thumb--none"><app-icon name="image" /></span>
-                        }
+                        <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark'"><img [src]="defaultLogo(slot)" alt="" /></span>
                         <span class="br__logoText">
                           <span class="br__logoName">{{ slotLabel(slot) }}</span>
-                          <span class="br__logoFile br__logoFile--default">{{
-                            (slot === 'export' ? 'admin.brand.logo.none' : 'admin.brand.logo.default') | t
-                          }}</span>
+                          <span class="br__logoFile br__logoFile--default">{{ 'admin.brand.logo.default' | t }}</span>
                         </span>
                         <app-button variant="outlined" size="sm" [ariaLabel]="('admin.brand.pick' | t) + ': ' + slotLabel(slot)" (click)="logo.open()">{{
                           'admin.brand.pick' | t
@@ -246,6 +240,52 @@
                       }
                     </li>
                   }
+                  <li
+                    class="br__logo"
+                    [class.br__logo--drop]="exportDrop()"
+                    (dragover)="onExportDragOver($event)"
+                    (dragleave)="exportDrop.set(false)"
+                    (drop)="onExportDrop($event)"
+                  >
+                    <app-file-picker #exportFile [accept]="exportAccept" (picked)="onExportLogoSelected($event)" />
+                    <span class="br__thumb br__thumb--none"><app-icon [name]="exportLogo() ? 'file' : 'image'" /></span>
+                    <span class="br__logoText">
+                      <span class="br__logoName">{{ 'admin.brand.logo.export' | t }}</span>
+                      @if (exportLogo(); as logo) {
+                        <span class="br__logoFile mono">{{ logo.fileName }} · {{ size(logo.size) }}</span>
+                      } @else {
+                        <span class="br__logoFile br__logoFile--default">{{ 'admin.brand.logo.none' | t }}</span>
+                      }
+                    </span>
+                    @if (exportLogo()) {
+                      <app-button
+                        variant="text"
+                        size="sm"
+                        [iconOnly]="true"
+                        [ariaLabel]="('admin.brand.replaceLogo' | t) + ': ' + ('admin.brand.logo.export' | t)"
+                        [title]="'admin.brand.replaceLogo' | t"
+                        (click)="exportFile.open()"
+                        ><app-icon name="upload"
+                      /></app-button>
+                      <app-button
+                        variant="text"
+                        size="sm"
+                        [iconOnly]="true"
+                        [ariaLabel]="('admin.brand.removeLogo' | t) + ': ' + ('admin.brand.logo.export' | t)"
+                        [title]="'admin.brand.removeLogo' | t"
+                        (click)="removeExportLogo()"
+                        ><app-icon name="trash"
+                      /></app-button>
+                    } @else {
+                      <app-button
+                        variant="outlined"
+                        size="sm"
+                        [ariaLabel]="('admin.brand.pick' | t) + ': ' + ('admin.brand.logo.export' | t)"
+                        (click)="exportFile.open()"
+                        >{{ 'admin.brand.pick' | t }}</app-button
+                      >
+                    }
+                  </li>
                 </ul>
               </app-section>
 

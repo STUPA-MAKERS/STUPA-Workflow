@@ -27,7 +27,7 @@ from app.modules.documents.application_markdown import (
     offer_name,
 )
 from app.modules.documents.router import application_pdf_filename
-from app.modules.site_config.export_logo import ExportLogo
+from app.modules.files.export_logo import ExportLogo
 from app.shared.config_schemas import FormFieldDef
 
 
@@ -375,13 +375,14 @@ async def test_the_pdf_carries_the_export_logo(monkeypatch: pytest.MonkeyPatch) 
     """
     logos: list[ExportLogo | None] = [ExportLogo("export-logo.png", b"png"), None]
 
-    async def export_logo(_session: object) -> ExportLogo | None:
+    async def export_logo(_session: object, _storage: object) -> ExportLogo | None:
         return logos.pop(0)
 
     monkeypatch.setattr(documents_service, "active_export_logo", export_logo)
     typst = _RecordingTypst()
     pdfs = documents_service.ApplicationPdfService(
         object(),  # type: ignore[arg-type]
+        storage=None,
         typst=typst,  # type: ignore[arg-type]
         settings=object(),  # type: ignore[arg-type]
     )

@@ -66,6 +66,14 @@ class CdVariantLogoOut(FrozenCamelModel, frozen=True):
     size: int | None = None
 
 
+class ExportLogoOut(FrozenCamelModel, frozen=True):
+    """The export logo of the branding (spec 000891): its name, sniffed type and size."""
+
+    file_name: str = Field(serialization_alias="fileName")
+    mime: str
+    size: int
+
+
 class CdVariantOut(FrozenCamelModel, frozen=True):
     """A CD variant with its logos, ordered by slot and position."""
 

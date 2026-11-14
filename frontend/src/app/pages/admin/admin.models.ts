@@ -1188,8 +1188,7 @@ export interface BackupList {
 /** The literal a restore has to carry. It is a machine token, never translated. */
 export const BACKUP_RESTORE_CONFIRMATION = 'RESTORE';
 
-/** `export` is the logo of every exported PDF except the protocol (spec 000891). */
-export type LogoSlot = 'wordmark' | 'imagemark' | 'favicon' | 'export';
+export type LogoSlot = 'wordmark' | 'imagemark' | 'favicon';
 
 export interface BrandingAsset {
   /** Data URL or server-side asset URL of the image mark. */
@@ -1288,11 +1287,23 @@ export const LOGO_ACCEPT_MIME: readonly string[] = [
   'image/vnd.microsoft.icon',
 ] as const;
 export const LOGO_MAX_SIZE_MB = 2;
-/** The export logo goes to the PDF renderer, which reads no ICO. */
+
+/**
+ * The export logo of every exported PDF except the protocol (spec 000891). Its bytes go
+ * to the PDF renderer only, never to the browser, so SVG and PDF are allowed here, and
+ * the page shows no preview of it.
+ */
+export interface ExportLogo {
+  readonly fileName: string;
+  readonly mime: string;
+  readonly size: number;
+}
 export const EXPORT_LOGO_ACCEPT_MIME: readonly string[] = [
   'image/png',
   'image/jpeg',
   'image/webp',
+  'image/svg+xml',
+  'application/pdf',
 ] as const;
 
 /** Re-export so admin code imports only from `admin.models`. */

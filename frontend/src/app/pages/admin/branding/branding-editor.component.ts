@@ -46,6 +46,7 @@ import {
   type Branding,
   type FooterLink,
   EXPORT_LOGO_ACCEPT_MIME,
+  type ExportLogo,
   LOGO_ACCEPT_MIME,
   LOGO_MAX_SIZE_MB,
   type LogoSlot,
@@ -120,7 +121,13 @@ export class BrandingEditorComponent {
   protected readonly section: BrandingSection =
     inject(ActivatedRoute).snapshot.data['section'] === 'texts' ? 'texts' : 'branding';
 
-  protected readonly logoSlots: readonly LogoSlot[] = ['wordmark', 'imagemark', 'favicon', 'export'];
+  protected readonly accept = LOGO_ACCEPT_MIME.join(',');
+  protected readonly logoSlots: readonly LogoSlot[] = ['wordmark', 'imagemark', 'favicon'];
+  protected readonly exportAccept = EXPORT_LOGO_ACCEPT_MIME.join(',');
+  /** The export logo of the PDFs (spec 000891). It saves at once, not with the draft. */
+  protected readonly exportLogo = signal<ExportLogo | null>(null);
+  /** A file is dragged over the export logo row. */
+  protected readonly exportDrop = signal(false);
   protected readonly freetexts = FREETEXTS;
   protected readonly submittedKinds: readonly SubmittedKind[] = ['internal', 'external'];
 
@@ -167,6 +174,12 @@ export class BrandingEditorComponent {
 
   constructor() {
     this.loadConfig();
+    if (this.section === 'branding') {
+      this.api.getExportLogo().subscribe({
+        next: (logo) => this.exportLogo.set(logo),
+        error: () => this.exportLogo.set(null),
+      });
+    }
     inject(DestroyRef).onDestroy(() => this.brand.previewAccent(undefined));
   }
 
@@ -226,14 +239,8 @@ export class BrandingEditorComponent {
     return formatBytes(bytes, this.i18n.formatLocale());
   }
 
-  /** The image types that a slot takes: the export logo takes no ICO. */
-  protected acceptOf(slot: LogoSlot): readonly string[] {
-    return slot === 'export' ? EXPORT_LOGO_ACCEPT_MIME : LOGO_ACCEPT_MIME;
-  }
-
-  /** The built-in logo of a slot, in the colours of the theme; the export logo has none. */
-  protected defaultLogo(slot: LogoSlot): string | null {
-    if (slot === 'export') return null;
+  /** The built-in logo of a slot, in the colours of the theme. */
+  protected defaultLogo(slot: LogoSlot): string {
     const logo = DEFAULT_LOGOS[slot];
     return typeof logo === 'string' ? logo : logo[this.theme.resolved()];
   }
@@ -341,7 +348,7 @@ export class BrandingEditorComponent {
 
   /** Check the type and the size, then keep the file as a data URL in the draft. */
   private readLogo(slot: LogoSlot, file: File): void {
-    if (!this.acceptOf(slot).includes(file.type)) {
+    if (!LOGO_ACCEPT_MIME.includes(file.type)) {
       this.toast.error(this.i18n.translate('admin.brand.badType'));
       return;
     }
@@ -364,6 +371,52 @@ export class BrandingEditorComponent {
       });
     };
     reader.readAsDataURL(file);
+  }
+
+  protected onExportLogoSelected(files: File[]): void {
+    const file = files[0];
+    if (file) this.uploadExportLogo(file);
+  }
+
+  protected onExportDragOver(event: DragEvent): void {
+    event.preventDefault();
+    this.exportDrop.set(true);
+  }
+
+  protected onExportDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.exportDrop.set(false);
+    const file = event.dataTransfer?.files?.[0];
+    if (file) this.uploadExportLogo(file);
+  }
+
+  /** Check the type and the size, then upload the export logo at once. */
+  private uploadExportLogo(file: File): void {
+    if (!EXPORT_LOGO_ACCEPT_MIME.includes(file.type)) {
+      this.toast.error(this.i18n.translate('admin.brand.badType'));
+      return;
+    }
+    if (file.size > LOGO_MAX_SIZE_MB * 1024 * 1024) {
+      this.toast.error(this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }));
+      return;
+    }
+    this.api.uploadExportLogo(file).subscribe({
+      next: (logo) => {
+        this.exportLogo.set(logo);
+        this.toast.success(this.i18n.translate('admin.common.saved'));
+      },
+      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+    });
+  }
+
+  protected removeExportLogo(): void {
+    this.api.deleteExportLogo().subscribe({
+      next: () => {
+        this.exportLogo.set(null);
+        this.toast.success(this.i18n.translate('admin.common.saved'));
+      },
+      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+    });
   }
 
   protected removeLogo(slot: LogoSlot): void {

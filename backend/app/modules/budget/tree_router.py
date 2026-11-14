@@ -96,8 +96,8 @@ def get_budget_tree_service(
 ) -> BudgetTreeService:
     """Build the budget tree service for an authenticated principal.
 
-    Only the invoice import uses the storage. ``actor`` is the principal ``sub`` for the
-    audit trail of the money mutations.
+    The invoice import and the export logo of a plan PDF use the storage. ``actor`` is
+    the principal ``sub`` for the audit trail of the money mutations.
     """
     storage = getattr(request.app.state, "object_storage", None)
     return BudgetTreeService(session, storage=storage, settings=settings, actor=principal.sub)

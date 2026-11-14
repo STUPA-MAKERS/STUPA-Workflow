@@ -40,17 +40,18 @@ from app.modules.documents.application_markdown import (
     anlage_link,
     build_application_document,
 )
+from app.modules.files.export_logo import (
+    active_export_logo,
+    export_render_assets,
+    export_render_config,
+)
 from app.modules.files.models import Attachment
+from app.modules.files.storage import ObjectStorage
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.gremien.models import Gremium
 from app.modules.media.refs import document_path
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.pdf.typst_client import TypstClient, TypstError
-from app.modules.site_config.export_logo import (
-    active_export_logo,
-    export_render_assets,
-    export_render_config,
-)
 from app.modules.voting.models import Vote
 from app.settings import Settings
 from app.shared.errors import BadRequestError, NotFoundError, ServiceUnavailableError
@@ -130,12 +131,14 @@ class ApplicationPdfService:
 
     Attributes:
         session: The database session of the request.
+        storage: The object storage, for the export logo.
         typst: The client of the render service, or `None` when it is not configured.
         settings: The settings, for the local time zone.
     """
 
     session: AsyncSession
     _: KW_ONLY
+    storage: ObjectStorage | None
     typst: TypstClient | None
     settings: Settings
 
@@ -412,7 +415,7 @@ class ApplicationPdfService:
         """
         if self.typst is None:
             raise ServiceUnavailableError("PDF rendering is not available.")
-        logo = await active_export_logo(self.session)
+        logo = await active_export_logo(self.session, self.storage)
         try:
             return await self.typst.render_pdf(
                 build_application_document(doc),

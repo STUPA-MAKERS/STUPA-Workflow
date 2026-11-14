@@ -18,16 +18,16 @@ from sqlalchemy import select
 
 from app.modules.budget.plan_export import PlanFile
 from app.modules.budget.tree.service import BudgetTreeService
+from app.modules.files.export_logo import (
+    active_export_logo,
+    export_render_assets,
+    export_render_config,
+)
 from app.modules.media.refs import document_path
 from app.modules.media.service import MediaService
 from app.modules.meetings.agenda_service import agenda_order
 from app.modules.meetings.models import MeetingAgendaItem
 from app.modules.pdf.typst_client import TypstError
-from app.modules.site_config.export_logo import (
-    active_export_logo,
-    export_render_assets,
-    export_render_config,
-)
 from app.modules.voting.models import Vote
 from app.shared.errors import BadRequestError, ServiceUnavailableError
 
@@ -57,14 +57,16 @@ async def _vote_ids(session: AsyncSession, item_id: UUID) -> Sequence[UUID]:
     ).all()
 
 
-async def _render(typst: TypstClient, session: AsyncSession, file: PlanFile) -> bytes:
+async def _render(
+    typst: TypstClient, session: AsyncSession, storage: ObjectStorage, file: PlanFile
+) -> bytes:
     """Render the PDF of a plan with the export logo of the branding (spec 000891).
 
     Raises:
         BadRequestError: typst reported a permanent error (400).
         ServiceUnavailableError: typst failed for a short time (503).
     """
-    logo = await active_export_logo(session)
+    logo = await active_export_logo(session, storage)
     try:
         return await typst.render_pdf(
             file.source,
@@ -115,6 +117,6 @@ async def attach_plans(
             version_id, await _vote_ids(session, item.id), today
         )
         if file is not None:
-            pdf = await _render(typst, session, file)
+            pdf = await _render(typst, session, storage, file)
             item.plan_document_id = (await media.add_document(pdf, file.name)).id
     await session.flush()

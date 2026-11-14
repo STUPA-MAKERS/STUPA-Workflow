@@ -1,7 +1,7 @@
 """Config tables of the admin module.
 
-The module owns ``site_config_version`` and the corporate-design tables ``cd_variant``
-with ``cd_variant_logo``.
+The module owns ``site_config_version``, the corporate-design tables ``cd_variant``
+with ``cd_variant_logo``, and ``export_logo``.
 """
 
 from __future__ import annotations
@@ -115,4 +115,28 @@ class SiteConfigVersion(UUIDPkMixin, CreatedAtMixin, Base):
             unique=True,
             postgresql_where=text("active"),
         ),
+    )
+
+
+class ExportLogo(UUIDPkMixin, CreatedAtMixin, Base):
+    """The export logo of the branding: the one logo of every exported PDF (spec 000891).
+
+    The table holds at most one row: ``singleton`` is always true and unique. The bytes
+    live in the object storage under ``object_key``; they reach the render service only,
+    never the browser, so SVG and PDF are allowed. ``mime`` is the sniffed type.
+    ``created_by`` holds the OIDC ``sub`` of the uploader, so it carries no PII.
+    """
+
+    __tablename__ = "export_logo"
+
+    singleton: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    object_key: Mapped[str] = mapped_column(Text)
+    file_name: Mapped[str] = mapped_column(Text)
+    mime: Mapped[str] = mapped_column(Text)
+    size: Mapped[int] = mapped_column(Integer)
+    created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("singleton", name="uq_export_logo_singleton"),
+        CheckConstraint("singleton", name="ck_export_logo_singleton"),
     )

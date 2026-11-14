@@ -30,8 +30,8 @@ from app.modules.budget.plan_schemas import (
     PlanVersionOut,
 )
 from app.modules.budget.tree_router import get_budget_tree_service
+from app.modules.files.export_logo import ExportLogo
 from app.modules.pdf.typst_client import TypstError
-from app.modules.site_config.export_logo import ExportLogo
 from app.shared.xlsx import XLSX_MEDIA_TYPE
 
 _TOP = uuid.uuid4()
@@ -92,6 +92,7 @@ class _FakePlans:
     def __init__(self, *, visible: bool = True) -> None:
         self.calls: list[tuple[str, Any]] = []
         self.session = _Tx()
+        self.storage = None
         self.visible = visible
 
     async def can_view_node(self, budget_id: uuid.UUID, member: object) -> bool:
@@ -514,7 +515,7 @@ def audited(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     async def no_gremien(_service: object, _sub: str) -> set[uuid.UUID]:
         return set()
 
-    async def export_logo(session: _Tx) -> ExportLogo | None:
+    async def export_logo(session: _Tx, _storage: object) -> ExportLogo | None:
         return session.export_logo
 
     monkeypatch.setattr(plan_router, "audit_record", record)

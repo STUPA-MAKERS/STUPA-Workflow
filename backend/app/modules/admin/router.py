@@ -60,6 +60,7 @@ from app.modules.admin.schemas import (
     CdVariantOptionOut,
     CdVariantOut,
     CdVariantUpdate,
+    ExportLogoOut,
     FlowVersionCreate,
     FlowVersionOut,
     GremiumAdminOut,
@@ -105,6 +106,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.service.cd_variants import SquareLogoRef
+from app.modules.admin.service.export_logo import ExportLogoService
 from app.modules.admin.site_config_service import ManifestScheme, SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
 from app.modules.auth.login_settings import LoginSettingsService
@@ -188,7 +190,16 @@ def get_cd_variant_service(
     return CdVariantService(session, storage=storage, settings=settings)
 
 
+def get_export_logo_service(
+    session: DbSession, request: Request, settings: SettingsDep
+) -> ExportLogoService:
+    """Build the export-logo service. Without MinIO the upload and the file answer 503."""
+    storage = getattr(request.app.state, "object_storage", None)
+    return ExportLogoService(session, storage=storage, settings=settings)
+
+
 ServiceDep = Annotated[ConfigService, Depends(get_config_service)]
+ExportLogoServiceDep = Annotated[ExportLogoService, Depends(get_export_logo_service)]
 SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
 GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_service)]
 OidcMappingServiceDep = Annotated[OidcMappingService, Depends(get_oidc_mapping_service)]
@@ -1416,6 +1427,67 @@ async def put_site_config(
     A logo must be an image. Inline SVG is not allowed. An invalid payload gives 422.
     """
     return await service.save(payload, principal.sub)
+
+
+@router.get(
+    "/export-logo",
+    response_model=ExportLogoOut | None,
+    dependencies=[_SITE],
+    responses=_errors(401, 403),
+)
+async def get_export_logo(service: ExportLogoServiceDep) -> ExportLogoOut | None:
+    """Read the export logo of the branding, or `null` when none is set (spec 000891)."""
+    return await service.get()
+
+
+@router.put(
+    "/export-logo",
+    response_model=ExportLogoOut,
+    dependencies=[Depends(_enforce_cd_logo_body)],
+    responses=_errors(401, 403, 413, 415, 422, 503),
+)
+async def put_export_logo(
+    service: ExportLogoServiceDep,
+    principal: SiteAdmin,
+    file: Annotated[UploadFile, File()],
+) -> ExportLogoOut:
+    """Upload the export logo of every exported PDF except the protocol (spec 000891).
+
+    The server decides the type from the magic bytes: PNG, JPEG, WebP, SVG or PDF. SVG
+    and PDF pass, because these bytes reach the render service and never the browser.
+    """
+    data = await file.read()
+    out, replaced_key = await service.upload(data, filename=file.filename, actor=principal.sub)
+    await service.session.commit()
+    await service.remove_object(replaced_key)
+    return out
+
+
+@router.delete("/export-logo", status_code=204, responses=_errors(401, 403, 404))
+async def delete_export_logo(service: ExportLogoServiceDep, principal: SiteAdmin) -> None:
+    """Remove the export logo; the exported PDFs then carry no logo."""
+    key = await service.delete(principal.sub)
+    await service.session.commit()
+    await service.remove_object(key)
+
+
+@router.get(
+    "/export-logo/file",
+    dependencies=[_SITE],
+    responses=_errors(401, 403, 404, 503),
+)
+async def get_export_logo_file(service: ExportLogoServiceDep) -> Response:
+    """Download the export logo, always as an attachment.
+
+    Hardening: the route does not echo the stored type, because a stored SVG would
+    render inline in the app origin and run script.
+    """
+    data, name = await service.file_bytes()
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": content_disposition("attachment", name)},
+    )
 
 
 @router.get(

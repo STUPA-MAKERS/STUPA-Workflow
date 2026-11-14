@@ -51,12 +51,7 @@ MAX_FREETEXT_CHARS = 10_000
 MAX_LABEL_CHARS = 500
 MAX_I18N_KEY_CHARS = 16
 
-#: ``export`` is the logo of every exported PDF except the protocol (spec 000891). The
-#: server hands it to the render service and never shows it.
-LogoSlot = Literal["wordmark", "imagemark", "favicon", "export"]
-
-#: The image types that the render service reads. ICO is not one of them.
-EXPORT_LOGO_MIME: frozenset[str] = frozenset({"image/png", "image/jpeg", "image/webp"})
+LogoSlot = Literal["wordmark", "imagemark", "favicon"]
 
 #: image/vnd.microsoft.icon is an alias of image/x-icon. Normalize it before a comparison.
 _MIME_ALIASES = {"image/vnd.microsoft.icon": "image/x-icon"}
@@ -328,21 +323,6 @@ class Branding(FrozenStrictCamelModel, frozen=True):
             return {k: v for k, v in data.items() if k not in ("footerColumns", "footer_columns")}
         return data
 
-    @field_validator("logos")
-    @classmethod
-    def _export_logo_inline(cls, v: dict[LogoSlot, BrandingAsset]) -> dict[LogoSlot, BrandingAsset]:
-        """Require the export logo as an inline PNG, JPEG or WebP.
-
-        The server sends the bytes of the export logo to the render service, so a URL
-        that the server never fetches cannot be one, and the renderer reads no ICO.
-        """
-        logo = v.get("export")
-        if logo is not None and logo.inline_bytes() is None:
-            raise ValueError("the export logo must be an inline data-URL")
-        if logo is not None and logo.mime not in EXPORT_LOGO_MIME:
-            raise ValueError(f"unsupported export logo mime: {logo.mime!r}")
-        return v
-
     @field_validator("accent_color")
     @classmethod
     def _lower_accent(cls, v: str | None) -> str | None:
@@ -357,8 +337,7 @@ class Branding(FrozenStrictCamelModel, frozen=True):
 class PublicBranding(Branding, frozen=True):
     """The branding of the public ``GET /site-config``.
 
-    The export logo stays out of it, because only the server reads it. The help and
-    ticket settings stay out of it, because ``notifyNew`` and
+    The help and ticket settings stay out of it, because ``notifyNew`` and
     ``retentionMonths`` are not public. The public config names ``help.wikiUrl`` and
     ``tickets.publicEnabled`` on its top level instead. The stored feature switches
     stay out too: the public config names the features that are on, which also follows
@@ -368,9 +347,3 @@ class PublicBranding(Branding, frozen=True):
     help: HelpSettings = Field(default_factory=HelpSettings, exclude=True)
     tickets: TicketSettings = Field(default_factory=TicketSettings, exclude=True)
     features: FeatureSwitches = Field(default_factory=FeatureSwitches, exclude=True)
-
-    @field_validator("logos")
-    @classmethod
-    def _drop_export_logo(cls, v: dict[LogoSlot, BrandingAsset]) -> dict[LogoSlot, BrandingAsset]:
-        """Leave the export logo out, because only the server reads it (spec 000891)."""
-        return {slot: logo for slot, logo in v.items() if slot != "export"}

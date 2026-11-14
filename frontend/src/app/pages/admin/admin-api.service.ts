@@ -44,6 +44,7 @@ import {
   type LoginSettings,
   type AuditPage,
   type Branding,
+  type ExportLogo,
   type CdLogoSlot,
   type CdVariant,
   type CdVariantCreateBody,
@@ -1569,6 +1570,35 @@ export class AdminApiService {
       params,
       responseType: 'blob',
     });
+  }
+
+  /** The mock export logo: the mock keeps no file, only its data. */
+  private mockExportLogo: ExportLogo | null = null;
+
+  /** GET /admin/export-logo — the export logo, or `null` (spec 000891). */
+  getExportLogo(): Observable<ExportLogo | null> {
+    if (this.mock) return of(this.mockExportLogo);
+    return this.http.get<ExportLogo | null>(`${this.base}/admin/export-logo`);
+  }
+
+  /** PUT /admin/export-logo — multipart upload that replaces the export logo. */
+  uploadExportLogo(file: File): Observable<ExportLogo> {
+    if (this.mock) {
+      this.mockExportLogo = { fileName: file.name, mime: file.type, size: file.size };
+      return of(this.mockExportLogo);
+    }
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.put<ExportLogo>(`${this.base}/admin/export-logo`, form);
+  }
+
+  /** DELETE /admin/export-logo — the exports then carry no logo. */
+  deleteExportLogo(): Observable<void> {
+    if (this.mock) {
+      this.mockExportLogo = null;
+      return of(undefined);
+    }
+    return this.http.delete<void>(`${this.base}/admin/export-logo`);
   }
 
   getSiteConfig(): Observable<SiteConfig> {
