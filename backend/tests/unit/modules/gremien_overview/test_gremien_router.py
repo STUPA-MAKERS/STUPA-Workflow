@@ -81,6 +81,7 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> _Calls:
                 next_meeting=None,
                 live=False,
                 quorum_percent=50,
+                quorum_min_present=None,
                 protocols_public=True,
                 allow_vote_delegation=False,
                 logo_url=None,

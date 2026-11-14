@@ -141,6 +141,12 @@ class _Presence:
     seats: Mapping[UUID, int]
 
 
+def _counts_present(vote: Vote) -> bool:
+    """Tell if the quorum of a meeting vote counts the present members."""
+    stored = vote.config if isinstance(vote.config, dict) else {}
+    return vote.meeting_id is not None and stored.get("quorumBasis") == "present"
+
+
 def _quorum_present(vote: Vote, presence: _Presence) -> int | None:
     """Return the present count for the quorum of a meeting vote, or None.
 
@@ -148,8 +154,7 @@ def _quorum_present(vote: Vote, presence: _Presence) -> int | None:
     pool substitutes on a seat. A closed vote takes the members fixed at its close, a
     running vote the present members of its meeting now.
     """
-    stored = vote.config if isinstance(vote.config, dict) else {}
-    if vote.meeting_id is None or stored.get("quorumBasis") != "present":
+    if vote.meeting_id is None or not _counts_present(vote):
         return None
     fixed: int | None = getattr(vote, "present_members", None)
     members = (
@@ -211,8 +216,12 @@ class VoteReadOps(MeetingServiceBase):
             .all()
         )
         present_by_meeting = await self._present_by_meeting(meeting_ids)
+        seat_meetings = sorted(
+            {v.meeting_id for v in rows if v.meeting_id is not None and _counts_present(v)},
+            key=str,
+        )
         presence = _Presence(
-            present_by_meeting, await pool_seat_counts(self.session, meeting_ids)
+            present_by_meeting, await pool_seat_counts(self.session, seat_meetings)
         )
         tallies = await self._vote_tallies(rows, presence)
         elections = await self._election_tallies([v for v in rows if is_election(v)], presence)
@@ -420,9 +429,7 @@ class VoteReadOps(MeetingServiceBase):
         ).all()
         return dict(rows)
 
-    async def _vote_tallies(
-        self, votes: Sequence[Vote], presence: _Presence
-    ) -> dict[UUID, _Tally]:
+    async def _vote_tallies(self, votes: Sequence[Vote], presence: _Presence) -> dict[UUID, _Tally]:
         """Build `{vote_id: (counts, leading, failedReason)}` from the ballots.
 
         This is the reload path. The method loads the ballots from `secret_ballot` in

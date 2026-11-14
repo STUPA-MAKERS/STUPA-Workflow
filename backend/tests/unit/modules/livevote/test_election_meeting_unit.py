@@ -24,6 +24,7 @@ from app.modules.livevote.events import (
 )
 from app.modules.livevote.schemas import MeetingVoteOpenBody
 from app.modules.livevote.service import BrokerPublisher, MeetingService
+from app.modules.livevote.service.votes import _Presence
 from app.modules.voting.schemas import (
     ElectionLotOut,
     ElectionResultOut,
@@ -292,7 +293,7 @@ async def test_votes_for_marks_a_missed_quorum_of_an_election() -> None:
 
 async def test_election_tallies_without_elections() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc._election_tallies([]) == {}
+    assert await svc._election_tallies([], _Presence({}, {})) == {}
 
 
 async def test_ballots_of_gives_an_election_only_cast() -> None:

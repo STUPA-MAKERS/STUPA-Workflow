@@ -3622,6 +3622,12 @@
           "type": "INTEGER"
         },
         {
+          "name": "quorum_min_present",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "protocols_public",
           "nullable": false,
           "primaryKey": false,

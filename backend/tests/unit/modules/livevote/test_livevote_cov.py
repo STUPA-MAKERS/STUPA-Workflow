@@ -58,6 +58,7 @@ from app.modules.livevote.service.paging import (
     _encode_cursor,
     _encode_offset,
 )
+from app.modules.livevote.service.votes import _Presence
 from app.modules.meetings import rules as permissions_mod
 from app.modules.meetings.agenda_service import AgendaService, title_of
 from app.modules.meetings.attendance_service import AttendanceService
@@ -615,7 +616,7 @@ async def test_present_by_meeting_empty() -> None:
 
 async def test_vote_tallies_empty() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc._vote_tallies([]) == {}
+    assert await svc._vote_tallies([], _Presence({}, {})) == {}
 
 
 async def test_votes_for_closed_revealed() -> None:
@@ -748,7 +749,7 @@ async def test_vote_tallies_failed_reason_set() -> None:
     vrow = _vote_row(meeting_id=mid, status="closed", result="rejected", eligible=10)
     sess = _QueueSession(executes=[res((vrow.id, "no"), (vrow.id, "no"))])
     svc = MeetingService(sess)  # type: ignore[arg-type]
-    out = await svc._vote_tallies([vrow])
+    out = await svc._vote_tallies([vrow], _Presence({}, {}))
     counts, _leading, reason = out[vrow.id]
     assert counts == {"yes": 0, "no": 2}
     assert reason in ("quorum", "majority")
@@ -3953,9 +3954,7 @@ async def test_check_draft_open_reads_the_meeting_and_runs_the_checks(
     async def _get(self: Any, meeting_id: UUID, principal: Any = None) -> Any:
         return out
 
-    async def _checks(
-        service: Any, agenda: Any, meeting: Any, vote_id: UUID, *, actor: str
-    ) -> int:
+    async def _checks(service: Any, agenda: Any, meeting: Any, vote_id: UUID, *, actor: str) -> int:
         seen.append((meeting, vote_id, actor))
         return 4
 
