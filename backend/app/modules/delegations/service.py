@@ -30,9 +30,12 @@ The server enforces these invariants:
   gremium-wide entry. The lead can also revoke a
   delegation while the meeting is live. A ballot that the delegate already cast
   stays.
-* Transfer, not duplicate. Each (meeting, recipient) pair carries at most one
-  vote delegation, else 409. The delegator cannot vote in that meeting. See
+* Transfer, not duplicate. A recipient holds at most `delegation_max_per_delegate`
+  delegations of the gremium in one meeting, else 409 `delegate_limit`. A pool seat
+  does not count. The delegator cannot vote in that meeting. See
   `voting_delegation_check`. The audit log records every use.
+* Elections. An election takes the ballot of a delegation only with the gremium
+  switch `delegation_in_elections` (`counted_in`). A pool seat always counts.
 """
 
 from __future__ import annotations
@@ -42,7 +45,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, or_, select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -157,13 +160,44 @@ async def _independently_eligible(
     return await _membership_with_vote_cast(session, principal_id, gremium_id)
 
 
+@dataclass(frozen=True, slots=True)
+class Represented:
+    """One member whose ballot the caller casts: a voting delegation or a pool seat."""
+
+    sub: str
+    principal_id: UUID
+    #: True for a seat that a pool substitute claimed for itself.
+    pool: bool
+
+
+def takes_delegations(vote: object, *, in_elections: bool) -> bool:
+    """Tell whether `vote` takes the ballot of a delegation.
+
+    An election takes it only when the gremium allows it (`delegation_in_elections`).
+    """
+    return getattr(vote, "kind", "motion") != "election" or in_elections
+
+
+def counted_in(
+    vote: object, incoming: tuple[Represented, ...], *, in_elections: bool
+) -> tuple[Represented, ...]:
+    """Return the represented members that a cast in `vote` writes a ballot for.
+
+    A pool seat is a substitution, not a transfer of the voting right, so it counts
+    in every vote. A delegation counts where `takes_delegations` says so.
+    """
+    if takes_delegations(vote, in_elections=in_elections):
+        return incoming
+    return tuple(r for r in incoming if r.pool)
+
+
 async def voting_delegation_check(
     session: AsyncSession,
     sub: str,
     meeting_id: UUID | None,
     eligible_group: str,
     now: datetime,
-) -> tuple[bool, str | None]:
+) -> tuple[bool, tuple[Represented, ...]]:
     """Give the two-sided vote verdict for `sub`.
 
     The verdict is meeting-bound. Only `meeting_delegation` rows of this meeting
@@ -174,24 +208,23 @@ async def voting_delegation_check(
     * An outgoing row with `delegate_voting` blocks the caller. The transfer lets
       only the recipient vote. A pool seat (`pool_seat.py`) does not block: the own
       ballot of the member frees it.
-    * An incoming row with `delegate_voting` returns the `sub` of the delegator.
-      The caller may then cast one delegated ballot next to the own ballot. That
-      ballot runs under `delegator_sub`, so it is a transfer and not a duplicate.
-      The caller can therefore vote even as an external user.
+    * Each incoming row with `delegate_voting` gives one represented member. One cast
+      of the caller writes one ballot under the `sub` of each of them, so it is a
+      transfer and not a duplicate. The caller can therefore vote even as an external
+      user.
 
     `now` keeps the signature equal to the other checks. A delegation is bound to a meeting, not to
     a time.
 
     Returns:
-        The blocked flag and the `sub` of the delegator. The second value is None
-        when the caller holds no incoming voting delegation.
+        The blocked flag and the represented members, oldest delegation first.
     """
     if meeting_id is None:
-        return False, None
+        return False, ()
     try:
         gremium_id = UUID(eligible_group)
     except (ValueError, TypeError):
-        return False, None
+        return False, ()
     pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
     delegator = aliased(PrincipalRow)
     delegate = aliased(PrincipalRow)
@@ -200,11 +233,10 @@ async def voting_delegation_check(
         await session.execute(
             select(
                 is_delegator,
-                and_(
-                    MeetingDelegation.delegate_voting,
-                    or_(~is_delegator, ~pool_seat_clause(delegate)),
-                ),
+                MeetingDelegation.delegate_voting,
+                pool_seat_clause(delegate),
                 delegator.sub,
+                delegator.id,
             )
             .join(
                 delegator,
@@ -219,14 +251,16 @@ async def voting_delegation_check(
                     MeetingDelegation.delegate_principal_id == pid_subq,
                 ),
             )
+            .order_by(MeetingDelegation.created_at, MeetingDelegation.id)
         )
     ).all()
-    blocked = any(is_delegator and voting for is_delegator, voting, _ in rows)
-    delegator_sub = next(
-        (d_sub for is_delegator, voting, d_sub in rows if not is_delegator and voting),
-        None,
+    blocked = any(outgoing and voting and not seat for outgoing, voting, seat, _, _ in rows)
+    incoming = tuple(
+        Represented(sub=d_sub, principal_id=d_id, pool=bool(seat))
+        for outgoing, voting, seat, d_sub, d_id in rows
+        if not outgoing and voting
     )
-    return blocked, delegator_sub
+    return blocked, incoming
 
 
 @dataclass(frozen=True, slots=True)
@@ -432,7 +466,7 @@ class DelegationService:
                 is not eligible, or the delegator may not vote (403).
             NotFoundError: The meeting or the recipient does not exist (404).
             ConflictError: The delegator already delegated for this meeting, or the
-                recipient already carries a delegated vote (409).
+                recipient holds the most delegations of the gremium (409).
             ValidationProblem: The meeting is not planned, the deadline has
                 passed, the delegator picked themselves, or the delegation would
                 build a chain (422).
@@ -600,8 +634,11 @@ class DelegationService:
         is a stable 32-bit derivation of the meeting id.
 
         Raises:
-            ConflictError: The delegator already delegated for this meeting, or the
-                recipient already carries a delegated vote (409).
+            ConflictError: The delegator already delegated for this meeting
+                (``delegation_exists``), or the recipient holds the most delegations of
+                the gremium (``delegate_limit``). A pool delegation does not count for
+                the limit, and a pool substitute carries one delegated vote
+                (``delegate_already_voting``).
             ValidationProblem: The delegation would build a chain (422).
         """
         await lock_meeting_delegations(self.session, meeting.id)
@@ -610,11 +647,13 @@ class DelegationService:
                 select(
                     MeetingDelegation.delegator_principal_id,
                     MeetingDelegation.delegate_principal_id,
+                    MeetingDelegation.via_pool,
                     MeetingDelegation.delegate_voting,
                 ).where(MeetingDelegation.meeting_id == meeting.id)
             )
         ).all()
-        for delegator_id, delegate_id, voting in existing:
+        mine = [(pool, voting) for _, to, pool, voting in existing if to == delegate.id]
+        for delegator_id, delegate_id, _, _ in existing:
             if delegator_id == delegator.id:
                 raise ConflictError(
                     "The member already delegated for this meeting.", code="delegation_exists"
@@ -629,11 +668,17 @@ class DelegationService:
                     "Recipient has delegated their own vote for this meeting.",
                     errors=[{"field": "delegateId", "msg": "no re-delegation chains"}],
                 )
-            if delegate_voting and voting and delegate_id == delegate.id:
-                raise ConflictError(
-                    "Recipient already carries a delegated vote for this meeting.",
-                    code="delegate_already_voting",
-                )
+        if via_pool and delegate_voting and any(voting for _, voting in mine):
+            raise ConflictError(
+                "Recipient already carries a delegated vote for this meeting.",
+                code="delegate_already_voting",
+            )
+        held = sum(1 for pool, _ in mine if not pool)
+        if not via_pool and held >= gremium.delegation_max_per_delegate:
+            raise ConflictError(
+                "Recipient already holds the most delegations of this gremium for the meeting.",
+                code="delegate_limit",
+            )
 
         row = MeetingDelegation(
             meeting_id=meeting.id,
@@ -978,7 +1023,9 @@ class DelegationService:
 
         A pool seat does not block the member. A pool substitute without a voting
         delegation exercises the free seat that its represented ballot would take
-        (`pool_seat_for`), so the ballot shows the proxy row for that member.
+        (`pool_seat_for`), so the ballot names that member. The names are the members
+        that a cast of the caller writes a ballot for (`counted_in`): an election
+        without the gremium switch names only a pool seat.
         """
         vote = await self.session.get(Vote, vote_id)
         if vote is None:
@@ -1007,27 +1054,40 @@ class DelegationService:
                         MeetingDelegation.delegate_principal_id == me.id,
                     ),
                 )
+                .order_by(MeetingDelegation.created_at, MeetingDelegation.id)
             )
         ).all()
-        incoming = [d.delegator_principal_id for d, _ in rows if d.delegator_principal_id != me.id]
+        transfers = takes_delegations(vote, in_elections=False) or bool(
+            await self.session.scalar(
+                select(Gremium.delegation_in_elections).where(Gremium.id == gremium_id)
+            )
+        )
+        incoming = [
+            d.delegator_principal_id
+            for d, seat in rows
+            if d.delegator_principal_id != me.id and (transfers or seat)
+        ]
         outgoing = [
             d.delegate_principal_id
             for d, seat in rows
             if d.delegator_principal_id == me.id and not seat
         ]
+        holds_any = any(d.delegator_principal_id != me.id for d, _ in rows)
         free = (
             None
-            if incoming
+            if holds_any
             else await pool_seat_for(self.session, actor.sub, vote.meeting_id, vote.eligible_group)
         )
         delegated_to = outgoing[-1] if outgoing else None
-        delegated_by = incoming[-1] if incoming else (free.id if free is not None else None)
-        names = await self._names({i for i in (delegated_to, delegated_by) if i})
+        represented = incoming or ([free.id] if free is not None else [])
+        names = await self._names({i for i in (delegated_to, *represented) if i})
+        by_names = [names.get(pid) or "?" for pid in represented]
         return VoteDelegationStatus(
             blocked=bool(outgoing),
             delegated_to_name=names.get(delegated_to) if delegated_to else None,
-            exercising=bool(incoming) or free is not None,
-            delegated_by_name=names.get(delegated_by) if delegated_by else None,
+            exercising=bool(represented),
+            delegated_by_name=", ".join(by_names) if by_names else None,
+            delegated_by_names=by_names,
         )
 
     async def _require_pool_manage(self, gremium_id: UUID, actor: Principal) -> None:

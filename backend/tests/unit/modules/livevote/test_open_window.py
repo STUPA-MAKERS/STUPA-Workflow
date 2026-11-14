@@ -147,7 +147,7 @@ async def test_update_refuses_a_confirm_point_before_the_open() -> None:
 
 
 async def test_gremium_defaults_start_with_the_values_of_the_satzung() -> None:
-    """A missing row gives the defaults 40, 25, off, off and 120.
+    """A missing row gives the defaults 40, 25, off, off, 120 and 2.
 
     §F/administration/admin/000906.
     """
@@ -158,6 +158,7 @@ async def test_gremium_defaults_start_with_the_values_of_the_satzung() -> None:
         "guestsMayVote": False,
         "allowVoteDelegation": False,
         "delegationLeadMinutes": 120,
+        "delegationMaxPerDelegate": 2,
     }
 
 
@@ -181,6 +182,7 @@ async def test_update_gremium_defaults_audits_only_the_change(
         "guestsMayVote": False,
         "allowVoteDelegation": True,
         "delegationLeadMinutes": 120,
+        "delegationMaxPerDelegate": 2,
     }
     row = await MeetingSettingsService(session).update_gremium_defaults(  # type: ignore[arg-type]
         values, actor="adm"

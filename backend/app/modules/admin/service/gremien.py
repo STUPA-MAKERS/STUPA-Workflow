@@ -39,6 +39,8 @@ def _gremium_out(row: Gremium) -> GremiumOut:
         allow_vote_delegation=row.allow_vote_delegation,
         delegation_lead_minutes=row.delegation_lead_minutes,
         delegation_allow_external=row.delegation_allow_external,
+        delegation_max_per_delegate=row.delegation_max_per_delegate,
+        delegation_in_elections=bool(row.delegation_in_elections),
         quorum_percent=row.quorum_percent,
         quorum_min_present=row.quorum_min_present,
         repeat_quorum_percent=row.repeat_quorum_percent,
@@ -64,6 +66,23 @@ def _apply_quorum(row: Gremium, payload: GremiumUpdate) -> None:
     }
     for name, value in writes.items():
         setattr(row, name, value)
+
+
+_DELEGATION_FIELDS = (
+    "allow_vote_delegation",
+    "delegation_lead_minutes",
+    "delegation_allow_external",
+    "delegation_max_per_delegate",
+    "delegation_in_elections",
+)
+
+
+def _apply_delegation(row: Gremium, payload: GremiumUpdate) -> None:
+    """Write the delegation settings that the patch sent. None means "not sent"."""
+    writes = {name: getattr(payload, name) for name in _DELEGATION_FIELDS}
+    for name, value in writes.items():
+        if value is not None:
+            setattr(row, name, value)
 
 
 class GremiumOps(ConfigServiceBase):
@@ -134,6 +153,8 @@ class GremiumOps(ConfigServiceBase):
             allow_vote_delegation=payload.allow_vote_delegation,
             delegation_lead_minutes=payload.delegation_lead_minutes,
             delegation_allow_external=payload.delegation_allow_external,
+            delegation_max_per_delegate=payload.delegation_max_per_delegate,
+            delegation_in_elections=payload.delegation_in_elections,
             quorum_percent=payload.quorum_percent,
             quorum_min_present=payload.quorum_min_present,
             repeat_quorum_percent=payload.repeat_quorum_percent,
@@ -225,12 +246,7 @@ class GremiumOps(ConfigServiceBase):
             row.cd_variant_id = payload.cd_variant_id
         if payload.default_lang is not None:
             row.default_lang = payload.default_lang
-        if payload.allow_vote_delegation is not None:
-            row.allow_vote_delegation = payload.allow_vote_delegation
-        if payload.delegation_lead_minutes is not None:
-            row.delegation_lead_minutes = payload.delegation_lead_minutes
-        if payload.delegation_allow_external is not None:
-            row.delegation_allow_external = payload.delegation_allow_external
+        _apply_delegation(row, payload)
         guests_voted = _guests_vote(row)
         _apply_quorum(row, payload)
         if guests_voted and not _guests_vote(row):

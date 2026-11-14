@@ -214,7 +214,7 @@ export const MOCK_PRINCIPALS: readonly AdminPrincipal[] = [
 export const MOCK_GREMIUM_STUPA_ID = 'g0000000-0000-0000-0000-000000000001';
 
 export const MOCK_GREMIEN: readonly Gremium[] = [
-  { id: MOCK_GREMIUM_STUPA_ID, name: 'Studierendenparlament', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: true, delegationLeadMinutes: 60, delegationAllowExternal: false, quorumPercent: 50 },
+  { id: MOCK_GREMIUM_STUPA_ID, name: 'Studierendenparlament', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: true, delegationLeadMinutes: 60, delegationAllowExternal: false, delegationMaxPerDelegate: 2, delegationInElections: false, quorumPercent: 50 },
   { id: 'g-asta', name: 'AStA', slug: 'asta', cdVariantId: 'cd-asta', defaultLang: 'de', allowVoteDelegation: false, delegationLeadMinutes: 0, delegationAllowExternal: false, quorumPercent: null },
 ];
 
@@ -389,6 +389,7 @@ export const MOCK_GREMIUM_DEFAULTS: GremiumDefaults = {
   guestsMayVote: false,
   allowVoteDelegation: false,
   delegationLeadMinutes: 120,
+  delegationMaxPerDelegate: 2,
 };
 export const MOCK_MEETING_SETTINGS: MeetingSettings = { openLeadMinutes: 60, confirmLeadMinutes: 10 };
 

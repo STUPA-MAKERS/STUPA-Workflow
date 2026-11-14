@@ -36,7 +36,7 @@ async def get_vote(vote_id: str) -> dict:
     Every vote is secret and exposes the counts only. `openedAt` and `closedAt` are the
     real open and end times; `closesAt` is the planned end of the cast window.
     `myBallot.cast` tells whether the caller cast the own ballot (never the choice), and
-    `representedCast` tells whether the caller cast the ballot of a delegator.
+    `representedCast` tells whether every member that the caller represents has a ballot.
 
     A personnel election has `kind: "election"`, the candidates in `election` and,
     after the close, `electionResult` (`counts` per candidate id, `abstentions`,

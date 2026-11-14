@@ -51,7 +51,7 @@ from app.modules.delegations.pool_seat import (
     pool_seat_for,
     release_pool_seat_of,
 )
-from app.modules.delegations.service import voting_delegation_check
+from app.modules.delegations.service import Represented, counted_in, voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService, StagedFire
 from app.modules.meetings.protocol_models import ProtocolVoteRef
@@ -1283,13 +1283,25 @@ class VotingService:
     ) -> BallotAccepted:
         """Cast a vote.
 
-        ``as_delegation=True`` casts the REPRESENTED vote. It runs under the ``sub`` of
-        the delegator. The own vote and the represented vote are two separate ballots.
-        This is a transfer, not a duplicate. The unique constraint on (vote, voter)
-        protects each ballot on its own.
+        One cast counts for the own ballot and for every member that the principal
+        represents: it writes one ballot for the principal and one under the ``sub`` of
+        each delegator, all with the same choice. This is a transfer, not a duplicate.
+        The unique constraint on (vote, voter) protects each ballot on its own, and a
+        represented ballot that is already in stays as it is.
+
+        ``as_delegation=True`` casts the represented ballots alone. It is the cast of a
+        person without an own ballot (an external delegate, a pool substitute) and of a
+        member whose own ballot is already in. While the own ballot is open and the
+        member holds a delegation, it answers 409 ``vote_as_unit``: two casts could
+        differ, and a secret ballot has no link to its voter.
+
+        An election takes the ballot of a delegation only with the gremium switch
+        ``delegation_in_elections``. Without it the own cast writes the own ballot
+        alone, and the represented cast answers 403 ``delegation_not_in_election``. A
+        pool seat counts in every vote.
 
         The row lock serializes this call against ``close``. The status check and the
-        ballot insert share one transaction, so no ballot lands after the tally.
+        ballot inserts share one transaction, so no ballot lands after the tally.
 
         Voting stays human, so a principal with a scope cap gets 403. ``vote.cast`` sits
         in FORBIDDEN_PERMISSIONS, so no OAuth scope carries it. The group keys carry no
@@ -1297,19 +1309,19 @@ class VotingService:
         stands here for both ballots.
 
         The own ballot checks the roster of the vote, because the router gates only the
-        session and external substitutes reach this point. A represented ballot audits
-        the use of the delegation. On a later 409 (double vote) the session dependency
-        rolls back the transaction, and this entry with it. A member who casts the own
-        ballot in a meeting takes part in the meeting, which frees a pool seat of the
-        member (``release_pool_seat_of``).
+        session and external substitutes reach this point. Each represented ballot
+        audits the use of the delegation. A member who casts the own ballot in a meeting
+        takes part in the meeting, which frees a pool seat of the member
+        (``release_pool_seat_of``).
 
-        A pool substitute without a voting delegation claims a free seat with the first
-        represented ballot (``claim_pool_seat``). The claim stores a delegation, so the
+        A pool substitute without a voting delegation claims a free seat with the
+        represented cast (``claim_pool_seat``). The claim stores a delegation, so the
         ballot runs under the ``sub`` of the represented member like any delegated
         ballot, and a refused ballot rolls the claim back.
 
         Raises:
-            ConflictError: 409 - the vote is closed or the voter already voted.
+            ConflictError: 409 - the vote is closed, the voter already voted, or the
+                represented cast must be the own cast (``vote_as_unit``).
             ForbiddenError: 403 - the voter is not eligible for this vote.
             ValidationProblem: 422 - the choice is not a configured option.
         """
@@ -1320,17 +1332,30 @@ class VotingService:
             raise ConflictError("voting window has closed.", code="vote_window_closed")
         if principal.scope_permissions is not None:
             raise ForbiddenError("Only a human session can cast a ballot.")
-        blocked, delegator_sub = await voting_delegation_check(
+        blocked, incoming = await voting_delegation_check(
             self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
         )
-        voter_sub = (
-            await self._represented_voter(principal, vote, delegator_sub)
+        represented = await self._represented_in(vote, incoming)
+        own = None if as_delegation else self._own_voter(principal, vote, blocked=blocked)
+        others = (
+            await self._represented_voters(
+                principal,
+                vote,
+                represented,
+                own_open=await self._own_open(principal, vote, blocked=blocked),
+                refused=len(represented) < len(incoming),
+            )
             if as_delegation
-            else self._own_voter(principal, vote, blocked=blocked)
+            else [r.sub for r in represented]
         )
         config = self._config(vote)
         stored = self._stored_choice(vote, config, choice)
-        if as_delegation:
+        if own is not None and not await self._insert_ballot(vote.id, own, stored):
+            raise ConflictError("Already voted.", code=ALREADY_VOTED)
+        written = [sub for sub in others if await self._insert_ballot(vote.id, sub, stored)]
+        if own is None and not written:
+            raise ConflictError("Already voted.", code=ALREADY_VOTED)
+        for _ in written:
             await audit_record(
                 self.session,
                 actor=principal.sub,
@@ -1339,36 +1364,85 @@ class VotingService:
                 target_id=str(vote.id),
                 data={"eligibleGroup": vote.eligible_group},
             )
-        if vote.meeting_id is not None and not as_delegation:
+        if vote.meeting_id is not None and own is not None:
             from app.modules.meetings.attendance_service import AttendanceService
 
             await release_pool_seat_of(self.session, vote.meeting_id, principal.sub)
             await AttendanceService(self.session).mark_present_on_cast(
                 vote.meeting_id, principal.sub
             )
-        return await self._cast_secret(vote.id, voter_sub, stored)
+        return await self._accept(len(written) + (own is not None))
 
-    async def _represented_voter(
-        self, principal: Principal, vote: Vote, delegator_sub: str | None
-    ) -> str:
-        """Return the ``sub`` that a represented ballot runs under.
+    async def _accept(self, ballots: int) -> BallotAccepted:
+        """Commit the ballots of one cast and build the answer."""
+        await self.session.commit()
+        return BallotAccepted(status="cast", ballots=ballots)
+
+    async def _represented_in(
+        self, vote: Vote, incoming: tuple[Represented, ...]
+    ) -> tuple[Represented, ...]:
+        """Return the represented members that a cast in ``vote`` writes a ballot for.
+
+        An election reads the gremium switch ``delegation_in_elections``
+        (``counted_in``). Every other vote counts all of them without a read.
+        """
+        if not incoming or not election_mod.is_election(vote):
+            return incoming
+        from app.modules.gremien.models import Gremium
+
+        gremium_id = await self._vote_gremium_id(
+            meeting_id=vote.meeting_id, eligible_group=vote.eligible_group
+        )
+        in_elections = gremium_id is not None and await self.session.scalar(
+            select(Gremium.delegation_in_elections).where(Gremium.id == gremium_id)
+        )
+        return counted_in(vote, incoming, in_elections=bool(in_elections))
+
+    async def _own_open(self, principal: Principal, vote: Vote, *, blocked: bool) -> bool:
+        """Tell whether the principal can still cast an own ballot in ``vote``."""
+        return (
+            not blocked
+            and self._may_cast(principal, vote.eligible_group)
+            and not (await self.my_ballot(vote, principal.sub)).cast
+        )
+
+    async def _represented_voters(
+        self,
+        principal: Principal,
+        vote: Vote,
+        represented: tuple[Represented, ...],
+        *,
+        own_open: bool,
+        refused: bool,
+    ) -> list[str]:
+        """Return each ``sub`` that a represented cast writes a ballot under.
 
         Without a voting delegation, a pool substitute claims a free seat
         (``claim_pool_seat``).
 
         Raises:
-            ForbiddenError: 403 - neither a delegation nor a free seat.
+            ConflictError: 409 ``vote_as_unit`` - the own ballot is open, and the own
+                cast counts for the represented members too.
+            ForbiddenError: 403 - neither a delegation nor a free seat, or an election
+                that takes no delegation ballot (``delegation_not_in_election``).
         """
-        represented = (
-            delegator_sub
-            if delegator_sub is not None
-            else await claim_pool_seat(
-                self.session, principal.sub, vote.meeting_id, vote.eligible_group
+        if represented:
+            if own_open:
+                raise ConflictError(
+                    "Cast the own ballot. It counts for the represented members too.",
+                    code="vote_as_unit",
+                )
+            return [r.sub for r in represented]
+        if refused:
+            raise ForbiddenError(
+                "An election takes no delegation ballot.", code="delegation_not_in_election"
             )
+        seat = await claim_pool_seat(
+            self.session, principal.sub, vote.meeting_id, vote.eligible_group
         )
-        if represented is None:
+        if seat is None:
             raise ForbiddenError("No delegated voting right for this ballot.")
-        return represented
+        return [seat]
 
     def _own_voter(self, principal: Principal, vote: Vote, *, blocked: bool) -> str:
         """Return the ``sub`` of an own ballot after the roster check.
@@ -1451,7 +1525,9 @@ class VotingService:
             target_id=str(vote.id),
             data=self._audit_refs(vote),
         )
-        return await self._cast_secret(vote.id, voter_sub, stored)
+        if not await self._insert_ballot(vote.id, voter_sub, stored):
+            raise ConflictError("Already voted.", code=ALREADY_VOTED)
+        return await self._accept(1)
 
     @staticmethod
     def _is_gremium_group(eligible_group: str) -> bool:
@@ -1506,21 +1582,30 @@ class VotingService:
             return False
         if principal.scope_permissions is not None:
             return False
-        blocked, delegator_sub = await voting_delegation_check(
+        blocked, incoming = await voting_delegation_check(
             self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
         )
-        if (
-            not blocked
-            and self._may_cast(principal, vote.eligible_group)
-            and not (await self.my_ballot(vote, principal.sub)).cast
-        ):
+        if await self._own_open(principal, vote, blocked=blocked):
             return True
-        represented = (
-            delegator_sub
-            if delegator_sub is not None
-            else await self._free_seat_sub(principal, vote)
+        if incoming:
+            return not await self._all_cast(vote, await self._represented_in(vote, incoming))
+        seat = await self._free_seat_sub(principal, vote)
+        return seat is not None and not (await self.my_ballot(vote, seat)).cast
+
+    async def _all_cast(self, vote: Vote, represented: tuple[Represented, ...]) -> bool:
+        """Tell whether every represented member has a ballot in ``vote``.
+
+        True without a represented member: nothing is left to cast then.
+        """
+        subs = [r.sub for r in represented]
+        if not subs:
+            return True
+        cast_count = await self.session.scalar(
+            select(func.count())
+            .select_from(VotedMarker)
+            .where(VotedMarker.vote_id == vote.id, VotedMarker.voter_sub.in_(subs))
         )
-        return represented is not None and not (await self.my_ballot(vote, represented)).cast
+        return int(cast_count or 0) >= len(set(subs))
 
     async def _free_seat_sub(self, principal: Principal, vote: Vote) -> str | None:
         """Return the ``sub`` of the pool seat that the principal could claim, or None."""
@@ -1529,15 +1614,14 @@ class VotingService:
         )
         return seat.sub if seat is not None else None
 
-    async def _cast_secret(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
-        """Insert the secret ballot. A second cast of the same voter gives 409.
+    async def _insert_ballot(self, vote_id: UUID, voter_sub: str, choice: str) -> bool:
+        """Insert the secret ballot of one voter. Return False when the voter already voted.
 
         ``voted_marker`` (UNIQUE) is the "has voted" identity anchor. The method writes
         the identity-less ballot only when the marker is new, so no link from choice to
         voter exists. ``ON CONFLICT DO NOTHING`` keeps the first marker, and an empty
-        ``RETURNING`` means the voter already voted. On a conflict nothing was written,
-        so no rollback is needed: the session dependency ``get_session`` ends the
-        transaction on the exception.
+        ``RETURNING`` means the voter already voted. The method does not commit: the
+        ballots of one cast share the transaction of ``cast``.
         """
         marker = (
             pg_insert(VotedMarker)
@@ -1545,12 +1629,10 @@ class VotingService:
             .on_conflict_do_nothing(constraint="uq_voted_marker_vote_voter")
             .returning(VotedMarker.id)
         )
-        inserted = (await self.session.execute(marker)).first()
-        if inserted is None:
-            raise ConflictError("Already voted.", code=ALREADY_VOTED)
+        if (await self.session.execute(marker)).first() is None:
+            return False
         self.session.add(SecretBallot(vote_id=vote_id, choice=choice))
-        await self.session.commit()
-        return BallotAccepted(status="cast")
+        return True
 
     async def assert_can_read(self, vote: Vote, principal: Principal) -> None:
         """Guard read access to a vote (broken object level authorization).
@@ -1629,18 +1711,17 @@ class VotingService:
         return MyBallot(cast=marker is not None)
 
     async def represented_cast(self, vote: Vote, sub: str) -> bool:
-        """Tell whether ``sub`` holds a voting delegation and cast the represented ballot.
+        """Tell whether ``sub`` represents members and all their ballots are in.
 
-        The represented ballot runs under the ``sub`` of the delegator
-        (``voting_delegation_check``). The method returns False without an incoming
-        voting delegation for the meeting of the vote.
+        A represented ballot runs under the ``sub`` of the delegator
+        (``voting_delegation_check``). The method returns False without a represented
+        member that ``vote`` takes a ballot for.
         """
-        _, delegator_sub = await voting_delegation_check(
+        _, incoming = await voting_delegation_check(
             self.session, sub, vote.meeting_id, vote.eligible_group, datetime.now(UTC)
         )
-        if delegator_sub is None:
-            return False
-        return (await self.my_ballot(vote, delegator_sub)).cast
+        represented = await self._represented_in(vote, incoming)
+        return bool(represented) and await self._all_cast(vote, represented)
 
     async def _vote_gremium_id(
         self, *, meeting_id: UUID | None, eligible_group: str

@@ -25,6 +25,7 @@ from app.modules.audit.service import record as audit_record
 from app.modules.meetings.models import (
     DEFAULT_CONFIRM_LEAD_MINUTES,
     DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES,
+    DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE,
     DEFAULT_GREMIUM_QUORUM_PERCENT,
     DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT,
     DEFAULT_OPEN_LEAD_MINUTES,
@@ -43,6 +44,7 @@ GREMIUM_DEFAULT_FIELDS: tuple[tuple[str, str], ...] = (
     ("default_guests_may_vote", "guestsMayVote"),
     ("default_allow_vote_delegation", "allowVoteDelegation"),
     ("default_delegation_lead_minutes", "delegationLeadMinutes"),
+    ("default_delegation_max_per_delegate", "delegationMaxPerDelegate"),
 )
 
 
@@ -73,6 +75,7 @@ def _defaults() -> MeetingSettings:
         default_guests_may_vote=False,
         default_allow_vote_delegation=False,
         default_delegation_lead_minutes=DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES,
+        default_delegation_max_per_delegate=DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE,
     )
 
 

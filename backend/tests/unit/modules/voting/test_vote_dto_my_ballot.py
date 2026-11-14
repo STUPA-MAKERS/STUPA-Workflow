@@ -34,9 +34,7 @@ def test_vote_out_dumps_the_new_fields_in_camel_case() -> None:
         id=uuid4(),
         applicationId=uuid4(),
         eligibleGroup="g",
-        config=VoteConfig.model_validate(
-            {"options": ["yes", "no"], "majorityRule": "two_thirds"}
-        ),
+        config=VoteConfig.model_validate({"options": ["yes", "no"], "majorityRule": "two_thirds"}),
         status="closed",
         secret=True,
         majorityRule="two_thirds",
@@ -91,3 +89,33 @@ async def test_ballots_of_reads_own_marker_and_represented() -> None:
     assert proxied.id not in own
     assert untouched.id not in own
     assert represented == {proxied.id, both.id}
+
+
+async def test_ballots_of_needs_every_delegator_and_the_election_switch() -> None:
+    """Two delegators: the vote is represented when both have a ballot.
+
+    An election counts the delegators only for a Gremium with
+    ``delegation_in_elections`` (§F/meetings/delegations/000910).
+    """
+    meeting, gremium = uuid4(), uuid4()
+    half = _row(meeting_id=meeting, gremium=gremium)
+    full = _row(meeting_id=meeting, gremium=gremium)
+    election = _row(meeting_id=meeting, gremium=gremium)
+    election.kind = "election"
+    markers = res(
+        (half.id, "boss"),
+        (full.id, "boss"),
+        (full.id, "chief"),
+        (election.id, "boss"),
+        (election.id, "chief"),
+    )
+    rows = res((meeting, gremium, "boss"), (meeting, gremium, "chief"))
+    votes = [half, full, election]
+    off = MeetingService(_QueueSession(executes=[rows, markers]))  # type: ignore[arg-type]
+    _, represented = await off._ballots_of("me", votes)  # type: ignore[arg-type]
+    assert represented == {full.id}
+    on = MeetingService(  # type: ignore[arg-type]
+        _QueueSession(executes=[rows, markers], scalars_q=[[gremium]])
+    )
+    _, represented = await on._ballots_of("me", votes)  # type: ignore[arg-type]
+    assert represented == {full.id, election.id}

@@ -230,6 +230,10 @@ export interface Gremium {
   readonly delegationLeadMinutes?: number;
   /** Allow delegation to users outside the gremium & substitute pool. */
   readonly delegationAllowExternal?: boolean;
+  /** The most delegations that one person holds in one meeting. A pool entry does not count. */
+  readonly delegationMaxPerDelegate?: number;
+  /** An election takes the ballot of a delegation. */
+  readonly delegationInElections?: boolean;
   /** Default quorum as a percent of eligible voters who must attend. null = none. */
   readonly quorumPercent?: number | null;
   /** The least number of present persons for the quorum of a meeting vote. null = none. */
@@ -263,6 +267,8 @@ export interface GremiumCreateBody {
   readonly allowVoteDelegation?: boolean;
   readonly delegationLeadMinutes?: number;
   readonly delegationAllowExternal?: boolean;
+  readonly delegationMaxPerDelegate?: number;
+  readonly delegationInElections?: boolean;
   readonly quorumPercent?: number | null;
   /** The least number of present persons for the quorum of a meeting vote. null = none. */
   readonly quorumMinPresent?: number | null;
@@ -282,6 +288,8 @@ export interface GremiumUpdateBody {
   readonly allowVoteDelegation?: boolean;
   readonly delegationLeadMinutes?: number;
   readonly delegationAllowExternal?: boolean;
+  readonly delegationMaxPerDelegate?: number;
+  readonly delegationInElections?: boolean;
   readonly quorumPercent?: number | null;
   /** The least number of present persons for the quorum of a meeting vote. null = none. */
   readonly quorumMinPresent?: number | null;
@@ -1140,6 +1148,7 @@ export interface GremiumDefaults {
   readonly guestsMayVote: boolean;
   readonly allowVoteDelegation: boolean;
   readonly delegationLeadMinutes: number;
+  readonly delegationMaxPerDelegate: number;
 }
 
 /** Upper bound of both {@link MeetingSettings} values (`MAX_LEAD_MINUTES`, one week). */

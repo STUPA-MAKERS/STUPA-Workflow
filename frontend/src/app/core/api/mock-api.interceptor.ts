@@ -361,8 +361,11 @@ function mockBallot(id: string, body: unknown, url: string): Observable<never> |
   const ballots = MOCK_BALLOTS.get(id) ?? {};
   const row = asDelegation ? 'proxy' : 'own';
   if (ballots[row]) return mockProblem(409, 'already_voted', url);
-  MOCK_BALLOTS.set(id, { ...ballots, [row]: choice ?? 'yes' });
-  return { status: 'cast' };
+  const cast = choice ?? 'yes';
+  // One own cast counts for the represented member too (spec 000932).
+  const next = asDelegation ? { ...ballots, proxy: cast } : { own: cast, proxy: ballots.proxy ?? cast };
+  MOCK_BALLOTS.set(id, next);
+  return { status: 'cast', ballots: asDelegation || ballots.proxy ? 1 : 2 };
 }
 
 const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
@@ -1939,7 +1942,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/search')) return ok(mockSearch(req.params.get('q') ?? ''));
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
     if (/\/delegations\/votes\/[^/]+\/status$/.test(p)) {
-      return ok({ blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Erika Beispiel' });
+      return ok({ blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Erika Beispiel', delegatedByNames: ['Erika Beispiel'] });
     }
     if (/\/votes\/[^/]+$/.test(p)) return ok(mockVote(p.split('/').at(-1) ?? MOCK_VOTE.id));
     const dateFrom = req.params.get('dateFrom');

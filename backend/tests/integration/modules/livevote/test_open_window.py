@@ -75,7 +75,7 @@ async def test_gremium_defaults_leave_an_old_gremium(
 ) -> None:
     """Change a default and read an old Gremium.
 
-    §F/administration/admin/000906: the defaults start with 40, 25, off, off and 120. A
+    §F/administration/admin/000906: the defaults start with 40, 25, off, off, 120 and 2. A
     change of a default changes no Gremium that exists.
     """
     with TestClient(api) as client:
@@ -87,6 +87,7 @@ async def test_gremium_defaults_leave_an_old_gremium(
             "guestsMayVote": False,
             "allowVoteDelegation": False,
             "delegationLeadMinutes": 120,
+            "delegationMaxPerDelegate": 2,
         }
         tag = uuid.uuid4().hex[:8]
         old = client.post(
@@ -105,6 +106,7 @@ async def test_gremium_defaults_leave_an_old_gremium(
             "guestsMayVote": True,
             "allowVoteDelegation": True,
             "delegationLeadMinutes": 60,
+            "delegationMaxPerDelegate": 2,
         }
         put = client.put("/api/admin/gremium-defaults", json=changed)
         assert put.status_code == 200, put.text

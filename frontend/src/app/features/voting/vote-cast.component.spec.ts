@@ -307,6 +307,7 @@ describe('VoteCastComponent', () => {
   it('hides only the represented row on a 403 from a represented cast and reads the state again', async () => {
     const { getVote, voteStatus, toast } = await setup({
       castError: { status: 403 },
+      vote: vote({ myBallot: { cast: true, choice: 'yes' } }),
       delegation: { ...NO_DELEGATION, exercising: true, delegatedByName: 'Jonas Weber' },
     });
     getVote.mockClear();
@@ -354,21 +355,40 @@ describe('VoteCastComponent', () => {
     expect(screen.getByText(/an \? übertragen/)).toBeInTheDocument();
   });
 
-  it('offers own and represented rows; the represented one casts with asDelegation', async () => {
+  /** §F/meetings/voting/000932 */
+  it('casts once for the own ballot and the represented members', async () => {
     const { castBallot } = await setup({
+      delegation: {
+        ...NO_DELEGATION,
+        exercising: true,
+        delegatedByName: 'Anna Beispiel, Jonas Weber',
+        delegatedByNames: ['Anna Beispiel', 'Jonas Weber'],
+      },
+    });
+    const unit = within(
+      screen.getByRole('group', { name: 'Deine Stimme, auch für Anna Beispiel, Jonas Weber' }),
+    );
+    expect(screen.queryByRole('group', { name: /Als Vertretung/ })).not.toBeInTheDocument();
+    await userEvent.click(unit.getByRole('button', { name: 'Nein' }));
+    await userEvent.click(confirmButton());
+    expect(castBallot).toHaveBeenCalledTimes(1);
+    expect(castBallot).toHaveBeenCalledWith('v1', 'no', false);
+  });
+
+  it('casts the represented ballot with asDelegation when the own ballot is in', async () => {
+    const { castBallot } = await setup({
+      vote: vote({ myBallot: { cast: true, choice: 'yes' } }),
       delegation: { ...NO_DELEGATION, exercising: true, delegatedByName: 'Jonas Weber' },
     });
     const proxy = within(screen.getByRole('group', { name: 'Als Vertretung für Jonas Weber' }));
     await userEvent.click(proxy.getByRole('button', { name: 'Enthaltung' }));
     await userEvent.click(confirmButton());
     expect(castBallot).toHaveBeenCalledWith('v1', 'abstain', true);
-    await castOwn('Nein');
-    expect(castBallot).toHaveBeenLastCalledWith('v1', 'no', false);
   });
 
   it('names an unknown represented member with a placeholder', async () => {
     await setup({ delegation: { ...NO_DELEGATION, exercising: true } });
-    expect(screen.getByRole('group', { name: 'Als Vertretung für ?' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Deine Stimme, auch für ?' })).toBeInTheDocument();
   });
 
   it('restores the represented lock from representedCast', async () => {

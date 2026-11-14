@@ -261,21 +261,21 @@ describe('MeetingFollowViewComponent', () => {
     });
 
     /** Step 1 picks, and step 2 casts the own ballot over REST. */
-    it('shows the open vote with the two-step ballot of the own row and the represented row', async () => {
+    it('shows the open vote with the two-step ballot that counts for the represented member too', async () => {
       const open = vote({ id: 'v-1', agendaItemId: 't-2', voted: 14, present: 19 });
       const { context, voteReads, http } = await setup({ meeting: member({ votes: [open] }) });
       context();
       voteReads(rest(), { blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Jonas Weber' });
       const side = screen.getByRole('complementary', { name: 'Teilnahme' });
       expect(within(side).getByText('Abstimmung offen')).toBeInTheDocument();
-      expect(within(side).getByRole('group', { name: 'Deine Stimme' })).toBeInTheDocument();
-      expect(within(side).getByRole('group', { name: 'Als Vertretung für Jonas Weber' })).toBeInTheDocument();
+      const unit = within(side).getByRole('group', { name: 'Deine Stimme, auch für Jonas Weber' });
+      expect(within(side).queryByRole('group', { name: /Als Vertretung/ })).toBeNull();
       expect(within(side).getByText('14 von 19 Anwesenden haben abgestimmt')).toBeInTheDocument();
       const dock = screen.getByRole('contentinfo', { name: 'Stand der Sitzung' });
       expect(within(dock).getByText(/Deine Stimme/)).toBeInTheDocument();
       expect(within(dock).getByText('offen')).toBeInTheDocument();
       expect(within(dock).getByText('Vertretung: noch offen')).toBeInTheDocument();
-      await userEvent.click(within(within(side).getByRole('group', { name: 'Deine Stimme' })).getByRole('button', { name: 'Ja' }));
+      await userEvent.click(within(unit).getByRole('button', { name: 'Ja' }));
       await userEvent.click(within(side).getByRole('button', { name: 'Stimme abgeben: Ja' }));
       const cast = http.expectOne('/api/votes/v-1/ballot');
       expect(cast.request.body).toEqual({ choice: 'yes', asDelegation: false });

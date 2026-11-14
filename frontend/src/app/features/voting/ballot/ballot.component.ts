@@ -38,8 +38,9 @@ import {
   pollOptionLabel,
 } from '../poll.util';
 
-/** The two ballots a person can hold in one vote: the own one, and the one of a member
- *  they represent. The server keeps them apart. */
+/** The two rows a ballot can show: the own one, and the one of the members that a person
+ *  without an open own ballot represents. One cast of the own row counts for the
+ *  represented members too (spec 000932). */
 export type BallotRow = 'own' | 'proxy';
 
 /** The answers of a date poll ballot, one per date. */
@@ -97,9 +98,10 @@ function castBallot(choice: BallotPick | null): MyBallot {
  * change afterwards. Nothing here offers a change: once the server accepted the
  * ballot, the row locks and says "Danke! Deine Stimme: Ja".
  *
- * - A person who represents a member gets a second row "Als Vertretung für <name>". It
- *   casts with `asDelegation`, apart from the own ballot. The button acts on the row of
- *   the last pick.
+ * - A person who represents members casts once: the own row says "Deine Stimme, auch für
+ *   <names>", and the server writes one ballot for each of them. A person without an own
+ *   ballot (an external or a pool substitute), or one whose own ballot was in before the
+ *   delegation came, gets the row "Als Vertretung für <names>" (`asDelegation`).
  * - A secret vote never shows the choice after the cast, only that the ballot is in.
  * - The button is off while a cast runs, so a double click sends one ballot.
  * - A 409 `already_voted` (another tab, the meeting page) locks the row as well.
@@ -146,7 +148,7 @@ export class BallotComponent {
   /** The own ballot as the server knows it (`myBallot`). `null`: no own row, because
    *  the person may not cast an own ballot (no right, or handed over). */
   readonly own = input<MyBallot | null>(NOT_CAST);
-  /** The name of the member the person represents. Without it there is no second row. */
+  /** The names of the members the person represents, joined. `null`: nobody. */
   readonly proxyName = input<string | null>(null);
   /** The represented ballot as the server knows it (`representedCast`). */
   readonly proxyCast = input(false);
@@ -215,15 +217,31 @@ export class BallotComponent {
     const own = this.own();
     return own === null ? null : (this.local().own ?? own);
   });
+  /**
+   * The own row counts for the represented members too: one cast, one choice. The server
+   * state must agree for it, both ballots open or both in. When only one of them is in
+   * (a delegation that came after the own ballot), the represented row stays apart.
+   */
+  protected readonly unit = computed(() => {
+    const own = this.own();
+    if (own === null || !this.proxyName()) return false;
+    return this.local().own !== null || own.cast === this.proxyCast();
+  });
   protected readonly proxyState = computed<MyBallot | null>(() => {
-    if (!this.proxyName()) return null;
+    if (!this.proxyName() || this.unit()) return null;
     return this.local().proxy ?? (this.proxyCast() ? { cast: true, choice: null } : NOT_CAST);
   });
 
-  /** Name the rows when a proxy row exists, and always on a phone (board). A lone own
-   *  row needs no name. */
+  /** Name the rows when the person represents somebody, and always on a phone (board).
+   *  A lone own row needs no name. */
   protected readonly named = computed(
-    () => this.layout() === 'phone' || this.compact() || this.proxyState() !== null,
+    () => this.layout() === 'phone' || this.compact() || !!this.proxyName(),
+  );
+  /** "Deine Stimme", or "Deine Stimme, auch für Anna, Ben" for the one cast. */
+  protected readonly ownHeading = computed(() =>
+    this.unit()
+      ? this.i18n.translate('voting.ballot.ownWith', { name: this.proxyName() ?? '' })
+      : this.i18n.translate('voting.ballot.own'),
   );
 
   /** The row the button acts on now, or `null` when every row is cast. */

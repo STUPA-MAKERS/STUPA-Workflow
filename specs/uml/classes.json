@@ -3616,6 +3616,18 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "delegation_max_per_delegate",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "delegation_in_elections",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "quorum_percent",
           "nullable": true,
           "primaryKey": false,
@@ -4740,6 +4752,12 @@
         },
         {
           "name": "default_delegation_lead_minutes",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "default_delegation_max_per_delegate",
           "nullable": false,
           "primaryKey": false,
           "type": "INTEGER"

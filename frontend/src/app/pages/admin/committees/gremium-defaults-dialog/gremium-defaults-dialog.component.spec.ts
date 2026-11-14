@@ -12,6 +12,7 @@ const DEFAULTS: GremiumDefaults = {
   guestsMayVote: false,
   allowVoteDelegation: false,
   delegationLeadMinutes: 120,
+  delegationMaxPerDelegate: 2,
 };
 
 function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
@@ -62,6 +63,10 @@ describe('GremiumDefaultsDialogComponent', () => {
     const lead = screen.getByRole('spinbutton', { name: 'Vorlauf für Delegationen (Minuten)' });
     await userEvent.clear(lead);
     await userEvent.type(lead, '90');
+    const most = screen.getByRole('spinbutton', { name: 'Höchstzahl Delegationen je Person' });
+    expect(most).toHaveValue(2);
+    await userEvent.clear(most);
+    await userEvent.type(most, '3');
     await userEvent.click(screen.getByRole('switch', { name: 'Gäste dürfen abstimmen' }));
     await userEvent.click(screen.getByRole('switch', { name: 'Stimm-Delegation erlauben' }));
     await userEvent.click(saveButton());
@@ -71,6 +76,7 @@ describe('GremiumDefaultsDialogComponent', () => {
       guestsMayVote: true,
       allowVoteDelegation: true,
       delegationLeadMinutes: 90,
+      delegationMaxPerDelegate: 3,
     });
     expect(toasts()).toContain('Vorgaben gespeichert.');
     expect(closed).toHaveBeenCalled();
@@ -84,6 +90,12 @@ describe('GremiumDefaultsDialogComponent', () => {
     expect(cmp.form().delegationLeadMinutes).toBe(0);
     cmp.patchLead(999999);
     expect(cmp.form().delegationLeadMinutes).toBe(43200);
+    cmp.patchMax('');
+    expect(cmp.form().delegationMaxPerDelegate).toBe(2);
+    cmp.patchMax(0);
+    expect(cmp.form().delegationMaxPerDelegate).toBe(1);
+    cmp.patchMax(99);
+    expect(cmp.form().delegationMaxPerDelegate).toBe(20);
     cmp.patchPercent('quorumPercent', 'abc');
     expect(cmp.form().quorumPercent).toBeNull();
   });

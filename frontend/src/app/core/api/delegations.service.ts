@@ -80,7 +80,10 @@ export interface VoteDelegationStatus {
   readonly blocked: boolean;
   readonly delegatedToName: string | null;
   readonly exercising: boolean;
+  /** The names of the represented members, joined with ", ". */
   readonly delegatedByName: string | null;
+  /** The represented members, oldest delegation first. One cast counts for each. */
+  readonly delegatedByNames?: readonly string[];
 }
 
 /** Substitute-pool entry (GET/POST /delegations/substitutes). */

@@ -181,6 +181,8 @@ def gremium_row(**kw: Any) -> Any:
         "allow_vote_delegation": False,
         "delegation_lead_minutes": 0,
         "delegation_allow_external": False,
+        "delegation_max_per_delegate": 2,
+        "delegation_in_elections": False,
         "quorum_percent": None,
         "quorum_min_present": None,
         "repeat_quorum_percent": None,
@@ -386,6 +388,21 @@ async def test_update_gremium_takes_the_ballot_from_guests() -> None:
     s, session = svc([*audit_results()], gets=[row])
     await s.update_gremium(row.id, GremiumUpdate(name="Bleibt offen"), "admin")
     assert not any("UPDATE meeting" in str(stmt) for stmt in session.statements)
+
+
+async def test_update_gremium_sets_the_delegation_limit_and_the_election_switch() -> None:
+    """§F/meetings/delegations/000909, §F/meetings/delegations/000910."""
+    row = gremium_row()
+    s, _ = svc([*audit_results()], gets=[row])
+    out = await s.update_gremium(
+        row.id, GremiumUpdate(delegationMaxPerDelegate=3, delegationInElections=True), "admin"
+    )
+    assert (out.delegation_max_per_delegate, out.delegation_in_elections) == (3, True)
+    assert (row.delegation_max_per_delegate, row.delegation_in_elections) == (3, True)
+    with pytest.raises(ValueError, match="delegationMaxPerDelegate"):
+        GremiumUpdate(delegationMaxPerDelegate=0)
+    with pytest.raises(ValueError, match="delegationMaxPerDelegate"):
+        GremiumUpdate(delegationMaxPerDelegate=21)
 
 
 async def test_update_gremium_noop_keeps_values() -> None:

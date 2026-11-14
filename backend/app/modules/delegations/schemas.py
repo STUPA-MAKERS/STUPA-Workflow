@@ -122,4 +122,9 @@ class VoteDelegationStatus(FrozenCamelModel, frozen=True):
     delegated_to_name: str | None = Field(default=None, serialization_alias="delegatedToName")
     #: True when the caller casts a delegated vote. The UI shows an "as substitute" badge.
     exercising: bool
+    #: The names of the represented members, joined with ", ". None without one.
     delegated_by_name: str | None = Field(default=None, serialization_alias="delegatedByName")
+    #: The represented members, oldest delegation first. One cast counts for all.
+    delegated_by_names: list[str] = Field(
+        default_factory=list, serialization_alias="delegatedByNames"
+    )

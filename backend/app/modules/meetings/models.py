@@ -334,6 +334,7 @@ MAX_LEAD_MINUTES = 10080
 DEFAULT_GREMIUM_QUORUM_PERCENT = 40
 DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT = 25
 DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES = 120
+DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE = 2
 
 
 class MeetingSettings(Base):
@@ -381,6 +382,11 @@ class MeetingSettings(Base):
         Integer,
         server_default=str(DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES),
         default=DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES,
+    )
+    default_delegation_max_per_delegate: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE),
+        default=DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE,
     )
     updated_at: Mapped[_datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

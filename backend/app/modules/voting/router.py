@@ -275,6 +275,12 @@ async def cast_ballot(
     gremium of the vote. The service holds the authorization: it checks the roster of
     the vote for the own ballot and a delegation row for the represented ballot. Both
     need a human session.
+
+    One cast counts for the own ballot and for each member that the caller represents
+    with a voting delegation, and ``ballots`` gives their number. ``asDelegation`` is
+    the cast of a person without an open own ballot. With an open own ballot it
+    answers 409 ``vote_as_unit``. An election takes the delegation ballots only with
+    the gremium switch ``delegationInElections`` (403 ``delegation_not_in_election``).
     """
     accepted = await service.cast(
         vote_id,
@@ -368,7 +374,7 @@ async def get_vote(
     gremien get 403, so there is no cross-tenant read. ``canManage`` and ``canCast``
     tell what the caller may do with the vote. ``myBallot`` holds the own ballot of the
     caller (a secret vote gives only ``cast``), and ``representedCast`` tells whether
-    the caller cast the ballot of a delegator. ``openedAt`` and ``closedAt`` are the real
+    the caller cast the ballot of every delegator. ``openedAt`` and ``closedAt`` are the real
     open and end times. ``closesAt`` is the planned end of the cast window.
     """
     return await service.get_scoped(vote_id, principal)
