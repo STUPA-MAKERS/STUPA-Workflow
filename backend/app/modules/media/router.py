@@ -67,8 +67,7 @@ _PRIVATE_CACHE = "private, max-age=31536000, immutable"
 #: PDF viewers of Firefox and Chromium still render with it. The same headers as the
 #: inline preview of an attachment PDF.
 DOCUMENT_PREVIEW_CSP = (
-    "default-src 'none'; frame-ancestors 'self'; base-uri 'none'; "
-    "form-action 'none'; sandbox"
+    "default-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox"
 )
 
 #: The OAuth scopes whose texts take images: protocol TOPs, to-do cards and their

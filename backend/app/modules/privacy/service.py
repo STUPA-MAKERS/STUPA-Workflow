@@ -577,9 +577,7 @@ class AuskunftService:
             for t in trows
         ]
         ticket_files = await self._ticket_attachments(trows) if trows else []
-        ticket_notes = (
-            await self._ticket_notes(principal_row) if principal_row is not None else []
-        )
+        ticket_notes = await self._ticket_notes(principal_row) if principal_row is not None else []
         todos = await todo_export(
             self.session, [principal_row.id] if principal_row is not None else []
         )

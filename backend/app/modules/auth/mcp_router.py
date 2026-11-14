@@ -118,6 +118,7 @@ def mcp_package(
     base = settings.public_base_url.rstrip("/")
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+
         def _filter(info: tarfile.TarInfo) -> tarfile.TarInfo | None:
             parts = set(Path(info.name).parts)
             return None if parts & _EXCLUDE else info
@@ -127,16 +128,12 @@ def mcp_package(
             '"""Auto-generated at download — pins this package to its source platform."""\n'
             f"BASE_URL = {json.dumps(base)}\n"
         ).encode()
-        baked_info = tarfile.TarInfo(
-            "antragsplattform-mcp/antragsplattform_mcp/_baked.py"
-        )
+        baked_info = tarfile.TarInfo("antragsplattform-mcp/antragsplattform_mcp/_baked.py")
         baked_info.size = len(baked)
         tar.addfile(baked_info, io.BytesIO(baked))
     buf.seek(0)
     return StreamingResponse(
         buf,
         media_type="application/gzip",
-        headers={
-            "Content-Disposition": 'attachment; filename="antragsplattform-mcp.tar.gz"'
-        },
+        headers={"Content-Disposition": 'attachment; filename="antragsplattform-mcp.tar.gz"'},
     )

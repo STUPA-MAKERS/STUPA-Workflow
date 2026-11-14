@@ -3,6 +3,8 @@
 * ``GET/PUT /admin/meeting-settings`` reads the seeded defaults (60 and 10 minutes),
   replaces them, refuses a confirmation point before the earliest open (422) and
   writes a ``config_change`` entry.
+* ``GET/PUT /admin/gremium-defaults`` reads the defaults of a new Gremium and replaces
+  them. A Gremium that exists keeps its values (§F/administration/admin/000906).
 * ``PATCH /meetings/{id}`` with ``status: live`` gives 409 ``meeting_too_early``
   before the window and 409 ``early_open_unconfirmed`` in the early part without
   ``confirmEarly``. The planned meeting carries ``opensAt`` and ``confirmUntil``.
@@ -10,6 +12,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -65,6 +68,58 @@ async def test_settings_defaults_update_and_audit(
         "openLeadMinutes": {"from": 60, "to": 120},
         "confirmLeadMinutes": {"from": 10, "to": 30},
     }
+
+
+async def test_gremium_defaults_leave_an_old_gremium(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """Change a default and read an old Gremium.
+
+    §F/administration/admin/000906: the defaults start with 40, 25, off, off and 120. A
+    change of a default changes no Gremium that exists.
+    """
+    with TestClient(api) as client:
+        got = client.get("/api/admin/gremium-defaults")
+        assert got.status_code == 200, got.text
+        assert got.json() == {
+            "quorumPercent": 40,
+            "repeatQuorumPercent": 25,
+            "guestsMayVote": False,
+            "allowVoteDelegation": False,
+            "delegationLeadMinutes": 120,
+        }
+        tag = uuid.uuid4().hex[:8]
+        old = client.post(
+            "/api/admin/committees",
+            json={
+                "name": f"Alt {tag}",
+                "slug": f"alt-{tag}",
+                "quorumPercent": 40,
+                "repeatQuorumPercent": 25,
+            },
+        )
+        assert old.status_code in (200, 201), old.text
+        changed = {
+            "quorumPercent": 50,
+            "repeatQuorumPercent": 30,
+            "guestsMayVote": True,
+            "allowVoteDelegation": True,
+            "delegationLeadMinutes": 60,
+        }
+        put = client.put("/api/admin/gremium-defaults", json=changed)
+        assert put.status_code == 200, put.text
+        assert put.json() == changed
+        assert client.get("/api/admin/gremium-defaults").json() == changed
+        bad = client.put("/api/admin/gremium-defaults", json={**changed, "quorumPercent": 101})
+        assert bad.status_code == 422, bad.text
+        rows = client.get("/api/admin/committees").json()
+        [row] = [g for g in rows if g["id"] == old.json()["id"]]
+        assert (row["quorumPercent"], row["repeatQuorumPercent"]) == (40, 25)
+        assert row["guestsMayVote"] is False and row["allowVoteDelegation"] is False
+        settings = client.get("/api/admin/meeting-settings").json()
+        assert settings["openLeadMinutes"] == 60
+    entries = [e for e in await audit_actions(maker) if e.target_type == "meeting_settings"]
+    assert entries[-1].data["gremiumDefaults"]["quorumPercent"] == {"from": 40, "to": 50}
 
 
 async def test_open_before_the_window_conflicts(

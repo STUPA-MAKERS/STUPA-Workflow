@@ -71,12 +71,14 @@ STATUS_TITLE_MAP: dict[int, str] = {
 
 class FieldError(FrozenModel, frozen=True):
     """Validation error of one field in a problem response."""
+
     field: str
     msg: str
 
 
 class ProblemDetail(FrozenModel, frozen=True):
     """Error body of every 4xx and 5xx response (RFC 9457 problem+json)."""
+
     type: str
     title: str
     status: int
@@ -146,36 +148,43 @@ class AppError(Exception):
 
 class BadRequestError(AppError):
     """400 - malformed request."""
+
     status = 400
 
 
 class UnauthorizedError(AppError):
     """401 - no valid login."""
+
     status = 401
 
 
 class ForbiddenError(AppError):
     """403 - the caller lacks the right."""
+
     status = 403
 
 
 class NotFoundError(AppError):
     """404 - unknown or not readable resource."""
+
     status = 404
 
 
 class ConflictError(AppError):
     """409 - conflict with the current state."""
+
     status = 409
 
 
 class GoneError(AppError):
     """410 - the resource no longer exists."""
+
     status = 410
 
 
 class PayloadTooLargeError(AppError):
     """413 - the body exceeds its cap."""
+
     status = 413
 
 
@@ -205,9 +214,7 @@ class RateLimitedError(AppError):
         title: str | None = None,
     ) -> None:
         """Build the error; a ``retry_after`` in seconds sets the ``Retry-After`` header."""
-        headers = (
-            {"Retry-After": str(max(0, retry_after))} if retry_after is not None else None
-        )
+        headers = {"Retry-After": str(max(0, retry_after))} if retry_after is not None else None
         super().__init__(detail, code=code, title=title, headers=headers)
 
 
@@ -254,19 +261,14 @@ def _validation_problem(
     return _problem_response(problem)
 
 
-async def _validation_handler(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+async def _validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     errors = tuple(
-        FieldError(field=".".join(str(p) for p in e["loc"]), msg=e["msg"])
-        for e in exc.errors()
+        FieldError(field=".".join(str(p) for p in e["loc"]), msg=e["msg"]) for e in exc.errors()
     )
     return _validation_problem(request, detail="Request validation failed.", errors=errors)
 
 
-async def _http_exception_handler(
-    request: Request, exc: StarletteHTTPException
-) -> JSONResponse:
+async def _http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     """Map an HTTPException onto problem+json.
 
     A body-parse error (see ``_BODY_PARSE_ERROR_DETAILS``) becomes 422 instead of the
@@ -315,11 +317,7 @@ async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
         detail="An internal error occurred.",
         traceId=_trace_id(request),
     )
-    extra = (
-        {"X-Robots-Tag": "noindex"}
-        if request.url.path.startswith(PUBLIC_API_PREFIX)
-        else None
-    )
+    extra = {"X-Robots-Tag": "noindex"} if request.url.path.startswith(PUBLIC_API_PREFIX) else None
     return _problem_response(problem, extra)
 
 
@@ -438,9 +436,7 @@ def use_problem_json_contract(app: FastAPI) -> None:
             return app.openapi_schema
         schema = _with_problem_components(generate())
         problem_content = {
-            "application/problem+json": {
-                "schema": {"$ref": "#/components/schemas/ProblemDetail"}
-            }
+            "application/problem+json": {"schema": {"$ref": "#/components/schemas/ProblemDetail"}}
         }
         paths = schema.get("paths", {})
         assert isinstance(paths, dict)

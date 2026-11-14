@@ -47,6 +47,12 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     #: The least number of present roster persons for the quorum of a meeting vote.
     #: NULL = no least number, only the percent counts.
     quorum_min_present: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The quorum of a vote in a Wiederholungssitzung (meeting kind ``repeat``), in
+    #: percent. NULL = such a vote uses ``quorum_percent``.
+    repeat_quorum_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Admitted guests of a public meeting may vote. Off: guests only watch. A Gremium
+    #: with a quorum never lets guests vote, whatever this switch says.
+    guests_may_vote: Mapped[bool] = mapped_column(Boolean, server_default="false")
     #: The final protocols of this gremium appear without login on the public
     #: protocols page, as the public version only. Off by default.
     protocols_public: Mapped[bool] = mapped_column(Boolean, server_default="false")

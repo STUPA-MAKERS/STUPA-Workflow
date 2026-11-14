@@ -64,6 +64,16 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
     createGremium: jest.fn((b: Partial<Gremium>) => of({ id: 'g-new', ...b })),
     updateGremium: jest.fn((id: string, b: Partial<Gremium>) => of({ ...GREMIEN[0], id, ...b })),
     deleteGremium: jest.fn(() => of(void 0)),
+    getGremiumDefaults: jest.fn(() =>
+      of({
+        quorumPercent: 40,
+        repeatQuorumPercent: 25,
+        guestsMayVote: false,
+        allowVoteDelegation: false,
+        delegationLeadMinutes: 120,
+      }),
+    ),
+    putGremiumDefaults: jest.fn((b: object) => of(b)),
     listGremiumRoles: jest.fn((gid: string) =>
       of([
         {
@@ -159,6 +169,7 @@ describe('AdminGremienComponent', () => {
     expect(value('CD-Variante')).toBe('StuPa-Protokoll');
     expect(value('Standardsprache')).toBe('Deutsch');
     expect(value('Quorum')).toBe('50 %');
+    expect(value('Gäste dürfen abstimmen')).toBe('Nein');
     expect(value('Stimm-Delegation erlauben')).toBe('Ja');
     expect(value('Vorlauf für Delegationen')).toBe('60 Minuten');
     expect(value('Delegation an Externe erlauben')).toBe('Nein');
@@ -169,6 +180,37 @@ describe('AdminGremienComponent', () => {
     expect(
       within(first).getByRole('heading', { name: 'Gremienrollen und Berechtigungen' }),
     ).toBeInTheDocument();
+  });
+
+  /** §F/administration/admin/000906 */
+  it('opens the defaults for new Gremien from the header and saves them', async () => {
+    const { api, toast } = await setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Vorgaben' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Vorgaben für neue Gremien' });
+    const repeat = within(dialog).getByRole('spinbutton', { name: 'Quorum der Wiederholungssitzung (%)' });
+    await waitFor(() => expect(repeat).toHaveValue(25));
+    await userEvent.clear(repeat);
+    await userEvent.type(repeat, '20');
+    await userEvent.click(within(dialog).getByText('Speichern').closest('button') as HTMLButtonElement);
+    expect(api.putGremiumDefaults).toHaveBeenCalledWith(
+      expect.objectContaining({ quorumPercent: 40, repeatQuorumPercent: 20, delegationLeadMinutes: 120 }),
+    );
+    expect(toast.success).toHaveBeenCalledWith('Vorgaben gespeichert.');
+  });
+
+  /** §F/meetings/voting/000902 */
+  it('shows the repeat quorum of a Gremium that has one', async () => {
+    const list = clone(GREMIEN);
+    const api = makeApi({
+      listGremien: jest.fn(() =>
+        of([{ ...list[0], repeatQuorumPercent: null }, { ...list[1], repeatQuorumPercent: 25 }]),
+      ),
+    });
+    await setup({ api });
+    await userEvent.click(screen.getByRole('button', { name: /^AStA/ }));
+    expect(
+      within(item('AStA')).getByText('Quorum der Wiederholungssitzung').nextElementSibling?.textContent?.trim(),
+    ).toBe('25 %');
   });
 
   /** Opening again reads the recipients only once. */

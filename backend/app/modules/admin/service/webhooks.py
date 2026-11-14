@@ -67,9 +67,7 @@ def _last_state(status: str) -> str:
             return "pending"
 
 
-def _delivery_status_out(
-    webhook_id: UUID, row: WebhookDelivery | None
-) -> WebhookDeliveryStatusOut:
+def _delivery_status_out(webhook_id: UUID, row: WebhookDelivery | None) -> WebhookDeliveryStatusOut:
     """Reduce the latest delivery to a coarse view without IP or body detail.
 
     The four DB states map to three admin states: ``ok`` is ``sent``, ``dead`` stays
@@ -96,9 +94,7 @@ class WebhookOps(ConfigServiceBase):
 
     async def list_webhooks(self) -> list[WebhookOut]:
         """List the webhooks by name."""
-        rows = (
-            await self.session.scalars(select(Webhook).order_by(Webhook.name))
-        ).all()
+        rows = (await self.session.scalars(select(Webhook).order_by(Webhook.name))).all()
         return [_webhook_out(r) for r in rows]
 
     @staticmethod
@@ -200,12 +196,9 @@ class WebhookOps(ConfigServiceBase):
         It shows only the state class, the HTTP status code and the attempt
         count. A webhook without any delivery yields ``never``.
         """
-        webhooks = (
-            await self.session.scalars(select(Webhook).order_by(Webhook.name))
-        ).all()
+        webhooks = (await self.session.scalars(select(Webhook).order_by(Webhook.name))).all()
         return [
-            _delivery_status_out(hook.id, await self._latest_delivery(hook.id))
-            for hook in webhooks
+            _delivery_status_out(hook.id, await self._latest_delivery(hook.id)) for hook in webhooks
         ]
 
     async def _latest_delivery(self, webhook_id: UUID) -> WebhookDelivery | None:

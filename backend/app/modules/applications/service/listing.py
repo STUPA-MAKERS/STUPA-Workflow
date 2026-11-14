@@ -347,9 +347,7 @@ class ListingOps(ApplicationsServiceBase):
         if not member_ids:
             return []
         root_paths = (
-            await self.session.scalars(
-                select(Budget.tree_path).where(viewed_by(member_ids))
-            )
+            await self.session.scalars(select(Budget.tree_path).where(viewed_by(member_ids)))
         ).all()
         budget_scope = (_view_subtrees(root_paths),) if root_paths else ()
 
@@ -472,9 +470,7 @@ class ListingOps(ApplicationsServiceBase):
         ]
         since_by_app = await self._state_since_map(app.id for app, _ in tasks)
         return [
-            _list_item(
-                app, state_out, since_by_app.get(app.id, app.created_at), archived_at=None
-            )
+            _list_item(app, state_out, since_by_app.get(app.id, app.created_at), archived_at=None)
             for app, state_out in tasks
         ]
 
@@ -573,9 +569,7 @@ def _archived_filter(archived: bool | None) -> ColumnElement[bool] | None:
             return None
 
 
-def _sort_column(
-    sort: str, since_sq: Subquery
-) -> ColumnElement[Any] | InstrumentedAttribute[Any]:
+def _sort_column(sort: str, since_sq: Subquery) -> ColumnElement[Any] | InstrumentedAttribute[Any]:
     """Return the column of a list sort key; an unknown key sorts by the creation time."""
     match sort:
         case "amount":
@@ -603,12 +597,7 @@ def _sqlite_projection(keys: Sequence[str]) -> ColumnElement[Any]:
 def _view_subtrees(root_paths: Sequence[str]) -> ColumnElement[bool]:
     """Keep the applications in the subtree of one of the view cost centers."""
     scoped = select(Budget.id).where(
-        or_(
-            *[
-                or_(Budget.tree_path == rp, Budget.tree_path.like(f"{rp}-%"))
-                for rp in root_paths
-            ]
-        )
+        or_(*[or_(Budget.tree_path == rp, Budget.tree_path.like(f"{rp}-%")) for rp in root_paths])
     )
     return Application.budget_id.in_(scoped)
 

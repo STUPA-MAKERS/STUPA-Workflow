@@ -24,6 +24,9 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.meetings.models import (
     DEFAULT_CONFIRM_LEAD_MINUTES,
+    DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES,
+    DEFAULT_GREMIUM_QUORUM_PERCENT,
+    DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT,
     DEFAULT_OPEN_LEAD_MINUTES,
     Meeting,
     MeetingSettings,
@@ -32,6 +35,20 @@ from app.modules.meetings.roster import planned_start_utc
 from app.shared.errors import ConflictError, ValidationProblem
 
 AUDIT_TARGET_TYPE = "meeting_settings"
+
+#: The Gremium defaults of the settings row, as (model attribute, JSON key).
+GREMIUM_DEFAULT_FIELDS: tuple[tuple[str, str], ...] = (
+    ("default_quorum_percent", "quorumPercent"),
+    ("default_repeat_quorum_percent", "repeatQuorumPercent"),
+    ("default_guests_may_vote", "guestsMayVote"),
+    ("default_allow_vote_delegation", "allowVoteDelegation"),
+    ("default_delegation_lead_minutes", "delegationLeadMinutes"),
+)
+
+
+def gremium_defaults(row: MeetingSettings) -> dict[str, Any]:
+    """Return the Gremium defaults of the settings row by their JSON keys."""
+    return {key: getattr(row, attr) for attr, key in GREMIUM_DEFAULT_FIELDS}
 
 
 @dataclass(frozen=True)
@@ -51,6 +68,11 @@ def _defaults() -> MeetingSettings:
         id=1,
         open_lead_minutes=DEFAULT_OPEN_LEAD_MINUTES,
         confirm_lead_minutes=DEFAULT_CONFIRM_LEAD_MINUTES,
+        default_quorum_percent=DEFAULT_GREMIUM_QUORUM_PERCENT,
+        default_repeat_quorum_percent=DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT,
+        default_guests_may_vote=False,
+        default_allow_vote_delegation=False,
+        default_delegation_lead_minutes=DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES,
     )
 
 
@@ -104,6 +126,17 @@ def check_open(window: OpenWindow | None, *, now: datetime, confirmed: bool) -> 
             "the meeting opens before its planned start — confirm the early open",
             code="early_open_unconfirmed",
         )
+
+
+def _write_gremium_defaults(row: MeetingSettings, values: dict[str, Any], actor: str) -> None:
+    """Write every Gremium default and the change stamp to the settings row."""
+    writes: dict[str, Any] = {
+        **{attr: values[key] for attr, key in GREMIUM_DEFAULT_FIELDS},
+        "updated_at": datetime.now(UTC),
+        "updated_by": actor,
+    }
+    for attr, value in writes.items():
+        setattr(row, attr, value)
 
 
 class MeetingSettingsService:
@@ -169,4 +202,31 @@ class MeetingSettingsService:
         )
         await self.session.commit()
         await self.session.refresh(row)
+        return row
+
+    async def update_gremium_defaults(
+        self, values: dict[str, Any], *, actor: str
+    ) -> MeetingSettings:
+        """Replace the Gremium defaults and write a ``config_change`` audit entry.
+
+        ``values`` holds every default by its JSON key. The method touches no Gremium:
+        only the form of a new Gremium reads the defaults. The caller commits.
+        """
+        row = await self.get()
+        before = gremium_defaults(row)
+        _write_gremium_defaults(row, values, actor)
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.CONFIG_CHANGE,
+            target_type=AUDIT_TARGET_TYPE,
+            target_id="1",
+            data={
+                "gremiumDefaults": {
+                    key: {"from": before[key], "to": values[key]}
+                    for key in before
+                    if before[key] != values[key]
+                }
+            },
+        )
         return row

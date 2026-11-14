@@ -21,6 +21,8 @@ pages. The rules here follow the pytex protocol variant (`protocol-stupa`,
   single `protokoll` name on the title page and on the signature page, and it
   adds a handover line below the heading of the agenda item where a later period
   starts. Without `keepers` the `protokoll` name stays in use.
+* `sitzungsart`, `ort` and `form` name the kind, the place and the form of the
+  meeting. Each fills one title-page data line, and a missing key gives no line.
 * `started_at` (`YYYY-MM-DD HH:MM`) is the real start. It fills the date and the
   start time when `datum` or `beginn` is missing.
 * `typ: antrag` marks an Antrag. Its headings are the sections of the form, so they
@@ -71,7 +73,9 @@ _GREMIUM_LOGOS: Final[dict[str, tuple[str, ...]]] = {
 _FOOTER_SWAP: Final[dict[str, str]] = {"MAKERS": "MAKERS-RAlign"}
 
 _SCALAR_ROWS: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
+    ("Sitzungsart", ("sitzungsart",)),
     ("Ort", ("ort",)),
+    ("Form", ("form",)),
     ("Sitzungsleitung", ("sitzungsleitung",)),
     ("Protokoll", ("protokoll",)),
     ("Gremium", ("gremium",)),

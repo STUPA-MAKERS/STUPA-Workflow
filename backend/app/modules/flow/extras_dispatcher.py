@@ -119,9 +119,7 @@ class FlowExtrasActionDispatcher:
                 )
                 return
             try:
-                await AgendaService(session).add(
-                    meeting.id, application_id=action.application_id
-                )
+                await AgendaService(session).add(meeting.id, application_id=action.application_id)
             except (NotFoundError, ConflictError) as exc:
                 logger.warning(
                     "addToNextSession: could not add application %s to meeting %s: %s",
@@ -131,9 +129,7 @@ class FlowExtrasActionDispatcher:
                 )
 
     @staticmethod
-    async def _agenda_gremium(
-        session: AsyncSession, action: DispatchedAction
-    ) -> UUID | None:
+    async def _agenda_gremium(session: AsyncSession, action: DispatchedAction) -> UUID | None:
         """Return the Gremium of an `addToNextSession` action, or `None` to skip it.
 
         An explicit `gremiumId` wins. Without one the action takes the snapshot
@@ -142,9 +138,7 @@ class FlowExtrasActionDispatcher:
         """
         if "gremiumId" not in action.params:
             gremium_id = await session.scalar(
-                select(Application.vote_gremium_id).where(
-                    Application.id == action.application_id
-                )
+                select(Application.vote_gremium_id).where(Application.id == action.application_id)
             )
             if gremium_id is None:
                 logger.warning(
@@ -217,9 +211,7 @@ class FlowExtrasActionDispatcher:
                     app.id,
                 )
                 return
-            if await self._assign_node(
-                session, app, matches[0], source="flow:applicantGremium"
-            ):
+            if await self._assign_node(session, app, matches[0], source="flow:applicantGremium"):
                 await session.commit()
 
     async def _assign_budget_from_map(self, action: DispatchedAction) -> None:
@@ -311,9 +303,7 @@ class FlowExtrasActionDispatcher:
             if await self._assign_node(session, app, budget_id, source="flow:field"):
                 await session.commit()
 
-    async def _do_assign(
-        self, application_id: UUID, budget_id: UUID, *, source: str
-    ) -> None:
+    async def _do_assign(self, application_id: UUID, budget_id: UUID, *, source: str) -> None:
         async with self.sessionmaker() as session:
             app = await session.get(Application, application_id)
             if app is None:
@@ -350,9 +340,7 @@ class FlowExtrasActionDispatcher:
         if node is None:
             logger.warning("assignBudget: budget %s missing — skipped", budget_id)
             return False
-        await session.get(
-            Application, app.id, with_for_update=True, populate_existing=True
-        )
+        await session.get(Application, app.id, with_for_update=True, populate_existing=True)
         if await in_budget_vote_state(session, app):
             logger.warning(
                 "assignBudget: application %s is in a vote whose Gremium comes from "

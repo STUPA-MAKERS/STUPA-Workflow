@@ -134,15 +134,12 @@ async def assert_application_votable(
         )
     if await service.application_vote_gremium(application_id) != meeting.gremium_id:
         raise ConflictError(
-            "The Gremium of this meeting does not decide the current vote of the "
-            "application.",
+            "The Gremium of this meeting does not decide the current vote of the application.",
             code="vote_gremium_mismatch",
         )
 
 
-async def eligible_count(
-    service: MeetingService, meeting: MeetingOut, *, guests_vote: bool
-) -> int:
+async def eligible_count(service: MeetingService, meeting: MeetingOut, *, guests_vote: bool) -> int:
     """Return the quorum denominator of a meeting vote from the current roster.
 
     The server always derives it from the real roster and never from the client. A

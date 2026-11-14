@@ -34,16 +34,10 @@ _UPGRADE: tuple[str, ...] = (
         CONSTRAINT uq_email_login_link_token_hash UNIQUE (token_hash)
     )
     """,
-    (
-        "CREATE INDEX IF NOT EXISTS ix_email_login_link_expires_at "
-        "ON email_login_link (expires_at)"
-    ),
+    ("CREATE INDEX IF NOT EXISTS ix_email_login_link_expires_at ON email_login_link (expires_at)"),
     "ALTER TABLE applicant_session ALTER COLUMN application_id DROP NOT NULL",
     "ALTER TABLE applicant_session ADD COLUMN IF NOT EXISTS email citext",
-    (
-        "ALTER TABLE applicant_session "
-        "DROP CONSTRAINT IF EXISTS ck_applicant_session_one_binding"
-    ),
+    ("ALTER TABLE applicant_session DROP CONSTRAINT IF EXISTS ck_applicant_session_one_binding"),
     (
         "ALTER TABLE applicant_session ADD CONSTRAINT ck_applicant_session_one_binding "
         "CHECK ((application_id IS NULL) <> (email IS NULL))"
@@ -51,10 +45,7 @@ _UPGRADE: tuple[str, ...] = (
 )
 
 _DOWNGRADE: tuple[str, ...] = (
-    (
-        "ALTER TABLE applicant_session "
-        "DROP CONSTRAINT IF EXISTS ck_applicant_session_one_binding"
-    ),
+    ("ALTER TABLE applicant_session DROP CONSTRAINT IF EXISTS ck_applicant_session_one_binding"),
     "DELETE FROM applicant_session WHERE application_id IS NULL",
     "ALTER TABLE applicant_session DROP COLUMN IF EXISTS email",
     "ALTER TABLE applicant_session ALTER COLUMN application_id SET NOT NULL",

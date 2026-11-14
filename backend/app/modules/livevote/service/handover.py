@@ -322,9 +322,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
                     code="no_next_item",
                 )
             await self._drop_planned(meeting.id)
-            self.session.add(
-                ProtocolKeeperPeriod(meeting_id=meeting.id, principal_id=target)
-            )
+            self.session.add(ProtocolKeeperPeriod(meeting_id=meeting.id, principal_id=target))
             await self.session.flush()
         await self._audit_handover(
             meeting, principal.sub, mode=mode, previous=previous, target=target

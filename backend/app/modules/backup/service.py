@@ -138,9 +138,7 @@ class BackupService:
         """Return one catalogue row, or ``None``."""
         return await self.session.get(Backup, backup_id)
 
-    async def create_row(
-        self, *, kind: str, actor: str | None, note: str | None = None
-    ) -> Backup:
+    async def create_row(self, *, kind: str, actor: str | None, note: str | None = None) -> Backup:
         """Insert a pending catalogue row. The worker fills in the rest."""
         row = Backup(
             kind=kind,
@@ -228,10 +226,7 @@ class BackupService:
         bucket, but nothing references it and the admin page cannot list it.
         """
         rows = list((await self.session.scalars(select(Backup))).all())
-        return [
-            {c.name: getattr(row, c.name) for c in Backup.__table__.columns}
-            for row in rows
-        ]
+        return [{c.name: getattr(row, c.name) for c in Backup.__table__.columns} for row in rows]
 
     async def reseed_catalogue(self, rows: list[dict[str, Any]]) -> int:
         """Put catalogue rows back after a restore, keeping the restored ones too.
@@ -559,9 +554,7 @@ class BackupService:
             logger.warning("%s warnings: %s", what, err.decode(errors="replace")[:2000])
 
 
-async def stream_upload(
-    source: AsyncIterator[bytes], target: IO[bytes], cap: int
-) -> int:
+async def stream_upload(source: AsyncIterator[bytes], target: IO[bytes], cap: int) -> int:
     """Copy an upload into `target`, stopping at `cap` bytes.
 
     Returns:

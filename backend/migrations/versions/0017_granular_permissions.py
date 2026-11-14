@@ -53,8 +53,7 @@ _DOWNGRADE: tuple[str, ...] = (
     "('admin.site', 'admin.gremien', 'admin.types')",
     *_fanout("budget.structure", ("budget.manage",)),
     *_fanout("budget.book", ("budget.manage",)),
-    "DELETE FROM role_permission WHERE permission IN "
-    "('budget.structure', 'budget.book')",
+    "DELETE FROM role_permission WHERE permission IN ('budget.structure', 'budget.book')",
     "DELETE FROM role_permission WHERE permission = 'protocol.finalize'",
     "DELETE FROM role_permission WHERE permission = 'audit.verify'",
 )

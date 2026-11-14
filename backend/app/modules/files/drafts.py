@@ -105,9 +105,7 @@ def _is_usable(attachment: Attachment, expires_at: datetime | None, now: datetim
         return False
     if attachment.storage_key is None:
         return False
-    return not (
-        attachment.scanned and attachment.scan_result not in (None, SCAN_RESULT_CLEAN)
-    )
+    return not (attachment.scanned and attachment.scan_result not in (None, SCAN_RESULT_CLEAN))
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,9 +188,7 @@ class DraftAttachments:
         await self._check_quota(token_hash, len(data))
 
         attachment_id = uuid.uuid4()
-        storage_key = (
-            f"{DRAFT_KEY_PREFIX}{attachment_id}/{sanitize_storage_name(display_name)}"
-        )
+        storage_key = f"{DRAFT_KEY_PREFIX}{attachment_id}/{sanitize_storage_name(display_name)}"
         await self.files.put_object(storage_key, data, mime)
         expires_at = now + timedelta(days=self.settings.attachment_draft_ttl_days)
         token_row = insert(AttachmentDraftToken).values(
@@ -246,8 +242,9 @@ class DraftAttachments:
         """
         count, total = (
             await self.session.execute(
-                select(func.count(Attachment.id), func.coalesce(func.sum(Attachment.size), 0))
-                .where(
+                select(
+                    func.count(Attachment.id), func.coalesce(func.sum(Attachment.size), 0)
+                ).where(
                     Attachment.application_id.is_(None),
                     Attachment.draft_token_hash == token_hash,
                 )
@@ -425,9 +422,7 @@ async def check_drafts(
         )
     ).all()
     expires_at = await session.scalar(
-        select(AttachmentDraftToken.expires_at).where(
-            AttachmentDraftToken.token_hash == token_hash
-        )
+        select(AttachmentDraftToken.expires_at).where(AttachmentDraftToken.token_hash == token_hash)
     )
     usable = {row.id for row in rows if _is_usable(row, expires_at, moment)}
     missing = [aid for aid in dict.fromkeys(attachment_ids) if aid not in usable]

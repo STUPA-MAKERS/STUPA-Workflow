@@ -28,27 +28,18 @@ _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS reference_number text",
     "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS payment_method text",
     "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS category text",
-    (
-        "ALTER TABLE budget_expense DROP CONSTRAINT IF EXISTS "
-        "budget_expense_payment_method_valid"
-    ),
+    ("ALTER TABLE budget_expense DROP CONSTRAINT IF EXISTS budget_expense_payment_method_valid"),
     (
         "ALTER TABLE budget_expense ADD CONSTRAINT budget_expense_payment_method_valid "
         "CHECK (payment_method IS NULL OR payment_method IN "
         "('ueberweisung', 'bar', 'lastschrift', 'karte'))"
     ),
-    (
-        "CREATE INDEX IF NOT EXISTS ix_budget_expense_invoice_date "
-        "ON budget_expense (invoice_date)"
-    ),
+    ("CREATE INDEX IF NOT EXISTS ix_budget_expense_invoice_date ON budget_expense (invoice_date)"),
 )
 
 _DOWNGRADE: tuple[str, ...] = (
     "DROP INDEX IF EXISTS ix_budget_expense_invoice_date",
-    (
-        "ALTER TABLE budget_expense DROP CONSTRAINT IF EXISTS "
-        "budget_expense_payment_method_valid"
-    ),
+    ("ALTER TABLE budget_expense DROP CONSTRAINT IF EXISTS budget_expense_payment_method_valid"),
     "ALTER TABLE budget_expense DROP COLUMN IF EXISTS category",
     "ALTER TABLE budget_expense DROP COLUMN IF EXISTS payment_method",
     "ALTER TABLE budget_expense DROP COLUMN IF EXISTS reference_number",

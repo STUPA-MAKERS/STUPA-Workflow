@@ -142,9 +142,7 @@ class BudgetNodeOut(FrozenCamelModel, frozen=True):
     effective_decision_gremium_id: UUID | None = Field(
         default=None, alias="effectiveDecisionGremiumId"
     )
-    decision_gremium_source_id: UUID | None = Field(
-        default=None, alias="decisionGremiumSourceId"
-    )
+    decision_gremium_source_id: UUID | None = Field(default=None, alias="decisionGremiumSourceId")
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
     #: The plan switch of a top-level node. Read only here: the plan routes change it.
@@ -193,9 +191,7 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     effective_decision_gremium_id: UUID | None = Field(
         default=None, alias="effectiveDecisionGremiumId"
     )
-    decision_gremium_source_id: UUID | None = Field(
-        default=None, alias="decisionGremiumSourceId"
-    )
+    decision_gremium_source_id: UUID | None = Field(default=None, alias="decisionGremiumSourceId")
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
     #: The plan switch of a top-level node. Read only here: the plan routes change it.
@@ -206,9 +202,7 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     #: node the years with a version in force, for a node below it the years whose
     #: version in force has a line for it.
     planned_in: tuple[UUID, ...] = Field(default=(), alias="plannedIn")
-    by_fiscal_year: tuple[AllocationView, ...] = Field(
-        default_factory=tuple, alias="byFiscalYear"
-    )
+    by_fiscal_year: tuple[AllocationView, ...] = Field(default_factory=tuple, alias="byFiscalYear")
     #: Read-only `Sequence`, because a caller builds a node with a list of children.
     children: Sequence[BudgetTreeNodeOut] = Field(default_factory=tuple)
 
@@ -586,9 +580,7 @@ class InvoiceOut(FrozenCamelModel, frozen=True):
     has_file: bool = Field(default=False, alias="hasFile")
     actor: str | None = None
     created_at: datetime = Field(alias="createdAt")
-    linked_bookings: list[InvoiceBookingOut] = Field(
-        default_factory=list, alias="linkedBookings"
-    )
+    linked_bookings: list[InvoiceBookingOut] = Field(default_factory=list, alias="linkedBookings")
 
 
 class InvoiceSegmentCounts(FrozenCamelModel, frozen=True):

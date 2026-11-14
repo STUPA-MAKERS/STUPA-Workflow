@@ -159,10 +159,7 @@ class PlanOps(NodeOps, AllocationOps):
         One query resolves the names of all lists, so the page never shows an id.
         """
         ids = {
-            UUID(step["gremiumId"])
-            for steps in records
-            for step in steps
-            if step.get("gremiumId")
+            UUID(step["gremiumId"]) for steps in records for step in steps if step.get("gremiumId")
         }
         rows = (
             await self.session.execute(select(Gremium.id, Gremium.name).where(Gremium.id.in_(ids)))
@@ -700,9 +697,7 @@ class PlanOps(NodeOps, AllocationOps):
         await self._audit_version(plan, version, copied_from=payload.copy_from_fiscal_year_id)
         return await self._plan_out(plan, top.id)
 
-    async def _copy_source(
-        self, top: Budget, fiscal_year_id: UUID
-    ) -> list[BudgetPlanLine]:
+    async def _copy_source(self, top: Budget, fiscal_year_id: UUID) -> list[BudgetPlanLine]:
         """Return the lines of the version in force of another year of `top`."""
         fy = await self.session.get(FiscalYear, fiscal_year_id)
         plan = await self._plan_of(fiscal_year_id) if fy is not None else None
@@ -830,9 +825,7 @@ class PlanOps(NodeOps, AllocationOps):
         """
         version, plan, _fy, top = await self._version_context(version_id)
         if version.state != "draft":
-            raise ConflictError(
-                "Only a draft version can be edited.", code="plan_version_locked"
-            )
+            raise ConflictError("Only a draft version can be edited.", code="plan_version_locked")
         nodes = await self._subtree(top)
         node = next((n for n in nodes if n.id == budget_id and n.id != top.id), None)
         if node is None:
@@ -859,9 +852,7 @@ class PlanOps(NodeOps, AllocationOps):
                 errors=[{"field": "side", "msg": "not a direct child of the top level"}],
             )
         to_income = (
-            titel
-            and payload.side == "income"
-            and (previous is None or previous.side != "income")
+            titel and payload.side == "income" and (previous is None or previous.side != "income")
         )
         asked = self._wanted(payload, previous, giver, drop_marks=to_income)
         own = self._line_for(version.id, node.id, lines)
@@ -1038,9 +1029,7 @@ class PlanOps(NodeOps, AllocationOps):
         """
         version, plan, _fy, top = await self._version_context(version_id)
         if version.state != "draft":
-            raise ConflictError(
-                "Only a draft version can be edited.", code="plan_version_locked"
-            )
+            raise ConflictError("Only a draft version can be edited.", code="plan_version_locked")
         nodes = await self._subtree(top)
         lines = await self._lines(version.id)
         node = next((n for n in nodes if n.id == budget_id), None)
@@ -1129,9 +1118,7 @@ class PlanOps(NodeOps, AllocationOps):
         """
         version, plan, _fy, top = await self._version_context(version_id)
         if version.state != "draft":
-            raise ConflictError(
-                "Only a draft version can be edited.", code="plan_version_locked"
-            )
+            raise ConflictError("Only a draft version can be edited.", code="plan_version_locked")
         lines = {line.budget_id: line for line in await self._lines(version.id)}
         line = lines.get(budget_id)
         if line is None:
@@ -1155,8 +1142,7 @@ class PlanOps(NodeOps, AllocationOps):
         )
         if booked is not None:
             raise ConflictError(
-                "The cost centre has bookings in this fiscal year. Set its amount to 0 "
-                "instead.",
+                "The cost centre has bookings in this fiscal year. Set its amount to 0 instead.",
                 code="plan_line_has_bookings",
             )
         raised = self._resum(
@@ -1350,9 +1336,7 @@ class PlanOps(NodeOps, AllocationOps):
         for field in ("draft_name", "draft_key"):
             setattr(line, field, None)
 
-    async def _ready_to_leave_draft(
-        self, top: Budget, lines: list[BudgetPlanLine]
-    ) -> None:
+    async def _ready_to_leave_draft(self, top: Budget, lines: list[BudgetPlanLine]) -> None:
         """Check a draft that leaves the draft, and keep the names in its lines.
 
         The version must have a line, each Titel a side, and the plan must be balanced.
@@ -1497,9 +1481,7 @@ class PlanOps(NodeOps, AllocationOps):
                 errors=[{"field": "step", "msg": "the gremium is gone"}],
             )
         if step.get("requestedAt"):
-            raise ConflictError(
-                "The step waits for its Gremium already.", code="plan_step_waits"
-            )
+            raise ConflictError("The step waits for its Gremium already.", code="plan_step_waits")
         self._keep_steps(
             version, plan_rules.with_step_requested(steps, index, datetime.now(UTC).isoformat())
         )
@@ -1939,9 +1921,7 @@ class PlanOps(NodeOps, AllocationOps):
         """
         version, plan, fy, top = await self._version_context(version_id)
         if version.state != "draft":
-            raise ConflictError(
-                "Only a draft version can be deleted.", code="plan_version_locked"
-            )
+            raise ConflictError("Only a draft version can be deleted.", code="plan_version_locked")
         alone = len(await self._versions(plan.id)) == 1
         await self._audit(
             AuditAction.BUDGET_PLAN_VERSION_DELETE,

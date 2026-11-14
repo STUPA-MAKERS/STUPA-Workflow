@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/integration/modules/livevote/test_public_meeting.py:test_guest_mode_follows_the_switch_of_the_gremium"
+  - "backend/tests/unit/modules/livevote/test_public_meeting_lead_unit.py:test_guest_ballot_needs_the_switch_and_no_quorum"
+  - "backend/tests/unit/modules/admin/test_admin_service_cov.py:test_update_gremium_takes_the_ballot_from_guests"
+implementation:
+  - backend/app/modules/gremien/models.py
+  - backend/app/modules/livevote/service/lifecycle.py
+  - backend/app/modules/admin/service/gremien.py
+  - frontend/src/app/features/meetings/public-join/public-join-settings.component.html
 scope:
   - backend/app/modules/gremien
   - backend/app/modules/admin

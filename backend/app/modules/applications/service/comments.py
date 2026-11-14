@@ -214,9 +214,7 @@ class CommentOps(ApplicationsServiceBase):
         )
         return at is not None
 
-    async def _comment_files(
-        self, ids: Sequence[UUID]
-    ) -> dict[UUID, list[MessageAttachmentOut]]:
+    async def _comment_files(self, ids: Sequence[UUID]) -> dict[UUID, list[MessageAttachmentOut]]:
         """Return the files of the comments in one query."""
         return await FilesService(self.session).message_attachments("comment", ids)
 
@@ -348,9 +346,7 @@ class CommentOps(ApplicationsServiceBase):
             return
         raise ForbiddenError("Only the author or an application manager may change a comment.")
 
-    async def _audit_comment(
-        self, comment: Comment, action: AuditAction, *, actor: str
-    ) -> None:
+    async def _audit_comment(self, comment: Comment, action: AuditAction, *, actor: str) -> None:
         """Record a comment mutation. ``data`` holds no comment text, only metadata."""
         await audit_record(
             self.session,

@@ -183,6 +183,8 @@ def gremium_row(**kw: Any) -> Any:
         "delegation_allow_external": False,
         "quorum_percent": None,
         "quorum_min_present": None,
+        "repeat_quorum_percent": None,
+        "guests_may_vote": False,
         "protocols_public": False,
         "protocol_recipients": [],
     }
@@ -362,6 +364,28 @@ async def test_update_gremium_quorum_set_to_null() -> None:
         row.id, GremiumUpdate.model_validate({"quorumPercent": None}), "admin"
     )
     assert out.quorum_percent is None
+
+
+async def test_update_gremium_takes_the_ballot_from_guests() -> None:
+    """A quorum or the switch off sets the open meetings to "nur zuschauen".
+
+    §F/meetings/meetings/000904, §F/meetings/meetings/000905. The meetings change only
+    when the Gremium let guests vote before.
+    """
+    row = gremium_row(guests_may_vote=True)
+    s, session = svc([res(), *audit_results()], gets=[row])
+    out = await s.update_gremium(row.id, GremiumUpdate(guestsMayVote=False), "admin")
+    assert out.guests_may_vote is False
+    assert "UPDATE meeting" in str(session.statements[0])
+    row = gremium_row(guests_may_vote=True)
+    s, session = svc([res(), *audit_results()], gets=[row])
+    await s.update_gremium(row.id, GremiumUpdate(quorumPercent=40, repeatQuorumPercent=25), "admin")
+    assert row.repeat_quorum_percent == 25
+    assert "UPDATE meeting" in str(session.statements[0])
+    row = gremium_row(guests_may_vote=True)
+    s, session = svc([*audit_results()], gets=[row])
+    await s.update_gremium(row.id, GremiumUpdate(name="Bleibt offen"), "admin")
+    assert not any("UPDATE meeting" in str(stmt) for stmt in session.statements)
 
 
 async def test_update_gremium_noop_keeps_values() -> None:

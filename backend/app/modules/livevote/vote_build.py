@@ -44,6 +44,22 @@ def _vote_config(
             )
 
 
+async def _default_quorum_percent(service: MeetingService, meeting: MeetingOut) -> int | None:
+    """Return the quorum that a vote of this meeting starts with.
+
+    A Wiederholungssitzung (kind ``repeat``) uses the repeat quorum of its Gremium.
+    Without that value, and in every other meeting, the quorum of the Gremium applies.
+    """
+    repeat = (
+        await service.gremium_repeat_quorum_percent(meeting.gremium_id)
+        if meeting.kind == "repeat"
+        else None
+    )
+    return (
+        repeat if repeat is not None else await service.gremium_quorum_percent(meeting.gremium_id)
+    )
+
+
 async def build_meeting_vote(
     service: MeetingService,
     meeting: MeetingOut,
@@ -144,7 +160,7 @@ async def build_meeting_vote(
         if guests_vote or payload.poll is not None
         else payload.quorum_percent
         if payload.quorum_percent is not None
-        else await service.gremium_quorum_percent(meeting.gremium_id)
+        else await _default_quorum_percent(service, meeting)
     )
     quorum: dict[str, object] = (
         {} if quorum_percent is None else {"quorum": {"type": "percent", "value": quorum_percent}}

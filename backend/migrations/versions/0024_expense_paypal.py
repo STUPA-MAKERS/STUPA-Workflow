@@ -17,10 +17,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 _UPGRADE: tuple[str, ...] = (
-    (
-        "ALTER TABLE budget_expense DROP CONSTRAINT IF EXISTS "
-        "budget_expense_payment_method_valid"
-    ),
+    ("ALTER TABLE budget_expense DROP CONSTRAINT IF EXISTS budget_expense_payment_method_valid"),
     (
         "ALTER TABLE budget_expense ADD CONSTRAINT budget_expense_payment_method_valid "
         "CHECK (payment_method IS NULL OR payment_method IN "
@@ -29,10 +26,7 @@ _UPGRADE: tuple[str, ...] = (
 )
 
 _DOWNGRADE: tuple[str, ...] = (
-    (
-        "ALTER TABLE budget_expense DROP CONSTRAINT IF EXISTS "
-        "budget_expense_payment_method_valid"
-    ),
+    ("ALTER TABLE budget_expense DROP CONSTRAINT IF EXISTS budget_expense_payment_method_valid"),
     (
         "ALTER TABLE budget_expense ADD CONSTRAINT budget_expense_payment_method_valid "
         "CHECK (payment_method IS NULL OR payment_method IN "

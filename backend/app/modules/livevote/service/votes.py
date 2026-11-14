@@ -497,6 +497,14 @@ class VoteReadOps(MeetingServiceBase):
             )
         ).scalar_one_or_none()
 
+    async def gremium_repeat_quorum_percent(self, gremium_id: UUID) -> int | None:
+        """Return the quorum of a Wiederholungssitzung of this gremium in percent, or None."""
+        return (
+            await self.session.execute(
+                select(Gremium.repeat_quorum_percent).where(Gremium.id == gremium_id)
+            )
+        ).scalar_one_or_none()
+
     async def gremium_quorum_percent(self, gremium_id: UUID) -> int | None:
         """Return the default quorum of this gremium in percent of eligible voters.
 

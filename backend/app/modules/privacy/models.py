@@ -18,15 +18,11 @@ class PrivacySettings(Base):
     __tablename__ = "privacy_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    default_retention_months: Mapped[int] = mapped_column(
-        Integer, server_default="24", default=24
-    )
+    default_retention_months: Mapped[int] = mapped_column(Integer, server_default="24", default=24)
 
     __table_args__ = (
         CheckConstraint("id = 1", name="privacy_settings_singleton"),
-        CheckConstraint(
-            "default_retention_months >= 1", name="default_retention_months_min"
-        ),
+        CheckConstraint("default_retention_months >= 1", name="default_retention_months_min"),
     )
 
 
@@ -50,9 +46,7 @@ class ErasureRequest(UUIDPkMixin, CreatedAtMixin, Base):
     status: Mapped[str] = mapped_column(Text, server_default="open")
     requested_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     handled_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    handled_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
@@ -60,8 +54,6 @@ class ErasureRequest(UUIDPkMixin, CreatedAtMixin, Base):
             "subject_type IN ('applicant','principal')",
             name="erasure_request_subject_type",
         ),
-        CheckConstraint(
-            "status IN ('open','executed','rejected')", name="erasure_request_status"
-        ),
+        CheckConstraint("status IN ('open','executed','rejected')", name="erasure_request_status"),
         Index("ix_erasure_request_status", "status"),
     )

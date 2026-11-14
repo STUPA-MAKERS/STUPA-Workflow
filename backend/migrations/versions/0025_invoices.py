@@ -47,10 +47,7 @@ _UPGRADE: tuple[str, ...] = (
         "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS invoice_id uuid "
         "REFERENCES invoice (id) ON DELETE SET NULL"
     ),
-    (
-        "CREATE INDEX IF NOT EXISTS ix_budget_expense_invoice_id "
-        "ON budget_expense (invoice_id)"
-    ),
+    ("CREATE INDEX IF NOT EXISTS ix_budget_expense_invoice_id ON budget_expense (invoice_id)"),
 )
 
 _DOWNGRADE: tuple[str, ...] = (

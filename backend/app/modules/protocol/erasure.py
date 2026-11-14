@@ -81,9 +81,7 @@ def _indented(current: str, line: str) -> str:
     return current[: len(current) - len(current.lstrip())] + line
 
 
-def _rewrite_one(
-    changes: Sequence[_Change], lines: tuple[str, ...], start: int
-) -> tuple[str, ...]:
+def _rewrite_one(changes: Sequence[_Change], lines: tuple[str, ...], start: int) -> tuple[str, ...]:
     """Replace the callout that opens at ``start`` when it equals an old callout."""
     end = _block_end(lines, start)
     block = [line.strip() for line in lines[start:end]]

@@ -92,9 +92,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade the schema to the previous revision."""
     for col in ("accepted_state_keys", "denied_state_keys"):
-        op.execute(
-            f"ALTER TABLE budget ADD COLUMN IF NOT EXISTS {col} jsonb NOT NULL DEFAULT '[]'"
-        )
+        op.execute(f"ALTER TABLE budget ADD COLUMN IF NOT EXISTS {col} jsonb NOT NULL DEFAULT '[]'")
     for col, flag in (("accepted_state_keys", "is_approved"), ("denied_state_keys", "is_denied")):
         op.execute(
             f"UPDATE budget SET {col} = COALESCE("

@@ -76,8 +76,7 @@ def upgrade() -> None:
     op.execute("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS started_at timestamptz")
     left = bind.execute(
         sa.text(
-            "SELECT count(*) FROM meeting "
-            "WHERE status IN ('live', 'closed') AND started_at IS NULL"
+            "SELECT count(*) FROM meeting WHERE status IN ('live', 'closed') AND started_at IS NULL"
         )
     ).scalar_one()
     logger.info(

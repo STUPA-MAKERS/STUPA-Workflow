@@ -276,9 +276,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         await self._require_open_fiscal_year(expense.fiscal_year_id)
         fields = payload.model_fields_set
         sets_amount = "amount" in fields and payload.amount is not None
-        child_n = (
-            (await self._child_counts([expense_id])).get(expense_id, 0) if sets_amount else 0
-        )
+        child_n = (await self._child_counts([expense_id])).get(expense_id, 0) if sets_amount else 0
         if child_n > 0:
             raise ValidationProblem(
                 "The amount of a booking with sub-bookings is the sum of its sub-bookings.",

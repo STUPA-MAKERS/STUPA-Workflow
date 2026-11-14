@@ -51,9 +51,7 @@ async def load_login_settings(session: AsyncSession) -> LoginSettings:
 
 def session_days(settings: LoginSettings, client: str) -> int:
     """Return the lifetime in days for a session client (`web` or `pwa`)."""
-    return (
-        settings.pwa_session_days if client == SESSION_CLIENT_PWA else settings.web_session_days
-    )
+    return settings.pwa_session_days if client == SESSION_CLIENT_PWA else settings.web_session_days
 
 
 class LoginSettingsService:

@@ -51,8 +51,7 @@ _EXT_TO_MIME: dict[str, frozenset[str]] = {
     ".webp": frozenset({"image/webp"}),
     ".doc": frozenset({"application/msword"}),
     ".docx": frozenset(
-        {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
-        | _OOXML_ZIP
+        {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"} | _OOXML_ZIP
     ),
     ".xls": frozenset({"application/vnd.ms-excel"}),
     ".xlsx": frozenset(
@@ -60,8 +59,7 @@ _EXT_TO_MIME: dict[str, frozenset[str]] = {
     ),
     ".ppt": frozenset({"application/vnd.ms-powerpoint"}),
     ".pptx": frozenset(
-        {"application/vnd.openxmlformats-officedocument.presentationml.presentation"}
-        | _OOXML_ZIP
+        {"application/vnd.openxmlformats-officedocument.presentationml.presentation"} | _OOXML_ZIP
     ),
     ".odt": frozenset({"application/vnd.oasis.opendocument.text"}),
     ".ods": frozenset({"application/vnd.oasis.opendocument.spreadsheet"}),
@@ -152,11 +150,7 @@ def validate_upload(filename: str | None, data: bytes) -> str:
     if allowed_for_ext is None:
         raise MimeRejected(f"Unsupported file extension: {ext or '(none)'}")
     if sniffed not in allowed_for_ext:
-        raise MimeRejected(
-            f"Content type '{sniffed}' does not match extension '{ext}'."
-        )
+        raise MimeRejected(f"Content type '{sniffed}' does not match extension '{ext}'.")
     if sniffed in _OOXML_ZIP and not _is_ooxml_container(data, ext):
-        raise MimeRejected(
-            f"File claims extension '{ext}' but is not a valid OOXML document."
-        )
+        raise MimeRejected(f"File claims extension '{ext}' but is not a valid OOXML document.")
     return sniffed

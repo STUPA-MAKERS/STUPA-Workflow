@@ -161,6 +161,7 @@ class FieldOption(FrozenStrictCamelModel, frozen=True):
         key: For ``budget_select``, the path segment of the cost center.
         color: For ``budget_select``, the own display color of the cost center, or None.
     """
+
     value: str
     label: I18nMap
     parent_id: str | None = Field(default=None, alias="parentId")
@@ -180,6 +181,7 @@ class FieldValidation(FrozenStrictCamelModel, frozen=True):
             The opt-out is a checkbox with a mandatory reason, and the position then
             needs only one offer. Unset means allowed.
     """
+
     min: float | None = None
     max: float | None = None
     min_len: int | None = Field(default=None, alias="minLen", ge=0)
@@ -222,6 +224,7 @@ class FieldValidation(FrozenStrictCamelModel, frozen=True):
 
 class FormFieldDef(FrozenStrictCamelModel, frozen=True):
     """Definition of one form field."""
+
     key: str = Field(pattern=KEY_PATTERN)
     type: FieldType
     label: I18nMap
@@ -270,6 +273,7 @@ class StateDef(FrozenStrictCamelModel, frozen=True):
         is_approved: An application in this state is approved (spec 000571).
         is_denied: An application in this state is denied (spec 000571).
     """
+
     key: str = Field(pattern=KEY_PATTERN)
     label: I18nMap
     color: str | None = None
@@ -304,6 +308,7 @@ class TransitionDef(FrozenStrictCamelModel, frozen=True):
         requires_action: The transition counts as an open task of the actor (Tasks
             tab). False marks a purely optional action.
     """
+
     from_: str = Field(alias="from")
     to: str
     label: I18nMap | None = None
@@ -318,6 +323,7 @@ class TransitionDef(FrozenStrictCamelModel, frozen=True):
 
 class FlowGraph(FrozenStrictCamelModel, frozen=True):
     """A flow: its states, transitions and editor layout."""
+
     states: list[StateDef]
     transitions: list[TransitionDef] = Field(default_factory=list)
     layout: dict[str, Any] | None = None
@@ -385,10 +391,7 @@ def validate_flow_graph(graph: FlowGraph) -> None:
                     raise GuardError(
                         "addToNextSession action is only valid on a transition into a vote state"
                     )
-                if (
-                    action.get("type") in ASSIGN_BUDGET_ACTION_TYPES
-                    and t.to in budget_vote_keys
-                ):
+                if action.get("type") in ASSIGN_BUDGET_ACTION_TYPES and t.to in budget_vote_keys:
                     raise GuardError(
                         f"{action.get('type')} action is not valid on a transition into "
                         "a vote state whose Gremium comes from the cost center; assign "
@@ -479,8 +482,7 @@ def _validate_vote_gremium(state: StateDef) -> None:
     if has_source:
         if state.config["gremiumSource"] != GREMIUM_SOURCE_BUDGET:
             raise FlowValidationError(
-                f"vote state {state.key!r}: config.gremiumSource must be "
-                f"{GREMIUM_SOURCE_BUDGET!r}"
+                f"vote state {state.key!r}: config.gremiumSource must be {GREMIUM_SOURCE_BUDGET!r}"
             )
         if state.is_initial:
             raise FlowValidationError(
@@ -491,8 +493,7 @@ def _validate_vote_gremium(state: StateDef) -> None:
     gremium_id = state.config.get("gremiumId")
     if not isinstance(gremium_id, str) or not gremium_id:
         raise FlowValidationError(
-            f"vote state {state.key!r} requires config.gremiumId or "
-            "config.gremiumSource 'budget'"
+            f"vote state {state.key!r} requires config.gremiumId or config.gremiumSource 'budget'"
         )
 
 
@@ -528,9 +529,7 @@ def _reachable(initial: str, adjacency: Mapping[str, tuple[str, ...]]) -> frozen
     return seen | frontier
 
 
-def _assert_no_automatic_cycle(
-    key_set: set[str], transitions: list[TransitionDef]
-) -> None:
+def _assert_no_automatic_cycle(key_set: set[str], transitions: list[TransitionDef]) -> None:
     """Assert that the automatic subgraph has no cycle.
 
     A guard-less ``automatic`` transition fires at once on the minute cron. Take two
@@ -575,9 +574,7 @@ def _first_cycle(
             case (None, True, _):
                 return (*trail[trail.index(node) :], node), finished
             case (None, False, False):
-                inner, searched = _first_cycle(
-                    adjacency[node], (*trail, node), finished, adjacency
-                )
+                inner, searched = _first_cycle(adjacency[node], (*trail, node), finished, adjacency)
                 return inner, searched | {node}
             case _:
                 return found
@@ -587,15 +584,14 @@ def _first_cycle(
 
 class Quorum(FrozenStrictCamelModel, frozen=True):
     """Quorum of a vote: a count or a percentage."""
+
     type: Literal["count", "percent"]
     value: float = Field(ge=0)
 
 
 #: The majority rules of a motion. The two members rules count the yes ballots against
 #: the eligible count of the vote, the other three against the cast ballots.
-MajorityRule = Literal[
-    "simple", "absolute", "two_thirds", "members_majority", "members_two_thirds"
-]
+MajorityRule = Literal["simple", "absolute", "two_thirds", "members_majority", "members_two_thirds"]
 MEMBERS_RULES: frozenset[str] = frozenset({"members_majority", "members_two_thirds"})
 
 #: What the quorum of a vote counts: the cast ballots, or the present persons of the
@@ -724,9 +720,7 @@ class ElectionConfig(FrozenStrictCamelModel, frozen=True):
     """
 
     seats: int = Field(ge=1, le=ELECTION_MAX_CANDIDATES)
-    candidates: list[ElectionCandidate] = Field(
-        min_length=1, max_length=ELECTION_MAX_CANDIDATES
-    )
+    candidates: list[ElectionCandidate] = Field(min_length=1, max_length=ELECTION_MAX_CANDIDATES)
     secret: bool = True
     quorum: Quorum | None = None
     quorum_basis: QuorumBasis = Field(default="ballots", alias="quorumBasis")
@@ -743,9 +737,7 @@ class ElectionConfig(FrozenStrictCamelModel, frozen=True):
             return self
         return self.model_copy(
             update={
-                "candidates": [
-                    c.model_copy(update={"principal_id": None}) for c in self.candidates
-                ]
+                "candidates": [c.model_copy(update={"principal_id": None}) for c in self.candidates]
             }
         )
 
@@ -899,6 +891,7 @@ class PollConfig(FrozenStrictCamelModel, frozen=True):
 
 class Recipient(FrozenStrictCamelModel, frozen=True):
     """Recipient of a notification rule: a group, a role or the applicant."""
+
     kind: Literal["group", "role", "applicant"]
     ref: str | None = None
 
@@ -914,6 +907,7 @@ class Recipient(FrozenStrictCamelModel, frozen=True):
 
 class NotificationRule(FrozenStrictCamelModel, frozen=True):
     """Rule that sends a mail template to recipients on an event."""
+
     event: EventName
     filter_type_id: UUID | None = Field(default=None, alias="filterTypeId")
     recipients: list[Recipient] = Field(min_length=1)
@@ -923,6 +917,7 @@ class NotificationRule(FrozenStrictCamelModel, frozen=True):
 
 class WebhookConfig(FrozenStrictCamelModel, frozen=True):
     """Config of one outgoing webhook."""
+
     name: str
     url: HttpUrl
     active: bool = True
@@ -930,6 +925,7 @@ class WebhookConfig(FrozenStrictCamelModel, frozen=True):
 
 class ComparisonOffers(FrozenStrictCamelModel, frozen=True):
     """Requirement for comparison offers on an application."""
+
     required: bool = False
     min_count: int = Field(default=2, alias="minCount", ge=0)
     threshold_amount: Decimal | None = Field(default=None, alias="thresholdAmount", ge=0)

@@ -235,9 +235,7 @@ def issue_oauth_tx(secret: str, data: dict[str, str]) -> str:
 
     The cookie holds client_id, redirect_uri, code_challenge, scope and state.
     """
-    return _serializer(secret, _OAUTH_TX_SALT).dumps(
-        {k: data.get(k, "") for k in _OAUTH_TX_FIELDS}
-    )
+    return _serializer(secret, _OAUTH_TX_SALT).dumps({k: data.get(k, "") for k in _OAUTH_TX_FIELDS})
 
 
 def load_oauth_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None:
@@ -325,9 +323,7 @@ async def load_principal_session(
     sid = _unsign_sid(secret, cookie_value, max_age)
     if sid is None:
         return None
-    row = (
-        await db.execute(select(AuthSession).where(AuthSession.sid == sid))
-    ).scalar_one_or_none()
+    row = (await db.execute(select(AuthSession).where(AuthSession.sid == sid))).scalar_one_or_none()
     if row is None or row.expires_at <= now:
         return None
     return row
@@ -359,9 +355,7 @@ async def delete_principal_session(
     sid = _unsign_sid(secret, cookie_value, max_age)
     if sid is None:
         return None
-    row = (
-        await db.execute(select(AuthSession).where(AuthSession.sid == sid))
-    ).scalar_one_or_none()
+    row = (await db.execute(select(AuthSession).where(AuthSession.sid == sid))).scalar_one_or_none()
     if row is None:
         return None
     await db.delete(row)

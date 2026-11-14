@@ -26,9 +26,7 @@ _UPGRADE: tuple[str, ...] = (
     ),
 )
 
-_DOWNGRADE: tuple[str, ...] = (
-    "ALTER TABLE transition DROP COLUMN IF EXISTS requires_action",
-)
+_DOWNGRADE: tuple[str, ...] = ("ALTER TABLE transition DROP COLUMN IF EXISTS requires_action",)
 
 
 def upgrade() -> None:

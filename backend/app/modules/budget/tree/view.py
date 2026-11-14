@@ -201,14 +201,10 @@ class TreeViewOps(BudgetTreeServiceBase):
         requested_rows = _positive_rows(shares, "requested")
 
         expended_rows = [
-            (fy, path, amount)
-            for path, fy, amount, kind, _app in expense_rows
-            if kind == "expense"
+            (fy, path, amount) for path, fy, amount, kind, _app in expense_rows if kind == "expense"
         ]
         income_rows = [
-            (fy, path, amount)
-            for path, fy, amount, kind, _app in expense_rows
-            if kind == "income"
+            (fy, path, amount) for path, fy, amount, kind, _app in expense_rows if kind == "income"
         ]
 
         node_tuples = [

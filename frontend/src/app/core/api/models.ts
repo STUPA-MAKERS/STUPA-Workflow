@@ -1645,8 +1645,14 @@ export interface MeetingOutWire {
   readonly admittedGuests?: number;
   /** The open join requests; the meeting lead only, else 0. */
   readonly pendingGuests?: number;
-  /** Public participation is possible: only a gremium without a quorum allows it. */
-  readonly publicJoinAllowed?: boolean;
+  /** Guests can get a ballot: the Gremium has the switch on and no quorum. */
+  readonly guestsVoteAllowed?: boolean;
+  /** The kind of the meeting. */
+  readonly kind?: MeetingKind;
+  /** The place of the meeting, or `null`. */
+  readonly location?: string | null;
+  /** The form of the meeting. */
+  readonly form?: MeetingForm;
   /** The earliest open of a planned meeting with a date (UTC), else `null`. */
   readonly opensAt?: IsoDateTime | null;
   /** Before this point the open needs `confirmEarly` (UTC), else `null`. */
@@ -1686,6 +1692,9 @@ export interface MeetingCreateBody {
   /** Public participation over a QR code. */
   readonly publicJoin?: boolean;
   readonly guestsMode?: GuestsMode;
+  readonly kind?: MeetingKind;
+  readonly location?: string | null;
+  readonly form?: MeetingForm;
 }
 
 /** Body for `PATCH /meetings/{id}`. Status, active application, date or protokollant. */
@@ -1713,6 +1722,10 @@ export interface MeetingPatchBody {
   readonly publicJoin?: boolean;
   /** Guests vote or only follow. `watch` gives 409 `guest_vote_open` while a guest vote runs. */
   readonly guestsMode?: GuestsMode;
+  /** Only while the meeting is planned (409 `meeting_not_planned`). */
+  readonly kind?: MeetingKind;
+  readonly location?: string | null;
+  readonly form?: MeetingForm;
   /** Confirms an early open (`status: 'live'` before `confirmUntil`). */
   readonly confirmEarly?: boolean;
 }
@@ -1845,8 +1858,14 @@ export interface Meeting {
   readonly admittedGuests: number;
   /** The open join requests (meeting lead only, else 0). */
   readonly pendingGuests: number;
-  /** Public participation is possible: only a gremium without a quorum allows it. */
-  readonly publicJoinAllowed: boolean;
+  /** Guests can get a ballot: the Gremium has the switch on and no quorum. */
+  readonly guestsVoteAllowed: boolean;
+  /** The kind of the meeting. Only a planned meeting changes it. */
+  readonly kind: MeetingKind;
+  /** The place of the meeting, or `null`. */
+  readonly location: string | null;
+  /** The form of the meeting. */
+  readonly form: MeetingForm;
   /** The earliest open of a planned meeting with a date (ISO, UTC), else `null`. */
   readonly opensAt: IsoDateTime | null;
   /** Before this point the open is early and needs a confirmation (ISO, UTC), else `null`. */
@@ -1979,6 +1998,12 @@ export interface SearchResults {
 
 /** Admitted guests vote (`vote`) or only follow the meeting (`watch`). */
 export type GuestsMode = 'vote' | 'watch';
+/** The kind of a meeting. A new meeting is `ordinary`. */
+export type MeetingKind = 'ordinary' | 'extraordinary' | 'repeat' | 'constituent';
+export const MEETING_KINDS: readonly MeetingKind[] = ['ordinary', 'extraordinary', 'repeat', 'constituent'];
+/** The form of a meeting. A new meeting is `presence`. */
+export type MeetingForm = 'presence' | 'hybrid' | 'video';
+export const MEETING_FORMS: readonly MeetingForm[] = ['presence', 'hybrid', 'video'];
 
 /** The state of a join request or of a guest. */
 export type GuestStatus = 'pending' | 'admitted' | 'rejected' | 'removed' | 'left';
@@ -2086,6 +2111,6 @@ export interface GuestMe {
 
 /** `GET /committees/{id}/meeting-defaults`: what a new meeting of the gremium allows. */
 export interface MeetingDefaults {
-  readonly publicJoinAllowed: boolean;
+  readonly guestsVoteAllowed: boolean;
   readonly quorumPercent: number | null;
 }

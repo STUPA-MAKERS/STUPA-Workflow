@@ -132,9 +132,7 @@ async def convert_builtin_cd_logos(
     )
 
 
-async def _convert_row(
-    row: CdVariantLogo, storage: ObjectStorage | None
-) -> dict[str, Any] | None:
+async def _convert_row(row: CdVariantLogo, storage: ObjectStorage | None) -> dict[str, Any] | None:
     """Upload the bundled file of one vendored row and turn the row into an upload.
 
     Returns:

@@ -1,0 +1,68 @@
+<app-dialog
+  [open]="open()"
+  [title]="'admin.gremien.defaults.title' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="close()"
+>
+  <app-load-state
+    [state]="state()"
+    [errorText]="'admin.gremien.defaults.loadFailed' | t"
+    (retry)="load()"
+  >
+    <ng-template #loading>
+      <app-skeleton variant="lines" [count]="4" [label]="'admin.gremien.defaults.loading' | t" />
+    </ng-template>
+    <ng-template #content>
+      @if (form(); as f) {
+        <form class="gdd" (submit)="$event.preventDefault(); save()">
+          <app-input
+            type="number"
+            [label]="'admin.gremien.quorum' | t"
+            name="quorumPercent"
+            [ngModel]="f.quorumPercent"
+            (ngModelChange)="patchPercent('quorumPercent', $event)"
+          />
+          <app-input
+            type="number"
+            [label]="'admin.gremien.repeatQuorum' | t"
+            name="repeatQuorumPercent"
+            [ngModel]="f.repeatQuorumPercent"
+            (ngModelChange)="patchPercent('repeatQuorumPercent', $event)"
+          />
+          <app-switch
+            class="gdd__switch"
+            name="guestsMayVote"
+            [ngModel]="f.guestsMayVote"
+            (ngModelChange)="patch({ guestsMayVote: $event })"
+            >{{ 'admin.gremien.guestsMayVote' | t }}</app-switch
+          >
+          <app-switch
+            class="gdd__switch"
+            name="allowVoteDelegation"
+            [ngModel]="f.allowVoteDelegation"
+            (ngModelChange)="patch({ allowVoteDelegation: $event })"
+            >{{ 'admin.gremien.delegation' | t }}</app-switch
+          >
+          <app-input
+            type="number"
+            [label]="'admin.gremien.delegationLead' | t"
+            name="delegationLeadMinutes"
+            [ngModel]="f.delegationLeadMinutes"
+            (ngModelChange)="patchLead($event)"
+          />
+          <button type="submit" hidden></button>
+        </form>
+      }
+    </ng-template>
+  </app-load-state>
+
+  <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="fill"
+    [disabled]="form() === null"
+    [loading]="saving()"
+    (click)="save()"
+    >{{ 'action.save' | t }}</app-button
+  >
+</app-dialog>

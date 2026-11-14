@@ -31,6 +31,14 @@
       @if (optionsLoaded() && !gremiumOptions().length) {
         <p class="cmd__hint" role="status">{{ 'meetings.create.noGremien' | t }}</p>
       }
+      <app-select
+        name="kind"
+        [id]="'cmd-kind'"
+        [label]="'meetings.kind.label' | t"
+        [options]="kindOptions()"
+        [ngModel]="kind()"
+        (ngModelChange)="kind.set($event)"
+      />
       <div class="cmd__when">
         <app-datepicker
           name="date"
@@ -56,6 +64,24 @@
           (ngModelChange)="endTime.set($event)"
         />
       </div>
+      <div class="cmd__where">
+        <app-input
+          name="location"
+          [id]="'cmd-location'"
+          [label]="'meetings.location.label' | t"
+          [error]="locationError()"
+          [ngModel]="location()"
+          (ngModelChange)="location.set($event)"
+        />
+        <app-select
+          name="form"
+          [id]="'cmd-form'"
+          [label]="'meetings.form.label' | t"
+          [options]="formOptions()"
+          [ngModel]="form()"
+          (ngModelChange)="form.set($event)"
+        />
+      </div>
     } @else {
       <app-input
         name="title"
@@ -76,8 +102,7 @@
       <app-public-join-settings
         [(publicJoin)]="publicJoin"
         [(guestsMode)]="guestsMode"
-        [allowed]="defaults()?.publicJoinAllowed ?? true"
-        [quorumPercent]="defaults()?.quorumPercent ?? null"
+        [voteAllowed]="defaults()?.guestsVoteAllowed ?? false"
       />
     }
     <button type="submit" hidden></button>

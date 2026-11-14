@@ -105,9 +105,7 @@ async def _standalone_scope(
         if g.startswith(VOTE_GROUP_PREFIX)
     ) | {str(gid) for ids in held for gid in ids}
     standalone_ok = (
-        and_(Vote.meeting_id.is_(None), Vote.eligible_group.in_(sorted(keys)))
-        if keys
-        else false()
+        and_(Vote.meeting_id.is_(None), Vote.eligible_group.in_(sorted(keys))) if keys else false()
     )
     return global_ok, standalone_ok
 

@@ -97,9 +97,7 @@ def _settings_out(row: NotificationSettings) -> NotificationSettingsOut:
     )
 
 
-@admin_router.get(
-    "", response_model=NotificationSettingsOut, responses=_AUTH_ERRORS
-)
+@admin_router.get("", response_model=NotificationSettingsOut, responses=_AUTH_ERRORS)
 async def get_notification_settings(
     service: ServiceDep, _principal: NotifAdmin
 ) -> NotificationSettingsOut:
@@ -128,9 +126,7 @@ async def put_notification_settings(
 
 
 @templates_router.get("", response_model=list[MailTemplateOut], responses=_AUTH_ERRORS)
-async def list_mail_templates(
-    service: ServiceDep, _principal: NotifAdmin
-) -> list[MailTemplateOut]:
+async def list_mail_templates(service: ServiceDep, _principal: NotifAdmin) -> list[MailTemplateOut]:
     """List all mail templates (i18n subject, body and HTML plus placeholders)."""
     return await service.list_templates()
 

@@ -77,9 +77,7 @@ async def login(
     state = oidc.generate_state()
     nonce = oidc.generate_nonce()
     try:
-        url = await oidc.authorization_url(
-            settings, state=state, challenge=challenge, nonce=nonce
-        )
+        url = await oidc.authorization_url(settings, state=state, challenge=challenge, nonce=nonce)
     except OidcError as exc:
         raise ServiceUnavailableError("The identity provider is unavailable.") from exc
     response = RedirectResponse(url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)

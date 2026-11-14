@@ -34,10 +34,7 @@ depends_on: str | Sequence[str] | None = None
 _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE application ADD COLUMN IF NOT EXISTS archived_at timestamptz",
     "ALTER TABLE application ADD COLUMN IF NOT EXISTS archived_by text",
-    (
-        "CREATE INDEX IF NOT EXISTS ix_application_archived_at "
-        "ON application (archived_at)"
-    ),
+    ("CREATE INDEX IF NOT EXISTS ix_application_archived_at ON application (archived_at)"),
     (
         "INSERT INTO role_permission (role_id, permission) "
         "SELECT r.id, 'application.archive' FROM role r "

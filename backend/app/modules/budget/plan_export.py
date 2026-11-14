@@ -162,11 +162,7 @@ class ExportHead:
     @property
     def state_label(self) -> str:
         """The state of the version in words: the open step for a version in progress."""
-        return (
-            self.step
-            if self.state == "in_progress" and self.step
-            else STATE_LABELS[self.state]
-        )
+        return self.step if self.state == "in_progress" and self.step else STATE_LABELS[self.state]
 
     @property
     def title(self) -> str:
@@ -288,8 +284,7 @@ def build_export(
         for pair in _rows(child, 0, by_id, base_by_id, prev_by_id, prev_fiscal_year_id)
     )
     grouped: tuple[tuple[Group, tuple[ExportRow, ...]], ...] = tuple(
-        (group, tuple(row for side, row in pairs if (side or "none") == group))
-        for group in GROUPS
+        (group, tuple(row for side, row in pairs if (side or "none") == group)) for group in GROUPS
     )
     return PlanExport(
         head=head,

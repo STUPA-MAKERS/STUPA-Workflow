@@ -82,9 +82,7 @@ async def permission_holders(
     inactive account never counts. ``principal_id`` narrows the result to one account.
     """
     roles = _holder_role_ids(perm)
-    assigned = select(RoleAssignment.principal_id).where(
-        RoleAssignment.role_id.in_(roles)
-    )
+    assigned = select(RoleAssignment.principal_id).where(RoleAssignment.role_id.in_(roles))
     groups = list(
         (
             await session.scalars(

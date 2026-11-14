@@ -172,16 +172,17 @@ describe('JoinQrComponent', () => {
     expect(screen.queryByRole('button', { name: /Auf dem Beamer zeigen/ })).toBeNull();
   });
 
-describe('public participation needs a gremium without a quorum', () => {
-  it('locks the switch and names the quorum, but lets a public meeting switch off', async () => {
-    const { fixture } = await render(PublicJoinSettingsComponent, { inputs: { allowed: false, quorumPercent: 50 } });
-    expect(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ })).toBeDisabled();
-    expect(screen.getByText('Nur in Gremien ohne Quorum möglich. Dieses Gremium hat ein Quorum von 50 %.')).toBeInTheDocument();
-    fixture.componentRef.setInput('quorumPercent', null);
-    fixture.componentInstance.publicJoin.set(true);
-    fixture.detectChanges();
-    expect(screen.getByText('Nur in Gremien ohne Quorum möglich.')).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ })).toBeEnabled();
+describe('a Gremium that gives guests no ballot', () => {
+  /** §F/meetings/meetings/000904, §F/meetings/meetings/000905 */
+  it('keeps the switch usable and shows the lock line in place of the choice', async () => {
+    const { fixture } = await render(PublicJoinSettingsComponent, { inputs: { voteAllowed: false } });
+    const sw = screen.getByRole('switch', { name: /Öffentliche Teilnahme/ });
+    expect(sw).toBeEnabled();
+    expect(screen.queryByText('Gäste schauen in diesem Gremium nur zu.')).toBeNull();
+    await userEvent.click(sw);
+    expect(fixture.componentInstance.publicJoin()).toBe(true);
+    expect(screen.getByText('Gäste schauen in diesem Gremium nur zu.')).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Gäste dürfen abstimmen/ })).toBeNull();
   });
 });
 });

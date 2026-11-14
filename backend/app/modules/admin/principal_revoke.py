@@ -222,11 +222,7 @@ def group_targets(snap: Snapshot) -> dict[str, tuple[set[UUID], set[UUID]]]:
     own = set(snap.groups)
     gremium_pairs = [
         *((group, gid) for group, gid in snap.membership_maps if group in own),
-        *(
-            (group, gid)
-            for group, gid, _role_id in snap.role_maps
-            if group in own and gid in tied
-        ),
+        *((group, gid) for group, gid, _role_id in snap.role_maps if group in own and gid in tied),
     ]
     role_pairs = [
         (group, role.id)
@@ -315,9 +311,7 @@ def _membership_out(snap: Snapshot, gid: UUID) -> RevokeMembershipOut | None:
     )
 
 
-def build_preview(
-    snap: Snapshot, row: PrincipalRow, *, is_self: bool
-) -> RevokePreviewOut:
+def build_preview(snap: Snapshot, row: PrincipalRow, *, is_self: bool) -> RevokePreviewOut:
     """Build the preview of the dialog from the snapshot. Writes nothing."""
     targets = group_targets(snap)
     gremien = sorted(
@@ -326,9 +320,7 @@ def build_preview(
                 gremium_id=gid,
                 name=snap.gremium_names.get(gid, ""),
                 membership=_membership_out(snap, gid),
-                groups=_ordered_groups(
-                    snap, (g for g, (gs, _rs) in targets.items() if gid in gs)
-                ),
+                groups=_ordered_groups(snap, (g for g, (gs, _rs) in targets.items() if gid in gs)),
                 pool_entries=[_pool_out(p, snap) for p in snap.pool if p.gremium_id == gid],
                 planned_delegations=[
                     _delegation_out(d, snap)
@@ -356,9 +348,7 @@ def build_preview(
                     snap, (g for g, (_gs, rs) in targets.items() if role.id in rs)
                 ),
                 assignments=[
-                    _assignment_out(a, snap)
-                    for a in snap.assignments
-                    if a.role.id == role.id
+                    _assignment_out(a, snap) for a in snap.assignments if a.role.id == role.id
                 ],
             )
             for role in held_roles(snap).values()
@@ -413,9 +403,9 @@ def plan_revoke(
         )
     tied = tied_gremien(snap)
     held = held_roles(snap)
-    unknown = [
-        FieldError(field="gremiumIds", msg=str(g)) for g in gremien if g not in tied
-    ] + [FieldError(field="globalRoleIds", msg=str(r)) for r in roles if r not in held]
+    unknown = [FieldError(field="gremiumIds", msg=str(g)) for g in gremien if g not in tied] + [
+        FieldError(field="globalRoleIds", msg=str(r)) for r in roles if r not in held
+    ]
     if unknown:
         raise ValidationProblem(
             "The person has no tie to a selected Gremium or role.",
@@ -424,9 +414,7 @@ def plan_revoke(
         )
     chosen_g, chosen_r = set(gremien), set(roles)
     targets = group_targets(snap)
-    removed = [
-        g for g, (gs, rs) in targets.items() if gs & chosen_g or rs & chosen_r
-    ]
+    removed = [g for g, (gs, rs) in targets.items() if gs & chosen_g or rs & chosen_r]
     missing_g = {gid for g in removed for gid in targets[g][0] - chosen_g}
     missing_r = {rid for g in removed for rid in targets[g][1] - chosen_r}
     if missing_g or missing_r:
@@ -434,10 +422,7 @@ def plan_revoke(
             "A removed SSO group also leads to an entry that is not selected.",
             code="revoke_incomplete",
             errors=[FieldError(field="gremiumIds", msg=str(g)) for g in sorted(missing_g, key=str)]
-            + [
-                FieldError(field="globalRoleIds", msg=str(r))
-                for r in sorted(missing_r, key=str)
-            ],
+            + [FieldError(field="globalRoleIds", msg=str(r)) for r in sorted(missing_r, key=str)],
         )
     assignments = [a for a in snap.assignments if a.role.id in chosen_r]
     in_chosen = [d for d in snap.delegations if d.gremium_id in chosen_g]
@@ -475,9 +460,7 @@ def has_groups_filter(has_groups: bool | None) -> ColumnElement[bool] | None:
     if has_groups is None:
         return None
     col = PrincipalRow.oidc_groups
-    length = case(
-        (func.jsonb_typeof(col) == "array", func.jsonb_array_length(col)), else_=0
-    )
+    length = case((func.jsonb_typeof(col) == "array", func.jsonb_array_length(col)), else_=0)
     return length > 0 if has_groups else length == 0
 
 
@@ -588,9 +571,7 @@ class PrincipalRevokeService:
         if row is None:
             raise NotFoundError(f"principal {principal_id} not found")
         if row.merged_into is not None:
-            raise ConflictError(
-                "A merged account holds no rights.", code="principal_merged"
-            )
+            raise ConflictError("A merged account holds no rights.", code="principal_merged")
         return row
 
     async def _snapshot(self, row: PrincipalRow) -> Snapshot:
@@ -651,9 +632,7 @@ class PrincipalRevokeService:
         others = _other_people(base) - {pid}
         names = {i: ref.name for i, ref in (await refs_by_id(s, others)).items()}
         grantors = {a.granted_by for a in base.assignments if a.granted_by}
-        grantor_names = {
-            sub: ref.name for sub, ref in (await refs_by_sub(s, grantors)).items()
-        }
+        grantor_names = {sub: ref.name for sub, ref in (await refs_by_sub(s, grantors)).items()}
         open_tasks = await self._open_tasks(
             row.sub, {m.gremium_id for m in base.memberships if m.can_vote}
         )

@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/integration/modules/livevote/test_open_window.py:test_gremium_defaults_leave_an_old_gremium"
+  - "backend/tests/unit/modules/livevote/test_open_window.py:test_update_gremium_defaults_audits_only_the_change"
+implementation:
+  - backend/app/modules/livevote/open_window.py
+  - backend/app/modules/admin/router.py
+  - backend/app/modules/meetings/models.py
+  - frontend/src/app/pages/admin/committees/gremium-defaults-dialog/gremium-defaults-dialog.component.ts
+  - frontend/src/app/pages/admin/committees/gremium-dialog/gremium-dialog.component.ts
 scope:
   - backend/app/modules/admin
   - backend/app/modules/meetings

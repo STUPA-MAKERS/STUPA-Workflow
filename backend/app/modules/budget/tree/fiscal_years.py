@@ -239,9 +239,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
     ) -> bool:
         """Tell whether at least one row of that table references this fiscal year."""
         found = (
-            await self.session.execute(
-                select(id_col).where(fy_col == fiscal_year_id).limit(1)
-            )
+            await self.session.execute(select(id_col).where(fy_col == fiscal_year_id).limit(1))
         ).scalar_one_or_none()
         return found is not None
 
@@ -355,9 +353,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
         """
         fy = await self._get_fiscal_year(fiscal_year_id)
         if fy.budget_id != top.id:
-            raise NotFoundError(
-                f"fiscal year {fiscal_year_id} does not belong to budget {top.id}"
-            )
+            raise NotFoundError(f"fiscal year {fiscal_year_id} does not belong to budget {top.id}")
         return fy
 
     async def set_fiscal_year_closed(

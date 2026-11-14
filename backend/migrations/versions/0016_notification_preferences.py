@@ -28,9 +28,7 @@ _UPGRADE: tuple[str, ...] = (
     ),
 )
 
-_DOWNGRADE: tuple[str, ...] = (
-    "DROP TABLE IF EXISTS notification_preference",
-)
+_DOWNGRADE: tuple[str, ...] = ("DROP TABLE IF EXISTS notification_preference",)
 
 
 def upgrade() -> None:

@@ -134,9 +134,7 @@ class EditOps(ApplicationsServiceBase):
             target_id=str(app.id),
             data={
                 "version": next_version,
-                "changedFields": sorted(
-                    {*diff["added"], *diff["removed"], *diff["changed"]}
-                ),
+                "changedFields": sorted({*diff["added"], *diff["removed"], *diff["changed"]}),
             },
         )
         try:
@@ -188,18 +186,14 @@ class EditOps(ApplicationsServiceBase):
             self.session,
             actor=actor,
             action=(
-                AuditAction.APPLICATION_ARCHIVE
-                if archived
-                else AuditAction.APPLICATION_UNARCHIVE
+                AuditAction.APPLICATION_ARCHIVE if archived else AuditAction.APPLICATION_UNARCHIVE
             ),
             target_type="application",
             target_id=str(app.id),
             data={
                 "typeId": str(app.type_id),
                 "gremiumId": str(app.gremium_id) if app.gremium_id else None,
-                "currentStateId": (
-                    str(app.current_state_id) if app.current_state_id else None
-                ),
+                "currentStateId": (str(app.current_state_id) if app.current_state_id else None),
             },
         )
         now = datetime.now(UTC)
@@ -240,12 +234,8 @@ class EditOps(ApplicationsServiceBase):
             data={
                 "typeId": str(app.type_id),
                 "gremiumId": str(app.gremium_id) if app.gremium_id else None,
-                "currentStateId": (
-                    str(app.current_state_id) if app.current_state_id else None
-                ),
-                "fiscalYearId": (
-                    str(app.fiscal_year_id) if app.fiscal_year_id else None
-                ),
+                "currentStateId": (str(app.current_state_id) if app.current_state_id else None),
+                "fiscalYearId": (str(app.fiscal_year_id) if app.fiscal_year_id else None),
                 "budgetId": str(app.budget_id) if app.budget_id else None,
                 "versionCount": int(version_count or 0),
             },

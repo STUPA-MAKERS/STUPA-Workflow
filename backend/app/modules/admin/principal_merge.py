@@ -283,9 +283,7 @@ class _Tally:
     ``_Counts`` for the area and never changes one in place.
     """
 
-    by_area: dict[MergeArea, _Counts] = field(
-        default_factory=lambda: {a: _Counts() for a in AREAS}
-    )
+    by_area: dict[MergeArea, _Counts] = field(default_factory=lambda: {a: _Counts() for a in AREAS})
 
     def add(
         self, area: MergeArea, *, rewritten: int = 0, combined: int = 0, removed: int = 0
@@ -301,9 +299,7 @@ class _Tally:
     def out(self) -> list[MergeAreaOut]:
         """Return the counts of every area in display order."""
         return [
-            MergeAreaOut(
-                area=a, rewritten=c.rewritten, combined=c.combined, removed=c.removed
-            )
+            MergeAreaOut(area=a, rewritten=c.rewritten, combined=c.combined, removed=c.removed)
             for a, c in self.by_area.items()
         ]
 
@@ -388,22 +384,16 @@ class PrincipalMergeService:
         if target is None:
             raise NotFoundError(f"principal {target_id} not found")
         if source.merged_into is not None:
-            raise ConflictError(
-                "This account is already merged.", code="principal_already_merged"
-            )
+            raise ConflictError("This account is already merged.", code="principal_already_merged")
         if target.merged_into is not None:
             raise ConflictError(
                 "The target account is merged into another account.",
                 code="merge_target_merged",
             )
         if target.active is False:
-            raise ConflictError(
-                "The target account is deactivated.", code="merge_target_inactive"
-            )
+            raise ConflictError("The target account is deactivated.", code="merge_target_inactive")
         if await self._erased([source.id, target.id]):
-            raise ConflictError(
-                "An erased account cannot be merged.", code="principal_erased"
-            )
+            raise ConflictError("An erased account cannot be merged.", code="principal_erased")
         return source, target
 
     async def _erased(self, ids: list[UUID]) -> bool:
@@ -477,9 +467,7 @@ class PrincipalMergeService:
         extra = sorted(have_source - have_target)
         if not extra:
             return [], True
-        actor_row = await self.session.scalar(
-            select(PrincipalRow).where(PrincipalRow.sub == actor)
-        )
+        actor_row = await self.session.scalar(select(PrincipalRow).where(PrincipalRow.sub == actor))
         have_actor = await self._effective(actor_row, now)
         covered = ALL_RIGHTS in have_actor or set(extra) <= have_actor
         gremium_ids = {UUID(k.split("@", 1)[1]) for k in extra if "@" in k}
@@ -508,6 +496,7 @@ class PrincipalMergeService:
         same meeting (an equal one is a harmless duplicate); an open erasure request,
         because its execution would erase the account that it names.
         """
+
         async def found(kind: MergeConflictKind, stmt: Select[Any]) -> list[MergeConflictOut]:
             rows = (await self.session.execute(stmt)).all()
             return [MergeConflictOut(kind=kind, label=label) for (label,) in rows]
@@ -541,9 +530,7 @@ class PrincipalMergeService:
 
         same_meeting = await found(
             "delegation_same_meeting",
-            meeting_where(
-                deleg(delegator_principal_id=old), deleg(delegator_principal_id=new)
-            ),
+            meeting_where(deleg(delegator_principal_id=old), deleg(delegator_principal_id=new)),
         )
         vote_twice = await found(
             "delegation_vote_twice",
@@ -605,9 +592,7 @@ class PrincipalMergeService:
         for area, column in ID_COLUMNS:
             await self._rewrite(area, column, source.id, target.id, tally, apply=apply)
 
-    async def _remove(
-        self, column: InstrumentedAttribute[Any], old: UUID, *, apply: bool
-    ) -> int:
+    async def _remove(self, column: InstrumentedAttribute[Any], old: UUID, *, apply: bool) -> int:
         """Delete the rows whose ``column`` is ``old``, or count them. Return the number."""
         table = _table(column)
         return (
@@ -729,9 +714,7 @@ class PrincipalMergeService:
             NotificationPreference.principal_id,
             old,
             new,
-            exists().where(
-                np.principal_id == new, np.kind == NotificationPreference.kind
-            ),
+            exists().where(np.principal_id == new, np.kind == NotificationPreference.kind),
             tally,
             apply=apply,
         )
@@ -742,9 +725,7 @@ class PrincipalMergeService:
             MeetingAttendance.principal_id,
             old,
             new,
-            exists().where(
-                att.principal_id == new, att.meeting_id == MeetingAttendance.meeting_id
-            ),
+            exists().where(att.principal_id == new, att.meeting_id == MeetingAttendance.meeting_id),
             tally,
             apply=apply,
             extra={
@@ -844,9 +825,7 @@ class PrincipalMergeService:
             new,
             exists().where(
                 substitute_other.gremium_id == ds.gremium_id,
-                substitute_other.member_principal_id.is_not_distinct_from(
-                    ds.member_principal_id
-                ),
+                substitute_other.member_principal_id.is_not_distinct_from(ds.member_principal_id),
                 substitute_other.substitute_principal_id == new,
             ),
             tally,
@@ -946,9 +925,7 @@ class PrincipalMergeService:
         await sync_principal_memberships(self.session, source)
         return now
 
-    async def preview(
-        self, source_id: UUID, target_id: UUID, *, actor: str
-    ) -> MergePreviewOut:
+    async def preview(self, source_id: UUID, target_id: UUID, *, actor: str) -> MergePreviewOut:
         """Count what a merge would do and list the conflicts. Write nothing.
 
         ``actor`` is the ``sub`` of the admin. The extra rights of the source block the
@@ -973,9 +950,7 @@ class PrincipalMergeService:
             can_merge=not conflicts and covered,
         )
 
-    async def merge(
-        self, source_id: UUID, target_id: UUID, *, actor: str
-    ) -> MergeResultOut:
+    async def merge(self, source_id: UUID, target_id: UUID, *, actor: str) -> MergeResultOut:
         """Merge the source into the target in one transaction and commit.
 
         ``actor`` is the ``sub`` of the admin.
@@ -1007,8 +982,7 @@ class PrincipalMergeService:
                     "The old account holds rights that the target and you lack.",
                     code="merge_privileges",
                     errors=[
-                        FieldError(field="permission", msg=_permission_label(p))
-                        for p in extra
+                        FieldError(field="permission", msg=_permission_label(p)) for p in extra
                     ],
                 )
             tally = _Tally()

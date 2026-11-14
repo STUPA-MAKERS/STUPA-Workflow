@@ -47,6 +47,14 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     #: one hour from `start_time`. With it the value must be after `start_time`.
     end_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="planned")
+    #: The kind of the meeting: ``ordinary``, ``extraordinary``, ``repeat``
+    #: (Wiederholungssitzung, with its own quorum) or ``constituent``. It changes only
+    #: while the meeting is ``planned``.
+    kind: Mapped[str] = mapped_column(Text, server_default="ordinary")
+    #: The place of the meeting as free text, for the invitation and the protocol.
+    location: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The form of the meeting: ``presence``, ``hybrid`` or ``video``.
+    form: Mapped[str] = mapped_column(Text, server_default="presence")
     #: The real start. The transition from `planned` to `live` sets it once. It
     #: stays NULL for a meeting that started before the column existed: the audit log
     #: holds no start time for it. A reader then falls back to the planned start.
@@ -78,7 +86,7 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     #: (`vote`) or only follow the meeting (`watch`). It has an effect only while
     #: `public_join` is on.
     public_join: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    guests_mode: Mapped[str] = mapped_column(Text, server_default="vote")
+    guests_mode: Mapped[str] = mapped_column(Text, server_default="watch")
     #: The short code of the join link `/j/<code>`. The first switch-on of
     #: `public_join` creates it, and a rotation replaces it. It is unique among the
     #: meetings that are not closed.
@@ -87,6 +95,10 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     __table_args__ = (
         CheckConstraint("status IN ('planned','live','closed')", name="meeting_status"),
         CheckConstraint("guests_mode IN ('vote','watch')", name="guests_mode"),
+        CheckConstraint(
+            "kind IN ('ordinary','extraordinary','repeat','constituent')", name="meeting_kind"
+        ),
+        CheckConstraint("form IN ('presence','hybrid','video')", name="meeting_form"),
         Index("ix_meeting_gremium_id", "gremium_id"),
         Index(
             "uq_meeting_join_code_open",
@@ -317,6 +329,11 @@ DEFAULT_OPEN_LEAD_MINUTES = 60
 DEFAULT_CONFIRM_LEAD_MINUTES = 10
 #: One week. A larger lead time makes the window useless.
 MAX_LEAD_MINUTES = 10080
+#: The values that the form of a new Gremium starts with. They come from the
+#: Organisationssatzung and the Geschäftsordnung, and the deadlines page changes them.
+DEFAULT_GREMIUM_QUORUM_PERCENT = 40
+DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT = 25
+DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES = 120
 
 
 class MeetingSettings(Base):
@@ -326,6 +343,9 @@ class MeetingSettings(Base):
     planned start. `confirm_lead_minutes` is the end of the early window: before it
     the open needs an extra confirmation. It is never larger than
     `open_lead_minutes`.
+
+    The `default_*` columns are the values that the form of a new Gremium starts
+    with. A change never touches a Gremium that exists.
     """
 
     __tablename__ = "meeting_settings"
@@ -338,6 +358,29 @@ class MeetingSettings(Base):
         Integer,
         server_default=str(DEFAULT_CONFIRM_LEAD_MINUTES),
         default=DEFAULT_CONFIRM_LEAD_MINUTES,
+    )
+    default_quorum_percent: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        server_default=str(DEFAULT_GREMIUM_QUORUM_PERCENT),
+        default=DEFAULT_GREMIUM_QUORUM_PERCENT,
+    )
+    default_repeat_quorum_percent: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        server_default=str(DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT),
+        default=DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT,
+    )
+    default_guests_may_vote: Mapped[bool] = mapped_column(
+        Boolean, server_default="false", default=False
+    )
+    default_allow_vote_delegation: Mapped[bool] = mapped_column(
+        Boolean, server_default="false", default=False
+    )
+    default_delegation_lead_minutes: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES),
+        default=DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES,
     )
     updated_at: Mapped[_datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

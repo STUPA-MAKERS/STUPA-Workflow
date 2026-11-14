@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/integration/modules/livevote/test_public_meeting.py:test_a_gremium_with_a_quorum_lets_guests_only_watch"
+  - "backend/tests/unit/modules/livevote/test_public_meeting_lead_unit.py:test_a_stale_vote_mode_becomes_watch_at_the_switch_on"
+implementation:
+  - backend/app/modules/livevote/service/lifecycle.py
+  - backend/app/modules/livevote/service/service_base.py
+  - frontend/src/app/features/meetings/public-join/public-join-settings.component.html
 scope:
   - backend/app/modules/livevote
   - frontend/src/app/features/meetings

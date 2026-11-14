@@ -24,6 +24,7 @@ from sqlalchemy import select, update
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.guests import GuestEvents, GuestService
 from app.modules.livevote.open_window import check_open
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
@@ -54,6 +55,9 @@ _AUDITED_FIELDS: tuple[tuple[str, str], ...] = (
     ("start_time", "startTime"),
     ("end_time", "endTime"),
     ("protokollant_id", "protokollantId"),
+    ("kind", "kind"),
+    ("location", "location"),
+    ("form", "form"),
 )
 
 
@@ -63,6 +67,19 @@ def _snapshot(meeting: Meeting) -> dict[str, str | None]:
         (key, getattr(meeting, attr)) for attr, key in _AUDITED_FIELDS
     )
     return {key: None if value is None else str(value) for key, value in values}
+
+
+def _apply_kind_place_form(meeting: Meeting, payload: MeetingPatch) -> None:
+    """Write the kind, the place and the form that the patch sent. A null place clears it."""
+    changes: dict[str, str | None] = {
+        **({} if payload.kind is None else {"kind": payload.kind}),
+        **(
+            {"location": payload.location or None} if "location" in payload.model_fields_set else {}
+        ),
+        **({} if payload.form is None else {"form": payload.form}),
+    }
+    for attr, value in changes.items():
+        setattr(meeting, attr, value)
 
 
 def _merged(first: GuestEvents | None, closed: GuestEvents | None) -> GuestEvents | None:
@@ -91,6 +108,11 @@ class LifecycleOps(HandoverOps):
         protokollant_id = await self._resolve_protokollant(
             payload.gremium_id, payload.protokollant_id
         )
+        if payload.guests_mode == "vote":
+            await self._assert_guests_vote_allowed(payload.gremium_id)
+        guests_mode = payload.guests_mode or (
+            "vote" if await self.guests_vote_allowed(payload.gremium_id) else "watch"
+        )
         meeting = Meeting(
             gremium_id=payload.gremium_id,
             title=payload.title,
@@ -98,13 +120,14 @@ class LifecycleOps(HandoverOps):
             start_time=payload.start_time,
             end_time=payload.end_time,
             status="planned",
+            kind=payload.kind,
+            location=payload.location or None,
+            form=payload.form,
             created_by=principal.sub,
             protokollant_id=protokollant_id,
             public_join=payload.public_join,
-            guests_mode=payload.guests_mode,
+            guests_mode=guests_mode,
         )
-        if payload.public_join:
-            await self._assert_public_join_allowed(payload.gremium_id)
         self.session.add(meeting)
         await self.session.flush()
         if payload.public_join:
@@ -214,6 +237,9 @@ class LifecycleOps(HandoverOps):
             or "start_time" in payload.model_fields_set
             or "end_time" in payload.model_fields_set
             or "protokollant_id" in payload.model_fields_set
+            or "kind" in payload.model_fields_set
+            or "location" in payload.model_fields_set
+            or "form" in payload.model_fields_set
             or wants_public
         )
         wants_write = payload.status is not None or payload.active_application_id is not None
@@ -273,6 +299,16 @@ class LifecycleOps(HandoverOps):
                 code="meeting_closed",
             )
 
+        if (
+            payload.kind is not None
+            and payload.kind != meeting.kind
+            and meeting.status != "planned"
+        ):
+            raise ConflictError(
+                "the kind of a meeting changes only before the meeting starts",
+                code="meeting_not_planned",
+            )
+
         before = _snapshot(meeting)
         now = datetime.now(UTC)
         if status_change and payload.status == "live":
@@ -299,6 +335,7 @@ class LifecycleOps(HandoverOps):
             )
         if payload.title is not None:
             meeting.title = payload.title
+        _apply_kind_place_form(meeting, payload)
         if "date" in payload.model_fields_set:
             meeting.date = payload.date
         if "start_time" in payload.model_fields_set:
@@ -330,9 +367,7 @@ class LifecycleOps(HandoverOps):
             meeting.status = payload.status
         await self._stamp_current(meeting, now)
         kept_keeper = (
-            {"protokollantId": before["protokollantId"]}
-            if moved_keeper or switched_keeper
-            else {}
+            {"protokollantId": before["protokollantId"]} if moved_keeper or switched_keeper else {}
         )
         after = {**_snapshot(meeting), **kept_keeper}
         changes = {
@@ -473,7 +508,7 @@ class LifecycleOps(HandoverOps):
         """
         old_public, old_mode = meeting.public_join, meeting.guests_mode
         new_public = old_public if payload.public_join is None else payload.public_join
-        new_mode = old_mode if payload.guests_mode is None else payload.guests_mode
+        new_mode = await self._new_guests_mode(meeting, payload, new_public)
         if (old_public, old_mode) == (new_public, new_mode):
             return None
         if old_mode == "vote" and new_mode == "watch" and await self._guest_vote_open(meeting.id):
@@ -481,8 +516,8 @@ class LifecycleOps(HandoverOps):
                 "A vote with guests is open. Close it before the guests only watch.",
                 code="guest_vote_open",
             )
-        if new_public and not old_public:
-            await self._assert_public_join_allowed(meeting.gremium_id)
+        if new_mode == "vote" and old_mode != "vote":
+            await self._assert_guests_vote_allowed(meeting.gremium_id)
         meeting.public_join = new_public
         meeting.guests_mode = new_mode
         guests = GuestService(self.session)
@@ -507,30 +542,45 @@ class LifecycleOps(HandoverOps):
         )
         return events
 
-    async def _assert_public_join_allowed(self, gremium_id: UUID) -> None:
-        """Allow public participation only in a gremium without a quorum.
+    async def _new_guests_mode(
+        self, meeting: Meeting, payload: MeetingPatch, new_public: bool
+    ) -> str:
+        """Return the guest mode after the patch.
 
-        A gremium with a quorum (STUPA, AStA) decides by the members only; the feature
-        serves the gremien without a quorum (Fachschaften).
+        A meeting can hold the mode ``vote`` from before its Gremium took the ballot
+        from guests. Switching public participation on without a mode then gives
+        ``watch``, because the guests of this Gremium only watch.
+        """
+        if payload.guests_mode is not None:
+            return payload.guests_mode
+        stale = meeting.guests_mode == "vote" and new_public and not meeting.public_join
+        if stale and not await self.guests_vote_allowed(meeting.gremium_id):
+            return "watch"
+        return meeting.guests_mode
+
+    async def _assert_guests_vote_allowed(self, gremium_id: UUID) -> None:
+        """Refuse the guest mode ``vote`` where the Gremium gives guests no ballot.
+
+        A Gremium with a quorum (STUPA, AStA) decides by its members only, so its
+        guests only watch. A Gremium without a quorum follows its switch
+        ``guests_may_vote``.
 
         Raises:
-            ValidationProblem: ``public_join_needs_no_quorum``.
+            ValidationProblem: ``guests_vote_needs_no_quorum`` or ``guests_vote_off``.
         """
-        if await self.gremium_has_quorum(gremium_id):
+        row = await self.session.get(Gremium, gremium_id)
+        if getattr(row, "quorum_percent", None) is not None:
             raise ValidationProblem(
-                "Public participation needs a gremium without a quorum.",
-                code="public_join_needs_no_quorum",
-                errors=[{"field": "publicJoin", "msg": "the gremium has a quorum"}],
+                "Guests only watch in a gremium with a quorum.",
+                code="guests_vote_needs_no_quorum",
+                errors=[{"field": "guestsMode", "msg": "the gremium has a quorum"}],
             )
-
-    async def gremium_has_quorum(self, gremium_id: UUID) -> bool:
-        """Tell if the gremium sets a default quorum (the vote config of its meetings)."""
-        from app.modules.gremien.models import Gremium
-
-        percent = await self.session.scalar(
-            select(Gremium.quorum_percent).where(Gremium.id == gremium_id)
-        )
-        return percent is not None
+        if not bool(getattr(row, "guests_may_vote", False)):
+            raise ValidationProblem(
+                "This gremium gives guests no ballot.",
+                code="guests_vote_off",
+                errors=[{"field": "guestsMode", "msg": "guest ballots are off for the gremium"}],
+            )
 
     async def _guest_vote_open(self, meeting_id: UUID) -> bool:
         """Tell if the meeting has an open vote with guests."""

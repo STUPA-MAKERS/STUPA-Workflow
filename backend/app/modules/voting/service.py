@@ -254,8 +254,7 @@ def _check_closable(vote: Vote, *, quorum_met: bool, now: datetime | None) -> No
     window_expired = now is not None and vote.closes_at is not None and now >= vote.closes_at
     if not quorum_met and not window_expired:
         raise ConflictError(
-            "quorum not met — the vote cannot be closed; collect more ballots "
-            "or cancel the vote.",
+            "quorum not met — the vote cannot be closed; collect more ballots or cancel the vote.",
             code="quorum_not_met",
         )
 
@@ -294,9 +293,7 @@ class VotingService:
         """
         base = select(Vote).where(Vote.id == vote_id)
         stmt = (
-            base.with_for_update().execution_options(populate_existing=True)
-            if for_update
-            else base
+            base.with_for_update().execution_options(populate_existing=True) if for_update else base
         )
         vote = (await self.session.execute(stmt)).scalar_one_or_none()
         if vote is None:
@@ -539,9 +536,7 @@ class VotingService:
             await self._delete_audited(vote, actor=actor, reason=reason)
         return ids
 
-    async def _delete_audited(
-        self, vote: Vote, *, actor: str, reason: str | None = None
-    ) -> None:
+    async def _delete_audited(self, vote: Vote, *, actor: str, reason: str | None = None) -> None:
         """Write ``vote_delete`` for a loaded vote and delete it, without a commit.
 
         ``reason`` names a delete that another delete caused (``meeting_deleted``).
@@ -780,9 +775,7 @@ class VotingService:
                 outcome = tally_mod.result(
                     config, counts, eligible, present=await self._quorum_present(vote, config)
                 )
-                return _Counted(
-                    counts, sum(counts.values()), outcome.quorum_met, outcome.leading
-                )
+                return _Counted(counts, sum(counts.values()), outcome.quorum_met, outcome.leading)
 
     async def _attendance(
         self, vote: Vote, config: VoteConfig
@@ -1009,9 +1002,7 @@ class VotingService:
 
             row = (
                 await self.session.execute(
-                    select(State.kind, State.config).where(
-                        State.id == application.current_state_id
-                    )
+                    select(State.kind, State.config).where(State.id == application.current_state_id)
                 )
             ).first()
             if row is not None and row[0] == "vote":
@@ -1176,9 +1167,7 @@ class VotingService:
         if vote.application_id is None and payload.proposal is not None:
             raise not_allowed_problem("Only an application vote takes a decision proposal.")
         if vote.application_id is not None:
-            self._check_proposal(
-                await self._get_application(vote.application_id), payload.proposal
-            )
+            self._check_proposal(await self._get_application(vote.application_id), payload.proposal)
         config = payload.config
         kind = _kind_of(config)
         vote.kind = kind
@@ -1451,9 +1440,7 @@ class VotingService:
             raise ConflictError("voting window has closed.", code="vote_window_closed")
         config = self._config(vote)
         if not config.guests_vote:
-            raise ForbiddenError(
-                "Only the members vote in this ballot.", code="vote_members_only"
-            )
+            raise ForbiddenError("Only the members vote in this ballot.", code="vote_members_only")
         stored = self._stored_choice(vote, config, choice)
         voter_sub = guest_voter_sub(guest_id)
         await audit_record(
@@ -1679,9 +1666,7 @@ class VotingService:
         except (ValueError, TypeError):
             return None
 
-    async def _meeting_grants_vote_management(
-        self, meeting_id: UUID, principal: Principal
-    ) -> bool:
+    async def _meeting_grants_vote_management(self, meeting_id: UUID, principal: Principal) -> bool:
         """Ask the meeting rule that the client sees as ``canManageVotes``.
 
         The meeting payload publishes ``canManageVotes``, and the client renders the
@@ -1878,9 +1863,7 @@ class VotingService:
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
             raise ConflictError(f"vote is {vote.status}, cannot cancel.", code="vote_not_open")
-        await self._mark_cancelled(
-            vote, now=now or datetime.now(UTC), actor=actor, reason="manual"
-        )
+        await self._mark_cancelled(vote, now=now or datetime.now(UTC), actor=actor, reason="manual")
         await self.session.commit()
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
@@ -2196,9 +2179,7 @@ class VotingService:
         )
         _check_closable(vote, quorum_met=outcome.quorum_met, now=now)
 
-        result_value: tally_mod.VoteResult = (
-            outcome.result if outcome.quorum_met else "rejected"
-        )
+        result_value: tally_mod.VoteResult = outcome.result if outcome.quorum_met else "rejected"
         closed_at = now or datetime.now(UTC)
         eligible = await self._fix_attendance(vote, config)
 

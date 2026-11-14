@@ -26,6 +26,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade the schema to the previous revision."""
     op.execute(
-        "ALTER TABLE budget ADD COLUMN IF NOT EXISTS "
-        "fully_bound boolean NOT NULL DEFAULT false"
+        "ALTER TABLE budget ADD COLUMN IF NOT EXISTS fully_bound boolean NOT NULL DEFAULT false"
     )

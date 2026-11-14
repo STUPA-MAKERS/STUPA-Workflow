@@ -99,7 +99,10 @@ const MEETING_MODEL: Meeting = {
   joinCode: null,
   admittedGuests: 0,
   pendingGuests: 0,
-  publicJoinAllowed: true,
+  guestsVoteAllowed: true,
+  kind: 'ordinary',
+  location: null,
+  form: 'presence',
   opensAt: null,
   confirmUntil: null,
   votes: [

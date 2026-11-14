@@ -948,8 +948,8 @@ let MOCK_MEETING: MeetingOutWire = {
   joinCode: '7KQ4MP',
   admittedGuests: 7,
   pendingGuests: 3,
-  /** The gremium of the live meeting has no quorum, so it may be public. */
-  publicJoinAllowed: true,
+  /** The Gremium of the live meeting has no quorum and lets guests vote. */
+  guestsVoteAllowed: true,
   votes: [
     {
       id: 'a0000000-0000-0000-0000-0000000000a1',
@@ -1004,8 +1004,8 @@ const MOCK_PLANNED_MEETING: MeetingOutWire = {
   status: 'planned',
   gremiumId: null,
   gremiumName: 'Haushaltsausschuss',
-  /** This gremium has a quorum: no public participation (the switch is locked). */
-  publicJoinAllowed: false,
+  /** This Gremium has a quorum: guests only watch. */
+  guestsVoteAllowed: false,
   votes: [],
   createdAt: '2026-06-01T10:00:00Z',
   /** The demo user leads it and nobody keeps the minutes yet: "Sitzung eröffnen" in the menu says why it is disabled. */
@@ -1901,7 +1901,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     const defaults = /\/committees\/([^/]+)\/meeting-defaults$/.exec(p);
     if (defaults) {
       const quorum = defaults[1] === 'g0000000-0000-0000-0000-000000000001' ? 50 : null;
-      return ok({ publicJoinAllowed: quorum === null, quorumPercent: quorum });
+      return ok({ guestsVoteAllowed: quorum === null, quorumPercent: quorum });
     }
     if (/\/committees\/[^/]+\/meeting-members$/.test(p)) {
       return ok(

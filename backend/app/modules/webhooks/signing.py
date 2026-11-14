@@ -24,9 +24,9 @@ EVENT_HEADER = "X-Webhook-Event"
 
 def canonical_body(payload: dict[str, Any]) -> bytes:
     """Serialize the payload deterministically so bytes and signature stay stable."""
-    return json.dumps(
-        payload, separators=(",", ":"), sort_keys=True, ensure_ascii=False
-    ).encode("utf-8")
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True, ensure_ascii=False).encode(
+        "utf-8"
+    )
 
 
 def signing_input(timestamp: int, body: bytes) -> bytes:
@@ -40,9 +40,7 @@ def sign(secret: bytes, timestamp: int, body: bytes) -> str:
     return f"sha256={digest}"
 
 
-def build_headers(
-    secret: bytes, body: bytes, *, event: str, timestamp: int
-) -> dict[str, str]:
+def build_headers(secret: bytes, body: bytes, *, event: str, timestamp: int) -> dict[str, str]:
     """Build the delivery headers.
 
     They hold the signature over the timestamp and the body, the timestamp itself, the

@@ -4,6 +4,9 @@
     [title]="'admin.gremien.title' | t"
   >
     <app-breadcrumbs crumbs />
+    <app-button actions variant="text" (click)="defaultsOpen.set(true)">{{
+      'admin.gremien.defaults.open' | t
+    }}</app-button>
   </app-page-header>
 
   @if (canMappings()) {
@@ -82,6 +85,8 @@
   (saved)="onSaved($event)"
   (baseSaved)="onBaseSaved($event)"
 />
+
+<app-gremium-defaults-dialog [open]="defaultsOpen()" (closed)="defaultsOpen.set(false)" />
 
 <app-confirm-dialog
   [open]="confirmDelete() !== null"

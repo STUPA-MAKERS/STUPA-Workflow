@@ -52,8 +52,7 @@ _UPGRADE: tuple[str, ...] = (
     """,
     "CREATE INDEX IF NOT EXISTS ix_calendar_appointment_starts_on "
     "ON calendar_appointment (starts_on)",
-    "CREATE INDEX IF NOT EXISTS ix_calendar_appointment_ends_on "
-    "ON calendar_appointment (ends_on)",
+    "CREATE INDEX IF NOT EXISTS ix_calendar_appointment_ends_on ON calendar_appointment (ends_on)",
     "CREATE INDEX IF NOT EXISTS ix_calendar_appointment_creator_id "
     "ON calendar_appointment (creator_id)",
     """
@@ -96,8 +95,7 @@ _UPGRADE: tuple[str, ...] = (
             FOREIGN KEY (principal_id) REFERENCES principal (id) ON DELETE CASCADE
     )
     """,
-    "CREATE INDEX IF NOT EXISTS ix_calendar_answer_principal_id "
-    "ON calendar_answer (principal_id)",
+    "CREATE INDEX IF NOT EXISTS ix_calendar_answer_principal_id ON calendar_answer (principal_id)",
     (
         "INSERT INTO role_permission (role_id, permission) "
         "SELECT r.id, p.permission FROM role r "

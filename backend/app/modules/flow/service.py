@@ -211,9 +211,7 @@ class FlowService:
         The internal callers (worker, vote close, revert) keep the default.
         """
         app = (
-            await self.session.execute(
-                select(Application).where(Application.id == application_id)
-            )
+            await self.session.execute(select(Application).where(Application.id == application_id))
         ).scalar_one_or_none()
         if app is None or (not allow_unconfirmed and app.email_confirmed_at is None):
             raise NotFoundError(f"application {application_id} not found")
@@ -221,9 +219,7 @@ class FlowService:
 
     async def _load_transition(self, transition_id: UUID) -> Transition:
         transition = (
-            await self.session.execute(
-                select(Transition).where(Transition.id == transition_id)
-            )
+            await self.session.execute(select(Transition).where(Transition.id == transition_id))
         ).scalar_one_or_none()
         if transition is None:
             raise NotFoundError(f"transition {transition_id} not found")
@@ -348,9 +344,7 @@ class FlowService:
         app = await self._load_app(application_id, allow_unconfirmed=allow_unconfirmed)
         if app.current_state_id is None:
             return []
-        ctx = await flow_context.build_context(
-            self.session, app, principal, manual=True
-        )
+        ctx = await flow_context.build_context(self.session, app, principal, manual=True)
         visible = [
             t
             for t in await self._outgoing(app)
@@ -437,9 +431,7 @@ class FlowService:
         state = await self._load_state(app.current_state_id)
         if state is not None and state.kind == "vote":
             return None
-        ctx = await flow_context.build_context(
-            self.session, app, principal, manual=False
-        )
+        ctx = await flow_context.build_context(self.session, app, principal, manual=False)
         for t in await self._outgoing(app):
             if not (t.automatic and eval_guard(t.guard, ctx)):
                 continue
@@ -448,12 +440,12 @@ class FlowService:
             ):
                 continue
             return await self.fire(
-                    application_id,
-                    t.id,
-                    principal,
-                    note="auto",
-                    manual=False,
-                )
+                application_id,
+                t.id,
+                principal,
+                note="auto",
+                manual=False,
+            )
         return None
 
     _SYSTEM = Principal(
@@ -502,9 +494,7 @@ class FlowService:
                 await self._announce_current_state(application_id)
         except (ConflictError, NotFoundError) as exc:
             await self.session.rollback()
-            logger.info(
-                "auto-transition on confirmation skipped (app=%s): %s", application_id, exc
-            )
+            logger.info("auto-transition on confirmation skipped (app=%s): %s", application_id, exc)
             return None
         except Exception:
             await self.session.rollback()
@@ -538,9 +528,7 @@ class FlowService:
             ]
         )
 
-    async def branch_transition(
-        self, application_id: UUID, branch: str
-    ) -> Transition | None:
+    async def branch_transition(self, application_id: UUID, branch: str) -> Transition | None:
         """Find the outgoing transition of the current state with `branch`.
 
         `branch` is `pass` or `fail` of a `vote` state. The result is `None` when the
@@ -599,9 +587,7 @@ class FlowService:
         """
         t = await self.branch_transition(application_id, branch)
         if t is None:
-            raise NotFoundError(
-                f"no '{branch}' transition from the application's current state"
-            )
+            raise NotFoundError(f"no '{branch}' transition from the application's current state")
         return await self.stage_fire(
             application_id,
             t.id,
@@ -1086,9 +1072,7 @@ class FlowService:
             if swap is None
             else {
                 "decisionUndoneId": None if swap.undone_id is None else str(swap.undone_id),
-                "decisionRestoredId": (
-                    None if swap.restored_id is None else str(swap.restored_id)
-                ),
+                "decisionRestoredId": (None if swap.restored_id is None else str(swap.restored_id)),
             }
         )
         await AuditService(self.session).record(
@@ -1192,9 +1176,7 @@ class FlowService:
             )
         target = await self._load_state(target_state_id)
         if target is None or target.flow_version_id != app.flow_version_id:
-            raise NotFoundError(
-                "target state does not belong to this application's flow"
-            )
+            raise NotFoundError("target state does not belong to this application's flow")
         if target_state_id == from_state_id:
             raise ConflictError(
                 "Application is already in the target state.", code="already_in_state"

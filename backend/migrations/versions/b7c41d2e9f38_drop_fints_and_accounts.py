@@ -47,8 +47,7 @@ _UPGRADE: tuple[str, ...] = (
     "DROP INDEX IF EXISTS ix_budget_expense_account_id",
     "ALTER TABLE budget_expense DROP COLUMN IF EXISTS account_id",
     "DROP TABLE IF EXISTS account",
-    "DELETE FROM role_permission WHERE permission IN "
-    "('account.manage', 'budget.reconcile_ignore')",
+    "DELETE FROM role_permission WHERE permission IN ('account.manage', 'budget.reconcile_ignore')",
 )
 
 #: Structure only — the rows are gone for good.
@@ -69,8 +68,7 @@ _DOWNGRADE: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS ix_account_name ON account (name)",
     "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS account_id uuid "
     "REFERENCES account (id) ON DELETE SET NULL",
-    "CREATE INDEX IF NOT EXISTS ix_budget_expense_account_id "
-    "ON budget_expense (account_id)",
+    "CREATE INDEX IF NOT EXISTS ix_budget_expense_account_id ON budget_expense (account_id)",
     """
     CREATE TABLE IF NOT EXISTS account_fints_credential (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -136,8 +134,7 @@ _DOWNGRADE: tuple[str, ...] = (
     """,
     "CREATE INDEX IF NOT EXISTS ix_bank_allocation_statement_line_id "
     "ON bank_allocation (statement_line_id)",
-    "CREATE INDEX IF NOT EXISTS ix_bank_allocation_expense_id "
-    "ON bank_allocation (expense_id)",
+    "CREATE INDEX IF NOT EXISTS ix_bank_allocation_expense_id ON bank_allocation (expense_id)",
     """
     CREATE TABLE IF NOT EXISTS bank_sync_session (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -148,8 +145,7 @@ _DOWNGRADE: tuple[str, ...] = (
         expires_at timestamptz NOT NULL
     )
     """,
-    "CREATE INDEX IF NOT EXISTS ix_bank_sync_session_account_id "
-    "ON bank_sync_session (account_id)",
+    "CREATE INDEX IF NOT EXISTS ix_bank_sync_session_account_id ON bank_sync_session (account_id)",
     """
     CREATE TABLE IF NOT EXISTS counterparty_memory (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -55,9 +55,7 @@ def upgrade() -> None:
     """Upgrade the schema to this revision."""
     op.execute("ALTER TABLE attachment ALTER COLUMN application_id DROP NOT NULL")
     op.execute("ALTER TABLE attachment ADD COLUMN IF NOT EXISTS draft_token_hash bytea")
-    op.execute(
-        "ALTER TABLE attachment ADD COLUMN IF NOT EXISTS draft_expires_at timestamptz"
-    )
+    op.execute("ALTER TABLE attachment ADD COLUMN IF NOT EXISTS draft_expires_at timestamptz")
     op.execute(f"ALTER TABLE attachment DROP CONSTRAINT IF EXISTS {_XOR}")
     op.execute(
         f"ALTER TABLE attachment ADD CONSTRAINT {_XOR} "
@@ -82,9 +80,7 @@ def upgrade() -> None:
         "expires_at timestamptz NOT NULL, "
         f"CONSTRAINT pk_{_TOKENS} PRIMARY KEY (token_hash))"
     )
-    op.execute(
-        f"CREATE INDEX IF NOT EXISTS {_IX_TOKEN_EXPIRES} ON {_TOKENS} (expires_at)"
-    )
+    op.execute(f"CREATE INDEX IF NOT EXISTS {_IX_TOKEN_EXPIRES} ON {_TOKENS} (expires_at)")
 
 
 def downgrade() -> None:

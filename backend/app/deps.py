@@ -58,7 +58,6 @@ def get_email_session_resolver() -> EmailSessionResolver:
     raise RuntimeError("The e-mail session resolver is not configured.")
 
 
-
 def _bearer_token(request: Request, settings: Settings) -> str | None:
     """Read the applicant token from `Authorization: Bearer` or the HttpOnly cookie.
 
@@ -109,9 +108,7 @@ async def _principal_from_access_token(
     principal = await rbac.resolve_principal(db, row, now)
     if not principal.has("mcp.use"):
         return None
-    return replace(
-        principal, scope_permissions=oauth.scope_permissions(oauth.parse_scope(scope))
-    )
+    return replace(principal, scope_permissions=oauth.scope_permissions(oauth.parse_scope(scope)))
 
 
 async def get_current_principal(
@@ -147,15 +144,11 @@ async def get_current_principal(
     if session is None:
         return None
     row = (
-        await db.execute(
-            select(PrincipalRow).where(PrincipalRow.id == session.principal_id)
-        )
+        await db.execute(select(PrincipalRow).where(PrincipalRow.id == session.principal_id))
     ).scalar_one_or_none()
     if row is None or row.active is False:
         return None
-    if not await renew_principal_session(
-        db, settings, session=session, principal=row, now=now
-    ):
+    if not await renew_principal_session(db, settings, session=session, principal=row, now=now):
         return None
     if row.active is False:
         return None
@@ -166,9 +159,7 @@ async def get_current_applicant(
     request: Request,
     db: DbSession,
     settings: SettingsDep,
-    resolve_email_session: Annotated[
-        EmailSessionResolver, Depends(get_email_session_resolver)
-    ],
+    resolve_email_session: Annotated[EmailSessionResolver, Depends(get_email_session_resolver)],
 ) -> Applicant | None:
     """Resolve the server-side magic-link session (signed opaque `sid`) to an Applicant.
 

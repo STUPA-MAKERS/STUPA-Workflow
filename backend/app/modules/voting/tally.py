@@ -229,9 +229,7 @@ def result(
     )
     lead = leading(counts)
 
-    raw = (
-        _majority(config.majority_rule, yes, no, cast, eligible) if quorum_met else "rejected"
-    )
+    raw = _majority(config.majority_rule, yes, no, cast, eligible) if quorum_met else "rejected"
     final: VoteResult = config.tie_break if raw == "tie" else raw
     return Outcome(result=final, quorum_met=quorum_met, leading=lead)
 
@@ -398,9 +396,7 @@ def _seat_outcome(base: ElectionOutcome, ranked: tuple[str, ...], seats: int) ->
     )
 
 
-def draw_lot(
-    among: Sequence[str], seats: int, choose: Callable[[Sequence[str]], str]
-) -> list[str]:
+def draw_lot(among: Sequence[str], seats: int, choose: Callable[[Sequence[str]], str]) -> list[str]:
     """Draw ``seats`` distinct candidates from ``among`` with ``choose``.
 
     The caller passes ``secrets.choice``; a test passes a fixed chooser. The draw

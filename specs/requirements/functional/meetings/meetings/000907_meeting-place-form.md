@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/integration/modules/livevote/test_public_meeting.py:test_meeting_kind_place_and_form"
+implementation:
+  - backend/app/modules/meetings/models.py
+  - backend/app/modules/livevote/schemas.py
+  - backend/app/modules/livevote/service/lifecycle.py
+  - frontend/src/app/features/meetings/create-meeting-dialog/create-meeting-dialog.component.html
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/livevote

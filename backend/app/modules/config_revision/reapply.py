@@ -58,9 +58,7 @@ async def reapply_snapshot(
             from app.modules.forms.schemas import FormVersionCreate
             from app.shared.config_schemas import FormFieldDef
 
-            fields = [
-                FormFieldDef.model_validate(f) for f in snapshot.get("fields", []) or []
-            ]
+            fields = [FormFieldDef.model_validate(f) for f in snapshot.get("fields", []) or []]
             payload = FormVersionCreate(
                 fields=fields, activate=True, description=snapshot.get("description")
             )

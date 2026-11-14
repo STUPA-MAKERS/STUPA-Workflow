@@ -279,18 +279,14 @@ class TransferOps(ExpenseOps):
             )
         }
         pairs = [(r, incomes[r.transfer_id]) for r in out_rows if r.transfer_id in incomes]
-        paths = await self._path_keys(
-            {r.budget_id for pair in pairs for r in pair}
-        )
+        paths = await self._path_keys({r.budget_id for pair in pairs for r in pair})
         names = await self._actor_names({r.actor for r, _ in pairs if r.actor})
         return [
             self._row_out(out, income, paths, actor_name=names.get(out.actor or ""))
             for out, income in pairs
         ]
 
-    async def update_transfer(
-        self, transfer_id: UUID, payload: TransferUpdate
-    ) -> TransferRowOut:
+    async def update_transfer(self, transfer_id: UUID, payload: TransferUpdate) -> TransferRowOut:
         """Patch both legs of a transfer in one transaction.
 
         The amount, the description, the note and the two business dates apply

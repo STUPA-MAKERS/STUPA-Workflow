@@ -214,9 +214,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         await dispose_engine()
         await close_mail_pool(getattr(app.state, "arq_pool", None))
         state = getattr(app, "state", None)
-        redis_client = (
-            getattr(state, "_antiabuse_redis", None) if state is not None else None
-        )
+        redis_client = getattr(state, "_antiabuse_redis", None) if state is not None else None
         if redis_client is not None:
             await redis_client.aclose()
         await livevote_redis.aclose()

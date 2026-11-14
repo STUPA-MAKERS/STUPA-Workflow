@@ -285,14 +285,10 @@ class Branding(FrozenStrictCamelModel, frozen=True):
     #: browser-tab title, the header aria-label and the home H1. An empty value falls
     #: back to the hardcoded defaults and the i18n values.
     app_name: str = Field(default="", alias="appName", max_length=MAX_LABEL_CHARS)
-    app_short_name: str = Field(
-        default="", alias="appShortName", max_length=MAX_LABEL_CHARS
-    )
+    app_short_name: str = Field(default="", alias="appShortName", max_length=MAX_LABEL_CHARS)
     logos: dict[LogoSlot, BrandingAsset] = Field(default_factory=dict)
     copyright: I18nMap = Field(default_factory=dict)
-    legal_links: list[FooterLink] = Field(
-        default_factory=list, alias="legalLinks", max_length=50
-    )
+    legal_links: list[FooterLink] = Field(default_factory=list, alias="legalLinks", max_length=50)
     freetexts: SiteFreetexts = Field(default_factory=SiteFreetexts)
     #: Show the Gravatar image of a person instead of the initials. The API fetches the
     #: image through its own proxy (`GET /principals/{id}/avatar`), so the browser never

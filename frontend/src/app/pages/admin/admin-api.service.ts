@@ -38,6 +38,7 @@ import {
   type ConfigRevisionDiffWire,
   type NotificationSettings,
   type GuestSettings,
+  type GremiumDefaults,
   type MeetingSettings,
   type FeatureSwitches,
   type HelpTicketsSettings,
@@ -112,6 +113,7 @@ import {
   MOCK_GREMIUM_STUPA_ID,
   MOCK_GROUP_MAPPINGS,
   MOCK_GUEST_SETTINGS,
+  MOCK_GREMIUM_DEFAULTS,
   MOCK_MEETING_SETTINGS,
   MOCK_FEATURES,
   MOCK_HELP_TICKETS,
@@ -175,6 +177,7 @@ export class AdminApiService {
     mailRecipients: structuredCopy(MOCK_GREMIUM_MAIL_RECIPIENTS),
     guestSettings: structuredCopy(MOCK_GUEST_SETTINGS) as GuestSettings,
     meetingSettings: structuredCopy(MOCK_MEETING_SETTINGS) as MeetingSettings,
+    gremiumDefaults: structuredCopy(MOCK_GREMIUM_DEFAULTS) as GremiumDefaults,
     loginSettings: structuredCopy(MOCK_LOGIN_SETTINGS) as LoginSettings,
     helpTickets: structuredCopy(MOCK_HELP_TICKETS) as HelpTicketsSettings,
     cdVariants: structuredCopy(MOCK_CD_VARIANTS) as CdVariant[],
@@ -1281,6 +1284,23 @@ export class AdminApiService {
       return of(structuredCopy(this.store.meetingSettings));
     }
     return this.http.put<MeetingSettings>(`${this.base}/admin/meeting-settings`, body);
+  }
+
+  /** GET /admin/gremium-defaults — the values that the form of a new Gremium starts with. */
+  getGremiumDefaults(): Observable<GremiumDefaults> {
+    if (this.mock) return of(structuredCopy(this.store.gremiumDefaults));
+    return this.http.get<GremiumDefaults>(`${this.base}/admin/gremium-defaults`, {
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * PUT /admin/gremium-defaults — replaces all values. No Gremium that exists changes.
+   * The mock answers the body and stores nothing.
+   */
+  putGremiumDefaults(body: GremiumDefaults): Observable<GremiumDefaults> {
+    if (this.mock) return of(structuredCopy(body));
+    return this.http.put<GremiumDefaults>(`${this.base}/admin/gremium-defaults`, body);
   }
 
   /**

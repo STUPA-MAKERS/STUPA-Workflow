@@ -90,9 +90,7 @@ def _elected_in(vote: Vote, candidate_id: str) -> bool:
     """Tell whether the closed result of ``vote`` elected ``candidate_id``."""
     stored = vote.election_result
     return (
-        vote.status == "closed"
-        and bool(stored)
-        and candidate_id in (stored.get("elected") or [])
+        vote.status == "closed" and bool(stored) and candidate_id in (stored.get("elected") or [])
     )
 
 

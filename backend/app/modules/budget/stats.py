@@ -28,7 +28,5 @@ class BudgetStatsService:
         """
         keyword = "CONCURRENTLY " if concurrently else ""
         for view in _REFRESH_VIEWS:
-            await self.session.execute(
-                text(f"REFRESH MATERIALIZED VIEW {keyword}{view}")
-            )
+            await self.session.execute(text(f"REFRESH MATERIALIZED VIEW {keyword}{view}"))
         await self.session.commit()

@@ -155,9 +155,7 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
     side: Mapped[str | None] = mapped_column(Text, nullable=True)
     transferable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     coverable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    blocked: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2), default=Decimal(0), server_default="0"
-    )
+    blocked: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal(0), server_default="0")
 
     __table_args__ = (
         UniqueConstraint(

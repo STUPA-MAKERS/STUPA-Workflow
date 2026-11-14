@@ -243,6 +243,16 @@ class GremiumCreate(WireModel, frozen=True):
     delegationLeadMinutes: int = 0
     delegationAllowExternal: bool = False
     quorumPercent: int | None = Field(default=None, ge=0, le=100)
+    repeatQuorumPercent: int | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="The quorum of a Wiederholungssitzung. Without it the normal quorum counts.",
+    )
+    guestsMayVote: bool = Field(
+        default=False,
+        description="Guests of a public meeting can get a ballot. Counts only without a quorum.",
+    )
     protocolsPublic: bool = Field(
         default=False,
         description=(
@@ -261,6 +271,8 @@ class GremiumUpdate(WireModel, frozen=True):
     delegationLeadMinutes: int | None = None
     delegationAllowExternal: bool | None = None
     quorumPercent: int | None = None
+    repeatQuorumPercent: int | None = None
+    guestsMayVote: bool | None = None
     protocolsPublic: bool | None = Field(
         default=None,
         description=(
@@ -555,7 +567,18 @@ class MeetingCreate(WireModel, frozen=True):
         "to join, the meeting lead admits them.",
     )
     guestsMode: Literal["vote", "watch"] | None = Field(
-        default=None, description="Admitted guests vote (`vote`) or only follow (`watch`)."
+        default=None,
+        description="Admitted guests vote (`vote`) or only follow (`watch`). `vote` needs a "
+        "Gremium that lets guests vote and has no quorum (422 `guests_vote_off`, "
+        "`guests_vote_needs_no_quorum`).",
+    )
+    kind: Literal["ordinary", "extraordinary", "repeat", "constituent"] | None = Field(
+        default=None,
+        description="The kind of the meeting. A new meeting is `ordinary`.",
+    )
+    location: str | None = Field(default=None, description="The place, at most 200 characters.")
+    form: Literal["presence", "hybrid", "video"] | None = Field(
+        default=None, description="The form of the meeting. A new meeting is `presence`."
     )
 
 
@@ -577,6 +600,15 @@ class MeetingPatch(WireModel, frozen=True):
     guestsMode: Literal["vote", "watch"] | None = Field(
         default=None,
         description="`watch` gives 409 `guest_vote_open` while a vote with guests is open.",
+    )
+    kind: Literal["ordinary", "extraordinary", "repeat", "constituent"] | None = Field(
+        default=None,
+        description="The kind of the meeting. It changes only while the meeting is planned "
+        "(409 `meeting_not_planned`).",
+    )
+    location: str | None = Field(default=None, description="The place, at most 200 characters.")
+    form: Literal["presence", "hybrid", "video"] | None = Field(
+        default=None, description="The form of the meeting. A new meeting is `presence`."
     )
     confirmEarly: bool = Field(
         default=False,

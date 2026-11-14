@@ -17,6 +17,7 @@ import type {
   FlowGraph,
   FormDraft,
   GuestSettings,
+  GremiumDefaults,
   MeetingSettings,
   FeatureSwitches,
   HelpTicketsSettings,
@@ -382,6 +383,13 @@ export const MOCK_WEBHOOK_STATUS: readonly WebhookDeliveryStatus[] = [
 
 /** The guest settings of the mock backend (the server defaults). */
 export const MOCK_GUEST_SETTINGS: GuestSettings = { confirmTtlHours: 12, linkTtlDays: null };
+export const MOCK_GREMIUM_DEFAULTS: GremiumDefaults = {
+  quorumPercent: 40,
+  repeatQuorumPercent: 25,
+  guestsMayVote: false,
+  allowVoteDelegation: false,
+  delegationLeadMinutes: 120,
+};
 export const MOCK_MEETING_SETTINGS: MeetingSettings = { openLeadMinutes: 60, confirmLeadMinutes: 10 };
 
 /** The settings of the page "Hilfe & Tickets", as the backend defaults them. */

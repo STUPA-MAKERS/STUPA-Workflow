@@ -105,12 +105,8 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
         UniqueConstraint("path_key", name="uq_budget_path_key"),
         UniqueConstraint("tree_path", name="uq_budget_tree_path"),
         CheckConstraint("currency = 'EUR'", name="budget_currency_eur"),
-        CheckConstraint(
-            "fiscal_start_month BETWEEN 1 AND 12", name="budget_fiscal_start_month"
-        ),
-        CheckConstraint(
-            "fiscal_start_day BETWEEN 1 AND 31", name="budget_fiscal_start_day"
-        ),
+        CheckConstraint("fiscal_start_month BETWEEN 1 AND 12", name="budget_fiscal_start_month"),
+        CheckConstraint("fiscal_start_day BETWEEN 1 AND 31", name="budget_fiscal_start_day"),
         Index("ix_budget_parent_id", "parent_id"),
         Index("ix_budget_gremium_id", "gremium_id"),
         Index("ix_budget_decision_gremium_id", "decision_gremium_id"),
@@ -134,9 +130,7 @@ class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "fiscal_year"
 
-    budget_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("budget.id", ondelete="CASCADE")
-    )
+    budget_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("budget.id", ondelete="CASCADE"))
     year: Mapped[int] = mapped_column(Integer)
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
@@ -160,18 +154,14 @@ class BudgetAllocation(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "budget_allocation"
 
-    budget_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("budget.id", ondelete="CASCADE")
-    )
+    budget_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("budget.id", ondelete="CASCADE"))
     fiscal_year_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("fiscal_year.id", ondelete="CASCADE")
     )
     allocated: Mapped[Decimal] = mapped_column(Numeric(12, 2), server_default="0")
 
     __table_args__ = (
-        UniqueConstraint(
-            "budget_id", "fiscal_year_id", name="uq_budget_allocation_budget_fy"
-        ),
+        UniqueConstraint("budget_id", "fiscal_year_id", name="uq_budget_allocation_budget_fy"),
         Index("ix_budget_allocation_fiscal_year_id", "fiscal_year_id"),
     )
 
@@ -192,9 +182,7 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "budget_expense"
 
-    budget_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("budget.id", ondelete="CASCADE")
-    )
+    budget_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("budget.id", ondelete="CASCADE"))
     fiscal_year_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("fiscal_year.id", ondelete="CASCADE")
     )
@@ -244,9 +232,7 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     __table_args__ = (
         CheckConstraint("amount > 0", name="budget_expense_amount_positive"),
         CheckConstraint("currency = 'EUR'", name="budget_expense_currency_eur"),
-        CheckConstraint(
-            "kind IN ('expense', 'income')", name="budget_expense_kind_valid"
-        ),
+        CheckConstraint("kind IN ('expense', 'income')", name="budget_expense_kind_valid"),
         CheckConstraint(
             "payment_method IS NULL OR payment_method IN "
             "('ueberweisung', 'bar', 'lastschrift', 'karte', 'paypal')",

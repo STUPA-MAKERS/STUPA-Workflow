@@ -45,9 +45,7 @@ def can_enter_force(state: str, steps: Sequence[Mapping[str, Any]]) -> bool:
     A draft comes into force when its budget has no steps: `steps` then holds the
     steps of the budget. A version in progress comes into force after its last step.
     """
-    return (state == "draft" and not steps) or (
-        state == "in_progress" and next_step(steps) is None
-    )
+    return (state == "draft" and not steps) or (state == "in_progress" and next_step(steps) is None)
 
 
 def can_return_to_draft(state: str) -> bool:
@@ -256,9 +254,7 @@ def allocation_changes(
     }
 
 
-def titel_of(
-    parent_of: Mapping[UUID, UUID | None], top_id: UUID, node_id: UUID
-) -> UUID | None:
+def titel_of(parent_of: Mapping[UUID, UUID | None], top_id: UUID, node_id: UUID) -> UUID | None:
     """Return the Titel of a node: the direct child of the top-level node at or above it.
 
     The top-level node and a node of a different tree have no Titel.

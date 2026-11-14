@@ -24,9 +24,7 @@ _UPGRADE: tuple[str, ...] = (
     "UPDATE application SET email_confirmed_at = created_at WHERE email_confirmed_at IS NULL",
 )
 
-_DOWNGRADE: tuple[str, ...] = (
-    "ALTER TABLE application DROP COLUMN IF EXISTS email_confirmed_at",
-)
+_DOWNGRADE: tuple[str, ...] = ("ALTER TABLE application DROP COLUMN IF EXISTS email_confirmed_at",)
 
 
 def upgrade() -> None:

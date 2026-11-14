@@ -28,9 +28,7 @@ from app.modules.gremien.models import Gremium
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
-def _node_out(
-    b: Budget, decision: tuple[UUID | None, UUID | None] = (None, None)
-) -> BudgetNodeOut:
+def _node_out(b: Budget, decision: tuple[UUID | None, UUID | None] = (None, None)) -> BudgetNodeOut:
     """Map a node to its API shape.
 
     `decision` is the effective deciding Gremium and the node that holds it (see
@@ -56,9 +54,9 @@ def _node_out(
         planCoverableDefault=bool(b.plan_coverable_default),
     )
 
+
 #: Fixed advisory-lock key of the keys of the top-level budgets (``"BUDGET_K"``).
 _TOP_KEYS_LOCK = 0x4255444745545F4B
-
 
 
 class NodeOps(BudgetTreeServiceBase):
@@ -67,8 +65,9 @@ class NodeOps(BudgetTreeServiceBase):
     async def _subtree(self, top: Budget) -> list[Budget]:
         """Return `top` and every node below it."""
         return list(
-            (await self.session.scalars(select(Budget).where(Budget.id.in_(_subtree_ids(top)))))
-            .all()
+            (
+                await self.session.scalars(select(Budget).where(Budget.id.in_(_subtree_ids(top))))
+            ).all()
         )
 
     async def _lines(self, version_id: UUID) -> list[BudgetPlanLine]:
@@ -304,9 +303,7 @@ class NodeOps(BudgetTreeServiceBase):
             ConflictError: `budget_path_key_exists` (409).
         """
         taken = await self.session.scalar(
-            select(Budget.id)
-            .where(Budget.path_key.in_(path_keys), Budget.id.not_in(own))
-            .limit(1)
+            select(Budget.id).where(Budget.path_key.in_(path_keys), Budget.id.not_in(own)).limit(1)
         )
         if taken is not None:
             raise ConflictError(
@@ -381,9 +378,7 @@ class NodeOps(BudgetTreeServiceBase):
                 fy.start_date, fy.end_date = self._fiscal_year_bounds(
                     fy.year, node.fiscal_start_month, node.fiscal_start_day
                 )
-        after: dict[str, object] = {
-            field: _json_safe(getattr(node, field)) for field in before
-        }
+        after: dict[str, object] = {field: _json_safe(getattr(node, field)) for field in before}
         await self._audit(
             AuditAction.BUDGET_NODE_UPDATE,
             target_type="budget",
@@ -429,9 +424,7 @@ class NodeOps(BudgetTreeServiceBase):
                 code="budget_key_exists",
             )
         parent_path = (
-            (await self._get_node(node.parent_id)).tree_path
-            if node.parent_id is not None
-            else None
+            (await self._get_node(node.parent_id)).tree_path if node.parent_id is not None else None
         )
         old_path = node.tree_path
         new_path = tree_rules.compose_tree_path(parent_path, new_key)

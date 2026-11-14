@@ -22,9 +22,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.gremien.models import DelegationSubstitute
 
 
-async def substitutes_for(
-    session: AsyncSession, gremium_id: UUID, member_id: UUID
-) -> set[UUID]:
+async def substitutes_for(session: AsyncSession, gremium_id: UUID, member_id: UUID) -> set[UUID]:
     """Return every pool substitute that may represent `member_id` in the gremium.
 
     The set holds the personal entries for the member and the gremium-wide
@@ -77,9 +75,7 @@ async def substitute_gremien_for_sub(session: AsyncSession, sub: str) -> set[UUI
     return set((await session.execute(stmt)).scalars().all())
 
 
-async def pool_entries_of(
-    session: AsyncSession, principal_id: UUID
-) -> list[DelegationSubstitute]:
+async def pool_entries_of(session: AsyncSession, principal_id: UUID) -> list[DelegationSubstitute]:
     """Return every pool entry in which `principal_id` is the substitute or the member.
 
     The revoke of the rights of a person (`admin/principal_revoke.py`) shows these

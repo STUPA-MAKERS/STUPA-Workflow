@@ -283,13 +283,13 @@ describe('mockApiInterceptor', () => {
       expect(form.sections.length).toBeGreaterThan(0);
     });
 
-    it('GET /committees/{id}/meeting-defaults → a quorum for the StuPa, public join elsewhere', async () => {
+    it('GET /committees/{id}/meeting-defaults → a quorum for the StuPa, a guest ballot elsewhere', async () => {
       expect(await get('/api/committees/g0000000-0000-0000-0000-000000000001/meeting-defaults')).toEqual({
-        publicJoinAllowed: false,
+        guestsVoteAllowed: false,
         quorumPercent: 50,
       });
       expect(await get('/api/committees/g-other/meeting-defaults')).toEqual({
-        publicJoinAllowed: true,
+        guestsVoteAllowed: true,
         quorumPercent: null,
       });
     });

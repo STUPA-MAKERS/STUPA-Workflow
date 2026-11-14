@@ -86,17 +86,11 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     opens_state_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("state.id", ondelete="SET NULL"), nullable=True
     )
-    opens_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    closes_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: The real end of the vote. ``close`` and ``cancel`` set it. NULL while the vote
     #: runs, and for old rows that migration ``vote_closed_at`` could not backfill.
-    closed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="draft")
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
     result_branch_transition_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -142,9 +136,7 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('draft','open','closed','cancelled')", name="vote_status"
-        ),
+        CheckConstraint("status IN ('draft','open','closed','cancelled')", name="vote_status"),
         CheckConstraint(
             "result IS NULL OR result IN ('passed','rejected','tie','elected','runoff')",
             name="vote_result",
@@ -167,14 +159,10 @@ class VotedMarker(UUIDPkMixin, Base):
 
     __tablename__ = "voted_marker"
 
-    vote_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("vote.id", ondelete="CASCADE")
-    )
+    vote_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vote.id", ondelete="CASCADE"))
     voter_sub: Mapped[str] = mapped_column(Text)
 
-    __table_args__ = (
-        UniqueConstraint("vote_id", "voter_sub", name="uq_voted_marker_vote_voter"),
-    )
+    __table_args__ = (UniqueConstraint("vote_id", "voter_sub", name="uq_voted_marker_vote_voter"),)
 
 
 class SecretBallot(UUIDPkMixin, Base):
@@ -188,9 +176,7 @@ class SecretBallot(UUIDPkMixin, Base):
 
     __tablename__ = "secret_ballot"
 
-    vote_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("vote.id", ondelete="CASCADE")
-    )
+    vote_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vote.id", ondelete="CASCADE"))
     choice: Mapped[str] = mapped_column(Text)
 
     __table_args__ = (Index("ix_secret_ballot_vote_id", "vote_id"),)

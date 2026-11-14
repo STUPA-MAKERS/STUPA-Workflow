@@ -132,9 +132,7 @@ def _revertable_without_revision(action: str, data: Mapping[str, Any]) -> bool:
 class AuditLogService(AuditService):
     """The audit service with the reads of the admin view."""
 
-    async def revertable_flags(
-        self, entries: Sequence[AuditEntry]
-    ) -> dict[int, bool]:
+    async def revertable_flags(self, entries: Sequence[AuditEntry]) -> dict[int, bool]:
         """Determine for each entry whether the log can revert it.
 
         The check is cheap and mostly static, because the list view needs it for
@@ -147,8 +145,7 @@ class AuditLogService(AuditService):
             e.id: str(rid) for e in entries if (rid := (e.data or {}).get("revisionId"))
         }
         static = {
-            e.id: e.id not in revision_ids
-            and _revertable_without_revision(e.action, e.data or {})
+            e.id: e.id not in revision_ids and _revertable_without_revision(e.action, e.data or {})
             for e in entries
         }
         by_revision = {
@@ -159,9 +156,7 @@ class AuditLogService(AuditService):
         predecessors = await self._revision_predecessors(by_revision)
         return {**static, **predecessors}
 
-    async def _revision_predecessors(
-        self, by_revision: Mapping[uuid.UUID, int]
-    ) -> dict[int, bool]:
+    async def _revision_predecessors(self, by_revision: Mapping[uuid.UUID, int]) -> dict[int, bool]:
         """Map the entry of each config revision to whether the revision has a predecessor.
 
         One batch query serves all revisions. An empty map runs no query.
@@ -315,9 +310,7 @@ class AuditLogService(AuditService):
         )
         return {str(plan_id): f"{name} {year}" for plan_id, name, year in rows}
 
-    async def resolve_data_ids(
-        self, data_dicts: Sequence[dict[str, Any] | None]
-    ) -> dict[str, str]:
+    async def resolve_data_ids(self, data_dicts: Sequence[dict[str, Any] | None]) -> dict[str, str]:
         """Resolve the UUIDs inside ``data`` payloads to display names, in batches.
 
         The keys of ``data`` are untyped. The method therefore collects every
@@ -331,9 +324,7 @@ class AuditLogService(AuditService):
         names the account itself (``sourceId`` of a merge names the old one). The
         order of the lookups does not matter, because no lookup overwrites an entry.
         """
-        candidates = frozenset(
-            uuid.UUID(s) for d in data_dicts for s in data_uuid_strings(d)
-        )
+        candidates = frozenset(uuid.UUID(s) for d in data_dicts for s in data_uuid_strings(d))
         return await self._data_id_labels(candidates) if candidates else {}
 
     async def _data_id_labels(self, candidates: frozenset[uuid.UUID]) -> dict[str, str]:
