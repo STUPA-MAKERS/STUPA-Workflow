@@ -1574,14 +1574,18 @@ export class AdminApiService {
   }
 
   /** The mock PDF branding: the mock keeps no file, only its data. */
-  private readonly mockPdfAssets: Record<PdfSlot, PdfAsset | null> = {
+  private readonly mockPdfAssets = signal<Readonly<Record<PdfSlot, PdfAsset | null>>>({
     logo: { builtin: true, fileName: null, mime: null, size: null },
     footer: { builtin: true, fileName: null, mime: null, size: null },
-  };
+  });
+
+  private setMockPdfAsset(slot: PdfSlot, asset: PdfAsset | null): void {
+    this.mockPdfAssets.update((all) => ({ ...all, [slot]: asset }));
+  }
 
   /** GET /admin/pdf-assets/{slot} — the graphic of the slot, or `null` (specs 000891, 000892). */
   getPdfAsset(slot: PdfSlot): Observable<PdfAsset | null> {
-    if (this.mock) return of(this.mockPdfAssets[slot]);
+    if (this.mock) return of(this.mockPdfAssets()[slot]);
     return this.http.get<PdfAsset | null>(`${this.base}/admin/pdf-assets/${slot}`);
   }
 
@@ -1589,7 +1593,7 @@ export class AdminApiService {
   uploadPdfAsset(slot: PdfSlot, file: File): Observable<PdfAsset> {
     if (this.mock) {
       const asset = { builtin: false, fileName: file.name, mime: file.type, size: file.size };
-      this.mockPdfAssets[slot] = asset;
+      this.setMockPdfAsset(slot, asset);
       return of(asset);
     }
     const form = new FormData();
@@ -1601,7 +1605,7 @@ export class AdminApiService {
   resetPdfAsset(slot: PdfSlot): Observable<PdfAsset> {
     if (this.mock) {
       const asset = { builtin: true, fileName: null, mime: null, size: null };
-      this.mockPdfAssets[slot] = asset;
+      this.setMockPdfAsset(slot, asset);
       return of(asset);
     }
     return this.http.post<PdfAsset>(`${this.base}/admin/pdf-assets/${slot}/default`, {});
@@ -1610,7 +1614,7 @@ export class AdminApiService {
   /** DELETE /admin/pdf-assets/{slot} — the PDFs then carry no graphic there. */
   deletePdfAsset(slot: PdfSlot): Observable<void> {
     if (this.mock) {
-      this.mockPdfAssets[slot] = null;
+      this.setMockPdfAsset(slot, null);
       return of(undefined);
     }
     return this.http.delete<void>(`${this.base}/admin/pdf-assets/${slot}`);

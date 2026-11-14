@@ -29,7 +29,7 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, func, select, text
+from sqlalchemy import Engine, delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin import principal_merge as merge_mod
@@ -78,7 +78,7 @@ from app.modules.meetings.models import (
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
-from app.modules.site_config.models import SiteConfigVersion
+from app.modules.site_config.models import PdfAsset, SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.models import (
     TodoAssignee,
@@ -482,9 +482,11 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
 
         role = await _role(session, "member")
         admin_id = await _admin_actor(session)
+        await session.execute(delete(PdfAsset).where(PdfAsset.slot == "footer"))
         session.add_all(
             [
                 SiteConfigVersion(version=secrets.randbelow(10**8) + 10**6, created_by=old.sub),
+                PdfAsset(slot="footer", builtin="Skyline", created_by=old.sub),
                 ConfigRevision(
                     entity_type="flow", entity_id=f"merge-{tag}", version=1, created_by=old.sub
                 ),

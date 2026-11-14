@@ -178,12 +178,12 @@ export class BrandingEditorComponent {
   constructor() {
     this.loadConfig();
     if (this.section === 'branding') {
-      for (const slot of this.pdfSlots) {
+      this.pdfSlots.forEach((slot) =>
         this.api.getPdfAsset(slot).subscribe({
           next: (asset) => this.setPdfAsset(slot, asset),
           error: () => this.setPdfAsset(slot, null),
-        });
-      }
+        }),
+      );
     }
     inject(DestroyRef).onDestroy(() => this.brand.previewAccent(undefined));
   }
