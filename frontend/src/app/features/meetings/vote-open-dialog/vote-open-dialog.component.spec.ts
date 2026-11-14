@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { render, screen, within } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { AgendaItem, Meeting, MeetingVote } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -79,7 +79,11 @@ describe('VoteOpenDialogComponent', () => {
     expect(screen.getByLabelText('Beschlussfrage')).toHaveValue(
       'Soll der Antrag „Zuschuss Party“ wie beschrieben gefördert werden?',
     );
-    expect(screen.getByRole('combobox', { name: 'Mehrheitsregel' })).toHaveTextContent('Einfache Mehrheit');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Mehrheitsregel' })).toHaveTextContent(
+        'Einfache Mehrheit',
+      ),
+    );
     expect(cmp.majorityRule()).toBe('simple');
     expect(screen.queryByRole('switch', { name: 'Geheime Abstimmung' })).toBeNull();
   });
@@ -358,8 +362,10 @@ describe('VoteOpenDialogComponent', () => {
       });
       expect(screen.getByRole('dialog', { name: 'Abstimmung bearbeiten' })).toBeInTheDocument();
       expect(screen.getByLabelText('Beschlussfrage')).toHaveValue('Fördern wir die Party?');
-      expect(screen.getByRole('combobox', { name: 'Mehrheitsregel' })).toHaveTextContent(
-        'Absolute Mehrheit der Stimmen',
+      await waitFor(() =>
+        expect(screen.getByRole('combobox', { name: 'Mehrheitsregel' })).toHaveTextContent(
+          'Absolute Mehrheit der Stimmen',
+        ),
       );
       expect(screen.queryByRole('button', { name: 'Vorbereiten' })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
