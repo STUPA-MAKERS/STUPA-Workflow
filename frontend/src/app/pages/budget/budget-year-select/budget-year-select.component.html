@@ -1,0 +1,10 @@
+<app-select
+  name="budgetYear"
+  [label]="'budget.pair.field' | t"
+  [placeholder]="'budget.pair.placeholder' | t"
+  [options]="options()"
+  [required]="required()"
+  [error]="pairs() !== null && !options().length ? ('budget.pair.none' | t) : ''"
+  [ngModel]="fiscalYearId()"
+  (ngModelChange)="pick($event)"
+/>

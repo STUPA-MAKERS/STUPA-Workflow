@@ -25,6 +25,12 @@
       <app-section [heading]="'expenses.transfers.pairTitle' | t">
         @if (mode() === 'create') {
           @let legs = free();
+          <app-budget-year-select
+            class="tf__pair"
+            [fiscalYearId]="d.tFiscalYearId()"
+            [preferBudgetId]="preferTop()"
+            (picked)="d.onTransferPair($event)"
+          />
           <div class="tf__legs">
             <app-cost-centre-select
               class="tf__leg"
@@ -34,11 +40,9 @@
               [placeholder]="'expenses.field.costCentrePlaceholder' | t"
               [emptyLabel]="'expenses.field.noCostCentres' | t"
               [required]="true"
-              [nodes]="tree()"
+              [nodes]="pairTree()"
               [value]="d.tFromId()"
               [fiscalYearId]="d.tFiscalYearId()"
-              [fiscalYears]="d.topFiscalYears()"
-              (opened)="d.loadTopFiscalYears()"
               (picked)="pick('from', $event)"
             >
               <ng-container *ngTemplateOutlet="freeLine; context: { $implicit: legs.from }" />
@@ -63,11 +67,9 @@
               [placeholder]="'expenses.field.costCentrePlaceholder' | t"
               [emptyLabel]="'expenses.field.noCostCentres' | t"
               [required]="true"
-              [nodes]="tree()"
+              [nodes]="pairTree()"
               [value]="d.tToId()"
               [fiscalYearId]="d.tFiscalYearId()"
-              [fiscalYears]="d.topFiscalYears()"
-              (opened)="d.loadTopFiscalYears()"
               (picked)="pick('to', $event)"
             >
               <ng-container *ngTemplateOutlet="freeLine; context: { $implicit: legs.to }" />
@@ -122,21 +124,6 @@
             [required]="true"
             [ngModel]="d.tAmount()"
             (ngModelChange)="d.tAmount.set($event)"
-          />
-          <app-select
-            class="tf__fy"
-            name="tfy"
-            [label]="'expenses.field.fiscalYear' | t"
-            [placeholder]="'expenses.field.fiscalYearPlaceholder' | t"
-            [options]="d.transferFyOptions()"
-            [required]="true"
-            [error]="
-              d.tFromId() && !d.transferFyOptions().length
-                ? ('expenses.field.noFiscalYear' | t)
-                : ''
-            "
-            [ngModel]="d.tFiscalYearId()"
-            (ngModelChange)="d.tFiscalYearId.set($event)"
           />
           <app-input
             class="tf__desc"

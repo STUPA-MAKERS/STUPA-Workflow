@@ -5,6 +5,7 @@ import { downloadBlob, liveSearch, type SelectOption, ToastService } from '@stup
 import type { Uuid } from '@core/api/models';
 import {
   BudgetTreeApi,
+  type BudgetYear,
   FISCAL_YEAR_CLOSED,
   type Expense,
   type ExpenseKind,
@@ -66,6 +67,8 @@ export class ExpenseDialogsState {
   readonly newDescription = signal('');
   readonly newBudgetId = signal('');
   readonly newFiscalYearId = signal('');
+  /** The budget of the pair of a new booking (spec 000879). */
+  readonly newTopId = signal('');
   readonly newApplicationId = signal('');
   readonly appQuery = signal('');
   readonly appCandidates = signal<{ id: string; title: string }[]>([]);
@@ -150,6 +153,8 @@ export class ExpenseDialogsState {
   readonly tFromId = signal('');
   readonly tToId = signal('');
   readonly tFiscalYearId = signal('');
+  /** The budget of the pair of a new transfer. */
+  readonly tTopId = signal('');
   readonly tAmount = signal('');
   readonly tDescription = signal('');
   readonly transferFyOptions = signal<SelectOption[]>([]);
@@ -259,6 +264,7 @@ export class ExpenseDialogsState {
     this.newDescription.set('');
     this.newBudgetId.set(this.list.budgetId() || '');
     this.newFiscalYearId.set('');
+    this.newTopId.set('');
     this.newApplicationId.set('');
     this.newInvoiceId.set('');
     this.newInvoiceDate.set('');
@@ -361,11 +367,33 @@ export class ExpenseDialogsState {
     this.appCandidates.set([]);
   }
 
+  /** The cost centre of a new booking. The pair of budget and year stays (spec 000879). */
   onPickBudget(id: string): void {
     this.newBudgetId.set(id);
-    this.newFiscalYearId.set('');
-    this.fiscalYearOptions.set([]);
-    if (id) this.loadFiscalYears(id);
+  }
+
+  /**
+   * The pair of a new booking: its budget and its fiscal year. A cost centre of another
+   * budget goes, because the cost centre comes from the budget of the pair.
+   */
+  onPickPair(pair: BudgetYear): void {
+    this.newTopId.set(pair.budgetId);
+    this.newFiscalYearId.set(pair.fiscalYearId);
+    const top = findTopBudgetNode(this.list.budgetTree(), this.newBudgetId());
+    if (this.newBudgetId() && top?.id !== pair.budgetId) this.newBudgetId.set('');
+  }
+
+  /** The pair of a new transfer. A leg in another budget goes. */
+  onTransferPair(pair: BudgetYear): void {
+    this.tTopId.set(pair.budgetId);
+    this.tFiscalYearId.set(pair.fiscalYearId);
+    const tree = this.list.budgetTree();
+    if (this.tFromId() && findTopBudgetNode(tree, this.tFromId())?.id !== pair.budgetId) {
+      this.tFromId.set('');
+    }
+    if (this.tToId() && findTopBudgetNode(tree, this.tToId())?.id !== pair.budgetId) {
+      this.tToId.set('');
+    }
   }
 
   /** `prefer`: the year to pick when it is open, else `defaultFiscalYear` is picked. */
@@ -596,6 +624,7 @@ export class ExpenseDialogsState {
     this.tFromId.set(this.list.budgetId() || '');
     this.tToId.set('');
     this.tFiscalYearId.set('');
+    this.tTopId.set('');
     this.tAmount.set('');
     this.tDescription.set('');
     this.transferFyOptions.set([]);
@@ -642,11 +671,9 @@ export class ExpenseDialogsState {
     }
   }
 
+  /** The source of a new transfer. The pair of budget and year stays (spec 000879). */
   onTransferFrom(id: string): void {
     this.tFromId.set(id);
-    this.tFiscalYearId.set('');
-    this.transferFyOptions.set([]);
-    if (id) this.loadTransferFy(id);
   }
 
   private loadTransferFy(budgetId: string): void {

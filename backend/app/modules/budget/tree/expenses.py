@@ -296,7 +296,7 @@ class ExpenseOps(BudgetTreeServiceBase):
             else None
         )
         if target is not None:
-            await self._resolve_fiscal_year(target, expense.fiscal_year_id)
+            await self._resolve_fiscal_year(target, expense.fiscal_year_id, kept=True)
         for name, value in _expense_changes(payload, target).items():
             setattr(expense, name, value)
         if "invoice_id" in fields and payload.invoice_id is not None:

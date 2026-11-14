@@ -499,3 +499,37 @@ async def test_list_invoices_search_filter_pagination(session: AsyncSession) -> 
 
     empty = await svc.list_invoices_paged(q="zzzzzznope")
     assert empty.total == 0 and empty.items == []
+
+
+async def test_a_new_booking_takes_only_a_year_that_is_not_past(session: AsyncSession) -> None:
+    """A Haushalt without a plan gives each year that is not closed and not past.
+
+    The pairs name the current year, a booking into a past year is refused, and a
+    booking without a year takes the current one. Rule: §F/finance/budget/000879.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"BY{_suffix()}", name="Top", gremiumId=g.id))
+    this = date.today().year
+    past = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this - 1))
+    now = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this))
+    later = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this + 1))
+    closed = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this + 2))
+    await svc.set_fiscal_year_closed(top.id, closed.id, closed=True)
+
+    pairs = [p for p in await svc.choosable_pairs(None) if p.budget_id == top.id]
+    assert [(p.fiscal_year_id, p.current, p.budget_name) for p in pairs] == [
+        (now.id, True, "Top"), (later.id, False, "Top"),
+    ]
+    assert [p for p in await svc.choosable_pairs(set()) if p.budget_id == top.id] == []
+
+    def booking(fiscal_year_id: uuid.UUID | None) -> ExpenseCreate:
+        return ExpenseCreate(
+            budgetId=top.id, fiscalYearId=fiscal_year_id, amount=Decimal("5"), description="x"
+        )
+
+    with pytest.raises(ValidationProblem) as refused:
+        await svc.book_expense(booking(past.id), actor="tester")
+    assert refused.value.code == "fiscal_year_not_choosable"
+    assert (await svc.book_expense(booking(later.id), actor="tester")).fiscal_year_id == later.id
+    assert (await svc.book_expense(booking(None), actor="tester")).fiscal_year_id == now.id

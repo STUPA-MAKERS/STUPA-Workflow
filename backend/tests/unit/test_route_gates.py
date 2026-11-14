@@ -70,6 +70,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/budget-plan-versions/{version_id}/export.xlsx"): _BUDGET_NODE,
     ("GET", "/api/budget-plan-versions/{version_id}/export.pdf"): _BUDGET_NODE,
     ("GET", "/api/budgets"): "budget.tree_router._has_full_view + member gremien",
+    ("GET", "/api/budget-years"): "budget.tree_router._has_full_view + member gremien",
     ("GET", "/api/budgets/{budget_id}/applications"): _BUDGET_NODE,
     ("GET", "/api/budgets/{budget_id}/expenses"): _BUDGET_NODE,
     ("GET", "/api/budgets/{budget_id}/fiscal-years"): _BUDGET_NODE,

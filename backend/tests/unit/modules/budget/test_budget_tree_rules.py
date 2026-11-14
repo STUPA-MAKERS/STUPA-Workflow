@@ -265,3 +265,14 @@ def test_transfer_pair_changed() -> None:
     assert r.transfer_pair_changed(a, b, b, None)
     assert r.transfer_pair_changed(a, b, None, a)
     assert r.transfer_pair_changed(a, b, b, a)
+
+
+def test_a_year_is_choosable_when_it_is_open_not_past_and_decided() -> None:
+    """Rule: §F/finance/budget/000879."""
+    today = date(2026, 11, 14)
+    end = date(2026, 12, 31)
+    assert r.is_choosable_year(end, today, closed=False, plan_in_force=None)
+    assert r.is_choosable_year(today, today, closed=False, plan_in_force=True)
+    assert not r.is_choosable_year(end, today, closed=True, plan_in_force=None)
+    assert not r.is_choosable_year(date(2026, 11, 13), today, closed=False, plan_in_force=None)
+    assert not r.is_choosable_year(end, today, closed=False, plan_in_force=False)

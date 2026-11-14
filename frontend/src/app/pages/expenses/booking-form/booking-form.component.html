@@ -81,40 +81,30 @@
                 'expenses.form.fromApplication' | t
               }}</app-locked-field>
             } @else {
-              <app-cost-centre-select
-                [id]="'bf-cc-' + mode()"
-                [label]="'expenses.field.costCentre' | t"
-                [placeholder]="'expenses.field.costCentrePlaceholder' | t"
-                [emptyLabel]="'expenses.field.noCostCentres' | t"
-                [required]="true"
-                [nodes]="tree()"
-                [value]="ccId()"
-                [fiscalYearId]="ccYear()"
-                [fiscalYears]="s.topFiscalYears()"
-                (opened)="s.loadTopFiscalYears()"
-                (picked)="pickCostCentre($event)"
+              <app-budget-year-select
+                [fiscalYearId]="s.newFiscalYearId()"
+                [preferBudgetId]="preferTop()"
+                (picked)="s.onPickPair($event)"
               />
+              @if (s.newTopId()) {
+                <app-cost-centre-select
+                  [id]="'bf-cc-' + mode()"
+                  [label]="'expenses.field.costCentre' | t"
+                  [placeholder]="'expenses.field.costCentrePlaceholder' | t"
+                  [emptyLabel]="'expenses.field.noCostCentres' | t"
+                  [required]="true"
+                  [nodes]="pairTree()"
+                  [value]="ccId()"
+                  [fiscalYearId]="ccYear()"
+                  (picked)="pickCostCentre($event)"
+                />
+              }
             }
             <div class="mf__grid">
               @if (s.newApplicationId()) {
                 <app-locked-field filled [label]="'expenses.field.fiscalYear' | t">{{
                   'expenses.form.fromApplication' | t
                 }}</app-locked-field>
-              } @else {
-                <app-select
-                  name="fy"
-                  [label]="'expenses.field.fiscalYear' | t"
-                  [placeholder]="'expenses.field.fiscalYearPlaceholder' | t"
-                  [options]="s.fiscalYearOptions()"
-                  [required]="true"
-                  [error]="
-                    s.newBudgetId() && !s.fiscalYearOptions().length
-                      ? ('expenses.field.noFiscalYear' | t)
-                      : ''
-                  "
-                  [ngModel]="s.newFiscalYearId()"
-                  (ngModelChange)="s.newFiscalYearId.set($event)"
-                />
               }
               <app-input
                 name="cat"

@@ -211,6 +211,18 @@ def pick_fiscal_year[T](candidates: Sequence[tuple[T, date, date]], today: date)
             return None
 
 
+def is_choosable_year(
+    end: date, today: date, *, closed: bool, plan_in_force: bool | None
+) -> bool:
+    """Say if a new booking or assignment can take a fiscal year (spec 000879).
+
+    The year must not be closed and must not be past. `plan_in_force` is `None` for a
+    budget without a plan. For a budget with a plan it says if the plan of the year is
+    in force, because money moves only on a decided plan.
+    """
+    return not closed and end >= today and plan_in_force is not False
+
+
 def is_valid_fiscal_start(start_month: int, start_day: int) -> bool:
     """Check that the fiscal cutoff day and month form a valid date in EVERY year.
 

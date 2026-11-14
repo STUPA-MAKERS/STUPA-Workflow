@@ -76,8 +76,6 @@ import {
   type RowMenuItem,
   type RowMenuSection,
   SectionComponent,
-  SelectFieldComponent,
-  type SelectOption,
   SheetBarComponent,
   SheetBarTitleDirective,
   SideSheetComponent,
@@ -94,10 +92,12 @@ import {
   BudgetTreeApi,
   FISCAL_YEAR_CLOSED,
   type BudgetTreeNode,
+  type BudgetYear,
   type FiscalYear,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
 import { problemCode } from '@core/api/problem';
+import { BudgetYearSelectComponent } from '../budget/budget-year-select/budget-year-select.component';
 import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, transitionLooks } from './applications.util';
@@ -203,10 +203,10 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     ButtonComponent,
     DialogComponent,
     IconComponent,
-    SelectFieldComponent,
     TabPageDirective,
     TabPagerComponent,
     TabsComponent,
+    BudgetYearSelectComponent,
     CostCentreSelectComponent,
     AttachmentsPanelComponent,
     AnswerViewComponent,
@@ -386,22 +386,22 @@ export class ApplicationsDetailComponent {
   protected fiscalLabel(id: string | null | undefined): string {
     return (id && this.fiscalLabels().get(id)) || '';
   }
-  /** Dropdown options: "automatic" plus every open fiscal year of the top budget.
-   *  An inactive year carries a mark. A closed year takes no assignment, so it shows
-   *  only while it is the current year of the application. */
-  protected readonly fiscalOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('applications.budget.fiscalAuto') },
-    ...this.fiscalYears()
-      .filter((y) => !y.closedAt || y.id === this.app()?.fiscalYearId)
-      .map((y) => ({
-      value: y.id,
-        label: y.closedAt
-          ? this.i18n.translate('budget.fy.closedLabel', { year: y.display })
-          : y.active
-            ? y.display
-            : `${y.display} (${this.i18n.translate('applications.budget.fiscalInactive')})`,
-      })),
-  ]);
+  /** The budget of the pair in the dialog (spec 000879). */
+  protected readonly assignTopId = signal('');
+  /** The cost centres of the budget of the pair. */
+  protected readonly assignTree = computed(() =>
+    this.budgetTree().filter((n) => n.id === this.assignTopId()),
+  );
+  /** The budget of the assigned cost centre: the field of the pair starts with its year. */
+  protected readonly assignPreferTop = computed(
+    () => this.topLevelIdOf(this.app()?.budgetId ?? '') ?? '',
+  );
+  /** Take the pair of the dialog. A cost centre of another budget leaves the choice. */
+  protected onAssignPair(pair: BudgetYear): void {
+    this.assignTopId.set(pair.budgetId);
+    this.fiscalChoice.set(pair.fiscalYearId);
+    if (this.topLevelIdOf(this.budgetChoice()) !== pair.budgetId) this.budgetChoice.set('');
+  }
   /** Find the top budget (root) whose subtree contains the cost centre. */
   private topLevelIdOf(budgetId: string): string | null {
     const contains = (n: BudgetTreeNode): boolean =>
@@ -425,21 +425,11 @@ export class ApplicationsDetailComponent {
       },
     });
   }
-  /** Handle a cost centre picked in the dialog and reload the fiscal-year list.
-   *  The fiscal-year choice survives only when the user picks the original cost
-   *  centre again. */
-  protected onBudgetPicked(id: string): void {
-    this.budgetChoice.set(id);
-    this.fiscalChoice.set(
-      id === (this.app()?.budgetId ?? '') ? (this.app()?.fiscalYearId ?? '') : '',
-    );
-    this.loadFiscalYears(id || null);
-  }
   protected openBudgetDialog(): void {
     const cur = this.app()?.budgetId ?? '';
     this.budgetChoice.set(cur);
     this.fiscalChoice.set(this.app()?.fiscalYearId ?? '');
-    this.loadFiscalYears(cur || null);
+    this.assignTopId.set(this.assignPreferTop());
     this.budgetDialogOpen.set(true);
   }
 
@@ -1252,7 +1242,11 @@ export class ApplicationsDetailComponent {
     if (this.assigningBudget()) return;
     this.assigningBudget.set(true);
     this.budgetApi
-      .assignBudget(this.id, this.budgetChoice() || null, this.fiscalChoice() || null)
+      .assignBudget(
+        this.id,
+        this.budgetChoice() || null,
+        this.budgetChoice() ? this.fiscalChoice() || null : null,
+      )
       .subscribe({
         next: () => {
           this.assigningBudget.set(false);

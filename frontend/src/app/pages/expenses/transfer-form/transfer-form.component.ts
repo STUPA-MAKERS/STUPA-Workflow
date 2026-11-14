@@ -11,13 +11,13 @@ import {
   IconComponent,
   InputComponent,
   LockedFieldComponent,
-  SelectFieldComponent,
   TextareaComponent,
   ScrollFadeDirective,
   SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { BudgetYearSelectComponent } from '../../budget/budget-year-select/budget-year-select.component';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
 import {
@@ -25,6 +25,7 @@ import {
   costCentreFigures,
   costCentreLabel,
   findBudgetNode,
+  findTopBudgetNode,
 } from '../../budget/expense-display.util';
 import type { FinanceFormLayout } from '../booking-form/booking-form.component';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
@@ -64,6 +65,7 @@ interface LegFree {
     ScrollFadeDirective,
     PaneFormHeadComponent,
     ButtonComponent,
+    BudgetYearSelectComponent,
     CostCentreSelectComponent,
     CurrencyInputComponent,
     DatepickerComponent,
@@ -73,7 +75,6 @@ interface LegFree {
     InputComponent,
     LockedFieldComponent,
     NgTemplateOutlet,
-    SelectFieldComponent,
     TextareaComponent,
     TranslatePipe,
   ],
@@ -110,6 +111,16 @@ export class TransferFormComponent {
   });
 
   /** "Frei danach" of the source (minus the amount) and the target (plus the amount). */
+  /** The budget of the picked source: the field of the pair starts with its year. */
+  protected readonly preferTop = computed(
+    () => findTopBudgetNode(this.tree(), this.dialogs().tFromId())?.id ?? '',
+  );
+
+  /** The cost centres of the budget of the pair (spec 000879). */
+  protected readonly pairTree = computed(() =>
+    this.tree().filter((top) => top.id === this.dialogs().tTopId()),
+  );
+
   protected readonly free = computed<{ from: LegFree | null; to: LegFree | null }>(() => {
     const d = this.dialogs();
     return {

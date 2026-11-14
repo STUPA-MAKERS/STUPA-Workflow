@@ -20,6 +20,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import tree_rules
 from app.modules.budget.access import viewed_by
+from app.modules.budget.plan_models import BudgetPlan, BudgetPlanVersion
 from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.budget.tree_rules import _SEP
 from app.settings import Settings, get_settings
@@ -279,19 +280,78 @@ class BudgetTreeServiceBase:
         them and cannot call them.
         """
 
-    async def _resolve_fiscal_year(self, node: Budget, fiscal_year_id: UUID | None) -> UUID:
+    def _today(self) -> date:
+        """Return the date of today in the time zone of the platform."""
+        return datetime.now(ZoneInfo(self.settings.local_timezone)).date()
+
+    async def choosable_years(self, top: Budget) -> list[FiscalYear]:
+        """Return the fiscal years of a budget that a new booking can take (spec 000879).
+
+        A year that is not closed and not past. A budget with a plan gives only the
+        years whose plan is in force.
+        """
+        decided = (
+            set(
+                (
+                    await self.session.scalars(
+                        select(BudgetPlan.fiscal_year_id)
+                        .join(BudgetPlanVersion, BudgetPlanVersion.plan_id == BudgetPlan.id)
+                        .join(FiscalYear, FiscalYear.id == BudgetPlan.fiscal_year_id)
+                        .where(
+                            FiscalYear.budget_id == top.id,
+                            BudgetPlanVersion.state == "in_force",
+                        )
+                    )
+                ).all()
+            )
+            if top.plan_enabled
+            else None
+        )
+        today = self._today()
+        return [
+            f
+            for f in await self._fiscal_years_of(top.id)
+            if tree_rules.is_choosable_year(
+                f.end_date,
+                today,
+                closed=f.closed_at is not None,
+                plan_in_force=None if decided is None else f.id in decided,
+            )
+        ]
+
+    async def _require_choosable(self, top: Budget, fy: FiscalYear) -> None:
+        """Refuse a fiscal year that a new booking or assignment cannot take.
+
+        Raises:
+            ConflictError: `fiscal_year_closed` (409).
+            ValidationProblem: `fiscal_year_not_choosable` (422) for a year that is
+                past, or whose plan is not in force in a budget with a plan.
+        """
+        self._refuse_closed(fy)
+        if fy.id not in {f.id for f in await self.choosable_years(top)}:
+            raise ValidationProblem(
+                "The fiscal year is past or its plan is not in force.",
+                code="fiscal_year_not_choosable",
+                errors=[{"field": "fiscalYearId", "msg": "past, or no plan in force"}],
+            )
+
+    async def _resolve_fiscal_year(
+        self, node: Budget, fiscal_year_id: UUID | None, *, kept: bool = False
+    ) -> UUID:
         """Resolve the fiscal year of a node operation.
 
         A booking, a transfer and an assignment all use this. An explicit fiscal
-        year must belong to the top-level budget. Without one the method takes
-        the current fiscal year of the top-level budget: the single active open
-        year, or among several active open years the one that contains the
-        local date. A closed year never counts as that default. The result is
-        never `None`.
+        year must belong to the top-level budget and must be a year that a new
+        booking can take (`choosable_years`, spec 000879). `kept` is for a booking
+        that moves to another cost center and keeps its year: the year must then
+        only be open. Without a fiscal year the method takes the current one of the
+        top-level budget: the single active year that a booking can take, or among
+        several the one that contains the local date. The result is never `None`.
 
         Raises:
             ValidationProblem: The fiscal year belongs to another top-level
-                budget, or no current fiscal year can be derived (422).
+                budget, is `fiscal_year_not_choosable`, or no current fiscal year
+                can be derived (422).
             ConflictError: `fiscal_year_closed` (409) for an explicit closed
                 fiscal year.
         """
@@ -303,15 +363,17 @@ class BudgetTreeServiceBase:
                     "Fiscal year does not belong to this budget's top-level.",
                     errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
                 )
-            self._refuse_closed(fy)
+            if kept:
+                self._refuse_closed(fy)
+            else:
+                await self._require_choosable(top, fy)
             return fy.id
         candidates = [
             (f.id, f.start_date, f.end_date)
-            for f in await self._fiscal_years_of(top.id)
-            if f.active and f.closed_at is None
+            for f in await self.choosable_years(top)
+            if f.active
         ]
-        today = datetime.now(ZoneInfo(self.settings.local_timezone)).date()
-        picked = tree_rules.pick_fiscal_year(candidates, today)
+        picked = tree_rules.pick_fiscal_year(candidates, self._today())
         if picked is None:
             raise ValidationProblem(
                 "No current fiscal year — specify fiscalYearId.",

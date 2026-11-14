@@ -621,55 +621,34 @@ describe('ApplicationsDetailComponent — header', () => {
     const YEARS_URL = (r: { url: string }) => r.url === '/api/budgets/b1/fiscal-years';
 
     /**
-     * Another cost centre of the same top budget sets the year choice back to automatic. The
-     * original cost centre brings its year back. No cost centre, or one outside the tree, has no
-     * years to choose.
+     * The dialog asks for the pair of budget and fiscal year first (spec 000879). A pair of
+     * another budget empties the cost centre, a pair of the same budget keeps it.
      */
-    it('names the cost centre with its fiscal year and changes both in the dialog', async () => {
+    it('names the cost centre with its fiscal year and asks for the pair in the dialog', async () => {
       const { http, cmp, detectChanges } = await setup({ app: { budgetId: 'b2', fiscalYearId: 'fy1' }, tree: TREE });
       http.expectOne(YEARS_URL).flush(YEARS);
       detectChanges();
       expect(screen.getByText('Kostenstelle · HHJ 2026')).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: 'Kostenstelle ändern' }));
-      http.expectOne(YEARS_URL).flush(YEARS);
+      const pair = { budgetId: 'b1', budgetName: 'VS-Mittel', fiscalYearId: 'fy1', display: '2026', current: true };
+      http.expectOne('/api/budget-years').flush([pair]);
       detectChanges();
       const c = cmp as unknown as {
-        fiscalOptions: () => { value: string; label: string }[];
-        onBudgetPicked: (id: string) => void;
+        onAssignPair: (p: typeof pair) => void;
         fiscalChoice: () => string;
-        fiscalYears: () => unknown[];
+        budgetChoice: () => string;
+        assignTree: () => { id: string }[];
       };
-      expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktuelles HHJ)', '2026', '2025 (inaktiv)']);
-
-      c.onBudgetPicked('b1');
-      expect(c.fiscalChoice()).toBe('');
-      http.expectOne(YEARS_URL).flush({}, { status: 500, statusText: 'x' });
-      expect(c.fiscalYears()).toEqual([]);
-      c.onBudgetPicked('b2');
+      expect(c.assignTree().map((n) => n.id)).toEqual(['b1']);
+      expect(c.budgetChoice()).toBe('b2');
       expect(c.fiscalChoice()).toBe('fy1');
-      http.expectOne(YEARS_URL).flush(YEARS);
-      c.onBudgetPicked('');
-      c.onBudgetPicked('gone');
-      expect(c.fiscalYears()).toEqual([]);
-      http.verify();
-    });
 
-    it('offers a closed year only while it is the year of the application', async () => {
-      const closed = { ...YEARS[1], id: 'fyc', year: 2024, display: '2024', closedAt: '2026-03-01T00:00:00Z' };
-      const c = (await setup({ app: { budgetId: 'b2', fiscalYearId: 'fy1' }, tree: TREE })).cmp as unknown as {
-        fiscalOptions: () => { value: string; label: string }[];
-        fiscalYears: { set: (v: unknown[]) => void };
-        app: { update: (f: (a: Record<string, unknown>) => Record<string, unknown>) => void };
-      };
-      c.fiscalYears.set([YEARS[0], closed]);
-      expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktuelles HHJ)', '2026']);
-      c.app.update((a) => ({ ...a, fiscalYearId: 'fyc' }));
-      expect(c.fiscalOptions().map((o) => o.label)).toEqual([
-        'Automatisch (aktuelles HHJ)',
-        '2026',
-        '2024 · abgeschlossen',
-      ]);
+      c.onAssignPair({ ...pair, budgetId: 'other', fiscalYearId: 'fy9' });
+      expect(c.budgetChoice()).toBe('');
+      expect(c.fiscalChoice()).toBe('fy9');
+      expect(c.assignTree()).toEqual([]);
+      http.verify();
     });
 
     it('names a cost centre without a year and offers "Zuordnen" without one', async () => {

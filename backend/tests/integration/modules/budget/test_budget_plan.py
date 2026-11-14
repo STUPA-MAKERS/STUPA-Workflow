@@ -3050,3 +3050,41 @@ async def test_a_draft_key_that_gives_a_taken_path_key_is_refused(session: Async
     plan = await t.svc.rename_line(vid, t.inc.id, PlanLineRename(key="83"))
     shown = {line.budget_id: line.path_key for line in _version(plan).lines}
     assert shown[t.inc.id] == f"{t.top.path_key}-83"
+
+
+async def test_a_haushalt_with_a_plan_takes_a_booking_only_on_a_plan_in_force(
+    session: AsyncSession,
+) -> None:
+    """A year of a Haushalt with a plan is choosable only when its plan is in force.
+
+    The year of the tree is the current one for a test that runs in its year, so the
+    test makes its own years from the date of today. Rule: §F/finance/budget/000879.
+    """
+    svc = BudgetTreeService(session, actor="tester")
+    top = await svc.create_node(BudgetNodeCreate(key=f"P{uuid.uuid4().hex[:8]}", name="Plan"))
+    inc = await svc.create_node(BudgetNodeCreate(key="1", name="Ein", parentId=top.id))
+    exp = await svc.create_node(BudgetNodeCreate(key="8", name="Aus", parentId=top.id))
+    this = datetime.now(UTC).year
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this + 1))
+    await svc.set_plan_switch(top.id, True)
+    await session.commit()
+
+    def booking() -> ExpenseCreate:
+        return ExpenseCreate(budgetId=exp.id, fiscalYearId=fy.id, amount=D(5), description="x")
+
+    assert [p for p in await svc.choosable_pairs(None) if p.budget_id == top.id] == []
+    with pytest.raises(ValidationProblem) as early:
+        await svc.book_expense(booking(), actor="tester")
+    assert _code(early) == "fiscal_year_not_choosable"
+
+    plan = await svc.get_plan(top.id, fy.id)
+    vid = _version(plan).id
+    await svc.set_line(vid, inc.id, PlanLineSet(side="income", amount=D(10)))
+    await svc.set_line(vid, exp.id, PlanLineSet(side="expense", amount=D(10)))
+    await svc.set_plan_state(vid, PlanStateSet(state="in_force"))
+    await session.commit()
+
+    assert [p.fiscal_year_id for p in await svc.choosable_pairs(None) if p.budget_id == top.id] == [
+        fy.id
+    ]
+    assert (await svc.book_expense(booking(), actor="tester")).fiscal_year_id == fy.id

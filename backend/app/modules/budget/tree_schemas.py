@@ -233,6 +233,20 @@ class FiscalYearUpdate(FrozenCamelModel, frozen=True):
     active: bool | None = None
 
 
+class BudgetYearOut(FrozenCamelModel, frozen=True):
+    """A pair of a top-level budget and one of its fiscal years that a booking can take.
+
+    A person chooses the pair before the cost center (spec 000879). `current` marks
+    the year that holds the date of today.
+    """
+
+    budget_id: UUID = Field(alias="budgetId")
+    budget_name: str = Field(alias="budgetName")
+    fiscal_year_id: UUID = Field(alias="fiscalYearId")
+    display: str
+    current: bool
+
+
 class FiscalYearOut(FrozenCamelModel, frozen=True):
     """Fiscal-year base data.
 

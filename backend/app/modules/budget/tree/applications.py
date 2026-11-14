@@ -161,6 +161,8 @@ class AssignmentOps(BudgetTreeServiceBase):
                 fiscal year belongs to another top-level budget.
             ConflictError: `fiscal_year_closed` (409) when the current or the
                 new fiscal year is closed.
+            ValidationProblem: `fiscal_year_not_choosable` (422) for a new year that
+                is past or whose plan is not in force.
         """
         app = await self._get_application(application_id)
         if app.budget_id is None:
@@ -177,7 +179,7 @@ class AssignmentOps(BudgetTreeServiceBase):
                 errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
             )
         await self._require_open_fiscal_year(app.fiscal_year_id)
-        self._refuse_closed(fy)
+        await self._require_choosable(top, fy)
         app.fiscal_year_id = fy.id
         await self._audit(
             AuditAction.BUDGET_MOVE_FISCAL_YEAR,
