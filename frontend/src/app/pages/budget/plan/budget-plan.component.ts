@@ -36,7 +36,6 @@ import {
   SheetBarComponent,
   SheetBarTitleDirective,
   SideSheetComponent,
-  SkeletonComponent,
   StatusTextComponent,
   type Step,
   StepperComponent,
@@ -220,7 +219,6 @@ const WIDE_FROM = 10_000_000;
     SheetBarComponent,
     SheetBarTitleDirective,
     SideSheetComponent,
-    SkeletonComponent,
     StatusTextComponent,
     StepperComponent,
     SwitchComponent,
@@ -376,6 +374,13 @@ export class BudgetPlanComponent {
     { side: 'income' as const, heading: this.i18n.translate('budget.plan.income'), total: this.incomeTotal() },
     { side: 'expense' as const, heading: this.i18n.translate('budget.plan.expense'), total: this.expenseTotal() },
   ]);
+  /** The sides the skeleton draws, with the name widths (%) of their rows in the tree. */
+  readonly skeletonGroups = computed(() => [
+    { heading: this.i18n.translate('budget.plan.income'), rows: [55, 42] },
+    { heading: this.i18n.translate('budget.plan.expense'), rows: [62, 48, 70, 40] },
+  ]);
+  /** Label widths (rem) of the steps the skeleton draws: draft, a vote, in force. */
+  readonly skeletonSteps: readonly number[] = [4.5, 9, 5.5];
   readonly sideOptions = computed<SelectOption[]>(() => [
     { value: 'income', label: this.i18n.translate('budget.plan.side.income') },
     { value: 'expense', label: this.i18n.translate('budget.plan.side.expense') },

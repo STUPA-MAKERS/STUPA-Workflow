@@ -423,6 +423,42 @@ describe('BudgetPlanComponent', () => {
       expect(view.container.querySelector('app-load-error')).not.toBeNull();
     });
 
+    it('§NF/performance/loading/000893: the first load shows the pane and the plan sheet as a skeleton', async () => {
+      setViewport(true);
+      const view = await render(BudgetPlanComponent, {
+        providers: [
+          provideRouter([]),
+          { provide: BudgetPlanApi, useValue: {} },
+          { provide: BudgetTreeApi, useValue: { tree: () => new Subject<BudgetTreeNode[]>(), changed: new Subject<void>() } },
+          { provide: AuthService, useValue: { can: () => true } },
+          { provide: AdminApiService, useValue: { listGremienOptions: () => of([]) } },
+        ],
+      });
+      const page = view.container;
+      const all = (selector: string) => [...page.querySelectorAll(selector)].map(text);
+      expect(page.querySelector('[role="status"]')?.textContent).toContain('Statistik wird geladen');
+      expect(page.querySelector('.bd__pane .bd__skSeg')).not.toBeNull();
+      expect(all('.bd__pane .bp__group span:first-child')).toEqual(['Einnahmen', 'Ausgaben']);
+      expect(page.querySelectorAll('.bp__skStep')).toHaveLength(3);
+      expect(all('.bd__figLabel')).toEqual(['Einnahmen', 'Ausgaben', 'Differenz']);
+      expect(all('.bd__sec .section__title')).toEqual(['Einnahmen', 'Ausgaben']);
+      expect(page.querySelector('.bd__figValue')?.textContent?.trim()).toBe('');
+      expect(page.querySelector('app-skeleton')).toBeNull();
+    });
+
+    it('§NF/performance/loading/000893: a plan read keeps the tree and shows the plan skeleton in the sheet', async () => {
+      const view = await setup();
+      const pending = new Subject<BudgetPlan>();
+      view.api.plan.mockReturnValueOnce(pending);
+      view.fixture.componentInstance.pickYear('fy-26');
+      view.fixture.detectChanges();
+      expect(view.container.querySelector('.bd__sheetBody .bp__skSteps')).not.toBeNull();
+      expect(view.container.querySelector('.bd__pane .bd__skSeg')).toBeNull();
+      pending.next(plan());
+      view.fixture.detectChanges();
+      expect(view.container.querySelector('.bp__skSteps')).toBeNull();
+    });
+
     it('the retry of a failed read of the fiscal years reads them again', async () => {
       const view = await setup();
       expect(view.container.querySelector('app-load-error')).toBeNull();
@@ -508,7 +544,7 @@ describe('BudgetPlanComponent', () => {
       view.fixture.componentInstance.refreshPlan();
       view.fixture.detectChanges();
       expect(settings()).toBe(first);
-      expect(view.container.querySelector('app-skeleton')).toBeNull();
+      expect(view.container.querySelector('.bp__skSteps')).toBeNull();
       late.next(plan([version({ lines: [line('fees', '77')] })]));
       view.fixture.detectChanges();
       expect(settings()).toBe(first);
@@ -962,7 +998,7 @@ describe('BudgetPlanComponent', () => {
       view.fixture.detectChanges();
       expect(view.error).toHaveBeenCalledWith('Der gesperrte Betrag liegt über dem Ansatz.');
       expect(sheet()).toBe(open);
-      expect(view.container.querySelector('app-skeleton')).toBeNull();
+      expect(view.container.querySelector('.bp__skSteps')).toBeNull();
       expect(note.value).toBe('');
       pending.next(plan());
       view.fixture.detectChanges();

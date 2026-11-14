@@ -12,6 +12,9 @@
       <section class="ld-pane ld-pane--fill bd__pane" aria-hidden="true">
         <app-page-header [pane]="true" [title]="'nav.budget' | t" />
         <div class="bd__paneBody">
+          @if (planTop()) {
+            <span class="skel-box bd__skSeg"></span>
+          }
           <span class="skel-box bd__skSearch"></span>
           <div class="bd__chips">
             <span class="skel-box bd__skChip"></span>
@@ -38,6 +41,9 @@
         <div class="bd__topRow">
           <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
         </div>
+        @if (planTop()) {
+          <span class="skel-box bd__skSeg"></span>
+        }
         <div class="bd__chips">
           <span class="skel-box bd__skChip bd__skChip--wide"></span>
           <span class="skel-box bd__skChip"></span>
@@ -65,9 +71,34 @@
             </div>
           }
         </dl>
-        <app-section class="bd__sec" size="lg" [heading]="'budget.usage.heading' | t">
-          <app-skeleton variant="rows" [count]="4" />
-        </app-section>
+        <!-- The two columns of the loaded page: the distribution and the use per child. -->
+        <div class="bd__cols">
+          <app-section class="bd__sec" size="lg" [heading]="'budget.dash.distribution' | t">
+            <span sectionAction class="skel-box bd__skChip"></span>
+            <app-budget-pie [label]="metricLabel(metric())" [slices]="[]" [loading]="true" />
+          </app-section>
+          <app-section class="bd__sec" size="lg" [heading]="'budget.usage.headingNode' | t">
+            <div class="bd__usageCols">
+              <span class="bd__grow"></span>
+              <span class="bd__c1">{{ 'budget.dash.fig.requested' | t }}</span>
+              <span class="bd__c2">{{ 'budget.usage.bar' | t }}</span>
+              <span class="bd__c3">{{ 'budget.dash.fig.available' | t }}</span>
+            </div>
+            <ul class="bd__usage">
+              @for (row of skeletonUsage; track $index) {
+                <li class="bd__urow">
+                  <div class="bd__uline">
+                    <span class="bd__ucell"><span class="skel-text" [style.width.%]="row"></span></span>
+                    <span class="bd__c1"><span class="skel-text bd__skNum"></span></span>
+                    <span class="bd__c2"><span class="skel-text bd__skNum bd__skNum--short"></span></span>
+                    <span class="bd__c3"><span class="skel-text bd__skNum"></span></span>
+                  </div>
+                  <span class="skel-box bd__skUsage"></span>
+                </li>
+              }
+            </ul>
+          </app-section>
+        </div>
         <app-section class="bd__sec bd__sec--apps" size="lg" [heading]="itemsTitle()">
           <app-skeleton variant="rows" [count]="3" />
         </app-section>
