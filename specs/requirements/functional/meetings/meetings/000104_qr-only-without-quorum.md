@@ -2,12 +2,10 @@
 id: "000104"
 title: Public participation only without quorum
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/livevote/guests.py
-  - frontend/src/app/features/meetings/public-join/public-join-settings.component.ts
+updated: 2026-11-14
+replaced_by: F/meetings/meetings/000905
 scope:
   - backend/app/modules/livevote
   - frontend/src/app/features/meetings
