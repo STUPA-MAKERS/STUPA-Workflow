@@ -284,7 +284,9 @@ def _checks(model: type[Any]) -> dict[str, str]:
     """Map the CHECK constraint names of a model table to their SQL text."""
     table: Table = model.__table__
     return {
-        str(c.name): str(c.sqltext) for c in table.constraints if isinstance(c, CheckConstraint)
+        str(c.name): str(c.sqltext)
+        for c in table.constraints
+        if isinstance(c, CheckConstraint)
     }
 
 
@@ -299,7 +301,9 @@ def test_logo_table_holds_the_exactly_one_of_constraint() -> None:
 
 async def test_create_variant_persists_and_audits() -> None:
     s, sess = svc([res(), *audit_results()])
-    out = await s.create_variant(CdVariantCreate(key="senat", name="Senat"), "admin")
+    out = await s.create_variant(
+        CdVariantCreate(key="senat", name="Senat"), "admin"
+    )
     assert out.key == "senat" and out.name == "Senat" and out.logos == []
     assert sess.committed == 1
 
@@ -439,7 +443,9 @@ async def test_upload_logo_rejects_a_mismatched_magic_byte() -> None:
     storage = FakeStorage()
     s, _ = svc(gets=[row], storage=storage)
     with pytest.raises(UnsupportedMediaTypeError):
-        await s.upload_logo(row.id, b"<html>x</html>", slot="title", filename="evil.png", actor="a")
+        await s.upload_logo(
+            row.id, b"<html>x</html>", slot="title", filename="evil.png", actor="a"
+        )
     assert storage.put_calls == []
 
 
@@ -600,7 +606,9 @@ async def test_reorder_logos_rejects_a_foreign_id() -> None:
 async def test_reorder_logos_unknown_variant_404() -> None:
     s, _ = svc()
     with pytest.raises(NotFoundError):
-        await s.reorder_logos(uuid.uuid4(), CdVariantLogoReorder(slot="title", logoIds=[]), "admin")
+        await s.reorder_logos(
+            uuid.uuid4(), CdVariantLogoReorder(slot="title", logoIds=[]), "admin"
+        )
 
 
 async def test_create_gremium_rejects_an_unknown_cd_variant() -> None:
@@ -618,7 +626,9 @@ async def test_update_gremium_rejects_an_unknown_cd_variant() -> None:
     session = FakeSession(gets=[row, None])
     service = ConfigService(session)  # type: ignore[arg-type]
     with pytest.raises(ValidationProblem):
-        await service.update_gremium(row.id, GremiumUpdate(cdVariantId=uuid.uuid4()), "admin")
+        await service.update_gremium(
+            row.id, GremiumUpdate(cdVariantId=uuid.uuid4()), "admin"
+        )
     assert session.committed == 0
 
 
@@ -637,7 +647,9 @@ async def test_update_gremium_binds_an_existing_cd_variant() -> None:
     row = gremium_row()
     session = FakeSession([*audit_results()], gets=[row, variant])
     service = ConfigService(session)  # type: ignore[arg-type]
-    out = await service.update_gremium(row.id, GremiumUpdate(cdVariantId=variant.id), "admin")
+    out = await service.update_gremium(
+        row.id, GremiumUpdate(cdVariantId=variant.id), "admin"
+    )
     assert out.cd_variant_id == variant.id
 
 
@@ -657,13 +669,17 @@ async def test_cd_variant_key_reads_the_referenced_row() -> None:
     assert await cd_variant_key_for_gremium(session, gremium) == "stupa"  # type: ignore[arg-type]
 
 
-@pytest.mark.parametrize("gremium", [None, Gremium(name="X", slug="x", cd_variant_id=None)])
+@pytest.mark.parametrize(
+    "gremium", [None, Gremium(name="X", slug="x", cd_variant_id=None)]
+)
 async def test_cd_variant_key_without_a_variant_is_none(gremium: Gremium | None) -> None:
     session = FakeSession()
     assert await cd_variant_key_for_gremium(session, gremium) is None  # type: ignore[arg-type]
 
 
-def _resolver_session(variant: CdVariant, logos: list[CdVariantLogo]) -> FakeSession:
+def _resolver_session(
+    variant: CdVariant, logos: list[CdVariantLogo]
+) -> FakeSession:
     """`scalar` answers the variant lookup by key, `scalars` the logos."""
     return FakeSession([res(*logos)], scalars=[variant])
 
@@ -676,9 +692,7 @@ async def test_resolve_vendored_only_variant_loads_no_asset() -> None:
     ]
     storage = FakeStorage()
     out = await resolve_cd_variant_by_key(
-        _resolver_session(variant, logos),
-        storage,
-        variant.key,  # type: ignore[arg-type]
+        _resolver_session(variant, logos), storage, variant.key  # type: ignore[arg-type]
     )
     assert out is not None
     assert out.title_logos == ("STUPA",) and out.footer_logos == ("STUPA",)
@@ -701,9 +715,7 @@ async def test_resolve_upload_only_variant_returns_names_and_bytes() -> None:
     storage = FakeStorage()
     storage.objects["cd-logos/a/wappen.svg"] = (SVG, "image/svg+xml")
     out = await resolve_cd_variant_by_key(
-        _resolver_session(variant, [logo]),
-        storage,
-        variant.key,  # type: ignore[arg-type]
+        _resolver_session(variant, [logo]), storage, variant.key  # type: ignore[arg-type]
     )
     assert out is not None
     name = asset_file_name(logo.id, "wappen.svg", "image/svg+xml")
@@ -722,7 +734,9 @@ async def test_resolve_mixed_variant_keeps_the_slot_order() -> None:
         file_name="mark.png",
         mime="image/png",
     )
-    vendored = logo_row(variant_id=variant.id, slot="title", position=1, vendored_name="MAKERS")
+    vendored = logo_row(
+        variant_id=variant.id, slot="title", position=1, vendored_name="MAKERS"
+    )
     footer = logo_row(
         variant_id=variant.id, slot="footer", position=0, vendored_name="MAKERS-RAlign"
     )
@@ -757,9 +771,7 @@ async def test_resolve_without_storage_fails_loudly() -> None:
     )
     with pytest.raises(ServiceUnavailableError):
         await resolve_cd_variant_by_key(
-            _resolver_session(variant, [logo]),
-            None,
-            variant.key,  # type: ignore[arg-type]
+            _resolver_session(variant, [logo]), None, variant.key  # type: ignore[arg-type]
         )
 
 
@@ -774,9 +786,7 @@ async def test_resolve_storage_error_is_unavailable() -> None:
     )
     with pytest.raises(ServiceUnavailableError):
         await resolve_cd_variant_by_key(
-            _resolver_session(variant, [logo]),
-            Failing(),
-            variant.key,  # type: ignore[arg-type]
+            _resolver_session(variant, [logo]), Failing(), variant.key  # type: ignore[arg-type]
         )
 
 

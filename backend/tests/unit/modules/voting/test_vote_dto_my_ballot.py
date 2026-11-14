@@ -114,8 +114,7 @@ async def test_ballots_of_needs_every_delegator_and_the_election_switch() -> Non
     off = MeetingService(_QueueSession(executes=[rows, markers]))  # type: ignore[arg-type]
     _, represented = await off._ballots_of("me", votes)  # type: ignore[arg-type]
     assert represented == {full.id}
-    on = MeetingService(  # type: ignore[arg-type]
-        _QueueSession(executes=[rows, markers], scalars_q=[[gremium]])
-    )
+    session = _QueueSession(executes=[rows, markers], scalars_q=[[gremium]])
+    on = MeetingService(session)  # type: ignore[arg-type]
     _, represented = await on._ballots_of("me", votes)  # type: ignore[arg-type]
     assert represented == {full.id, election.id}

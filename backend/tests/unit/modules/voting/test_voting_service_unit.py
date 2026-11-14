@@ -1447,7 +1447,7 @@ async def test_represented_cast_reads_the_ballot_of_the_delegator() -> None:
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(_incoming("delegator-1"), _incoming("delegator-2")))
     db.scalar_results = [2]
-    assert await VotingService(db).represented_cast(vote, "proxy") is True
+    assert await VotingService(db).represented_cast(vote, "proxy") is True  # pyright: ignore[reportArgumentType]
     db = fake_session(result(_incoming("delegator-1"), _incoming("delegator-2")))
     db.scalar_results = [1]
     assert await VotingService(db).represented_cast(vote, "proxy") is False  # pyright: ignore[reportArgumentType]
