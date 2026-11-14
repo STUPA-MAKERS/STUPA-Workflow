@@ -2,9 +2,9 @@
 id: "000797"
 title: The plan in force sets the allocations
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_in_force_writes_the_allocations"
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_allocations_from_lines"

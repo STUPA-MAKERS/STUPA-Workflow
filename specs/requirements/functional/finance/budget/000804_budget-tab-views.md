@@ -2,9 +2,9 @@
 id: "000804"
 title: The Budget tab has the views Bewirtschaftung and Planung
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"

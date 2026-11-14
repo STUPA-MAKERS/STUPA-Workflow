@@ -2,9 +2,9 @@
 id: "000819"
 title: A draft version can lose a line
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_delete_line"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"

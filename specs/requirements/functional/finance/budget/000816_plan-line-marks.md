@@ -2,9 +2,9 @@
 id: "000816"
 title: A plan line of an expense holds the Vermerke
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_set_line_checks_the_node_and_the_marks"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_an_income_side_takes_the_vermerke_off_the_draft_line"

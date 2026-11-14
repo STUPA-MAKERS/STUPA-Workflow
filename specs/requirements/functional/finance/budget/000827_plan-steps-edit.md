@@ -2,9 +2,9 @@
 id: "000827"
 title: The steps of a budget are edited in its edit form
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "frontend/src/app/pages/admin/budgets/admin-budgets.component.spec.ts:AdminBudgetsComponent"
   - "frontend/src/app/pages/admin/budgets/admin-budgets.util.spec.ts:AdminBudgetsUtil"

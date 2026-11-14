@@ -2,9 +2,9 @@
 id: "000847"
 title: A read after a write does not stand on a read from before it
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "frontend/src/app/core/cache/cache.interceptor.spec.ts:cacheInterceptor"
 implementation:

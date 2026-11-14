@@ -2,9 +2,9 @@
 id: "000839"
 title: A version back in draft ends the votes of its steps
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_back_to_draft_ends_the_votes_of_the_version"
 implementation:

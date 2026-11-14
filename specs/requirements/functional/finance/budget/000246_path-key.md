@@ -2,7 +2,7 @@
 id: "000246"
 title: A cost centre has a stable path key
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 tests:

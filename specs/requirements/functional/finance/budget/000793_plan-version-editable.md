@@ -2,9 +2,9 @@
 id: "000793"
 title: Only a draft version can be edited
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_only_a_draft_can_be_edited"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_create_a_cost_centre_in_a_draft"

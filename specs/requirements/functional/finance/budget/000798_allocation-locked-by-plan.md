@@ -2,9 +2,9 @@
 id: "000798"
 title: A year with a plan in force refuses a direct allocation change
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_year_with_a_plan_in_force_refuses_a_direct_allocation"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_revert_of_a_first_allocation_respects_the_plan"

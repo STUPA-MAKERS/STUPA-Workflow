@@ -2,9 +2,9 @@
 id: "000833"
 title: The allocation of a year without a plan in force is set in the Budget tab
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
 implementation:

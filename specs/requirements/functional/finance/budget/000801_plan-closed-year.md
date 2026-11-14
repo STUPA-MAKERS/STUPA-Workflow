@@ -2,9 +2,9 @@
 id: "000801"
 title: A closed fiscal year refuses plan changes
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_closed_year_refuses_plan_writes"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_delete_node_keeps_the_draft_of_a_closed_year"

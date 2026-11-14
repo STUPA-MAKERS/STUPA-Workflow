@@ -2,9 +2,9 @@
 id: "000830"
 title: A Kostenstelle created in a draft gets a line
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_create_a_cost_centre_in_a_draft"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_two_creates_of_one_key_answer_a_conflict"

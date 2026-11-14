@@ -2,9 +2,9 @@
 id: "000824"
 title: A version keeps the steps it started with
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_version_passes_the_steps_of_its_budget"
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_step_snapshot_and_pass"

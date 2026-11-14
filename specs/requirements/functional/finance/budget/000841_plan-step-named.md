@@ -2,9 +2,9 @@
 id: "000841"
 title: A request that records a step names the step
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_request_passes_only_the_step_it_names"
   - "backend/tests/unit/modules/budget/test_plan_router.py:test_the_step_route_passes_the_named_step"

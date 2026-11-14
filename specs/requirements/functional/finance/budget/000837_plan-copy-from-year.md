@@ -2,9 +2,9 @@
 id: "000837"
 title: A new plan can copy the plan of another year
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_create_plan_copies_the_plan_in_force_of_another_year"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"

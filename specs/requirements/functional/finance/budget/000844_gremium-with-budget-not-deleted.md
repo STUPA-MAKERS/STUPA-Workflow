@@ -2,9 +2,9 @@
 id: "000844"
 title: A Gremium with a budget is not deleted
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_gremium_with_a_budget_is_not_deleted"
   - "backend/tests/unit/modules/admin/test_delete_gremium_inuse_conflict.py:test_delete_gremium_with_a_budget_raises_conflict"
