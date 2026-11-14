@@ -212,10 +212,12 @@ describe('GremiumDialogComponent', () => {
   });
 
   /** §F/administration/admin/000906 */
-  it('reads no defaults for a stored Gremium and survives a failed read', async () => {
+  it('reads no defaults for a stored Gremium', async () => {
     const stored = await setup(STUPA);
     expect(stored.api.getGremiumDefaults).not.toHaveBeenCalled();
-    stored.fixture.destroy();
+  });
+
+  it('survives a failed read of the defaults', async () => {
     const api = makeApi({ getGremiumDefaults: jest.fn(() => throwError(() => ({ status: 500 }))) });
     await setup(null, api);
     expect(screen.getByRole('spinbutton', { name: 'Quorum (%)' })).toHaveValue(null);

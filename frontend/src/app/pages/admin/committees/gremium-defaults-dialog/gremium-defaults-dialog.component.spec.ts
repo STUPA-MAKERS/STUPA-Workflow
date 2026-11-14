@@ -95,8 +95,8 @@ describe('GremiumDefaultsDialogComponent', () => {
         .mockReturnValueOnce(throwError(() => ({ status: 500 })))
         .mockReturnValue(of({ ...DEFAULTS })),
     });
-    const { fixture } = await setup(api);
-    expect(screen.getByText('Die Vorgaben konnten nicht geladen werden.')).toBeInTheDocument();
+    const { fixture, toasts } = await setup(api);
+    expect(toasts()).toContain('Die Vorgaben konnten nicht geladen werden.');
     expect(saveButton()).toBeDisabled();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cmp = fixture.componentInstance as any;
