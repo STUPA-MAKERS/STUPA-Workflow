@@ -2,7 +2,7 @@
 id: "000852"
 title: The budget pages use the words Haushalt, Titel, Ansatz and Haushaltsplan
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 tests:
