@@ -2,7 +2,7 @@
 id: "000924"
 title: A final protocol can be marked as approved
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

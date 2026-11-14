@@ -2,7 +2,7 @@
 id: "000909"
 title: A delegate holds a limited number of delegations
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

@@ -2,7 +2,7 @@
 id: "000906"
 title: A new Gremium starts with the meeting defaults
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

@@ -2,7 +2,7 @@
 id: "000914"
 title: A Gremium can decide by Umlaufverfahren
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

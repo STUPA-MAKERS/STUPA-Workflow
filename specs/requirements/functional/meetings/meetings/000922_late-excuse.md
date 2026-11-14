@@ -2,7 +2,7 @@
 id: "000922"
 title: A member can give an excuse after the meeting
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

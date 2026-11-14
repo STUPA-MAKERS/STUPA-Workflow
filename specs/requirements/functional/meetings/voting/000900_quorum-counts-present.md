@@ -2,7 +2,7 @@
 id: "000900"
 title: The quorum of a meeting vote counts the present members
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

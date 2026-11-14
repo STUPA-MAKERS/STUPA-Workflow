@@ -2,7 +2,7 @@
 id: "000921"
 title: The lead gets a mail before a member reaches the absence limit
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

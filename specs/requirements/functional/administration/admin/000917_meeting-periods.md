@@ -2,7 +2,7 @@
 id: "000917"
 title: The meeting settings hold the periods of the Geschäftsordnung
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

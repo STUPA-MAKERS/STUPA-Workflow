@@ -2,7 +2,7 @@
 id: "000923"
 title: The attendance of a Gremium exports as XLSX
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

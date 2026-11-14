@@ -2,7 +2,7 @@
 id: "000901"
 title: A Gremium can need a least number of present members
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

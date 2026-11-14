@@ -2,7 +2,7 @@
 id: "000926"
 title: The decisions of a public Gremium are public
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

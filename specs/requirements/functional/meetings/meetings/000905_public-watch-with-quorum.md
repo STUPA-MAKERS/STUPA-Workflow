@@ -2,7 +2,7 @@
 id: "000905"
 title: A Gremium with a quorum lets guests only watch
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

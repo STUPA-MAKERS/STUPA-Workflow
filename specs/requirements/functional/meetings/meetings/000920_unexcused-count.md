@@ -2,7 +2,7 @@
 id: "000920"
 title: The Gremium page counts the unexcused absences of a term
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

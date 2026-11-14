@@ -2,7 +2,7 @@
 id: "000925"
 title: The keeper sends the protocol draft to the members
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

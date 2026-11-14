@@ -2,7 +2,7 @@
 id: "000918"
 title: A late meeting date shows a warning
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

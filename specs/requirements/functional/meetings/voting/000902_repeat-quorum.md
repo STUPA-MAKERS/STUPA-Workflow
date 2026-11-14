@@ -2,7 +2,7 @@
 id: "000902"
 title: A Wiederholungssitzung has its own quorum
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

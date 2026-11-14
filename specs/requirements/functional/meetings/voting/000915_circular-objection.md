@@ -2,7 +2,7 @@
 id: "000915"
 title: An objection ends an Umlaufverfahren
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

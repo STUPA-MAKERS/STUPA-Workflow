@@ -2,7 +2,7 @@
 id: "000904"
 title: Guest ballots are a Gremium setting
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

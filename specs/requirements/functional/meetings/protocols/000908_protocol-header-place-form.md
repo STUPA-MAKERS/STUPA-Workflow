@@ -2,7 +2,7 @@
 id: "000908"
 title: The protocol names the kind, the place and the form of the meeting
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

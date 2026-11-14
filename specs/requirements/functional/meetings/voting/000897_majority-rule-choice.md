@@ -2,7 +2,7 @@
 id: "000897"
 title: The vote form offers five majority rules
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

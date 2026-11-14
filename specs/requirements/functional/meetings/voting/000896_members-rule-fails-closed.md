@@ -2,7 +2,7 @@
 id: "000896"
 title: A members rule without an eligible count rejects
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

@@ -2,7 +2,7 @@
 id: "000898"
 title: A vote with a members rule has no guest ballots
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

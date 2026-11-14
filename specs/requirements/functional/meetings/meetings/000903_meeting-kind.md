@@ -2,7 +2,7 @@
 id: "000903"
 title: A meeting has a kind
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

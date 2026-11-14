@@ -2,7 +2,7 @@
 id: "000899"
 title: The vote on a Haushaltsplan needs the majority of the members
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null

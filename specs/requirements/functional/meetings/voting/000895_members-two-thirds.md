@@ -2,7 +2,7 @@
 id: "000895"
 title: A vote can need two thirds of the members
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 implementation: null
