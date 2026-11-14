@@ -35,12 +35,12 @@ from app.modules.budget.plan_schemas import (
 )
 from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_router import ServiceDep, _errors, _require_node_view
-from app.modules.pdf.typst_client import TypstError, build_typst_client
-from app.modules.site_config.export_logo import (
-    active_export_logo,
+from app.modules.files.pdf_branding import (
+    active_pdf_branding,
     export_render_assets,
     export_render_config,
 )
+from app.modules.pdf.typst_client import TypstError, build_typst_client
 from app.shared.errors import BadRequestError, ServiceUnavailableError
 from app.shared.filenames import content_disposition
 from app.shared.xlsx import XLSX_MEDIA_TYPE, build_table_workbook
@@ -174,13 +174,16 @@ async def export_plan_pdf(
         ServiceUnavailableError: The render service does not answer (503).
     """
     export = await _export_of(service, principal, version_id, "pdf")
-    logo = await active_export_logo(service.session)
+    branding = await active_pdf_branding(service.session, service.storage)
     try:
         pdf = await build_typst_client(settings).render_pdf(
             plan_export.pdf_source(export),
             variant="plan",
-            config={**export_render_config(logo, footer=False), **plan_export.pdf_config(export)},
-            assets=export_render_assets(logo),
+            config={
+                **export_render_config(branding, footer=False),
+                **plan_export.pdf_config(export),
+            },
+            assets=export_render_assets(branding),
         )
     except TypstError as exc:
         if not exc.retryable:

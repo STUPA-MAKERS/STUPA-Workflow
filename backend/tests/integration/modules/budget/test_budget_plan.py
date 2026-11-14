@@ -8,7 +8,6 @@ guards of the allocation, the revert and the delete of a cost center.
 from __future__ import annotations
 
 import asyncio
-import base64
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -53,8 +52,6 @@ from app.modules.budget.tree_schemas import (
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.search.service import SearchService
-from app.modules.site_config.export_logo import ExportLogo, active_export_logo
-from app.modules.site_config.models import SiteConfigVersion
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
@@ -1210,40 +1207,6 @@ async def test_each_plan_change_is_audited(session: AsyncSession) -> None:
     assert rows[-1].data["allocations"][str(t.top.id)] == ["0.00", "100.00"]
     assert (rows[-1].data["before"], rows[-1].data["after"]) == ("draft", "in_force")
     assert rows[-1].data["versionId"] == str(plan.versions[0].id)
-
-
-async def test_the_export_logo_comes_from_the_active_branding(session: AsyncSession) -> None:
-    """The export reads the export logo of the active site config, and nothing else.
-
-    Rule: §F/administration/admin/000891.
-    """
-    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
-    logo = {
-        "url": "data:image/png;base64," + base64.b64encode(png).decode(),
-        "filename": "logo.png",
-        "mime": "image/png",
-        "size": len(png),
-    }
-    found = (
-        await session.scalars(select(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)))
-    ).first()
-    assert await active_export_logo(session) is None
-    active = found or SiteConfigVersion(version=10**8 + 7, active=True, branding={})
-    session.add(active)
-    kept = dict(active.branding)
-    try:
-        active.branding = {**kept, "logos": {}}
-        await session.commit()
-        assert await active_export_logo(session) is None
-        active.branding = {**kept, "logos": {"export": logo}}
-        await session.commit()
-        assert await active_export_logo(session) == ExportLogo("export-logo.png", png)
-    finally:
-        if found is None:
-            await session.delete(active)
-        else:
-            active.branding = kept
-        await session.commit()
 
 
 async def _gremium(session: AsyncSession) -> uuid.UUID:

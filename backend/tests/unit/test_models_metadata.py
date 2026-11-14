@@ -172,6 +172,7 @@ MODEL_MODULES = {
     "cd_variant": "app.modules.site_config.models",
     "cd_variant_logo": "app.modules.site_config.models",
     "site_config_version": "app.modules.site_config.models",
+    "pdf_asset": "app.modules.site_config.models",
 }
 
 
@@ -185,5 +186,5 @@ def test_model_in_module_of_its_subject() -> None:
     assert {table: modules[table] for table in MODEL_MODULES} == MODEL_MODULES
     assert {
         table for table, module in modules.items() if module == "app.modules.site_config.models"
-    } == {"cd_variant", "cd_variant_logo", "site_config_version"}
+    } == {"cd_variant", "cd_variant_logo", "pdf_asset", "site_config_version"}
     assert not [module for module in modules.values() if module.startswith("app.modules.admin.")]

@@ -123,7 +123,7 @@ from app.modules.meetings.models import (
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
-from app.modules.site_config.models import SiteConfigVersion
+from app.modules.site_config.models import PdfAsset, SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.merge import fold_personal_board, rewrite_mentions
 from app.modules.todos.models import (
@@ -194,6 +194,7 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("budget", BudgetExpense.actor),
     ("budget", Invoice.actor),
     ("config", SiteConfigVersion.created_by),
+    ("config", PdfAsset.created_by),
     ("config", GuestApplicationSettings.updated_by),
     ("config", MeetingSettings.updated_by),
     ("config", LoginSettings.updated_by),

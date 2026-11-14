@@ -30,8 +30,8 @@ from app.modules.budget.plan_schemas import (
     PlanVersionOut,
 )
 from app.modules.budget.tree_router import get_budget_tree_service
+from app.modules.files.pdf_branding import PdfBranding, RenderGraphic
 from app.modules.pdf.typst_client import TypstError
-from app.modules.site_config.export_logo import ExportLogo
 from app.shared.xlsx import XLSX_MEDIA_TYPE
 
 _TOP = uuid.uuid4()
@@ -78,7 +78,7 @@ class _Tx:
 
     def __init__(self) -> None:
         self.commits = 0
-        self.export_logo: ExportLogo | None = None
+        self.branding = PdfBranding()
         self.rollbacks = 0
 
     async def commit(self) -> None:
@@ -92,6 +92,7 @@ class _FakePlans:
     def __init__(self, *, visible: bool = True) -> None:
         self.calls: list[tuple[str, Any]] = []
         self.session = _Tx()
+        self.storage = None
         self.visible = visible
 
     async def can_view_node(self, budget_id: uuid.UUID, member: object) -> bool:
@@ -514,11 +515,11 @@ def audited(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     async def no_gremien(_service: object, _sub: str) -> set[uuid.UUID]:
         return set()
 
-    async def export_logo(session: _Tx) -> ExportLogo | None:
-        return session.export_logo
+    async def branding(session: _Tx, _storage: object) -> PdfBranding:
+        return session.branding
 
     monkeypatch.setattr(plan_router, "audit_record", record)
-    monkeypatch.setattr(plan_router, "active_export_logo", export_logo)
+    monkeypatch.setattr(plan_router, "active_pdf_branding", branding)
     monkeypatch.setattr("app.modules.budget.tree_router._member_gremium_ids", no_gremien)
     return entries
 
@@ -566,7 +567,7 @@ def test_the_pdf_carries_the_export_logo(
     typst = _Typst()
     monkeypatch.setattr(plan_router, "build_typst_client", lambda settings: typst)
     fake = _FakePlans()
-    fake.session.export_logo = ExportLogo("export-logo.png", b"png")
+    fake.session.branding = PdfBranding(RenderGraphic("export-logo.png", b"png"))
     resp = _client(fake).get(f"/api/budget-plan-versions/{_VERSION}/export.pdf")
     assert resp.status_code == 200, resp.text
     ((_source, _variant, config),) = typst.requests

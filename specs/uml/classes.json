@@ -4899,6 +4899,73 @@
     {
       "attributes": [
         {
+          "name": "slot",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "logo",
+            "footer"
+          ]
+        },
+        {
+          "name": "builtin",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "object_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "file_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "mime",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "size",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PdfAsset",
+      "module": "site_config",
+      "name": "PdfAsset",
+      "path": "backend/app/modules/site_config/models.py",
+      "table": "pdf_asset"
+    },
+    {
+      "attributes": [
+        {
           "name": "sub",
           "nullable": false,
           "primaryKey": false,

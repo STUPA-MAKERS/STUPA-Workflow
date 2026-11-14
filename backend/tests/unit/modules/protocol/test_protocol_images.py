@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from app.modules.files.pdf_branding import PdfBranding, RenderGraphic
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol import service as protocol_service_mod
 from app.modules.protocol.markdown import sanitize_user_markdown
@@ -59,6 +60,31 @@ def _service(session: _RenderSession, storage: MediaStorage, typst: FakeTypst) -
     )
 
 
+_BRANDING: list[PdfBranding] = []
+
+
+@pytest.fixture(autouse=True)
+def _pdf_branding(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The footer graphic is the Skyline unless a test puts another branding first."""
+
+    async def branding(_session: object, _storage: object) -> PdfBranding:
+        return _BRANDING.pop(0) if _BRANDING else PdfBranding(footer=RenderGraphic("Skyline"))
+
+    monkeypatch.setattr(protocol_service_mod, "active_pdf_branding", branding)
+
+
+async def test_render_sends_the_footer_graphic() -> None:
+    """Rule: §F/administration/admin/000892. The protocol carries the footer graphic."""
+    session, storage, typst = _RenderSession(), MediaStorage(), FakeTypst()
+    _BRANDING.append(PdfBranding(footer=RenderGraphic("footer-graphic.svg", b"<svg/>")))
+    await _service(session, storage, typst)._render_pdf(_protocol(), "# TOP\n")
+    assert typst.configs[-1] == {"footer_graphic": "footer-graphic.svg"}
+    assert typst.assets[-1] == {"footer-graphic.svg": b"<svg/>"}
+    _BRANDING.append(PdfBranding())
+    await _service(session, storage, typst)._render_pdf(_protocol(), "# TOP\n")
+    assert typst.configs[-1] == {"footer_graphic": ""}
+
+
 async def test_render_sends_the_images_as_assets() -> None:
     session, storage, typst = _RenderSession(), MediaStorage(), FakeTypst()
     a = add_image(session, storage, b"A" * 3, "image/png")
@@ -81,7 +107,7 @@ async def test_render_merges_the_images_with_the_logos(monkeypatch: pytest.Monke
         _protocol("custom"), f"![a](/api/media/images/{a})"
     )
     assert typst.assets[-1] == {"a1-logo.png": b"LOGO", f"img-{a}.webp": b"A"}
-    assert typst.configs[-1] == {"logos": ["x"]}
+    assert typst.configs[-1] == {"logos": ["x"], "footer_graphic": "Skyline"}
 
 
 async def test_render_without_images_and_logos_sends_no_assets() -> None:

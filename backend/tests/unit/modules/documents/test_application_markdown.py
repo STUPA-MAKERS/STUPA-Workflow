@@ -27,7 +27,7 @@ from app.modules.documents.application_markdown import (
     offer_name,
 )
 from app.modules.documents.router import application_pdf_filename
-from app.modules.site_config.export_logo import ExportLogo
+from app.modules.files.pdf_branding import PdfBranding, RenderGraphic
 from app.shared.config_schemas import FormFieldDef
 
 
@@ -373,21 +373,29 @@ async def test_the_pdf_carries_the_export_logo(monkeypatch: pytest.MonkeyPatch) 
     It goes in the footer, and without one the render gets empty logo lists, so the render
     service adds no logo of its own.
     """
-    logos: list[ExportLogo | None] = [ExportLogo("export-logo.png", b"png"), None]
+    brandings = [
+        PdfBranding(RenderGraphic("export-logo.png", b"png"), RenderGraphic("Skyline")),
+        PdfBranding(),
+    ]
 
-    async def export_logo(_session: object) -> ExportLogo | None:
-        return logos.pop(0)
+    async def branding(_session: object, _storage: object) -> PdfBranding:
+        return brandings.pop(0)
 
-    monkeypatch.setattr(documents_service, "active_export_logo", export_logo)
+    monkeypatch.setattr(documents_service, "active_pdf_branding", branding)
     typst = _RecordingTypst()
     pdfs = documents_service.ApplicationPdfService(
         object(),  # type: ignore[arg-type]
+        storage=None,
         typst=typst,  # type: ignore[arg-type]
         settings=object(),  # type: ignore[arg-type]
     )
     await pdfs.render(_doc())
     await pdfs.render(_doc())
     assert typst.calls == [
-        (None, {"logos": [], "footer_logos": ["export-logo.png"]}, {"export-logo.png": b"png"}),
-        (None, {"logos": [], "footer_logos": []}, None),
+        (
+            None,
+            {"logos": [], "footer_logos": ["export-logo.png"], "footer_graphic": "Skyline"},
+            {"export-logo.png": b"png"},
+        ),
+        (None, {"logos": [], "footer_logos": [], "footer_graphic": ""}, None),
     ]

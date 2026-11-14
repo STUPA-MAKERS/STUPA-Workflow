@@ -136,7 +136,7 @@ def _client(
 
     async def _pdf_service() -> AsyncIterator[ApplicationPdfService]:
         async for session in api.dependency_overrides[get_session]():
-            yield ApplicationPdfService(session, typst=typst, settings=settings)  # type: ignore[arg-type]
+            yield ApplicationPdfService(session, storage=None, typst=typst, settings=settings)  # type: ignore[arg-type]
 
     api.dependency_overrides[get_current_principal] = lambda: principal
     api.dependency_overrides[get_current_applicant] = lambda: applicant

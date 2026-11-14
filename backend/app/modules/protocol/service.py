@@ -54,6 +54,11 @@ from app.modules.files.cd_resolver import (
     cd_variant_key_for_gremium,
     resolve_cd_variant_by_key,
 )
+from app.modules.files.pdf_branding import (
+    active_pdf_branding,
+    footer_render_assets,
+    footer_render_config,
+)
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.service import MeetingService
@@ -1372,6 +1377,7 @@ class ProtocolService:
             return {}
         pdfs = ApplicationPdfService(
             self.session,
+            storage=self.storage,
             typst=self.typst,
             settings=self.settings or get_settings(),
         )
@@ -1392,6 +1398,7 @@ class ProtocolService:
         another one. A protocol always renders with a protocol variant: the design
         contributes logos, but it does not pick the document shape, because a report
         shape loses the TOP numbering, the vote boxes and the signature page. The
+        footer graphic of the PDF branding (spec 000892) goes on each page. The
         uploaded images of the text go next to the logos. An image that is missing or
         exceeds the budget stays out, and the PDF shows its alt text. The body is
         user-written. The render service converts it into data before Typst sees it, so
@@ -1417,7 +1424,8 @@ class ProtocolService:
                 self.session, self.storage, protocol.cd_variant
             )
             variant = protocol_variant_for(protocol.cd_variant)
-            config = cd_render_config(cd) if cd else None
+            branding = await active_pdf_branding(self.session, self.storage)
+            config = {**(cd_render_config(cd) if cd else {}), **footer_render_config(branding)}
             media = MediaService(self.session, storage=self.storage)
             images = await media.render_assets(markdown)
             documents = await media.render_documents(markdown)
@@ -1426,7 +1434,13 @@ class ProtocolService:
                 if ANLAGE_MARK in markdown
                 else {}
             )
-            assets = {**(cd.assets if cd else {}), **images, **documents, **anlagen} or None
+            assets = {
+                **(cd.assets if cd else {}),
+                **footer_render_assets(branding),
+                **images,
+                **documents,
+                **anlagen,
+            } or None
             pdf = await self.typst.render_pdf(
                 markdown, variant=variant, config=config, assets=assets
             )

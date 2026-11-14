@@ -73,6 +73,7 @@ async function setupWithStub(
     getSiteConfig: jest.fn(() => of({ ...STUB_CFG, branding: emptyBranding() })),
     saveSiteConfig: jest.fn((b: Branding) => of({ version: 4, branding: b })),
     listConfigRevisions: jest.fn(() => of([])),
+    getPdfAsset: jest.fn(() => of(null)),
     ...api,
   };
   const view = await render(BrandingEditorComponent, {
@@ -481,20 +482,63 @@ describe('BrandingEditorComponent', () => {
     expect(c.draft().logos.wordmark.mime).toBe('image/png');
   });
 
-  it('offers the export logo with no built-in logo and takes no ICO for it (spec 000891)', async () => {
-    const { toast, container, fixture } = await setupWithStub({});
-    expect(screen.getByRole('button', { name: 'Auswählen: PDF-Exporte' })).toBeInTheDocument();
-    expect(screen.getByText('Kein Logo')).toBeInTheDocument();
-    const inputs = container.querySelectorAll<HTMLInputElement>('input[type="file"]');
-    expect(inputs[3].accept).toBe('image/png,image/jpeg,image/webp');
-    await userEvent.upload(inputs[3], new File(['x'], 'logo.ico', { type: 'image/x-icon' }), {
-      applyAccept: false,
-    });
+  it('shows the default, uploads, resets and empties the PDF branding (specs 000891, 000892)', async () => {
+    const builtin = { builtin: true, fileName: null, mime: null, size: null };
+    const upload = { builtin: false, fileName: 'logo.svg', mime: 'image/svg+xml', size: 3 };
+    const api = {
+      getPdfAsset: jest.fn(() => of(builtin)),
+      uploadPdfAsset: jest.fn(() => of(upload)),
+      resetPdfAsset: jest.fn(() => of(builtin)),
+      deletePdfAsset: jest.fn(() => of(undefined)),
+    };
+    const { toast, container, fixture } = await setupWithStub(api);
+    expect(api.getPdfAsset).toHaveBeenCalledWith('logo');
+    expect(api.getPdfAsset).toHaveBeenCalledWith('footer');
+    expect(screen.getByText('PDF-Logo')).toBeInTheDocument();
+    expect(screen.getByText('PDF-Footer-Grafik')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Standard wiederherstellen: PDF-Logo' })).toBeNull();
+    const input = container.querySelectorAll<HTMLInputElement>('input[type="file"]')[3];
+    expect(input.accept).toBe('image/png,image/jpeg,image/webp,image/svg+xml,application/pdf');
+    await userEvent.upload(input, new File(['x'], 'logo.ico', { type: 'image/x-icon' }), { applyAccept: false });
     expect(toast.error).toHaveBeenCalledWith('Dateityp nicht erlaubt.');
+    expect(api.uploadPdfAsset).not.toHaveBeenCalled();
+    await userEvent.upload(input, new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' }));
+    fixture.detectChanges();
+    expect(api.uploadPdfAsset).toHaveBeenCalledWith('logo', expect.any(File));
+    expect(screen.getByText(/logo\.svg/)).toBeInTheDocument();
+    expect(container.querySelector('.br__logos img[src^="data:image/svg"]')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Standard wiederherstellen: PDF-Logo' }));
+    expect(api.resetPdfAsset).toHaveBeenCalledWith('logo');
+    await userEvent.click(screen.getByRole('button', { name: 'Entfernen: PDF-Footer-Grafik' }));
+    fixture.detectChanges();
+    expect(api.deletePdfAsset).toHaveBeenCalledWith('footer');
+    expect(screen.getByText('Keine Grafik')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Auswählen: PDF-Footer-Grafik' })).toBeInTheDocument();
+  });
+
+  it('drops a file on a PDF branding row and keeps going when the read fails', async () => {
+    const api = {
+      getPdfAsset: jest.fn(() => throwError(() => new Error('x'))),
+      uploadPdfAsset: jest.fn(() => throwError(() => new Error('x'))),
+      resetPdfAsset: jest.fn(() => throwError(() => new Error('x'))),
+      deletePdfAsset: jest.fn(() => throwError(() => new Error('x'))),
+    };
+    const { toast, fixture } = await setupWithStub(api);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.onLogoSelected('export', [new File(['raw'], 'logo.png', { type: 'image/png' })]);
-    await waitFor(() => expect(c.draft().logos.export?.filename).toBe('logo.png'));
+    expect(screen.getByText('Kein Logo')).toBeInTheDocument();
+    const prevented = jest.fn();
+    c.onPdfDragOver('footer', { preventDefault: prevented } as unknown as DragEvent);
+    expect(c.pdfDrop()).toBe('footer');
+    const big = new File([new Uint8Array(3 * 1024 * 1024)], 'big.pdf', { type: 'application/pdf' });
+    c.onPdfDrop('footer', { preventDefault: prevented, dataTransfer: { files: [big] } } as unknown as DragEvent);
+    expect(c.pdfDrop()).toBeNull();
+    expect(api.uploadPdfAsset).not.toHaveBeenCalled();
+    c.onPdfAssetSelected('logo', []);
+    c.onPdfAssetSelected('logo', [new File(['%PDF'], 'a.pdf', { type: 'application/pdf' })]);
+    c.resetPdfAsset('logo');
+    c.removePdfAsset('footer');
+    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 
   it('creates the apply info map on first use', async () => {
