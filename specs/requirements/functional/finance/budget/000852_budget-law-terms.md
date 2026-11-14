@@ -2,9 +2,9 @@
 id: "000852"
 title: The budget pages use the words Haushalt, Titel, Ansatz and Haushaltsplan
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "frontend/src/app/core/i18n/translations.spec.ts:BudgetTerms"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
@@ -43,6 +43,11 @@ The German texts of the platform must name the parts of the budget tree as follo
    also not in the names that the server writes. The question of the vote of a step
    names a Nachtrag and leaves the first version out, because the question starts with
    "Haushaltsplan".
+5. A booking pair that moves an amount from one Kostenstelle to another in one fiscal
+   year is an "Umschichtung" (plural "Umschichtungen", action "Umschichten"). This holds
+   for the "Art" filter of the bookings, the form, the detail, the toasts and the names of
+   the audit entries. The word "Übertrag" must not show for it. "Umbuchen" stays the
+   action that moves bookings to another Kostenstelle.
 
 Every other word stays: "Ist", "Ausgegeben", "Gebunden", "Gesperrt", "Nachtrag", "Seite",
 "Schlüssel", "Haushaltsjahr". The texts of other areas stay too: "Mit Budget" and "Ohne
@@ -56,10 +61,13 @@ Studierendenschaft a Haushaltsplan that consists of Titel with an Ansatz each, a
 Haushalt that someone manages, so it misleads as the name of the level above the Titel. Two
 words for one amount ("Zuteilung" and "Ansatz") make a reader look for a difference that
 does not exist. The other words are the ones that other Studierendenschaften use, so a
-change would only cost the readers.
+change would only cost the readers. In the Landeshaushaltsordnung an amount is "übertragbar"
+when its rest moves to the next fiscal year (§ 19), and the plan shows this mark, so
+"Übertrag" for a move between two Kostenstellen of one year names the wrong thing.
 
 Test: A test of the catalog reads every German text and finds neither "Budget" outside the
 listed areas nor "Stammplan". The component tests of the tree, of the section and of the
 plan read "Titel" for a node below a Haushalt and "Kostenstelle" for a node below it, and
 "Ansatz" or "Zuteilung" by the plan switch of the Haushalt. A backend test reads the name
-of the first version.
+of the first version. The test of the catalog also finds no "Übertrag" and no "Überträge"
+in a German text.

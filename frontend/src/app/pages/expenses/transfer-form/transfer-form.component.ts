@@ -43,7 +43,7 @@ interface LegFree {
 
 /**
  * The transfer form: move an amount from
- * one cost centre to another in one fiscal year ("Übertrag"), or correct a transfer. It
+ * one cost centre to another in one fiscal year ("Umschichtung"), or correct a transfer. It
  * replaces the detail sheet.
  *
  * New: "Von → nach" with the two legs as cards (each opens `app-cost-centre-select`) and
@@ -129,7 +129,7 @@ export class TransferFormComponent {
     };
   });
 
-  /** The main action: "500,00 € übertragen", or "Übertragen" without an amount. */
+  /** The main action: "500,00 € umschichten", or "Umschichten" without an amount. */
   protected readonly submitLabel = computed(() => {
     const amount = this.amount();
     return amount > 0

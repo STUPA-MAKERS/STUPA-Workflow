@@ -37,4 +37,11 @@ describe('BudgetTerms', () => {
     expect(texts.filter(([, value]) => /Stammplan/.test(value)).map(([key]) => key)).toEqual([]);
     expect(en['budget.plan.version.base']).toBe('Budget plan');
   });
+
+  it('§F/finance/budget/000852: a move between two Kostenstellen is an "Umschichtung", never an "Übertrag"', () => {
+    const named = Object.entries(de).filter(([, value]) => /Übertr(ag|äge)(s|n)?(?![a-zäöü])/.test(String(value)));
+    expect(named.map(([key]) => key)).toEqual([]);
+    expect(de['expenses.kind.transfer']).toBe('Umschichtung');
+    expect(de['expenses.transferConfirm']).toBe('Umschichten');
+  });
 });

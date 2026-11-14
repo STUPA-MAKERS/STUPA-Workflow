@@ -122,7 +122,7 @@ const SORTS: readonly {
  *
  * The list: title with export, sort and a menu; the search and the chips (cost centre as
  * the tree sheet of the applications page, kind, period, amount); the rows by month. The
- * kind chip "Art" also holds "Übertrag", which shows the transfers instead of the bookings. The detail: the open booking or transfer
+ * kind chip "Art" also holds "Umschichtung", which shows the transfers instead of the bookings. The detail: the open booking or transfer
  * (`?id=` and `?transfer=` in the URL, so the global search lands on a booking), the
  * form of a new or an edited booking or transfer, or, while rows are selected, the
  * panel of the bulk actions.
@@ -225,7 +225,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly budgetId = this.list.budgetId;
   readonly sortField = this.list.sortField;
   readonly sortOrder = this.list.sortOrder;
-  /** The set filters; "Übertrag" in the "Art" chip counts as one. */
+  /** The set filters; "Umschichtung" in the "Art" chip counts as one. */
   readonly activeFilterCount = computed(
     () => this.list.activeFilterCount() + (this.tab() === 'transfers' ? 1 : 0),
   );
@@ -324,7 +324,7 @@ export class ExpensesComponent implements OnDestroy {
   /** Phone: filters and pickers open from the bottom; wider: from the start edge. */
   readonly sheetSide = computed(() => (this.phone() ? 'bottom' : 'start'));
 
-  /** The kinds of the "Art" chip. "Übertrag" shows only for `canManage()`, because the
+  /** The kinds of the "Art" chip. "Umschichtung" shows only for `canManage()`, because the
    *  server lists transfers only for `budget.book`. */
   readonly kindOptions = computed<FilterSelectOption[]>(() => [
     { value: '', label: this.i18n.translate('expenses.filter.all') },
@@ -821,7 +821,7 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  /** The "Art" chip. "Übertrag" opens the transfers; any other kind opens the bookings
+  /** The "Art" chip. "Umschichtung" opens the transfers; any other kind opens the bookings
    *  with that kind. */
   setKind(k: string): void {
     if (k === 'transfer') {

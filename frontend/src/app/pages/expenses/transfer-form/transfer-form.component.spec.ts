@@ -183,7 +183,7 @@ describe('TransferFormComponent', () => {
     const { host, view, user } = await setup('create');
     expect(host.dialogs.tTopId()).toBe('top');
     expect(host.dialogs.tFiscalYearId()).toBe('fy');
-    expect(screen.getByRole('heading', { name: 'Übertrag buchen' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Umschichtung buchen' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Von → nach' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^Von Kostenstelle/ }));
     await tick();
@@ -264,7 +264,7 @@ describe('TransferFormComponent', () => {
     host.dialogs.tFiscalYearId.set('');
     view.fixture.detectChanges();
     expect(text()).not.toContain('Frei danach');
-    expect(screen.getByRole('button', { name: 'Übertragen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Umschichten' })).toBeDisabled();
   });
 
   it('submits a new transfer with the fab and closes with the head', async () => {
@@ -284,7 +284,7 @@ describe('TransferFormComponent', () => {
 
   it('locks the pair in the edit and saves with the fab, without a delete', async () => {
     const { host, form, user } = await setup('edit');
-    expect(screen.getByRole('heading', { name: 'Übertrag bearbeiten' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Umschichtung bearbeiten' })).toBeInTheDocument();
     expect(screen.getByText('Kultur')).toBeInTheDocument();
     expect(screen.getByText('Hochschulsport')).toBeInTheDocument();
     expect(screen.getByText('2026')).toBeInTheDocument();
@@ -299,7 +299,7 @@ describe('TransferFormComponent', () => {
 
   it('leaves out its head in the bottom sheet', async () => {
     await setup('edit', 'sheet');
-    expect(screen.queryByRole('heading', { name: 'Übertrag bearbeiten' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Umschichtung bearbeiten' })).toBeNull();
   });
 });
 
