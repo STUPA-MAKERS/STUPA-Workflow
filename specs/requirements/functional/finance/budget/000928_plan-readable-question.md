@@ -2,7 +2,7 @@
 id: "000928"
 title: A page asks whether the reader reads a plan and gets no 403
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 tests:

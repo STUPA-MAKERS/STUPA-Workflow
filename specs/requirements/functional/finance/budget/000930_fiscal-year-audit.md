@@ -2,7 +2,7 @@
 id: "000930"
 title: The create and the change of a fiscal year are in the audit log
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 tests:

@@ -336,10 +336,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000879](requirements/functional/finance/budget/000879_budget-year-before-cost-centre.md) | A person chooses Haushalt and Haushaltsjahr before the Kostenstelle | approved |
 | [F/finance/budget/000889](requirements/functional/finance/budget/000889_year-before-needs-plan.md) | The columns of the year before show only when that year has a plan | approved |
 | [F/finance/budget/000890](requirements/functional/finance/budget/000890_deciding-gremium-reads-haushalt.md) | A Gremium that decides a plan reads the Haushalt | approved |
-| [F/finance/budget/000927](requirements/functional/finance/budget/000927_gremium-delete-takes-tree-lock.md) | The delete of a Gremium takes the lock of each tree that names it | draft |
-| [F/finance/budget/000928](requirements/functional/finance/budget/000928_plan-readable-question.md) | A page asks whether the reader reads a plan and gets no 403 | draft |
-| [F/finance/budget/000929](requirements/functional/finance/budget/000929_plan-line-with-bookings-stays.md) | The line of a Kostenstelle with bookings is not removed | draft |
-| [F/finance/budget/000930](requirements/functional/finance/budget/000930_fiscal-year-audit.md) | The create and the change of a fiscal year are in the audit log | draft |
+| [F/finance/budget/000927](requirements/functional/finance/budget/000927_gremium-delete-takes-tree-lock.md) | The delete of a Gremium takes the lock of each tree that names it | approved |
+| [F/finance/budget/000928](requirements/functional/finance/budget/000928_plan-readable-question.md) | A page asks whether the reader reads a plan and gets no 403 | approved |
+| [F/finance/budget/000929](requirements/functional/finance/budget/000929_plan-line-with-bookings-stays.md) | The line of a Kostenstelle with bookings is not removed | approved |
+| [F/finance/budget/000930](requirements/functional/finance/budget/000930_fiscal-year-audit.md) | The create and the change of a fiscal year are in the audit log | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | approved |
@@ -702,7 +702,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000701](requirements/non-functional/usability/controls/000701_date-shortcut-resolves-on-commit.md) | A date shortcut becomes the date when the field commits | approved |
 | [NF/usability/controls/000702](requirements/non-functional/usability/controls/000702_date-shortcut-month-end.md) | A month or year shortcut stops at the end of the month | approved |
 | [NF/usability/controls/000741](requirements/non-functional/usability/controls/000741_load-more-button.md) | A button that loads more rows of a list is centred with a chevron | approved |
-| [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | Back closes the dialogs of the Haushalt | draft |
+| [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | Back closes the dialogs of the Haushalt | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll edge fades, or cuts at a line | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |

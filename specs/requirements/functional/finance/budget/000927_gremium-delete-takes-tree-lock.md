@@ -2,7 +2,7 @@
 id: "000927"
 title: The delete of a Gremium takes the lock of each tree that names it
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 tests:

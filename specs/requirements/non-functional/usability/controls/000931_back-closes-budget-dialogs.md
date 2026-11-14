@@ -2,7 +2,7 @@
 id: "000931"
 title: Back closes the dialogs of the Haushalt
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 tests:
