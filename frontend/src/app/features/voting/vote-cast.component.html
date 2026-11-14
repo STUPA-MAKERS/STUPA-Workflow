@@ -93,3 +93,13 @@
   (confirm)="doDelete()"
   (cancel)="confirmDelete.set(false)"
 />
+
+<app-confirm-dialog
+  [open]="confirmObject()"
+  [title]="'circular.object.title' | t"
+  [body]="'circular.object.body' | t"
+  [confirmLabel]="'circular.object.action' | t"
+  [busy]="objecting()"
+  (confirm)="doObject()"
+  (cancel)="confirmObject.set(false)"
+/>

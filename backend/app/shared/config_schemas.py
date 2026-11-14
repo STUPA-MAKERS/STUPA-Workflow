@@ -710,17 +710,27 @@ class ElectionCandidate(FrozenStrictCamelModel, frozen=True):
         return stripped
 
 
+#: The majority that elects: the most votes (``relative``), or more votes than half of
+#: the eligible count (``members_majority``, one seat only).
+ElectionMajorityRule = Literal["relative", "members_majority"]
+
+
 class ElectionConfig(FrozenStrictCamelModel, frozen=True):
     """The rules of one election, stored as JSONB in ``vote.config``.
 
-    ``vote.kind = 'election'`` marks the row. An election has no majority rule and no
-    tie break: the relative majority elects, a tie at the seat boundary goes to a
+    ``vote.kind = 'election'`` marks the row. An election has no tie break: the
+    relative majority elects, a tie at the seat boundary goes to a
     runoff (several seats) or to the lot (one seat, or a runoff round). One candidate
     for one seat is a Ja/Nein/Enthaltung ballot: elected when Ja > Nein.
+
+    ``majorityRule = members_majority`` (one seat only) asks for more votes than half
+    of the eligible count. Without them the result is ``no_majority``, and no lot and
+    no further round follows by itself (§F/meetings/voting/000912).
     """
 
     seats: int = Field(ge=1, le=ELECTION_MAX_CANDIDATES)
     candidates: list[ElectionCandidate] = Field(min_length=1, max_length=ELECTION_MAX_CANDIDATES)
+    majority_rule: ElectionMajorityRule = Field(default="relative", alias="majorityRule")
     secret: bool = True
     quorum: Quorum | None = None
     quorum_basis: QuorumBasis = Field(default="ballots", alias="quorumBasis")
@@ -755,7 +765,16 @@ class ElectionConfig(FrozenStrictCamelModel, frozen=True):
             raise ValueError("an election needs at least as many candidates as seats")
         if self.guests_vote and self.quorum is not None:
             raise ValueError("a vote with guests (guestsVote) has no quorum")
+        if self.members_majority and self.seats != 1:
+            raise ValueError("the majority of the members elects one seat only")
+        if self.members_majority and self.guests_vote:
+            raise ValueError("a vote with guests cannot ask for the majority of the members")
         return self
+
+    @property
+    def members_majority(self) -> bool:
+        """Tell whether a candidate needs more votes than half of the eligible count."""
+        return self.majority_rule == "members_majority"
 
     @property
     def yes_no(self) -> bool:

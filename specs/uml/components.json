@@ -1041,7 +1041,7 @@
       "to": "media"
     },
     {
-      "count": 11,
+      "count": 12,
       "from": "protocol",
       "to": "meetings"
     },
@@ -1061,7 +1061,7 @@
       "to": "shared"
     },
     {
-      "count": 7,
+      "count": 11,
       "from": "protocol",
       "to": "voting"
     },
@@ -1261,7 +1261,7 @@
       "to": "audit"
     },
     {
-      "count": 17,
+      "count": 18,
       "from": "voting",
       "to": "auth"
     },
@@ -1286,7 +1286,7 @@
       "to": "gremien"
     },
     {
-      "count": 17,
+      "count": 19,
       "from": "voting",
       "to": "meetings"
     },
@@ -1296,7 +1296,7 @@
       "to": "notifications"
     },
     {
-      "count": 18,
+      "count": 20,
       "from": "voting",
       "to": "shared"
     },

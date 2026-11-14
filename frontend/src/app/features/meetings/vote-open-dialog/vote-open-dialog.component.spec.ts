@@ -434,6 +434,34 @@ describe('VoteOpenDialogComponent', () => {
       );
     });
 
+    it('keeps the majority of the members of a repeated election', async () => {
+      const { http, cmp } = await setup(FREE_TOP, 8, {
+        mode: 'repeat',
+        vote: stored({
+          applicationId: null,
+          agendaItemId: 't-8',
+          status: 'closed',
+          kind: 'election',
+          question: 'Vorsitz',
+          round: 1,
+          election: {
+            seats: 1,
+            candidates: [
+              { id: 'c1', name: 'Anna', principalId: 'p-1' },
+              { id: 'c2', name: 'Ben' },
+            ],
+            secret: true,
+            majorityRule: 'members_majority',
+          },
+        }),
+      });
+      expect(cmp.membersElection()).toBe(true);
+      cmp.submit(true);
+      expect(http.expectOne('/api/meetings/m-1/votes').request.body).toEqual(
+        expect.objectContaining({ kind: 'election', majorityRule: 'members_majority', repeatOf: 'v-5' }),
+      );
+    });
+
     it('counts on from a repeat and fills the defaults of a sparse vote', async () => {
       const { cmp } = await setup(FREE_TOP, 8, {
         mode: 'repeat',

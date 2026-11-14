@@ -141,6 +141,7 @@ describe('election wiring', () => {
       round: 1,
     });
     expect(mapMeetingVote({ id: 'v1', status: 'open' })).not.toHaveProperty('kind');
+    expect(electionFields({ kind: 'circular' })).toEqual({ kind: 'circular' });
     expect(electionFields({ kind: 'election', parentVoteId: 'e0' })).toEqual({
       kind: 'election',
       election: null,

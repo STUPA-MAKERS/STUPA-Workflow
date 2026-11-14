@@ -91,7 +91,7 @@ async def _standalone_scope(
     their Gremium.
     """
     global_ok: ColumnElement[bool] = (
-        and_(Vote.meeting_id.is_(None), Vote.kind != "poll")
+        and_(Vote.meeting_id.is_(None), Vote.kind.not_in(("poll", "circular")))
         if principal.has("application.read") or principal.has("application.read_all")
         else false()
     )

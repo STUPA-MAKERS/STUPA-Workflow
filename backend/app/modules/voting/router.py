@@ -36,13 +36,16 @@ from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.meetings.publisher import MeetingPublisher, get_meeting_publisher
+from app.modules.voting.circular import CircularService
 from app.modules.voting.election import ElectionService
 from app.modules.voting.poll import PollService
 from app.modules.voting.poll_mails import notify_poll_started
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,
-    PollCreate,
+    CircularCreate,
+    CircularRulesOut,
+    GremiumVoteCreate,
     PollPatch,
     VoteClosed,
     VoteCreate,
@@ -106,22 +109,28 @@ def mail_poll_start(
     responses=_errors(400, 401, 403, 422),
 )
 async def create_poll(
-    payload: PollCreate,
+    payload: GremiumVoteCreate,
     service: ServiceDep,
     principal: ReaderDep,
     background: BackgroundTasks,
     request: Request,
     settings: SettingsDep,
 ) -> VoteOut:
-    """Create the poll of a Gremium, without a meeting and without an application.
+    """Create the poll or the Umlaufverfahren of a Gremium, without a meeting.
 
-    Only ``kind: poll``. The caller needs the gremium permission ``vote.manage`` in
-    ``eligibleGroup`` (or the admin role), else 403. ``closesAt`` lies at least one
-    hour ahead (422 ``closes_at_too_soon``); the deadline cron closes the poll then.
+    ``kind: poll`` or ``kind: circular``; a body without ``kind`` is a poll. An
+    Umlaufverfahren is a motion with the majority of the members; ``closesAt`` lies at
+    least ``circularMinDays`` days ahead (422 ``circular_window_too_short``), and it
+    sends no mail. The rest describes the poll. The caller needs the gremium permission
+    ``vote.manage`` in ``eligibleGroup`` (or the admin role), else 403. ``closesAt`` lies
+    at least one hour ahead (422 ``closes_at_too_soon``); the deadline cron closes the poll then.
     Without ``draft`` the poll opens at once, and the eligible members (``vote.cast``)
     get the mail ``poll_started``.
     """
-    vote = await PollService(service).create(payload, principal, now=datetime.now(UTC))
+    now = datetime.now(UTC)
+    if isinstance(payload, CircularCreate):
+        return await CircularService(service).create(payload, principal, now=now)
+    vote = await PollService(service).create(payload, principal, now=now)
     mail_poll_start(vote, background, request, settings)
     return vote
 
@@ -294,6 +303,30 @@ async def cast_ballot(
 
 
 @router.post(
+    "/votes/{vote_id}/objection",
+    response_model=VoteOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def object_to_circular(
+    vote_id: UUID,
+    service: ServiceDep,
+    publisher: PublisherDep,
+    principal: ReaderDep,
+) -> VoteOut:
+    """Object to an open Umlaufverfahren.
+
+    Each eligible member (``vote.cast`` in the Gremium, a human session) can object.
+    The first objection cancels the vote with ``cancelReason: objection``, and the
+    audit entry ``vote_cancel`` names the member. A vote of another kind answers 409
+    ``not_circular``, a vote that is not open 409 ``vote_not_open``.
+    """
+    vote = await CircularService(service).object(vote_id, principal, now=datetime.now(UTC))
+    await service.session.commit()
+    await publisher.vote_cancelled(vote)
+    return vote
+
+
+@router.post(
     "/votes/{vote_id}/draw-lot",
     response_model=VoteOut,
     responses=_errors(401, 403, 404, 409),
@@ -317,6 +350,20 @@ async def draw_lot(
     vote = await ElectionService(service).draw_lot(vote_id, principal, now=datetime.now(UTC))
     await publisher.vote_lot_drawn(vote)
     return vote
+
+
+@router.get(
+    "/votes/circular-rules",
+    response_model=CircularRulesOut,
+    responses=_errors(401),
+)
+async def circular_rules(service: ServiceDep, _principal: ReaderDep) -> CircularRulesOut:
+    """Return the rules that the form of a new Umlaufverfahren needs.
+
+    ``minDays`` is ``circularMinDays``: the least number of days between the start and
+    ``closesAt``.
+    """
+    return CircularRulesOut(minDays=await CircularService(service).min_days())
 
 
 @router.get(

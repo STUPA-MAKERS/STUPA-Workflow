@@ -203,6 +203,15 @@ describe('ElectionResultComponent', () => {
     expect(screen.getByLabelText('Nein: 1 Stimmen, 14 %')).toBeInTheDocument();
   });
 
+  it('says that nobody has the majority of the members (§000912)', async () => {
+    await setup({
+      result: 'no_majority',
+      election: { ...ELECTION, seats: 1, majorityRule: 'members_majority' },
+      electionResult: { counts: { c1: 3, c2: 2 }, abstentions: 0, ballots: 5, elected: [], runoff: null },
+    });
+    expect(screen.getByText('Keine Mehrheit der Mitglieder')).toBeInTheDocument();
+  });
+
   it('shows no status line while the vote is open', async () => {
     await setup({ result: null, electionResult: null, counts: { c1: 1 } });
     expect(screen.queryByText(/Gewählt|Stichwahl|Niemand/)).toBeNull();

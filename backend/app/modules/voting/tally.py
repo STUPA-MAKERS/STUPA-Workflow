@@ -234,7 +234,7 @@ def result(
     return Outcome(result=final, quorum_met=quorum_met, leading=lead)
 
 
-ElectionResult = Literal["elected", "runoff", "tie", "rejected"]
+ElectionResult = Literal["elected", "runoff", "tie", "rejected", "no_majority"]
 
 
 def encode_election_choice(candidate_ids: Sequence[str]) -> str:
@@ -294,6 +294,14 @@ def _election_quorum(
     )
 
 
+def _members_majority(votes: int, eligible: int) -> bool:
+    """Tell whether ``votes`` is more than half of the eligible count.
+
+    An unknown count (0) is fail-closed: no number of votes reaches it.
+    """
+    return eligible > 0 and votes * 2 > eligible
+
+
 def _yes_no_outcome(
     config: ElectionConfig, choices: Sequence[str | None], eligible: int, present: int | None
 ) -> ElectionOutcome:
@@ -301,9 +309,11 @@ def _yes_no_outcome(
     ballots = sum(counts.values())
     participation = ballots if config.abstain_counts_quorum else ballots - counts["abstain"]
     quorum_met = _election_quorum(config, participation, eligible, present)
-    elected = quorum_met and counts["yes"] > counts["no"]
+    enough = _members_majority(counts["yes"], eligible) if config.members_majority else True
+    elected = quorum_met and enough and counts["yes"] > counts["no"]
+    missed: ElectionResult = "no_majority" if quorum_met and not enough else "rejected"
     return ElectionOutcome(
-        result="elected" if elected else "rejected",
+        result="elected" if elected else missed,
         quorum_met=quorum_met,
         counts={"yes": counts["yes"], "no": counts["no"]},
         abstentions=counts["abstain"],
@@ -333,6 +343,9 @@ def tally_election(
     several seats (no runoff). A missed quorum elects nobody. ``present`` is the present
     count of a meeting election (see ``result``).
 
+    With ``majorityRule = members_majority`` (one seat) a candidate is elected only
+    with more votes than half of ``eligible``. Otherwise the result is ``no_majority``.
+
     The sort is stable, so candidates with equal votes keep the order of the candidate
     list.
     """
@@ -356,7 +369,28 @@ def tally_election(
         ballots=ballots,
     )
     ranked = tuple(sorted((cid for cid in known if counts[cid] > 0), key=lambda c: -counts[c]))
-    return _seat_outcome(missed, ranked, config.seats) if quorum_met else missed
+    if not quorum_met:
+        return missed
+    if config.members_majority:
+        return _members_outcome(missed, ranked, eligible)
+    return _seat_outcome(missed, ranked, config.seats)
+
+
+def _members_outcome(
+    base: ElectionOutcome, ranked: tuple[str, ...], eligible: int
+) -> ElectionOutcome:
+    """Elect the first candidate of a quorate election for one seat, or nobody.
+
+    The candidate needs more votes than half of the eligible count, so at most one
+    candidate reaches the number, and no lot decides (§F/meetings/voting/000912).
+    """
+    won = bool(ranked) and _members_majority(base.counts[ranked[0]], eligible)
+    return replace(
+        base,
+        result="elected" if won else "no_majority",
+        quorum_met=True,
+        elected=ranked[:1] if won else (),
+    )
 
 
 def _list_picks(raw: str | None, known: Collection[str], limit: int) -> tuple[str, ...]:

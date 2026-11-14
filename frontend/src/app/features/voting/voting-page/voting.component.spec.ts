@@ -298,6 +298,24 @@ describe('VotingComponent', () => {
       expect(screen.getByText('Stimme offen')).toBeInTheDocument();
     });
 
+    it('an Umlaufverfahren names its Gremium and its end (§000914)', async () => {
+      await start('/voting', {
+        pages: [
+          page([
+            item('c1', {
+              kind: 'circular',
+              applicationId: null,
+              gremiumName: 'AStA',
+              closesAt: '2026-10-30T11:00:00Z',
+              openedAt: today(9, 5),
+            }),
+          ]),
+        ],
+      });
+      expect(screen.getAllByText('Offen').length).toBeGreaterThan(0);
+      expect(screen.getByText(/^AStA · bis Fr, 30\.10\., \d\d:00$/)).toBeInTheDocument();
+    });
+
     it('an ended Gremium poll names only its Gremium', async () => {
       await start('/voting', {
         pages: [
@@ -321,7 +339,13 @@ describe('VotingComponent', () => {
       expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ kind: 'poll' }));
       expect(cmp.activeFilterCount()).toBe(1);
       expect(cmp.kindChipLabel()).toBe('Art: Umfrage');
-      expect(cmp.kindOptions().map((o) => o.label)).toEqual(['Alle', 'Beschluss', 'Wahl', 'Umfrage']);
+      expect(cmp.kindOptions().map((o) => o.label)).toEqual([
+        'Alle',
+        'Beschluss',
+        'Wahl',
+        'Umfrage',
+        'Umlaufverfahren',
+      ]);
       const navigate = jest.spyOn(router, 'navigate');
       cmp.setKind('election');
       expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { kind: 'election' } }));
@@ -339,10 +363,10 @@ describe('VotingComponent', () => {
     it('offers "Neue Umfrage" only with vote.manage and opens the new poll', async () => {
       const member = await start('/voting');
       expect(member.cmp.canCreatePoll()).toBe(false);
-      expect(screen.queryByRole('button', { name: 'Umfrage anlegen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Abstimmung anlegen' })).toBeNull();
       TestBed.resetTestingModule();
       const manager = await start('/voting', { manager: true });
-      expect(screen.getByRole('button', { name: 'Umfrage anlegen' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Abstimmung anlegen' })).toBeInTheDocument();
       const navigate = jest.spyOn(manager.router, 'navigate');
       manager.listVotes.mockClear();
       manager.cmp.pollDialog.set(false);

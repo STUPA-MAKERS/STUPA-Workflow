@@ -16,11 +16,14 @@ import { problemDetail } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   DatepickerComponent,
   DialogComponent,
   IconComponent,
+  SegmentedComponent,
+  type SegmentedOption,
   SelectFieldComponent,
   type SelectOption,
   TextareaComponent,
@@ -33,9 +36,19 @@ import { type PollDraft, emptyPollDraft, localMoment, pollDraftValid, pollInOf }
 
 /** The end of a poll lies at least this far ahead (the server checks it too). */
 export const POLL_MIN_RUNTIME_MS = 60 * 60 * 1000;
+/** The days of an Umlaufverfahren until the server tells its own number. */
+export const CIRCULAR_MIN_DAYS = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** What the dialog creates outside a meeting. */
+type NewKind = 'poll' | 'circular';
 
 /**
- * "Neue Umfrage" (`/voting`, the FAB): a poll of a Gremium, outside a meeting.
+ * "Abstimmung anlegen" (`/voting`, the FAB): a poll or an Umlaufverfahren of a Gremium,
+ * outside a meeting.
+ *
+ * An Umlaufverfahren takes the Gremium, the question and the end only: the server fixes
+ * Ja/Nein/Enthaltung and the majority of the members, and the end lies at least
+ * `minDays` days ahead (`GET /votes/circular-rules`).
  *
  * The person picks the Gremium (one where they hold `vote.manage`; the admin any), the
  * question, the mode and the options (`app-poll-editor`), the end (date and time, at
@@ -54,6 +67,7 @@ export const POLL_MIN_RUNTIME_MS = 60 * 60 * 1000;
     FormsModule,
     IconComponent,
     PollEditorComponent,
+    SegmentedComponent,
     SelectFieldComponent,
     TextareaComponent,
     TimeInputComponent,
@@ -76,6 +90,16 @@ export class NewPollDialogComponent {
   /** The server created the poll. */
   readonly created = output<Vote>();
 
+  readonly kind = signal<NewKind>('poll');
+  readonly circular = computed(() => this.kind() === 'circular');
+  readonly kindOptions = computed<SegmentedOption[]>(() =>
+    (['poll', 'circular'] as const).map((value) => ({
+      value,
+      label: this.i18n.translate(`meetings.vote.kind.${value}`),
+    })),
+  );
+  /** `circularMinDays` of the server. */
+  readonly minDays = signal(CIRCULAR_MIN_DAYS);
   readonly gremium = signal('');
   readonly question = signal('');
   readonly draft = signal<PollDraft>(emptyPollDraft());
@@ -89,16 +113,17 @@ export class NewPollDialogComponent {
 
   /** The end as an ISO moment, or `null`. */
   readonly closesAt = computed(() => localMoment(this.endDate(), this.endTime()));
-  /** The end lies at least one hour ahead. */
+  /** The end lies at least one hour ahead; that of an Umlaufverfahren `minDays` days. */
   readonly endOk = computed(() => {
     const at = this.closesAt();
-    return !!at && new Date(at).getTime() >= Date.now() + POLL_MIN_RUNTIME_MS;
+    const ahead = this.circular() ? this.minDays() * DAY_MS : POLL_MIN_RUNTIME_MS;
+    return !!at && new Date(at).getTime() >= Date.now() + ahead;
   });
   readonly canSubmit = computed(
     () =>
       !!this.gremium() &&
       !!this.question().trim() &&
-      pollDraftValid(this.draft()) &&
+      (this.circular() || pollDraftValid(this.draft())) &&
       this.endOk() &&
       !this.submitting(),
   );
@@ -109,7 +134,16 @@ export class NewPollDialogComponent {
     });
   }
 
+  setKind(value: string | null): void {
+    if (value === 'poll' || value === 'circular') this.kind.set(value);
+  }
+
   private reset(): void {
+    this.kind.set('poll');
+    this.api.circularRules().subscribe({
+      next: (rules) => this.minDays.set(rules.minDays),
+      error: () => {},
+    });
     this.question.set('');
     this.draft.set(emptyPollDraft());
     this.endDate.set('');
@@ -157,20 +191,21 @@ export class NewPollDialogComponent {
     if (!this.canSubmit()) return;
     this.submitting.set(true);
     this.savingDraft.set(draft);
-    this.api
-      .createPoll({
-        kind: 'poll',
-        eligibleGroup: this.gremium(),
-        question: this.question().trim(),
-        ...pollInOf(this.draft()),
-        secret: true,
-        closesAt: this.closesAt()!,
-        draft,
-      })
-      .subscribe({
+    const circular = this.circular();
+    const head = {
+      eligibleGroup: this.gremium(),
+      question: this.question().trim(),
+      closesAt: this.closesAt()!,
+      draft,
+    };
+    const call = circular
+      ? this.api.createCircular({ kind: 'circular', ...head })
+      : this.api.createPoll({ kind: 'poll', ...head, ...pollInOf(this.draft()), secret: true });
+    const started: TranslationKey = circular ? 'circular.toast.started' : 'poll.toast.started';
+    call.subscribe({
         next: (vote) => {
           this.submitting.set(false);
-          this.toast.success(this.i18n.translate(draft ? 'poll.toast.saved' : 'poll.toast.started'));
+          this.toast.success(this.i18n.translate(draft ? 'poll.toast.saved' : started));
           this.created.emit(vote);
         },
         error: (err: unknown) => {

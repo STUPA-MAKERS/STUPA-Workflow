@@ -167,6 +167,9 @@ export function electionSnippet(vote: MeetingVote): string {
     ...lines,
     ...tally,
     `> Gewählt: ${elected.length ? elected.join(', ') : 'niemand'}`,
+    ...(election.majorityRule === 'members_majority' && !elected.length
+      ? ['> Keine Mehrheit der Mitglieder.']
+      : []),
     ...lot,
     ...runoff,
   ].join('\n');
@@ -206,7 +209,10 @@ export function pollSnippet(vote: MeetingVote, poll: PollConfig): string {
 export function electionMeta(vote: MeetingVote): string {
   const round = vote.round ?? 1;
   const meta = `Wahl · ${vote.election?.seats ?? 1} Posten`;
-  return round > 1 ? `${meta} · Stichwahl (${round}. Wahlgang)` : meta;
+  const rounds = round > 1 ? `${meta} · Stichwahl (${round}. Wahlgang)` : meta;
+  return vote.election?.majorityRule === 'members_majority'
+    ? `${rounds} · Mehrheit der Mitglieder`
+    : rounds;
 }
 
 /** The kind line of a poll callout, as the backend `poll_meta` writes it. */

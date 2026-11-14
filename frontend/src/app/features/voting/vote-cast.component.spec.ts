@@ -1071,6 +1071,90 @@ describe('VoteCastComponent', () => {
       expect(fixture.componentInstance.pollAction()).toBeNull();
       if (!canManage) expect(fixture.componentInstance.hasMenu()).toBe(false);
     });
+
+  describe('Umlaufverfahren (§000914, §000915)', () => {
+    const circular = (over: Partial<Vote> = {}) =>
+      vote({
+        kind: 'circular',
+        meetingId: null,
+        agendaItemId: null,
+        applicationId: null,
+        config: { options: ['yes', 'no', 'abstain'], majorityRule: 'members_majority' },
+        ...over,
+      });
+
+    async function withApi(v: Vote, opts: { canManage?: boolean; canCast?: boolean; fail?: boolean } = {}) {
+      const view = await setup({
+        vote: v,
+        canManage: opts.canManage ?? false,
+        canCast: opts.canCast ?? true,
+        page: { split: true },
+      });
+      const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<string, jest.Mock>;
+      api['openVote'] = jest.fn(() => of(void 0));
+      api['objectToCircular'] = jest.fn(() =>
+        opts.fail
+          ? throwError(() => conflict('vote_not_open'))
+          : of(circular({ status: 'cancelled', cancelReason: 'objection' })),
+      );
+      return { ...view, api };
+    }
+
+    it('a manager starts a draft', async () => {
+      const draft = await withApi(circular({ status: 'draft' }), { canManage: true });
+      expect(draft.fixture.componentInstance.pollAction()).toBe('start');
+      draft.fixture.componentInstance.onMenu('start');
+      expect(draft.api['openVote']).toHaveBeenCalledWith('v1');
+      expect(draft.toast.success).toHaveBeenCalledWith('Umlaufverfahren gestartet');
+    });
+
+    it('a manager never ends an open one by hand', async () => {
+      const open = await withApi(circular(), { canManage: true });
+      expect(open.fixture.componentInstance.pollAction()).toBeNull();
+    });
+
+    it('an eligible member objects after a confirmation', async () => {
+      const { api, toast, page, fixture } = await withApi(circular());
+      const cmp = fixture.componentInstance;
+      expect(cmp.canObject()).toBe(true);
+      await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Widersprechen' }));
+      expect(cmp.confirmObject()).toBe(true);
+      expect(api['objectToCircular']).not.toHaveBeenCalled();
+      cmp.doObject();
+      expect(api['objectToCircular']).toHaveBeenCalledWith('v1');
+      expect(cmp.confirmObject()).toBe(false);
+      expect(cmp.vote()?.status).toBe('cancelled');
+      expect(toast.success).toHaveBeenCalledWith('Umlaufverfahren durch Widerspruch abgebrochen');
+      expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'updated' });
+    });
+
+    it('a refused objection says why and reads the vote again', async () => {
+      const { toast, getVote, fixture } = await withApi(circular(), { fail: true });
+      const cmp = fixture.componentInstance;
+      cmp.confirmObject.set(true);
+      cmp.doObject();
+      expect(toast.error).toHaveBeenCalled();
+      expect(cmp.objecting()).toBe(false);
+      expect(cmp.confirmObject()).toBe(false);
+      expect(getVote).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      ['without a ballot', circular(), false],
+      ['on a closed one', circular({ status: 'closed', result: 'passed' }), true],
+      ['on a motion', vote(), true],
+    ])('offers no objection %s', async (_name, v, canCast) => {
+      const { fixture } = await withApi(v, { canCast });
+      expect(fixture.componentInstance.canObject()).toBe(false);
+    });
+
+    it('objects to nothing without a vote', async () => {
+      const { fixture } = await setup({ routeId: null });
+      fixture.componentInstance.doObject();
+      expect(fixture.componentInstance.objecting()).toBe(false);
+    });
+  });
   });
 
   describe('vote on a step of a Haushaltsplan (§F/finance/budget/000838)', () => {

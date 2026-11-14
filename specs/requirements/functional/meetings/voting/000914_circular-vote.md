@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - backend/app/modules/voting/circular.py
+  - frontend/src/app/features/voting/new-poll-dialog/new-poll-dialog.component.ts
 scope:
   - backend/app/modules/voting
   - frontend/src/app/features/voting

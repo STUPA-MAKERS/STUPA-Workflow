@@ -70,7 +70,9 @@ async def build_meeting_vote(
 
     The admitted guests vote by default in a meeting where guests vote, on a public
     item, and never in an election unless the lead switches them on. On the item of a
-    Haushaltsplan only the members vote, with the quorum of the Gremium. A vote with
+    Haushaltsplan only the members vote, with the quorum of the Gremium. An election
+    takes the rule ``members_majority`` for one seat (§F/meetings/voting/000912), and
+    every other rule of the body means the relative majority. A vote with
     guests and a poll have no quorum; without an explicit percent the vote inherits
     the percent quorum of the Gremium. A vote without guests also takes the least number
     of present persons of the Gremium. A members rule has no guest ballots: the server
@@ -123,7 +125,10 @@ async def build_meeting_vote(
             errors=[{"field": "guestsVote", "msg": "an agenda item of a plan"}],
         )
     majority_rule = "members_majority" if of_plan else payload.majority_rule
-    members_rule = not election and payload.poll is None and majority_rule in MEMBERS_RULES
+    members_election = election and majority_rule == "members_majority"
+    members_rule = members_election or (
+        not election and payload.poll is None and majority_rule in MEMBERS_RULES
+    )
     if members_rule and payload.guests_vote:
         raise ValidationProblem(
             "Guests do not vote on a question that needs a majority of the members.",
@@ -143,6 +148,7 @@ async def build_meeting_vote(
         {
             "seats": payload.seats,
             "candidates": payload.election_candidates(),
+            "majorityRule": "members_majority" if members_election else "relative",
             "secret": secret_only(payload.secret, field="secret"),
             "guestsVote": guests_vote,
         }

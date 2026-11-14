@@ -136,13 +136,19 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("budget_plan_version.id", ondelete="SET NULL"), nullable=True
     )
 
+    #: Why the vote was cancelled, when the reason is part of the record: ``objection``
+    #: for an Umlaufverfahren (``kind = 'circular'``) that a member objected to. NULL for
+    #: every other cancel; the audit entry ``vote_cancel`` holds the reason of each.
+    cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     __table_args__ = (
         CheckConstraint("status IN ('draft','open','closed','cancelled')", name="vote_status"),
         CheckConstraint(
-            "result IS NULL OR result IN ('passed','rejected','tie','elected','runoff')",
+            "result IS NULL OR result IN "
+            "('passed','rejected','tie','elected','runoff','no_majority')",
             name="vote_result",
         ),
-        CheckConstraint("kind IN ('motion','election','poll')", name="vote_kind"),
+        CheckConstraint("kind IN ('motion','election','poll','circular')", name="vote_kind"),
         Index("ix_vote_application_id", "application_id"),
         Index("ix_vote_status_closes_at", "status", "closes_at"),
         Index("ix_vote_repeat_of_id", "repeat_of_id"),

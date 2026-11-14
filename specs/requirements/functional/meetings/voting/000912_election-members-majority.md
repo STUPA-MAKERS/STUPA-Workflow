@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - backend/app/modules/voting/tally.py
+  - backend/app/shared/config_schemas.py
+  - frontend/src/app/features/meetings/vote-open-dialog/vote-open-dialog.component.ts
 scope:
   - backend/app/modules/voting
   - backend/app/shared

@@ -430,8 +430,9 @@ class MeetingVoteBody(FrozenCamelModel, frozen=True):
     #: gives 422 ``open_vote_unavailable``.
     secret: bool | None = None
     #: Personnel elections. ``kind = election`` takes ``seats`` and
-    #: ``candidates`` and ignores ``options`` and ``majorityRule``. ``question`` is the
-    #: name of the ballot ("Wahlgang") and is required. The server gives each
+    #: ``candidates`` and ignores ``options``. Of ``majorityRule`` it takes only
+    #: ``members_majority`` (one seat); every other rule means the relative majority.
+    #: ``question`` is the name of the ballot ("Wahlgang") and is required. The server gives each
     #: candidate its id (``c1``, ``c2``, ...) in the given order.
     kind: VoteKind = "motion"
     seats: int = Field(default=1, ge=1, le=ELECTION_MAX_CANDIDATES)
@@ -469,9 +470,13 @@ class MeetingVoteBody(FrozenCamelModel, frozen=True):
             raise ValueError("a poll (kind poll) takes its options in poll, and only a poll")
         if self.kind == "poll" and not (self.question or "").strip():
             raise ValueError("a poll needs its question")
+        if self.kind == "circular":
+            raise ValueError("an Umlaufverfahren has no meeting")
         if self.kind == "election":
             if not (self.question or "").strip():
                 raise ValueError("an election needs the name of the ballot (question)")
+            if self.majority_rule == "members_majority" and self.seats != 1:
+                raise ValueError("the majority of the members elects one seat only")
             if len(self.candidates) < self.seats:
                 raise ValueError("an election needs at least as many candidates as seats")
             people = [c.principal_id for c in self.candidates if c.principal_id is not None]

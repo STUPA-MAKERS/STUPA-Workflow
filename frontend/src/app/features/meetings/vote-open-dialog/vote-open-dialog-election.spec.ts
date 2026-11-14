@@ -136,6 +136,41 @@ describe('VoteOpenDialogComponent · election', () => {
     expect(cmp.canSubmit()).toBe(true);
   });
 
+  it('asks for the majority of the members only for one seat and sends the rule (§000912)', async () => {
+    const { http, cmp, fixture } = await setup();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('radio', { name: 'Wahl' }));
+    const members = () => screen.queryByRole('switch', { name: 'Mehrheit der Mitglieder nötig' });
+    expect(members()).toHaveAttribute('aria-checked', 'false');
+    await user.click(members()!);
+    expect(cmp.membersElection()).toBe(true);
+    expect(cmp.ruleSentence()).toMatch(/Hälfte aller stimmberechtigten Mitglieder/);
+    cmp.changeSeats(1);
+    fixture.detectChanges();
+    expect(members()).toBeNull();
+    expect(cmp.membersElection()).toBe(false);
+    cmp.changeSeats(-1);
+    cmp.addMember('p-1');
+    cmp.addMember('p-2');
+    cmp.submit();
+    const req = http.expectOne('/api/meetings/m-1/votes');
+    expect(req.request.body).toMatchObject({
+      kind: 'election',
+      seats: 1,
+      majorityRule: 'members_majority',
+      guestsVote: false,
+    });
+  });
+
+  it('sends no majority rule for a plain election', async () => {
+    const { http, cmp } = await setup();
+    cmp.setKind('election');
+    cmp.addMember('p-1');
+    cmp.addMember('p-2');
+    cmp.submit();
+    expect(http.expectOne('/api/meetings/m-1/votes').request.body).not.toHaveProperty('majorityRule');
+  });
+
   it('names a roster member without a name by the e-mail, else by the id', async () => {
     const { cmp, fixture } = await setup();
     fixture.componentRef.setInput('members', [

@@ -10,7 +10,7 @@ import type { MajorityRule } from '@core/api/models';
 
 /** The result of one decision. */
 /** A personnel election gives `elected`, `runoff`, `tie` or `rejected`. */
-export type PublicVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
+export type PublicVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff' | 'no_majority';
 
 /** A gremium that publishes its protocols (`GET /public/committees`). */
 export interface PublicGremium {

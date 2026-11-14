@@ -186,4 +186,18 @@ describe('election.util', () => {
     expect(closedStatus('motion', 'passed').key).toBe('vote.result.passed');
     expect(closedStatus(undefined, 'tie').key).toBe('vote.result.rejected');
   });
+
+  /** §F/meetings/voting/000912: an election for one seat with the majority of the members. */
+  it('reads the rule and the result of an election with the majority of the members', () => {
+    const members: ElectionConfig = { ...SINGLE, majorityRule: 'members_majority' };
+    expect(electionCaption(members, 1, t)).toContain(' · meetings.vote.rule.members_majority');
+    expect(electionCaption(SINGLE, 1, t)).not.toContain('members_majority');
+    expect(electionCaption(null, 1, t)).not.toContain('members_majority');
+    const missed: ElectionResult = { counts: { c1: 2 }, abstentions: 0, ballots: 2, elected: [] };
+    expect(electionResultLine(members, 'no_majority', missed, t)).toBe('election.result.noMajority');
+    expect(electionStatus('no_majority')).toEqual({ kind: 'error', key: 'election.status.noMajority' });
+    expect(closedStatus('election', 'no_majority').key).toBe('election.status.noMajority');
+    expect(closedStatus('circular', 'passed').key).toBe('vote.result.passed');
+    expect(CATALOG.de['election.status.noMajority']).toBe('Keine Mehrheit');
+  });
 });

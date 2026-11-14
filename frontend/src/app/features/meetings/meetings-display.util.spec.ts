@@ -196,6 +196,20 @@ describe('voteMetaLine', () => {
     expect(voteMetaLine({ ...base, kind: 'poll', status: 'draft', secret: false }, t as never, 'de')).toBe('');
   });
 
+  it('names no rule for an election with the majority of the members: its caption does', () => {
+    const election = { seats: 1, candidates: [], secret: true, majorityRule: 'members_majority' as const };
+    expect(
+      voteMetaLine({ ...base, kind: 'election', status: 'draft', majorityRule: 'simple', election }, t as never, 'de'),
+    ).toBe('');
+    expect(
+      voteMetaLine(
+        { ...base, kind: 'election', status: 'draft', majorityRule: 'simple', election: { ...election, majorityRule: 'relative' } },
+        t as never,
+        'de',
+      ),
+    ).toBe('vote.majority.simple');
+  });
+
   it('leaves out what a live event did not bring yet', () => {
     expect(voteMetaLine(base, t as never, 'de')).toBe('');
     expect(voteMetaLine({ ...base, status: 'draft', majorityRule: 'simple' }, t as never, 'de')).toBe('vote.majority.simple');

@@ -113,6 +113,7 @@ import type {
   TransitionResult,
   Uuid,
   VersionOutWire,
+  CircularCreateBody,
   PollCreateBody,
   PollIn,
   Vote,
@@ -730,6 +731,26 @@ export class ApiClient {
    */
   createPoll(body: PollCreateBody): Observable<Vote> {
     return this.http.post<Vote>(`${this.base}/votes`, body);
+  }
+
+  /**
+   * POST /votes — create an Umlaufverfahren of a Gremium (gremium `vote.manage`). Its end
+   * lies at least `circularMinDays` days ahead (422 `circular_window_too_short`).
+   */
+  createCircular(body: CircularCreateBody): Observable<Vote> {
+    return this.http.post<Vote>(`${this.base}/votes`, body);
+  }
+
+  /** GET /votes/circular-rules — the least number of days of an Umlaufverfahren. */
+  circularRules(): Observable<{ readonly minDays: number }> {
+    return this.http.get<{ readonly minDays: number }>(`${this.base}/votes/circular-rules`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /votes/{id}/objection — object to an open Umlaufverfahren; this cancels it. */
+  objectToCircular(voteId: Uuid): Observable<Vote> {
+    return this.http.post<Vote>(`${this.base}/votes/${voteId}/objection`, {});
   }
 
   /** POST /meetings — create a meeting (gremium `session.manage`, or admin). */

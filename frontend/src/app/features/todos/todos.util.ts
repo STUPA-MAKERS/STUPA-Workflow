@@ -77,6 +77,7 @@ export const VOTE_RESULT_LABEL: Record<TodoVoteResult, TranslationKey> = {
   tie: 'vote.result.tie',
   elected: 'vote.result.elected',
   runoff: 'vote.result.runoff',
+  no_majority: 'vote.result.no_majority',
 };
 
 export const TICKET_STATUS_LABEL: Record<string, TranslationKey> = {

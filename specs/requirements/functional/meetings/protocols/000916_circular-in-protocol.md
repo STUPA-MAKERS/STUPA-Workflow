@@ -5,7 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - backend/app/modules/protocol/circular.py
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/voting

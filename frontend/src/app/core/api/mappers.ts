@@ -291,6 +291,7 @@ export function electionFields(wire: ElectionFields): ElectionFields {
   if (wire.kind === 'poll') {
     return { kind: 'poll', poll: wire.poll ?? null, pollResult: wire.pollResult ?? null };
   }
+  if (wire.kind === 'circular') return { kind: 'circular' };
   if (wire.kind !== 'election') return {};
   return {
     kind: 'election',
