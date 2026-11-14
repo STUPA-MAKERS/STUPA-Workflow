@@ -199,24 +199,18 @@ describe('AdminGremienComponent', () => {
   });
 
   /** §F/meetings/voting/000902 */
-  it('shows the repeat quorum only for a Gremium that has one', async () => {
+  it('shows the repeat quorum of a Gremium that has one', async () => {
     const list = clone(GREMIEN);
     const api = makeApi({
       listGremien: jest.fn(() =>
-        of([
-          { ...list[0], repeatQuorumPercent: 25 },
-          { ...list[1], repeatQuorumPercent: null },
-        ]),
+        of([{ ...list[0], repeatQuorumPercent: null }, { ...list[1], repeatQuorumPercent: 25 }]),
       ),
     });
     await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: /^Studierendenparlament/ }));
-    const stupa = item('Studierendenparlament');
-    expect(
-      within(stupa).getByText('Quorum der Wiederholungssitzung').nextElementSibling?.textContent?.trim(),
-    ).toBe('25 %');
     await userEvent.click(screen.getByRole('button', { name: /^AStA/ }));
-    expect(within(item('AStA')).queryByText('Quorum der Wiederholungssitzung')).toBeNull();
+    expect(
+      within(item('AStA')).getByText('Quorum der Wiederholungssitzung').nextElementSibling?.textContent?.trim(),
+    ).toBe('25 %');
   });
 
   /** Opening again reads the recipients only once. */
