@@ -761,6 +761,32 @@ async def test_booking_scope_without_full_view_uses_the_member_gremien(
     assert scope == {gid}
 
 
+async def test_budget_years_follow_the_view_of_the_reader(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The full view lists every budget, another reader the budgets of member Gremien."""
+    from app.modules.budget import tree_router
+
+    gid = uuid.uuid4()
+    asked: list[set[uuid.UUID] | None] = []
+
+    class _Pairs:
+        async def choosable_pairs(self, scope: set[uuid.UUID] | None) -> list[object]:
+            asked.append(scope)
+            return []
+
+    async def _members(_service: object, _sub: str) -> set[uuid.UUID]:
+        return {gid}
+
+    monkeypatch.setattr(tree_router, "_member_gremium_ids", _members)
+    service = cast(Any, _Pairs())
+    full = Principal(sub="kasse", permissions={"budget.view"})
+    member = Principal(sub="member-1", permissions=set())
+    assert await tree_router.list_budget_years(service, full) == []
+    assert await tree_router.list_budget_years(service, member) == []
+    assert asked == [None, {gid}]
+
+
 def test_update_invoice(fake: _FakeService) -> None:
     resp = _client(fake).patch(f"/api/invoices/{_IID}", json={"status": "paid"})
     assert resp.status_code == 200
