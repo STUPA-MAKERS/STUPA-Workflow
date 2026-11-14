@@ -11,7 +11,7 @@ Idempotent. A fresh database already has the table from the ``create_all`` basel
 (0001).
 
 Revision ID: edaeff27b6a4
-Revises: 4b8e2f6c1a93
+Revises: 9c1f5d3a7e42
 Create Date: 2026-11-14 00:10:00
 """
 
@@ -22,7 +22,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "edaeff27b6a4"
-down_revision: str | None = "4b8e2f6c1a93"
+down_revision: str | None = "9c1f5d3a7e42"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
