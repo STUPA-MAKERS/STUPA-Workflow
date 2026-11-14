@@ -2,9 +2,9 @@
 id: "000846"
 title: An allocation by hand has at most two decimal places
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/unit/modules/budget/test_plan_router.py:test_an_allocation_has_two_decimal_places"
 implementation:

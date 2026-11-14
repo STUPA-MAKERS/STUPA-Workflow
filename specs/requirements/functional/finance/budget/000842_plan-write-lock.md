@@ -2,9 +2,9 @@
 id: "000842"
 title: A write in the tree of a budget takes the lock of the budget
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_write_beside_a_plan_waits_for_the_lock_of_its_budget"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_plan_that_went_while_a_write_waited_is_not_found"

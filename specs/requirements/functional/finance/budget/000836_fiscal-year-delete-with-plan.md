@@ -2,9 +2,9 @@
 id: "000836"
 title: A fiscal year with a decided plan cannot be deleted
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_fiscal_year_with_a_decided_plan_is_not_deleted"
   - "backend/tests/unit/modules/budget/test_tree_service_cov.py:test_delete_fiscal_year_with_bookings_409"

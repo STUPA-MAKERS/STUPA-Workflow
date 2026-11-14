@@ -2,9 +2,9 @@
 id: "000843"
 title: A text that the database cannot store answers 422
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/unit/shared/test_error_contract.py:test_a_text_that_the_database_refuses_is_a_422"
   - "backend/tests/unit/shared/test_error_contract.py:test_another_database_error_stays_a_bare_500"

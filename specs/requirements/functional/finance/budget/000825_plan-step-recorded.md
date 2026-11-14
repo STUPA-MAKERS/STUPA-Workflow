@@ -2,9 +2,9 @@
 id: "000825"
 title: A person records a passed step
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_version_passes_the_steps_of_its_budget"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_step_with_a_vote_is_not_recorded_by_hand"

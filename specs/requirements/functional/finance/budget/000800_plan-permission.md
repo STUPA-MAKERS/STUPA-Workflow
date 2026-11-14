@@ -2,9 +2,9 @@
 id: "000800"
 title: A plan write needs budget.structure
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/unit/modules/budget/test_plan_router.py:test_write_route_needs_budget_structure"
   - "backend/tests/unit/modules/budget/test_plan_router.py:test_get_plan_follows_the_read_rule_of_the_cost_centre"

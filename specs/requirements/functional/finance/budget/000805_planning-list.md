@@ -2,9 +2,9 @@
 id: "000805"
 title: The list of Planung shows the plan as a tree
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
 implementation:

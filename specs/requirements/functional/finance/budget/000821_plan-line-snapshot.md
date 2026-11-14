@@ -2,9 +2,9 @@
 id: "000821"
 title: A decided version keeps the name and the key of each line
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_budget_without_steps_goes_from_draft_into_force"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_version_passes_the_steps_of_its_budget"

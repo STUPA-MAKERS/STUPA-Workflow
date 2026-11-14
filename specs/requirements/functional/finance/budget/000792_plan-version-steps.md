@@ -2,9 +2,9 @@
 id: "000792"
 title: A plan version passes the steps of its budget
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_can_enter_force"
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_can_return_to_draft"

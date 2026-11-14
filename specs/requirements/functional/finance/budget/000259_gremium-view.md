@@ -2,9 +2,9 @@
 id: "000259"
 title: Gremium members see their cost centres
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_gremium_of_the_view_must_exist"
 implementation:

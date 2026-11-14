@@ -2,9 +2,9 @@
 id: "000808"
 title: The plan page lists income and expenses in two tables
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
 implementation:

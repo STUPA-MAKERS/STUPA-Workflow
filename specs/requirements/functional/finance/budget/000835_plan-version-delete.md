@@ -2,9 +2,9 @@
 id: "000835"
 title: A draft version can be deleted
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_draft_version_is_deleted"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
