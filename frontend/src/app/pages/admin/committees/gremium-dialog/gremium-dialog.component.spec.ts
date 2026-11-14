@@ -103,11 +103,14 @@ describe('GremiumDialogComponent', () => {
     expect(api.getGremiumMailRecipients).toHaveBeenCalledWith('g-1');
   });
 
-  /** The switches are the guest ballot, delegation, delegation to externals and the public page. */
+  /**
+   * The switches are the guest ballot, delegation, delegation to externals, delegation in
+   * elections and the public page.
+   */
   it('has no switch to change a ballot after casting', async () => {
     await setup(STUPA);
     expect(screen.queryByText(/Stimme nach Abgabe/)).toBeNull();
-    expect(screen.getAllByRole('switch')).toHaveLength(4);
+    expect(screen.getAllByRole('switch')).toHaveLength(5);
   });
 
   /** The quorum is a percent, so 150 becomes 100. */
@@ -135,6 +138,8 @@ describe('GremiumDialogComponent', () => {
       allowVoteDelegation: true,
       delegationLeadMinutes: 30,
       delegationAllowExternal: true,
+      delegationMaxPerDelegate: 2,
+      delegationInElections: false,
       quorumPercent: 100,
       quorumMinPresent: 1000,
       repeatQuorumPercent: null,
@@ -173,6 +178,8 @@ describe('GremiumDialogComponent', () => {
       allowVoteDelegation: true,
       delegationLeadMinutes: 0,
       delegationAllowExternal: false,
+      delegationMaxPerDelegate: 2,
+      delegationInElections: false,
       quorumPercent: 40,
       quorumMinPresent: null,
       repeatQuorumPercent: null,
