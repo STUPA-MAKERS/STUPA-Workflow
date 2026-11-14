@@ -100,7 +100,9 @@ def test_the_header_names_the_kind_the_place_and_the_form() -> None:
     """
     head = 'sitzungsart: "Wiederholungssitzung"\nort: "Raum 9-108"\nform: "Hybrid"\n'
     doc = build_document(BACKEND_DOC.replace("protokoll: ", head + "protokoll: "), variant=None)
-    assert doc["data"][2:6] == [
+    data = doc["data"]
+    assert isinstance(data, list)
+    assert data[2:6] == [
         ["Sitzungsart", "Wiederholungssitzung"],
         ["Ort", "Raum 9-108"],
         ["Form", "Hybrid"],
@@ -108,7 +110,13 @@ def test_the_header_names_the_kind_the_place_and_the_form() -> None:
     ]
     head = 'sitzungsart: "Ordentliche Sitzung"\nform: "Präsenz"\n'
     doc = build_document(BACKEND_DOC.replace("protokoll: ", head + "protokoll: "), variant=None)
-    assert [row[0] for row in doc["data"][2:5]] == ["Sitzungsart", "Form", "Protokoll"]
+    data = doc["data"]
+    assert isinstance(data, list)
+    assert data[2:5] == [
+        ["Sitzungsart", "Ordentliche Sitzung"],
+        ["Form", "Präsenz"],
+        ["Protokoll", "Berta Beispiel"],
+    ]
 
 
 def test_title_falls_back_to_gremium_and_date() -> None:
