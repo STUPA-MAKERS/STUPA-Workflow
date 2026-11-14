@@ -50,7 +50,7 @@ interface LegFree {
  * "Frei danach" on each (the free amount now struck through, the amount after the
  * transfer), "Richtung tauschen", then the amount beside the fiscal year and the
  * description over the full width (one column in a narrow pane). The main action names
- * the amount ("500,00 € übertragen"). The edit has the amount and the description beside
+ * the amount ("500,00 € umschichten"). The edit has the amount and the description beside
  * the fiscal year, the dates and the note.
  *
  * Edit: the two cost centres of a transfer are fixed on the server, so the legs show

@@ -205,10 +205,10 @@ describe('TransferFormComponent', () => {
     expect(text()).toMatch(/Frei danach ?11\.150,00 € 10\.650,00 €/);
     expect(text()).toMatch(/Frei danach ?7\.100,00 € 7\.600,00 €/);
     expect(document.querySelectorAll('s')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /^500,00\s€ übertragen$/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^500,00\s€ umschichten$/ })).toBeDisabled();
     host.dialogs.tDescription.set('Zuschuss');
     view.fixture.detectChanges();
-    expect(screen.getByRole('button', { name: /^500,00\s€ übertragen$/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^500,00\s€ umschichten$/ })).toBeEnabled();
   });
 
   it('swaps the direction and keeps the year inside one budget', async () => {
@@ -276,7 +276,7 @@ describe('TransferFormComponent', () => {
     host.dialogs.tAmount.set('20');
     host.dialogs.tDescription.set('Zuschuss');
     view.fixture.detectChanges();
-    await user.click(screen.getByRole('button', { name: /^20,00\s€ übertragen$/ }));
+    await user.click(screen.getByRole('button', { name: /^20,00\s€ umschichten$/ }));
     expect(create).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Schließen' }));
     expect(host.dialogs.transferOpen()).toBe(false);

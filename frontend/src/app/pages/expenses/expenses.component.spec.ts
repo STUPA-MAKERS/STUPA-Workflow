@@ -2407,7 +2407,7 @@ describe('ExpensesComponent — transfers tab', () => {
   it('shows an empty state and reports a failed load', async () => {
     const ctx = await setup();
     await openTransfers(ctx, transferPage([], 0));
-    expect(screen.getByText('Keine Überträge gefunden.')).toBeInTheDocument();
+    expect(screen.getByText('Keine Umschichtungen gefunden.')).toBeInTheDocument();
     ctx.http.verify();
   });
 
@@ -2604,7 +2604,7 @@ describe('ExpensesComponent — transfers tab', () => {
       .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET')
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
     ctx.detectChanges();
-    expect(screen.getByText('Keine Überträge gefunden.')).toBeInTheDocument();
+    expect(screen.getByText('Keine Umschichtungen gefunden.')).toBeInTheDocument();
     ctx.http.verify();
   });
 
