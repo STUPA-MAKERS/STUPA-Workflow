@@ -198,6 +198,27 @@ describe('AdminGremienComponent', () => {
     expect(toast.success).toHaveBeenCalledWith('Vorgaben gespeichert.');
   });
 
+  /** §F/meetings/voting/000902 */
+  it('shows the repeat quorum only for a Gremium that has one', async () => {
+    const list = clone(GREMIEN);
+    const api = makeApi({
+      listGremien: jest.fn(() =>
+        of([
+          { ...list[0], repeatQuorumPercent: 25 },
+          { ...list[1], repeatQuorumPercent: null },
+        ]),
+      ),
+    });
+    await setup({ api });
+    await userEvent.click(screen.getByRole('button', { name: /^Studierendenparlament/ }));
+    const stupa = item('Studierendenparlament');
+    expect(
+      within(stupa).getByText('Quorum der Wiederholungssitzung').nextElementSibling?.textContent?.trim(),
+    ).toBe('25 %');
+    await userEvent.click(screen.getByRole('button', { name: /^AStA/ }));
+    expect(within(item('AStA')).queryByText('Quorum der Wiederholungssitzung')).toBeNull();
+  });
+
   /** Opening again reads the recipients only once. */
   it('opens and closes a row with a press on the row', async () => {
     const { api } = await setup();
