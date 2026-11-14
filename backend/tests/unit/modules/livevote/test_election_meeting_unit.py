@@ -259,13 +259,13 @@ async def test_votes_for_reads_an_election() -> None:
     sess = _QueueSession(
         executes=[
             res(row),
+            res((mid, 3)),
             res(),
             res(
                 (row.id, encode_election_choice(["c1"])),
                 (row.id, encode_election_choice(["c1"])),
                 (row.id, encode_election_choice(["c2"])),
             ),
-            res((mid, 3)),
         ]
     )
     out = await MeetingService(sess)._votes_for([mid])  # type: ignore[arg-type]
@@ -286,7 +286,7 @@ async def test_votes_for_marks_a_missed_quorum_of_an_election() -> None:
         "quorum": {"type": "count", "value": 5},
     }
     row = _election_row(meeting_id=mid, result="rejected", config=config)
-    sess = _QueueSession(executes=[res(row), res(), res(), res((mid, 3))])
+    sess = _QueueSession(executes=[res(row), res((mid, 3)), res(), res()])
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
     assert item.failed_reason == "quorum"
 

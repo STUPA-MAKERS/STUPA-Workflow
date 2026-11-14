@@ -132,6 +132,7 @@ async def test_overview_member_rows() -> None:
         name="AStA",
         slug="asta",
         quorum_percent=50,
+        quorum_min_present=None,
         protocols_public=True,
         allow_vote_delegation=False,
     )
@@ -140,6 +141,7 @@ async def test_overview_member_rows() -> None:
         name="STUPA",
         slug="stupa",
         quorum_percent=None,
+        quorum_min_present=None,
         protocols_public=None,
         allow_vote_delegation=True,
     )
@@ -174,6 +176,7 @@ async def test_overview_view_all_marks_foreign_gremien() -> None:
         name="STUPA",
         slug="stupa",
         quorum_percent=None,
+        quorum_min_present=None,
         protocols_public=False,
         allow_vote_delegation=False,
     )

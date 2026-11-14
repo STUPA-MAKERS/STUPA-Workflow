@@ -632,8 +632,8 @@ async def test_votes_for_closed_revealed() -> None:
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((vrow.id, "yes"), (vrow.id, "no")),
             res((mid, 2)),
+            res((vrow.id, "yes"), (vrow.id, "no")),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -657,8 +657,8 @@ async def test_votes_for_open_hidden() -> None:
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((vrow.id, "yes")),
             res((mid, 3)),
+            res((vrow.id, "yes")),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -681,8 +681,8 @@ async def test_votes_for_open_all_voted_stays_hidden() -> None:
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((vrow.id, "yes"), (vrow.id, "yes")),
             res((mid, 2)),
+            res((vrow.id, "yes"), (vrow.id, "yes")),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -731,8 +731,8 @@ async def test_votes_for_config_not_dict() -> None:
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res(),
             res((mid, 0)),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -2433,6 +2433,9 @@ class _FakeMeetingService:
         return self._meeting_out.gremium_id
 
     async def gremium_quorum_percent(self, gremium_id: UUID) -> int | None:
+        return None
+
+    async def gremium_quorum_min_present(self, gremium_id: UUID) -> int | None:
         return None
 
     async def vote_eligible_count(self, gremium_id: UUID) -> int:

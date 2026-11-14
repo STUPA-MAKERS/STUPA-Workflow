@@ -182,6 +182,7 @@ def gremium_row(**kw: Any) -> Any:
         "delegation_lead_minutes": 0,
         "delegation_allow_external": False,
         "quorum_percent": None,
+        "quorum_min_present": None,
         "protocols_public": False,
         "protocol_recipients": [],
     }
@@ -319,12 +320,8 @@ async def test_create_gremium_ok() -> None:
     Queue: ``_gremium_by_slug`` finds no row, ``ensure_forced_roles`` finds no role, then
     the two audit results.
     """
-    s, sess = svc(
-        [res(), res(), *audit_results()]
-    )
-    out = await s.create_gremium(
-        GremiumCreate(name="Neu", slug="neu", quorumPercent=10), "admin"
-    )
+    s, sess = svc([res(), res(), *audit_results()])
+    out = await s.create_gremium(GremiumCreate(name="Neu", slug="neu", quorumPercent=10), "admin")
     assert out.name == "Neu"
     assert sess.committed == 1
 
@@ -437,9 +434,7 @@ async def test_delete_gremium_removes_the_files_of_the_to_do_comments(
     storage = object()
     seen: list[tuple[Any, ...]] = []
 
-    async def _drop(
-        self: FilesService, owner: str, ids: list[Any], *, actor: str
-    ) -> list[str]:
+    async def _drop(self: FilesService, owner: str, ids: list[Any], *, actor: str) -> list[str]:
         seen.append(("drop", self.storage, owner, list(ids), actor, list(session.deleted)))
         return ["k1", "k2"]
 
@@ -448,9 +443,7 @@ async def test_delete_gremium_removes_the_files_of_the_to_do_comments(
 
     monkeypatch.setattr(FilesService, "drop_for_messages", _drop)
     monkeypatch.setattr(FilesService, "remove_objects", _remove)
-    session = FakeSession(
-        [*todo_locks(c1, c2), res(), res(), *audit_results()], scalars=[row]
-    )
+    session = FakeSession([*todo_locks(c1, c2), res(), res(), *audit_results()], scalars=[row])
     s = ConfigService(session, storage=storage)  # type: ignore[arg-type]
     await s.delete_gremium(row.id, _ADMIN)
     assert seen == [
@@ -653,9 +646,7 @@ async def test_set_gremium_mail_recipients_empty_clears_the_column() -> None:
     gid = uuid.uuid4()
     row = gremium_row(id=gid, protocol_recipients=["old@x.de"])
     s, _ = svc([*audit_results()], gets=[row])
-    out = await s.set_gremium_mail_recipients(
-        gid, GremiumMailRecipients(recipients=[]), "admin"
-    )
+    out = await s.set_gremium_mail_recipients(gid, GremiumMailRecipients(recipients=[]), "admin")
     assert out.recipients == []
     assert row.protocol_recipients == []
 
@@ -917,9 +908,7 @@ async def test_create_global_flow_version_fresh_no_existing_version() -> None:
     7. and 8. the audit.
     """
     graph = _two_state_graph()
-    s, sess = svc(
-        [res(), res(), res(), res(), res(), res(), *audit_results()]
-    )
+    s, sess = svc([res(), res(), res(), res(), res(), res(), *audit_results()])
     out = await s.create_global_flow_version(FlowVersionCreate(graph=graph), "admin")
     assert out.active is True
     assert out.version == 1
@@ -1070,9 +1059,7 @@ async def test_update_role_permissions_only_label_none() -> None:
         [res(), *audit_results(), res("application.archive")],
         gets=[role],
     )
-    out = await s.update_role(
-        role.id, RoleUpdate(permissions=["application.archive"]), "admin"
-    )
+    out = await s.update_role(role.id, RoleUpdate(permissions=["application.archive"]), "admin")
     assert role.name_i18n == {"de": "Alt"}
     assert out.permissions == ["application.archive"]
 
@@ -1157,8 +1144,9 @@ async def test_set_principal_active_activate() -> None:
 async def test_set_principal_active_deactivate_other() -> None:
     """Queue: the session delete, the audit results, the assignments."""
     principal = principal_row(active=True, sub="someone")
-    s, _ = svc([res(), *audit_results(), res(assignment_row(principal_id=principal.id))],
-               gets=[principal])
+    s, _ = svc(
+        [res(), *audit_results(), res(assignment_row(principal_id=principal.id))], gets=[principal]
+    )
     out = await s.set_principal_active(principal.id, False, "admin")
     assert out.active is False
     assert len(out.assignments) == 1
@@ -1220,9 +1208,7 @@ async def test_create_group_mapping_ok() -> None:
     """Queue: the role, then the two audit results."""
     role = role_row()
     s, sess = svc([*audit_results()], gets=[role])
-    out = await s.create_group_mapping(
-        GroupMappingCreate(oidcGroup="grp", roleId=role.id), "admin"
-    )
+    out = await s.create_group_mapping(GroupMappingCreate(oidcGroup="grp", roleId=role.id), "admin")
     assert out.oidc_group == "grp"
     assert sess.committed == 1
 
@@ -1259,17 +1245,13 @@ async def test_update_group_mapping_role_not_found() -> None:
     row = mapping_row()
     s, _ = svc(gets=[row, None])
     with pytest.raises(NotFoundError):
-        await s.update_group_mapping(
-            row.id, GroupMappingUpdate(roleId=uuid.uuid4()), "admin"
-        )
+        await s.update_group_mapping(row.id, GroupMappingUpdate(roleId=uuid.uuid4()), "admin")
 
 
 async def test_update_group_mapping_not_found() -> None:
     s, _ = svc(gets=[None])
     with pytest.raises(NotFoundError):
-        await s.update_group_mapping(
-            uuid.uuid4(), GroupMappingUpdate(oidcGroup="x"), "admin"
-        )
+        await s.update_group_mapping(uuid.uuid4(), GroupMappingUpdate(oidcGroup="x"), "admin")
 
 
 async def test_delete_group_mapping_ok() -> None:
@@ -1529,9 +1511,7 @@ async def test_create_public_gremium_audits_the_flag(monkeypatch: pytest.MonkeyP
         "app.modules.admin.service.gremien.GremiumRoleService.ensure_forced_roles", _roles
     )
     s, _ = svc([res()])
-    out = await s.create_gremium(
-        GremiumCreate(name="FS", slug="fs", protocolsPublic=True), "admin"
-    )
+    out = await s.create_gremium(GremiumCreate(name="FS", slug="fs", protocolsPublic=True), "admin")
     assert out.protocols_public is True
     assert entries[-1]["data"] == {"protocolsPublic": True}
 
