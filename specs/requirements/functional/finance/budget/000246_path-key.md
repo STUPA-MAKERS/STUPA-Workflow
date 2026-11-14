@@ -4,7 +4,7 @@ title: A cost centre has a stable path key
 kind: functional
 status: draft
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-14
 tests:
   - "backend/tests/integration/modules/budget/test_budget_tree_service.py:test_rename_key_recomputes_descendant_paths"
   - "backend/tests/unit/modules/budget/test_plan_router.py:test_the_node_schemas_refuse_what_they_cannot_store"
@@ -21,7 +21,7 @@ scope:
 
 # A cost centre has a stable path key
 
-A cost centre must have a `key` and a server-made `path_key`, for example `VS-800-04`. A `key` must hold only letters and digits, at most 64; a key with a line feed at its end
+A cost centre must have a `key` and a server-made `path_key` (its form: 000878). A `key` must hold only letters and digits, at most 64; a key with a line feed at its end
 must answer 422. The parent of a cost centre must not
 change. A person with `budget.structure` can change the `key`, and the platform must then
 make the `path_key` of the cost centre and of each cost centre below it again. A `key` that a sibling has must answer 409 `budget_key_exists`, also when two requests

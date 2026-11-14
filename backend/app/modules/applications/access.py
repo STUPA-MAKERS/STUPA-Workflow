@@ -284,7 +284,7 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
     the result does not. Both functions must cover the same three paths:
 
     1. the ``view_gremium_id`` of the cost center of the application and of each of
-       its ancestors (the ``path_key`` prefixes, as ``can_view_node`` reads them), and
+       its ancestors (the prefixes of the tree path, as ``can_view_node`` reads them), and
        each Gremium that decides the plan of its Haushalt in a step (spec 000890);
     2. the deciding Gremium of the current vote state (``application.vote_gremium_id``);
     3. the Gremium of each meeting that voted on the application.
@@ -309,14 +309,14 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
         return set()
     budget_id, vote_gremium_id = row
     path_key = (
-        await db.scalar(select(Budget.path_key).where(Budget.id == budget_id))
+        await db.scalar(select(Budget.tree_path).where(Budget.id == budget_id))
         if budget_id is not None
         else None
     )
     segments = path_key.split(_SEP) if path_key is not None else []
     prefixes = [_SEP.join(segments[: i + 1]) for i in range(len(segments))]
     views = (
-        await db.scalars(select(Budget.view_gremium_id).where(Budget.path_key.in_(prefixes)))
+        await db.scalars(select(Budget.view_gremium_id).where(Budget.tree_path.in_(prefixes)))
         if path_key is not None
         else ()
     )
@@ -325,7 +325,7 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
             select(BudgetPlanStep.gremium_id)
             .join(Budget, Budget.id == BudgetPlanStep.budget_id)
             .where(
-                Budget.path_key == prefixes[0],
+                Budget.tree_path == prefixes[0],
                 Budget.parent_id.is_(None),
                 Budget.plan_enabled.is_(True),
             )

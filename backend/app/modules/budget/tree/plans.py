@@ -1065,6 +1065,20 @@ class PlanOps(NodeOps, AllocationOps):
                 f"budget key {key!r} already exists under this parent",
                 code="budget_key_exists",
             )
+        if key is not None and plan_rules.path_key_clash(
+            plan_rules.draft_paths(
+                top.id,
+                top.tree_path,
+                {n.id: n.parent_id for n in nodes},
+                {n.id: n.key for n in nodes},
+                {**{ln.budget_id: ln.draft_key for ln in lines}, node.id: key},
+            ),
+            {n.id: n.path_key for n in nodes},
+        ):
+            raise ConflictError(
+                f"budget key {key!r} gives a path key that another cost centre has",
+                code="budget_path_key_exists",
+            )
         before = {"name": line.draft_name, "key": line.draft_key}
         wanted = {
             **({"draft_key": None if key == node.key else key} if key is not None else {}),
@@ -1242,7 +1256,7 @@ class PlanOps(NodeOps, AllocationOps):
         """Return the path key of each cost center as the draft with `lines` sets it."""
         paths = plan_rules.draft_paths(
             top.id,
-            top.path_key,
+            top.tree_path,
             {n.id: n.parent_id for n in nodes},
             {n.id: n.key for n in nodes},
             {line.budget_id: line.draft_key for line in lines},
@@ -1276,14 +1290,18 @@ class PlanOps(NodeOps, AllocationOps):
         """Give each cost center the name and the key of its line (spec 000877).
 
         The line holds neither afterwards, so a later version starts from the cost
-        center. Each rename is an entry in the audit log.
+        center. Each rename is an entry in the audit log. A parent comes before the
+        cost centers below it, so each path key is made from the new key above it.
 
         Raises:
             ConflictError: `budget_key_exists` (409) when a sibling took the key
                 after the draft named it.
         """
         by_id = {n.id: n for n in nodes}
-        renamed = [ln for ln in lines if ln.draft_name is not None or ln.draft_key is not None]
+        renamed = sorted(
+            (ln for ln in lines if ln.draft_name is not None or ln.draft_key is not None),
+            key=lambda ln: by_id[ln.budget_id].tree_path.count("-"),
+        )
         for line in renamed:
             await self._apply_rename(version, line, by_id[line.budget_id])
 
@@ -1962,12 +1980,15 @@ class PlanOps(NodeOps, AllocationOps):
                 f"budget key {payload.key!r} already exists under this parent",
                 code="budget_key_exists",
             )
+        tree_path = tree_rules.compose_tree_path(parent.tree_path, payload.key)
+        await self._require_free_path_keys({tree_rules.path_key_of(tree_path)}, payload.key)
         node = Budget(
             id=uuid.uuid4(),
             parent_id=parent.id,
             gremium_id=parent.gremium_id,
             key=payload.key,
-            path_key=tree_rules.compose_path_key(parent.path_key, payload.key),
+            path_key=tree_rules.path_key_of(tree_path),
+            tree_path=tree_path,
             name=payload.name,
         )
         self.session.add(node)

@@ -61,11 +61,11 @@ def _applied(*clauses: ColumnElement[bool] | None) -> tuple[ColumnElement[bool],
 
 
 def _subtree_ids(node: Budget) -> Select[UUID]:
-    """Select the ids of `node` and of every node below it, by the path-key prefix."""
+    """Select the ids of `node` and of every node below it, by the prefix of the tree path."""
     return select(Budget.id).where(
         or_(
-            Budget.path_key == node.path_key,
-            Budget.path_key.like(node.path_key + _SEP + "%"),
+            Budget.tree_path == node.tree_path,
+            Budget.tree_path.like(node.tree_path + _SEP + "%"),
         )
     )
 
@@ -121,7 +121,7 @@ class BudgetTreeServiceBase:
 
         A node is visible when a member Gremium reads the node itself or an ancestor
         (`access.viewed_by`). This is the set form of `TreeViewOps.can_view_node`: the
-        matching root paths open their whole subtree through the ``path_key`` prefix.
+        matching root paths open their whole subtree through the prefix of the tree path.
         A holder of the full budget view needs no filter and does not call this.
 
         A path segment is alphanumeric (`tree_rules.is_valid_key`), so the prefix holds
@@ -131,14 +131,14 @@ class BudgetTreeServiceBase:
             return set()
         root_paths = (
             await self.session.scalars(
-                select(Budget.path_key).where(viewed_by(member_gremium_ids))
+                select(Budget.tree_path).where(viewed_by(member_gremium_ids))
             )
         ).all()
         if not root_paths:
             return set()
         scoped = or_(
             *[
-                or_(Budget.path_key == rp, Budget.path_key.like(f"{rp}{_SEP}%"))
+                or_(Budget.tree_path == rp, Budget.tree_path.like(f"{rp}{_SEP}%"))
                 for rp in root_paths
             ]
         )
@@ -230,10 +230,10 @@ class BudgetTreeServiceBase:
 
         It is the first path segment and holds `parent_id IS NULL`.
         """
-        top_path = node.path_key.split(_SEP, 1)[0]
+        top_path = node.tree_path.split(_SEP, 1)[0]
         top = (
             await self.session.execute(
-                select(Budget).where(Budget.path_key == top_path, Budget.parent_id.is_(None))
+                select(Budget).where(Budget.tree_path == top_path, Budget.parent_id.is_(None))
             )
         ).scalar_one_or_none()
         if top is None:

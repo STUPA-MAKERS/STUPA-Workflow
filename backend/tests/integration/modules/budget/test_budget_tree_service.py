@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.budget.tree.service import BudgetTreeService
+from app.modules.budget.tree.service_base import _subtree_ids
 from app.modules.budget.tree_models import Budget
 from app.modules.budget.tree_schemas import (
     AllocationSet,
@@ -144,16 +145,47 @@ async def test_rename_key_recomputes_descendant_paths(session: AsyncSession) -> 
     top = await svc.create_node(BudgetNodeCreate(key=f"RK{_suffix()}", name="Top", gremiumId=g.id))
     mid = await svc.create_node(BudgetNodeCreate(key="800", name="Mid", parentId=top.id))
     leaf = await svc.create_node(BudgetNodeCreate(key="04", name="Leaf", parentId=mid.id))
-    assert leaf.path_key == f"{top.path_key}-800-04"
+    assert leaf.path_key == f"{top.path_key}-80004"
 
     out = await svc.update_node(mid.id, BudgetNodeUpdate(key="810", name="Mid"))
     assert out.path_key == f"{top.path_key}-810"
     leaf_row = await session.get(Budget, leaf.id)
-    assert leaf_row is not None and leaf_row.path_key == f"{top.path_key}-810-04"
+    assert leaf_row is not None and leaf_row.path_key == f"{top.path_key}-81004"
+    assert leaf_row.tree_path == f"{top.path_key}-810-04"
 
     await svc.create_node(BudgetNodeCreate(key="900", name="Sib", parentId=top.id))
     with pytest.raises(ConflictError):
         await svc.update_node(mid.id, BudgetNodeUpdate(key="900"))
+
+
+async def test_a_path_key_that_another_cost_centre_has_is_refused(session: AsyncSession) -> None:
+    """Two Kostenstellen never share a path key, and a subtree is found by the tree.
+
+    `80` with the child `133` and `801` with the child `33` would both be `…-80133`.
+    Rule: §F/finance/budget/000878.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"PK{_suffix()}", name="Top", gremiumId=g.id))
+    short = await svc.create_node(BudgetNodeCreate(key="80", name="Kurz", parentId=top.id))
+    long = await svc.create_node(BudgetNodeCreate(key="801", name="Lang", parentId=top.id))
+    leaf = await svc.create_node(BudgetNodeCreate(key="33", name="Blatt", parentId=long.id))
+    assert leaf.path_key == f"{top.path_key}-80133"
+
+    with pytest.raises(ConflictError) as created:
+        await svc.create_node(BudgetNodeCreate(key="133", name="Gleich", parentId=short.id))
+    assert created.value.code == "budget_path_key_exists"
+    kid = await svc.create_node(BudgetNodeCreate(key="5", name="Kind", parentId=short.id))
+    other = await svc.create_node(BudgetNodeCreate(key="7", name="Sieben", parentId=top.id))
+    await svc.create_node(BudgetNodeCreate(key="0133", name="Tief", parentId=other.id))
+    with pytest.raises(ConflictError) as renamed:
+        await svc.update_node(other.id, BudgetNodeUpdate(key="8"))
+    assert renamed.value.code == "budget_path_key_exists"
+
+    short_row = await session.get(Budget, short.id)
+    assert short_row is not None
+    below = set((await session.scalars(_subtree_ids(short_row))).all())
+    assert below == {short.id, kid.id}
 
 
 async def test_transfer(session: AsyncSession) -> None:

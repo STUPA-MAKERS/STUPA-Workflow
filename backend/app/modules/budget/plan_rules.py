@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Any, Literal, assert_never
 from uuid import UUID
 
-from app.modules.budget.tree_rules import compose_path_key
+from app.modules.budget.tree_rules import compose_tree_path, path_key_of
 
 PlanState = Literal["draft", "in_progress", "in_force", "replaced"]
 #: The states a person can ask for. The platform sets the other two: `in_progress`
@@ -365,9 +365,22 @@ def draft_paths(
     def path(node: UUID) -> str:
         parent = parent_of[node]
         above = top_path if parent is None or parent == top_id else path(parent)
-        return compose_path_key(above, draft_key_of.get(node) or key_of[node])
+        return compose_tree_path(above, draft_key_of.get(node) or key_of[node])
 
-    return {node: path(node) for node in parent_of if node != top_id}
+    return {node: path_key_of(path(node)) for node in parent_of if node != top_id}
+
+
+def path_key_clash(draft: Mapping[UUID, str], now: Mapping[UUID, str]) -> bool:
+    """Say if a draft gives two cost centers one path key (spec 000878).
+
+    `draft` holds the path key of each cost center as the draft sets it, `now` the
+    path key that each has. A path key that another cost center has now counts too,
+    because the keys apply one after the other when the version comes into force.
+    """
+    owner = {path: node for node, path in now.items()}
+    return len(set(draft.values())) != len(draft) or any(
+        owner.get(path, node) != node for node, path in draft.items()
+    )
 
 
 def key_taken(

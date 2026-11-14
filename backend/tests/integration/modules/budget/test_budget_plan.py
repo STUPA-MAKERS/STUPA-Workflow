@@ -754,8 +754,8 @@ async def test_a_version_exports_with_the_year_before_and_the_version_before(
     assert [(g.group, g.amount) for g in first.groups] == [("income", D(100)), ("expense", D(100))]
     assert [(r.key.split("-", 1)[1], r.name, r.depth, r.amount) for r in first.groups[1].rows] == [
         ("8", "Zuschüsse", 0, D(100)),
-        ("8-1", "Fachschaften", 1, D(60)),
-        ("8-2", "AKs", 1, D(40)),
+        ("81", "Fachschaften", 1, D(60)),
+        ("82", "AKs", 1, D(40)),
     ]
     assert first.balance == D(0)
 
@@ -971,7 +971,7 @@ async def test_create_a_cost_centre_in_a_draft(session: AsyncSession) -> None:
         select(Budget).where(Budget.parent_id == t.exp.id, Budget.key == "3")
     )
     assert node is not None
-    assert node.path_key.endswith("-8-3")
+    assert node.path_key.endswith("-83")
     assert next(x for x in _version(out).lines if x.budget_id == node.id).side == "expense"
     assert _amounts(_version(out))[node.id] == D(5)
     assert _amounts(_version(out))[t.exp.id] == D(105)
@@ -1868,7 +1868,11 @@ async def test_two_creates_of_one_key_answer_a_conflict(
     async def _free(self: BudgetTreeService, parent_id: object, key: str) -> bool:
         return False
 
+    async def _unchecked(self: BudgetTreeService, *_args: object) -> None:
+        return None
+
     monkeypatch.setattr(BudgetTreeService, "_sibling_exists", _free)
+    monkeypatch.setattr(BudgetTreeService, "_require_free_path_keys", _unchecked)
     with pytest.raises(ConflictError) as taken:
         await t.svc.create_node(BudgetNodeCreate(key="1", name="Doppelt", parentId=t.exp.id))
     assert _code(taken) == "budget_key_exists"
@@ -2303,7 +2307,11 @@ async def test_a_key_taken_at_the_same_moment_is_a_conflict(
     async def _unseen(_parent: object, _key: str) -> bool:
         return False
 
+    async def _unchecked(*_args: object) -> None:
+        return None
+
     monkeypatch.setattr(t.svc, "_sibling_exists", _unseen)
+    monkeypatch.setattr(t.svc, "_require_free_path_keys", _unchecked)
     with pytest.raises(ConflictError) as taken:
         await t.svc.create_plan_node(
             vid, PlanNodeCreate(parentId=t.exp.id, key="1", name="Doppelt")
@@ -2946,16 +2954,16 @@ async def test_a_draft_gives_a_cost_centre_its_new_name_and_key(session: AsyncSe
     assert _code(in_draft) == "budget_key_exists"
     await session.commit()
     shown = {line.budget_id: (line.name, line.path_key, line.key) for line in _version(plan).lines}
-    assert shown[t.exp_a.id] == ("Fachschaftsräte", f"{top}-9-5", "5")
-    assert shown[t.exp_b.id] == (None, f"{top}-9-2", None)
+    assert shown[t.exp_a.id] == ("Fachschaftsräte", f"{top}-95", "5")
+    assert shown[t.exp_b.id] == (None, f"{top}-92", None)
     assert shown[t.exp.id] == (None, f"{top}-9", "9")
     assert shown[t.inc.id] == (None, None, None)
     node = await session.get_one(Budget, t.exp_a.id)
-    assert (node.name, node.key, node.path_key) == ("Fachschaften", "1", f"{top}-8-1")
+    assert (node.name, node.key, node.path_key) == ("Fachschaften", "1", f"{top}-81")
 
     back = await t.svc.rename_line(vid, t.exp.id, PlanLineRename(key="8"))
     kept = await t.svc.rename_line(vid, t.exp_a.id, PlanLineRename(name="Fachschaften"))
-    assert {ln.budget_id: ln.path_key for ln in _version(back).lines}[t.exp_a.id] == f"{top}-8-5"
+    assert {ln.budget_id: ln.path_key for ln in _version(back).lines}[t.exp_a.id] == f"{top}-85"
     assert {ln.budget_id: ln.name for ln in _version(kept).lines}[t.exp_a.id] is None
     await t.svc.rename_line(vid, t.exp.id, PlanLineRename(key="9"))
     await t.svc.rename_line(vid, t.exp_a.id, PlanLineRename(name="Fachschaftsräte"))
@@ -2963,17 +2971,17 @@ async def test_a_draft_gives_a_cost_centre_its_new_name_and_key(session: AsyncSe
     await session.commit()
     export = await t.svc.plan_export(vid, date(2026, 11, 13))
     rows = {r.key: r.name for g in export.groups for r in g.rows}
-    assert rows[f"{top}-9-5"] == "Fachschaftsräte"
-    assert rows[f"{top}-9-2"] == "AKs"
+    assert rows[f"{top}-95"] == "Fachschaftsräte"
+    assert rows[f"{top}-92"] == "AKs"
 
     done = _version(await _in_force_from(t, vid))
     decided = {line.budget_id: (line.name, line.path_key, line.key) for line in done.lines}
-    assert decided[t.exp_a.id] == ("Fachschaftsräte", f"{top}-9-5", None)
+    assert decided[t.exp_a.id] == ("Fachschaftsräte", f"{top}-95", None)
     await session.refresh(node)
-    assert (node.name, node.key, node.path_key) == ("Fachschaftsräte", "5", f"{top}-9-5")
+    assert (node.name, node.key, node.path_key) == ("Fachschaftsräte", "5", f"{top}-95")
     other = await session.get_one(Budget, t.exp_b.id)
     await session.refresh(other)
-    assert other.path_key == f"{top}-9-2"
+    assert other.path_key == f"{top}-92"
     income = await session.get_one(Budget, t.inc.id)
     await session.refresh(income)
     assert (income.name, income.key) == ("Semesterbeiträge", "1")
@@ -3013,15 +3021,32 @@ async def test_a_version_in_progress_keeps_the_new_name_on_its_way_back(
     waiting = _version(await t.svc.set_state_by_hand(vid, _by_hand("in_progress", 0)))
     await session.commit()
     kept = {line.budget_id: (line.name, line.path_key, line.key) for line in waiting.lines}
-    assert kept[t.exp_b.id] == ("Arbeitskreise", f"{top}-8-7", None)
-    assert kept[t.exp_a.id] == ("Fachschaften", f"{top}-8-1", None)
+    assert kept[t.exp_b.id] == ("Arbeitskreise", f"{top}-87", None)
+    assert kept[t.exp_a.id] == ("Fachschaften", f"{top}-81", None)
     again = _version(await t.svc.set_state_by_hand(vid, _by_hand("draft")))
     await session.commit()
     draft = {line.budget_id: (line.name, line.path_key, line.key) for line in again.lines}
-    assert draft[t.exp_b.id] == ("Arbeitskreise", f"{top}-8-7", "7")
+    assert draft[t.exp_b.id] == ("Arbeitskreise", f"{top}-87", "7")
     node = await session.get_one(Budget, t.exp_b.id)
     assert (node.name, node.key) == ("AKs", "2")
     await t.svc.delete_version(vid)
     await session.commit()
     await session.refresh(node)
-    assert (node.name, node.key, node.path_key) == ("AKs", "2", f"{top}-8-2")
+    assert (node.name, node.key, node.path_key) == ("AKs", "2", f"{top}-82")
+
+
+async def test_a_draft_key_that_gives_a_taken_path_key_is_refused(session: AsyncSession) -> None:
+    """A key in a draft must not give the path key of another Kostenstelle.
+
+    The Titel `1` with the key `81` would be `…-81`, as the Kostenstelle `1` below the
+    Titel `8` is. A key that gives a free path key is taken.
+    Rule: §F/finance/budget/000878.
+    """
+    t = await _tree(session)
+    vid = _version(await _balanced_draft(t)).id
+    with pytest.raises(ConflictError) as clash:
+        await t.svc.rename_line(vid, t.inc.id, PlanLineRename(key="81"))
+    assert _code(clash) == "budget_path_key_exists"
+    plan = await t.svc.rename_line(vid, t.inc.id, PlanLineRename(key="83"))
+    shown = {line.budget_id: line.path_key for line in _version(plan).lines}
+    assert shown[t.inc.id] == f"{t.top.path_key}-83"

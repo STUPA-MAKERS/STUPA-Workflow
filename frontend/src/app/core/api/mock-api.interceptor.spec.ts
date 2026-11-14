@@ -435,7 +435,7 @@ describe('mockApiInterceptor', () => {
       const tree = await get<N[]>('/api/budgets');
       expect(tree).toHaveLength(1);
       const root = tree[0];
-      expect(root.children[1].children[0].pathKey).toBe('HH-200-210');
+      expect(root.children[1].children[0].pathKey).toBe('HH-200210');
       const a = root.byFiscalYear[0];
       expect(Number(a.available)).toBe(Number(a.allocated) - Number(a.committed) + Number(a.income));
       const gestaltung = root.children[1].children[2];
@@ -455,7 +455,7 @@ describe('mockApiInterceptor', () => {
       expect(all.length).toBe(5);
       const fs = await get<A[]>('/api/budgets/b1000000-0000-0000-0000-000000000020/applications');
       expect(fs.length).toBe(3);
-      expect(fs.every((x) => x.pathKey.startsWith('HH-200-'))).toBe(true);
+      expect(fs.every((x) => x.pathKey.startsWith('HH-200'))).toBe(true);
       const old = await get<A[]>(
         `/api/budgets/${root}/applications`,
         new HttpParams().set('fiscalYear', 'f1000000-0000-0000-0000-000000000002'),

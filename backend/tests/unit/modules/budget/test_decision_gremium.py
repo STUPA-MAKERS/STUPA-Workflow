@@ -97,10 +97,11 @@ async def test_decision_gremium_of_unknown_node() -> None:
 async def test_create_node_with_a_decision_gremium() -> None:
     """A node gets its decision Gremium.
 
-    The fake session serves the sibling check (none) and the Gremium lookup.
+    The fake session serves the sibling check (none), the check of the path key (free)
+    and the Gremium lookup.
     """
     g = uuid.uuid4()
-    sess = fake_session(result(), result(g))
+    sess = fake_session(result(), result(), result(g))
     out = await BudgetTreeService(sess).create_node(
         BudgetNodeCreate(key="VS", name="VS", decisionGremiumId=g)
     )
@@ -109,7 +110,7 @@ async def test_create_node_with_a_decision_gremium() -> None:
 
 
 async def test_create_node_refuses_an_unknown_gremium() -> None:
-    sess = fake_session(result(), result())
+    sess = fake_session(result(), result(), result())
     with pytest.raises(ValidationProblem) as err:
         await BudgetTreeService(sess).create_node(
             BudgetNodeCreate(key="VS", name="VS", decisionGremiumId=uuid.uuid4())
@@ -120,13 +121,13 @@ async def test_create_node_refuses_an_unknown_gremium() -> None:
 async def test_create_child_inherits_in_the_response() -> None:
     """A child shows the inherited decision Gremium in the response.
 
-    The fake session serves the parent, the sibling check, then the ancestors of the
-    parent.
+    The fake session serves the parent, the sibling check, the check of the path key,
+    then the ancestors of the parent.
     """
     g = uuid.uuid4()
     parent = _budget(path_key="VS", key="VS")
     sess = fake_session(
-        result(parent), result(), result("VS"), result((parent.id, None, g))
+        result(parent), result(), result(), result("VS"), result((parent.id, None, g))
     )
     out = await BudgetTreeService(sess).create_node(
         BudgetNodeCreate(key="8", name="Ressort", parentId=parent.id)

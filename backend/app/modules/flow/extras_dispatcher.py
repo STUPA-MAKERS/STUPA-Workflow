@@ -197,8 +197,8 @@ class FlowExtrasActionDispatcher:
             subtree = (
                 (
                     or_(
-                        Budget.path_key == parent_path,
-                        Budget.path_key.like(parent_path + _SEP + "%"),
+                        Budget.tree_path == parent_path,
+                        Budget.tree_path.like(parent_path + _SEP + "%"),
                     ),
                 )
                 if parent_path is not None
@@ -426,10 +426,10 @@ async def _walk_up(session: AsyncSession, node: Budget, seen: frozenset[UUID]) -
 
 
 async def _parent_path(session: AsyncSession, parent_ref: object) -> str | None:
-    """Return the `path_key` of the `parentId` node, or `None` when it does not resolve."""
+    """Return the tree path of the `parentId` node, or `None` when it does not resolve."""
     parent_id = _parse_budget_uuid("assignBudgetFromApplicantGremium parentId", parent_ref)
     return (
-        await session.scalar(select(Budget.path_key).where(Budget.id == parent_id))
+        await session.scalar(select(Budget.tree_path).where(Budget.id == parent_id))
         if parent_id is not None
         else None
     )

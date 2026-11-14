@@ -328,6 +328,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000875](requirements/functional/finance/budget/000875_plan-export.md) | A version of a Haushaltsplan exports as XLSX and as PDF | approved |
 | [F/finance/budget/000876](requirements/functional/finance/budget/000876_plan-in-protocol.md) | A plan on the agenda is an Anlage of the protocol | approved |
 | [F/finance/budget/000877](requirements/functional/finance/budget/000877_rename-in-draft.md) | A Kostenstelle of a Haushalt with a plan gets a new key or name in a draft | approved |
+| [F/finance/budget/000878](requirements/functional/finance/budget/000878_path-key-one-hyphen.md) | The path key of a Kostenstelle has one hyphen | approved |
 | [F/finance/budget/000889](requirements/functional/finance/budget/000889_year-before-needs-plan.md) | The columns of the year before show only when that year has a plan | approved |
 | [F/finance/budget/000890](requirements/functional/finance/budget/000890_deciding-gremium-reads-haushalt.md) | A Gremium that decides a plan reads the Haushalt | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |

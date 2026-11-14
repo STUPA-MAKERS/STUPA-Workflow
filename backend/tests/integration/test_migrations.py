@@ -2219,3 +2219,87 @@ def test_a_plan_of_the_switch_goes_back_to_the_draft(
             text("SELECT count(*) FROM budget_plan WHERE fiscal_year_id = :fy"),
             {"fy": t["closed"]},
         ).scalar_one() == 0
+
+
+def _old_tree(conn: Connection, paths: tuple[str, ...]) -> dict[str, object]:
+    """Insert cost centers by their path keys in the form before 9c1f5d3a7e42."""
+    ids: dict[str, object] = {}
+    for path in paths:
+        parent, _, key = path.rpartition("-")
+        ids[path] = conn.execute(
+            text(
+                "INSERT INTO budget (key, path_key, name, parent_id) "
+                "VALUES (:k, :p, :k, :parent) RETURNING id"
+            ),
+            {"k": key, "p": path, "parent": ids.get(parent)},
+        ).scalar_one()
+    return ids
+
+
+def test_path_keys_take_the_form_with_one_hyphen(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration 9c1f5d3a7e42: the path key has one hyphen, the tree path keeps the tree.
+
+    The line of a decided plan takes the new form too. The way back gives the path key
+    with a hyphen per level again. Rule: §F/finance/budget/000878.
+    """
+    command.downgrade(alembic_cfg, "4b8e2f6c1a93")
+    with engine.begin() as conn:
+        ids = _old_tree(conn, ("MIGP", "MIGP-801", "MIGP-801-33"))
+        fy = conn.execute(
+            text(
+                "INSERT INTO fiscal_year (budget_id, year, start_date, end_date) "
+                "VALUES (:b, 2026, '2026-01-01', '2026-12-31') RETURNING id"
+            ),
+            {"b": ids["MIGP"]},
+        ).scalar_one()
+        version = _plan_version(conn, fy, "in_force")
+        conn.execute(
+            text(
+                "INSERT INTO budget_plan_line (version_id, budget_id, amount, name, path_key) "
+                "VALUES (:v, :b, 7, 'alt', 'MIGP-801-33')"
+            ),
+            {"v": version, "b": ids["MIGP-801-33"]},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text("SELECT tree_path, path_key FROM budget WHERE tree_path LIKE 'MIGP%'")
+        ).all()
+        assert {(row[0], row[1]) for row in rows} == {
+            ("MIGP", "MIGP"), ("MIGP-801", "MIGP-801"), ("MIGP-801-33", "MIGP-80133"),
+        }
+        assert conn.execute(
+            text("SELECT path_key FROM budget_plan_line WHERE version_id = :v"), {"v": version}
+        ).scalar_one() == "MIGP-80133"
+
+    command.downgrade(alembic_cfg, "4b8e2f6c1a93")
+    with engine.begin() as conn:
+        assert set(
+            conn.execute(text("SELECT path_key FROM budget WHERE path_key LIKE 'MIGP%'")).scalars()
+        ) == {"MIGP", "MIGP-801", "MIGP-801-33"}
+    command.upgrade(alembic_cfg, "head")
+
+
+def test_two_cost_centres_with_one_path_key_stop_the_upgrade(
+    alembic_cfg: Config, engine: Engine
+) -> None:
+    """Migration 9c1f5d3a7e42 names the cost centers that would share a path key.
+
+    It changes no row before it stops. Rule: §F/finance/budget/000878.
+    """
+    command.downgrade(alembic_cfg, "4b8e2f6c1a93")
+    with engine.begin() as conn:
+        _old_tree(conn, ("MIGQ", "MIGQ-80", "MIGQ-80-133", "MIGQ-801", "MIGQ-801-33"))
+    try:
+        with pytest.raises(RuntimeError, match="MIGQ-80133 for MIGQ-80-133, MIGQ-801-33"):
+            command.upgrade(alembic_cfg, "head")
+        with engine.begin() as conn:
+            assert conn.execute(
+                text("SELECT count(*) FROM budget WHERE path_key = 'MIGQ-80-133'")
+            ).scalar_one() == 1
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM budget WHERE path_key LIKE 'MIGQ-80%-%'"))
+            conn.execute(text("DELETE FROM budget WHERE path_key LIKE 'MIGQ%'"))
+        command.upgrade(alembic_cfg, "head")

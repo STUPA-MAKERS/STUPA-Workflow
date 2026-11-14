@@ -49,7 +49,7 @@ class AssignmentOps(BudgetTreeServiceBase):
     ) -> list[BudgetApplicationOut]:
         """List the applications of this cost center **and of its subtree**.
 
-        The subtree comes from the ``path_key`` prefix: the node itself (``==``)
+        The subtree comes from the prefix of the tree path: the node itself (``==``)
         or a descendant (``LIKE path||'-%'``). ``stage`` comes from the
         ``budget_entry``, which is 1:1 per application. An optional fiscal year
         filters the result. The newest application comes first.

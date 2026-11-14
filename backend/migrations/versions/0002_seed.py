@@ -101,6 +101,7 @@ _budget = sa.table(
     sa.column("gremium_id", sa.Uuid),
     sa.column("key", sa.Text),
     sa.column("path_key", sa.Text),
+    sa.column("tree_path", sa.Text),
     sa.column("name", sa.Text),
     sa.column("color", sa.Text),
 )
@@ -341,6 +342,7 @@ def _flatten(nodes: list, parent_path: str, parent_id: str | None, out: list) ->
                 "gremium_id": None,
                 "key": key,
                 "path_key": path_key,
+                "tree_path": path_key,
                 "name": name,
                 "color": None,
             }
@@ -436,6 +438,7 @@ def upgrade() -> None:
             "gremium_id": _STUPA_ID,
             "key": "VSM",
             "path_key": "VSM",
+            "tree_path": "VSM",
             "name": "VS-Mittel",
             "color": None,
         },
@@ -445,6 +448,7 @@ def upgrade() -> None:
             "gremium_id": _STUPA_ID,
             "key": "QSM",
             "path_key": "QSM",
+            "tree_path": "QSM",
             "name": "QS-Mittel",
             "color": None,
         },

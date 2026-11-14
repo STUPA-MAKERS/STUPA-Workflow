@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
@@ -244,7 +244,9 @@ class NodeOps(BudgetTreeServiceBase):
             ).scalar_one_or_none()
             if gremium is None:
                 raise NotFoundError(f"gremium {payload.gremium_id} not found")
-        parent_path = parent.path_key if parent is not None else None
+        tree_path = tree_rules.compose_tree_path(
+            parent.tree_path if parent is not None else None, payload.key
+        )
         gremium_id = parent.gremium_id if parent is not None else payload.gremium_id
 
         if await self._sibling_exists(payload.parent_id, payload.key):
@@ -252,6 +254,7 @@ class NodeOps(BudgetTreeServiceBase):
                 f"budget key {payload.key!r} already exists under this parent",
                 code="budget_key_exists",
             )
+        await self._require_free_path_keys({tree_rules.path_key_of(tree_path)}, payload.key)
         await self._check_gremium(payload.decision_gremium_id, "decisionGremiumId")
 
         node = Budget(
@@ -259,7 +262,8 @@ class NodeOps(BudgetTreeServiceBase):
             parent_id=payload.parent_id,
             gremium_id=gremium_id,
             key=payload.key,
-            path_key=tree_rules.compose_path_key(parent_path, payload.key),
+            path_key=tree_rules.path_key_of(tree_path),
+            tree_path=tree_path,
             name=payload.name,
             currency=payload.currency,
             active=payload.active,
@@ -288,6 +292,27 @@ class NodeOps(BudgetTreeServiceBase):
         decision = await self._decision_view(node)
         await self.session.commit()
         return _node_out(node, decision)
+
+    async def _require_free_path_keys(
+        self, path_keys: set[str], key: str, own: Collection[UUID] = ()
+    ) -> None:
+        """Refuse a key that gives a path key that another cost center has (spec 000878).
+
+        `own` holds the cost centers that get the path keys, so they do not count.
+
+        Raises:
+            ConflictError: `budget_path_key_exists` (409).
+        """
+        taken = await self.session.scalar(
+            select(Budget.id)
+            .where(Budget.path_key.in_(path_keys), Budget.id.not_in(own))
+            .limit(1)
+        )
+        if taken is not None:
+            raise ConflictError(
+                f"budget key {key!r} gives a path key that another cost centre has",
+                code="budget_path_key_exists",
+            )
 
     async def _sibling_exists(self, parent_id: UUID | None, key: str) -> bool:
         existing = (
@@ -375,7 +400,7 @@ class NodeOps(BudgetTreeServiceBase):
         return _node_out(node, decision)
 
     async def _rename_key(self, node: Budget, new_key: str) -> None:
-        """Rename the `key` of a node and re-derive the `path_key` of its subtree.
+        """Rename the `key` of a node and re-derive the paths of its subtree.
 
         The descendants are fetched by path prefix before the node is renamed.
 
@@ -388,7 +413,8 @@ class NodeOps(BudgetTreeServiceBase):
 
         Raises:
             ValidationProblem: The new key segment is invalid (422).
-            ConflictError: A sibling already uses the key (409).
+            ConflictError: A sibling already uses the key, or another cost center
+                has the path key that the key gives (409).
         """
         if not tree_rules.is_valid_key(new_key):
             raise ValidationProblem(
@@ -403,23 +429,29 @@ class NodeOps(BudgetTreeServiceBase):
                 code="budget_key_exists",
             )
         parent_path = (
-            (await self._get_node(node.parent_id)).path_key if node.parent_id is not None else None
+            (await self._get_node(node.parent_id)).tree_path
+            if node.parent_id is not None
+            else None
         )
-        old_path = node.path_key
-        new_path = tree_rules.compose_path_key(parent_path, new_key)
+        old_path = node.tree_path
+        new_path = tree_rules.compose_tree_path(parent_path, new_key)
         descendants = (
             (
                 await self.session.execute(
-                    select(Budget).where(Budget.path_key.like(old_path + _SEP + "%"))
+                    select(Budget).where(Budget.tree_path.like(old_path + _SEP + "%"))
                 )
             )
             .scalars()
             .all()
         )
+        moved = {n.id: new_path + n.tree_path[len(old_path) :] for n in (node, *descendants)}
+        await self._require_free_path_keys(
+            {tree_rules.path_key_of(path) for path in moved.values()}, new_key, moved
+        )
         node.key = new_key
-        node.path_key = new_path
-        for d in descendants:
-            d.path_key = new_path + d.path_key[len(old_path) :]
+        for n in (node, *descendants):
+            n.tree_path = moved[n.id]
+            n.path_key = tree_rules.path_key_of(moved[n.id])
         try:
             await self.session.flush()
         except IntegrityError as exc:

@@ -88,11 +88,11 @@ class TreeViewOps(BudgetTreeServiceBase):
         if not member_gremium_ids:
             return False
         node = await self._get_node(budget_id)
-        segments = node.path_key.split(_SEP)
+        segments = node.tree_path.split(_SEP)
         prefixes = [_SEP.join(segments[: i + 1]) for i in range(len(segments))]
         hit = await self.session.scalar(
             select(Budget.id)
-            .where(Budget.path_key.in_(prefixes), viewed_by(member_gremium_ids))
+            .where(Budget.tree_path.in_(prefixes), viewed_by(member_gremium_ids))
             .limit(1)
         )
         return hit is not None
@@ -158,14 +158,14 @@ class TreeViewOps(BudgetTreeServiceBase):
         """
         nodes = sorted(
             (await self.session.execute(select(Budget))).scalars().all(),
-            key=lambda b: _natural_path_key(b.path_key),
+            key=lambda b: _natural_path_key(b.tree_path),
         )
         allocs = (await self.session.execute(select(BudgetAllocation))).scalars().all()
         app_rows = (
             await self.session.execute(
                 select(
                     Application.id,
-                    Budget.path_key,
+                    Budget.tree_path,
                     Application.fiscal_year_id,
                     Application.amount,
                     func.coalesce(Application.approved_amount, Application.amount),
@@ -184,7 +184,7 @@ class TreeViewOps(BudgetTreeServiceBase):
         expense_rows = (
             await self.session.execute(
                 select(
-                    Budget.path_key,
+                    Budget.tree_path,
                     BudgetExpense.fiscal_year_id,
                     BudgetExpense.amount,
                     BudgetExpense.kind,
@@ -217,7 +217,7 @@ class TreeViewOps(BudgetTreeServiceBase):
                 n.parent_id,
                 n.gremium_id,
                 n.key,
-                n.path_key,
+                n.tree_path,
                 n.name,
                 n.currency,
                 n.active,
