@@ -30,6 +30,7 @@ from app.shared.search import escape_like
 if TYPE_CHECKING:
     from app.modules.flow.dispatch import ActionDispatcher
 
+
 @dataclass(frozen=True, slots=True)
 class _ResolvedApplicant:
     """The applicant of a capture.
@@ -231,6 +232,5 @@ class OnBehalfOps(CreateOps):
             )
         ).all()
         return [
-            ApplicantCandidateOut(id=r.id, displayName=r.display_name, email=r.email)
-            for r in rows
+            ApplicantCandidateOut(id=r.id, displayName=r.display_name, email=r.email) for r in rows
         ]

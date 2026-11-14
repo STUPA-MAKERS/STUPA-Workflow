@@ -32,10 +32,7 @@ _UPGRADE: tuple[str, ...] = (
 _DOWNGRADE: tuple[str, ...] = (
     "UPDATE protocol SET status = 'draft' WHERE status = 'rendering'",
     "ALTER TABLE protocol DROP CONSTRAINT IF EXISTS protocol_status",
-    (
-        "ALTER TABLE protocol ADD CONSTRAINT protocol_status "
-        "CHECK (status IN ('draft','final'))"
-    ),
+    ("ALTER TABLE protocol ADD CONSTRAINT protocol_status CHECK (status IN ('draft','final'))"),
 )
 
 

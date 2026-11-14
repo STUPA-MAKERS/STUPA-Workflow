@@ -24,7 +24,6 @@ if TYPE_CHECKING:  # pragma: no cover - types only
     from openpyxl.worksheet.worksheet import Worksheet
 
 
-
 class _Allocation(Protocol):
     """The sums of one cost center in one fiscal year, as the budget sheet reads them."""
 
@@ -89,9 +88,7 @@ class _ApplicationRow(Protocol):
     def state_since(self) -> datetime | None: ...
 
 
-XLSX_MEDIA_TYPE = (
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def _num(value: Decimal | float | None) -> float | None:
@@ -125,9 +122,7 @@ def _cell_width(cell: object) -> int:
     return len(str(cell)) if cell is not None else 0
 
 
-def _column_widths(
-    headers: Sequence[str], rows: Sequence[Sequence[object]]
-) -> tuple[int, ...]:
+def _column_widths(headers: Sequence[str], rows: Sequence[Sequence[object]]) -> tuple[int, ...]:
     """Return the length of the longest cell of each column, the header included."""
     return tuple(
         max((len(str(header)), *(_cell_width(row[i]) for row in rows)))
@@ -168,9 +163,7 @@ def _workbook_bytes(workbook: Workbook) -> bytes:
     return buf.getvalue()
 
 
-def _iter_nodes(
-    nodes: Iterable[_BudgetNode], depth: int = 0
-) -> Iterable[tuple[int, _BudgetNode]]:
+def _iter_nodes(nodes: Iterable[_BudgetNode], depth: int = 0) -> Iterable[tuple[int, _BudgetNode]]:
     for node in nodes:
         yield depth, node
         yield from _iter_nodes(node.children, depth + 1)
@@ -263,7 +256,7 @@ def _unique_title(label: str, used: Set[str]) -> str:
 
     The name holds 31 characters at most and none of the characters `[]:*?/\`.
     """
-    safe = ("".join("_" if c in '[]:*?/\\' else c for c in label).strip() or "HHJ")[:31]
+    safe = ("".join("_" if c in "[]:*?/\\" else c for c in label).strip() or "HHJ")[:31]
     suffixed = (_suffixed(safe, n) for n in count(2))
     return safe if safe not in used else next(t for t in suffixed if t not in used)
 
@@ -359,7 +352,13 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
         else {"expense": "Expense", "income": "Income"}
     )
     headers = [
-        "Datum", "Art", "Beschreibung", "Kostenstelle", "Antrag", "Betrag", "Währung",
+        "Datum",
+        "Art",
+        "Beschreibung",
+        "Kostenstelle",
+        "Antrag",
+        "Betrag",
+        "Währung",
     ]
     wb = Workbook()
     ws = _first_sheet(wb.active, "Buchungen")
@@ -411,7 +410,12 @@ def build_auskunft_workbook(
 
     ws_apps = wb.create_sheet(title="Anträge")
     app_headers = [
-        "Antrags-ID", "Antragstyp", "Status", "Erstellt", "Antragsteller", "Daten (JSON)",
+        "Antrags-ID",
+        "Antragstyp",
+        "Status",
+        "Erstellt",
+        "Antragsteller",
+        "Daten (JSON)",
     ]
     _header_row(ws_apps, app_headers)
     for a in applications:

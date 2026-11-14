@@ -86,9 +86,7 @@ async def active_switches(session: AsyncSession) -> FeatureSwitches:
     """
     raw = (
         await session.scalars(
-            select(SiteConfigVersion.branding["features"]).where(
-                SiteConfigVersion.active.is_(True)
-            )
+            select(SiteConfigVersion.branding["features"]).where(SiteConfigVersion.active.is_(True))
         )
     ).first()
     return switches_of(raw)

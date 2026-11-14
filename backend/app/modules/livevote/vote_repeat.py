@@ -62,9 +62,7 @@ async def repeat_source(
     if source is None:
         raise NotFoundError(f"vote {repeat_of} not found on this agenda item")
     if source.status != "closed":
-        raise ConflictError(
-            "Only a closed vote can be repeated.", code="vote_not_closed"
-        )
+        raise ConflictError("Only a closed vote can be repeated.", code="vote_not_closed")
     others = (
         await session.execute(
             select(Vote.status, Vote.repeat_of_id).where(
@@ -127,8 +125,7 @@ async def assert_reopenable(session: AsyncSession, source: Vote) -> StatusEvent 
     event = await _branch_event(session, source.id)
     if event is None or event.to_state_id != current or event.from_state_id is None:
         raise ConflictError(
-            "The application changed its status after the vote; a repeat cannot "
-            "take it back.",
+            "The application changed its status after the vote; a repeat cannot take it back.",
             code="application_moved_on",
         )
     return event

@@ -191,9 +191,7 @@ class FlowOps(ConfigServiceBase):
         ]
         id_by_key = {state.key: row.id for state, row in added}
         state_by_key = {state.key: row for state, row in added}
-        initial_id = next(
-            (row.id for state, row in reversed(added) if state.is_initial), None
-        )
+        initial_id = next((row.id for state, row in reversed(added) if state.is_initial), None)
 
         for order, trans in enumerate(payload.graph.transitions):
             self.session.add(

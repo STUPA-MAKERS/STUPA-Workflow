@@ -17,13 +17,9 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-_UPGRADE: tuple[str, ...] = (
-    "ALTER TABLE transition ADD COLUMN IF NOT EXISTS color text",
-)
+_UPGRADE: tuple[str, ...] = ("ALTER TABLE transition ADD COLUMN IF NOT EXISTS color text",)
 
-_DOWNGRADE: tuple[str, ...] = (
-    "ALTER TABLE transition DROP COLUMN IF EXISTS color",
-)
+_DOWNGRADE: tuple[str, ...] = ("ALTER TABLE transition DROP COLUMN IF EXISTS color",)
 
 
 def upgrade() -> None:

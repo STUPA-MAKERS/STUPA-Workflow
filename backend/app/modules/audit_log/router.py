@@ -81,9 +81,7 @@ async def list_audit(
         limit=limit,
     )
     names = await service.resolve_actor_names([e.actor for e in items])
-    labels = await service.resolve_target_labels(
-        [(e.target_type, e.target_id) for e in items]
-    )
+    labels = await service.resolve_target_labels([(e.target_type, e.target_id) for e in items])
     resolved_ids = await service.resolve_data_ids([e.data for e in items])
     revertable = await service.revertable_flags(items)
     out = tuple(
@@ -91,11 +89,7 @@ async def list_audit(
             e,
             names.get(e.actor or ""),
             labels.get((e.target_type or "", e.target_id or "")),
-            {
-                k: resolved_ids[k]
-                for k in data_uuid_strings(e.data)
-                if k in resolved_ids
-            },
+            {k: resolved_ids[k] for k in data_uuid_strings(e.data) if k in resolved_ids},
             revertable=revertable.get(e.id, False),
         )
         for e in items
@@ -115,9 +109,7 @@ async def list_audit(
 )
 async def list_audit_actors(service: ServiceDep) -> list[AuditActorOut]:
     """List distinct log actors for the actor filter, with resolved names."""
-    return [
-        AuditActorOut(sub=sub, name=name) for sub, name in await service.list_actors()
-    ]
+    return [AuditActorOut(sub=sub, name=name) for sub, name in await service.list_actors()]
 
 
 @router.get(

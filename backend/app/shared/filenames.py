@@ -46,9 +46,7 @@ _JOINERS = frozenset("‌‍")
 """ZWNJ and ZWJ. Emoji sequences and several scripts need them between two visible
 characters. At an edge or next to a dot or a space they only hide something."""
 
-_STORAGE_SAFE = frozenset(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._- "
-)
+_STORAGE_SAFE = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._- ")
 
 _FALLBACK_UNSAFE = frozenset('"\\%;/')
 """ASCII characters that do not go into the quoted ``filename`` fallback. A quote or a
@@ -83,9 +81,7 @@ def _drop_char(char: str) -> bool:
 def _drop_loose_joiners(name: str) -> str:
     """Remove a ZWJ or ZWNJ that does not sit between two visible characters."""
     return "".join(
-        char
-        for i, char in enumerate(name)
-        if char not in _JOINERS or not _loose_joiner(name, i)
+        char for i, char in enumerate(name) if char not in _JOINERS or not _loose_joiner(name, i)
     )
 
 
@@ -138,9 +134,7 @@ def sanitize_display_name(filename: str | None, *, default: str = DEFAULT_NAME) 
         The display name. It never holds ``/`` or ``\`` and is never ``.`` or ``..``.
     """
     raw = unicodedata.normalize("NFC", filename or "")
-    chars = (
-        " " if unicodedata.category(c) == "Zs" else c for c in raw if not _drop_char(c)
-    )
+    chars = (" " if unicodedata.category(c) == "Zs" else c for c in raw if not _drop_char(c))
     name = _trim(_basename("".join(chars)))
     return _trim(_cap(name, DISPLAY_NAME_MAX)) or default
 
@@ -173,9 +167,7 @@ def _ascii_fallback(name: str) -> str:
     response headers do not fit its ``proxy_buffer_size`` of 4 KB.
     """
     folded = _ascii_fold(name)
-    fallback = "".join(
-        c if " " <= c <= "~" and c not in _FALLBACK_UNSAFE else "_" for c in folded
-    )
+    fallback = "".join(c if " " <= c <= "~" and c not in _FALLBACK_UNSAFE else "_" for c in folded)
     return _cap(fallback, DISPLAY_NAME_MAX) or "download"
 
 
@@ -201,10 +193,7 @@ def content_disposition(
         filename*=UTF-8''Einf%C3%BChrung%20%E2%82%AC.pdf`` (one line).
     """
     name = sanitize_display_name(filename, default=default)
-    return (
-        f'{kind}; filename="{_ascii_fallback(name)}"; '
-        f"filename*=UTF-8''{quote(name, safe='')}"
-    )
+    return f"{kind}; filename=\"{_ascii_fallback(name)}\"; filename*=UTF-8''{quote(name, safe='')}"
 
 
 TITLE_MAX = 80

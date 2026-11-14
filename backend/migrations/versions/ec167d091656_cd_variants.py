@@ -192,15 +192,9 @@ _UPGRADE: tuple[str, ...] = (
 
 _DOWNGRADE: tuple[str, ...] = (
     "DELETE FROM role_permission WHERE permission = 'admin.cd_variants'",
-    (
-        "ALTER TABLE gremium ADD COLUMN IF NOT EXISTS cd_variant text "
-        "NOT NULL DEFAULT 'stupa'"
-    ),
+    ("ALTER TABLE gremium ADD COLUMN IF NOT EXISTS cd_variant text NOT NULL DEFAULT 'stupa'"),
     _RESTORE,
-    (
-        "ALTER TABLE gremium DROP CONSTRAINT IF EXISTS "
-        "fk_gremium_cd_variant_id_cd_variant"
-    ),
+    ("ALTER TABLE gremium DROP CONSTRAINT IF EXISTS fk_gremium_cd_variant_id_cd_variant"),
     "ALTER TABLE gremium DROP COLUMN IF EXISTS cd_variant_id",
 )
 

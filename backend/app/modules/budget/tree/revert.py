@@ -55,13 +55,9 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
             case AuditAction.BUDGET_EXPENSE_UPDATE:
                 await self._revert_expense_update(UUID(target_id), data)
             case _:  # pragma: no cover - the dispatcher only passes revertable actions
-                raise ConflictError(
-                    "This budget action cannot be reverted.", code="not_revertable"
-                )
+                raise ConflictError("This budget action cannot be reverted.", code="not_revertable")
 
-    async def _revert_expense_create(
-        self, expense_id: UUID, reverted_audit_id: int
-    ) -> None:
+    async def _revert_expense_create(self, expense_id: UUID, reverted_audit_id: int) -> None:
         """Delete the booking.
 
         The linked invoice keeps its status. A booking does not set its invoice
@@ -89,16 +85,12 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         await self.session.delete(expense)
         await self.session.commit()
 
-    async def _revert_transfer_create(
-        self, transfer_id: UUID, reverted_audit_id: int
-    ) -> None:
+    async def _revert_transfer_create(self, transfer_id: UUID, reverted_audit_id: int) -> None:
         """Delete both rows of a transfer, the expense and the income."""
         rows = (
             (
                 await self.session.execute(
-                    select(BudgetExpense).where(
-                        BudgetExpense.transfer_id == transfer_id
-                    )
+                    select(BudgetExpense).where(BudgetExpense.transfer_id == transfer_id)
                 )
             )
             .scalars()
@@ -180,15 +172,11 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         """Write back the prior values that the cost-center update recorded."""
         before = data.get("before")
         if not isinstance(before, dict) or not before:
-            raise ConflictError(
-                "No prior state recorded for this change.", code="not_revertable"
-            )
+            raise ConflictError("No prior state recorded for this change.", code="not_revertable")
         await self._lock_tree(budget_id)
         node = await self.session.get(Budget, budget_id)
         if node is None:
-            raise ConflictError(
-                "Cost centre no longer exists.", code="already_reverted"
-            )
+            raise ConflictError("Cost centre no longer exists.", code="already_reverted")
         self._assert_not_stale(node, data.get("after"))
         await self.update_node(budget_id, BudgetNodeUpdate(**before))
 
@@ -246,9 +234,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         """
         before = data.get("before")
         if not isinstance(before, dict) or not before:
-            raise ConflictError(
-                "No prior state recorded for this change.", code="not_revertable"
-            )
+            raise ConflictError("No prior state recorded for this change.", code="not_revertable")
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise ConflictError("Booking no longer exists.", code="already_reverted")

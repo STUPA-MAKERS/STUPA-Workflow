@@ -99,6 +99,7 @@ class MinioStorage:
         Raises:
             StorageError: The put failed. Every client error maps to this one type.
         """
+
         def _put() -> None:
             self._ensure_bucket()
             self.client.put_object(
@@ -120,6 +121,7 @@ class MinioStorage:
         Raises:
             StorageError: The read failed.
         """
+
         def _get() -> bytes:
             response = self.client.get_object(self.bucket, key)
             try:
@@ -146,9 +148,7 @@ class MinioStorage:
         ``StorageError`` BEFORE the response starts, that is 503, not mid-stream.
         """
         try:
-            response = await asyncio.to_thread(
-                self.client.get_object, self.bucket, key
-            )
+            response = await asyncio.to_thread(self.client.get_object, self.bucket, key)
         except Exception as exc:
             raise StorageError(f"get_stream failed: {type(exc).__name__}") from exc
 

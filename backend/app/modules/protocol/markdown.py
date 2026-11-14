@@ -184,6 +184,7 @@ def sanitize_user_markdown(markdown: str) -> str:
     stripped = _strip_eval_refdefs(_PYTEX_IFFALSE_RE.sub("", markdown))
     return _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, _strip_until_clean(stripped, 3))
 
+
 #: Gremium `cd_variant` values that select a protocol render variant.
 _PROTOCOL_VARIANTS = frozenset({"stupa", "asta"})
 
@@ -225,6 +226,10 @@ class ProtocolDoc:
         excused: The excused members, a group of their own.
         started_at: The real start in local time (`YYYY-MM-DD HH:MM`), or the planned start
             when the meeting has no recorded start.
+        kind: The kind of the meeting (`ordinary`, `extraordinary`, `repeat`,
+            `constituent`). The header shows its German name.
+        location: The place of the meeting. Without it the header has no place line.
+        form: The form of the meeting (`presence`, `hybrid`, `video`).
         quorate: The quorum from the present members against the active members. `None`
             means no statement.
     """
@@ -242,8 +247,25 @@ class ProtocolDoc:
     excused: Sequence[str] = ()
     absent: Sequence[str] = ()
     started_at: str | None = None
+    kind: str | None = None
+    location: str | None = None
+    form: str | None = None
     datalines: Sequence[str] = ()
     quorate: bool | None = None
+
+
+#: The German names of the meeting kinds and forms in the protocol header.
+MEETING_KIND_LABELS: Mapping[str, str] = {
+    "ordinary": "Ordentliche Sitzung",
+    "extraordinary": "Außerordentliche Sitzung",
+    "repeat": "Wiederholungssitzung",
+    "constituent": "Konstituierende Sitzung",
+}
+MEETING_FORM_LABELS: Mapping[str, str] = {
+    "presence": "Präsenz",
+    "hybrid": "Hybrid",
+    "video": "Videokonferenz",
+}
 
 
 #: Signature block of the renderer (`unterschriften`). The frontmatter
@@ -316,6 +338,9 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
         *_yaml_entry("beginn", _hhmm(doc.start_time)),
         *_yaml_entry("ende", _hhmm(doc.end_time)),
         *_yaml_entry("started_at", doc.started_at),
+        *_yaml_entry("sitzungsart", MEETING_KIND_LABELS.get(doc.kind or "")),
+        *_yaml_entry("ort", doc.location or None),
+        *_yaml_entry("form", MEETING_FORM_LABELS.get(doc.form or "")),
         *_yaml_entry("protokoll", doc.protokollant),
         *_yaml_keepers(doc.keepers),
         *_yaml_list("anwesend", doc.present),
@@ -340,9 +365,7 @@ def build_protocol_document(doc: ProtocolDoc) -> str:
     return "\n".join([*_frontmatter(doc), "", *([body] if body else [])]).rstrip() + "\n"
 
 
-def guest_vote_note(
-    present_members: int | None, present_guests: int | None, cast: int
-) -> str:
+def guest_vote_note(present_members: int | None, present_guests: int | None, cast: int) -> str:
     """Describe the base of a vote with guests, as counts and never as names.
 
     Such a vote has no quorum; the majority of the cast ballots decides. The line
@@ -611,9 +634,7 @@ def _claim(
     return assigned if k is None else {**assigned, k: n}
 
 
-def _assign_blocks(
-    texts: Sequence[tuple[str, ...]], snippets: Sequence[str]
-) -> Mapping[int, int]:
+def _assign_blocks(texts: Sequence[tuple[str, ...]], snippets: Sequence[str]) -> Mapping[int, int]:
     """Assign each block to at most one vote: the exact text first, then the head line."""
     empty: Mapping[int, int] = {}
     exact = reduce(partial(_claim, _whole, texts), enumerate(snippets), empty)

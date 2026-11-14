@@ -23,8 +23,7 @@ depends_on: str | Sequence[str] | None = None
 
 _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE principal ADD COLUMN IF NOT EXISTS calendar_token text",
-    "CREATE UNIQUE INDEX IF NOT EXISTS uq_principal_calendar_token "
-    "ON principal (calendar_token)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_principal_calendar_token ON principal (calendar_token)",
 )
 
 _DOWNGRADE: tuple[str, ...] = (

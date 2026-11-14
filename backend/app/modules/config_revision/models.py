@@ -33,9 +33,7 @@ class ConfigRevision(Base):
 
     __tablename__ = "config_revision"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        primary_key=True, server_default=func.gen_random_uuid()
-    )
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=func.gen_random_uuid())
     #: 'form' | 'flow' | 'site_config'.
     entity_type: Mapped[str] = mapped_column(Text)
     #: UUID string (form: application_type_id) or 'global' (flow/site_config).
@@ -48,9 +46,7 @@ class ConfigRevision(Base):
     )
     #: OIDC ``sub`` of the actor that caused the change (no PII).
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         UniqueConstraint(

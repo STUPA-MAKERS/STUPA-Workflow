@@ -163,9 +163,7 @@ async def discover(issuer: str) -> OidcEndpoints:
     return await _fetch_endpoints(issuer)
 
 
-async def authorization_url(
-    settings: Settings, *, state: str, challenge: str, nonce: str
-) -> str:
+async def authorization_url(settings: Settings, *, state: str, challenge: str, nonce: str) -> str:
     """Build the authorize URL for the authorization code flow with PKCE.
 
     Raises:
@@ -251,9 +249,7 @@ def _find_key(keys: list[dict[str, Any]], kid: object) -> dict[str, Any] | None:
 async def _jwk_for(issuer: str, kid: object) -> dict[str, Any] | None:
     """Find the key of `kid` in the cached JWKS, with one forced reload on a miss."""
     cached = _find_key(await _get_jwks(issuer, force=False), kid)
-    return (
-        cached if cached is not None else _find_key(await _get_jwks(issuer, force=True), kid)
-    )
+    return cached if cached is not None else _find_key(await _get_jwks(issuer, force=True), kid)
 
 
 async def _signing_key(settings: Settings, id_token: str) -> Any:  # noqa: ANN401
@@ -378,9 +374,7 @@ async def verify_refreshed_id_token(
     return OidcClaims(
         sub=fresh.sub,
         email=fresh.email if "email" in claims else cached.email,
-        name=fresh.name
-        if ("name" in claims or "preferred_username" in claims)
-        else cached.name,
+        name=fresh.name if ("name" in claims or "preferred_username" in claims) else cached.name,
         groups=fresh.groups if settings.oidc_groups_claim in claims else cached.groups,
         email_verified=fresh.email_verified,
     )

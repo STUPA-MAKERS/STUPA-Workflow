@@ -59,7 +59,5 @@ def document_ids_in(*texts: str | None) -> list[UUID]:
 
     The order is the order of the first appearance, and every id comes once.
     """
-    found = (
-        UUID(match.group(1)) for text in texts if text for match in _DOC_REF_RE.finditer(text)
-    )
+    found = (UUID(match.group(1)) for text in texts if text for match in _DOC_REF_RE.finditer(text))
     return list(dict.fromkeys(found))

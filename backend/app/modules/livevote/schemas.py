@@ -39,6 +39,15 @@ MeetingTitle = Annotated[
 ]
 
 
+#: The kind of a meeting. ``repeat`` is the Wiederholungssitzung with its own quorum.
+MeetingKind = Literal["ordinary", "extraordinary", "repeat", "constituent"]
+MeetingForm = Literal["presence", "hybrid", "video"]
+MEETING_LOCATION_MAX = 200
+MeetingLocation = Annotated[
+    str, StringConstraints(strip_whitespace=True, max_length=MEETING_LOCATION_MAX)
+]
+
+
 class MeetingCreate(FrozenCamelModel, frozen=True):
     """``POST /api/meetings`` — create a meeting (status ``planned``)."""
 
@@ -50,9 +59,14 @@ class MeetingCreate(FrozenCamelModel, frozen=True):
     end_time: _time | None = Field(default=None, alias="endTime")
     #: The protokollant must be a member of the Gremium.
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
-    #: Public participation with the QR code, and what the admitted guests do.
+    kind: MeetingKind = "ordinary"
+    #: The place as free text. An empty text means no place.
+    location: MeetingLocation | None = None
+    form: MeetingForm = "presence"
+    #: Public participation with the QR code, and what the admitted guests do. Without
+    #: a mode the guests vote where the Gremium allows it, and only watch elsewhere.
     public_join: bool = Field(default=False, alias="publicJoin")
-    guests_mode: GuestsMode = Field(default="vote", alias="guestsMode")
+    guests_mode: GuestsMode | None = Field(default=None, alias="guestsMode")
 
     @model_validator(mode="after")
     def _end_after_start(self) -> MeetingCreate:
@@ -83,6 +97,11 @@ class MeetingPatch(FrozenCamelModel, frozen=True):
     start_time: _time | None = Field(default=None, alias="startTime")
     end_time: _time | None = Field(default=None, alias="endTime")
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
+    #: The kind changes only while the meeting is ``planned`` (409). The place and the
+    #: form change like the title. ``location: null`` clears the place.
+    kind: MeetingKind | None = None
+    location: MeetingLocation | None = None
+    form: MeetingForm | None = None
     #: Public participation and the guest mode. Both need ``canManage``. Switching
     #: ``publicJoin`` off voids the open requests and removes the admitted guests.
     public_join: bool | None = Field(default=None, alias="publicJoin")
@@ -93,8 +112,9 @@ class MeetingPatch(FrozenCamelModel, frozen=True):
 
     @model_validator(mode="after")
     def _at_least_one(self) -> MeetingPatch:
-        if "title" in self.model_fields_set and self.title is None:
-            raise ValueError("title must not be null")
+        for name in ("title", "kind", "form"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} must not be null")
         if (
             self.complete_agenda_item_id is not None
             and "current_agenda_item_id" not in self.model_fields_set
@@ -107,6 +127,9 @@ class MeetingPatch(FrozenCamelModel, frozen=True):
             "end_time",
             "protokollant_id",
             "current_agenda_item_id",
+            "kind",
+            "location",
+            "form",
         } & self.model_fields_set
         public = self.public_join is not None or self.guests_mode is not None
         if (
@@ -117,8 +140,8 @@ class MeetingPatch(FrozenCamelModel, frozen=True):
         ):
             raise ValueError(
                 "at least one of 'status', 'activeApplicationId', 'currentAgendaItemId', "
-                "'title', 'date', 'startTime', 'endTime', 'protokollantId', 'publicJoin' or "
-                "'guestsMode' required"
+                "'title', 'date', 'startTime', 'endTime', 'protokollantId', 'kind', 'location', "
+                "'form', 'publicJoin' or 'guestsMode' required"
             )
         return self
 
@@ -152,9 +175,7 @@ class MeetingVoteOut(FrozenCamelModel, frozen=True):
     #: open and on ``passed`` or ``tie``.
     failed_reason: Literal["quorum", "majority"] | None = Field(default=None, alias="failedReason")
     #: The rules of the vote, for the vote card.
-    majority_rule: MajorityRule = Field(
-        default="simple", alias="majorityRule"
-    )
+    majority_rule: MajorityRule = Field(default="simple", alias="majorityRule")
     secret: bool = False
     quorum: Quorum | None = None
     #: The real open time (``opens_at``) and the real end time (close or cancel).
@@ -230,6 +251,9 @@ class MeetingOut(FrozenCamelModel, frozen=True):
     #: The close sets this field. It fills the end line of the protocol title page.
     closed_at: _datetime | None = Field(default=None, alias="closedAt")
     status: MeetingStatus
+    kind: MeetingKind = "ordinary"
+    location: str | None = None
+    form: MeetingForm = "presence"
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
     #: The agenda item the room handles now. Followers and the beamer follow it.
     current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
@@ -273,9 +297,9 @@ class MeetingOut(FrozenCamelModel, frozen=True):
     join_code: str | None = Field(default=None, alias="joinCode")
     admitted_guests: int = Field(default=0, alias="admittedGuests")
     pending_guests: int = Field(default=0, alias="pendingGuests")
-    #: Public participation only in a gremium without a quorum. The
-    #: settings switch is off and explained when this is false.
-    public_join_allowed: bool = Field(default=True, alias="publicJoinAllowed")
+    #: The Gremium lets admitted guests vote: its switch is on and it has no quorum.
+    #: When this is false the guests only watch, and the mode control is locked.
+    guests_vote_allowed: bool = Field(default=False, alias="guestsVoteAllowed")
     #: The open window of a planned meeting with a date (UTC). ``opensAt`` is the
     #: earliest open. Before ``confirmUntil`` the open needs ``confirmEarly``. Both are
     #: ``None`` for a meeting without a date and for a live or closed meeting.
@@ -401,9 +425,7 @@ class MeetingVoteBody(FrozenCamelModel, frozen=True):
     agenda_item_id: UUID = Field(alias="agendaItemId")
     question: str | None = None
     options: list[str] = Field(default_factory=lambda: ["yes", "no", "abstain"])
-    majority_rule: MajorityRule = Field(
-        default="simple", alias="majorityRule"
-    )
+    majority_rule: MajorityRule = Field(default="simple", alias="majorityRule")
     #: Every vote is always secret (motion, election, poll): ``None`` or true; false
     #: gives 422 ``open_vote_unavailable``.
     secret: bool | None = None
@@ -628,6 +650,6 @@ class JoinTargetOut(FrozenCamelModel, frozen=True):
 class MeetingDefaultsOut(FrozenCamelModel, frozen=True):
     """``GET /committees/{id}/meeting-defaults`` — what a new meeting of the gremium allows."""
 
-    #: Public participation only without a quorum.
-    public_join_allowed: bool = Field(alias="publicJoinAllowed")
+    #: Admitted guests may vote: the switch of the Gremium is on and it has no quorum.
+    guests_vote_allowed: bool = Field(alias="guestsVoteAllowed")
     quorum_percent: int | None = Field(default=None, alias="quorumPercent")

@@ -63,9 +63,7 @@ def election_config(vote: Vote) -> ElectionConfig:
 
 
 def _invalid_choice(msg: str) -> ValidationProblem:
-    return ValidationProblem(
-        "Invalid election ballot.", errors=[{"field": "choice", "msg": msg}]
-    )
+    return ValidationProblem("Invalid election ballot.", errors=[{"field": "choice", "msg": msg}])
 
 
 def stored_choice(config: ElectionConfig, choice: str | list[str]) -> str:

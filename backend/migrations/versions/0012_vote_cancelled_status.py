@@ -33,10 +33,7 @@ _UPGRADE: tuple[str, ...] = (
 _DOWNGRADE: tuple[str, ...] = (
     "UPDATE vote SET status = 'closed' WHERE status = 'cancelled'",
     "ALTER TABLE vote DROP CONSTRAINT IF EXISTS vote_status",
-    (
-        "ALTER TABLE vote ADD CONSTRAINT vote_status "
-        "CHECK (status IN ('draft','open','closed'))"
-    ),
+    ("ALTER TABLE vote ADD CONSTRAINT vote_status CHECK (status IN ('draft','open','closed'))"),
 )
 
 

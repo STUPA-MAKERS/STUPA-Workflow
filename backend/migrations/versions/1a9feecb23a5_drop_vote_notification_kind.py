@@ -57,15 +57,10 @@ def upgrade() -> None:
             len(prefs),
         )
     templates = bind.execute(
-        sa.text(
-            "DELETE FROM mail_template "
-            f"WHERE key IN ({_DROPPED_TEMPLATES_SQL}) RETURNING key"
-        )
+        sa.text(f"DELETE FROM mail_template WHERE key IN ({_DROPPED_TEMPLATES_SQL}) RETURNING key")
     ).all()
     for (key,) in templates:
-        logger.warning(
-            "deleted the stored override of the mail template %r; no code sends it", key
-        )
+        logger.warning("deleted the stored override of the mail template %r; no code sends it", key)
 
 
 def downgrade() -> None:

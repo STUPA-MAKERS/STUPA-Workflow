@@ -211,9 +211,7 @@ def pick_fiscal_year[T](candidates: Sequence[tuple[T, date, date]], today: date)
             return None
 
 
-def is_choosable_year(
-    end: date, today: date, *, closed: bool, plan_in_force: bool | None
-) -> bool:
+def is_choosable_year(end: date, today: date, *, closed: bool, plan_in_force: bool | None) -> bool:
     """Say if a new booking or assignment can take a fiscal year (spec 000879).
 
     The year must not be closed and must not be past. `plan_in_force` is `None` for a
@@ -244,9 +242,7 @@ def fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[dat
             this to 422 instead of a 500.
     """
     if not is_valid_fiscal_start(start_month, start_day):
-        raise ValueError(
-            f"invalid fiscal start day/month: {start_day:02d}.{start_month:02d}"
-        )
+        raise ValueError(f"invalid fiscal start day/month: {start_day:02d}.{start_month:02d}")
     start = date(year, start_month, start_day)
     end = date(year + 1, start_month, start_day) - timedelta(days=1)
     return start, end
@@ -254,11 +250,7 @@ def fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[dat
 
 def fiscal_year_display(year: int, start_month: int, start_day: int) -> str:
     """Format a fiscal year: `YYYY` for a Jan 1 cutoff, else `YYYY/YY`."""
-    return (
-        str(year)
-        if start_month == 1 and start_day == 1
-        else f"{year}/{(year + 1) % 100:02d}"
-    )
+    return str(year) if start_month == 1 and start_day == 1 else f"{year}/{(year + 1) % 100:02d}"
 
 
 def resolve_decision_gremium[K, G](
@@ -306,8 +298,19 @@ def _decision_from[K, G](
 #: currency, active, color, fiscal_start_month, fiscal_start_day, view_gremium_id,
 #: decision_gremium_id.
 NodeTuple = tuple[
-    object, object | None, object | None, str, str, str, str, bool,
-    str | None, int, int, object | None, object | None,
+    object,
+    object | None,
+    object | None,
+    str,
+    str,
+    str,
+    str,
+    bool,
+    str | None,
+    int,
+    int,
+    object | None,
+    object | None,
 ]
 
 
@@ -430,8 +433,21 @@ def build_forest(
     decision_of = {n[0]: n[12] for n in nodes}
 
     def to_dict(n: NodeTuple) -> dict[str, Any]:
-        (nid, parent_id, n_gremium, key, path, name, currency, active, color,
-         fy_month, fy_day, view_gremium_id, decision_gremium_id) = n
+        (
+            nid,
+            parent_id,
+            n_gremium,
+            key,
+            path,
+            name,
+            currency,
+            active,
+            color,
+            fy_month,
+            fy_day,
+            view_gremium_id,
+            decision_gremium_id,
+        ) = n
         effective, source = resolve_decision_gremium(nid, parent_of, decision_of)
         return {
             "id": nid,
@@ -461,8 +477,4 @@ def build_forest(
         }
 
     roots = children_of.get(None, [])
-    return [
-        to_dict(r)
-        for r in roots
-        if gremium_id is None or r[2] == gremium_id
-    ]
+    return [to_dict(r) for r in roots if gremium_id is None or r[2] == gremium_id]

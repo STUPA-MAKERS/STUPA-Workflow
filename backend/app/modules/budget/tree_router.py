@@ -136,9 +136,7 @@ async def _require_node_view(
         raise ForbiddenError("no access to this cost centre")
 
 
-async def _booking_scope(
-    service: BudgetTreeService, principal: Principal
-) -> set[UUID] | None:
+async def _booking_scope(service: BudgetTreeService, principal: Principal) -> set[UUID] | None:
     """Return the gremium scope for linked bookings, or ``None`` for the full view."""
     if _has_full_view(principal):
         return None
@@ -169,9 +167,7 @@ async def list_budget_tree(
     return await service.get_tree(gremium_id=gremium_id, visible_gremium_ids=member)
 
 
-def _find_subtree(
-    roots: Sequence[BudgetTreeNodeOut], node_id: UUID
-) -> BudgetTreeNodeOut | None:
+def _find_subtree(roots: Sequence[BudgetTreeNodeOut], node_id: UUID) -> BudgetTreeNodeOut | None:
     """Return the node with `node_id` from the forest, depth first, or None."""
     hits = (node if node.id == node_id else _find_subtree(node.children, node_id) for node in roots)
     return next((hit for hit in hits if hit is not None), None)
@@ -327,9 +323,7 @@ async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
 @router.get(
     "/budget-expenses/{expense_id}/sub-bookings",
     response_model=list[ExpenseOut],
-    dependencies=[
-        Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))
-    ],
+    dependencies=[Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))],
     responses=_errors(401, 403, 404),
 )
 async def list_sub_bookings(expense_id: UUID, service: ServiceDep) -> list[ExpenseOut]:
@@ -380,9 +374,7 @@ async def book_expense(
 @router.get(
     "/expenses",
     response_model=Page[ExpenseOut],
-    dependencies=[
-        Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))
-    ],
+    dependencies=[Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))],
     responses=_errors(401, 403, 404),
 )
 async def list_expenses(
@@ -883,9 +875,7 @@ async def close_fiscal_year(
     assignments on it answer 409 `fiscal_year_closed`. A closed year stays
     closed on a second call.
     """
-    return await service.set_fiscal_year_closed(
-        budget_id, fiscal_year_id, closed=True
-    )
+    return await service.set_fiscal_year_closed(budget_id, fiscal_year_id, closed=True)
 
 
 @router.post(
@@ -900,9 +890,7 @@ async def reopen_fiscal_year(
     principal: Annotated[Principal, Depends(require_principal("budget.structure"))],
 ) -> FiscalYearOut:
     """Reopen a closed fiscal year. Its money data can change again."""
-    return await service.set_fiscal_year_closed(
-        budget_id, fiscal_year_id, closed=False
-    )
+    return await service.set_fiscal_year_closed(budget_id, fiscal_year_id, closed=False)
 
 
 @router.delete(
@@ -911,9 +899,7 @@ async def reopen_fiscal_year(
     dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(401, 403, 404, 409, 422),
 )
-async def delete_fiscal_year(
-    budget_id: UUID, fiscal_year_id: UUID, service: ServiceDep
-) -> None:
+async def delete_fiscal_year(budget_id: UUID, fiscal_year_id: UUID, service: ServiceDep) -> None:
     """Delete a fiscal year of a top-level budget.
 
     A fiscal year that still carries bookings, allocations or assigned

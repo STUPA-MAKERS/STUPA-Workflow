@@ -208,8 +208,7 @@ def _patched_config(payload: PollPatch, config: PollConfig) -> PollConfig | None
         [o.model_dump(by_alias=True, exclude_none=True) for o in payload.options]
         if payload.options is not None
         else [
-            o.model_dump(by_alias=True, exclude_none=True, exclude={"id"})
-            for o in config.options
+            o.model_dump(by_alias=True, exclude_none=True, exclude={"id"}) for o in config.options
         ]
     )
     data = {

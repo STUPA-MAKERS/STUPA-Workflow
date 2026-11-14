@@ -79,9 +79,9 @@ async def _deliver_magic_link(
         )
 
         async def deliver(recipient: str, link: str) -> None:
-            await NotificationService(
-                db, queue=queue, settings=settings
-            ).send_magic_link(email=recipient, link=link, lang=lang)
+            await NotificationService(db, queue=queue, settings=settings).send_magic_link(
+                email=recipient, link=link, lang=lang
+            )
 
         await magic_link.request_magic_link(
             db, settings, email=email, application_id=application_id, deliver=deliver
@@ -113,9 +113,7 @@ async def request_magic_link(
     constant.
     """
     pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(
-        _deliver_magic_link, settings, str(body.email), body.application_id, pool
-    )
+    background.add_task(_deliver_magic_link, settings, str(body.email), body.application_id, pool)
     return {"status": "accepted"}
 
 
@@ -178,9 +176,7 @@ async def _deliver_email_login(settings: Settings, email: str, pool: object) -> 
         async def send_link(recipient: str, link: str) -> None:
             await notifications.send_email_login(email=recipient, link=link, lang=lang)
 
-        await email_login.request_email_login(
-            db, settings, email=email, send_link=send_link
-        )
+        await email_login.request_email_login(db, settings, email=email, send_link=send_link)
         await db.commit()
 
 

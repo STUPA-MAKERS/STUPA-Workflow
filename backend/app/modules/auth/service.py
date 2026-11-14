@@ -32,6 +32,7 @@ from app.shared.errors import ForbiddenError
 
 logger = logging.getLogger("app.auth")
 
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -92,15 +93,11 @@ async def oidc_callback(
         ForbiddenError: The principal is deactivated or merged into another one.
     """
     token_set = await oidc.exchange_code(settings, code=code, verifier=verifier)
-    claims = await oidc.verify_id_token(
-        settings, id_token=token_set["id_token"], nonce=nonce
-    )
+    claims = await oidc.verify_id_token(settings, id_token=token_set["id_token"], nonce=nonce)
     row = await upsert_principal(db, claims)
     if row.active is False:
         raise ForbiddenError("Account is deactivated.")
-    await ensure_admin_for_principal(
-        db, settings, row, email_verified=claims.email_verified
-    )
+    await ensure_admin_for_principal(db, settings, row, email_verified=claims.email_verified)
     await ensure_member_for_principal(db, row)
     await sync_principal_memberships(db, row)
     now = _now()

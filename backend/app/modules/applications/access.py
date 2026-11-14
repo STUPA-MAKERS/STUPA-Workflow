@@ -95,9 +95,7 @@ class Access:
         the applicant, so the internal comments of the Gremium stay hidden.
         """
         return (
-            self.principal is not None
-            and not self._owner_as_applicant
-            and self.via != "observer"
+            self.principal is not None and not self._owner_as_applicant and self.via != "observer"
         )
 
     @property
@@ -214,9 +212,7 @@ async def _observer_access(
     )
 
 
-async def _committee_can_read(
-    db: AsyncSession, application_id: UUID, principal: Principal
-) -> bool:
+async def _committee_can_read(db: AsyncSession, application_id: UUID, principal: Principal) -> bool:
     """Check the committee read scope for one application.
 
     The scope grants read access only. It never grants write or transition
@@ -497,9 +493,7 @@ async def require_app_applicant(
     access = await require_app_edit(application_id, db, principal, applicant)
     if access.applicant is not None:
         return access
-    if access.principal is not None and await _is_creator(
-        db, application_id, access.principal
-    ):
+    if access.principal is not None and await _is_creator(db, application_id, access.principal):
         return access
     raise ForbiddenError("Only the applicant fires this transition.")
 

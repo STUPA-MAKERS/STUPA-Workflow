@@ -91,11 +91,7 @@ def _invoice_changes(payload: InvoiceUpdate) -> dict[str, object]:
             if "gross_amount" in fields and payload.gross_amount is not None
             else {}
         ),
-        **(
-            {"status": payload.status}
-            if "status" in fields and payload.status is not None
-            else {}
-        ),
+        **({"status": payload.status} if "status" in fields and payload.status is not None else {}),
     }
 
 
@@ -108,9 +104,7 @@ class InvoiceOps(BudgetTreeServiceBase):
     """
 
     @staticmethod
-    def _invoice_out(
-        inv: Invoice, linked: list[InvoiceBookingOut] | None = None
-    ) -> InvoiceOut:
+    def _invoice_out(inv: Invoice, linked: list[InvoiceBookingOut] | None = None) -> InvoiceOut:
         return InvoiceOut(
             id=inv.id,
             number=inv.number,
@@ -163,9 +157,7 @@ class InvoiceOps(BudgetTreeServiceBase):
             )
         )
         rows = (
-            await self.session.execute(
-                stmt.order_by(BudgetExpense.created_at, BudgetExpense.id)
-            )
+            await self.session.execute(stmt.order_by(BudgetExpense.created_at, BudgetExpense.id))
         ).all()
         bookings = tuple(
             (cast("UUID", booking.invoice_id), _booking_out(booking, path_key, budget_name))
@@ -264,19 +256,13 @@ class InvoiceOps(BudgetTreeServiceBase):
         visible = await self._visible_ids(visible_gremium_ids)
         booked_clause = self._booked_clause(visible)
         counts = await self._segment_counts(base_filters, booked_clause)
-        segment = (
-            None
-            if booked is None
-            else (booked_clause if booked else not_(booked_clause))
-        )
+        segment = None if booked is None else (booked_clause if booked else not_(booked_clause))
         filters = (
             *base_filters,
             *_applied(Invoice.status == status if status is not None else None, segment),
         )
 
-        total = await self.session.scalar(
-            select(func.count()).select_from(Invoice).where(*filters)
-        )
+        total = await self.session.scalar(select(func.count()).select_from(Invoice).where(*filters))
         ordering = Invoice.issue_date.desc().nulls_last()
         order_by = (rank_expr.desc(), ordering) if rank_expr is not None else (ordering,)
         rows = (
@@ -410,9 +396,7 @@ class InvoiceOps(BudgetTreeServiceBase):
         Returns:
             The same `fileToken` that `POST /invoices` expects.
         """
-        storage_key, display_name, mime = await self._validate_scan_store(
-            data, filename=filename
-        )
+        storage_key, display_name, mime = await self._validate_scan_store(data, filename=filename)
         return InvoiceFileResult(fileToken=storage_key, fileName=display_name, fileMime=mime)
 
     async def parse_invoice_file(self, data: bytes, *, filename: str | None) -> InvoiceParseResult:

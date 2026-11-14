@@ -99,6 +99,5 @@ def downgrade() -> None:
     Deleted overlaps do not come back.
     """
     op.execute(
-        "ALTER TABLE gremium_membership "
-        "DROP CONSTRAINT IF EXISTS ex_gremium_membership_no_overlap"
+        "ALTER TABLE gremium_membership DROP CONSTRAINT IF EXISTS ex_gremium_membership_no_overlap"
     )

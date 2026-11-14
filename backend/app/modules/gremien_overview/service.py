@@ -761,9 +761,7 @@ class GremienService:
             .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
             .where(GremiumMembership.gremium_id == gremium_id)
         )
-        return [
-            _Term(pid, key, dict(names or {})) for pid, key, names in rows.all()
-        ]
+        return [_Term(pid, key, dict(names or {})) for pid, key, names in rows.all()]
 
     async def _people(self, ids: Iterable[UUID]) -> dict[UUID, tuple[str | None, str]]:
         """Return the display name and the ``sub`` of each principal."""
@@ -804,9 +802,7 @@ class GremienService:
             .order_by(Meeting.date, Meeting.start_time.nulls_first(), Meeting.id)
         )
         meetings = tuple(found.all())
-        records, delegates = await self._member_states(
-            principal_id, [mid for mid, *_ in meetings]
-        )
+        records, delegates = await self._member_states(principal_id, [mid for mid, *_ in meetings])
         return MemberAttendanceOut(
             principal_id=principal_id,
             display_name=person.display_name,

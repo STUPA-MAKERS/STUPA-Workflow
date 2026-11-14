@@ -95,9 +95,7 @@ class PlanExportOps(PlanOps, TreeViewOps):
         head = ExportHead(
             budget_name=top.name,
             fiscal_year=tree_rules.fiscal_year_display(fy.year, month, day),
-            prev_year=(
-                tree_rules.fiscal_year_display(before.year, month, day) if before else None
-            ),
+            prev_year=(tree_rules.fiscal_year_display(before.year, month, day) if before else None),
             number=version.number,
             state=version.state,
             exported_on=today,
@@ -150,9 +148,7 @@ class PlanExportOps(PlanOps, TreeViewOps):
         if kept is not None:
             return plan_file_of(kept)
         return (
-            plan_file(await self.plan_export(version_id, today))
-            if version_id is not None
-            else None
+            plan_file(await self.plan_export(version_id, today)) if version_id is not None else None
         )
 
     def _reading_out(

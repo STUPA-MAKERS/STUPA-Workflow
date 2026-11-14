@@ -268,9 +268,7 @@ class AgendaService:
     async def _draft_plans(self, rows: Sequence[MeetingAgendaItem]) -> frozenset[UUID]:
         """Return the plan versions of the items that are a draft, so the item reads them."""
         plan_ids = [
-            plan_id
-            for r in rows
-            if (plan_id := getattr(r, "plan_version_id", None)) is not None
+            plan_id for r in rows if (plan_id := getattr(r, "plan_version_id", None)) is not None
         ]
         return (
             frozenset(

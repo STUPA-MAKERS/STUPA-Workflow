@@ -61,12 +61,8 @@ class ApplicationCreate(FrozenCamelModel, frozen=True):
     applicant_name: str | None = Field(default=None, alias="applicantName", max_length=256)
     lang: Lang = DEFAULT_LANG
     altcha: AltchaSolutionStr | None = None
-    attachment_ids: list[UUID] = Field(
-        default_factory=list, alias="attachmentIds", max_length=100
-    )
-    draft_token: str | None = Field(
-        default=None, alias="draftToken", min_length=1, max_length=128
-    )
+    attachment_ids: list[UUID] = Field(default_factory=list, alias="attachmentIds", max_length=100)
+    draft_token: str | None = Field(default=None, alias="draftToken", min_length=1, max_length=128)
     predecessor_id: UUID | None = Field(default=None, alias="predecessorId")
 
 
@@ -95,12 +91,8 @@ class OnBehalfCreate(FrozenCamelModel, frozen=True):
     received_on: date | None = Field(default=None, alias="receivedOn")
     intake: str | None = Field(default=None, max_length=500)
     lang: Lang = DEFAULT_LANG
-    attachment_ids: list[UUID] = Field(
-        default_factory=list, alias="attachmentIds", max_length=100
-    )
-    draft_token: str | None = Field(
-        default=None, alias="draftToken", min_length=1, max_length=128
-    )
+    attachment_ids: list[UUID] = Field(default_factory=list, alias="attachmentIds", max_length=100)
+    draft_token: str | None = Field(default=None, alias="draftToken", min_length=1, max_length=128)
     predecessor_id: UUID | None = Field(default=None, alias="predecessorId")
 
     @model_validator(mode="after")
@@ -113,9 +105,7 @@ class OnBehalfCreate(FrozenCamelModel, frozen=True):
         if self.applicant_principal_id is None and (
             self.applicant_email is None or not (self.applicant_name or "").strip()
         ):
-            raise ValueError(
-                "A guest applicant needs applicantName and applicantEmail."
-            )
+            raise ValueError("A guest applicant needs applicantName and applicantEmail.")
         return self
 
 

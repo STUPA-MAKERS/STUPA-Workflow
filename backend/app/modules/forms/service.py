@@ -205,9 +205,7 @@ class FormsService:
         rows = (
             await self.session.execute(select(Gremium.id, Gremium.name).order_by(Gremium.name))
         ).all()
-        return [
-            FieldOption(value=str(gid), label={"de": name, "en": name}) for gid, name in rows
-        ]
+        return [FieldOption(value=str(gid), label={"de": name, "en": name}) for gid, name in rows]
 
     async def set_form_active(self, type_id: UUID, active: bool) -> FormDraftOut:
         """Activate or deactivate the form of an application type.

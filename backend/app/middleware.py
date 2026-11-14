@@ -244,9 +244,7 @@ def _write_bucket(request: Request, settings: Settings) -> tuple[str, int]:
     """
     cookie = request.cookies.get(settings.session_cookie_name)
     if cookie:
-        sid = principal_sid(
-            settings.session_secret, cookie, SESSION_COOKIE_MAX_AGE
-        )
+        sid = principal_sid(settings.session_secret, cookie, SESSION_COOKIE_MAX_AGE)
         if sid is not None:
             return f"write:session:{sid}", settings.rl_default_write_session_per_hour
     return f"write:ip:{client_ip(request)}", settings.rl_default_write_per_hour

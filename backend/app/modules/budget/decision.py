@@ -50,9 +50,7 @@ async def decision_gremium_of(
     return tree_rules.resolve_decision_gremium(budget_id, parent_of, own_of)
 
 
-async def effective_decision_gremium(
-    session: AsyncSession, budget_id: UUID | None
-) -> UUID | None:
+async def effective_decision_gremium(session: AsyncSession, budget_id: UUID | None) -> UUID | None:
     """Return the effective deciding Gremium of a cost center, or `None`.
 
     `None` comes back for a missing cost center (`budget_id=None` or an unknown id) and

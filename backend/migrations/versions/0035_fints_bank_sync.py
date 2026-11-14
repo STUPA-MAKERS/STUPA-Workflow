@@ -80,8 +80,7 @@ _UPGRADE: tuple[str, ...] = (
     """,
     "CREATE INDEX IF NOT EXISTS ix_bank_allocation_statement_line_id "
     "ON bank_allocation (statement_line_id)",
-    "CREATE INDEX IF NOT EXISTS ix_bank_allocation_expense_id "
-    "ON bank_allocation (expense_id)",
+    "CREATE INDEX IF NOT EXISTS ix_bank_allocation_expense_id ON bank_allocation (expense_id)",
     """
     CREATE TABLE IF NOT EXISTS counterparty_memory (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -100,8 +99,7 @@ _UPGRADE: tuple[str, ...] = (
         created_at timestamptz NOT NULL DEFAULT now()
     )
     """,
-    "CREATE INDEX IF NOT EXISTS ix_bank_sync_session_account_id "
-    "ON bank_sync_session (account_id)",
+    "CREATE INDEX IF NOT EXISTS ix_bank_sync_session_account_id ON bank_sync_session (account_id)",
 )
 
 _DOWNGRADE: tuple[str, ...] = (

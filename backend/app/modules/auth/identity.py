@@ -72,9 +72,7 @@ def _ref(
     return PrincipalRef(id=pid, display_name=dn, email=em, own_name=own)
 
 
-async def refs_by_sub(
-    session: AsyncSession, subs: Iterable[str | None]
-) -> dict[str, PrincipalRef]:
+async def refs_by_sub(session: AsyncSession, subs: Iterable[str | None]) -> dict[str, PrincipalRef]:
     """Map each known ``sub`` to the principal that a display shows. One query."""
     wanted = {s for s in subs if s}
     if not wanted:
@@ -83,9 +81,7 @@ async def refs_by_sub(
     return {row[0]: _ref(row) for row in rows}
 
 
-async def refs_by_id(
-    session: AsyncSession, ids: Iterable[UUID]
-) -> dict[UUID, PrincipalRef]:
+async def refs_by_id(session: AsyncSession, ids: Iterable[UUID]) -> dict[UUID, PrincipalRef]:
     """Map each known principal id to the principal that a display shows. One query."""
     wanted = set(ids)
     if not wanted:

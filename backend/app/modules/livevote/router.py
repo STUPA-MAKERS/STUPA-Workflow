@@ -280,14 +280,16 @@ async def get_meeting_defaults(
 ) -> MeetingDefaultsOut:
     """What a new meeting of the gremium allows.
 
-    Public participation needs a gremium without a quorum; the create dialog reads it
-    before the meeting exists. The caller must manage the gremium (``session.manage``
+    Guests vote only where the Gremium allows it and has no quorum; the create dialog
+    reads it before the meeting exists. The caller must manage the gremium (``session.manage``
     or admin).
     """
     if not await service.can_manage(gremium_id, principal):
         raise ForbiddenError("not allowed to manage meetings for this committee")
     quorum = await service.gremium_quorum_percent(gremium_id)
-    return MeetingDefaultsOut(publicJoinAllowed=quorum is None, quorumPercent=quorum)
+    return MeetingDefaultsOut(
+        guestsVoteAllowed=await service.guests_vote_allowed(gremium_id), quorumPercent=quorum
+    )
 
 
 @router.get("/meetings", response_model=list[MeetingOut], responses=_errors(401, 403, 422))
@@ -696,9 +698,7 @@ async def open_meeting_vote(
             await assert_application_votable(service, meeting, item.application_id)
     of_plan = built.model_copy(update={"plan_version_id": plan_version_id})
     create = (
-        of_plan.model_copy(
-            update={"repeat_of_id": source.id, "attempt": (source.attempt or 1) + 1}
-        )
+        of_plan.model_copy(update={"repeat_of_id": source.id, "attempt": (source.attempt or 1) + 1})
         if source is not None
         else of_plan
     )
@@ -748,9 +748,7 @@ async def open_prepared_meeting_vote(
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
     await service.assert_can_run_votes(meeting_id, principal)
-    eligible = await draft_open_checks(
-        service, agenda, meeting, vote_id, actor=principal.sub
-    )
+    eligible = await draft_open_checks(service, agenda, meeting, vote_id, actor=principal.sub)
     opened = await voting.open(
         vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
     )
@@ -849,9 +847,7 @@ async def list_assignable(
 
 async def _budget_scope(session: AsyncSession, principal: Principal) -> set[UUID] | None:
     """Return the Gremien that give the person a view of budgets, or ``None`` for all."""
-    return (
-        None if has_budget_read(principal) else await gremium_reader_ids(session, principal.sub)
-    )
+    return None if has_budget_read(principal) else await gremium_reader_ids(session, principal.sub)
 
 
 @router.get(
@@ -883,9 +879,7 @@ async def list_assignable_plans(
     )
     return AssignablePlansOut(
         decides=bool(waiting) or bool(await budget.plan_budget_ids(meeting.gremium_id)),
-        plans=tuple(
-            plan for plan in (*waiting, *drafts) if plan.plan_version_id not in on_agenda
-        ),
+        plans=tuple(plan for plan in (*waiting, *drafts) if plan.plan_version_id not in on_agenda),
     )
 
 

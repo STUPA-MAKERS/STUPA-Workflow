@@ -74,7 +74,9 @@ def _link_break(prev_hash: bytes | None, entry: AuditEntry) -> ChainBreak | None
     return (
         "prev_hash_mismatch"
         if entry.prev_hash != prev_hash
-        else None if _entry_hash(entry) == entry.hash else "hash_mismatch"
+        else None
+        if _entry_hash(entry) == entry.hash
+        else "hash_mismatch"
     )
 
 
@@ -258,9 +260,7 @@ class AuditService:
         ).scalar_one()
         if not locked:
             await self.session.rollback()
-            raise ConflictError(
-                "an audit chain check is in progress", code="audit_verify_running"
-            )
+            raise ConflictError("an audit chain check is in progress", code="audit_verify_running")
         last_manual = (
             await self.session.execute(
                 select(func.max(AuditVerification.started_at)).where(
@@ -269,9 +269,7 @@ class AuditService:
             )
         ).scalar_one_or_none()
         wait = (
-            last_manual + cooldown - datetime.now(UTC)
-            if last_manual is not None
-            else timedelta(0)
+            last_manual + cooldown - datetime.now(UTC) if last_manual is not None else timedelta(0)
         )
         if wait > timedelta(0):
             await self.session.rollback()
@@ -378,9 +376,7 @@ class AuditService:
         return (
             await self.session.execute(
                 select(AuditVerification)
-                .order_by(
-                    AuditVerification.started_at.desc(), AuditVerification.id.desc()
-                )
+                .order_by(AuditVerification.started_at.desc(), AuditVerification.id.desc())
                 .limit(1)
             )
         ).scalar_one_or_none()
@@ -409,9 +405,7 @@ class AuditService:
             )
         )
         total = (
-            await self.session.execute(
-                select(func.count()).select_from(stmt.subquery())
-            )
+            await self.session.execute(select(func.count()).select_from(stmt.subquery()))
         ).scalar_one()
         rows = (
             (
@@ -453,20 +447,14 @@ class AuditService:
         )
 
         rows = (
-            (
-                await self.session.execute(
-                    stmt.order_by(AuditEntry.id.desc()).limit(limit + 1)
-                )
-            )
+            (await self.session.execute(stmt.order_by(AuditEntry.id.desc()).limit(limit + 1)))
             .scalars()
             .all()
         )
         has_more = len(rows) > limit
         return list(rows[:limit]), has_more
 
-    async def resolve_actor_names(
-        self, subs: Sequence[str | None]
-    ) -> dict[str, str | None]:
+    async def resolve_actor_names(self, subs: Sequence[str | None]) -> dict[str, str | None]:
         """Resolve each ``sub`` to a display name.
 
         The lookup prefers ``display_name`` and falls back to ``email``. It reads the

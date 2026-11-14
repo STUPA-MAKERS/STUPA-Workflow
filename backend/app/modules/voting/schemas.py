@@ -197,9 +197,7 @@ class VoteCreate(FrozenStrictCamelModel, frozen=True):
     question: str | None = None
     opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
-    result_branch_transition_id: UUID | None = Field(
-        default=None, alias="resultBranchTransitionId"
-    )
+    result_branch_transition_id: UUID | None = Field(default=None, alias="resultBranchTransitionId")
     #: The decision proposal: approved amount and conditions. Only an application
     #: vote takes it. A passed vote writes it as the decision of the application.
     proposal: DecisionIn | None = None
@@ -230,9 +228,7 @@ class VoteCreateInternal(FrozenCamelModel, frozen=True):
     eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
     opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
-    result_branch_transition_id: UUID | None = Field(
-        default=None, alias="resultBranchTransitionId"
-    )
+    result_branch_transition_id: UUID | None = Field(default=None, alias="resultBranchTransitionId")
     #: The decision proposal: approved amount and conditions. Only an application
     #: vote takes it. A passed vote writes it as the decision of the application.
     proposal: DecisionIn | None = None
@@ -244,9 +240,7 @@ class VoteCreateInternal(FrozenCamelModel, frozen=True):
         """A percent quorum requires an eligible-voter count (fail-closed)."""
         quorum = None if isinstance(self.config, PollConfig) else self.config.quorum
         if quorum is not None and quorum.type == "percent" and self.eligible_count is None:
-            raise ValueError(
-                "eligibleCount is required when a percent quorum is configured"
-            )
+            raise ValueError("eligibleCount is required when a percent quorum is configured")
         return self
 
 
@@ -293,9 +287,7 @@ class TallyOut(FrozenCamelModel, frozen=True):
     #: Why the vote failed: ``quorum`` = quorum missed (fail-closed), ``majority`` =
     #: quorum met but majority missed. It stays None while the vote is open, and on
     #: passed or tie.
-    failed_reason: Literal["quorum", "majority"] | None = Field(
-        default=None, alias="failedReason"
-    )
+    failed_reason: Literal["quorum", "majority"] | None = Field(default=None, alias="failedReason")
     #: Attendance of a meeting vote: the present members and the admitted guests.
     #: An open vote shows the values of now, a closed vote the values fixed at the
     #: close. None for a vote without a meeting and for a vote that closed before the
@@ -360,9 +352,7 @@ class VoteOut(FrozenCamelModel, frozen=True):
     poll: PollConfig | None = None
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
     #: Copies of ``config`` for the vote card, so a client needs no config parse.
-    majority_rule: MajorityRule = Field(
-        default="simple", alias="majorityRule"
-    )
+    majority_rule: MajorityRule = Field(default="simple", alias="majorityRule")
     quorum: Quorum | None = None
     #: The real moment when the vote opened (``open`` sets ``opens_at``).
     opened_at: datetime | None = Field(default=None, alias="openedAt")
@@ -459,8 +449,6 @@ class VoteClosed(FrozenCamelModel, frozen=True):
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
     closed_at: datetime | None = Field(default=None, alias="closedAt")
-    fired_transition_id: UUID | None = Field(
-        default=None, alias="firedTransitionId"
-    )
+    fired_transition_id: UUID | None = Field(default=None, alias="firedTransitionId")
     new_state_id: UUID | None = Field(default=None, alias="newStateId")
     branch_fired: bool = Field(default=False, alias="branchFired")

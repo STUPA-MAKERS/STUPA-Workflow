@@ -24,10 +24,7 @@ _UPGRADE: tuple[str, ...] = (
         "ALTER TABLE budget ADD COLUMN IF NOT EXISTS "
         "view_gremium_id uuid REFERENCES gremium(id) ON DELETE SET NULL"
     ),
-    (
-        "CREATE INDEX IF NOT EXISTS ix_budget_view_gremium_id "
-        "ON budget (view_gremium_id)"
-    ),
+    ("CREATE INDEX IF NOT EXISTS ix_budget_view_gremium_id ON budget (view_gremium_id)"),
 )
 
 _DOWNGRADE: tuple[str, ...] = (

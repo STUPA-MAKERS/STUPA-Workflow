@@ -79,24 +79,14 @@ class NotificationSettings(Base):
     __tablename__ = "notification_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    task_reminder_enabled: Mapped[bool] = mapped_column(
-        Boolean, server_default="true"
-    )
-    task_reminder_after_days: Mapped[int] = mapped_column(
-        Integer, server_default="5"
-    )
-    task_reminder_repeat_days: Mapped[int] = mapped_column(
-        Integer, server_default="7"
-    )
+    task_reminder_enabled: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    task_reminder_after_days: Mapped[int] = mapped_column(Integer, server_default="5")
+    task_reminder_repeat_days: Mapped[int] = mapped_column(Integer, server_default="7")
 
     __table_args__ = (
         CheckConstraint("id = 1", name="notification_settings_singleton"),
-        CheckConstraint(
-            "task_reminder_after_days >= 1", name="task_reminder_after_days_min"
-        ),
-        CheckConstraint(
-            "task_reminder_repeat_days >= 0", name="task_reminder_repeat_days_min"
-        ),
+        CheckConstraint("task_reminder_after_days >= 1", name="task_reminder_after_days_min"),
+        CheckConstraint("task_reminder_repeat_days >= 0", name="task_reminder_repeat_days_min"),
     )
 
 

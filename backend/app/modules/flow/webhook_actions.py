@@ -58,9 +58,7 @@ class WebhookActionDispatcher:
         try:
             target = UUID(str(webhook_id))
         except ValueError:
-            logger.warning(
-                "webhook action with invalid webhookId %r — skipped", webhook_id
-            )
+            logger.warning("webhook action with invalid webhookId %r — skipped", webhook_id)
             return
         payload: dict[str, object] = {
             "event": _TRANSITION_EVENT,

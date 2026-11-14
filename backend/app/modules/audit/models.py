@@ -60,9 +60,7 @@ class AuditEntry(Base):
     action: Mapped[str] = mapped_column(Text)
     target_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     target_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     #: Holds id references and metadata ONLY. Never put a raw PII value here.
     data: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     prev_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
@@ -89,9 +87,7 @@ class AuditVerification(UUIDPkMixin, Base):
     __tablename__ = "audit_verification"
 
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    finished_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     valid: Mapped[bool] = mapped_column(Boolean)
     checked: Mapped[int] = mapped_column(BigInteger)
     broken_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

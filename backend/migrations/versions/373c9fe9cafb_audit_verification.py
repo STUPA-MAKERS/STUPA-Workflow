@@ -68,9 +68,13 @@ _CREATE: tuple[str, ...] = (
 def _report_bad_role_keys() -> None:
     """Log the role keys that do not match the role key pattern. Change nothing."""
     bind = op.get_bind()
-    roles = bind.execute(
-        sa.text("SELECT key FROM role WHERE key !~ :p ORDER BY key"), {"p": _KEY_PATTERN}
-    ).scalars().all()
+    roles = (
+        bind.execute(
+            sa.text("SELECT key FROM role WHERE key !~ :p ORDER BY key"), {"p": _KEY_PATTERN}
+        )
+        .scalars()
+        .all()
+    )
     gremium_roles = bind.execute(
         sa.text(
             "SELECT g.name, r.key FROM gremium_role r JOIN gremium g ON g.id = r.gremium_id "

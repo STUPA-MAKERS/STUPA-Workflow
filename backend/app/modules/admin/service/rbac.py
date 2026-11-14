@@ -64,9 +64,7 @@ def _principal_out(
         assignments=[_assignment_out(a) for a in assignments],
         oidc_groups=[str(g) for g in (row.oidc_groups or [])],
         merged_into_id=row.merged_into,
-        merged_into_name=(
-            (merged_names or {}).get(row.merged_into) if row.merged_into else None
-        ),
+        merged_into_name=((merged_names or {}).get(row.merged_into) if row.merged_into else None),
         merged_at=_iso(row.merged_at),
         has_access=has_access,
     )
@@ -113,9 +111,7 @@ class RbacOps(ConfigServiceBase):
         Raises:
             ConflictError: The key exists already.
         """
-        existing = (
-            await self.session.scalars(select(Role).where(Role.key == payload.key))
-        ).first()
+        existing = (await self.session.scalars(select(Role).where(Role.key == payload.key))).first()
         if existing is not None:
             raise ConflictError(f"role {payload.key!r} already exists", code="role_exists")
         role = Role(key=payload.key, name_i18n=payload.label)
@@ -132,9 +128,7 @@ class RbacOps(ConfigServiceBase):
             permissions=sorted(set(payload.permissions)),
         )
 
-    async def update_role(
-        self, role_id: UUID, payload: RoleUpdate, actor: str
-    ) -> RoleOut:
+    async def update_role(self, role_id: UUID, payload: RoleUpdate, actor: str) -> RoleOut:
         """Update a global role.
 
         Raises:
@@ -155,14 +149,10 @@ class RbacOps(ConfigServiceBase):
         await self.session.commit()
         perms = (
             await self.session.scalars(
-                select(RolePermission.permission).where(
-                    RolePermission.role_id == role_id
-                )
+                select(RolePermission.permission).where(RolePermission.role_id == role_id)
             )
         ).all()
-        return RoleOut(
-            id=role.id, key=role.key, label=role.name_i18n, permissions=sorted(perms)
-        )
+        return RoleOut(id=role.id, key=role.key, label=role.name_i18n, permissions=sorted(perms))
 
     async def delete_role(self, role_id: UUID, actor: str) -> None:
         """Delete a role.
@@ -283,9 +273,7 @@ class RbacOps(ConfigServiceBase):
         if not active and principal.sub == actor:
             raise ConflictError("you cannot deactivate your own account", code="self_deactivation")
         if active and principal.merged_into is not None:
-            raise ConflictError(
-                "a merged account cannot be activated", code="principal_merged"
-            )
+            raise ConflictError("a merged account cannot be activated", code="principal_merged")
         principal.active = active
         if not active:
             await end_principal_sessions(self.session, principal.id)
@@ -293,9 +281,7 @@ class RbacOps(ConfigServiceBase):
         await self.session.commit()
         assignments = (
             await self.session.scalars(
-                select(RoleAssignmentRow).where(
-                    RoleAssignmentRow.principal_id == principal_id
-                )
+                select(RoleAssignmentRow).where(RoleAssignmentRow.principal_id == principal_id)
             )
         ).all()
         merged_names = await self._merged_names([principal])

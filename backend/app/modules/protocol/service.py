@@ -216,9 +216,7 @@ class ProtocolService:
         """
         base = select(Protocol).where(Protocol.id == protocol_id)
         stmt = (
-            base.with_for_update().execution_options(populate_existing=True)
-            if for_update
-            else base
+            base.with_for_update().execution_options(populate_existing=True) if for_update else base
         )
         protocol = (await self.session.execute(stmt)).scalar_one_or_none()
         if protocol is None:
@@ -241,9 +239,7 @@ class ProtocolService:
             raise NotFoundError(f"meeting {meeting_id} not found")
         return meeting
 
-    async def authorize_write_meeting(
-        self, meeting_id: UUID, principal: Principal
-    ) -> None:
+    async def authorize_write_meeting(self, meeting_id: UUID, principal: Principal) -> None:
         """Check the write access to the protocol of a meeting (create or load).
 
         One of these rights is enough: the admin role, the Gremium permission
@@ -287,9 +283,7 @@ class ProtocolService:
         protocol = await self._get(protocol_id)
         await self._meeting_service().assert_can_read(protocol.meeting_id, principal)
 
-    async def authorize_read_meeting(
-        self, meeting_id: UUID, principal: Principal
-    ) -> None:
+    async def authorize_read_meeting(self, meeting_id: UUID, principal: Principal) -> None:
         """Check the read access to the protocol of a meeting (GET …/protocol)."""
         await self._meeting_service().assert_can_read(meeting_id, principal)
 
@@ -327,9 +321,7 @@ class ProtocolService:
         try:
             return await self.storage.get(protocol.pdf_storage_key)
         except StorageError as exc:
-            raise ServiceUnavailableError(
-                "Protocol PDF temporarily unavailable."
-            ) from exc
+            raise ServiceUnavailableError("Protocol PDF temporarily unavailable.") from exc
 
     async def pdf_filename(self, protocol_id: UUID, *, public: bool = False) -> str:
         """Return the download name of the protocol PDF: meeting title and day.
@@ -355,9 +347,7 @@ class ProtocolService:
         try:
             return await self.storage.get(protocol.public_pdf_storage_key)
         except StorageError as exc:
-            raise ServiceUnavailableError(
-                "Protocol PDF temporarily unavailable."
-            ) from exc
+            raise ServiceUnavailableError("Protocol PDF temporarily unavailable.") from exc
 
     async def _to_out(self, protocol: Protocol) -> ProtocolOut:
         gremium = await self.session.get(Gremium, protocol.gremium_id)
@@ -375,9 +365,7 @@ class ProtocolService:
 
     async def _by_meeting(self, meeting_id: UUID) -> Protocol | None:
         return (
-            await self.session.execute(
-                select(Protocol).where(Protocol.meeting_id == meeting_id)
-            )
+            await self.session.execute(select(Protocol).where(Protocol.meeting_id == meeting_id))
         ).scalar_one_or_none()
 
     @staticmethod
@@ -413,9 +401,7 @@ class ProtocolService:
             raise NotFoundError(f"protocol for meeting {meeting_id} not found")
         return await self._to_out(protocol)
 
-    async def get_or_create(
-        self, meeting_id: UUID, *, author: str | None = None
-    ) -> ProtocolOut:
+    async def get_or_create(self, meeting_id: UUID, *, author: str | None = None) -> ProtocolOut:
         """Create or load the protocol of a meeting (idempotent).
 
         The method is race-safe. On a parallel POST, `INSERT … ON CONFLICT
@@ -510,9 +496,7 @@ class ProtocolService:
         await self.session.delete(protocol)
         await self.session.commit()
 
-    async def embed_votes(
-        self, protocol_id: UUID, vote_ids: Sequence[UUID]
-    ) -> ProtocolOut:
+    async def embed_votes(self, protocol_id: UUID, vote_ids: Sequence[UUID]) -> ProtocolOut:
         """Append votes as snippets and write `protocol_vote_ref` (idempotent).
 
         A vote that is already embedded gets no second snippet. An unknown vote gives
@@ -714,9 +698,7 @@ class ProtocolService:
 
         mail_public = await self._mails_public(protocol)
         gremium = await self.session.get(Gremium, protocol.gremium_id)
-        await attach_plans(
-            self.session, self.storage, self.typst, protocol.meeting_id, now.date()
-        )
+        await attach_plans(self.session, self.storage, self.typst, protocol.meeting_id, now.date())
         uploads, mail_pdf = (
             await self._render_both(protocol, mail_public=mail_public)
             if mail_public or bool(getattr(gremium, "protocols_public", False))
@@ -953,6 +935,9 @@ class ProtocolService:
                     if date is not None and start_time is not None
                     else None
                 ),
+                kind=getattr(meeting, "kind", None),
+                location=getattr(meeting, "location", None),
+                form=getattr(meeting, "form", None),
                 protokollant=header.protokollant,
                 keepers=header.keepers,
                 present=header.present,
@@ -1039,9 +1024,7 @@ class ProtocolService:
             else roster_filter(gremium_id)
         )
         members = (
-            await self.session.scalar(
-                select(func.count()).select_from(PrincipalRow).where(where)
-            )
+            await self.session.scalar(select(func.count()).select_from(PrincipalRow).where(where))
         ) or 0
         percent = getattr(gremium, "quorum_percent", None)
         quorate = (
@@ -1069,9 +1052,7 @@ class ProtocolService:
             return HeaderMeta()
         rows = (
             await self.session.execute(
-                select(
-                    MeetingAttendance.status, PrincipalRow.display_name, PrincipalRow.sub
-                )
+                select(MeetingAttendance.status, PrincipalRow.display_name, PrincipalRow.sub)
                 .join(PrincipalRow, PrincipalRow.id == MeetingAttendance.principal_id)
                 .where(MeetingAttendance.meeting_id == meeting.id)
                 .order_by(PrincipalRow.display_name)
@@ -1125,12 +1106,16 @@ class ProtocolService:
     async def _texts(self, protocol: Protocol) -> list[tuple[int | None, str]]:
         """Return the Markdown texts: the TOP bodies with their numbers, then the free text."""
         bodies = (
-            await self.session.execute(
-                select(MeetingAgendaItem.body)
-                .where(MeetingAgendaItem.meeting_id == protocol.meeting_id)
-                .order_by(*agenda_order())
+            (
+                await self.session.execute(
+                    select(MeetingAgendaItem.body)
+                    .where(MeetingAgendaItem.meeting_id == protocol.meeting_id)
+                    .order_by(*agenda_order())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         tops = [(number, body) for number, body in enumerate(bodies, start=1) if body]
         return [*tops, *([(None, protocol.markdown)] if protocol.markdown else [])]
 
@@ -1223,12 +1208,16 @@ class ProtocolService:
         `inText` tells the detail page to show no second box for it.
         """
         items = (
-            await self.session.execute(
-                select(MeetingAgendaItem)
-                .where(MeetingAgendaItem.meeting_id == meeting_id)
-                .order_by(*agenda_order())
+            (
+                await self.session.execute(
+                    select(MeetingAgendaItem)
+                    .where(MeetingAgendaItem.meeting_id == meeting_id)
+                    .order_by(*agenda_order())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not items:
             return ""
         app_ids = [
@@ -1301,15 +1290,19 @@ class ProtocolService:
         stripped = item.body.strip() if item.body and item.body.strip() else ""
         raw = black_out(stripped) if public else stripped
         votes = (
-            await self.session.execute(
-                select(Vote)
-                .where(
-                    Vote.agenda_item_id == item.id,
-                    Vote.status != "cancelled",
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(
+                        Vote.agenda_item_id == item.id,
+                        Vote.status != "cancelled",
+                    )
+                    .order_by(Vote.created_at)
                 )
-                .order_by(Vote.created_at)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         views = [await voting.get(vote.id) for vote in votes]
         marks = _repeat_marks(votes, views)
         tz = self._tz()
@@ -1420,9 +1413,7 @@ class ProtocolService:
         if self.storage is None or self.typst is None:
             return None
         try:
-            cd = await resolve_cd_variant_by_key(
-                self.session, self.storage, protocol.cd_variant
-            )
+            cd = await resolve_cd_variant_by_key(self.session, self.storage, protocol.cd_variant)
             variant = protocol_variant_for(protocol.cd_variant)
             branding = await active_pdf_branding(self.session, self.storage)
             config = {**(cd_render_config(cd) if cd else {}), **footer_render_config(branding)}
@@ -1449,9 +1440,7 @@ class ProtocolService:
                 raise BadRequestError(
                     f"Protocol could not be rendered: {exc}", code="render_failed"
                 ) from exc
-            raise ServiceUnavailableError(
-                "Protocol rendering temporarily unavailable."
-            ) from exc
+            raise ServiceUnavailableError("Protocol rendering temporarily unavailable.") from exc
         key = (
             protocol_public_storage_key(protocol.id)
             if public
@@ -1483,9 +1472,7 @@ class ProtocolService:
             for key, pdf in uploads:
                 await self.storage.put(key, pdf, "application/pdf")
         except StorageError as exc:
-            raise ServiceUnavailableError(
-                "Protocol rendering temporarily unavailable."
-            ) from exc
+            raise ServiceUnavailableError("Protocol rendering temporarily unavailable.") from exc
 
     async def _send(self, protocol: Protocol, pdf: bytes | None) -> None:
         """Mail the protocol to MAIL_LIST(gremium) under an idempotency key.
@@ -1517,8 +1504,10 @@ class ProtocolService:
             if meeting is not None and meeting.date is not None
             else None
         )
-        subject = "Sitzungsprotokoll" + (f" {gremium_name}" if gremium_name else "") + (
-            f" — {day}" if day else ""
+        subject = (
+            "Sitzungsprotokoll"
+            + (f" {gremium_name}" if gremium_name else "")
+            + (f" — {day}" if day else "")
         )
         settings = self.settings or get_settings()
         link = protocol_link(settings, protocol.meeting_id)
@@ -1572,9 +1561,7 @@ class ProtocolService:
                 subject=subject,
                 text=text,
                 html=html,
-                idempotency_key=compute_idempotency_key(
-                    "protocol_finalized", str(protocol.id)
-                ),
+                idempotency_key=compute_idempotency_key("protocol_finalized", str(protocol.id)),
                 attachments=attachments,
             )
         )
@@ -1606,9 +1593,7 @@ class ProtocolService:
             ConflictError: The protocol is final or under render.
         """
         if protocol.status == "final":
-            raise ConflictError(
-                "Protocol is finalized and read-only.", code="protocol_finalized"
-            )
+            raise ConflictError("Protocol is finalized and read-only.", code="protocol_finalized")
         if protocol.status == "rendering":
             raise ConflictError(
                 "Protocol is being rendered and is read-only.", code="protocol_rendering"
@@ -1826,9 +1811,7 @@ def poll_snippet_of(
     )
 
 
-def _poll_lines(
-    result: PollResultOut, labels: Mapping[str, str], *, date: bool
-) -> list[PollLine]:
+def _poll_lines(result: PollResultOut, labels: Mapping[str, str], *, date: bool) -> list[PollLine]:
     """Map the stored result of a poll on its option lines, in the stored order."""
     order = [oid for oid in result.order if oid in labels] or list(labels)
     top = frozenset(result.top)

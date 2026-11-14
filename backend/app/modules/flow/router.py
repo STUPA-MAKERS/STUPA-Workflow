@@ -123,9 +123,7 @@ async def list_transitions(
     principal: PrincipalDep,
 ) -> list[TransitionOut]:
     """List the transitions whose guard the principal satisfies."""
-    return await service.available_transitions(
-        application_id, principal, allow_unconfirmed=False
-    )
+    return await service.available_transitions(application_id, principal, allow_unconfirmed=False)
 
 
 @router.post(

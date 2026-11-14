@@ -320,12 +320,7 @@ def iter_objects(tar: tarfile.TarFile) -> Iterator[tuple[str, bytes]]:
 
 def _safe_object_key(key: str) -> bool:
     """Reject an empty, absolute or traversing object key."""
-    return (
-        bool(key)
-        and not key.startswith("/")
-        and "\\" not in key
-        and ".." not in key.split("/")
-    )
+    return bool(key) and not key.startswith("/") and "\\" not in key and ".." not in key.split("/")
 
 
 def _member_handle(tar: tarfile.TarFile, name: str) -> IO[bytes]:

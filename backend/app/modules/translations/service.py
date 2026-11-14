@@ -103,9 +103,7 @@ class TranslationService:
         data: dict[str, object] = {
             **({"name": {"from": row.name, "to": new_name}} if new_name is not None else {}),
             **(
-                {"active": {"from": row.active, "to": new_active}}
-                if new_active is not None
-                else {}
+                {"active": {"from": row.active, "to": new_active}} if new_active is not None else {}
             ),
         }
         if new_name is not None:

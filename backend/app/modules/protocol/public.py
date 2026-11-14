@@ -96,7 +96,6 @@ class PublicDecision(FrozenCamelModel, frozen=True):
             conditions=passed_conditions(view),
         )
 
-
     @classmethod
     def _from_election(cls, view: object, election: ElectionConfig) -> PublicDecision:
         """Build the public decision of an election: elected names and a count."""
@@ -464,7 +463,7 @@ class PublicProtocolService:
         )
         rows = (await self.session.execute(stmt)).all()
         counts = Counter(semester_of(day) for (day,) in rows)
-        ordered = sorted(counts, key=lambda k: (semester_range(k)[0]), reverse=True)
+        ordered = sorted(counts, key=lambda k: semester_range(k)[0], reverse=True)
         return [PublicSemesterOut(key=k, count=counts[k]) for k in ordered]
 
     async def _visible(self, protocol_id: UUID) -> tuple[Protocol, Meeting, Gremium]:

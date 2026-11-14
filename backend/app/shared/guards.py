@@ -133,9 +133,7 @@ NOTIFY_RECIPIENT_KINDS: frozenset[str] = frozenset(
     {"gremium", "role", "applicant", "email", "voteGremium", "budgetGremium"}
 )
 #: Recipient kinds that take no ``ref``.
-_NOTIFY_KINDS_WITHOUT_REF: frozenset[str] = frozenset(
-    {"applicant", "voteGremium", "budgetGremium"}
-)
+_NOTIFY_KINDS_WITHOUT_REF: frozenset[str] = frozenset({"applicant", "voteGremium", "budgetGremium"})
 
 
 class GuardError(Exception):
@@ -338,17 +336,17 @@ _LEAF_EVALUATORS: dict[str, Callable[[object, GuardContext], bool]] = {
     "actorIsApplicant": lambda value, ctx: ctx.actor_is_applicant == bool(value),
     "applicantRoleIs": lambda value, ctx: value in ctx.applicant_roles,
     "applicantCommitteeIs": lambda value, ctx: str(value) in ctx.applicant_committees,
-    "applicationTypeIs": lambda value, ctx: ctx.application_type_key is not None
-    and str(value) == ctx.application_type_key,
+    "applicationTypeIs": lambda value, ctx: (
+        ctx.application_type_key is not None and str(value) == ctx.application_type_key
+    ),
     "budgetIs": lambda value, ctx: ctx.budget_id is not None and str(value) == ctx.budget_id,
     "budgetFitsApplication": lambda value, ctx: ctx.budget_fits == bool(value),
     "attachmentPresent": lambda value, ctx: ctx.has_attachment == bool(value),
     "isInVoteGremium": lambda value, ctx: (
-        ctx.vote_gremium_id is not None and ctx.vote_gremium_id in ctx.actor_committees
-    )
-    == bool(value),
-    "budgetHasDecisionGremium": lambda value, ctx: ctx.budget_has_decision_gremium
-    == bool(value),
+        (ctx.vote_gremium_id is not None and ctx.vote_gremium_id in ctx.actor_committees)
+        == bool(value)
+    ),
+    "budgetHasDecisionGremium": lambda value, ctx: ctx.budget_has_decision_gremium == bool(value),
     "hasField": _has_field,
     "compare": _eval_compare,
 }
@@ -510,9 +508,7 @@ def validate_action(action: dict[str, Any]) -> None:
         return
     optional = _ACTION_OPTIONAL_FIELD.get(action_type)
     if optional is not None:
-        if optional in action and (
-            not isinstance(action[optional], str) or not action[optional]
-        ):
+        if optional in action and (not isinstance(action[optional], str) or not action[optional]):
             raise GuardError(f"{action_type} '{optional}' must be a non-empty string")
         return
     field = _ACTION_REQUIRED_FIELD[action_type]

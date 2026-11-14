@@ -18,15 +18,10 @@ depends_on: str | Sequence[str] | None = None
 
 
 _UPGRADE: tuple[str, ...] = (
-    (
-        "ALTER TABLE budget ADD COLUMN IF NOT EXISTS "
-        "hidden_in_budget boolean NOT NULL DEFAULT false"
-    ),
+    ("ALTER TABLE budget ADD COLUMN IF NOT EXISTS hidden_in_budget boolean NOT NULL DEFAULT false"),
 )
 
-_DOWNGRADE: tuple[str, ...] = (
-    "ALTER TABLE budget DROP COLUMN IF EXISTS hidden_in_budget",
-)
+_DOWNGRADE: tuple[str, ...] = ("ALTER TABLE budget DROP COLUMN IF EXISTS hidden_in_budget",)
 
 
 def upgrade() -> None:

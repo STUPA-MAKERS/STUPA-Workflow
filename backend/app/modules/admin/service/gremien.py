@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import distinct, func, or_, select
+from sqlalchemy import distinct, func, or_, select, update
 
 from app.modules.admin.schemas import (
     GremiumAdminOut,
@@ -22,6 +22,7 @@ from app.modules.auth.principal import Principal
 from app.modules.files.service import FilesService
 from app.modules.gremien.gremium_roles import GremiumRoleService
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.meetings.models import Meeting
 from app.modules.site_config.models import CdVariant
 from app.modules.todos.boards import ensure_gremium_board
 from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
@@ -40,16 +41,25 @@ def _gremium_out(row: Gremium) -> GremiumOut:
         delegation_allow_external=row.delegation_allow_external,
         quorum_percent=row.quorum_percent,
         quorum_min_present=row.quorum_min_present,
+        repeat_quorum_percent=row.repeat_quorum_percent,
+        guests_may_vote=bool(row.guests_may_vote),
         protocols_public=bool(row.protocols_public),
     )
 
 
 def _apply_quorum(row: Gremium, payload: GremiumUpdate) -> None:
-    """Write the quorum fields that the patch sent; both can be cleared to null."""
+    """Write the quorum fields and the guest switch that the patch sent.
+
+    The three quorum fields can be cleared to null.
+    """
     if "quorum_percent" in payload.model_fields_set:
         row.quorum_percent = payload.quorum_percent
     if "quorum_min_present" in payload.model_fields_set:
         row.quorum_min_present = payload.quorum_min_present
+    if "repeat_quorum_percent" in payload.model_fields_set:
+        row.repeat_quorum_percent = payload.repeat_quorum_percent
+    if payload.guests_may_vote is not None:
+        row.guests_may_vote = payload.guests_may_vote
 
 
 class GremiumOps(ConfigServiceBase):
@@ -122,6 +132,8 @@ class GremiumOps(ConfigServiceBase):
             delegation_allow_external=payload.delegation_allow_external,
             quorum_percent=payload.quorum_percent,
             quorum_min_present=payload.quorum_min_present,
+            repeat_quorum_percent=payload.repeat_quorum_percent,
+            guests_may_vote=payload.guests_may_vote,
             protocols_public=payload.protocols_public,
         )
         self.session.add(row)
@@ -216,6 +228,7 @@ class GremiumOps(ConfigServiceBase):
         if payload.delegation_allow_external is not None:
             row.delegation_allow_external = payload.delegation_allow_external
         _apply_quorum(row, payload)
+        await self._guests_only_watch(row)
         publish = payload.protocols_public
         data: dict[str, object] | None = (
             {"field": "protocolsPublic", "old": bool(row.protocols_public), "new": publish}
@@ -227,6 +240,24 @@ class GremiumOps(ConfigServiceBase):
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id, data)
         await self.session.commit()
         return _gremium_out(row)
+
+    async def _guests_only_watch(self, row: Gremium) -> None:
+        """Set the open meetings to the guest mode ``watch`` when guests have no ballot.
+
+        The mode of a meeting must not outlive the rule of its Gremium: a quorum or
+        the switch ``guests_may_vote`` off takes the ballot from the guests.
+        """
+        if row.guests_may_vote and row.quorum_percent is None:
+            return
+        await self.session.execute(
+            update(Meeting)
+            .where(
+                Meeting.gremium_id == row.id,
+                Meeting.status != "closed",
+                Meeting.guests_mode == "vote",
+            )
+            .values(guests_mode="watch")
+        )
 
     async def delete_gremium(self, gremium_id: UUID, principal: Principal) -> None:
         """Delete a gremium.
@@ -454,13 +485,9 @@ class GremiumOps(ConfigServiceBase):
             )
 
     async def _gremium_by_slug(self, slug: str) -> Gremium | None:
-        return (
-            await self.session.scalars(select(Gremium).where(Gremium.slug == slug))
-        ).first()
+        return (await self.session.scalars(select(Gremium).where(Gremium.slug == slug))).first()
 
-    async def get_gremium_mail_recipients(
-        self, gremium_id: UUID
-    ) -> GremiumMailRecipients:
+    async def get_gremium_mail_recipients(self, gremium_id: UUID) -> GremiumMailRecipients:
         """Return the extra protocol recipients (``gremium.protocol_recipients``)."""
         gremium = await self.session.get(Gremium, gremium_id)
         if gremium is None:

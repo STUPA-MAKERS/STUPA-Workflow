@@ -131,9 +131,7 @@ class FilesService:
             ServiceUnavailableError: Object storage is off (HTTP 503).
         """
         if len(data) > self.max_bytes:
-            raise PayloadTooLargeError(
-                f"Attachment exceeds {self.max_bytes} bytes."
-            )
+            raise PayloadTooLargeError(f"Attachment exceeds {self.max_bytes} bytes.")
         if not data:
             raise UnsupportedMediaTypeError("Empty file.")
         display_name = sanitize_display_name(filename)
@@ -184,16 +182,12 @@ class FilesService:
         higher module (§S/backend/python/000651).
         """
         if len(data) > self.max_bytes:
-            raise PayloadTooLargeError(
-                f"Attachment exceeds {self.max_bytes} bytes."
-            )
+            raise PayloadTooLargeError(f"Attachment exceeds {self.max_bytes} bytes.")
         if not data:
             raise UnsupportedMediaTypeError("Empty file.")
 
         mime, display_name = self.validate(filename, data)
-        storage_key = (
-            f"{application_id}/{uuid.uuid4().hex}/{sanitize_storage_name(display_name)}"
-        )
+        storage_key = f"{application_id}/{uuid.uuid4().hex}/{sanitize_storage_name(display_name)}"
         await self.put_object(storage_key, data, mime)
 
         attachment = Attachment(
@@ -375,9 +369,7 @@ class FilesService:
         )
         return {
             owner_id: [
-                message_attachment_out(row)
-                for row in rows
-                if getattr(row, column.key) == owner_id
+                message_attachment_out(row) for row in rows if getattr(row, column.key) == owner_id
             ]
             for owner_id in owner_ids
         }
@@ -615,9 +607,7 @@ class FilesService:
         Returns:
             True when the result was stored, False when the row is gone.
         """
-        attachment = await self.session.get(
-            Attachment, attachment_id, populate_existing=True
-        )
+        attachment = await self.session.get(Attachment, attachment_id, populate_existing=True)
         if attachment is None:
             logger.info("scan result for unknown attachment %s — skipped", attachment_id)
             return False

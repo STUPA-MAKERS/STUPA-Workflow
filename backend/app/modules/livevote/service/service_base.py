@@ -92,7 +92,7 @@ class MeetingServiceBase(MeetingReads):
         agenda: AgendaSummary = (0, None),
         keepers: KeeperSummary | None = None,
         guests: GuestCounts = (0, 0),
-        public_join_allowed: bool = True,
+        guests_vote_allowed: bool = False,
         window: OpenWindow | None = None,
     ) -> MeetingOut:
         """Build the meeting view for one principal.
@@ -115,6 +115,9 @@ class MeetingServiceBase(MeetingReads):
             startedAt=meeting.started_at,
             closedAt=meeting.closed_at,
             status=meeting.status,  # type: ignore[arg-type]
+            kind=getattr(meeting, "kind", None) or "ordinary",
+            location=getattr(meeting, "location", None),
+            form=getattr(meeting, "form", None) or "presence",
             activeApplicationId=meeting.active_application_id,
             currentAgendaItemId=meeting.current_agenda_item_id,
             currentAgendaItem=agenda[1],
@@ -135,11 +138,11 @@ class MeetingServiceBase(MeetingReads):
             keeperPeriods=periods,
             plannedHandover=planned,
             publicJoin=bool(getattr(meeting, "public_join", False)),
-            guestsMode=getattr(meeting, "guests_mode", None) or "vote",
+            guestsMode=getattr(meeting, "guests_mode", None) or "watch",
             joinCode=getattr(meeting, "join_code", None) if can_manage else None,
             admittedGuests=guests[0],
             pendingGuests=guests[1] if can_manage else 0,
-            publicJoinAllowed=public_join_allowed,
+            guestsVoteAllowed=guests_vote_allowed,
             opensAt=window.opens_at if window is not None else None,
             confirmUntil=window.confirm_until if window is not None else None,
         )
@@ -240,10 +243,13 @@ class MeetingServiceBase(MeetingReads):
         row = await session.get(PrincipalRow, principal_id)
         return (row.display_name or row.email) if row is not None else None
 
-    async def _gremium_quorum_set(self, gremium_id: UUID) -> bool:
-        """Tell if the gremium sets a default quorum (then no public participation)."""
+    async def guests_vote_allowed(self, gremium_id: UUID) -> bool:
+        """Tell if admitted guests may vote: the switch is on and no quorum is set."""
         row = await self.session.get(Gremium, gremium_id)
-        return getattr(row, "quorum_percent", None) is not None
+        return (
+            bool(getattr(row, "guests_may_vote", False))
+            and getattr(row, "quorum_percent", None) is None
+        )
 
     async def _gremium_name_for(self, gremium_id: UUID | None) -> str | None:
         if gremium_id is None:

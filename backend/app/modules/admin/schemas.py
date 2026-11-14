@@ -139,23 +139,23 @@ class GremiumOut(FrozenCamelModel, frozen=True):
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
     #: Lead time in minutes before the meeting start, for non-pool delegations.
     #: 0 = until the meeting start.
-    delegation_lead_minutes: int = Field(
-        default=0, serialization_alias="delegationLeadMinutes"
-    )
+    delegation_lead_minutes: int = Field(default=0, serialization_alias="delegationLeadMinutes")
     #: Allow delegation to users outside gremium & substitute pool.
     delegation_allow_external: bool = Field(
         default=False, serialization_alias="delegationAllowExternal"
     )
     #: Default quorum as a percentage of the eligible voters, from 0 to 100.
     #: A None value means no quorum.
-    quorum_percent: int | None = Field(
-        default=None, serialization_alias="quorumPercent"
-    )
+    quorum_percent: int | None = Field(default=None, serialization_alias="quorumPercent")
     #: The least number of present roster persons for the quorum of a meeting vote.
     #: A None value means no least number.
-    quorum_min_present: int | None = Field(
-        default=None, serialization_alias="quorumMinPresent"
+    quorum_min_present: int | None = Field(default=None, serialization_alias="quorumMinPresent")
+    #: The quorum of a vote in a Wiederholungssitzung. None: ``quorumPercent`` applies.
+    repeat_quorum_percent: int | None = Field(
+        default=None, serialization_alias="repeatQuorumPercent"
     )
+    #: Admitted guests of a public meeting may vote. A quorum overrides the switch.
+    guests_may_vote: bool = Field(default=False, serialization_alias="guestsMayVote")
     #: The final protocols of the gremium appear on the public protocols page.
     protocols_public: bool = Field(default=False, serialization_alias="protocolsPublic")
 
@@ -183,15 +183,13 @@ class GremiumCreate(FrozenCamelModel, frozen=True):
     delegation_lead_minutes: int = Field(
         default=0, alias="delegationLeadMinutes", ge=0, le=60 * 24 * 30
     )
-    delegation_allow_external: bool = Field(
-        default=False, alias="delegationAllowExternal"
+    delegation_allow_external: bool = Field(default=False, alias="delegationAllowExternal")
+    quorum_percent: int | None = Field(default=None, alias="quorumPercent", ge=0, le=100)
+    quorum_min_present: int | None = Field(default=None, alias="quorumMinPresent", ge=1, le=1000)
+    repeat_quorum_percent: int | None = Field(
+        default=None, alias="repeatQuorumPercent", ge=0, le=100
     )
-    quorum_percent: int | None = Field(
-        default=None, alias="quorumPercent", ge=0, le=100
-    )
-    quorum_min_present: int | None = Field(
-        default=None, alias="quorumMinPresent", ge=1, le=1000
-    )
+    guests_may_vote: bool = Field(default=False, alias="guestsMayVote")
     protocols_public: bool = Field(default=False, alias="protocolsPublic")
 
 
@@ -207,15 +205,13 @@ class GremiumUpdate(FrozenCamelModel, frozen=True):
     delegation_lead_minutes: int | None = Field(
         default=None, alias="delegationLeadMinutes", ge=0, le=60 * 24 * 30
     )
-    delegation_allow_external: bool | None = Field(
-        default=None, alias="delegationAllowExternal"
+    delegation_allow_external: bool | None = Field(default=None, alias="delegationAllowExternal")
+    quorum_percent: int | None = Field(default=None, alias="quorumPercent", ge=0, le=100)
+    quorum_min_present: int | None = Field(default=None, alias="quorumMinPresent", ge=1, le=1000)
+    repeat_quorum_percent: int | None = Field(
+        default=None, alias="repeatQuorumPercent", ge=0, le=100
     )
-    quorum_percent: int | None = Field(
-        default=None, alias="quorumPercent", ge=0, le=100
-    )
-    quorum_min_present: int | None = Field(
-        default=None, alias="quorumMinPresent", ge=1, le=1000
-    )
+    guests_may_vote: bool | None = Field(default=None, alias="guestsMayVote")
     protocols_public: bool | None = Field(default=None, alias="protocolsPublic")
 
 
@@ -340,13 +336,9 @@ class ApplicationTypeOut(FrozenCamelModel, frozen=True):
     pdf_signatures: bool = Field(default=False, serialization_alias="pdfSignatures")
     comparison_offers: dict[Any, Any] | None = Field(serialization_alias="comparisonOffers")
     retention_months: int | None = Field(default=None, serialization_alias="retentionMonths")
-    active_form_version_id: UUID | None = Field(
-        serialization_alias="activeFormVersionId"
-    )
+    active_form_version_id: UUID | None = Field(serialization_alias="activeFormVersionId")
     #: The number of the active form version. ``None`` while no version is active.
-    active_form_version: int | None = Field(
-        default=None, serialization_alias="activeFormVersion"
-    )
+    active_form_version: int | None = Field(default=None, serialization_alias="activeFormVersion")
 
 
 class ApplicationTypeCreate(FrozenCamelModel, frozen=True):
@@ -357,12 +349,8 @@ class ApplicationTypeCreate(FrozenCamelModel, frozen=True):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool = Field(default=False, alias="hasBudget")
     pdf_signatures: bool = Field(default=False, alias="pdfSignatures")
-    comparison_offers: ComparisonOffers | None = Field(
-        default=None, alias="comparisonOffers"
-    )
-    retention_months: int | None = Field(
-        default=None, alias="retentionMonths", ge=1
-    )
+    comparison_offers: ComparisonOffers | None = Field(default=None, alias="comparisonOffers")
+    retention_months: int | None = Field(default=None, alias="retentionMonths", ge=1)
 
 
 class ApplicationTypeUpdate(FrozenCamelModel, frozen=True):
@@ -372,12 +360,8 @@ class ApplicationTypeUpdate(FrozenCamelModel, frozen=True):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool | None = Field(default=None, alias="hasBudget")
     pdf_signatures: bool | None = Field(default=None, alias="pdfSignatures")
-    comparison_offers: ComparisonOffers | None = Field(
-        default=None, alias="comparisonOffers"
-    )
-    retention_months: int | None = Field(
-        default=None, alias="retentionMonths", ge=1
-    )
+    comparison_offers: ComparisonOffers | None = Field(default=None, alias="comparisonOffers")
+    retention_months: int | None = Field(default=None, alias="retentionMonths", ge=1)
 
 
 class FlowVersionCreate(FrozenCamelModel, frozen=True):
@@ -604,9 +588,7 @@ class RevokeAssignmentOut(FrozenCamelModel, frozen=True):
     granted_by: str | None = Field(serialization_alias="grantedBy")
     #: The bootstrap `admin` of a person who is still a configured bootstrap admin:
     #: the startup sweep or the next login grants it again.
-    returns_automatically: bool = Field(
-        default=False, serialization_alias="returnsAutomatically"
-    )
+    returns_automatically: bool = Field(default=False, serialization_alias="returnsAutomatically")
 
 
 class RevokePoolEntryOut(FrozenCamelModel, frozen=True):
@@ -698,9 +680,7 @@ class PrincipalRevokeIn(FrozenStrictCamelModel, frozen=True):
     """Body of ``POST /admin/principals/{id}/revoke``."""
 
     gremium_ids: list[UUID] = Field(default_factory=list, alias="gremiumIds", max_length=500)
-    global_role_ids: list[UUID] = Field(
-        default_factory=list, alias="globalRoleIds", max_length=500
-    )
+    global_role_ids: list[UUID] = Field(default_factory=list, alias="globalRoleIds", max_length=500)
     deactivate: bool = False
 
 
@@ -932,10 +912,22 @@ class MeetingSettingsUpdate(FrozenStrictCamelModel, frozen=True):
     confirm_lead_minutes: int = Field(alias="confirmLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
 
 
+class GremiumDefaults(FrozenStrictCamelModel, frozen=True):
+    """The values that the form of a new Gremium starts with.
+
+    ``GET`` and ``PUT /admin/gremium-defaults`` read and replace them. A change
+    touches no Gremium that exists. The two quorum values can be null.
+    """
+
+    quorum_percent: int | None = Field(alias="quorumPercent", ge=0, le=100)
+    repeat_quorum_percent: int | None = Field(alias="repeatQuorumPercent", ge=0, le=100)
+    guests_may_vote: bool = Field(alias="guestsMayVote")
+    allow_vote_delegation: bool = Field(alias="allowVoteDelegation")
+    delegation_lead_minutes: int = Field(alias="delegationLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
+
+
 class GuestSettingsUpdate(FrozenStrictCamelModel, frozen=True):
     """Full replacement of the guest settings. Send ``linkTtlDays: null`` for no expiry."""
 
-    confirm_ttl_hours: int = Field(
-        alias="confirmTtlHours", ge=1, le=MAX_CONFIRM_TTL_HOURS
-    )
+    confirm_ttl_hours: int = Field(alias="confirmTtlHours", ge=1, le=MAX_CONFIRM_TTL_HOURS)
     link_ttl_days: int | None = Field(alias="linkTtlDays", ge=1, le=MAX_LINK_TTL_DAYS)

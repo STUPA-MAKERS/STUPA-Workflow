@@ -81,14 +81,8 @@ async def lock_tree(session: AsyncSession, budget_id: UUID | None) -> None:
     """
     if budget_id is None:
         return
-    up = (
-        select(Budget.id, Budget.parent_id)
-        .where(Budget.id == budget_id)
-        .cte("up", recursive=True)
-    )
-    chain = up.union_all(
-        select(Budget.id, Budget.parent_id).where(Budget.id == up.c.parent_id)
-    )
+    up = select(Budget.id, Budget.parent_id).where(Budget.id == budget_id).cte("up", recursive=True)
+    chain = up.union_all(select(Budget.id, Budget.parent_id).where(Budget.id == up.c.parent_id))
     top = select(chain.c.id).where(chain.c.parent_id.is_(None)).scalar_subquery()
     await session.execute(
         select(Budget)
@@ -385,9 +379,7 @@ class BudgetTreeServiceBase:
                 await self._require_choosable(top, fy)
             return fy.id
         candidates = [
-            (f.id, f.start_date, f.end_date)
-            for f in await self.choosable_years(top)
-            if f.active
+            (f.id, f.start_date, f.end_date) for f in await self.choosable_years(top) if f.active
         ]
         picked = tree_rules.pick_fiscal_year(candidates, self._today())
         if picked is None:

@@ -76,6 +76,4 @@ class TransitionResult(FrozenCamelModel, frozen=True):
 
     new_state_id: UUID = Field(alias="newStateId")
     status_event_id: UUID = Field(alias="statusEventId")
-    dispatched_actions: list[str] = Field(
-        default_factory=list, alias="dispatchedActions"
-    )
+    dispatched_actions: list[str] = Field(default_factory=list, alias="dispatchedActions")

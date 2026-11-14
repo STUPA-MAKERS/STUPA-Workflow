@@ -287,12 +287,16 @@ async def revoke_all_grants(db: AsyncSession, *, principal_id: UUID, now: dateti
         The number of revoked grants.
     """
     rows = (
-        await db.execute(
-            select(OAuthToken).where(
-                OAuthToken.principal_id == principal_id, OAuthToken.revoked_at.is_(None)
+        (
+            await db.execute(
+                select(OAuthToken).where(
+                    OAuthToken.principal_id == principal_id, OAuthToken.revoked_at.is_(None)
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for row in rows:
         revoke_grant(row, now)
     return len(rows)
@@ -308,9 +312,7 @@ async def resolve_access_token(
     """
     row = (
         await db.execute(
-            select(OAuthToken).where(
-                OAuthToken.access_token_hash == oauth.hash_token(token)
-            )
+            select(OAuthToken).where(OAuthToken.access_token_hash == oauth.hash_token(token))
         )
     ).scalar_one_or_none()
     if row is None or row.revoked_at is not None:

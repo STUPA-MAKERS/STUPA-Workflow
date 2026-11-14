@@ -125,9 +125,7 @@ async def list_oauth_grants_admin(
     total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
     rows = (
         await db.execute(
-            stmt.order_by(OAuthToken.created_at.desc())
-            .limit(query.limit)
-            .offset(query.offset)
+            stmt.order_by(OAuthToken.created_at.desc()).limit(query.limit).offset(query.offset)
         )
     ).all()
     return Page(
