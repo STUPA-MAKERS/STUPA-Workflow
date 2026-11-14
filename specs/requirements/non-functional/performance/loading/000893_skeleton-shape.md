@@ -2,7 +2,7 @@
 id: "000893"
 title: A skeleton has the shape of the loaded page
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
 tests:
