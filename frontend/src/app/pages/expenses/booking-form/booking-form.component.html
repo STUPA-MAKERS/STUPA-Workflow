@@ -100,7 +100,7 @@
                 />
               }
             }
-            <div class="mf__grid">
+            <div [class.mf__grid]="!!s.newApplicationId()">
               @if (s.newApplicationId()) {
                 <app-locked-field filled [label]="'expenses.field.fiscalYear' | t">{{
                   'expenses.form.fromApplication' | t

@@ -67,9 +67,10 @@ class _Session:
         self.committed += 1
 
 
-def _open_fy(fid: UUID, year: int = 2026) -> SimpleNamespace:
-    """Build an active open fiscal year row for the fake session."""
-    return SimpleNamespace(id=fid, start_date=date(year, 1, 1), end_date=date(year, 12, 31))
+def _open_fy(fid: UUID, year: int | None = None) -> SimpleNamespace:
+    """Build an open fiscal year row for the fake session, of this year by default."""
+    y = year or datetime.now(ZoneInfo(get_settings().local_timezone)).year
+    return SimpleNamespace(id=fid, start_date=date(y, 1, 1), end_date=date(y, 12, 31))
 
 
 def _stub_audit(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
@@ -257,22 +258,26 @@ async def test_assign_budget_picks_current_of_several_fiscal_years(
     assert app.fiscal_year_id == cur_id
 
 
-async def test_assign_budget_ambiguous_fiscal_year_left_open(
+async def test_assign_budget_without_a_current_fiscal_year_is_skipped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Leave the fiscal year open when it is ambiguous."""
-    _stub_audit(monkeypatch)
+    """A budget without a current year that a booking can take keeps the application."""
+    calls = _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
+    this_year = datetime.now(ZoneInfo(get_settings().local_timezone)).year
     app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
         current_state_id=None)
     node = SimpleNamespace(id=node_id, parent_id=None)
-    session = _Session(store={app_id: app, node_id: node}, active_fy=(uuid4(), uuid4()))
+    session = _Session(
+        store={app_id: app, node_id: node}, active_fy=(_open_fy(uuid4(), this_year + 1),)
+    )
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
     )
-    assert app.budget_id == node_id
+    assert app.budget_id is None
     assert app.fiscal_year_id is None
-    assert session.committed == 1
+    assert calls == []
+    assert session.committed == 0
 
 
 async def test_assign_budget_writes_audit_entry(monkeypatch: pytest.MonkeyPatch) -> None:

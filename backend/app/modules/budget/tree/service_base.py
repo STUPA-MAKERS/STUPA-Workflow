@@ -284,40 +284,45 @@ class BudgetTreeServiceBase:
         """Return the date of today in the time zone of the platform."""
         return datetime.now(ZoneInfo(self.settings.local_timezone)).date()
 
+    async def _decided_years(self, top: Budget) -> set[UUID] | None:
+        """Return the fiscal years of a budget whose plan is in force.
+
+        `None` for a budget without plans, because each of its years can be planned
+        without one.
+        """
+        if not top.plan_enabled:
+            return None
+        return set(
+            (
+                await self.session.scalars(
+                    select(BudgetPlan.fiscal_year_id)
+                    .join(BudgetPlanVersion, BudgetPlanVersion.plan_id == BudgetPlan.id)
+                    .join(FiscalYear, FiscalYear.id == BudgetPlan.fiscal_year_id)
+                    .where(
+                        FiscalYear.budget_id == top.id,
+                        BudgetPlanVersion.state == "in_force",
+                    )
+                )
+            ).all()
+        )
+
+    def _is_choosable(self, fy: FiscalYear, decided: set[UUID] | None) -> bool:
+        """Tell if a new booking can take the fiscal year (spec 000879)."""
+        return tree_rules.is_choosable_year(
+            fy.end_date,
+            self._today(),
+            closed=fy.closed_at is not None,
+            plan_in_force=None if decided is None else fy.id in decided,
+        )
+
     async def choosable_years(self, top: Budget) -> list[FiscalYear]:
         """Return the fiscal years of a budget that a new booking can take (spec 000879).
 
         A year that is not closed and not past. A budget with a plan gives only the
         years whose plan is in force.
         """
-        decided = (
-            set(
-                (
-                    await self.session.scalars(
-                        select(BudgetPlan.fiscal_year_id)
-                        .join(BudgetPlanVersion, BudgetPlanVersion.plan_id == BudgetPlan.id)
-                        .join(FiscalYear, FiscalYear.id == BudgetPlan.fiscal_year_id)
-                        .where(
-                            FiscalYear.budget_id == top.id,
-                            BudgetPlanVersion.state == "in_force",
-                        )
-                    )
-                ).all()
-            )
-            if top.plan_enabled
-            else None
-        )
-        today = self._today()
-        return [
-            f
-            for f in await self._fiscal_years_of(top.id)
-            if tree_rules.is_choosable_year(
-                f.end_date,
-                today,
-                closed=f.closed_at is not None,
-                plan_in_force=None if decided is None else f.id in decided,
-            )
-        ]
+        decided = await self._decided_years(top)
+        return [f for f in await self._fiscal_years_of(top.id) if self._is_choosable(f, decided)]
 
     async def _require_choosable(self, top: Budget, fy: FiscalYear) -> None:
         """Refuse a fiscal year that a new booking or assignment cannot take.
@@ -328,7 +333,7 @@ class BudgetTreeServiceBase:
                 past, or whose plan is not in force in a budget with a plan.
         """
         self._refuse_closed(fy)
-        if fy.id not in {f.id for f in await self.choosable_years(top)}:
+        if not self._is_choosable(fy, await self._decided_years(top)):
             raise ValidationProblem(
                 "The fiscal year is past or its plan is not in force.",
                 code="fiscal_year_not_choosable",

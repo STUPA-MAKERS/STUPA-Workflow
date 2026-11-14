@@ -39,7 +39,7 @@ class HostComponent {
   }
 }
 
-async function setup(pairs: BudgetYear[] | 'error', init: Partial<{ year: string; prefer: string }> = {}) {
+async function setup(pairs: BudgetYear[] | 'error') {
   const api = {
     listBudgetYears: () => (pairs === 'error' ? throwError(() => new Error('x')) : of(pairs)),
   };
@@ -47,8 +47,6 @@ async function setup(pairs: BudgetYear[] | 'error', init: Partial<{ year: string
     providers: [{ provide: BudgetTreeApi, useValue: api }],
   });
   const host = view.fixture.componentInstance;
-  host.year.set(init.year ?? '');
-  host.prefer.set(init.prefer ?? '');
   view.fixture.detectChanges();
   const inner = view.fixture.debugElement.children[0].componentInstance as unknown as {
     pick: (id: string) => void;
@@ -94,6 +92,9 @@ describe('BudgetYearSelectComponent', () => {
 
   it('tells nothing when no pair can be chosen', async () => {
     expect((await setup([])).host.got).toEqual([]);
+  });
+
+  it('tells nothing when the pairs do not load', async () => {
     expect((await setup('error')).host.got).toEqual([]);
   });
 });
