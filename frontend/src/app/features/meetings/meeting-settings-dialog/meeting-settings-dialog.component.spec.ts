@@ -103,6 +103,50 @@ describe('MeetingSettingsDialogComponent', () => {
     expect(req.request.body.endTime).toBeNull();
   });
 
+  /** § 000918 */
+  describe('late invitation', () => {
+    const inDays = (n: number): string => {
+      const d = new Date();
+      d.setDate(d.getDate() + n);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const PLANNED = { ...MEETING, gremiumId: 'g-1', kind: 'ordinary', date: inDays(2) } as Meeting;
+    const PERIODS = { guestsVoteAllowed: false, quorumPercent: null, inviteDaysOrdinary: 7, inviteDaysExtraordinary: 3 };
+
+    it('warns only for a new date that misses the period, and saves', async () => {
+      localStorage.setItem('ap.locale', 'de');
+      const { http, fixture, cmp } = await setup(PLANNED);
+      http.expectOne('/api/committees/g-1/meeting-defaults').flush(PERIODS);
+      flushRoster(http, fixture);
+      expect(screen.queryByText(/Ladungsfrist/)).toBeNull();
+      cmp.date.set(inDays(4));
+      fixture.detectChanges();
+      expect(screen.getByText('Die Ladungsfrist von 7 Tagen ist nicht mehr einzuhalten.')).toBeInTheDocument();
+      cmp.date.set(inDays(9));
+      fixture.detectChanges();
+      expect(screen.queryByText(/Ladungsfrist/)).toBeNull();
+      cmp.date.set(inDays(4));
+      cmp.save();
+      expect(http.expectOne('/api/meetings/m-1').request.body.date).toBe(inDays(4));
+    });
+
+    it('stays silent when the periods do not load, for a late answer and after the start', async () => {
+      const { http, fixture, cmp, rerender } = await setup(PLANNED);
+      const first = http.expectOne('/api/committees/g-1/meeting-defaults');
+      flushRoster(http, fixture);
+      await rerender({ inputs: { meeting: { ...PLANNED, id: 'm-2' } as Meeting, protocolFinal: false } });
+      first.flush(PERIODS);
+      expect(cmp.defaults()).toBeNull();
+      http.expectOne('/api/committees/g-1/meeting-defaults').error(new ProgressEvent('x'));
+      cmp.date.set(inDays(4));
+      expect(cmp.lateInvite()).toBeNull();
+      await rerender({ inputs: { meeting: { ...PLANNED, id: 'm-3', status: 'live' } as Meeting, protocolFinal: false } });
+      http.expectNone('/api/committees/g-1/meeting-defaults');
+      cmp.date.set(inDays(4));
+      expect(cmp.lateInvite()).toBeNull();
+    });
+  });
+
   it('locks every field of a closed meeting and saves nothing', async () => {
     const { http, fixture, cmp } = await setup({ ...MEETING, status: 'closed' } as Meeting);
     flushRoster(http, fixture);

@@ -904,6 +904,35 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
+  /** § 000922 */
+  it('POSTs a late excuse with its reason', () => {
+    api.excuseLate('m-1', 'Krank').subscribe();
+    const req = http.expectOne('/api/meetings/m-1/attendance/me/late-excuse');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ note: 'Krank' });
+    req.flush([]);
+  });
+
+  /** § 000925, § 000924 */
+  it('POSTs the draft mail and PUTs or DELETEs the approval of a protocol', () => {
+    let sent: unknown;
+    api.sendProtocolDraft('p-1').subscribe((v) => (sent = v));
+    const mail = http.expectOne('/api/protocols/p-1/draft-mail');
+    expect(mail.request.method).toBe('POST');
+    mail.flush({ recipients: 3 });
+    expect(sent).toEqual({ recipients: 3 });
+    const wire = { id: 'p-1', meetingId: 'm-1', markdown: '', status: 'final' };
+    let approved: unknown;
+    api.setProtocolApproval('p-1', 'm-2').subscribe((v) => (approved = v));
+    const put = http.expectOne({ method: 'PUT', url: '/api/protocols/p-1/approval' });
+    expect(put.request.body).toEqual({ meetingId: 'm-2' });
+    put.flush({ ...wire, approvedAt: 'x', approvedMeetingId: 'm-2', approvedMeetingTitle: 'S', approvedMeetingDate: '2026-10-29' });
+    expect(approved).toMatchObject({ approvedAt: 'x', approvedMeetingId: 'm-2', approvedMeetingTitle: 'S', approvedMeetingDate: '2026-10-29' });
+    api.setProtocolApproval('p-1', null).subscribe((v) => (approved = v));
+    http.expectOne({ method: 'DELETE', url: '/api/protocols/p-1/approval' }).flush(wire);
+    expect(approved).toMatchObject({ approvedAt: null, approvedMeetingId: null, approvedMeetingTitle: null, approvedMeetingDate: null });
+  });
+
   it('PUTs the reason of an excuse only when given', () => {
     api.setOwnAttendance('m-1', 'excused', 'Krank').subscribe();
     expect(http.expectOne('/api/meetings/m-1/attendance/me').request.body).toEqual({

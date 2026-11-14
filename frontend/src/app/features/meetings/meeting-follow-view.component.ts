@@ -39,6 +39,7 @@ import {
   type OwnAttendanceChange,
   ParticipantAttendanceComponent,
 } from './participant-attendance/participant-attendance.component';
+import { LateExcuseDialogComponent } from './late-excuse-dialog/late-excuse-dialog.component';
 import { ParticipantRosterComponent } from './participant-roster/participant-roster.component';
 import { ParticipantVoteComponent } from './participant-vote/participant-vote.component';
 import { ParticipantVoteService } from './participant-vote/participant-vote.service';
@@ -91,6 +92,7 @@ const EXCERPT_LENGTH = 160;
     SideSheetComponent,
     AgendaPaneComponent,
     TopSheetComponent,
+    LateExcuseDialogComponent,
     ParticipantAttendanceComponent,
     ParticipantVoteComponent,
     ParticipantRosterComponent,
@@ -113,6 +115,9 @@ export class MeetingFollowViewComponent {
   readonly back = output<void>();
   /** An own attendance report. */
   readonly attendanceChange = output<{ member: Attendance } & OwnAttendanceChange>();
+  /** A late excuse is stored. Carries the new roster (§ 000922). */
+  readonly lateExcused = output<Attendance[]>();
+  protected readonly lateExcuseOpen = signal(false);
 
   protected readonly phone = mediaQuery(MEDIA.phone);
   protected readonly wide = mediaQuery(MEDIA.wide);
@@ -362,6 +367,11 @@ export class MeetingFollowViewComponent {
   protected backToNow(): void {
     this.selectedId.set(null);
     this.fullText.set(false);
+  }
+
+  protected onLateExcused(roster: Attendance[]): void {
+    this.lateExcuseOpen.set(false);
+    this.lateExcused.emit(roster);
   }
 
   protected reportAttendance(change: OwnAttendanceChange): void {

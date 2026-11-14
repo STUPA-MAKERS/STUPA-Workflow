@@ -8,7 +8,7 @@ status `rendering` means the worker still renders in the background.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -72,3 +72,22 @@ class ProtocolOut(FrozenCamelModel, frozen=True):
     #: The gremium publishes its final protocols. The editor then shows the notice
     #: that the public TOPs become public.
     gremium_protocols_public: bool = Field(default=False, alias="gremiumProtocolsPublic")
+    #: The approval of the final protocol (§F/meetings/protocols/000924): the moment of
+    #: the mark and the meeting that approved it. All null without a mark. The title
+    #: and the date are null when that meeting was deleted.
+    approved_at: datetime | None = Field(default=None, alias="approvedAt")
+    approved_meeting_id: UUID | None = Field(default=None, alias="approvedMeetingId")
+    approved_meeting_title: str | None = Field(default=None, alias="approvedMeetingTitle")
+    approved_meeting_date: date | None = Field(default=None, alias="approvedMeetingDate")
+
+
+class ProtocolApprovalBody(FrozenCamelModel, frozen=True):
+    """`PUT /protocols/{id}/approval`: the meeting that approved the protocol."""
+
+    meeting_id: UUID = Field(alias="meetingId")
+
+
+class ProtocolDraftMailOut(FrozenCamelModel, frozen=True):
+    """`POST /protocols/{id}/draft-mail`: the number of addresses the draft went to."""
+
+    recipients: int

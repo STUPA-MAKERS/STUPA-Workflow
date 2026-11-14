@@ -1904,7 +1904,12 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     const defaults = /\/committees\/([^/]+)\/meeting-defaults$/.exec(p);
     if (defaults) {
       const quorum = defaults[1] === 'g0000000-0000-0000-0000-000000000001' ? 50 : null;
-      return ok({ guestsVoteAllowed: quorum === null, quorumPercent: quorum });
+      return ok({
+        guestsVoteAllowed: quorum === null,
+        quorumPercent: quorum,
+        inviteDaysOrdinary: 7,
+        inviteDaysExtraordinary: 3,
+      });
     }
     if (/\/committees\/[^/]+\/meeting-members$/.test(p)) {
       return ok(

@@ -391,6 +391,14 @@ class AttendanceSelfBody(_AttendanceNoteBody, frozen=True):
         return self
 
 
+class LateExcuseBody(FrozenStrictCamelModel, frozen=True):
+    """``POST …/attendance/me/late-excuse`` — the reason of an excuse after the meeting."""
+
+    note: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=ATTENDANCE_NOTE_MAX)
+    ]
+
+
 def _same_name(name: str) -> str:
     """Return a candidate name for the duplicate check: single spaces, lower case.
 
@@ -658,3 +666,7 @@ class MeetingDefaultsOut(FrozenCamelModel, frozen=True):
     #: Admitted guests may vote: the switch of the Gremium is on and it has no quorum.
     guests_vote_allowed: bool = Field(alias="guestsVoteAllowed")
     quorum_percent: int | None = Field(default=None, alias="quorumPercent")
+    #: The invitation periods in days (§F/administration/admin/000917): the first for
+    #: an ``ordinary`` meeting, the second for every other kind.
+    invite_days_ordinary: int = Field(alias="inviteDaysOrdinary")
+    invite_days_extraordinary: int = Field(alias="inviteDaysExtraordinary")

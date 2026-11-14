@@ -666,6 +666,13 @@
       "to": "Gremium"
     },
     {
+      "column": "approved_meeting_id",
+      "from": "Protocol",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Meeting"
+    },
+    {
       "column": "meeting_id",
       "from": "Protocol",
       "multiplicity": "1",
@@ -4757,6 +4764,42 @@
           "type": "INTEGER"
         },
         {
+          "name": "invite_days_ordinary",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "invite_days_extraordinary",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "protocol_draft_days",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "late_excuse_days",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "absence_limit",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "term_start_month",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "default_delegation_lead_minutes",
           "nullable": false,
           "primaryKey": false,
@@ -5244,6 +5287,24 @@
           "nullable": false,
           "primaryKey": false,
           "type": "INTEGER"
+        },
+        {
+          "name": "approved_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "approved_meeting_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "approved_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
         },
         {
           "name": "id",

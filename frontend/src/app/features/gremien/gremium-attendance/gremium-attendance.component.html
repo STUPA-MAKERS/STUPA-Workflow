@@ -28,6 +28,11 @@
       [text]="sortText()"
     />
     <span class="gat__grow"></span>
+    @if (canExportList()) {
+      <app-button variant="text" size="sm" [loading]="exporting()" [disabled]="loading()" (click)="exportList()">
+        {{ 'gremien.attendance.exportList' | t }}
+      </app-button>
+    }
     <app-button
       variant="text"
       [iconOnly]="true"
@@ -74,6 +79,9 @@
             <span class="mono gat__cardSum">{{ m.totals.present }}/{{ m.totals.held }}</span>
             <app-row-chevron [size]="16" />
           </span>
+          @if (m.unexcused) {
+            <span class="gat__absent" [class.gat__absent--near]="m.nearLimit">{{ m.unexcused }}</span>
+          }
           <span class="gat__cardCells">
             @for (c of m.cells; track c.month) {
               <span
@@ -154,6 +162,9 @@
                   @if (m.role) {
                     <span class="gat__role">{{ m.role }}</span>
                   }
+                  @if (m.unexcused) {
+                    <span class="gat__absent" [class.gat__absent--near]="m.nearLimit">{{ m.unexcused }}</span>
+                  }
                 </span>
               </span>
             </th>
@@ -213,4 +224,4 @@
   </ul>
 }
 
-<app-attendance-detail [gremiumId]="gremiumId()" />
+<app-attendance-detail [gremiumId]="gremiumId()" (changed)="load()" />

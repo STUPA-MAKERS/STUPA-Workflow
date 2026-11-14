@@ -69,6 +69,16 @@ describe('GremienApiService', () => {
     req.flush({});
   });
 
+  /** § 000923 */
+  it('reads the attendance list of a date range as a file', () => {
+    api.attendanceExport('g-1', '2026-04-01', '2026-09-30').subscribe();
+    const req = http.expectOne((r) => r.url === '/api/committees/g-1/attendance/export.xlsx');
+    expect(req.request.params.get('from')).toBe('2026-04-01');
+    expect(req.request.params.get('to')).toBe('2026-09-30');
+    expect(req.request.responseType).toBe('blob');
+    req.flush(new Blob(['x']));
+  });
+
   it('sends only the decision filters that are set', () => {
     api.decisions('g-1').subscribe();
     const plain = http.expectOne((r) => r.url === '/api/committees/g-1/decisions');

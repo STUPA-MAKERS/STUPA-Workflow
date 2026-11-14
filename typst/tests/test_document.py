@@ -172,6 +172,16 @@ def test_the_footer_graphic_is_the_skyline_an_asset_or_none() -> None:
         build_document("x", variant=None, config={"footer_graphic": 3})
 
 
+def test_the_page_watermark_is_the_config_text_or_none() -> None:
+    """§F/meetings/protocols/000925: the draft of a protocol has "Entwurf" on every page."""
+    assert build_document("x", variant=None)["watermark"] is None
+    assert build_document("x", variant=None, config={"watermark": " "})["watermark"] is None
+    doc = build_document("x", variant=None, config={"watermark": " Entwurf "})
+    assert doc["watermark"] == "Entwurf"
+    with pytest.raises(ConversionError, match="watermark"):
+        build_document("x", variant=None, config={"watermark": 3})
+
+
 def test_unknown_logo_and_variant() -> None:
     with pytest.raises(ConversionError, match="unknown logo"):
         build_document("x", variant=None, config={"logos": ["missing.png"]})

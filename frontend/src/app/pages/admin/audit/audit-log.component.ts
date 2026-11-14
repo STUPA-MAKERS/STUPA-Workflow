@@ -106,6 +106,8 @@ export const AUDIT_ACTIONS = [
   'protocol_delete',
   'protocol_finalize',
   'protocol_publication',
+  'protocol_draft_mail',
+  'protocol_approval',
   'vote_delete',
   'vote_open',
   'vote_close',

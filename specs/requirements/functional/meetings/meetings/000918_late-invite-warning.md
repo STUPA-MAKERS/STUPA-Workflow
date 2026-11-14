@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - frontend/src/app/features/meetings/meeting-kind.util.ts
+  - frontend/src/app/features/meetings/create-meeting-dialog/create-meeting-dialog.component.ts
 scope:
   - frontend/src/app/features/meetings
 ---

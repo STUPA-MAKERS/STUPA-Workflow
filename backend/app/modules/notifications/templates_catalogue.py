@@ -192,6 +192,23 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         },
     ),
     MailTemplateSpec(
+        "absence_limit",
+        "meeting",
+        meetings.BUILTIN_ABSENCE_LIMIT_SUBJECT,
+        meetings.BUILTIN_ABSENCE_LIMIT_BODY,
+        {
+            "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
+            "memberName": "Name des Mitglieds",
+            "count": "Zahl der unentschuldigten Fehlzeiten in der Amtszeit",
+            "limit": "Grenze der Fehlzeiten",
+            "reached": "Die Grenze ist erreicht (sonst: eine Fehlzeit davor)",
+            "meetingTitle": "Titel der Sitzung",
+            "meetingDate": "Datum",
+            "gremiumName": "Gremium",
+            "meetingId": "ID der Sitzung",
+        },
+    ),
+    MailTemplateSpec(
         "delegation_granted",
         "delegation",
         meetings.BUILTIN_DELEGATION_GRANTED_SUBJECT,

@@ -11,6 +11,18 @@ function makeApi() {
   return {
     getMeetingSettings: jest.fn(() => of({ openLeadMinutes: 60, confirmLeadMinutes: 10 })),
     putMeetingSettings: jest.fn((b: object) => of({ ...b, updatedAt: null })),
+    getMeetingPeriods: jest.fn(() =>
+      of({
+        inviteDaysOrdinary: 7,
+        inviteDaysExtraordinary: 3,
+        protocolDraftDays: 14,
+        lateExcuseDays: 7,
+        absenceLimit: 3,
+        circularMinDays: 3,
+        termStartMonth: 10,
+      }),
+    ),
+    putMeetingPeriods: jest.fn((b: object) => of(b)),
     getGuestSettings: jest.fn(() => of({ confirmTtlHours: 12, linkTtlDays: null })),
     putGuestSettings: jest.fn((b: object) => of(b)),
   };

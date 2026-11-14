@@ -302,6 +302,43 @@ describe('CreateMeetingDialogComponent', () => {
     expect(cmp.title()).toBe('Studierendenparlament meeting on 10 November 2026');
   });
 
+  /** § 000918 */
+  describe('late invitation', () => {
+    const inDays = (n: number): string => {
+      const d = new Date();
+      d.setDate(d.getDate() + n);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    it('warns when the date is nearer than the period of the kind and still goes on', async () => {
+      localStorage.setItem('ap.locale', 'de');
+      const { http, cmp, fixture } = await setup();
+      fixture.debugElement.injector.get(I18nService).setLocale('de');
+      flushGremien(http, fixture);
+      cmp.onGremiumChange('g-1');
+      http.expectOne('/api/committees/g-1/meeting-members').flush([]);
+      http
+        .expectOne('/api/committees/g-1/meeting-defaults')
+        .flush({ guestsVoteAllowed: false, quorumPercent: 50, inviteDaysOrdinary: 7, inviteDaysExtraordinary: 3 });
+      cmp.date.set(inDays(10));
+      cmp.time.set('18:00');
+      fixture.detectChanges();
+      expect(screen.queryByText(/Ladungsfrist/)).toBeNull();
+      cmp.date.set(inDays(5));
+      fixture.detectChanges();
+      expect(screen.getByText('Die Ladungsfrist von 7 Tagen ist nicht mehr einzuhalten.')).toBeInTheDocument();
+      cmp.kind.set('repeat');
+      fixture.detectChanges();
+      expect(screen.queryByText(/Ladungsfrist/)).toBeNull();
+      cmp.date.set(inDays(2));
+      fixture.detectChanges();
+      expect(screen.getByText('Die Ladungsfrist von 3 Tagen ist nicht mehr einzuhalten.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Weiter' })).toBeEnabled();
+      cmp.next();
+      expect(cmp.step()).toBe(2);
+    });
+  });
+
   describe('public participation', () => {
     /** §F/meetings/meetings/000904, §F/meetings/meetings/000905 */
     it('lets guests only watch where the Gremium gives them no ballot', async () => {

@@ -1151,6 +1151,40 @@ export interface GremiumDefaults {
   readonly delegationMaxPerDelegate: number;
 }
 
+/**
+ * The periods of the Geschäftsordnung (P admin.deadlines): `GET/PUT /admin/meeting-periods`
+ * (§ 000917). The `…Days` values are days.
+ */
+export interface MeetingPeriods {
+  /** Days between the invitation and an ordinary meeting. */
+  readonly inviteDaysOrdinary: number;
+  /** Days between the invitation and a meeting of every other kind. */
+  readonly inviteDaysExtraordinary: number;
+  /** Days after a meeting until the draft of the protocol is due. */
+  readonly protocolDraftDays: number;
+  /** Days after the close of a meeting in which a member can still give an excuse. */
+  readonly lateExcuseDays: number;
+  /** The number of unexcused absences in one term that ends a Mandat. */
+  readonly absenceLimit: number;
+  /** The shortest window of an Umlaufbeschluss, in days. */
+  readonly circularMinDays: number;
+  /** The month (1 to 12) in which a term starts. */
+  readonly termStartMonth: number;
+}
+
+export type MeetingPeriodKey = keyof MeetingPeriods;
+
+/** The lowest and the highest value of each {@link MeetingPeriods} field. */
+export const MEETING_PERIOD_BOUNDS: Readonly<Record<MeetingPeriodKey, readonly [number, number]>> = {
+  inviteDaysOrdinary: [0, 365],
+  inviteDaysExtraordinary: [0, 365],
+  protocolDraftDays: [0, 365],
+  lateExcuseDays: [0, 365],
+  absenceLimit: [1, 50],
+  circularMinDays: [0, 365],
+  termStartMonth: [1, 12],
+};
+
 /** Upper bound of both {@link MeetingSettings} values (`MAX_LEAD_MINUTES`, one week). */
 export const MAX_LEAD_MINUTES = 10080;
 

@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - backend/app/modules/meetings/absence.py
+  - backend/app/modules/gremien_overview/service.py
+  - frontend/src/app/features/gremien/gremium-attendance/gremium-attendance.component.ts
 scope:
   - backend/app/modules/gremien_overview
   - frontend/src/app/features/gremien

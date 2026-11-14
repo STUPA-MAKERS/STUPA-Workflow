@@ -9,7 +9,7 @@ cells and the decision rows.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
@@ -246,7 +246,7 @@ async def test_meetings_counts_the_roster() -> None:
     service = _svc(
         result(closed, planned),
         result((closed.id, 4)),
-        result((closed.id, "final")),
+        result((closed.id, "final", datetime(2026, 6, 1, tzinfo=UTC))),
         result(
             (closed.id, member, "present"),
             (closed.id, guest, "present"),
@@ -257,6 +257,7 @@ async def test_meetings_counts_the_roster() -> None:
     first, second = await service.meetings(G1)
     assert (first.agenda_item_count, first.present_count, first.member_count) == (4, 2, 4)
     assert first.protocol_status == "final"
+    assert (first.protocol_approved, second.protocol_approved) == (True, False)
     assert (second.agenda_item_count, second.present_count, second.member_count) == (0, 0, 2)
     assert second.protocol_status is None
 
@@ -267,9 +268,13 @@ async def test_attendance_matrix_rows() -> None:
         result(("2026-05", 2)),
         result((me_id, "2026-05", 2, 0, 0), (guest_id, "2026-05", 1, 1, 1)),
         result((me_id, "vorstand", {"de": "Vorstand"})),
+        result((guest_id, 2)),
         result((me_id, "Me", "me"), (guest_id, "Gast", "g")),
+        gets=(SimpleNamespace(term_start_month=4, absence_limit=5),),
     )
     out = await service.attendance(G1, ME, from_month="2026-05", to_month="2026-06")
+    assert out.absence_limit == 5 and (out.term_start.month, out.term_start.day) == (4, 1)
+    assert {r.display_name: r.unexcused for r in out.rows} == {"Gast": 2, "Me": 0}
     assert out.from_month == "2026-05" and out.to_month == "2026-06"
     assert [(m.month, m.meetings) for m in out.months] == [("2026-05", 2), ("2026-06", 0)]
     assert [r.display_name for r in out.rows] == ["Gast", "Me"]
@@ -288,6 +293,7 @@ async def test_attendance_without_people() -> None:
         G1, ME, from_month=None, to_month=None
     )
     assert out.rows == [] and len(out.months) == 6
+    assert out.absence_limit == 3 and out.term_start.month == 10
 
 
 async def test_attendance_unknown_principal_row() -> None:
@@ -306,14 +312,13 @@ async def test_member_attendance_unknown_principal() -> None:
 
 async def test_member_attendance_unrelated_principal() -> None:
     with pytest.raises(NotFoundError):
-        await _svc(result(None), gets=(SimpleNamespace(display_name="X"),)).member_attendance(
-            G1, uuid.uuid4(), "2026-05"
-        )
+        person = SimpleNamespace(display_name="X", sub="x")
+        await _svc(result(None), gets=(person,)).member_attendance(G1, uuid.uuid4(), "2026-05")
 
 
 async def test_member_attendance_without_meetings() -> None:
     out = await _svc(
-        result(True), result(), gets=(SimpleNamespace(display_name="X"),)
+        result(True), result(), gets=(SimpleNamespace(display_name="X", sub="x"),)
     ).member_attendance(G1, uuid.uuid4(), "2026-12")
     assert out.meetings == [] and out.month == "2026-12" and out.display_name == "X"
 
@@ -323,12 +328,12 @@ async def test_member_attendance_states() -> None:
     day = date(2026, 5, 1)
     service = _svc(
         result(True),
-        result(*((mid, f"S{n}", day, time(18, 0)) for n, mid in enumerate(m))),
+        result(*((mid, f"S{n}", day, time(18, 0), None) for n, mid in enumerate(m))),
         result((m[0], "present"), (m[1], "excused"), (m[2], "absent"), (m[3], "excused")),
         result(
             (m[3], "Kai"),
         ),
-        gets=(SimpleNamespace(display_name="Finn"),),
+        gets=(SimpleNamespace(display_name="Finn", sub="finn"),),
     )
     out = await service.member_attendance(G1, uuid.uuid4(), "2026-05")
     assert [(r.status, r.delegate_name) for r in out.meetings] == [
@@ -337,6 +342,43 @@ async def test_member_attendance_states() -> None:
         ("absent", None),
         ("delegated", "Kai"),
         ("absent", None),
+    ]
+    assert all(r.late_excuse_until is None for r in out.meetings)
+
+
+@pytest.mark.parametrize("stored", [None, 2])
+async def test_member_attendance_late_excuse_window_of_the_own_absence(stored: int | None) -> None:
+    """Carry the end of the window only on an own ``absent`` record while it is open.
+
+    The record of the first meeting is open. The second closed too long ago, the third
+    has a vote transfer, the fourth has no close time and the fifth is no absence.
+    """
+    m = [uuid.uuid4() for _ in range(5)]
+    day = date(2026, 5, 1)
+    fresh = datetime.now(UTC) - timedelta(hours=1)
+    old = datetime.now(UTC) - timedelta(days=30)
+    service = _svc(
+        result(True),
+        result(
+            (m[0], "S0", day, time(18, 0), fresh),
+            (m[1], "S1", day, time(18, 0), old),
+            (m[2], "S2", day, time(18, 0), fresh),
+            (m[3], "S3", day, time(18, 0), None),
+            (m[4], "S4", day, time(18, 0), fresh),
+        ),
+        result((m[0], "absent"), (m[1], "absent"), (m[2], "absent"), (m[3], "absent")),
+        result((m[2], "Kai")),
+        result(*([] if stored is None else [stored])),
+        gets=(SimpleNamespace(display_name="Finn", sub="finn"),),
+    )
+    out = await service.member_attendance(G1, uuid.uuid4(), "2026-05", requester_sub="finn")
+    days = 7 if stored is None else stored
+    assert [r.late_excuse_until for r in out.meetings] == [
+        fresh + timedelta(days=days),
+        None,
+        None,
+        None,
+        None,
     ]
 
 

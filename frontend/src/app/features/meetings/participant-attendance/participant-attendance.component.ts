@@ -14,6 +14,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
+  ButtonComponent,
   InputComponent,
   SegmentedComponent,
   type SegmentedOption,
@@ -40,13 +41,16 @@ export interface OwnAttendanceChange {
  * meeting, shows as text. A member with an active delegation of the meeting cannot
  * report "Anwesend": the option is off and the reason stands below it.
  *
+ * While the window of a late excuse is open (`lateExcuseUntil`), the absence of a closed
+ * meeting shows "Nachträglich entschuldigen".
+ *
  * Projected content goes at the end of the box.
  */
 @Component({
   selector: 'app-participant-attendance',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, InputComponent, SegmentedComponent, StatusTextComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, InputComponent, SegmentedComponent, StatusTextComponent],
   templateUrl: './participant-attendance.component.html',
   styleUrl: './participant-attendance.component.scss',
 })
@@ -62,6 +66,8 @@ export class ParticipantAttendanceComponent {
   readonly delegated = input(false);
 
   readonly change = output<OwnAttendanceChange>();
+  /** "Nachträglich entschuldigen": the member asks for the dialog of a late excuse (§ 000922). */
+  readonly lateExcuse = output<void>();
 
   /** The reason as the member types it. */
   protected readonly draft = signal('');

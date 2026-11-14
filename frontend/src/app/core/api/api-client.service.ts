@@ -908,6 +908,16 @@ export class ApiClient {
     );
   }
 
+  /**
+   * POST /meetings/{id}/attendance/me/late-excuse — change the own absence of a closed
+   * meeting to an excuse, with the reason (§ 000922). 409 `late_excuse_expired` after the period.
+   */
+  excuseLate(meetingId: Uuid, note: string): Observable<Attendance[]> {
+    return this.http.post<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance/me/late-excuse`, {
+      note,
+    });
+  }
+
   /** PUT /meetings/{id}/attendance/{principalId} — set a member (meeting lead). */
   setMemberAttendance(
     meetingId: Uuid,
@@ -1311,6 +1321,26 @@ export class ApiClient {
     return this.http
       .patch<ProtocolOutWire>(`${this.base}/protocols/${protocolId}`, { publicWithheld })
       .pipe(map(mapProtocol));
+  }
+
+  /**
+   * POST /protocols/{id}/draft-mail — send the PDF of a draft, with the watermark
+   * "Entwurf", to the members of the Gremium (§ 000925). The state stays `draft`.
+   */
+  sendProtocolDraft(protocolId: Uuid): Observable<{ readonly recipients: number }> {
+    return this.http.post<{ readonly recipients: number }>(`${this.base}/protocols/${protocolId}/draft-mail`, {});
+  }
+
+  /**
+   * PUT /protocols/{id}/approval — mark a final protocol as approved by `meetingId`;
+   * `null` removes the mark (DELETE). Needs the right to finalize (§ 000924).
+   */
+  setProtocolApproval(protocolId: Uuid, meetingId: Uuid | null): Observable<Protocol> {
+    const url = `${this.base}/protocols/${protocolId}/approval`;
+    const req = meetingId
+      ? this.http.put<ProtocolOutWire>(url, { meetingId })
+      : this.http.delete<ProtocolOutWire>(url);
+    return req.pipe(map(mapProtocol));
   }
 
   /** POST /protocols/{id}/finalize — →PDF (typst) → MinIO + MAIL_LIST.

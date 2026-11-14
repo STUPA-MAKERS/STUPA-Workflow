@@ -114,6 +114,9 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/committees"): "master data: id, name and variant of every gremium",
     ("GET", "/api/committees/overview"): "GremienService.overview (policy.GREMIUM_VIEW_ALL)",
     ("GET", "/api/committees/{gremium_id}/attendance"): _GREMIUM_VIEW,
+    ("GET", "/api/committees/{gremium_id}/attendance/export.xlsx"): (
+        "gremien_overview.router (session.manage in the Gremium)"
+    ),
     ("GET", "/api/committees/{gremium_id}/attendance/{principal_id}"): _GREMIUM_VIEW,
     ("GET", "/api/committees/{gremium_id}/decisions"): _GREMIUM_VIEW,
     ("GET", "/api/committees/{gremium_id}/logo"): "policy.can_view_gremium",
@@ -140,6 +143,9 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("PUT", "/api/meetings/{meeting_id}/agenda/{item_id}/done"): _MEETING_WRITE,
     ("GET", "/api/meetings/{meeting_id}/attendance"): _LIVE,
     ("PUT", "/api/meetings/{meeting_id}/attendance/me"): "AttendanceService.set_self (own row)",
+    ("POST", "/api/meetings/{meeting_id}/attendance/me/late-excuse"): (
+        "AttendanceService.excuse_late (own row)"
+    ),
     ("PUT", "/api/meetings/{meeting_id}/attendance/{principal_id}"): (
         "livevote.router._require_lead (PermissionOps.can_write)"
     ),
@@ -183,6 +189,9 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ),
     ("DELETE", "/api/protocols/{protocol_id}"): _PROTOCOL_WRITE,
     ("POST", "/api/protocols/{protocol_id}/finalize"): "ProtocolService.authorize_finalize",
+    ("POST", "/api/protocols/{protocol_id}/draft-mail"): "ProtocolService.authorize_write",
+    ("PUT", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
+    ("DELETE", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
     ("GET", "/api/protocols/{protocol_id}/pdf"): _PROTOCOL_READ,
     ("GET", "/api/protocols/{protocol_id}/pdf/public"): _PROTOCOL_READ,
     ("POST", "/api/protocols/{protocol_id}/votes"): _PROTOCOL_WRITE,

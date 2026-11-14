@@ -16,6 +16,7 @@ import type {
   GuestsMode,
   JoinLink,
   Meeting,
+  MeetingDefaults,
   MeetingForm,
   MeetingKind,
   MeetingPatchBody,
@@ -36,7 +37,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { problemCode, problemDetail } from '@core/api/problem';
 import { MeetingGuestsService } from '../meeting-guests.service';
-import { MEETING_LOCATION_MAX, meetingFormOptions, meetingKindOptions } from '../meeting-kind.util';
+import { lateInviteDays, MEETING_LOCATION_MAX, meetingFormOptions, meetingKindOptions } from '../meeting-kind.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
 import { personLabel } from '@shared/person-label.util';
 
@@ -112,6 +113,17 @@ export class MeetingSettingsDialogComponent {
       ? this.i18n.translate('meetings.location.tooLong', { max: MEETING_LOCATION_MAX })
       : '',
   );
+  /** The invitation periods of the Gremium, read for a planned meeting. */
+  readonly defaults = signal<MeetingDefaults | null>(null);
+  /**
+   * The invitation period that a new date misses, else `null`. Only a planned meeting
+   * with a changed date warns, and the warning never blocks the save (§ 000918).
+   */
+  readonly lateInvite = computed(() => {
+    const m = this.meeting();
+    if (m?.status !== 'planned' || this.date().trim() === m.date) return null;
+    return lateInviteDays(this.date(), this.kind(), this.defaults());
+  });
   /** The kind is fixed from the start of the meeting on. */
   readonly kindLocked = computed(() => this.meeting()?.status !== 'planned');
   readonly link = signal<JoinLink | null>(null);
@@ -186,6 +198,8 @@ export class MeetingSettingsDialogComponent {
     this.rotating.set(false);
     this.confirmOff.set(false);
     if (m.publicJoin && m.canManage) this.loadLink(m);
+    this.defaults.set(null);
+    if (m.status === 'planned' && m.gremiumId) this.loadDefaults(m.id, m.gremiumId);
     this.roster.set([]);
     this.api.listAttendance(m.id, { quiet: true }).subscribe({
       next: (rows) => {
@@ -193,6 +207,15 @@ export class MeetingSettingsDialogComponent {
         this.keeper.set(m.protokollantId ?? '');
       },
       error: () => this.roster.set([]),
+    });
+  }
+
+  private loadDefaults(meetingId: string, gremiumId: string): void {
+    this.api.meetingDefaults(gremiumId).subscribe({
+      next: (d) => {
+        if (this.meeting()?.id === meetingId) this.defaults.set(d);
+      },
+      error: () => {},
     });
   }
 

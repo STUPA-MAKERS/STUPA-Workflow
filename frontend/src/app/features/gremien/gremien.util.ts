@@ -97,6 +97,13 @@ export function presetRange(preset: RangePreset, today: Date): MonthRange {
   }
 }
 
+/** The first and the last day (`YYYY-MM-DD`) of a range of months. */
+export function rangeDays(range: MonthRange): { readonly from: string; readonly to: string } {
+  const [year, month] = range.to.split('-').map(Number);
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return { from: `${range.from}-01`, to: `${range.to}-${String(last).padStart(2, '0')}` };
+}
+
 /**
  * The semester of a range that starts in April or October: `{ summer, year }` with the
  * year of the start, else null.

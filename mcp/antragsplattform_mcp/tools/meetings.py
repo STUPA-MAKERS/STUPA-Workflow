@@ -588,6 +588,47 @@ async def finalize_protocol(protocol_id: str, public_withheld: bool | None = Non
 
 
 @group.tool
+async def send_protocol_draft(protocol_id: str) -> dict:
+    """Mail the PDF of a protocol draft to the members of its Gremium.
+
+    Each page of the PDF has the watermark "Entwurf". The protocol stays a draft.
+    Requires the write access to the protocol. A protocol that is not a draft gives
+    409 `protocol_not_draft`. Returns `{recipients}`, the number of addresses. The
+    send goes into the audit log (`protocol_draft_mail`).
+    """
+    return await api().post(f"/protocols/{protocol_id}/draft-mail")
+
+
+@group.tool
+async def set_protocol_approval(protocol_id: str, approved_in_meeting_id: str | None) -> dict:
+    """Mark a final protocol as approved, or remove the mark.
+
+    `approved_in_meeting_id` is the meeting that approved the protocol: another
+    meeting of the same Gremium (else 422 `invalid_approval_meeting`). `None` removes
+    the mark. Requires the gremium permission protocol.finalize. A protocol that is
+    not final gives 409 `protocol_not_final`. The change goes into the audit log
+    (`protocol_approval`).
+    """
+    path = f"/protocols/{protocol_id}/approval"
+    if approved_in_meeting_id is None:
+        return await api().delete(path)
+    return await api().put(path, json={"meetingId": approved_in_meeting_id})
+
+
+@group.tool
+async def excuse_own_absence(meeting_id: str, note: str) -> dict:
+    """Change the own `absent` of a closed meeting to `excused`, with the reason.
+
+    The window ends `lateExcuseDays` days after the close (409 `late_excuse_expired`).
+    The roster row of the caller has `lateExcuseUntil` while the window is open. A
+    meeting that is not closed gives 409 `meeting_not_closed`, a caller without an
+    `absent` record 409 `not_absent`.
+    """
+    path = f"/meetings/{meeting_id}/attendance/me/late-excuse"
+    return await api().post(path, json={"note": note})
+
+
+@group.tool
 async def list_delegations() -> dict:
     """List the meeting delegations: who delegates attendance and voting to whom."""
     return await api().get("/delegations")

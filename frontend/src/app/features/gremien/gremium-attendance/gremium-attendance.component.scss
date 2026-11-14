@@ -185,6 +185,15 @@ tbody tr:last-child .gat__td:last-child {
   color: var(--color-text-muted);
   font-size: 0.75rem;
 }
+.gat__absent {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-align: start;
+}
+.gat__absent--near {
+  color: var(--color-warning);
+  font-weight: var(--fw-semibold);
+}
 
 .gat__cell {
   --gat-s: 0%;

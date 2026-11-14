@@ -99,6 +99,12 @@ class AuditAction(StrEnum):
         PROTOCOL_PUBLICATION: A protocol held back from the public protocols page or
             released. ``data`` carries the meeting, the gremium and the old and new
             ``publicWithheld``.
+        PROTOCOL_DRAFT_MAIL: The draft of a protocol sent to the members of the
+            Gremium. ``data`` carries the meeting, the gremium and the number of
+            recipients, never an address.
+        PROTOCOL_APPROVAL: A final protocol marked as approved, or the mark removed.
+            ``data`` carries the meeting, the gremium and the approving meeting
+            (``approvedMeetingId``, null for a removed mark).
         PROTOKOLLANT_HANDOVER: Handover of the minutes in a live meeting. ``data``
             carries the ``mode`` (``now``, ``next_item``, ``activate`` when an agenda
             move starts the planned period, ``cancel`` when the planned handover goes
@@ -195,6 +201,8 @@ class AuditAction(StrEnum):
     PROTOCOL_DELETE = "protocol_delete"
     PROTOCOL_FINALIZE = "protocol_finalize"
     PROTOCOL_PUBLICATION = "protocol_publication"
+    PROTOCOL_DRAFT_MAIL = "protocol_draft_mail"
+    PROTOCOL_APPROVAL = "protocol_approval"
     PROTOKOLLANT_HANDOVER = "protokollant_handover"
     VOTE_DELETE = "vote_delete"
     VOTE_OPEN = "vote_open"

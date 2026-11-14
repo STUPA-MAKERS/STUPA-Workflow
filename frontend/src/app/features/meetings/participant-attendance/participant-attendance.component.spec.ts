@@ -21,6 +21,7 @@ async function setup(
   opts: { status?: MeetingStatus; delegated?: boolean; saving?: boolean } = {},
 ) {
   const change = jest.fn();
+  const lateExcuse = jest.fn();
   const view = await render(ParticipantAttendanceComponent, {
     inputs: {
       member,
@@ -28,9 +29,9 @@ async function setup(
       delegated: opts.delegated ?? false,
       saving: opts.saving ?? false,
     },
-    on: { change },
+    on: { change, lateExcuse },
   });
-  return { ...view, change };
+  return { ...view, change, lateExcuse };
 }
 
 describe('ParticipantAttendanceComponent', () => {
@@ -135,5 +136,15 @@ describe('ParticipantAttendanceComponent', () => {
     await setup(me({ status: 'present', source: 'self' }), { delegated: true });
     expect(screen.getByRole('radio', { name: 'Anwesend' })).toBeEnabled();
     expect(screen.queryByText(/Widerrufe die Vertretung/)).toBeNull();
+  });
+
+  /** § 000922 */
+  it('offers the late excuse only while the window of the own absence is open', async () => {
+    const { lateExcuse, fixture } = await setup(me({ status: 'absent', source: 'lead' }), { status: 'closed' });
+    expect(screen.queryByRole('button', { name: 'Nachträglich entschuldigen' })).toBeNull();
+    fixture.componentRef.setInput('member', me({ status: 'absent', source: 'lead', lateExcuseUntil: '2026-11-21T20:00:00Z' }));
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Nachträglich entschuldigen' }));
+    expect(lateExcuse).toHaveBeenCalledTimes(1);
   });
 });

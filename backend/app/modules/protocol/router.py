@@ -36,8 +36,11 @@ from app.modules.files.storage import ObjectStorage
 from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.pdf.typst_client import build_typst_client
+from app.modules.protocol.draft_mail import DraftMailer
 from app.modules.protocol.queue import enqueue_public_backfill, protocol_render_queue_from_pool
 from app.modules.protocol.schemas import (
+    ProtocolApprovalBody,
+    ProtocolDraftMailOut,
     ProtocolFinalizeBody,
     ProtocolOut,
     ProtocolPatch,
@@ -270,6 +273,67 @@ async def finalize_protocol(
         await MeetingService(service.session, BrokerPublisher(broker)).broadcast_state(
             out.meeting_id, principal
         )
+    return out
+
+
+@router.post(
+    "/protocols/{protocol_id}/draft-mail",
+    response_model=ProtocolDraftMailOut,
+    responses=_errors(400, 401, 403, 404, 409, 503),
+)
+async def send_protocol_draft(
+    protocol_id: UUID, service: ServiceDep, principal: PrincipalDep
+) -> ProtocolDraftMailOut:
+    """Send the PDF of a draft to the members of the Gremium.
+
+    Each page of the PDF has the watermark "Entwurf". The send changes nothing on the
+    protocol: it stays a draft. The caller needs the write access to the protocol. A
+    protocol that is not a draft answers 409 ``protocol_not_draft``. The send writes
+    ``protocol_draft_mail`` with the number of recipients.
+    """
+    await service.authorize_write(protocol_id, principal)
+    sent = await DraftMailer(service).send(protocol_id, now=datetime.now(UTC), actor=principal.sub)
+    await service.session.commit()
+    return ProtocolDraftMailOut(recipients=sent)
+
+
+@router.put(
+    "/protocols/{protocol_id}/approval",
+    response_model=ProtocolOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def approve_protocol(
+    protocol_id: UUID,
+    payload: ProtocolApprovalBody,
+    service: ServiceDep,
+    principal: PrincipalDep,
+) -> ProtocolOut:
+    """Mark a final protocol as approved and name the meeting that approved it.
+
+    The caller needs ``protocol.finalize`` in the Gremium. A protocol that is not final
+    answers 409 ``protocol_not_final``. The meeting must be another meeting of the same
+    Gremium (422 ``invalid_approval_meeting``). The mark writes ``protocol_approval``.
+    """
+    await service.authorize_finalize(protocol_id, principal)
+    out = await service.set_approval(
+        protocol_id, payload.meeting_id, now=datetime.now(UTC), actor=principal.sub
+    )
+    await service.session.commit()
+    return out
+
+
+@router.delete(
+    "/protocols/{protocol_id}/approval",
+    response_model=ProtocolOut,
+    responses=_errors(401, 403, 404),
+)
+async def unapprove_protocol(
+    protocol_id: UUID, service: ServiceDep, principal: PrincipalDep
+) -> ProtocolOut:
+    """Remove the approval mark of a protocol (``protocol.finalize``)."""
+    await service.authorize_finalize(protocol_id, principal)
+    out = await service.set_approval(protocol_id, None, now=datetime.now(UTC), actor=principal.sub)
+    await service.session.commit()
     return out
 
 

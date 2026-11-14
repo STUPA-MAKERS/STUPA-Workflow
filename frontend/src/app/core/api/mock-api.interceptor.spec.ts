@@ -287,10 +287,14 @@ describe('mockApiInterceptor', () => {
       expect(await get('/api/committees/g0000000-0000-0000-0000-000000000001/meeting-defaults')).toEqual({
         guestsVoteAllowed: false,
         quorumPercent: 50,
+        inviteDaysOrdinary: 7,
+        inviteDaysExtraordinary: 3,
       });
       expect(await get('/api/committees/g-other/meeting-defaults')).toEqual({
         guestsVoteAllowed: true,
         quorumPercent: null,
+        inviteDaysOrdinary: 7,
+        inviteDaysExtraordinary: 3,
       });
     });
 

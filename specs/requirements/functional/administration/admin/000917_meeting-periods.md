@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - backend/app/modules/meetings/periods.py
+  - backend/app/modules/admin/router.py
+  - frontend/src/app/pages/admin/deadlines/meeting-periods/meeting-periods.component.ts
 scope:
   - backend/app/modules/admin
   - backend/app/modules/meetings

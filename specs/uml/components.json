@@ -96,7 +96,7 @@
       "to": "livevote"
     },
     {
-      "count": 7,
+      "count": 8,
       "from": "admin",
       "to": "meetings"
     },
@@ -731,27 +731,32 @@
       "to": "applications"
     },
     {
-      "count": 3,
+      "count": 2,
+      "from": "gremien_overview",
+      "to": "audit"
+    },
+    {
+      "count": 5,
       "from": "gremien_overview",
       "to": "auth"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "gremien_overview",
       "to": "delegations"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "gremien_overview",
       "to": "gremien"
     },
     {
-      "count": 3,
+      "count": 7,
       "from": "gremien_overview",
       "to": "meetings"
     },
     {
-      "count": 5,
+      "count": 7,
       "from": "gremien_overview",
       "to": "shared"
     },
@@ -796,12 +801,12 @@
       "to": "flow"
     },
     {
-      "count": 8,
+      "count": 9,
       "from": "livevote",
       "to": "gremien"
     },
     {
-      "count": 34,
+      "count": 37,
       "from": "livevote",
       "to": "meetings"
     },
@@ -856,7 +861,7 @@
       "to": "audit"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "meetings",
       "to": "auth"
     },
@@ -866,7 +871,7 @@
       "to": "budget"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "meetings",
       "to": "delegations"
     },
@@ -876,7 +881,7 @@
       "to": "flow"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "meetings",
       "to": "gremien"
     },
@@ -1001,7 +1006,7 @@
       "to": "applications"
     },
     {
-      "count": 2,
+      "count": 6,
       "from": "protocol",
       "to": "audit"
     },
@@ -1026,7 +1031,7 @@
       "to": "files"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "protocol",
       "to": "gremien"
     },
@@ -1041,12 +1046,12 @@
       "to": "media"
     },
     {
-      "count": 12,
+      "count": 15,
       "from": "protocol",
       "to": "meetings"
     },
     {
-      "count": 7,
+      "count": 12,
       "from": "protocol",
       "to": "notifications"
     },
@@ -1056,7 +1061,7 @@
       "to": "pdf"
     },
     {
-      "count": 21,
+      "count": 24,
       "from": "protocol",
       "to": "shared"
     },

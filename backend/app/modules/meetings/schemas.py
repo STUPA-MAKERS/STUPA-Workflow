@@ -62,6 +62,10 @@ class AttendanceOut(FrozenCamelModel, frozen=True):
     #: The member has an own vote now (gremium permission ``vote.cast``). Only such a
     #: member can delegate, so the lead offers "Vertretung eintragen" only for them.
     can_vote: bool = Field(default=False, alias="canVote")
+    #: Until this moment the member can still change the own ``absent`` to ``excused``
+    #: (``lateExcuseDays`` after the close). Only the own row of a closed meeting
+    #: carries it, and only while the window is open.
+    late_excuse_until: _datetime | None = Field(default=None, alias="lateExcuseUntil")
 
 
 class MeetingMemberOut(FrozenCamelModel, frozen=True):

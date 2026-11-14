@@ -368,6 +368,10 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
     sentAt: wire.sentAt ?? null,
     publicWithheld: wire.publicWithheld ?? false,
     gremiumProtocolsPublic: wire.gremiumProtocolsPublic ?? false,
+    approvedAt: wire.approvedAt ?? null,
+    approvedMeetingId: wire.approvedMeetingId ?? null,
+    approvedMeetingTitle: wire.approvedMeetingTitle ?? null,
+    approvedMeetingDate: wire.approvedMeetingDate ?? null,
   };
 }
 

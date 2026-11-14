@@ -337,6 +337,15 @@ DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES = 120
 DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE = 2
 #: The least number of days that an Umlaufverfahren runs (`circularMinDays`).
 DEFAULT_CIRCULAR_MIN_DAYS = 3
+#: The periods of the Geschäftsordnung (§F/administration/admin/000917).
+DEFAULT_INVITE_DAYS_ORDINARY = 7
+DEFAULT_INVITE_DAYS_EXTRAORDINARY = 3
+DEFAULT_PROTOCOL_DRAFT_DAYS = 14
+DEFAULT_LATE_EXCUSE_DAYS = 7
+DEFAULT_ABSENCE_LIMIT = 3
+DEFAULT_TERM_START_MONTH = 10
+MAX_PERIOD_DAYS = 365
+MAX_ABSENCE_LIMIT = 50
 
 
 class MeetingSettings(Base):
@@ -383,6 +392,36 @@ class MeetingSettings(Base):
     #: The least number of days of the cast window of an Umlaufverfahren.
     circular_min_days: Mapped[int] = mapped_column(
         Integer, server_default=str(DEFAULT_CIRCULAR_MIN_DAYS), default=DEFAULT_CIRCULAR_MIN_DAYS
+    )
+    #: The invitation period of an ordinary meeting, in days.
+    invite_days_ordinary: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_INVITE_DAYS_ORDINARY),
+        default=DEFAULT_INVITE_DAYS_ORDINARY,
+    )
+    #: The invitation period of every other meeting kind, in days.
+    invite_days_extraordinary: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_INVITE_DAYS_EXTRAORDINARY),
+        default=DEFAULT_INVITE_DAYS_EXTRAORDINARY,
+    )
+    #: The days after a meeting until the draft of its protocol is due.
+    protocol_draft_days: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_PROTOCOL_DRAFT_DAYS),
+        default=DEFAULT_PROTOCOL_DRAFT_DAYS,
+    )
+    #: The days after the close in which a member can still give an excuse.
+    late_excuse_days: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_LATE_EXCUSE_DAYS), default=DEFAULT_LATE_EXCUSE_DAYS
+    )
+    #: The number of unexcused absences in one term that ends a Mandat.
+    absence_limit: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_ABSENCE_LIMIT), default=DEFAULT_ABSENCE_LIMIT
+    )
+    #: The month (1 to 12) on whose first day a term starts.
+    term_start_month: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_TERM_START_MONTH), default=DEFAULT_TERM_START_MONTH
     )
     default_delegation_lead_minutes: Mapped[int] = mapped_column(
         Integer,

@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - backend/app/modules/protocol/approval.py
+  - frontend/src/app/features/meetings/protocol-approval-dialog/protocol-approval-dialog.component.ts
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings

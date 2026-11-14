@@ -163,6 +163,55 @@ describe('MeetingSessionService', () => {
     expect(toasts().some((t) => t.startsWith('Aktion fehlgeschlagen.'))).toBe(true);
   });
 
+  /** § 000925 */
+  it('sends the protocol draft once and reports the number of addresses or the failure', () => {
+    const { http, session, toasts } = setup();
+    session.sendProtocolDraft();
+    http.verify();
+    session.protocol.set({ ...PROTOCOL });
+    session.sendProtocolDraft();
+    session.sendProtocolDraft();
+    const req = http.expectOne('/api/protocols/p-1/draft-mail');
+    expect(req.request.method).toBe('POST');
+    expect(session.draftSending()).toBe(true);
+    req.flush({ recipients: 12 });
+    expect(session.draftSending()).toBe(false);
+    expect(toasts()).toContain('Entwurf an 12 Adressen gesendet.');
+    session.sendProtocolDraft();
+    http.expectOne('/api/protocols/p-1/draft-mail').flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(session.draftSending()).toBe(false);
+    expect(toasts()).toContain('Aktion fehlgeschlagen.');
+  });
+
+  /** § 000924 */
+  it('marks the protocol as approved, removes the mark and reports a refusal', () => {
+    const { http, session, toasts } = setup();
+    session.setProtocolApproval('m-2');
+    http.verify();
+    const final = { ...PROTOCOL, status: 'final' as const, isFinal: true, isLocked: true };
+    session.protocol.set(final);
+    session.setProtocolApproval('m-2');
+    session.setProtocolApproval('m-3');
+    const put = http.expectOne('/api/protocols/p-1/approval');
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body).toEqual({ meetingId: 'm-2' });
+    put.flush({ ...PROTOCOL, status: 'final', approvedAt: '2026-10-29T18:00:00Z', approvedMeetingId: 'm-2' });
+    expect(session.protocol()?.approvedMeetingId).toBe('m-2');
+    expect(toasts()).toContain('Das Protokoll ist als genehmigt markiert.');
+    session.setProtocolApproval(null);
+    const del = http.expectOne('/api/protocols/p-1/approval');
+    expect(del.request.method).toBe('DELETE');
+    del.flush({ ...PROTOCOL, status: 'final' });
+    expect(session.protocol()?.approvedAt).toBeNull();
+    expect(toasts()).toContain('Die Genehmigung ist entfernt.');
+    session.setProtocolApproval('m-9');
+    http
+      .expectOne('/api/protocols/p-1/approval')
+      .flush({ detail: 'Andere Sitzung' }, { status: 422, statusText: 'Unprocessable' });
+    expect(session.approvalSaving()).toBe(false);
+    expect(toasts()).toContain('Aktion fehlgeschlagen.: Andere Sitzung');
+  });
+
   /** A member receives no code and no requests, so the meeting keeps its values. */
   it('passes the lead events to the guest list and takes the guest counts', () => {
     TestBed.configureTestingModule({
