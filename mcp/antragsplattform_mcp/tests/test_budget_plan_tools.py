@@ -58,6 +58,7 @@ def test_plan_tools_are_registered() -> None:
         "create_plan_nachtrag",
         "delete_plan_version",
         "set_plan_line",
+        "rename_plan_line",
         "delete_plan_line",
         "create_plan_cost_centre",
         "pass_plan_step",
@@ -77,6 +78,7 @@ def test_each_plan_tool_calls_its_route(fake_api: _FakeApi) -> None:
         budget_plan.create_plan_nachtrag("b1", "fy1"),
         budget_plan.delete_plan_version("v1"),
         budget_plan.set_plan_line("v1", "n1", S.PlanLineSet(amount="10.00", side="income")),
+        budget_plan.rename_plan_line("v1", "n1", S.PlanLineRename(key="80133")),
         budget_plan.delete_plan_line("v1", "n1"),
         budget_plan.create_plan_cost_centre(
             "v1", S.PlanNodeCreate(parentId="b1", key="9", name="Sport", side="expense")
@@ -97,6 +99,7 @@ def test_each_plan_tool_calls_its_route(fake_api: _FakeApi) -> None:
         ("POST", "/budgets/b1/fiscal-years/fy1/plan/versions", None),
         ("DELETE", "/budget-plan-versions/v1", None),
         ("PUT", "/budget-plan-versions/v1/lines/n1", {"side": "income", "amount": "10.00"}),
+        ("PUT", "/budget-plan-versions/v1/lines/n1/name", {"key": "80133"}),
         ("DELETE", "/budget-plan-versions/v1/lines/n1", None),
         (
             "POST",

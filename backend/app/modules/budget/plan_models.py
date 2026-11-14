@@ -135,6 +135,9 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
     and NULL on a line below a Titel, which has the side of its Titel. ``name`` and ``path_key``
     hold the name and the path key of the cost center at the decision, so a later
     rename does not change the text of a decided plan. They are NULL in a draft.
+    ``draft_name`` and ``draft_key`` hold the name and the key that a draft gives the
+    cost center. They apply to the cost center when the version comes into force and
+    are NULL from then on.
     """
 
     __tablename__ = "budget_plan_line"
@@ -147,6 +150,8 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     path_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    draft_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    draft_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     side: Mapped[str | None] = mapped_column(Text, nullable=True)
     transferable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     coverable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

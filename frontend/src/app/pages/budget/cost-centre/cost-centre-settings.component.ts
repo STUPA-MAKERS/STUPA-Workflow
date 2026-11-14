@@ -72,6 +72,9 @@ interface Saved<T> {
  * tells the page to read the tree again and a toast says that the change is saved. A failed
  * save shows its reason and the field takes the saved value again.
  */
+/** Save a new key or name of a Kostenstelle in a place other than the Kostenstelle itself. */
+export type RenameFn = (id: Uuid, field: 'key' | 'name', value: string) => Observable<unknown>;
+
 @Component({
   selector: 'app-cost-centre-settings',
   standalone: true,
@@ -94,6 +97,13 @@ export class CostCentreSettingsComponent {
 
   readonly node = input.required<BudgetTreeNode>();
   readonly gremiumOptions = input<readonly SelectOption[]>([]);
+  /**
+   * The save of a new key or name, where the page has its own: the draft of a Haushaltsplan
+   * takes them for a Kostenstelle of a Haushalt with a plan (000877).
+   */
+  readonly rename = input<RenameFn | null>(null);
+  /** The key and the name cannot change here: in a Haushalt with a plan a draft changes them. */
+  readonly textLocked = input(false);
   /** A save ended. The value says whether the server took it: the page reads the tree in both cases. */
   readonly saved = output<boolean>();
   /** The section went off the page: a component that is gone cannot emit. */
@@ -349,7 +359,10 @@ export class CostCentreSettingsComponent {
     const before = this.sent[key];
     this.sent = { ...this.sent, [key]: { value, seen: false } };
     this.running.set(true);
-    const request: Observable<unknown> = this.api.updateNode(id, { [field]: value });
+    const rename = field === 'key' || field === 'name' ? this.rename() : null;
+    const request: Observable<unknown> = rename
+      ? rename(id, field as 'key' | 'name', value as string)
+      : this.api.updateNode(id, { [field]: value });
     request
       .pipe(
         finalize(() => {

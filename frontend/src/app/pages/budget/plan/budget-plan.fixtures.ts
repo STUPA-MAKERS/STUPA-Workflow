@@ -90,6 +90,7 @@ export const line = (budgetId: string, amount: string, over: Partial<PlanLine> =
   note: null,
   name: null,
   pathKey: null,
+  key: null,
   transferable: false,
   coverable: false,
   blocked: '0',

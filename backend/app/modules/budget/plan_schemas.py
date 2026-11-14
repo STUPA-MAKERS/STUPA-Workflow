@@ -83,6 +83,17 @@ class PlanLineSet(FrozenStrictCamelModel, frozen=True):
     blocked: Amount = Decimal("0.00")
 
 
+class PlanLineRename(FrozenStrictCamelModel, frozen=True):
+    """Give the cost center of a draft line a new name, a new key or both.
+
+    A field that the request leaves out keeps its value. The values apply to the cost
+    center when the version comes into force.
+    """
+
+    name: NodeName | None = None
+    key: str | None = Field(default=None, min_length=1, max_length=64)
+
+
 class PlanStateSet(FrozenStrictCamelModel, frozen=True):
     """Bring a version into force, or move a version in progress back to draft."""
 
@@ -169,9 +180,12 @@ class PlanLineOut(FrozenCamelModel, frozen=True):
     side: Side | None = None
     amount: Decimal
     note: str | None = None
-    #: The name and the path key at the decision. `None` in a draft.
+    #: The name and the path key at the decision. In a draft: the name and the path
+    #: key that the draft gives the cost center, `None` where it changes neither.
     name: str | None = None
     path_key: str | None = Field(default=None, alias="pathKey")
+    #: The key that a draft gives the cost center. `None` in every other case.
+    key: str | None = None
     transferable: bool = False
     coverable: bool = False
     blocked: Decimal = Decimal(0)

@@ -58,6 +58,8 @@ async def update_budget(budget_id: str, patch: S.BudgetNodeUpdate) -> dict:
     inherits from its ancestors). An unknown Gremium gives 422
     `decision_gremium_invalid`, and an unknown `viewGremiumId` gives 422
     `view_gremium_invalid`. A key that a sibling has gives 409 `budget_key_exists`.
+    In a budget with a plan, a new `key` or `name` of a cost center below the top
+    level gives 409 `plan_draft_only`: use `rename_plan_line` in a draft.
     Requires budget.structure.
     """
     return await api().patch(f"/budgets/{budget_id}", json=dump_patch(patch))

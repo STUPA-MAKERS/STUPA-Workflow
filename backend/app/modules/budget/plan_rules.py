@@ -11,6 +11,8 @@ from decimal import Decimal
 from typing import Any, Literal, assert_never
 from uuid import UUID
 
+from app.modules.budget.tree_rules import compose_path_key
+
 PlanState = Literal["draft", "in_progress", "in_force", "replaced"]
 #: The states a person can ask for. The platform sets the other two: `in_progress`
 #: with the first passed step, `replaced` when a later version comes into force.
@@ -345,3 +347,40 @@ def starts_coverable(default: bool, side: str | None, *, new: bool, to_expense: 
     line at any other time, so a person can take the Vermerk off one line.
     """
     return default and side == "expense" and (new or to_expense)
+
+
+def draft_paths(
+    top_id: UUID,
+    top_path: str,
+    parent_of: Mapping[UUID, UUID | None],
+    key_of: Mapping[UUID, str],
+    draft_key_of: Mapping[UUID, str | None],
+) -> dict[UUID, str]:
+    """Return the path key of each cost center below the top level as a draft sets it.
+
+    A cost center takes the key of its draft line when the line names one, else its
+    own key. A new key of a parent changes the path key of each cost center below it.
+    """
+
+    def path(node: UUID) -> str:
+        parent = parent_of[node]
+        above = top_path if parent is None or parent == top_id else path(parent)
+        return compose_path_key(above, draft_key_of.get(node) or key_of[node])
+
+    return {node: path(node) for node in parent_of if node != top_id}
+
+
+def key_taken(
+    node: UUID,
+    key: str,
+    parent_of: Mapping[UUID, UUID | None],
+    key_of: Mapping[UUID, str],
+    draft_key_of: Mapping[UUID, str | None],
+) -> bool:
+    """Say if a sibling of `node` has `key` now or takes it in the draft.
+
+    Both count, because the keys apply one after the other when the version comes
+    into force, and a sibling that still holds the key then blocks the rename.
+    """
+    siblings = (n for n, parent in parent_of.items() if parent == parent_of[node] and n != node)
+    return any(key in (key_of[sibling], draft_key_of.get(sibling)) for sibling in siblings)

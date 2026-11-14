@@ -200,7 +200,7 @@
           }
           @if (editable()) {
             <app-section class="bd__sec" size="lg" [heading]="levelKey(ks) | t">
-              <app-cost-centre-settings [node]="ks" [gremiumOptions]="gremiumOptions()" (saved)="refreshTree(null, !$event)" />
+              <app-cost-centre-settings [node]="ks" [gremiumOptions]="gremiumOptions()" [textLocked]="!!createTop()?.planEnabled && ks.parentId !== null" (saved)="refreshTree(null, !$event)" />
             </app-section>
           }
         }

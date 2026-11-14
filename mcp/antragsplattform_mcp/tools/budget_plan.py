@@ -118,6 +118,21 @@ async def set_plan_line(version_id: str, budget_id: str, line: S.PlanLineSet) ->
 
 
 @group.tool
+async def rename_plan_line(version_id: str, budget_id: str, rename: S.PlanLineRename) -> dict:
+    """Give a cost center a new name or key in a draft version.
+
+    In a budget with a plan, this is the only way to change them below the top level.
+    The draft shows the new values. Every other place shows the old ones until the
+    version is in force. A field that you leave out keeps its value. The call gives 409
+    `plan_version_locked` for a version that is not a draft and 409 `budget_key_exists`
+    for a key that a sibling has or takes in the draft. Requires budget.structure.
+    """
+    return await api().put(
+        f"/budget-plan-versions/{version_id}/lines/{budget_id}/name", json=dump_patch(rename)
+    )
+
+
+@group.tool
 async def delete_plan_line(version_id: str, budget_id: str) -> dict:
     """Remove the line of one cost center from a draft version.
 

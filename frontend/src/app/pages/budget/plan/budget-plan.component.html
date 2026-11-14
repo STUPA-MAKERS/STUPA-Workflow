@@ -319,7 +319,7 @@
   @if (canWrite()) {
     @if (nodeOf(row.id); as node) {
       <app-section class="bd__sec" size="lg" [heading]="levelKey(node) | t">
-        <app-cost-centre-settings [node]="node" [gremiumOptions]="gremiumOptions()" (saved)="reloadTree()" />
+        <app-cost-centre-settings [node]="node" [gremiumOptions]="gremiumOptions()" [rename]="renameInDraft" [textLocked]="!editable()" (saved)="reloadTree()" />
       </app-section>
     }
   }

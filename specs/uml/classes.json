@@ -2585,6 +2585,18 @@
           "type": "TEXT"
         },
         {
+          "name": "draft_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "draft_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
           "name": "side",
           "nullable": true,
           "primaryKey": false,

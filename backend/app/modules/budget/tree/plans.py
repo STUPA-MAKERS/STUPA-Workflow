@@ -29,6 +29,7 @@ from app.modules.budget.plan_rules import PlanState, PlanTarget, Side
 from app.modules.budget.plan_schemas import (
     PlanCreate,
     PlanLineOut,
+    PlanLineRename,
     PlanLineSet,
     PlanMeetingOut,
     PlanNodeCreate,
@@ -62,14 +63,23 @@ def _changes_out(changes: dict[UUID, tuple[Decimal, Decimal]]) -> dict[str, list
     }
 
 
-def _line_out(line: BudgetPlanLine, side: str | None) -> PlanLineOut:
+def _line_out(
+    line: BudgetPlanLine, side: str | None, draft: Mapping[UUID, str] | None
+) -> PlanLineOut:
+    """Return a line as the API shows it.
+
+    `draft` is `None` for a version that left the draft: its line shows the name and
+    the path key of the decision. For a draft it holds the path keys that the draft
+    changes, and the line shows what the draft gives the cost center.
+    """
     return PlanLineOut(
         side=cast("Side | None", side),
         budgetId=line.budget_id,
         amount=line.amount.quantize(_CENT),
         note=line.note,
-        name=line.name,
-        pathKey=line.path_key,
+        name=line.name if draft is None else line.draft_name,
+        pathKey=line.path_key if draft is None else draft.get(line.budget_id),
+        key=None if draft is None else line.draft_key,
         transferable=bool(line.transferable),
         coverable=bool(line.coverable),
         blocked=(line.blocked if line.blocked is not None else _ZERO).quantize(_CENT),
@@ -187,7 +197,13 @@ class PlanOps(NodeOps, AllocationOps):
         versions = await self._versions(plan.id)
         lines = [await self._lines(v.id) for v in versions]
         of_budget = await self._budget_step_records(top_id)
-        parent_of = {n.id: n.parent_id for n in await self._subtree(await self._get_node(top_id))}
+        top = await self._get_node(top_id)
+        nodes = await self._subtree(top)
+        parent_of = {n.id: n.parent_id for n in nodes}
+        drafts = [
+            self._changed_paths(top, nodes, rows) if v.state == "draft" else None
+            for v, rows in zip(versions, lines, strict=True)
+        ]
         sides = [
             plan_rules.sides_of(
                 parent_of,
@@ -213,9 +229,11 @@ class PlanOps(NodeOps, AllocationOps):
                     inForceAt=v.in_force_at,
                     steps=shown,
                     meetings=meetings.get(v.id, ()),
-                    lines=tuple(_line_out(line, of.get(line.budget_id)) for line in rows),
+                    lines=tuple(_line_out(line, of.get(line.budget_id), draft) for line in rows),
                 )
-                for v, rows, shown, of in zip(versions, lines, steps, sides, strict=True)
+                for v, rows, shown, of, draft in zip(
+                    versions, lines, steps, sides, drafts, strict=True
+                )
             ),
         )
 
@@ -997,6 +1015,85 @@ class PlanOps(NodeOps, AllocationOps):
                 errors=[{"field": "blocked", "msg": "above the Ansatz"}],
             )
 
+    async def rename_line(
+        self, version_id: UUID, budget_id: UUID, payload: PlanLineRename
+    ) -> PlanOut:
+        """Give the cost center of a draft line a new name, a new key or both (spec 000877).
+
+        The cost center keeps its name and its key until the version comes into force.
+        A value equal to the one of the cost center takes the change back.
+
+        Raises:
+            NotFoundError: The version does not exist (404).
+            ConflictError: `fiscal_year_closed` (409), `plan_version_locked` (409) for
+                a version that is not a draft, `budget_key_exists` (409) for a key
+                that a sibling has or takes in the draft.
+            ValidationProblem: `plan_line_missing` (422) for a cost center without a
+                line in the version, `budget_key_invalid` (422).
+        """
+        version, plan, _fy, top = await self._version_context(version_id)
+        if version.state != "draft":
+            raise ConflictError(
+                "Only a draft version can be edited.", code="plan_version_locked"
+            )
+        nodes = await self._subtree(top)
+        lines = await self._lines(version.id)
+        node = next((n for n in nodes if n.id == budget_id), None)
+        line = next((ln for ln in lines if ln.budget_id == budget_id), None)
+        if node is None or line is None:
+            raise ValidationProblem(
+                "The cost centre has no line in this version.",
+                code="plan_line_missing",
+                errors=[{"field": "budgetId", "msg": "no line in the version"}],
+            )
+        named = payload.model_fields_set
+        key = payload.key if "key" in named else None
+        if key is not None and not tree_rules.is_valid_key(key):
+            raise ValidationProblem(
+                "Invalid budget key.",
+                code="budget_key_invalid",
+                errors=[{"field": "key", "msg": "must be alphanumeric (no '-')"}],
+            )
+        if key is not None and plan_rules.key_taken(
+            node.id,
+            key,
+            {n.id: n.parent_id for n in nodes},
+            {n.id: n.key for n in nodes},
+            {ln.budget_id: ln.draft_key for ln in lines},
+        ):
+            raise ConflictError(
+                f"budget key {key!r} already exists under this parent",
+                code="budget_key_exists",
+            )
+        before = {"name": line.draft_name, "key": line.draft_key}
+        wanted = {
+            **({"draft_key": None if key == node.key else key} if key is not None else {}),
+            **(
+                {"draft_name": None if payload.name == node.name else payload.name}
+                if "name" in named and payload.name is not None
+                else {}
+            ),
+        }
+        for field, value in wanted.items():
+            setattr(line, field, value)
+        await self._audit(
+            AuditAction.BUDGET_PLAN_LINE_SET,
+            target_type="budget_plan",
+            target_id=str(plan.id),
+            data={
+                "versionId": str(version.id),
+                "number": version.number,
+                "budgetId": str(node.id),
+                "pathKey": node.path_key,
+                "name": node.name,
+                "rename": {
+                    "before": before,
+                    "after": {"name": line.draft_name, "key": line.draft_key},
+                },
+            },
+        )
+        return await self._plan_out(plan, top.id)
+
     async def delete_line(self, version_id: UUID, budget_id: UUID) -> PlanOut:
         """Remove the line of one cost center from a draft version.
 
@@ -1139,12 +1236,80 @@ class PlanOps(NodeOps, AllocationOps):
             )
 
     @staticmethod
-    def _keep_names(lines: list[BudgetPlanLine], nodes: list[Budget]) -> None:
-        """Write the current name and path key of each cost center into its line."""
-        names = {n.id: (n.name, n.path_key) for n in nodes}
+    def _draft_paths(
+        top: Budget, nodes: list[Budget], lines: list[BudgetPlanLine]
+    ) -> dict[UUID, str]:
+        """Return the path key of each cost center as the draft with `lines` sets it."""
+        paths = plan_rules.draft_paths(
+            top.id,
+            top.path_key,
+            {n.id: n.parent_id for n in nodes},
+            {n.id: n.key for n in nodes},
+            {line.budget_id: line.draft_key for line in lines},
+        )
+        return {n.id: paths[n.id] for n in nodes if n.id != top.id}
+
+    @classmethod
+    def _changed_paths(
+        cls, top: Budget, nodes: list[Budget], lines: list[BudgetPlanLine]
+    ) -> dict[UUID, str]:
+        """Return the path keys that the draft with `lines` changes."""
+        paths = cls._draft_paths(top, nodes, lines)
+        return {n.id: paths[n.id] for n in nodes if n.id != top.id and paths[n.id] != n.path_key}
+
+    @classmethod
+    def _keep_names(cls, top: Budget, lines: list[BudgetPlanLine], nodes: list[Budget]) -> None:
+        """Write the name and the path key of each cost center into its line.
+
+        A line that gives its cost center a new name or a new key keeps the new one
+        (spec 000877), because the decision is on the plan as the draft shows it.
+        """
+        names = {n.id: n.name for n in nodes}
+        paths = cls._draft_paths(top, nodes, lines)
         for line in lines:
-            line.name = names[line.budget_id][0]
-            line.path_key = names[line.budget_id][1]
+            line.name = line.draft_name or names[line.budget_id]
+            line.path_key = paths[line.budget_id]
+
+    async def _apply_renames(
+        self, version: BudgetPlanVersion, lines: list[BudgetPlanLine], nodes: list[Budget]
+    ) -> None:
+        """Give each cost center the name and the key of its line (spec 000877).
+
+        The line holds neither afterwards, so a later version starts from the cost
+        center. Each rename is an entry in the audit log.
+
+        Raises:
+            ConflictError: `budget_key_exists` (409) when a sibling took the key
+                after the draft named it.
+        """
+        by_id = {n.id: n for n in nodes}
+        renamed = [ln for ln in lines if ln.draft_name is not None or ln.draft_key is not None]
+        for line in renamed:
+            await self._apply_rename(version, line, by_id[line.budget_id])
+
+    async def _apply_rename(
+        self, version: BudgetPlanVersion, line: BudgetPlanLine, node: Budget
+    ) -> None:
+        """Give one cost center the name and the key of its line, and clear them there."""
+        before = {"name": node.name, "key": node.key}
+        if line.draft_name is not None:
+            node.name = line.draft_name
+        if line.draft_key is not None:
+            await self._rename_key(node, line.draft_key)
+        await self._audit(
+            AuditAction.BUDGET_NODE_UPDATE,
+            target_type="budget",
+            target_id=str(node.id),
+            data={
+                "fields": ["name"] if line.draft_name is not None else [],
+                "keyProvided": line.draft_key is not None,
+                "before": before,
+                "after": {"name": node.name, "key": node.key},
+                "planVersionId": str(version.id),
+            },
+        )
+        for field in ("draft_name", "draft_key"):
+            setattr(line, field, None)
 
     async def _ready_to_leave_draft(
         self, top: Budget, lines: list[BudgetPlanLine]
@@ -1163,7 +1328,7 @@ class PlanOps(NodeOps, AllocationOps):
         amounts = {line.budget_id: line.amount for line in lines}
         sides = self._sides(top, nodes, lines)
         self._require_balanced(top, nodes, amounts, sides)
-        self._keep_names(lines, nodes)
+        self._keep_names(top, lines, nodes)
 
     async def _open_step(
         self, version: BudgetPlanVersion, top: Budget
@@ -1590,6 +1755,7 @@ class PlanOps(NodeOps, AllocationOps):
     ) -> dict[UUID, tuple[Decimal, Decimal]]:
         """Put a checked version in force: replace the one before, write the allocations."""
         nodes = await self._subtree(top)
+        await self._apply_renames(version, lines, nodes)
         await self._replace_in_force(plan.id)
         version.in_force_at = datetime.now(UTC)
         return await self._write_allocations(
