@@ -455,6 +455,7 @@ describe('BudgetPlanComponent', () => {
       expect(view.container.querySelector('.bd__sheetBody .bp__skSteps')).not.toBeNull();
       expect(view.container.querySelector('.bd__pane .bd__skSeg')).toBeNull();
       pending.next(plan());
+      pending.complete();
       view.fixture.detectChanges();
       expect(view.container.querySelector('.bp__skSteps')).toBeNull();
     });

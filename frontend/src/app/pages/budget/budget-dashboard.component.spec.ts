@@ -1181,9 +1181,11 @@ describe('BudgetDashboardComponent', () => {
     expect(busy.querySelector('.pie__hole')?.textContent).not.toMatch(/\d/);
     expect(busy.querySelectorAll('.bd__usage .bd__urow')).toHaveLength(4);
     expect(busy.querySelector('.bd__skSeg')).toBeNull();
-    http.expectOne((r) => r.url.endsWith('/budgets')).flush([node({ id: 'b-vs', key: 'VS', planEnabled: true })]);
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([{ ...node({ id: 'b-vs', key: 'VS' }), planEnabled: true }]);
     fixture.detectChanges();
     expect(container.querySelector('[aria-busy="true"] .bd__skSeg')).toBeTruthy();
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
+    http.match((r) => r.url.endsWith('/plan')).forEach((r) => r.flush(null, { status: 404, statusText: 'Not Found' }));
   });
 
   /**
