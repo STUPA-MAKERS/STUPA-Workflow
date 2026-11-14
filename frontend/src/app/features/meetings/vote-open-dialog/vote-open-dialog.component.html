@@ -126,16 +126,20 @@
       <span>{{ ruleSentence() }}</span>
     </p>
     } @else {
-    <div class="vod__group">
-      <span class="vod__cap cap" aria-hidden="true">{{ 'meetings.vote.majorityRule' | t }}</span>
-      <app-segmented width="equal"
-        class="vod__seg"
-        [ariaLabel]="'meetings.vote.majorityRule' | t"
+      @if (planItem()) {
+      <p class="vod__rule" role="note">
+        <app-icon name="info" [size]="16" />
+        <span>{{ 'meetings.vote.rule.plan' | t }}</span>
+      </p>
+      } @else {
+      <app-select
+        [label]="'meetings.vote.majorityRule' | t"
         [options]="ruleOptions()"
-        [value]="majorityRule()"
-        (valueChange)="setRule($event)"
+        [ngModel]="majorityRule()"
+        [ngModelOptions]="{ standalone: true }"
+        (ngModelChange)="setRule($event)"
       />
-    </div>
+      }
     }
 
     @if (guestsAllowed()) {

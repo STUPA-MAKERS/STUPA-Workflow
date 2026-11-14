@@ -6,6 +6,8 @@
  * never public on its own; its title and date appear only as part of a protocol.
  */
 
+import type { MajorityRule } from '@core/api/models';
+
 /** The result of one decision. */
 /** A personnel election gives `elected`, `runoff`, `tie` or `rejected`. */
 export type PublicVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
@@ -55,7 +57,7 @@ export interface PublicDecision {
   /** The counts per option, for example `ja`/`nein`/`enthaltung` or `yes`/`no`/`abstain`. */
   readonly counts: Record<string, number>;
   readonly result: PublicVoteResult | null;
-  readonly majorityRule: 'simple' | 'absolute' | 'two_thirds';
+  readonly majorityRule: MajorityRule;
   readonly secret: boolean;
   /** The vote is already in the TOP text as a callout: the page shows no second box. */
   readonly inText?: boolean;

@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/unit/modules/voting/test_voting_tally.py:test_least_number_of_present_persons"
+  - "backend/tests/integration/modules/livevote/test_quorum_present.py:test_close_needs_the_least_number_of_present_members"
+implementation:
+  - backend/app/modules/gremien/models.py
+  - backend/app/modules/livevote/vote_build.py
+  - backend/app/modules/voting/tally.py
+  - frontend/src/app/pages/admin/committees/gremium-dialog/gremium-dialog.component.html
 scope:
   - backend/app/modules/gremien
   - backend/app/modules/admin

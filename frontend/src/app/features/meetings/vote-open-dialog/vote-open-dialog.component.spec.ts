@@ -136,6 +136,35 @@ describe('VoteOpenDialogComponent', () => {
     expect(await runAxe(document.body)).toHaveNoViolations();
   });
 
+  /** §F/meetings/voting/000897: five rules, and the form starts with the simple majority. */
+  it('offers the five majority rules and starts with the simple majority', async () => {
+    const { cmp } = await setup();
+    expect(cmp.majorityRule()).toBe('simple');
+    expect(cmp.ruleOptions().map((o) => o.label)).toEqual([
+      'Einfache Mehrheit',
+      'Absolute Mehrheit der Stimmen',
+      'Zweidrittelmehrheit der Stimmen',
+      'Mehrheit der Mitglieder',
+      'Zweidrittelmehrheit der Mitglieder',
+    ]);
+  });
+
+  /** §F/meetings/voting/000899: the plan item offers no rule and sends the members majority. */
+  it('fixes the majority of the members on the item of a Haushaltsplan', async () => {
+    const { cmp } = await setup({ ...FREE_TOP, planVersionId: 'pv-1' });
+    expect(cmp.planItem()).toBe(true);
+    expect(cmp.majorityRule()).toBe('members_majority');
+    expect(screen.getByText('Ein Haushaltsplan braucht die Mehrheit der Mitglieder.')).toBeTruthy();
+  });
+
+  /** §F/meetings/voting/000898: a members rule locks the guest ballots. */
+  it('locks the guest ballots for a members rule', async () => {
+    const { cmp } = await setup();
+    cmp.setRule('members_two_thirds');
+    expect(cmp.membersRule()).toBe(true);
+    expect(cmp.guestsLocked()).toBe(true);
+  });
+
   it('accepts only the known majority rules', async () => {
     const { cmp } = await setup();
     cmp.setRule('absolute');

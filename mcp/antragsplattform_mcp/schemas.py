@@ -635,7 +635,16 @@ class MeetingVoteOpenBody(WireModel, frozen=True):
     kind: Literal["motion", "election"] = "motion"
     question: str | None = None
     options: list[str] = Field(default_factory=lambda: ["yes", "no", "abstain"])
-    majorityRule: Literal["simple", "absolute", "two_thirds"] = "simple"
+    majorityRule: Literal[
+        "simple", "absolute", "two_thirds", "members_majority", "members_two_thirds"
+    ] = Field(
+        default="simple",
+        description=(
+            "`members_majority` and `members_two_thirds` count the yes ballots against "
+            "all eligible members; the other rules count against the cast ballots. The "
+            "vote on a Haushaltsplan always uses `members_majority`."
+        ),
+    )
     secret: bool | None = Field(
         default=None,
         description="A motion and an election are always secret. Leave it out; false "

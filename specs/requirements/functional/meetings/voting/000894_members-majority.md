@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/unit/modules/voting/test_voting_tally.py:test_members_majority_counts_against_the_eligible_count"
+implementation:
+  - backend/app/modules/voting/tally.py
+  - backend/app/shared/config_schemas.py
 scope:
   - backend/app/modules/voting
   - backend/app/shared

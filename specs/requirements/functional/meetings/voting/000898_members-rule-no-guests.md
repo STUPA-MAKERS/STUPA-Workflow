@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/unit/modules/voting/test_voting_tally.py:test_members_rule_with_guests_is_refused"
+  - "backend/tests/integration/modules/livevote/test_quorum_present.py:test_members_rule_refuses_guest_ballots"
+implementation:
+  - backend/app/shared/config_schemas.py
+  - backend/app/modules/livevote/vote_build.py
 scope:
   - backend/app/modules/voting
   - backend/app/shared

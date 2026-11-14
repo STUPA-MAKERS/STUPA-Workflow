@@ -60,7 +60,15 @@ import {
 } from '../../voting/poll.util';
 import { personLabel } from '@shared/person-label.util';
 
-const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thirds'];
+const MAJORITY_RULES: readonly MajorityRule[] = [
+  'simple',
+  'absolute',
+  'two_thirds',
+  'members_majority',
+  'members_two_thirds',
+];
+/** The rules that count against all members: such a vote has no guest ballots. */
+const MEMBERS_RULES: readonly MajorityRule[] = ['members_majority', 'members_two_thirds'];
 const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll'];
 /** The bounds of the server (`ElectionConfig`). */
 export const MAX_SEATS = 50;
@@ -267,16 +275,24 @@ export class VoteOpenDialogComponent {
       : this.i18n.translate('election.rule.multi', { n: seats });
   });
 
-  readonly ruleOptions = computed<SegmentedOption[]>(() =>
+  readonly ruleOptions = computed<SelectFieldOption[]>(() =>
     MAJORITY_RULES.map((v) => ({ value: v, label: this.i18n.translate(`meetings.vote.rule.${v}`) })),
+  );
+  /** The item of a Haushaltsplan: the server sets the majority of the members. */
+  readonly planItem = computed(() => !!this.item()?.planVersionId);
+  /** The rule counts against all members, so no guest votes. */
+  readonly membersRule = computed(
+    () => !this.isElection() && !this.isPoll() && MEMBERS_RULES.includes(this.majorityRule()),
   );
 
   /** The switch exists only when the meeting lets guests vote. */
   readonly guestsAllowed = computed(
     () => this.meeting().publicJoin && this.meeting().guestsMode === 'vote',
   );
-  /** A non-public item and the item of a Haushaltsplan never let guests vote. */
-  readonly guestsLocked = computed(() => !!this.item()?.nonPublic || !!this.item()?.planVersionId);
+  /** A non-public item, the item of a Haushaltsplan and a members rule never let guests vote. */
+  readonly guestsLocked = computed(
+    () => !!this.item()?.nonPublic || this.planItem() || this.membersRule(),
+  );
   /** "TOP 3 · Zuschuss Erstsemester-Party WS 26/27". */
   readonly subtitle = computed(() => {
     const it = this.item();
@@ -312,7 +328,7 @@ export class VoteOpenDialogComponent {
     this.draft.set(emptyDraft(it.amount ?? null));
     this.questionEdited = false;
     this.question.set(it.applicationId ? this.prefill(it) : (it.title ?? ''));
-    this.majorityRule.set('simple');
+    this.majorityRule.set(it.planVersionId ? 'members_majority' : 'simple');
     this.guestsVote.set(this.guestsAllowed() && !it.nonPublic && !it.planVersionId);
     this.submitting.set(false);
     this.kind.set('motion');
@@ -329,7 +345,7 @@ export class VoteOpenDialogComponent {
     this.kind.set(kind);
     this.questionEdited = true;
     this.question.set(vote.question ?? '');
-    this.majorityRule.set(vote.majorityRule ?? 'simple');
+    this.majorityRule.set(it.planVersionId ? 'members_majority' : (vote.majorityRule ?? 'simple'));
     this.guestsVote.set(this.guestsAllowed() && !it.nonPublic && !!vote.guestsVote);
     if (it.applicationId) this.draft.set(draftOf(vote.proposal, it.amount ?? null));
     if (kind === 'election' && vote.election) {

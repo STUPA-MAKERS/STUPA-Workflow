@@ -125,6 +125,7 @@ describe('GremiumDialogComponent', () => {
       delegationLeadMinutes: 30,
       delegationAllowExternal: true,
       quorumPercent: 100,
+      quorumMinPresent: null,
     });
     expect(api.setGremiumMailRecipients).toHaveBeenCalledWith('g-1', [
       'a@x.de',
@@ -157,6 +158,7 @@ describe('GremiumDialogComponent', () => {
       delegationLeadMinutes: 0,
       delegationAllowExternal: false,
       quorumPercent: 40,
+      quorumMinPresent: null,
     });
     expect(api.setGremiumMailRecipients).toHaveBeenCalledWith('g-new', []);
     expect(saved).toHaveBeenCalledWith(expect.objectContaining({ created: true }));

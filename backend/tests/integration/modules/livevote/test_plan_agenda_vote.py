@@ -147,12 +147,21 @@ async def test_a_plan_on_the_agenda_of_a_closed_meeting_is_refused(
 async def test_the_item_of_a_plan_takes_one_motion_of_the_members(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """§F/finance/budget/000838: no election, no poll, no guests and no second vote."""
+    """§F/finance/budget/000838: no election, no poll, no guests and no second vote.
+
+    §F/meetings/voting/000899: the server sets the majority of the members, whatever
+    the body asks for.
+    """
     s = await seed(maker, status="planned", items=0)
     vid = await _waiting(maker, s.gremium_id)
     with TestClient(api) as client:
         item = _add(client, s, vid)
-        base = {"agendaItemId": item["id"], "question": "Plan?", "draft": True}
+        base = {
+            "agendaItemId": item["id"],
+            "question": "Plan?",
+            "draft": True,
+            "majorityRule": "simple",
+        }
         for extra, code in (
             ({"kind": "election", "seats": 1, "candidates": [{"name": "A"}, {"name": "B"}]},
              "plan_item_motion_only"),
@@ -173,6 +182,7 @@ async def test_the_item_of_a_plan_takes_one_motion_of_the_members(
         assert made.status_code == 200, made.text
         [vote] = made.json()["votes"]
         assert (vote["status"], vote["guestsVote"]) == ("draft", False)
+        assert vote["majorityRule"] == "members_majority"
         async with maker() as session:
             row = await session.get_one(Vote, uuid.UUID(vote["id"]))
             assert (row.plan_version_id, row.application_id) == (vid, None)

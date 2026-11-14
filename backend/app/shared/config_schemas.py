@@ -591,6 +591,17 @@ class Quorum(FrozenStrictCamelModel, frozen=True):
     value: float = Field(ge=0)
 
 
+#: The majority rules of a motion. The two members rules count the yes ballots against
+#: the eligible count of the vote, the other three against the cast ballots.
+MajorityRule = Literal[
+    "simple", "absolute", "two_thirds", "members_majority", "members_two_thirds"
+]
+MEMBERS_RULES: frozenset[str] = frozenset({"members_majority", "members_two_thirds"})
+
+#: What the quorum of a vote counts: the cast ballots, or the present persons of the
+#: meeting roster (a meeting vote).
+QuorumBasis = Literal["ballots", "present"]
+
 #: Keys that an old vote row can still hold. ``VoteConfig.from_stored`` drops them.
 _LEGACY_VOTE_KEYS = frozenset({"allowChange", "allow_change"})
 
@@ -609,11 +620,18 @@ class VoteConfig(FrozenStrictCamelModel, frozen=True):
             has no quorum; only the majority of the cast ballots counts. Only a
             meeting vote in a meeting with ``guests_mode = vote`` sets it, never on a
             non-public agenda item.
+        quorum_basis: ``present`` for a meeting vote: the quorum then counts the present
+            persons of the roster and no ballot of a delegation. ``ballots`` for a vote
+            without a meeting and for each vote that was created before this field.
+        quorum_min_present: The least number of present roster persons of the Gremium,
+            copied to the vote. It applies to a meeting vote only.
     """
 
     options: list[str] = Field(min_length=2)
-    majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(alias="majorityRule")
+    majority_rule: MajorityRule = Field(alias="majorityRule")
     quorum: Quorum | None = None
+    quorum_basis: QuorumBasis = Field(default="ballots", alias="quorumBasis")
+    quorum_min_present: int | None = Field(default=None, alias="quorumMinPresent", ge=1)
     abstain_counts_quorum: bool = Field(default=True, alias="abstainCountsQuorum")
     secret: bool = False
     tie_break: Literal["passed", "rejected", "tie"] = Field(default="rejected", alias="tieBreak")
@@ -624,6 +642,13 @@ class VoteConfig(FrozenStrictCamelModel, frozen=True):
         """A vote with guests has no quorum: only the majority of the cast ballots."""
         if self.guests_vote and self.quorum is not None:
             raise ValueError("a vote with guests (guestsVote) has no quorum")
+        return self
+
+    @model_validator(mode="after")
+    def _members_rule_has_no_guests(self) -> VoteConfig:
+        """A members rule counts against the members, so no guest votes."""
+        if self.guests_vote and self.majority_rule in MEMBERS_RULES:
+            raise ValueError("a vote with a members rule has no guest ballots (guestsVote)")
         return self
 
     @field_validator("options")
@@ -704,6 +729,8 @@ class ElectionConfig(FrozenStrictCamelModel, frozen=True):
     )
     secret: bool = True
     quorum: Quorum | None = None
+    quorum_basis: QuorumBasis = Field(default="ballots", alias="quorumBasis")
+    quorum_min_present: int | None = Field(default=None, alias="quorumMinPresent", ge=1)
     abstain_counts_quorum: bool = Field(default=True, alias="abstainCountsQuorum")
     guests_vote: bool = Field(default=False, alias="guestsVote")
 
@@ -760,6 +787,8 @@ class ElectionConfig(FrozenStrictCamelModel, frozen=True):
             options=options,
             majorityRule="simple",
             quorum=self.quorum,
+            quorumBasis=self.quorum_basis,
+            quorumMinPresent=self.quorum_min_present,
             abstainCountsQuorum=self.abstain_counts_quorum,
             secret=self.secret,
             tieBreak="tie",

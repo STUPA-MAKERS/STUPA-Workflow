@@ -55,6 +55,7 @@ class GremiumOverviewOut(_GremienOut, frozen=True):
     next_meeting: NextMeetingOut | None
     live: bool
     quorum_percent: int | None
+    quorum_min_present: int | None
     protocols_public: bool
     allow_vote_delegation: bool
     logo_url: str | None

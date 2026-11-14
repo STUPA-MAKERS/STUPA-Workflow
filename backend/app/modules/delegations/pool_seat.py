@@ -36,7 +36,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, select, text
+from sqlalchemy import ColumnElement, and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -53,6 +53,28 @@ from app.modules.meetings.models import Meeting, MeetingAttendance
 #: or take the same seat. The lock takes this key and a derivation of the meeting
 #: id as two int4 arguments. The value spells "DELE" in ASCII.
 _CREATE_LOCK_KEY = 0x4445_4C45
+
+
+async def pool_seat_counts(session: AsyncSession, meeting_ids: list[UUID]) -> dict[UUID, int]:
+    """Return the number of taken pool seats for each meeting.
+
+    A pool substitute on a seat is present for the quorum of a meeting vote. The seat
+    goes away when its member checks in, so a seat and a present member never count
+    twice.
+    """
+    if not meeting_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(MeetingDelegation.meeting_id, func.count())
+            .where(
+                MeetingDelegation.meeting_id.in_(meeting_ids),
+                MeetingDelegation.via_pool.is_(True),
+            )
+            .group_by(MeetingDelegation.meeting_id)
+        )
+    ).all()
+    return dict(rows)
 
 
 async def lock_meeting_delegations(session: AsyncSession, meeting_id: UUID) -> None:

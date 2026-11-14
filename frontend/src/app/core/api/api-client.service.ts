@@ -68,6 +68,7 @@ import type {
   HandoverMode,
   LogoutOut,
   MagicLinkVerifyResult,
+  type MajorityRule,
   EmailLoginRequest,
   ApplicantApplications,
   ApplicationObserver,
@@ -1029,7 +1030,7 @@ export class ApiClient {
       agendaItemId: Uuid;
       question?: string | null;
       options?: string[];
-      majorityRule?: 'simple' | 'absolute' | 'two_thirds';
+      majorityRule?: MajorityRule;
       secret?: boolean;
       quorumPercent?: number | null;
       /** Admitted guests vote too (no quorum). `undefined` lets the server choose. */

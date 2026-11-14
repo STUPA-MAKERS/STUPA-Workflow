@@ -15,6 +15,7 @@ from app.modules.applications.decision import DecisionIn
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
+from app.modules.delegations.pool_seat import pool_seat_counts
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.schemas import MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
@@ -132,13 +133,40 @@ def _meeting_vote_out(vote: Vote, meeting_id: UUID, reads: _VoteReads) -> Meetin
     )
 
 
-def _reload_tally(vote: Vote, choices: list[str | None]) -> _Tally:
+@dataclass(frozen=True, slots=True)
+class _Presence:
+    """The present members and the taken pool seats of the meetings of one read."""
+
+    members: Mapping[UUID, int]
+    seats: Mapping[UUID, int]
+
+
+def _quorum_present(vote: Vote, presence: _Presence) -> int | None:
+    """Return the present count for the quorum of a meeting vote, or None.
+
+    Only a vote with ``quorumBasis = present`` has one: the present members plus the
+    pool substitutes on a seat. A closed vote takes the members fixed at its close, a
+    running vote the present members of its meeting now.
+    """
+    stored = vote.config if isinstance(vote.config, dict) else {}
+    if vote.meeting_id is None or stored.get("quorumBasis") != "present":
+        return None
+    fixed: int | None = getattr(vote, "present_members", None)
+    members = (
+        fixed
+        if vote.status == "closed" and fixed is not None
+        else presence.members.get(vote.meeting_id, 0)
+    )
+    return members + presence.seats.get(vote.meeting_id, 0)
+
+
+def _reload_tally(vote: Vote, choices: list[str | None], present: int | None) -> _Tally:
     """Tally one vote from its stored choices; the failed reason only for a closed result."""
     from app.modules.voting import tally as tally_mod
 
     config = VoteConfig.from_stored(vote.config)
     counts = tally_mod.tally(config.options, choices)
-    outcome = tally_mod.result(config, counts, vote.eligible_count or 0)
+    outcome = tally_mod.result(config, counts, vote.eligible_count or 0, present=present)
     reason: Literal["quorum", "majority"] | None = (
         tally_mod.failed_reason(outcome.result, outcome.quorum_met)
         if vote.status == "closed" and vote.result is not None
@@ -182,10 +210,13 @@ class VoteReadOps(MeetingServiceBase):
             .scalars()
             .all()
         )
-        tallies = await self._vote_tallies(rows)
-        elections = await self._election_tallies([v for v in rows if is_election(v)])
-        polls = await self._poll_tallies([v for v in rows if is_poll(v)])
         present_by_meeting = await self._present_by_meeting(meeting_ids)
+        presence = _Presence(
+            present_by_meeting, await pool_seat_counts(self.session, meeting_ids)
+        )
+        tallies = await self._vote_tallies(rows, presence)
+        elections = await self._election_tallies([v for v in rows if is_election(v)], presence)
+        polls = await self._poll_tallies([v for v in rows if is_poll(v)])
         guests_by_meeting = await self.admitted_guests_by_meeting(meeting_ids)
         guest_votes = [
             v.id
@@ -238,7 +269,9 @@ class VoteReadOps(MeetingServiceBase):
         choices = await self._choices_by_vote(votes)
         return {v.id: tally_poll(choices.get(v.id, []), poll_config(v)) for v in votes}
 
-    async def _election_tallies(self, votes: Sequence[Vote]) -> dict[UUID, ElectionOutcome]:
+    async def _election_tallies(
+        self, votes: Sequence[Vote], presence: _Presence
+    ) -> dict[UUID, ElectionOutcome]:
         """Tally the elections of the reload path in one query."""
         if not votes:
             return {}
@@ -249,6 +282,7 @@ class VoteReadOps(MeetingServiceBase):
                 election_config(v),
                 v.eligible_count or 0,
                 round_=getattr(v, "round", 1) or 1,
+                present=_quorum_present(v, presence),
             )
             for v in votes
         }
@@ -386,7 +420,9 @@ class VoteReadOps(MeetingServiceBase):
         ).all()
         return dict(rows)
 
-    async def _vote_tallies(self, votes: Sequence[Vote]) -> dict[UUID, _Tally]:
+    async def _vote_tallies(
+        self, votes: Sequence[Vote], presence: _Presence
+    ) -> dict[UUID, _Tally]:
         """Build `{vote_id: (counts, leading, failedReason)}` from the ballots.
 
         This is the reload path. The method loads the ballots from `secret_ballot` in
@@ -396,7 +432,10 @@ class VoteReadOps(MeetingServiceBase):
         if not votes:
             return {}
         by_vote = await self._choices_by_vote(votes)
-        return {v.id: _reload_tally(v, by_vote.get(v.id, [])) for v in votes}
+        return {
+            v.id: _reload_tally(v, by_vote.get(v.id, []), _quorum_present(v, presence))
+            for v in votes
+        }
 
     async def open_vote(self, meeting_id: UUID) -> Vote | None:
         """Return the open vote of this meeting for the `subscribe` reconnect state."""
@@ -442,6 +481,14 @@ class VoteReadOps(MeetingServiceBase):
         return await self.session.scalar(
             select(Application.vote_gremium_id).where(Application.id == application_id)
         )
+
+    async def gremium_quorum_min_present(self, gremium_id: UUID) -> int | None:
+        """Return the least number of present roster persons of this gremium, or None."""
+        return (
+            await self.session.execute(
+                select(Gremium.quorum_min_present).where(Gremium.id == gremium_id)
+            )
+        ).scalar_one_or_none()
 
     async def gremium_quorum_percent(self, gremium_id: UUID) -> int | None:
         """Return the default quorum of this gremium in percent of eligible voters.

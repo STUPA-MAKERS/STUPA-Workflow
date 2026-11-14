@@ -71,6 +71,13 @@
           [ngModel]="form().quorumPercent"
           (ngModelChange)="patchQuorum($event)"
         />
+        <app-input
+          type="number"
+          [label]="'admin.gremien.quorumMinPresent' | t"
+          name="quorumMinPresent"
+          [ngModel]="form().quorumMinPresent"
+          (ngModelChange)="patchMinPresent($event)"
+        />
       </div>
 
       <div class="gd__col">

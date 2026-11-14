@@ -16,6 +16,7 @@ from app.shared.config_schemas import (
     POLL_MIN_OPTIONS,
     DateAnswer,
     ElectionConfig,
+    MajorityRule,
     PollConfig,
     PollMode,
     Quorum,
@@ -359,7 +360,7 @@ class VoteOut(FrozenCamelModel, frozen=True):
     poll: PollConfig | None = None
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
     #: Copies of ``config`` for the vote card, so a client needs no config parse.
-    majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
+    majority_rule: MajorityRule = Field(
         default="simple", alias="majorityRule"
     )
     quorum: Quorum | None = None

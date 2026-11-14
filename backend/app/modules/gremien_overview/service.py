@@ -338,6 +338,7 @@ def _overview_row(
         next_meeting=nxt,
         live=nxt is not None and nxt.status == "live",
         quorum_percent=g.quorum_percent,
+        quorum_min_present=g.quorum_min_present,
         protocols_public=bool(g.protocols_public),
         allow_vote_delegation=bool(g.allow_vote_delegation),
         logo_url=logo_url(g.id) if has_logo else None,

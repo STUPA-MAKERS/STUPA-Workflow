@@ -969,9 +969,9 @@
   "decision.applicantNoteConditions": "Bitte beachte die Auflagen des Beschlusses.",
   "meetings.vote.option": "Option",
   "meetings.vote.majorityRule": "Mehrheitsregel",
-  "meetings.vote.rule.simple": "Einfach",
-  "meetings.vote.rule.absolute": "Absolut",
-  "meetings.vote.rule.two_thirds": "Zwei Drittel",
+  "meetings.vote.rule.simple": "Einfache Mehrheit",
+  "meetings.vote.rule.absolute": "Absolute Mehrheit der Stimmen",
+  "meetings.vote.rule.two_thirds": "Zweidrittelmehrheit der Stimmen",
   "meetings.vote.openSubmit": "Abstimmung öffnen",
   "meetings.vote.prepare": "Vorbereiten",
   "meetings.vote.prepareTitle": "Abstimmung vorbereiten",
@@ -4384,5 +4384,13 @@
   "budget.plan.step.byHand": "von Hand",
   "budget.plan.toast.stateSet": "Der Zustand ist gesetzt.",
   "budget.plan.action.exportPdf": "Als PDF exportieren",
-  "budget.plan.action.exportXlsx": "Als XLSX exportieren"
+  "budget.plan.action.exportXlsx": "Als XLSX exportieren",
+  "meetings.vote.rule.members_majority": "Mehrheit der Mitglieder",
+  "meetings.vote.rule.members_two_thirds": "Zweidrittelmehrheit der Mitglieder",
+  "meetings.vote.rule.plan": "Ein Haushaltsplan braucht die Mehrheit der Mitglieder.",
+  "vote.majority.members_majority": "Mehrheit der Mitglieder",
+  "vote.majority.members_two_thirds": "Zweidrittelmehrheit der Mitglieder",
+  "vote.majorityCast.members_majority": "Mehrheit der Mitglieder",
+  "vote.majorityCast.members_two_thirds": "Zweidrittelmehrheit der Mitglieder",
+  "admin.gremien.quorumMinPresent": "Mindestzahl Anwesender"
 }

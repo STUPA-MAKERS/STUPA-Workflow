@@ -37,7 +37,7 @@ from app.modules.media.refs import document_ids_in, image_ids_in
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.filename import protocol_pdf_filename
-from app.shared.config_schemas import ElectionConfig
+from app.shared.config_schemas import ElectionConfig, MajorityRule
 from app.shared.errors import NotFoundError, ServiceUnavailableError
 from app.shared.schemas import FrozenCamelModel
 
@@ -46,7 +46,6 @@ logger = logging.getLogger("app.protocol")
 SNAPSHOT_VERSION = 1
 
 VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
-MajorityRule = Literal["simple", "absolute", "two_thirds"]
 
 
 def passed_conditions(view: object) -> list[str]:

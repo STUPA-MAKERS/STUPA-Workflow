@@ -25,7 +25,13 @@ from app.modules.voting.schemas import (
     VoteResultValue,
 )
 from app.shared.altcha import AltchaSolutionStr
-from app.shared.config_schemas import DateAnswer, ElectionConfig, PollConfig, Quorum
+from app.shared.config_schemas import (
+    DateAnswer,
+    ElectionConfig,
+    MajorityRule,
+    PollConfig,
+    Quorum,
+)
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 
@@ -116,7 +122,7 @@ class GuestVote(FrozenCamelModel, frozen=True):
     options: list[str]
     status: Literal["open", "closed"]
     secret: bool
-    majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(alias="majorityRule")
+    majority_rule: MajorityRule = Field(alias="majorityRule")
     guests_vote: bool = Field(alias="guestsVote")
     quorum: Quorum | None = None
     opened_at: _datetime | None = Field(default=None, alias="openedAt")
