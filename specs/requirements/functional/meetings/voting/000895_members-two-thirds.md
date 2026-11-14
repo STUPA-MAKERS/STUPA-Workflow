@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/unit/modules/voting/test_voting_tally.py:test_members_two_thirds_is_three_yes_for_two_members"
+implementation:
+  - backend/app/modules/voting/tally.py
 scope:
   - backend/app/modules/voting
   - backend/app/shared

@@ -108,6 +108,7 @@ describe('GremiumDialogComponent', () => {
     const quorum = screen.getByRole('spinbutton', { name: 'Quorum (%)' });
     await userEvent.clear(quorum);
     await userEvent.type(quorum, '150');
+    await userEvent.type(screen.getByRole('spinbutton', { name: 'Mindestzahl Anwesender' }), '2000');
     const lead = screen.getByRole('spinbutton', { name: 'Vorlauf für Delegationen (Minuten)' });
     await userEvent.clear(lead);
     await userEvent.type(lead, '30');
@@ -125,6 +126,7 @@ describe('GremiumDialogComponent', () => {
       delegationLeadMinutes: 30,
       delegationAllowExternal: true,
       quorumPercent: 100,
+      quorumMinPresent: 1000,
     });
     expect(api.setGremiumMailRecipients).toHaveBeenCalledWith('g-1', [
       'a@x.de',
@@ -146,6 +148,9 @@ describe('GremiumDialogComponent', () => {
     await userEvent.click(screen.getByRole('switch', { name: 'Stimm-Delegation erlauben' }));
     await waitFor(() => expect(screen.getByRole('spinbutton', { name: /Vorlauf/ })).toHaveValue(0));
     await userEvent.type(screen.getByRole('spinbutton', { name: 'Quorum (%)' }), '40');
+    const least = screen.getByRole('spinbutton', { name: 'Mindestzahl Anwesender' });
+    await userEvent.type(least, '3');
+    await userEvent.clear(least);
     await userEvent.click(save());
     expect(api.createGremium).toHaveBeenCalledWith({
       name: 'Finanz Ausschuss',
@@ -157,6 +162,7 @@ describe('GremiumDialogComponent', () => {
       delegationLeadMinutes: 0,
       delegationAllowExternal: false,
       quorumPercent: 40,
+      quorumMinPresent: null,
     });
     expect(api.setGremiumMailRecipients).toHaveBeenCalledWith('g-new', []);
     expect(saved).toHaveBeenCalledWith(expect.objectContaining({ created: true }));

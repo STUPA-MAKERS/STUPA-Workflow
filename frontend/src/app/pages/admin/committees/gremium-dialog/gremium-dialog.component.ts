@@ -52,6 +52,8 @@ export interface GremiumForm {
   readonly delegationAllowExternal: boolean;
   /** Default quorum in percent of the eligible voters. `null` = no quorum. */
   readonly quorumPercent: number | null;
+  /** The least number of present persons for the quorum. `null` = no least number. */
+  readonly quorumMinPresent: number | null;
   /** Extra protocol recipients, one address per line. */
   readonly mailRecipients: string;
   /** The final protocols show on the public protocol page. */
@@ -67,6 +69,7 @@ export function emptyGremiumForm(): GremiumForm {
     delegationLeadMinutes: 0,
     delegationAllowExternal: false,
     quorumPercent: null,
+    quorumMinPresent: null,
     mailRecipients: '',
     protocolsPublic: false,
   };
@@ -218,6 +221,7 @@ export class GremiumDialogComponent {
       delegationLeadMinutes: g.delegationLeadMinutes ?? 0,
       delegationAllowExternal: g.delegationAllowExternal ?? false,
       quorumPercent: g.quorumPercent ?? null,
+      quorumMinPresent: g.quorumMinPresent ?? null,
       mailRecipients: '',
       protocolsPublic: g.protocolsPublic ?? false,
     });
@@ -246,6 +250,16 @@ export class GremiumDialogComponent {
       'delegationLeadMinutes',
       Number.isFinite(n) ? Math.min(MAX_DELEGATION_LEAD_MINUTES, Math.max(0, n)) : 0,
     );
+  }
+
+  /** Least number of present persons: empty gives `null`, else a whole number from 1. */
+  protected patchMinPresent(value: number | string | null): void {
+    if (value === null || value === undefined || String(value).trim() === '') {
+      this.patch('quorumMinPresent', null);
+      return;
+    }
+    const n = Math.round(Number(value));
+    this.patch('quorumMinPresent', Number.isFinite(n) ? Math.min(1000, Math.max(1, n)) : null);
   }
 
   /** Quorum: empty gives `null` (no quorum), else a whole percent from 0 to 100. */
@@ -323,6 +337,7 @@ export class GremiumDialogComponent {
       delegationLeadMinutes: f.delegationLeadMinutes,
       delegationAllowExternal: f.delegationAllowExternal,
       quorumPercent: f.quorumPercent,
+      quorumMinPresent: f.quorumMinPresent,
       protocolsPublic: f.protocolsPublic,
     } satisfies GremiumUpdateBody;
     const isNew = this.isNew();

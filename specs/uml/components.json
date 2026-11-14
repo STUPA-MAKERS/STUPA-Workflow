@@ -786,7 +786,7 @@
       "to": "budget"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "livevote",
       "to": "delegations"
     },

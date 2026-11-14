@@ -969,9 +969,9 @@
   "decision.applicantNoteConditions": "Please observe the conditions of the decision.",
   "meetings.vote.option": "Option",
   "meetings.vote.majorityRule": "Majority rule",
-  "meetings.vote.rule.simple": "Simple",
-  "meetings.vote.rule.absolute": "Absolute",
-  "meetings.vote.rule.two_thirds": "Two thirds",
+  "meetings.vote.rule.simple": "Simple majority",
+  "meetings.vote.rule.absolute": "Absolute majority of the votes",
+  "meetings.vote.rule.two_thirds": "Two-thirds majority of the votes",
   "meetings.vote.openSubmit": "Open vote",
   "meetings.vote.prepare": "Prepare",
   "meetings.vote.prepareTitle": "Prepare a vote",
@@ -4387,5 +4387,13 @@
   "budget.plan.step.byHand": "by hand",
   "budget.plan.toast.stateSet": "The state is set.",
   "budget.plan.action.exportPdf": "Export as PDF",
-  "budget.plan.action.exportXlsx": "Export as XLSX"
+  "budget.plan.action.exportXlsx": "Export as XLSX",
+  "meetings.vote.rule.members_majority": "Majority of the members",
+  "meetings.vote.rule.members_two_thirds": "Two-thirds majority of the members",
+  "meetings.vote.rule.plan": "A budget plan needs the majority of the members.",
+  "vote.majority.members_majority": "Majority of the members",
+  "vote.majority.members_two_thirds": "Two-thirds majority of the members",
+  "vote.majorityCast.members_majority": "Majority of the members",
+  "vote.majorityCast.members_two_thirds": "Two-thirds majority of the members",
+  "admin.gremien.quorumMinPresent": "Least number present"
 }

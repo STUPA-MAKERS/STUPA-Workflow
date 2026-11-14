@@ -151,6 +151,11 @@ class GremiumOut(FrozenCamelModel, frozen=True):
     quorum_percent: int | None = Field(
         default=None, serialization_alias="quorumPercent"
     )
+    #: The least number of present roster persons for the quorum of a meeting vote.
+    #: A None value means no least number.
+    quorum_min_present: int | None = Field(
+        default=None, serialization_alias="quorumMinPresent"
+    )
     #: The final protocols of the gremium appear on the public protocols page.
     protocols_public: bool = Field(default=False, serialization_alias="protocolsPublic")
 
@@ -184,6 +189,9 @@ class GremiumCreate(FrozenCamelModel, frozen=True):
     quorum_percent: int | None = Field(
         default=None, alias="quorumPercent", ge=0, le=100
     )
+    quorum_min_present: int | None = Field(
+        default=None, alias="quorumMinPresent", ge=1, le=1000
+    )
     protocols_public: bool = Field(default=False, alias="protocolsPublic")
 
 
@@ -204,6 +212,9 @@ class GremiumUpdate(FrozenCamelModel, frozen=True):
     )
     quorum_percent: int | None = Field(
         default=None, alias="quorumPercent", ge=0, le=100
+    )
+    quorum_min_present: int | None = Field(
+        default=None, alias="quorumMinPresent", ge=1, le=1000
     )
     protocols_public: bool | None = Field(default=None, alias="protocolsPublic")
 

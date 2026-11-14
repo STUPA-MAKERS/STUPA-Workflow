@@ -20,6 +20,15 @@ is yes plus no.
 `absolute`: absolute majority of every cast vote, `2*yes > cast`, tie at `2*yes == cast`.
 `two_thirds`: passed at `3*yes >= 2*decisive`, rejected at `3*no >= 2*decisive`, any
 other case is a tie (blocking minority).
+`members_majority`: passed at `2*yes > eligible`, else rejected.
+`members_two_thirds`: passed at `3*yes >= 2*eligible`, else rejected.
+The two members rules count against the eligible count of the vote, so an abstention
+and a missing ballot have the effect of a no ballot. They have no tie, and without an
+eligible count they reject (fail-closed).
+
+Quorum: a vote with `quorumBasis = present` (a meeting vote) compares the present persons
+of the roster with the eligible count, and `quorumMinPresent` asks for a least number of
+them. Each other vote compares the cast ballots.
 
 `tieBreak` resolves a tie to passed, rejected or tie. A missed quorum always gives
 rejected (fail-closed), whatever the majority rule says.
@@ -49,14 +58,20 @@ from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Literal, assert_never
 
-from app.shared.config_schemas import ElectionConfig, PollConfig, Quorum, VoteConfig
+from app.shared.config_schemas import (
+    ElectionConfig,
+    MajorityRule,
+    PollConfig,
+    Quorum,
+    QuorumBasis,
+    VoteConfig,
+)
 
 YES = "yes"
 NO = "no"
 ABSTAIN = "abstain"
 
 VoteResult = Literal["passed", "rejected", "tie"]
-MajorityRule = Literal["simple", "absolute", "two_thirds"]
 FailedReason = Literal["quorum", "majority"]
 
 
@@ -121,6 +136,28 @@ def _quorum_met(quorum: Quorum | None, participation: int, eligible: int) -> boo
     )
 
 
+def _quorum_reached(
+    quorum: Quorum | None,
+    basis: QuorumBasis,
+    min_present: int | None,
+    *,
+    ballots: int,
+    eligible: int,
+    present: int | None,
+) -> bool:
+    """Check the quorum of a vote against the ballots or the present persons.
+
+    ``present`` is the number of present roster persons of a meeting vote, or None for
+    a vote without a meeting. A vote with the basis ``present`` and a present count
+    compares that count; each other vote compares ``ballots``. The least number of
+    present persons applies only with a present count.
+    """
+    by_present = basis == "present" and present is not None
+    enough = present is None or min_present is None or present >= min_present
+    turnout = present if by_present and present is not None else ballots
+    return enough and _quorum_met(quorum, turnout, eligible)
+
+
 def _by_sign(margin: int) -> VoteResult:
     """Give passed for a positive margin, rejected for a negative one and tie for zero."""
     return "passed" if margin > 0 else ("rejected" if margin < 0 else "tie")
@@ -138,11 +175,12 @@ def _two_thirds(yes: int, no: int) -> VoteResult:
     return "passed" if passes else ("rejected" if rejects else "tie")
 
 
-def _majority(rule: MajorityRule, yes: int, no: int, cast: int) -> VoteResult:
+def _majority(rule: MajorityRule, yes: int, no: int, cast: int, eligible: int) -> VoteResult:
     """Apply the majority rule to the yes and no counts.
 
     The `two_thirds` rule accepts at a share of 2/3 or more, and rejects symmetrically.
     When neither side reaches 2/3, a blocking minority holds and the result is a tie.
+    A members rule counts the yes ballots against ``eligible`` and has no tie.
 
     Returns:
         passed, rejected or tie. A tie here is raw and still needs `tieBreak`.
@@ -154,15 +192,26 @@ def _majority(rule: MajorityRule, yes: int, no: int, cast: int) -> VoteResult:
             return _by_sign(2 * yes - cast)
         case "two_thirds":
             return _two_thirds(yes, no)
+        case "members_majority":
+            return "passed" if eligible > 0 and 2 * yes > eligible else "rejected"
+        case "members_two_thirds":
+            return "passed" if eligible > 0 and 3 * yes >= 2 * eligible else "rejected"
         case _:
             assert_never(rule)
 
 
-def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outcome:
+def result(
+    config: VoteConfig,
+    counts: Mapping[str, int],
+    eligible: int,
+    *,
+    present: int | None = None,
+) -> Outcome:
     """Apply the quorum and the majority rule to get the outcome.
 
     The quorum turnout counts every cast vote. Abstentions drop out only when
-    ``abstainCountsQuorum`` is false.
+    ``abstainCountsQuorum`` is false. A meeting vote passes ``present``, the present
+    persons of its roster: with ``quorumBasis = present`` the quorum counts them.
     """
     yes = counts.get(YES, 0)
     no = counts.get(NO, 0)
@@ -170,10 +219,19 @@ def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outc
     cast = sum(counts.values())
 
     participation = cast if config.abstain_counts_quorum else cast - abstain
-    quorum_met = _quorum_met(config.quorum, participation, eligible)
+    quorum_met = _quorum_reached(
+        config.quorum,
+        config.quorum_basis,
+        config.quorum_min_present,
+        ballots=participation,
+        eligible=eligible,
+        present=present,
+    )
     lead = leading(counts)
 
-    raw = _majority(config.majority_rule, yes, no, cast) if quorum_met else "rejected"
+    raw = (
+        _majority(config.majority_rule, yes, no, cast, eligible) if quorum_met else "rejected"
+    )
     final: VoteResult = config.tie_break if raw == "tie" else raw
     return Outcome(result=final, quorum_met=quorum_met, leading=lead)
 
@@ -224,13 +282,27 @@ class ElectionOutcome:
         return {**self.counts, "abstain": self.abstentions}
 
 
+def _election_quorum(
+    config: ElectionConfig, participation: int, eligible: int, present: int | None
+) -> bool:
+    """Check the quorum of an election: the rule of a motion."""
+    return _quorum_reached(
+        config.quorum,
+        config.quorum_basis,
+        config.quorum_min_present,
+        ballots=participation,
+        eligible=eligible,
+        present=present,
+    )
+
+
 def _yes_no_outcome(
-    config: ElectionConfig, choices: Sequence[str | None], eligible: int
+    config: ElectionConfig, choices: Sequence[str | None], eligible: int, present: int | None
 ) -> ElectionOutcome:
     counts = tally(("yes", "no", "abstain"), choices)
     ballots = sum(counts.values())
     participation = ballots if config.abstain_counts_quorum else ballots - counts["abstain"]
-    quorum_met = _quorum_met(config.quorum, participation, eligible)
+    quorum_met = _election_quorum(config, participation, eligible, present)
     elected = quorum_met and counts["yes"] > counts["no"]
     return ElectionOutcome(
         result="elected" if elected else "rejected",
@@ -250,6 +322,7 @@ def tally_election(
     eligible: int,
     *,
     round_: int = 1,
+    present: int | None = None,
 ) -> ElectionOutcome:
     """Count an election and find the elected candidates.
 
@@ -259,14 +332,15 @@ def tally_election(
     elected. When more candidates have votes than there are seats, the first
     ``seats`` win, unless a tie crosses the seat boundary: then the candidates above
     the boundary are elected and the lot decides among the tied ones, also with
-    several seats (no runoff). A missed quorum elects nobody.
+    several seats (no runoff). A missed quorum elects nobody. ``present`` is the present
+    count of a meeting election (see ``result``).
 
     The sort is stable, so candidates with equal votes keep the order of the candidate
     list.
     """
     raw = tuple(choices)
     if config.yes_no:
-        return _yes_no_outcome(config, raw, eligible)
+        return _yes_no_outcome(config, raw, eligible, present)
     known = config.candidate_ids
     known_ids = frozenset(known)
     picks = tuple(_list_picks(item, known_ids, config.seats) for item in raw)
@@ -275,7 +349,7 @@ def tally_election(
     ballots = len(raw)
     full_abstentions = sum(1 for ballot in picks if not ballot)
     participation = ballots if config.abstain_counts_quorum else ballots - full_abstentions
-    quorum_met = _quorum_met(config.quorum, participation, eligible)
+    quorum_met = _election_quorum(config, participation, eligible, present)
     missed = ElectionOutcome(
         result="rejected",
         quorum_met=False,

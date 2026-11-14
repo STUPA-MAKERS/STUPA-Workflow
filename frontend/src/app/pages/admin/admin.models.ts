@@ -232,6 +232,8 @@ export interface Gremium {
   readonly delegationAllowExternal?: boolean;
   /** Default quorum as a percent of eligible voters who must attend. null = none. */
   readonly quorumPercent?: number | null;
+  /** The least number of present persons for the quorum of a meeting vote. null = none. */
+  readonly quorumMinPresent?: number | null;
   /** Number of members. Only the admin list (`GET /admin/committees`) gives it. */
   readonly memberCount?: number;
   /** Number of gremium roles, the forced roles included. Admin list only. */
@@ -258,6 +260,8 @@ export interface GremiumCreateBody {
   readonly delegationLeadMinutes?: number;
   readonly delegationAllowExternal?: boolean;
   readonly quorumPercent?: number | null;
+  /** The least number of present persons for the quorum of a meeting vote. null = none. */
+  readonly quorumMinPresent?: number | null;
   readonly protocolsPublic?: boolean;
 }
 
@@ -271,6 +275,8 @@ export interface GremiumUpdateBody {
   readonly delegationLeadMinutes?: number;
   readonly delegationAllowExternal?: boolean;
   readonly quorumPercent?: number | null;
+  /** The least number of present persons for the quorum of a meeting vote. null = none. */
+  readonly quorumMinPresent?: number | null;
   readonly protocolsPublic?: boolean;
 }
 

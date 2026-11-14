@@ -136,9 +136,9 @@ async def test_votes_for_reads_a_closed_poll() -> None:
     sess = _QueueSession(
         executes=[
             res(row),
+            res((mid, 3)),
             res(),
             res((row.id, '["o1"]'), (row.id, '["o1","o2"]'), (row.id, '["o1"]')),
-            res((mid, 3)),
         ]
     )
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
@@ -154,9 +154,7 @@ async def test_votes_for_reads_a_closed_poll() -> None:
 async def test_votes_for_hides_the_count_of_a_running_poll() -> None:
     mid = uuid4()
     row = _poll_row(meeting_id=mid, status="open", result=None)
-    sess = _QueueSession(
-        executes=[res(row), res(), res((row.id, '["o1"]')), res((mid, 3))]
-    )
+    sess = _QueueSession(executes=[res(row), res((mid, 3)), res(), res((row.id, '["o1"]'))])
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
     assert item.voted == 1
     assert item.poll_result is None

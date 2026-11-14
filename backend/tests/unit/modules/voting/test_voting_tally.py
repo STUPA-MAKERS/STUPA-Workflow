@@ -201,4 +201,114 @@ def test_majority_refuses_an_unknown_rule() -> None:
     ``VoteConfig`` validates the rule, so only a bypass of the types reaches this arm.
     """
     with pytest.raises(AssertionError):
-        _majority(cast("MajorityRule", "bogus"), 1, 0, 1)
+        _majority(cast("MajorityRule", "bogus"), 1, 0, 1, 1)
+
+
+# --- Members rules (§F/meetings/voting/000894, 000895, 000896) ------------------------
+
+
+@pytest.mark.parametrize(
+    ("yes", "no", "abstain", "eligible", "expected"),
+    [
+        (6, 0, 0, 10, "passed"),
+        (5, 0, 0, 10, "rejected"),
+        (5, 0, 5, 10, "rejected"),
+        (5, 4, 0, 9, "passed"),
+        (3, 0, 0, 10, "rejected"),
+    ],
+)
+def test_members_majority_counts_against_the_eligible_count(
+    yes: int, no: int, abstain: int, eligible: int, expected: str
+) -> None:
+    """More than half of the members say yes; an abstention acts as a no (§000894)."""
+    out = result(
+        _config(majority_rule="members_majority"),
+        {YES: yes, NO: no, ABSTAIN: abstain},
+        eligible,
+    )
+    assert out.result == expected
+
+
+@pytest.mark.parametrize(
+    ("yes", "eligible", "expected"),
+    [(6, 9, "passed"), (7, 10, "passed"), (6, 10, "rejected"), (2, 3, "passed")],
+)
+def test_members_two_thirds_is_three_yes_for_two_members(
+    yes: int, eligible: int, expected: str
+) -> None:
+    """The check is ``3 * yes >= 2 * eligible`` (§000895)."""
+    out = result(_config(majority_rule="members_two_thirds"), {YES: yes, NO: 0}, eligible)
+    assert out.result == expected
+
+
+@pytest.mark.parametrize("rule", ["members_majority", "members_two_thirds"])
+def test_members_rule_without_an_eligible_count_rejects(rule: str) -> None:
+    """A count of 0 never passes a motion (§000896)."""
+    out = result(_config(majority_rule=rule), {YES: 5, NO: 0}, 0)
+    assert out.result == "rejected"
+
+
+def test_members_rule_has_no_tie() -> None:
+    """A members rule gives passed or rejected, so the tie break never applies."""
+    config = _config(majority_rule="members_majority", tie_break="passed")
+    assert result(config, {YES: 5, NO: 5}, 10).result == "rejected"
+
+
+def test_members_rule_with_guests_is_refused() -> None:
+    """A guest is no member, so the config refuses the pair (§000898)."""
+    with pytest.raises(ValueError, match="members rule"):
+        VoteConfig.model_validate(
+            {"options": OPTIONS, "majorityRule": "members_majority", "guestsVote": True}
+        )
+
+
+# --- Quorum by present persons (§F/meetings/voting/000900, 000901) --------------------
+
+
+def _present_config(*, percent: int | None = 40, min_present: int | None = None) -> VoteConfig:
+    return VoteConfig.model_validate(
+        {
+            "options": OPTIONS,
+            "majorityRule": "simple",
+            "quorum": None if percent is None else {"type": "percent", "value": percent},
+            "quorumBasis": "present",
+            "quorumMinPresent": min_present,
+        }
+    )
+
+
+def test_quorum_counts_the_present_persons_and_not_the_ballots() -> None:
+    """One ballot of ten members meets a 40 % quorum with four present (§000900)."""
+    out = result(_present_config(), {YES: 1, NO: 0}, 10, present=4)
+    assert (out.quorum_met, out.result) == (True, "passed")
+
+
+def test_many_ballots_do_not_replace_present_persons() -> None:
+    """Ballots of delegations do not count: three present of ten miss 40 % (§000900)."""
+    out = result(_present_config(), {YES: 7, NO: 0}, 10, present=3)
+    assert (out.quorum_met, out.result) == (False, "rejected")
+
+
+def test_a_vote_without_a_meeting_counts_the_ballots() -> None:
+    """Without a present count the quorum compares the ballots (§000900)."""
+    assert result(_present_config(), {YES: 4, NO: 0}, 10).quorum_met is True
+    assert result(_present_config(), {YES: 3, NO: 0}, 10).quorum_met is False
+
+
+def test_the_basis_ballots_ignores_the_present_count() -> None:
+    """A vote that was created before the field keeps the count of its ballots."""
+    config = _config(quorum={"type": "percent", "value": 40})
+    assert result(config, {YES: 1, NO: 0}, 10, present=9).quorum_met is False
+
+
+@pytest.mark.parametrize(("present", "met"), [(2, False), (3, True)])
+def test_least_number_of_present_persons(present: int, met: bool) -> None:
+    """40 % of five is two, and the Gremium still needs three present (§000901)."""
+    out = result(_present_config(min_present=3), {YES: 2, NO: 0}, 5, present=present)
+    assert out.quorum_met is met
+
+
+def test_least_number_applies_without_a_percent() -> None:
+    """The least number alone can miss the quorum (§000901)."""
+    out = result(_present_config(percent=None, min_present=3), {YES: 2, NO: 0}, 5, present=2)
+    assert (out.quorum_met, out.result) == (False, "rejected")

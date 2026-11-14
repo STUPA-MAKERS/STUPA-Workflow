@@ -44,6 +44,9 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     #: Default quorum for the votes of this gremium. It is the percentage of
     #: eligible voters that must take part, from 0 to 100. NULL = no default.
     quorum_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The least number of present roster persons for the quorum of a meeting vote.
+    #: NULL = no least number, only the percent counts.
+    quorum_min_present: Mapped[int | None] = mapped_column(Integer, nullable=True)
     #: The final protocols of this gremium appear without login on the public
     #: protocols page, as the public version only. Off by default.
     protocols_public: Mapped[bool] = mapped_column(Boolean, server_default="false")

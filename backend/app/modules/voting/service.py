@@ -47,6 +47,7 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.delegations.pool_seat import (
     claim_pool_seat,
+    pool_seat_counts,
     pool_seat_for,
     release_pool_seat_of,
 )
@@ -768,13 +769,17 @@ class VotingService:
         """
         match getattr(vote, "kind", "motion"):
             case election_mod.ELECTION:
-                ev = await self._election_outcome(vote, eligible)
+                ev = await self._election_outcome(
+                    vote, eligible, await self._quorum_present(vote, config)
+                )
                 return _Counted(ev.display_counts(), ev.ballots, ev.quorum_met, None)
             case poll_mod.POLL:
                 pv = await self._poll_outcome(vote)
                 return _Counted(pv.display_counts(), pv.ballots, True, None)
             case _:
-                outcome = tally_mod.result(config, counts, eligible)
+                outcome = tally_mod.result(
+                    config, counts, eligible, present=await self._quorum_present(vote, config)
+                )
                 return _Counted(
                     counts, sum(counts.values()), outcome.quorum_met, outcome.leading
                 )
@@ -853,11 +858,34 @@ class VotingService:
             .all()
         )
 
-    async def _election_outcome(self, vote: Vote, eligible: int) -> tally_mod.ElectionOutcome:
+    async def _election_outcome(
+        self, vote: Vote, eligible: int, present: int | None = None
+    ) -> tally_mod.ElectionOutcome:
         """Tally an election from its stored ballots."""
         config = election_mod.election_config(vote)
         choices = await self._choices(vote)
-        return election_mod.outcome_of(config, choices, eligible, getattr(vote, "round", 1) or 1)
+        return election_mod.outcome_of(
+            config, choices, eligible, getattr(vote, "round", 1) or 1, present
+        )
+
+    async def _quorum_present(self, vote: Vote, config: VoteConfig) -> int | None:
+        """Return the present count that the quorum of a meeting vote compares.
+
+        Only a meeting vote with ``quorumBasis = present`` has one: the persons with the
+        attendance status ``present`` plus the pool substitutes on a seat. A member who
+        gave a delegation is not present, so the ballot of a delegation does not count.
+        A closed vote takes the present members fixed at its close.
+        """
+        if vote.meeting_id is None or config.quorum_basis != "present":
+            return None
+        fixed: int | None = getattr(vote, "present_members", None)
+        members = (
+            fixed
+            if vote.status == "closed" and fixed is not None
+            else await self._present_count(vote)
+        )
+        seats = await pool_seat_counts(self.session, [vote.meeting_id])
+        return members + seats.get(vote.meeting_id, 0)
 
     async def _poll_outcome(self, vote: Vote) -> tally_mod.PollOutcome:
         """Tally a poll from its stored ballots."""
@@ -2160,7 +2188,12 @@ class VotingService:
             return await self._close_poll(vote, principal, now=now)
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
-        outcome = tally_mod.result(config, counts, vote.eligible_count or 0)
+        outcome = tally_mod.result(
+            config,
+            counts,
+            vote.eligible_count or 0,
+            present=await self._quorum_present(vote, config),
+        )
         _check_closable(vote, quorum_met=outcome.quorum_met, now=now)
 
         result_value: tally_mod.VoteResult = (
@@ -2304,7 +2337,9 @@ class VotingService:
             ConflictError: The quorum is missed and the window has not expired.
         """
         config = self._config(vote)
-        outcome = await self._election_outcome(vote, vote.eligible_count or 0)
+        outcome = await self._election_outcome(
+            vote, vote.eligible_count or 0, await self._quorum_present(vote, config)
+        )
         _check_closable(vote, quorum_met=outcome.quorum_met, now=now)
         closed_at = now or datetime.now(UTC)
         eligible = await self._fix_attendance(vote, config)

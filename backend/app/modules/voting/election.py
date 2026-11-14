@@ -90,10 +90,14 @@ def stored_choice(config: ElectionConfig, choice: str | list[str]) -> str:
 
 
 def outcome_of(
-    config: ElectionConfig, choices: Sequence[str | None], eligible: int, round_: int
+    config: ElectionConfig,
+    choices: Sequence[str | None],
+    eligible: int,
+    round_: int,
+    present: int | None = None,
 ) -> tally_mod.ElectionOutcome:
     """Run the pure election tally."""
-    return tally_mod.tally_election(choices, config, eligible, round_=round_)
+    return tally_mod.tally_election(choices, config, eligible, round_=round_, present=present)
 
 
 def result_of(outcome: tally_mod.ElectionOutcome) -> ElectionResultOut:

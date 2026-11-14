@@ -22,6 +22,7 @@ from app.modules.voting.schemas import (
 from app.shared.config_schemas import (
     ELECTION_MAX_CANDIDATES,
     ElectionConfig,
+    MajorityRule,
     PollConfig,
     Quorum,
 )
@@ -151,7 +152,7 @@ class MeetingVoteOut(FrozenCamelModel, frozen=True):
     #: open and on ``passed`` or ``tie``.
     failed_reason: Literal["quorum", "majority"] | None = Field(default=None, alias="failedReason")
     #: The rules of the vote, for the vote card.
-    majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
+    majority_rule: MajorityRule = Field(
         default="simple", alias="majorityRule"
     )
     secret: bool = False
@@ -400,7 +401,7 @@ class MeetingVoteBody(FrozenCamelModel, frozen=True):
     agenda_item_id: UUID = Field(alias="agendaItemId")
     question: str | None = None
     options: list[str] = Field(default_factory=lambda: ["yes", "no", "abstain"])
-    majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
+    majority_rule: MajorityRule = Field(
         default="simple", alias="majorityRule"
     )
     #: Every vote is always secret (motion, election, poll): ``None`` or true; false

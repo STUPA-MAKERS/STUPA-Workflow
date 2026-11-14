@@ -24,6 +24,7 @@ from app.modules.livevote.events import (
 )
 from app.modules.livevote.schemas import MeetingVoteOpenBody
 from app.modules.livevote.service import BrokerPublisher, MeetingService
+from app.modules.livevote.service.votes import _Presence
 from app.modules.voting.schemas import (
     ElectionLotOut,
     ElectionResultOut,
@@ -258,13 +259,13 @@ async def test_votes_for_reads_an_election() -> None:
     sess = _QueueSession(
         executes=[
             res(row),
+            res((mid, 3)),
             res(),
             res(
                 (row.id, encode_election_choice(["c1"])),
                 (row.id, encode_election_choice(["c1"])),
                 (row.id, encode_election_choice(["c2"])),
             ),
-            res((mid, 3)),
         ]
     )
     out = await MeetingService(sess)._votes_for([mid])  # type: ignore[arg-type]
@@ -285,14 +286,14 @@ async def test_votes_for_marks_a_missed_quorum_of_an_election() -> None:
         "quorum": {"type": "count", "value": 5},
     }
     row = _election_row(meeting_id=mid, result="rejected", config=config)
-    sess = _QueueSession(executes=[res(row), res(), res(), res((mid, 3))])
+    sess = _QueueSession(executes=[res(row), res((mid, 3)), res(), res()])
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
     assert item.failed_reason == "quorum"
 
 
 async def test_election_tallies_without_elections() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc._election_tallies([]) == {}
+    assert await svc._election_tallies([], _Presence({}, {})) == {}
 
 
 async def test_ballots_of_gives_an_election_only_cast() -> None:

@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "frontend/src/app/features/meetings/vote-open-dialog/vote-open-dialog.component.spec.ts:VoteOpenDialogComponent"
+implementation:
+  - frontend/src/app/features/meetings/vote-open-dialog/vote-open-dialog.component.ts
 scope:
   - frontend/src/app/features/voting
   - frontend/src/app/features/meetings

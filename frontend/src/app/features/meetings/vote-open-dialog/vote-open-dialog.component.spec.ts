@@ -1,10 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { render, screen, within } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { AgendaItem, Meeting, MeetingVote } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
+import { pickOption } from '../../../../testing/select';
 import { type VoteDialogSource, VoteOpenDialogComponent } from './vote-open-dialog.component';
 
 const MEETING = { id: 'm-1', title: '34. Sitzung', status: 'live', isProtokollant: true, votes: [] } as unknown as Meeting;
@@ -72,13 +73,18 @@ describe('VoteOpenDialogComponent', () => {
   });
 
   it('names the item and prefills the question of an application item', async () => {
-    await setup();
+    const { cmp } = await setup();
     const dialog = screen.getByRole('dialog', { name: 'Abstimmung öffnen' });
     expect(dialog).toHaveAccessibleDescription('TOP 3 · Zuschuss Party');
     expect(screen.getByLabelText('Beschlussfrage')).toHaveValue(
       'Soll der Antrag „Zuschuss Party“ wie beschrieben gefördert werden?',
     );
-    expect(screen.getByRole('radio', { name: 'Einfach' })).toHaveAttribute('aria-checked', 'true');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Mehrheitsregel' })).toHaveTextContent(
+        'Einfache Mehrheit',
+      ),
+    );
+    expect(cmp.majorityRule()).toBe('simple');
     expect(screen.queryByRole('switch', { name: 'Geheime Abstimmung' })).toBeNull();
   });
 
@@ -86,7 +92,10 @@ describe('VoteOpenDialogComponent', () => {
     const { http, opened, toasts } = await setup();
     expect(screen.queryByText(/Stimmengleichheit/)).toBeNull();
     expect(screen.queryByText(/änderbar/)).toBeNull();
-    await userEvent.click(screen.getByRole('radio', { name: 'Zwei Drittel' }));
+    await pickOption(
+      screen.getByRole('combobox', { name: 'Mehrheitsregel' }),
+      'Zweidrittelmehrheit der Stimmen',
+    );
     const question = screen.getByLabelText('Beschlussfrage');
     await userEvent.clear(question);
     await userEvent.type(question, '  Fördern wir?  ');
@@ -134,6 +143,35 @@ describe('VoteOpenDialogComponent', () => {
   it('has no axe violations', async () => {
     await setup();
     expect(await runAxe(document.body)).toHaveNoViolations();
+  });
+
+  /** §F/meetings/voting/000897: five rules, and the form starts with the simple majority. */
+  it('offers the five majority rules and starts with the simple majority', async () => {
+    const { cmp } = await setup();
+    expect(cmp.majorityRule()).toBe('simple');
+    expect(cmp.ruleOptions().map((o) => o.label)).toEqual([
+      'Einfache Mehrheit',
+      'Absolute Mehrheit der Stimmen',
+      'Zweidrittelmehrheit der Stimmen',
+      'Mehrheit der Mitglieder',
+      'Zweidrittelmehrheit der Mitglieder',
+    ]);
+  });
+
+  /** §F/meetings/voting/000899: the plan item offers no rule and sends the members majority. */
+  it('fixes the majority of the members on the item of a Haushaltsplan', async () => {
+    const { cmp } = await setup({ ...FREE_TOP, planVersionId: 'pv-1' });
+    expect(cmp.planItem()).toBe(true);
+    expect(cmp.majorityRule()).toBe('members_majority');
+    expect(screen.getByText('Ein Haushaltsplan braucht die Mehrheit der Mitglieder.')).toBeTruthy();
+  });
+
+  /** §F/meetings/voting/000898: a members rule locks the guest ballots. */
+  it('locks the guest ballots for a members rule', async () => {
+    const { cmp } = await setup();
+    cmp.setRule('members_two_thirds');
+    expect(cmp.membersRule()).toBe(true);
+    expect(cmp.guestsLocked()).toBe(true);
   });
 
   it('accepts only the known majority rules', async () => {
@@ -324,7 +362,11 @@ describe('VoteOpenDialogComponent', () => {
       });
       expect(screen.getByRole('dialog', { name: 'Abstimmung bearbeiten' })).toBeInTheDocument();
       expect(screen.getByLabelText('Beschlussfrage')).toHaveValue('Fördern wir die Party?');
-      expect(screen.getByRole('radio', { name: 'Absolut' })).toHaveAttribute('aria-checked', 'true');
+      await waitFor(() =>
+        expect(screen.getByRole('combobox', { name: 'Mehrheitsregel' })).toHaveTextContent(
+          'Absolute Mehrheit der Stimmen',
+        ),
+      );
       expect(screen.queryByRole('button', { name: 'Vorbereiten' })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       const req = http.expectOne('/api/meetings/m-1/votes/v-5');

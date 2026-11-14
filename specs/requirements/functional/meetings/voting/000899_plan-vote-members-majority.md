@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/integration/modules/livevote/test_plan_agenda_vote.py:test_the_item_of_a_plan_takes_one_motion_of_the_members"
+  - "frontend/src/app/features/meetings/vote-open-dialog/vote-open-dialog.component.spec.ts:VoteOpenDialogComponent"
+implementation:
+  - backend/app/modules/livevote/vote_build.py
+  - frontend/src/app/features/meetings/vote-open-dialog/vote-open-dialog.component.html
 scope:
   - backend/app/modules/voting
   - backend/app/modules/livevote

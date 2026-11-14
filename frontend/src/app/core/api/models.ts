@@ -1163,7 +1163,13 @@ export interface ApplicantApplications {
   readonly items: readonly ApplicantApplicationItem[];
 }
 
-export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
+/** The two `members_` rules count the yes ballots against all eligible members. */
+export type MajorityRule =
+  | 'simple'
+  | 'absolute'
+  | 'two_thirds'
+  | 'members_majority'
+  | 'members_two_thirds';
 /** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 /** A motion gives `passed`, `rejected` or `tie`. A personnel election gives
@@ -1325,6 +1331,10 @@ export interface VoteConfig {
   readonly options: readonly string[];
   readonly majorityRule: MajorityRule;
   readonly quorum?: Quorum | null;
+  /** `present`: the quorum of a meeting vote counts the present persons, not the ballots. */
+  readonly quorumBasis?: 'ballots' | 'present';
+  /** The least number of present persons of the Gremium, copied to the vote. */
+  readonly quorumMinPresent?: number | null;
   readonly abstainCountsQuorum?: boolean;
   readonly secret?: boolean;
   /** Admitted guests of a public meeting vote too: no quorum, majority of the cast votes. */

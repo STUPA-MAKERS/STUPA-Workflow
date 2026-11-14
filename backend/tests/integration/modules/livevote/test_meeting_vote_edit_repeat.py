@@ -93,9 +93,7 @@ async def test_update_keeps_the_agenda_item(
     s = await seed(maker, status="live", items=2, votes=("draft",))
     body = {"agendaItemId": str(s.item_ids[1]), "question": "X"}
     with TestClient(api) as client:
-        resp = client.put(
-            f"/api/meetings/{s.meeting_id}/votes/{s.vote_ids['draft']}", json=body
-        )
+        resp = client.put(f"/api/meetings/{s.meeting_id}/votes/{s.vote_ids['draft']}", json=body)
     assert resp.status_code == 422, resp.text
     assert resp.json()["code"] == "agenda_item_mismatch"
 
@@ -106,9 +104,7 @@ async def test_update_after_close_of_the_meeting_is_refused(
     s = await seed(maker, status="closed", votes=("draft",))
     body = {"agendaItemId": str(s.item_ids[0]), "question": "X"}
     with TestClient(api) as client:
-        resp = client.put(
-            f"/api/meetings/{s.meeting_id}/votes/{s.vote_ids['draft']}", json=body
-        )
+        resp = client.put(f"/api/meetings/{s.meeting_id}/votes/{s.vote_ids['draft']}", json=body)
     assert resp.status_code == 409, resp.text
     assert resp.json()["code"] == "meeting_closed"
 
@@ -231,9 +227,7 @@ async def test_repeat_of_an_application_vote_moves_the_application_back(
 ) -> None:
     meeting_id, item_id, app_id, states = await _application_meeting(maker)
     with TestClient(app_api) as client:
-        resp = client.post(
-            f"/api/meetings/{meeting_id}/votes", json={"agendaItemId": str(item_id)}
-        )
+        resp = client.post(f"/api/meetings/{meeting_id}/votes", json={"agendaItemId": str(item_id)})
         assert resp.status_code == 200, resp.text
         [first] = resp.json()["votes"]
         closed = client.post(f"/api/votes/{first['id']}/close")

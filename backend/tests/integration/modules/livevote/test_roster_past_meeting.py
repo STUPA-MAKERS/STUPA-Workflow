@@ -88,17 +88,13 @@ async def _closed_meeting(
         await session.commit()
     g, m = s.gremium_id, s.meeting_id
     ids = {
-        "member_present": await _principal(
-            maker, g, "Anna", status="present", meeting_id=m
-        ),
+        "member_present": await _principal(maker, g, "Anna", status="present", meeting_id=m),
         "record_only": await _principal(
             maker, g, "Bert", member=False, status="present", meeting_id=m
         ),
         "open_member": await _principal(maker, g, "Carla"),
         "outsider": await _principal(maker, g, "Emil", member=False),
-        "member_excused": await _principal(
-            maker, g, "Fritz", status="excused", meeting_id=m
-        ),
+        "member_excused": await _principal(maker, g, "Fritz", status="excused", meeting_id=m),
     }
     return g, m, ids
 

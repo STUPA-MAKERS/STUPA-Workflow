@@ -54,6 +54,8 @@ export interface GremiumOverview {
   /** A meeting of the gremium runs now. */
   readonly live: boolean;
   readonly quorumPercent: number | null;
+  /** The least number of present persons for the quorum of a meeting vote. */
+  readonly quorumMinPresent?: number | null;
   readonly protocolsPublic: boolean;
   readonly allowVoteDelegation: boolean;
   /** The square logo of the CD variant (`/api/committees/{id}/logo`), else null. */
@@ -158,7 +160,7 @@ export interface GremiumDecision {
   /** The requested amount of the application, as a decimal string ("2890.00"). */
   readonly amount: string | number | null;
   readonly secret: boolean;
-  /** `simple`, `absolute` or `two_thirds`; null for an election. */
+  /** One of the five majority rules (`MajorityRule`); null for an election. */
   readonly majorityRule: string | null;
   /** The sums of a motion; null for an election. */
   readonly counts: GremiumDecisionCounts | null;

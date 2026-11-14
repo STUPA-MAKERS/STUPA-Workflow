@@ -5,7 +5,9 @@ prepared draft (``PUT /meetings/{id}/votes/{voteId}``) take the same body and bu
 the same config, so a changed draft passes the same checks as a new one: guests vote
 only where the meeting and the agenda item let them, an election and a poll belong to
 a free-text agenda item, every vote is secret, and the quorum
-denominator comes from the roster.
+denominator comes from the roster. The quorum of a meeting vote counts the present
+persons of the roster (``quorumBasis = present``), and the vote on a Haushaltsplan
+always takes the majority of the members.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from app.modules.meetings.models import MeetingAgendaItem
 from app.modules.voting.poll import build_config as build_poll_config
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import secret_only
-from app.shared.config_schemas import ElectionConfig, PollConfig, VoteConfig
+from app.shared.config_schemas import MEMBERS_RULES, ElectionConfig, PollConfig, VoteConfig
 from app.shared.errors import ValidationProblem
 
 
@@ -54,7 +56,9 @@ async def build_meeting_vote(
     item, and never in an election unless the lead switches them on. On the item of a
     Haushaltsplan only the members vote, with the quorum of the Gremium. A vote with
     guests and a poll have no quorum; without an explicit percent the vote inherits
-    the percent quorum of the Gremium.
+    the percent quorum of the Gremium. A vote without guests also takes the least number
+    of present persons of the Gremium. A members rule has no guest ballots: the server
+    refuses an explicit ``guestsVote`` and leaves the default off.
 
     Raises:
         ValidationProblem: Guests cannot vote here (``guests_vote_unavailable``,
@@ -102,10 +106,22 @@ async def build_meeting_vote(
             code="guests_vote_unavailable",
             errors=[{"field": "guestsVote", "msg": "an agenda item of a plan"}],
         )
+    majority_rule = "members_majority" if of_plan else payload.majority_rule
+    members_rule = not election and payload.poll is None and majority_rule in MEMBERS_RULES
+    if members_rule and payload.guests_vote:
+        raise ValidationProblem(
+            "Guests do not vote on a question that needs a majority of the members.",
+            code="guests_vote_unavailable",
+            errors=[{"field": "guestsVote", "msg": "a members rule"}],
+        )
     guests_vote = (
         payload.guests_vote
         if payload.guests_vote is not None
-        else guests_allowed and not item.non_public and not election and not of_plan
+        else guests_allowed
+        and not item.non_public
+        and not election
+        and not of_plan
+        and not members_rule
     )
     base: dict[str, object] = (
         {
@@ -117,7 +133,7 @@ async def build_meeting_vote(
         if election
         else {
             "options": payload.options,
-            "majorityRule": payload.majority_rule,
+            "majorityRule": majority_rule,
             "secret": secret_only(payload.secret, field="secret"),
             "tieBreak": "rejected",
             "guestsVote": guests_vote,
@@ -133,7 +149,20 @@ async def build_meeting_vote(
     quorum: dict[str, object] = (
         {} if quorum_percent is None else {"quorum": {"type": "percent", "value": quorum_percent}}
     )
-    config_data = {**base, **quorum}
+    min_present = (
+        None
+        if guests_vote or payload.poll is not None
+        else await service.gremium_quorum_min_present(meeting.gremium_id)
+    )
+    presence: dict[str, object] = (
+        {}
+        if payload.poll is not None
+        else {
+            "quorumBasis": "present",
+            **({} if min_present is None else {"quorumMinPresent": min_present}),
+        }
+    )
+    config_data = {**base, **quorum, **presence}
     if election:
         await service.assert_candidates_exist(
             [c.principal_id for c in payload.candidates if c.principal_id is not None]
