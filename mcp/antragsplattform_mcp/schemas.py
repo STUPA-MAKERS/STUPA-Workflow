@@ -603,7 +603,8 @@ class MeetingPatch(WireModel, frozen=True):
     )
     kind: Literal["ordinary", "extraordinary", "repeat", "constituent"] | None = Field(
         default=None,
-        description="The kind of the meeting. It changes only while the meeting is planned (409 `meeting_not_planned`).",
+        description="The kind of the meeting. It changes only while the meeting is planned "
+        "(409 `meeting_not_planned`).",
     )
     location: str | None = Field(default=None, description="The place, at most 200 characters.")
     form: Literal["presence", "hybrid", "video"] | None = Field(
