@@ -1089,6 +1089,33 @@ describe('ApiClient', () => {
     expect(fired).toBe(false);
   });
 
+  it('creates an Umlaufverfahren, reads its rules and posts an objection', () => {
+    const body = {
+      kind: 'circular' as const,
+      eligibleGroup: 'g-1',
+      question: 'Beschaffung Beamer?',
+      closesAt: '2026-12-01T12:00:00Z',
+      draft: false,
+    };
+    api.createCircular(body).subscribe();
+    const create = http.expectOne('/api/votes');
+    expect(create.request.method).toBe('POST');
+    expect(create.request.body).toEqual(body);
+    create.flush({ id: 'v-1' });
+
+    let days = 0;
+    api.circularRules().subscribe((r) => (days = r.minDays));
+    const rules = http.expectOne('/api/votes/circular-rules');
+    expect(rules.request.method).toBe('GET');
+    rules.flush({ minDays: 3 });
+    expect(days).toBe(3);
+
+    api.objectToCircular('v-1').subscribe();
+    const objection = http.expectOne('/api/votes/v-1/objection');
+    expect(objection.request.method).toBe('POST');
+    objection.flush({ id: 'v-1' });
+  });
+
   it('cancels a vote', () => {
     api.cancelVote('v-1').subscribe();
     const req = http.expectOne('/api/votes/v-1/cancel');

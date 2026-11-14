@@ -262,7 +262,7 @@ def _result_filter(result: DecisionResultFilter | None) -> tuple[ColumnElement[b
         case "passed":
             return (Vote.result.in_(("passed", "elected")),)
         case "rejected":
-            return (Vote.result.in_(("rejected", "tie")),)
+            return (Vote.result.in_(("rejected", "tie", "no_majority")),)
         case _:
             assert_never(result)
 

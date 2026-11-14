@@ -23,6 +23,8 @@ Groups of ``OBJECT_CHECK_ROUTES`` that authorize no object:
   the avatar of a principal is the same Gravatar image that the person list shows.
   ``GET /api/calendar/people`` serves id and name of the active accounts to any session
   for the invitation of a person, never an address, and nothing to a scoped token.
+  ``GET /api/votes/circular-rules`` serves the least number of days of an
+  Umlaufverfahren, one number of the meeting settings, to any session.
 """
 
 from __future__ import annotations
@@ -237,7 +239,11 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/todos/series"): "any member; names of series only (spec 000483)",
     ("POST", "/api/todos/series"): "TodoService.create_series (writes a shared board)",
     ("GET", "/api/votes"): "voting.listing.read_scope",
-    ("POST", "/api/votes"): "PollService.can_create (policy.has_gremium_permission vote.manage)",
+    ("POST", "/api/votes"): (
+        "PollService.can_create (policy.has_gremium_permission vote.manage), also for "
+        "CircularService.create"
+    ),
+    ("GET", "/api/votes/circular-rules"): "master data: circularMinDays for the create form",
     ("GET", "/api/votes/{vote_id}"): "VotingService.assert_can_read",
     ("PATCH", "/api/votes/{vote_id}"): _MANAGE_VOTE,
     ("DELETE", "/api/votes/{vote_id}"): _MANAGE_VOTE,
@@ -245,6 +251,9 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/votes/{vote_id}/cancel"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/close"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/draw-lot"): _MANAGE_VOTE,
+    ("POST", "/api/votes/{vote_id}/objection"): (
+        "CircularService.object (VotingService.can_cast_own: roster of the vote)"
+    ),
     ("POST", "/api/votes/{vote_id}/open"): _RUN_VOTE,
     ("WS", "/api/ws/meetings/{meeting_id}"): "livevote.router._authorize (is_participant)",
     ("WS", "/api/ws/meetings/{meeting_id}/projector"): (

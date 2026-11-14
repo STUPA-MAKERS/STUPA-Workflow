@@ -224,3 +224,59 @@ def test_draw_lot_takes_distinct_candidates() -> None:
 
 def test_draw_lot_never_draws_more_than_the_pool() -> None:
     assert draw_lot(["a"], 3, lambda pool: pool[0]) == ["a"]
+
+
+def test_members_majority_config_takes_one_seat_and_no_guests() -> None:
+    assert _config(majorityRule="members_majority").members_majority is True
+    assert _config().members_majority is False
+    with pytest.raises(ValidationError):
+        _config(seats=2, n=3, majorityRule="members_majority")
+    with pytest.raises(ValidationError):
+        _config(majorityRule="members_majority", guestsVote=True)
+
+
+def test_members_majority_elects_with_more_than_half_of_the_members() -> None:
+    config = _config(majorityRule="members_majority")
+    out = tally_election(_ballots(["c1"], ["c1"], ["c1"], ["c2"]), config, 5)
+    assert out.result == "elected"
+    assert out.elected == ("c1",)
+    assert out.tied == ()
+
+
+@pytest.mark.parametrize(
+    ("picks", "eligible"),
+    [
+        ([["c1"], ["c1"], ["c2"]], 4),
+        ([["c1"], ["c1"], ["c2"], ["c2"]], 4),
+        ([[], []], 4),
+        ([["c1"], ["c1"]], 0),
+    ],
+)
+def test_members_majority_missed_gives_no_majority(
+    picks: list[list[str]], eligible: int
+) -> None:
+    """Half of the members is not enough, a tie draws no lot, and no count fails closed."""
+    out = tally_election(_ballots(*picks), _config(majorityRule="members_majority"), eligible)
+    assert out.result == "no_majority"
+    assert out.elected == ()
+    assert out.tied == ()
+    assert out.quorum_met is True
+
+
+def test_members_majority_with_a_missed_quorum_is_rejected() -> None:
+    config = _config(majorityRule="members_majority", quorum={"type": "count", "value": 3})
+    out = tally_election(_ballots(["c1"], ["c1"]), config, 2)
+    assert out.quorum_met is False
+    assert out.result == "rejected"
+
+
+def test_members_majority_yes_no_ballot() -> None:
+    config = _config(n=1, majorityRule="members_majority")
+    assert tally_election(["yes", "yes", "yes"], config, 5).result == "elected"
+    missed = tally_election(["yes", "yes", "no"], config, 5)
+    assert missed.result == "no_majority"
+    assert missed.elected == ()
+    quorum = _config(
+        n=1, majorityRule="members_majority", quorum={"type": "count", "value": 4}
+    )
+    assert tally_election(["yes", "yes", "yes"], quorum, 5).result == "rejected"

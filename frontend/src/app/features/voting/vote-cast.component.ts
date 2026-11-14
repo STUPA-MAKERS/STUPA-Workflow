@@ -227,16 +227,25 @@ export class VoteCastComponent implements OnDestroy {
 
   /**
    * The poll of a Gremium (without a meeting) that the person may manage: "Starten" while
-   * it is a draft, "beenden" while it is open. A vote of a meeting runs in its meeting, and
+   * it is a draft, "beenden" while it is open. An Umlaufverfahren starts the same way,
+   * but it ends only at its planned end. A vote of a meeting runs in its meeting, and
    * so does the vote on a step of a Haushaltsplan.
    */
   readonly pollAction = computed<'start' | 'close' | null>(() => {
     const vote = this.loaded();
-    const standalone = !!vote && vote.kind === 'poll' && !vote.meetingId;
+    const circular = vote?.kind === 'circular';
+    const standalone = !!vote && (vote.kind === 'poll' || circular) && !vote.meetingId;
     if (!vote || !standalone || vote.canManage !== true) return null;
     if (vote.status === 'draft') return 'start';
-    return vote.status === 'open' ? 'close' : null;
+    return vote.status === 'open' && !circular ? 'close' : null;
   });
+  /** An eligible member can object to an open Umlaufverfahren; this cancels it. */
+  readonly canObject = computed(() => {
+    const vote = this.loaded();
+    return vote?.kind === 'circular' && vote.status === 'open' && vote.canCast === true;
+  });
+  readonly confirmObject = signal(false);
+  readonly objecting = signal(false);
   /** A poll action runs. */
   readonly pollBusy = signal(false);
 
@@ -249,7 +258,14 @@ export class VoteCastComponent implements OnDestroy {
     const planItems: readonly RowMenuItem[] = this.planReadable()
       ? [{ id: 'plan', label: this.i18n.translate('voting.plan.open'), icon: 'link' }]
       : [];
-    const pollItems: readonly RowMenuItem[] = [...planItems, ...(action ? [this.pollMenuItem(action)] : [])];
+    const objectItems: readonly RowMenuItem[] = this.canObject()
+      ? [{ id: 'object', label: this.i18n.translate('circular.object.action'), icon: 'x' }]
+      : [];
+    const pollItems: readonly RowMenuItem[] = [
+      ...planItems,
+      ...(action ? [this.pollMenuItem(action)] : []),
+      ...objectItems,
+    ];
     const deleteItems: readonly RowMenuItem[] = this.canDelete()
       ? [
           {
@@ -334,6 +350,9 @@ export class VoteCastComponent implements OnDestroy {
       case 'close':
         this.runPoll(id);
         return;
+      case 'object':
+        this.confirmObject.set(true);
+        return;
       case 'plan':
         void this.router.navigate(['/budget/plan'], { queryParams: { planVersion: this.loaded()?.planVersionId } });
         return;
@@ -356,7 +375,7 @@ export class VoteCastComponent implements OnDestroy {
   private pollToast(action: 'start' | 'close'): TranslationKey {
     switch (action) {
       case 'start':
-        return 'poll.toast.started';
+        return this.loaded()?.kind === 'circular' ? 'circular.toast.started' : 'poll.toast.started';
       case 'close':
         return 'poll.toast.closed';
     }
@@ -378,6 +397,30 @@ export class VoteCastComponent implements OnDestroy {
       },
       error: (err: unknown) => {
         this.pollBusy.set(false);
+        const detail = problemDetail(err);
+        const base = this.i18n.translate('meetings.toast.actionFailed');
+        this.toast.error(detail ? `${base}: ${detail}` : base);
+        this.reload();
+      },
+    });
+  }
+
+  /** The member confirmed the objection: the server cancels the Umlaufverfahren. */
+  doObject(): void {
+    const vote = this.loaded();
+    if (!vote || this.objecting()) return;
+    this.objecting.set(true);
+    this.api.objectToCircular(vote.id).subscribe({
+      next: (cancelled) => {
+        this.objecting.set(false);
+        this.confirmObject.set(false);
+        this.loaded.set(cancelled);
+        this.toast.success(this.i18n.translate('circular.object.done'));
+        this.page?.notify({ id: vote.id, kind: 'updated' });
+      },
+      error: (err: unknown) => {
+        this.objecting.set(false);
+        this.confirmObject.set(false);
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
         this.toast.error(detail ? `${base}: ${detail}` : base);

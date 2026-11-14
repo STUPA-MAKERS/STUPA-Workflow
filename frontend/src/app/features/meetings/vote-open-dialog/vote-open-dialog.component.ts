@@ -212,6 +212,12 @@ export class VoteOpenDialogComponent {
   /** `motion`: a decision. `election`: a personnel election. */
   readonly kind = signal<VoteKind>('motion');
   readonly seats = signal(1);
+  /** The election for one seat needs the majority of the members (spec 000912). */
+  readonly electionMembers = signal(false);
+  /** The rule applies: it is on and the election has one seat. */
+  readonly membersElection = computed(
+    () => this.isElection() && this.seats() === 1 && this.electionMembers(),
+  );
   readonly candidates = signal<CandidateDraft[]>([]);
   /** The free name that the lead types for a new candidate. */
   readonly freeName = signal('');
@@ -267,6 +273,7 @@ export class VoteOpenDialogComponent {
   /** "Jede Person hat 2 Stimmen …": the rule of the election in one sentence. */
   readonly ruleSentence = computed(() => {
     const seats = this.seats();
+    if (this.membersElection()) return this.i18n.translate('election.rule.members');
     if (seats === 1 && this.candidates().length === 1) {
       return this.i18n.translate('election.rule.yesNo');
     }
@@ -282,7 +289,9 @@ export class VoteOpenDialogComponent {
   readonly planItem = computed(() => !!this.item()?.planVersionId);
   /** The rule counts against all members, so no guest votes. */
   readonly membersRule = computed(
-    () => !this.isElection() && !this.isPoll() && MEMBERS_RULES.includes(this.majorityRule()),
+    () =>
+      this.membersElection() ||
+      (!this.isElection() && !this.isPoll() && MEMBERS_RULES.includes(this.majorityRule())),
   );
 
   /** The switch exists only when the meeting lets guests vote. */
@@ -333,6 +342,7 @@ export class VoteOpenDialogComponent {
     this.submitting.set(false);
     this.kind.set('motion');
     this.seats.set(1);
+    this.electionMembers.set(false);
     this.candidates.set([]);
     this.freeName.set('');
     this.poll.set(emptyPollDraft());
@@ -350,6 +360,7 @@ export class VoteOpenDialogComponent {
     if (it.applicationId) this.draft.set(draftOf(vote.proposal, it.amount ?? null));
     if (kind === 'election' && vote.election) {
       this.seats.set(vote.election.seats);
+      this.electionMembers.set(vote.election.majorityRule === 'members_majority');
       const first = this.takeKeys(vote.election.candidates.length);
       this.candidates.set(
         vote.election.candidates.map((c, i) => ({
@@ -485,6 +496,7 @@ export class VoteOpenDialogComponent {
             name: c.name,
             ...(c.principalId ? { principalId: c.principalId } : {}),
           })),
+          ...(this.membersElection() ? { majorityRule: 'members_majority' as const } : {}),
           secret: true,
           ...guests,
         }

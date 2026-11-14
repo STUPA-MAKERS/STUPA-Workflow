@@ -438,3 +438,53 @@ def test_beamer_gets_the_lot() -> None:
     )
     event: dict[str, object] = {"type": "vote_lot_drawn", "voteId": str(uuid4())}
     assert beamer._filter(event) == event
+
+
+def test_open_election_with_the_majority_of_the_members(setup: Any) -> None:
+    """One seat can need the majority of the members; guests never vote then (000912)."""
+    client, meetings, agenda, voting = setup
+    meetings._meeting_out = _meeting(True, "vote")
+    agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
+    resp = client.post(
+        f"/api/meetings/{uuid4()}/votes",
+        json=_election_body(majorityRule="members_majority"),
+    )
+    assert resp.status_code == 200, resp.text
+    config = voting.last_payload.config
+    assert isinstance(config, ElectionConfig)
+    assert config.majority_rule == "members_majority"
+    assert config.guests_vote is False
+
+    refused = client.post(
+        f"/api/meetings/{uuid4()}/votes",
+        json=_election_body(majorityRule="members_majority", guestsVote=True),
+    )
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["code"] == "guests_vote_unavailable"
+
+
+def test_open_election_ignores_another_majority_rule(setup: Any) -> None:
+    client, meetings, agenda, voting = setup
+    meetings._meeting_out = _meeting(False)
+    agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
+    resp = client.post(
+        f"/api/meetings/{uuid4()}/votes", json=_election_body(majorityRule="two_thirds")
+    )
+    assert resp.status_code == 200, resp.text
+    assert voting.last_payload.config.majority_rule == "relative"
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"kind": "circular"},
+        {
+            "majorityRule": "members_majority",
+            "seats": 2,
+            "candidates": [{"name": "A"}, {"name": "B"}, {"name": "C"}],
+        },
+    ],
+)
+def test_open_body_rejects_circular_and_members_with_two_seats(over: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        MeetingVoteOpenBody.model_validate(_election_body(**over))

@@ -85,6 +85,7 @@ from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient, TypstError
+from app.modules.protocol.circular import circular_block
 from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.markdown import (
     ElectionLine,
@@ -892,6 +893,9 @@ class ProtocolService:
         snippets. If not, it falls back to the free text in `protocol.markdown`, which
         is then the whole public body too.
 
+        The circular votes of the Gremium since the meeting before stand in front of
+        the first TOP, in both variants (`protocol.circular`, spec 000916).
+
         `public=True` redacts a non-public item and the header metadata. The mailed
         variant must not carry the names of the attendees, of the excused members, of
         the absentees or of the protocol keepers. `_header_meta` then returns empty name
@@ -909,6 +913,9 @@ class ProtocolService:
         header = await self._header_meta(meeting, public=public)
         free_text = (
             black_out(protocol.markdown) if public and protocol.markdown else protocol.markdown
+        )
+        circular = await circular_block(
+            self.session, meeting, VotingService(self.session), self._tz()
         )
         if snapshot is not None:
             snapshot.attendance = PublicAttendance(
@@ -945,7 +952,7 @@ class ProtocolService:
                 absent=header.absent,
                 datalines=header.datalines,
                 quorate=await self._quorate(gremium, meeting, header.present_count),
-                markdown=assembled or free_text,
+                markdown="\n\n".join(part for part in (circular, assembled or free_text) if part),
             )
         )
 
@@ -1759,6 +1766,7 @@ def election_snippet_of(
         runoff_seats=runoff.seats if runoff else 0,
         closed=result is not None,
         attempt=attempt,
+        members_majority=election.members_majority,
     )
 
 

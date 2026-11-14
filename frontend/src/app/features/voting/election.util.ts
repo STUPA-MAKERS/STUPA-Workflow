@@ -180,6 +180,7 @@ export function electionResultLine(
 ): string {
   const elected = candidateNames(election, er?.elected ?? [], t);
   if (result === 'tie') return t('election.result.tie');
+  if (result === 'no_majority') return t('election.result.noMajority');
   if (result === 'rejected' || elected.length === 0) return t('election.result.nobody');
   return t('election.result.elected', { names: elected.join(', ') });
 }
@@ -192,7 +193,10 @@ export function electionCaption(
 ): string {
   const seats = election?.seats ?? 1;
   const head = (round ?? 1) > 1 ? t('election.runoffRound', { n: round ?? 2 }) : t('election.kind');
-  return `${head} · ${seatsText(seats, t)}`;
+  const caption = `${head} · ${seatsText(seats, t)}`;
+  return election?.majorityRule === 'members_majority'
+    ? `${caption} · ${t('meetings.vote.rule.members_majority')}`
+    : caption;
 }
 
 /**
@@ -212,6 +216,8 @@ export function electionStatus(result: VoteResult | string | null): StatusView {
       return { kind: 'warn', key: 'election.status.runoff' };
     case 'tie':
       return { kind: 'warn', key: 'election.status.tie' };
+    case 'no_majority':
+      return { kind: 'error', key: 'election.status.noMajority' };
     default:
       return { kind: 'error', key: 'election.status.rejected' };
   }

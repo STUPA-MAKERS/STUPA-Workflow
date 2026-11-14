@@ -105,6 +105,9 @@ export class VotePanelComponent {
   /** The status; a poll reads "Umfrage offen" or "Umfrage beendet". */
   protected readonly status = computed<StatusView>(() => {
     const status = this.vote().status;
+    if (status === 'cancelled' && this.vote().cancelReason === 'objection') {
+      return { kind: 'muted', key: 'circular.status.objection' };
+    }
     return (this.poll() ? pollStatus(status) : null) ?? meetingVoteStatus(status);
   });
   /** The caption of the card: "Abstimmung offen", "Abstimmung geschlossen". */
@@ -150,14 +153,15 @@ export class VotePanelComponent {
     if (election) {
       return electionCaption(election, v.round, t);
     }
-    return voteRulesParts(
+    const parts = voteRulesParts(
       {
         majorityRule: v.majorityRule ?? v.config.majorityRule ?? 'simple',
         quorum: v.quorum ?? v.config.quorum,
         guestsVote: this.guestsVote(),
       },
       t,
-    ).join(' · ');
+    );
+    return [...(v.kind === 'circular' ? [t('meetings.vote.kind.circular')] : []), ...parts].join(' · ');
   });
 
   /** Admitted guests vote too (public meeting). */

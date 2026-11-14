@@ -45,7 +45,7 @@ logger = logging.getLogger("app.protocol")
 
 SNAPSHOT_VERSION = 1
 
-VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
+VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff", "no_majority"]
 
 
 def passed_conditions(view: object) -> list[str]:

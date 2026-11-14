@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
 from app.modules.applications.decision import DecisionIn
 from app.shared.config_schemas import (
@@ -26,9 +26,11 @@ from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 #: The result of a closed vote. A motion gives ``passed``/``rejected``/``tie``. An
 #: election gives ``elected``, ``runoff`` (a runoff decides the open seats),
-#: ``tie`` (the lot decides) or ``rejected`` (quorum missed, or nobody elected).
-VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff"]
-VoteKind = Literal["motion", "election", "poll"]
+#: ``tie`` (the lot decides), ``rejected`` (quorum missed, or nobody elected) or
+#: ``no_majority`` (nobody reached the majority of the members).
+VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff", "no_majority"]
+#: ``circular`` is an Umlaufverfahren: a motion of a Gremium without a meeting.
+VoteKind = Literal["motion", "election", "poll", "circular"]
 
 
 class ElectionRunoffOut(FrozenCamelModel, frozen=True):
@@ -168,6 +170,50 @@ class PollCreate(PollIn, frozen=True):
         return stripped
 
 
+class CircularCreate(FrozenStrictCamelModel, frozen=True):
+    """``POST /votes`` - start an Umlaufverfahren of a Gremium, without a meeting.
+
+    ``eligibleGroup`` is the Gremium. ``closesAt`` is the end of the cast window, at
+    least ``circularMinDays`` days ahead. ``draft`` keeps the vote a draft; otherwise
+    it opens at once. The rules are fixed: Ja / Nein / Enthaltung and the majority of
+    the members.
+    """
+
+    kind: Literal["circular"]
+    eligible_group: UUID = Field(alias="eligibleGroup")
+    question: str = Field(min_length=1, max_length=2000)
+    closes_at: datetime = Field(alias="closesAt")
+    draft: bool = False
+
+    @field_validator("question")
+    @classmethod
+    def _strip_question(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("the question is empty")
+        return stripped
+
+
+class CircularRulesOut(FrozenCamelModel, frozen=True):
+    """``GET /votes/circular-rules`` - what the form of a new Umlaufverfahren needs."""
+
+    #: ``circularMinDays``: the least number of days of the cast window.
+    min_days: int = Field(alias="minDays")
+
+
+def _create_kind(value: object) -> str:
+    """Return the kind of a ``POST /votes`` body; a body without ``kind`` is a poll."""
+    kind = value.get("kind", "poll") if isinstance(value, dict) else getattr(value, "kind", "poll")
+    return kind if kind in ("poll", "circular") else "poll"
+
+
+#: The body of ``POST /votes``: a poll or an Umlaufverfahren, told apart by ``kind``.
+GremiumVoteCreate = Annotated[
+    Annotated[PollCreate, Tag("poll")] | Annotated[CircularCreate, Tag("circular")],
+    Discriminator(_create_kind),
+]
+
+
 class PollPatch(FrozenStrictCamelModel, frozen=True):
     """``PATCH /votes/{id}`` - change a poll while it holds no ballot.
 
@@ -215,6 +261,8 @@ class VoteCreateInternal(FrozenCamelModel, frozen=True):
     config: VoteConfig | ElectionConfig | PollConfig
     eligible_group: UUID = Field(alias="eligibleGroup")
     question: str | None = None
+    #: An Umlaufverfahren: the row gets ``kind = circular`` (``config`` is a VoteConfig).
+    circular: bool = False
     #: The election that a runoff continues, and its round.
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = Field(default=1, ge=1)
@@ -358,6 +406,9 @@ class VoteOut(FrozenCamelModel, frozen=True):
     opened_at: datetime | None = Field(default=None, alias="openedAt")
     #: The real moment when the vote ended (close or cancel). None while it runs.
     closed_at: datetime | None = Field(default=None, alias="closedAt")
+    #: Why the vote was cancelled, when the row keeps it: ``objection`` for an
+    #: Umlaufverfahren that a member objected to.
+    cancel_reason: Literal["objection"] | None = Field(default=None, alias="cancelReason")
     tally: TallyOut
     #: A vote with guests: no quorum, only the majority of the cast ballots. A
     #: copy of ``config.guestsVote`` for the vote card.

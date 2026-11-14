@@ -73,9 +73,9 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
  */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
 
-/** The kind chip: every kind, the motions, the elections, the polls. */
+/** The kind chip: every kind, the motions, the elections, the polls, the Umlaufverfahren. */
 export type VoteKindFilter = '' | VoteKind;
-const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll'];
+const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll', 'circular'];
 
 const STATUS_QUERY: Readonly<Record<VoteStatusFilter, readonly VoteStatus[]>> = {
   '': ['open', 'closed'],
@@ -727,8 +727,9 @@ export class VotingComponent implements OnDestroy {
       (item.status === 'closed' && item.result
         ? closedStatus(item.kind, item.result)
         : this.statusOf(item.status));
+    const ofGremium = (poll || item.kind === 'circular') && !item.meetingId;
     const where =
-      poll && !item.meetingId && item.gremiumName
+      ofGremium && item.gremiumName
         ? this.gremiumWhere(item.gremiumName, ended ? null : item.closesAt)
         : this.meetingWhere(item);
     const ballot: VoteRow['ballot'] = item.myBallot.cast
@@ -736,7 +737,7 @@ export class VotingComponent implements OnDestroy {
       : item.status === 'open' && item.canCast
         ? 'pending'
         : null;
-    const [when, whenTitle] = this.whenOf(item, poll && !item.meetingId);
+    const [when, whenTitle] = this.whenOf(item, ofGremium);
     return {
       item,
       createdAt: (ended ? (item.closedAt ?? item.openedAt) : item.openedAt) ?? item.createdAt,

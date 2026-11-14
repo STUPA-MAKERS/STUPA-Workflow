@@ -4751,6 +4751,12 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "circular_min_days",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "default_delegation_lead_minutes",
           "nullable": false,
           "primaryKey": false,
@@ -6934,7 +6940,8 @@
           "values": [
             "motion",
             "election",
-            "poll"
+            "poll",
+            "circular"
           ]
         },
         {
@@ -6984,6 +6991,12 @@
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
+        },
+        {
+          "name": "cancel_reason",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
         },
         {
           "name": "id",

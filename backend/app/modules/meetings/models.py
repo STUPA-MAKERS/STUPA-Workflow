@@ -335,6 +335,8 @@ DEFAULT_GREMIUM_QUORUM_PERCENT = 40
 DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT = 25
 DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES = 120
 DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE = 2
+#: The least number of days that an Umlaufverfahren runs (`circularMinDays`).
+DEFAULT_CIRCULAR_MIN_DAYS = 3
 
 
 class MeetingSettings(Base):
@@ -377,6 +379,10 @@ class MeetingSettings(Base):
     )
     default_allow_vote_delegation: Mapped[bool] = mapped_column(
         Boolean, server_default="false", default=False
+    )
+    #: The least number of days of the cast window of an Umlaufverfahren.
+    circular_min_days: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_CIRCULAR_MIN_DAYS), default=DEFAULT_CIRCULAR_MIN_DAYS
     )
     default_delegation_lead_minutes: Mapped[int] = mapped_column(
         Integer,

@@ -56,6 +56,7 @@ from app.modules.delegations.service import Represented, counted_in, voting_dele
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService, StagedFire
 from app.modules.meetings.protocol_models import ProtocolVoteRef
+from app.modules.voting import circular as circular_mod
 from app.modules.voting import election as election_mod
 from app.modules.voting import poll as poll_mod
 from app.modules.voting import tally as tally_mod
@@ -827,6 +828,8 @@ class VotingService:
             repeatOfId=getattr(vote, "repeat_of_id", None),
             attempt=getattr(vote, "attempt", 1) or 1,
             planVersionId=getattr(vote, "plan_version_id", None),
+            cancelReason=getattr(vote, "cancel_reason", None),
+            **circular_mod.circular_fields(vote),
             **election_mod.election_fields(vote),
             **poll_mod.poll_fields(vote),
         )
@@ -1090,7 +1093,7 @@ class VotingService:
         The id is preset only when given, because an explicit None would bypass the
         server default.
         """
-        kind = _kind_of(payload.config)
+        kind = circular_mod.CIRCULAR if payload.circular else _kind_of(payload.config)
         poll = payload.config if isinstance(payload.config, PollConfig) else None
         preset = {"id": vote_id} if vote_id is not None else {}
         vote = Vote(
@@ -1107,7 +1110,7 @@ class VotingService:
             question=payload.question,
             config=(
                 payload.config.model_dump(by_alias=True)
-                if kind == "motion"
+                if isinstance(payload.config, VoteConfig)
                 else payload.config.model_dump(mode="json", by_alias=True)
             ),
             eligible_count=payload.eligible_count,
@@ -1249,6 +1252,7 @@ class VotingService:
         if await self.vote_gremium_mismatch(vote):
             raise vote_gremium_mismatch_error()
         await poll_mod.PollService(self).check_open(vote, now)
+        await circular_mod.CircularService(self).check_open(vote, now)
         await self._take_plan_step(vote, actor)
         config = self._config(vote)
         if eligible_count is not None:
@@ -1259,6 +1263,7 @@ class VotingService:
             **self._audit_refs(vote),
             "guestsVote": config.guests_vote,
             **({"kind": poll_mod.POLL} if poll_mod.is_poll(vote) else {}),
+            **circular_mod.circular_fields(vote),
         }
         await audit_record(
             self.session,
@@ -1679,8 +1684,9 @@ class VotingService:
         The admin role reaches this through `Principal.has`, not through a
         `principal.roles` read: `has` is where the OAuth scope cap applies.
 
-        A poll of a Gremium (``kind = poll``, no meeting) is not an application vote,
-        so the global application rights do not reach it: only an eligible voter, a
+        A poll and an Umlaufverfahren of a Gremium (``kind = poll`` or ``circular``, no
+        meeting) are no application votes, so the global application rights do not
+        reach them: only an eligible voter, a
         manager in its Gremium and the admin role (``admin_bypass``) read it.
 
         Raises:
@@ -1691,7 +1697,7 @@ class VotingService:
 
             await MeetingRules(self.session).assert_can_read(vote.meeting_id, principal)
             return
-        if poll_mod.is_poll(vote):
+        if poll_mod.is_poll(vote) or circular_mod.is_circular(vote):
             from app.modules.auth.policy import admin_bypass
 
             if admin_bypass(principal, "application.read"):
@@ -1860,12 +1866,12 @@ class VotingService:
     async def can_manage(self, vote: Vote, principal: Principal) -> bool:
         """Like ``can_manage_group`` but for an already-loaded vote.
 
-        A poll of a Gremium (no meeting) takes the right that creates it
+        A poll and an Umlaufverfahren of a Gremium (no meeting) take the right that creates them
         (``PollService.can_create``: ``vote.manage`` or the admin role), so
         ``session.manage`` alone cannot edit, open, close, cancel or delete a poll
         that it cannot create.
         """
-        if poll_mod.is_poll(vote) and vote.meeting_id is None:
+        if (poll_mod.is_poll(vote) or circular_mod.is_circular(vote)) and vote.meeting_id is None:
             gremium_id = await self._vote_gremium_id(
                 meeting_id=None, eligible_group=vote.eligible_group
             )
@@ -2281,8 +2287,9 @@ class VotingService:
         fired branch carries the decision for the timeline and the revert.
 
         Raises:
-            ConflictError: The vote is not open, or the quorum is not met before the
-                window expired.
+            ConflictError: The vote is not open, the quorum is not met before the
+                window expired, or the window of an Umlaufverfahren is still open
+                (``circular_window_open``).
         """
         await self._lock_plan_votes(vote_id)
         vote = await self._get_vote(vote_id, for_update=True)
@@ -2292,6 +2299,7 @@ class VotingService:
             return await self._close_election(vote, principal, now=now)
         if poll_mod.is_poll(vote):
             return await self._close_poll(vote, principal, now=now)
+        circular_mod.check_manual_close(vote, now, datetime.now(UTC))
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
         outcome = tally_mod.result(

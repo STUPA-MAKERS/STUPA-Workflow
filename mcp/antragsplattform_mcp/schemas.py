@@ -663,8 +663,11 @@ class MeetingVoteOpenBody(WireModel, frozen=True):
     `kind: "election"` opens a personnel election: `question` names the round,
     `seats` the number of posts and `candidates` the persons (at least `seats`). An
     election is only possible on a free-text item (422 `election_on_application_item`).
-    The server ignores `options` and `majorityRule` for an election: each voter gives up
-    to `seats` votes, the candidates with the most votes are elected.
+    The server ignores `options` for an election: each voter gives up to `seats` votes,
+    the candidates with the most votes are elected. `majorityRule` `members_majority`
+    on an election for one seat asks for more votes than half of all eligible members;
+    without that majority nobody is elected (result `no_majority`). Other rules do not
+    change an election.
     """
 
     agendaItemId: str

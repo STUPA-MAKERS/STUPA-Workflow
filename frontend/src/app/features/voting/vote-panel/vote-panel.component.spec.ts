@@ -302,4 +302,37 @@ describe('VotePanelComponent', () => {
       expect(screen.getByText('Abgegeben 1 · Mehrheit der abgegebenen Stimmen')).toBeInTheDocument();
     });
   });
+
+  describe('Umlaufverfahren (§000914, §000915)', () => {
+    const circular = (over: Partial<Vote> = {}) =>
+      vote({
+        kind: 'circular',
+        meetingId: null,
+        applicationId: null,
+        majorityRule: 'members_majority',
+        config: { options: ['yes', 'no', 'abstain'], majorityRule: 'members_majority' },
+        ...over,
+      });
+
+    it('names the kind in front of the rule', async () => {
+      await setup({ vote: circular(), context: { meeting: null, position: null } });
+      expect(screen.getByText('Umlaufverfahren · Mehrheit der Mitglieder')).toBeInTheDocument();
+    });
+
+    it('reads "Abgebrochen durch Widerspruch" after an objection', async () => {
+      await setup({
+        vote: circular({ status: 'cancelled', cancelReason: 'objection' }),
+        context: { meeting: null, position: null },
+      });
+      expect(screen.getByText('Abgebrochen durch Widerspruch')).toHaveClass('st--muted');
+    });
+
+    it('reads "Abgebrochen" after another cancel', async () => {
+      await setup({
+        vote: circular({ status: 'cancelled', cancelReason: null }),
+        context: { meeting: null, position: null },
+      });
+      expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
+    });
+  });
 });

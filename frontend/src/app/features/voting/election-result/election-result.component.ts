@@ -108,7 +108,11 @@ export class ElectionResultComponent {
     if (!result) return null;
     const er = this.electionResult();
     const kind: StatusKind =
-      result === 'elected' ? 'accent' : result === 'rejected' ? 'error' : 'warn';
+      result === 'elected'
+        ? 'accent'
+        : result === 'rejected' || result === 'no_majority'
+          ? 'error'
+          : 'warn';
     const text =
       result === 'runoff'
         ? this.t('election.result.runoff')

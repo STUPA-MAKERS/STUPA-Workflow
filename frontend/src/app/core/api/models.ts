@@ -1174,11 +1174,13 @@ export type MajorityRule =
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 /** A motion gives `passed`, `rejected` or `tie`. A personnel election gives
  *  `elected`, `runoff` (a runoff decides the open seats), `tie` (the lot decides) or
- *  `rejected` (quorum missed, or nobody elected). */
-export type VoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
+ *  `rejected` (quorum missed, or nobody elected). An election that needs the majority
+ *  of the members gives `no_majority` when no candidate reaches it. */
+export type VoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff' | 'no_majority';
 /** `motion`: a decision (Ja/Nein/Enthaltung). `election`: a personnel election.
- *  `poll`: a poll ("Umfrage") that only counts the answers. */
-export type VoteKind = 'motion' | 'election' | 'poll';
+ *  `poll`: a poll ("Umfrage") that only counts the answers. `circular`: an
+ *  Umlaufverfahren, a decision of a Gremium outside a meeting. */
+export type VoteKind = 'motion' | 'election' | 'poll' | 'circular';
 
 /** `single`: one option or an abstention. `multi`: 0 to `maxChoices` options.
  *  `date`: Ja/Vielleicht/Nein for every date. */
@@ -1242,6 +1244,18 @@ export interface PollCreateBody extends PollIn {
   readonly draft: boolean;
 }
 
+/** `POST /votes`: an Umlaufverfahren of a Gremium. The server fixes the rules:
+ *  Ja/Nein/Enthaltung, secret, the majority of the members. */
+export interface CircularCreateBody {
+  readonly kind: 'circular';
+  readonly eligibleGroup: Uuid;
+  readonly question: string;
+  /** The planned end, at least `circularMinDays` days ahead. */
+  readonly closesAt: IsoDateTime;
+  /** Keep it a draft; otherwise it opens at once. */
+  readonly draft: boolean;
+}
+
 /** One candidate of a personnel election. The server gives the ids (`c1`..`cn`). */
 export interface ElectionCandidate {
   readonly id: string;
@@ -1266,6 +1280,9 @@ export interface ElectionConfig {
   readonly quorum?: Quorum | null;
   readonly abstainCountsQuorum?: boolean;
   readonly guestsVote?: boolean;
+  /** `members_majority` (one seat): the elected candidate needs more votes than half
+   *  of the eligible members. */
+  readonly majorityRule?: 'relative' | 'members_majority';
 }
 
 /** The runoff that a tie at the seat boundary needs. `voteId` is set once it exists. */
@@ -1413,6 +1430,8 @@ export interface Vote extends ElectionFields {
   /** The planned end of the cast window (a deadline), not the real end. */
   readonly closesAt: IsoDateTime | null;
   readonly result: VoteResult | null;
+  /** `objection`: a member objected to the Umlaufverfahren, which cancelled it. */
+  readonly cancelReason?: 'objection' | null;
   readonly secret: boolean;
   /** Copies of `config.majorityRule` and `config.quorum` for the vote card. */
   readonly majorityRule?: MajorityRule;

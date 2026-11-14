@@ -63,6 +63,15 @@
       </div>
     </div>
 
+    @if (seats() === 1) {
+      <app-switch
+        [id]="'vod-members'"
+        [checked]="electionMembers()"
+        (checkedChange)="electionMembers.set($event)"
+        ><span class="vod__switchLabel">{{ 'election.dialog.members' | t }}</span></app-switch
+      >
+    }
+
     <div class="vod__group">
       <span class="vod__cap cap">{{ 'election.dialog.candidates' | t }}</span>
       @if (candidates().length > 0) {

@@ -205,10 +205,13 @@ export function voteRulesParts(vote: VoteRules, t: Translate): readonly string[]
 /**
  * The rules line of a vote card: "Einfache Mehrheit · Quorum 12 · seit 18:48"
  * ({@link voteRulesParts}, then the time of the open or the end). A poll shows only the
- * time.
+ * time, and so does an election with the majority of the members: its caption names the
+ * rule.
  */
 export function voteMetaLine(vote: MeetingVote, translate: Translate, i18nLocale: string): string {
-  const rules = vote.kind === 'poll' ? [] : voteRulesParts(vote, translate);
+  const captioned =
+    vote.kind === 'poll' || vote.election?.majorityRule === 'members_majority';
+  const rules = captioned ? [] : voteRulesParts(vote, translate);
   return [...rules, ...voteTimePart(vote, translate, i18nLocale)].join(' · ');
 }
 

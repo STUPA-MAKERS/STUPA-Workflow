@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - backend/app/modules/voting/circular.py
+  - frontend/src/app/features/voting/vote-cast.component.ts
 scope:
   - backend/app/modules/voting
   - frontend/src/app/features/voting

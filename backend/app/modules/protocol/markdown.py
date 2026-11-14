@@ -442,6 +442,8 @@ class ElectionSnippet:
     closed: bool = True
     #: The number of a repeat ("erneut abstimmen"); 1 for an election that repeats nothing.
     attempt: int = 1
+    #: The election needs the majority of the members (one seat, spec 000912).
+    members_majority: bool = False
 
 
 def _election_head(view: ElectionSnippet) -> str:
@@ -476,6 +478,7 @@ def _election_outcome(view: ElectionSnippet, *, public: bool) -> list[str]:
     return [
         f"> Gewählt: {names}",
         *([f"> {others} weitere Kandidierende"] if public and others > 0 else []),
+        *(["> Keine Mehrheit der Mitglieder."] if view.members_majority and not elected else []),
         *(["> Durch Los entschieden."] if view.by_lot else []),
         *(["> Gleichstand: das Los steht aus."] if view.lot_pending else []),
         *([runoff] if view.runoff_seats else []),
@@ -496,14 +499,18 @@ def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> st
     („Frage (2. Wahlgang)“). A repeat of an election counts on in the same way
     (`attempt`), but its kind line names no runoff. Each round then has its own head line,
     which `replace_vote_blocks` and `votes_in_body` match on.
+
+    An election with the rule `members_majority` names the rule in its kind line, and
+    a ballot without such a majority says „Keine Mehrheit der Mitglieder.“
     """
     runoff = f" · Stichwahl ({view.round}. Wahlgang)" if view.round > 1 else ""
+    members = " · Mehrheit der Mitglieder" if view.members_majority else ""
     ballot = _election_ballot(view) if view.closed and not public else []
     outcome = _election_outcome(view, public=public) if view.closed else []
     return "\n".join(
         [
             f"> [!abstimmung] **{_election_head(view)}**",
-            f"> Wahl · {view.seats} Posten{runoff}",
+            f"> Wahl · {view.seats} Posten{runoff}{members}",
             *ballot,
             *outcome,
         ]
