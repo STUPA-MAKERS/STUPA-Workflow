@@ -45,6 +45,7 @@ class _VoteReads:
     present_by_meeting: Mapping[UUID, int]
     guests_by_meeting: Mapping[UUID, int]
     late_guests: Mapping[UUID, int]
+    voters: Mapping[UUID, int]
     own: Mapping[UUID, MyBallot]
     represented: frozenset[UUID]
     for_principal: bool
@@ -111,7 +112,7 @@ def _meeting_vote_out(vote: Vote, meeting_id: UUID, reads: _VoteReads) -> Meetin
         result=vote.result,
         counts=counts if revealed else {},
         leading=leading if revealed else None,
-        voted=voted,
+        voted=reads.voters.get(vote.id, 0) if vote.status == "open" else voted,
         present=present,
         revealed=revealed,
         failedReason=reason,
@@ -246,6 +247,7 @@ class VoteReadOps(MeetingServiceBase):
             present_by_meeting=present_by_meeting,
             guests_by_meeting=guests_by_meeting,
             late_guests=late_guests,
+            voters=await self._voters_by_vote([v.id for v in rows if v.status == "open"]),
             own=own,
             represented=frozenset(represented),
             for_principal=principal is not None,
@@ -390,6 +392,23 @@ class VoteReadOps(MeetingServiceBase):
             )
         )
         return {str(gid) for gid in rows.all()}
+
+    async def _voters_by_vote(self, vote_ids: list[UUID]) -> dict[UUID, int]:
+        """Return `{vote_id: number of persons who cast}` (§F/meetings/voting/000933).
+
+        One cast counts once: a ballot with `same_caster` belongs to a person who is
+        counted already.
+        """
+        if not vote_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(VotedMarker.vote_id, func.count())
+                .where(VotedMarker.vote_id.in_(vote_ids), VotedMarker.same_caster.is_(False))
+                .group_by(VotedMarker.vote_id)
+            )
+        ).all()
+        return dict(rows)
 
     async def _present_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
         """Return `{meeting_id: number of present members}`."""

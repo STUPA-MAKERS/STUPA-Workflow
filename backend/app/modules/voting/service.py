@@ -30,9 +30,10 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
-from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy import ColumnElement, and_, delete, exists, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.modules.applications.decision import (
     DecisionIn,
@@ -726,7 +727,9 @@ class VotingService:
 
         ``counts`` and ``leading`` are visible only when ``revealed``, and that is the
         case only for a closed vote. Every vote is secret, so a running vote never
-        shows an interim tally: only ``voted`` and ``present`` travel.
+        shows an interim tally: only ``voted`` and ``present`` travel. ``voted`` of a
+        running vote counts the persons who cast (``voters``), against the present
+        persons. After the close it counts the ballots.
 
         A vote with guests counts the admitted guests as present too: they are
         expected ballots. ``presentMembers`` and ``presentGuests`` give the attendance
@@ -744,7 +747,7 @@ class VotingService:
         return TallyOut(
             counts=counted.counts if revealed else {},
             eligible=eligible,
-            voted=counted.voted,
+            voted=await self.voters(vote.id) if vote.status == "open" else counted.voted,
             present=present,
             revealed=revealed,
             quorumMet=counted.quorum_met,
@@ -1352,7 +1355,14 @@ class VotingService:
         stored = self._stored_choice(vote, config, choice)
         if own is not None and not await self._insert_ballot(vote.id, own, stored):
             raise ConflictError("Already voted.", code=ALREADY_VOTED)
-        written = [sub for sub in others if await self._insert_ballot(vote.id, sub, stored)]
+        seen = self._has_marker(vote.id, principal.sub)
+        written = [
+            sub
+            for index, sub in enumerate(others)
+            if await self._insert_ballot(
+                vote.id, sub, stored, same_caster=own is not None or index > 0 or seen
+            )
+        ]
         if own is None and not written:
             raise ConflictError("Already voted.", code=ALREADY_VOTED)
         for _ in written:
@@ -1614,8 +1624,28 @@ class VotingService:
         )
         return seat.sub if seat is not None else None
 
-    async def _insert_ballot(self, vote_id: UUID, voter_sub: str, choice: str) -> bool:
+    @staticmethod
+    def _has_marker(vote_id: UUID, voter_sub: str) -> ColumnElement[bool]:
+        """Build the SQL test "this voter has a ballot in the vote".
+
+        The represented cast of a person whose own ballot is in counts no second person.
+        The test runs inside the insert, so it costs no read.
+        """
+        marker = aliased(VotedMarker)
+        return exists().where(marker.vote_id == vote_id, marker.voter_sub == voter_sub)
+
+    async def _insert_ballot(
+        self,
+        vote_id: UUID,
+        voter_sub: str,
+        choice: str,
+        *,
+        same_caster: bool | ColumnElement[bool] = False,
+    ) -> bool:
         """Insert the secret ballot of one voter. Return False when the voter already voted.
+
+        ``same_caster`` marks a ballot whose caster already has a counted ballot in the
+        vote. The turnout of a running vote leaves it out (``voters``).
 
         ``voted_marker`` (UNIQUE) is the "has voted" identity anchor. The method writes
         the identity-less ballot only when the marker is new, so no link from choice to
@@ -1625,7 +1655,7 @@ class VotingService:
         """
         marker = (
             pg_insert(VotedMarker)
-            .values(vote_id=vote_id, voter_sub=voter_sub)
+            .values(vote_id=vote_id, voter_sub=voter_sub, same_caster=same_caster)
             .on_conflict_do_nothing(constraint="uq_voted_marker_vote_voter")
             .returning(VotedMarker.id)
         )
@@ -1696,6 +1726,18 @@ class VotingService:
                 "represented_cast": await self.represented_cast(vote, principal.sub),
             }
         )
+
+    async def voters(self, vote_id: UUID) -> int:
+        """Return the number of persons who cast in the vote (§F/meetings/voting/000933).
+
+        One cast counts once, for however many voting rights it writes a ballot.
+        """
+        count = await self.session.scalar(
+            select(func.count())
+            .select_from(VotedMarker)
+            .where(VotedMarker.vote_id == vote_id, VotedMarker.same_caster.is_(False))
+        )
+        return int(count or 0)
 
     async def my_ballot(self, vote: Vote, voter_sub: str) -> MyBallot:
         """Return the ballot that ``voter_sub`` cast in this vote.

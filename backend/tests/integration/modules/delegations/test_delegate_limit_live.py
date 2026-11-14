@@ -5,6 +5,8 @@
 * One cast of the delegate writes the own ballot and one ballot for each represented
   member (§F/meetings/voting/000932). The represented cast answers 409 `vote_as_unit`
   while the own ballot is open.
+* The turnout of a running vote counts the persons who cast, not the ballots
+  (§F/meetings/voting/000933).
 * An election takes no delegation ballot without the gremium switch
   (§F/meetings/delegations/000910).
 """
@@ -136,7 +138,10 @@ async def test_one_delegation_more_than_the_limit_conflicts(
 async def test_one_cast_writes_the_own_and_each_represented_ballot(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """§F/meetings/voting/000932: Dora casts once for herself, Anna and Ben."""
+    """§F/meetings/voting/000932: Dora casts once for herself, Anna and Ben.
+
+    §F/meetings/voting/000933: the three ballots count as one person in the turnout.
+    """
     w = await _world(maker)
     with TestClient(api) as client:
         assert _delegate(client, api, w, "Anna", "Dora").status_code == 201
@@ -159,6 +164,7 @@ async def test_one_cast_writes_the_own_and_each_represented_ballot(
     assert unit.status_code == 200, unit.text
     assert unit.json()["ballots"] == 3
     assert before_again["representedCast"] is True
+    assert before_again["tally"]["voted"] == 1
     assert (again.status_code, late.status_code) == (409, 409)
     assert anna.status_code == 403, anna.text
     assert await _voters(maker, vote_id) == {w.subs["Dora"], w.subs["Anna"], w.subs["Ben"]}
@@ -184,6 +190,11 @@ async def test_an_external_delegate_casts_for_every_represented_member(
         act(api, sub)
         own = _cast(client, vote_id, "yes")
         proxy = _cast(client, vote_id, "yes", proxy=True)
+        act(api, None)
+        turnout = client.get(f"/api/votes/{vote_id}").json()["tally"]["voted"]
+        listed = client.get(f"/api/meetings/{w.meeting_id}").json()
+    assert turnout == 1
+    assert [v["voted"] for v in listed["votes"]] == [1]
     assert own.status_code == 403, own.text
     assert proxy.status_code == 200, proxy.text
     assert proxy.json()["ballots"] == 2

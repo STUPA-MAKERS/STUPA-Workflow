@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -161,6 +162,11 @@ class VotedMarker(UUIDPkMixin, Base):
 
     vote_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vote.id", ondelete="CASCADE"))
     voter_sub: Mapped[str] = mapped_column(Text)
+    #: True for a ballot whose caster already has a counted ballot in this vote: each
+    #: represented ballot beside the own one, and each further one of a person without
+    #: an own ballot. The turnout of a running vote counts persons, so it leaves these
+    #: out (§F/meetings/voting/000933). The column names no person.
+    same_caster: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     __table_args__ = (UniqueConstraint("vote_id", "voter_sub", name="uq_voted_marker_vote_voter"),)
 

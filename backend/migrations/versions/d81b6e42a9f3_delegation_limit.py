@@ -7,6 +7,9 @@ A delegate can hold more than one voting delegation now, up to the limit of the
 Gremium, so the unique index on (meeting, delegate) of the voting delegations goes
 away. The downgrade does not bring it back, because rows can break it by then.
 
+``voted_marker`` gets ``same_caster``: the mark of a ballot whose caster already has a
+counted ballot in the vote, so the turnout of a running vote counts persons.
+
 Idempotent. A fresh database already has the columns from the ``create_all`` baseline
 (0001).
 
@@ -54,9 +57,11 @@ _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE meeting_settings "
     "ADD COLUMN IF NOT EXISTS default_delegation_max_per_delegate INTEGER NOT NULL DEFAULT 2",
     "DROP INDEX IF EXISTS uq_meeting_delegation_voting_delegate",
+    "ALTER TABLE voted_marker ADD COLUMN IF NOT EXISTS same_caster BOOLEAN NOT NULL DEFAULT false",
 )
 
 _DOWNGRADE: tuple[str, ...] = (
+    "ALTER TABLE voted_marker DROP COLUMN IF EXISTS same_caster",
     "ALTER TABLE meeting_settings DROP COLUMN IF EXISTS default_delegation_max_per_delegate",
     "ALTER TABLE gremium DROP CONSTRAINT IF EXISTS ck_gremium_delegation_max_per_delegate",
     "ALTER TABLE gremium DROP COLUMN IF EXISTS delegation_in_elections",
