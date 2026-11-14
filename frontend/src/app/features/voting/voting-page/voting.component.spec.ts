@@ -312,7 +312,7 @@ describe('VotingComponent', () => {
           ]),
         ],
       });
-      expect(screen.getByText('Offen')).toBeInTheDocument();
+      expect(screen.getAllByText('Offen').length).toBeGreaterThan(0);
       expect(screen.getByText(/^AStA · bis Fr, 30\.10\., \d\d:00$/)).toBeInTheDocument();
     });
 

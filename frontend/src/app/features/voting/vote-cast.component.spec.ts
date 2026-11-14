@@ -1100,13 +1100,15 @@ describe('VoteCastComponent', () => {
       return { ...view, api };
     }
 
-    it('a manager starts a draft but never ends an open one by hand', async () => {
+    it('a manager starts a draft', async () => {
       const draft = await withApi(circular({ status: 'draft' }), { canManage: true });
       expect(draft.fixture.componentInstance.pollAction()).toBe('start');
       draft.fixture.componentInstance.onMenu('start');
       expect(draft.api['openVote']).toHaveBeenCalledWith('v1');
       expect(draft.toast.success).toHaveBeenCalledWith('Umlaufverfahren gestartet');
-      draft.fixture.destroy();
+    });
+
+    it('a manager never ends an open one by hand', async () => {
       const open = await withApi(circular(), { canManage: true });
       expect(open.fixture.componentInstance.pollAction()).toBeNull();
     });
