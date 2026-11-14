@@ -550,10 +550,29 @@ async def test_get_closed_includes_result() -> None:
     assert out.tally.counts == {"yes": 2, "no": 1, "abstain": 0}
 
 
-async def test_get_secret_hides_counts_until_close() -> None:
+def _persons(count: int) -> Any:
+    """Stand-in for `VotingService.voters`: the persons who cast in a running vote."""
+
+    async def _voters(_self: Any, _vote_id: Any) -> int:
+        return count
+
+    return _voters
+
+
+async def test_voters_counts_the_markers_of_distinct_casters() -> None:
+    """§F/meetings/voting/000933: the turnout counts persons; no marker reads as 0."""
+    db = fake_session()
+    db.scalar_results = [2, None]
+    svc = VotingService(db)
+    assert await svc.voters(uuid4()) == 2
+    assert await svc.voters(uuid4()) == 0
+
+
+async def test_get_secret_hides_counts_until_close(monkeypatch: pytest.MonkeyPatch) -> None:
     """An open vote shows no choice counts before the close, only the participation."""
     vote = _vote()
     db = fake_session(result(vote), result("yes", "no", "yes"))
+    monkeypatch.setattr(VotingService, "voters", _persons(3))
     out = await VotingService(db).get(vote.id)
     assert out.secret is True
     assert out.tally.revealed is False
@@ -1312,7 +1331,9 @@ async def test_delete_locked_votes_without_votes_writes_nothing() -> None:
     assert _audits(db) == []
 
 
-async def test_get_meeting_open_stays_hidden_when_all_present_voted() -> None:
+async def test_get_meeting_open_stays_hidden_when_all_present_voted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """An open meeting vote hides the tally even when every present member voted.
 
     The present count and the admitted guests still travel.
@@ -1320,6 +1341,7 @@ async def test_get_meeting_open_stays_hidden_when_all_present_voted() -> None:
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote), result("yes", "yes"))
     db.scalar_results = [2, 1]
+    monkeypatch.setattr(VotingService, "voters", _persons(2))
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
     assert out.tally.counts == {}
@@ -1411,10 +1433,11 @@ async def test_assert_can_read_meeting_delegates_to_meeting_service(
     assert seen["meeting_id"] == vote.meeting_id
 
 
-async def test_get_scoped_checks_then_returns_tally() -> None:
+async def test_get_scoped_checks_then_returns_tally(monkeypatch: pytest.MonkeyPatch) -> None:
     """The scoped read checks access, then returns the hidden tally. No own ballot."""
     vote = _vote(meeting_id=None)
     db = fake_session(result(vote), result(vote), result("yes"))
+    monkeypatch.setattr(VotingService, "voters", _persons(1))
     p = Principal(sub="u", permissions={"application.read"})
     out = await VotingService(db).get_scoped(vote.id, p)
     assert out.tally.counts == {}

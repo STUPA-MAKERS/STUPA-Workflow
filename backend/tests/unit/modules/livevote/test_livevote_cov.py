@@ -646,7 +646,24 @@ async def test_votes_for_closed_revealed() -> None:
     assert item.present == 2
 
 
-async def test_votes_for_open_hidden() -> None:
+def _persons_by_vote(count: int) -> Any:
+    """Stand-in for `_voters_by_vote`: `count` persons cast in each running vote."""
+
+    async def _voters(_self: Any, vote_ids: list[Any]) -> dict[Any, int]:
+        return dict.fromkeys(vote_ids, count)
+
+    return _voters
+
+
+async def test_voters_by_vote_counts_per_vote() -> None:
+    """§F/meetings/voting/000933: one batched read, and none without a running vote."""
+    vote_id = uuid4()
+    svc = MeetingService(_QueueSession(executes=[res((vote_id, 2))]))  # type: ignore[arg-type]
+    assert await svc._voters_by_vote([]) == {}
+    assert await svc._voters_by_vote([vote_id]) == {vote_id: 2}
+
+
+async def test_votes_for_open_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
     """Hide the tally of an open vote.
 
     The fake session returns, in order: the votes, the secret ballots and the present
@@ -661,6 +678,7 @@ async def test_votes_for_open_hidden() -> None:
             res((vrow.id, "yes")),
         ]
     )
+    monkeypatch.setattr(MeetingService, "_voters_by_vote", _persons_by_vote(1))
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._votes_for([mid])
     item = out[mid][0]
@@ -670,7 +688,7 @@ async def test_votes_for_open_hidden() -> None:
     assert item.voted == 1
 
 
-async def test_votes_for_open_all_voted_stays_hidden() -> None:
+async def test_votes_for_open_all_voted_stays_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep the tally of an open vote hidden even when every present member voted.
 
     The fake session returns, in order: the votes, two secret ballots and two present
@@ -685,6 +703,7 @@ async def test_votes_for_open_all_voted_stays_hidden() -> None:
             res((vrow.id, "yes"), (vrow.id, "yes")),
         ]
     )
+    monkeypatch.setattr(MeetingService, "_voters_by_vote", _persons_by_vote(2))
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._votes_for([mid])
     item = out[mid][0]
