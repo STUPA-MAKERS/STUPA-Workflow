@@ -128,6 +128,17 @@ def check_open(window: OpenWindow | None, *, now: datetime, confirmed: bool) -> 
         )
 
 
+def _write_gremium_defaults(row: MeetingSettings, values: dict[str, Any], actor: str) -> None:
+    """Write every Gremium default and the change stamp to the settings row."""
+    writes: dict[str, Any] = {
+        **{attr: values[key] for attr, key in GREMIUM_DEFAULT_FIELDS},
+        "updated_at": datetime.now(UTC),
+        "updated_by": actor,
+    }
+    for attr, value in writes.items():
+        setattr(row, attr, value)
+
+
 class MeetingSettingsService:
     """Read and change the meeting settings."""
 
@@ -203,10 +214,7 @@ class MeetingSettingsService:
         """
         row = await self.get()
         before = gremium_defaults(row)
-        for attr, key in GREMIUM_DEFAULT_FIELDS:
-            setattr(row, attr, values[key])
-        row.updated_at = datetime.now(UTC)
-        row.updated_by = actor
+        _write_gremium_defaults(row, values, actor)
         await audit_record(
             self.session,
             actor=actor,

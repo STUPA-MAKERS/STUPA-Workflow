@@ -69,6 +69,19 @@ def _snapshot(meeting: Meeting) -> dict[str, str | None]:
     return {key: None if value is None else str(value) for key, value in values}
 
 
+def _apply_kind_place_form(meeting: Meeting, payload: MeetingPatch) -> None:
+    """Write the kind, the place and the form that the patch sent. A null place clears it."""
+    changes: dict[str, str | None] = {
+        **({} if payload.kind is None else {"kind": payload.kind}),
+        **(
+            {"location": payload.location or None} if "location" in payload.model_fields_set else {}
+        ),
+        **({} if payload.form is None else {"form": payload.form}),
+    }
+    for attr, value in changes.items():
+        setattr(meeting, attr, value)
+
+
 def _merged(first: GuestEvents | None, closed: GuestEvents | None) -> GuestEvents | None:
     """Join the guest broadcasts of a patch: the close sends its own after the earlier ones."""
     match (first, closed):
@@ -322,12 +335,7 @@ class LifecycleOps(HandoverOps):
             )
         if payload.title is not None:
             meeting.title = payload.title
-        if payload.kind is not None:
-            meeting.kind = payload.kind
-        if "location" in payload.model_fields_set:
-            meeting.location = payload.location or None
-        if payload.form is not None:
-            meeting.form = payload.form
+        _apply_kind_place_form(meeting, payload)
         if "date" in payload.model_fields_set:
             meeting.date = payload.date
         if "start_time" in payload.model_fields_set:

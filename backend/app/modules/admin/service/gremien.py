@@ -52,14 +52,13 @@ def _apply_quorum(row: Gremium, payload: GremiumUpdate) -> None:
 
     The three quorum fields can be cleared to null.
     """
-    if "quorum_percent" in payload.model_fields_set:
-        row.quorum_percent = payload.quorum_percent
-    if "quorum_min_present" in payload.model_fields_set:
-        row.quorum_min_present = payload.quorum_min_present
-    if "repeat_quorum_percent" in payload.model_fields_set:
-        row.repeat_quorum_percent = payload.repeat_quorum_percent
-    if payload.guests_may_vote is not None:
-        row.guests_may_vote = payload.guests_may_vote
+    nullable = ("quorum_percent", "quorum_min_present", "repeat_quorum_percent")
+    writes: dict[str, int | bool | None] = {
+        **{name: getattr(payload, name) for name in nullable if name in payload.model_fields_set},
+        **({} if payload.guests_may_vote is None else {"guests_may_vote": payload.guests_may_vote}),
+    }
+    for name, value in writes.items():
+        setattr(row, name, value)
 
 
 class GremiumOps(ConfigServiceBase):
