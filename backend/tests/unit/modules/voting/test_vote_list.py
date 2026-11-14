@@ -97,7 +97,7 @@ async def test_scope_application_reader_does_not_read_gremium_polls(
     """An application reader reads the standalone application votes, never a Gremium poll."""
     reader = Principal(sub="r", permissions={"application.read"})
     sql = _sql(await listing.read_scope(fake_session(), reader))
-    assert "vote.kind != %(kind_1)s" in sql
+    assert "vote.kind NOT IN" in sql
 
 
 async def test_scope_admin_reads_every_standalone_vote_and_poll(scope: dict[str, Any]) -> None:
@@ -111,7 +111,7 @@ async def test_scope_application_reader_with_a_gremium_key_reads_its_polls(
 ) -> None:
     reader = Principal(sub="r", permissions={"application.read"}, groups={vote_group_key(GID)})
     sql = _sql(await listing.read_scope(fake_session(), reader))
-    assert "vote.kind != %(kind_1)s" in sql
+    assert "vote.kind NOT IN" in sql
     assert "eligible_group IN" in sql
 
 
