@@ -15,9 +15,9 @@ scope:
 # The meeting settings hold the periods of the Geschäftsordnung
 
 The meeting settings must hold these values with these start values: `inviteDaysOrdinary` 7,
-`inviteDaysExtraordinary` 3, `motionDeadlineDays` 10, `protocolDraftDays` 14, `lateExcuseDays`
-7, `absenceLimit` 3, `circularMinDays` 3 and `termStartMonth` 10. The admin page "Sitzungen"
-must edit them with the permission `admin.deadlines`.
+`inviteDaysExtraordinary` 3, `protocolDraftDays` 14, `lateExcuseDays` 7, `absenceLimit` 3,
+`circularMinDays` 3 and `termStartMonth` 10. The admin page "Sitzungen" must edit them with the
+permission `admin.deadlines`.
 
 Reason: The periods come from the Geschäftsordnung, and an admin must be able to follow a
 change of it without a release.

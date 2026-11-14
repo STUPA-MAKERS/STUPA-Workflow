@@ -406,7 +406,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/delegations/000461](requirements/functional/meetings/delegations/000461_external-delegates.md) | External delegates need a Gremium switch | approved |
 | [F/meetings/delegations/000909](requirements/functional/meetings/delegations/000909_delegate-limit.md) | A delegate holds a limited number of delegations | draft |
 | [F/meetings/delegations/000910](requirements/functional/meetings/delegations/000910_no-delegation-in-election.md) | An election takes no delegation ballot | draft |
-| [F/meetings/delegations/000911](requirements/functional/meetings/delegations/000911_no-delegation-constituent.md) | A konstituierende Sitzung takes no delegation | draft |
 | [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | approved |
 | [F/meetings/meetings/000093](requirements/functional/meetings/meetings/000093_state-order.md) | Meeting states move only forward | approved |
 | [F/meetings/meetings/000094](requirements/functional/meetings/meetings/000094_close-with-open-vote.md) | A meeting with an open vote does not close | approved |
@@ -447,7 +446,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000905](requirements/functional/meetings/meetings/000905_public-watch-with-quorum.md) | A Gremium with a quorum lets guests only watch | draft |
 | [F/meetings/meetings/000907](requirements/functional/meetings/meetings/000907_meeting-place-form.md) | A meeting has a place and a form | draft |
 | [F/meetings/meetings/000918](requirements/functional/meetings/meetings/000918_late-invite-warning.md) | A late meeting date shows a warning | draft |
-| [F/meetings/meetings/000919](requirements/functional/meetings/meetings/000919_motion-deadline.md) | An Antrag goes to the first meeting after the Antragsschluss | draft |
 | [F/meetings/meetings/000920](requirements/functional/meetings/meetings/000920_unexcused-count.md) | The Gremium page counts the unexcused absences of a term | draft |
 | [F/meetings/meetings/000921](requirements/functional/meetings/meetings/000921_absence-notice.md) | The lead gets a mail before a member reaches the absence limit | draft |
 | [F/meetings/meetings/000922](requirements/functional/meetings/meetings/000922_late-excuse.md) | A member can give an excuse after the meeting | draft |
@@ -512,7 +510,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/voting/000901](requirements/functional/meetings/voting/000901_quorum-min-present.md) | A Gremium can need a least number of present members | draft |
 | [F/meetings/voting/000902](requirements/functional/meetings/voting/000902_repeat-quorum.md) | A Wiederholungssitzung has its own quorum | draft |
 | [F/meetings/voting/000912](requirements/functional/meetings/voting/000912_election-members-majority.md) | An election for one seat can need the majority of the members | draft |
-| [F/meetings/voting/000913](requirements/functional/meetings/voting/000913_election-rounds.md) | An election without a majority goes to a second and a third round | draft |
 | [F/meetings/voting/000914](requirements/functional/meetings/voting/000914_circular-vote.md) | A Gremium can decide by Umlaufverfahren | draft |
 | [F/meetings/voting/000915](requirements/functional/meetings/voting/000915_circular-objection.md) | An objection ends an Umlaufverfahren | draft |
 | [F/public/public-pages/000170](requirements/functional/public/public-pages/000170_no-public-meetings.md) | Meetings are never public | replaced |
@@ -523,6 +520,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/public/public-pages/000687](requirements/functional/public/public-pages/000687_blackout-public.md) | The public variants black out a marked segment | approved |
 | [F/public/public-pages/000688](requirements/functional/public/public-pages/000688_blackout-bar-width.md) | A black bar has one fixed width and the text colour | approved |
 | [F/public/public-pages/000887](requirements/functional/public/public-pages/000887_blackout-bar-baseline.md) | A black bar in the PDF sits on the baseline of its line | approved |
+| [F/public/public-pages/000926](requirements/functional/public/public-pages/000926_public-decisions.md) | The decisions of a public Gremium are public | draft |
 | [NF/accessibility/conformance/000490](requirements/non-functional/accessibility/conformance/000490_wcag-22-aa.md) | Every view meets WCAG 2.2 level AA | approved |
 | [NF/accessibility/conformance/000491](requirements/non-functional/accessibility/conformance/000491_axe-every-route.md) | Every route passes an axe check in both themes | approved |
 | [NF/accessibility/conformance/000492](requirements/non-functional/accessibility/conformance/000492_template-lint.md) | The template lint has the accessibility rules | approved |

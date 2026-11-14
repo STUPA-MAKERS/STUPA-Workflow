@@ -17,7 +17,8 @@ scope:
 
 An election for one seat must be able to have the rule `members_majority`. A candidate must
 then be elected only with more votes than half of the eligible count. If no candidate reaches
-this number, the result must be `no_majority`.
+this number, the result must be `no_majority`. The app must start no further round by itself. A
+further Wahlgang is a new election that the protokollant starts.
 
 Reason: The Organisationssatzung asks for the "Mehrheit der Mitglieder" for the Vorsitz and the
 other members of the AStA.
