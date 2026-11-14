@@ -26,10 +26,18 @@ class _Typst:
 
 
 async def _render(*, retryable: bool) -> bytes:
-    """Render a plan without a version through a failing service."""
+    """Render a plan through a failing service."""
     return await plan_anlage._render(
-        cast("Any", _Typst(retryable=retryable)), cast("Any", None), None, _FILE
+        cast("Any", _Typst(retryable=retryable)), cast("Any", None), _FILE
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_export_logo(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def none(_session: object) -> None:
+        return None
+
+    monkeypatch.setattr(plan_anlage, "active_export_logo", none)
 
 
 @pytest.mark.asyncio

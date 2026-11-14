@@ -203,9 +203,9 @@
                       (dragleave)="onDragLeave()"
                       (drop)="onDrop(slot, $event)"
                     >
-                      <app-file-picker #logo [accept]="accept" (picked)="onLogoSelected(slot, $event)" />
+                      <app-file-picker #logo [accept]="acceptOf(slot).join(',')" (picked)="onLogoSelected(slot, $event)" />
                       @if (d.logos[slot]; as asset) {
-                        <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark'"><img [src]="asset.url" alt="" /></span>
+                        <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark' || slot === 'export'"><img [src]="asset.url" alt="" /></span>
                         <span class="br__logoText">
                           <span class="br__logoName">{{ slotLabel(slot) }}</span>
                           <span class="br__logoFile mono">{{ asset.filename }} · {{ size(asset.size) }}</span>
@@ -229,10 +229,16 @@
                           ><app-icon name="trash"
                         /></app-button>
                       } @else {
-                        <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark'"><img [src]="defaultLogo(slot)" alt="" /></span>
+                        @if (defaultLogo(slot); as builtIn) {
+                          <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark'"><img [src]="builtIn" alt="" /></span>
+                        } @else {
+                          <span class="br__thumb br__thumb--none"><app-icon name="image" /></span>
+                        }
                         <span class="br__logoText">
                           <span class="br__logoName">{{ slotLabel(slot) }}</span>
-                          <span class="br__logoFile br__logoFile--default">{{ 'admin.brand.logo.default' | t }}</span>
+                          <span class="br__logoFile br__logoFile--default">{{
+                            (slot === 'export' ? 'admin.brand.logo.none' : 'admin.brand.logo.default') | t
+                          }}</span>
                         </span>
                         <app-button variant="outlined" size="sm" [ariaLabel]="('admin.brand.pick' | t) + ': ' + slotLabel(slot)" (click)="logo.open()">{{
                           'admin.brand.pick' | t

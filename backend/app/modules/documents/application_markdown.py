@@ -120,9 +120,7 @@ class ApplicationDoc:
     Attributes:
         title: The title of the Antrag (the system title of the form).
         type_name: The name of the Antragsart.
-        gremium_name: The Gremium of the Antrag, for the design of the PDF. The PDF does
-            not print it.
-        cd_variant: The design key of the Gremium, for the logos.
+        gremium_name: The Gremium of the Antrag. The PDF does not print it.
         state_label: The current status, or `None` to leave it out (the protocol Anlage).
         received_on: The date of receipt.
         applicant: The name of the applicant, or `None` when it is unknown or the reader
@@ -145,7 +143,6 @@ class ApplicationDoc:
     title: str
     type_name: str | None
     gremium_name: str | None
-    cd_variant: str | None
     state_label: str | None
     received_on: date | None
     applicant: str | None
@@ -533,7 +530,6 @@ def _frontmatter(doc: ApplicationDoc) -> list[str]:
         f"title: {_yaml_scalar(_unbar(doc.title or 'Antrag'))}",
         "typ: antrag",
         *([f"gremium: {_yaml_scalar(doc.gremium_name)}"] if doc.gremium_name else []),
-        *([f"cd: {_yaml_scalar(doc.cd_variant)}"] if doc.cd_variant else []),
         "---",
     ]
 

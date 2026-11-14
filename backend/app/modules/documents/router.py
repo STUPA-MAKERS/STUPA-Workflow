@@ -12,13 +12,12 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Response
 
 from app.deps import DbSession, SettingsDep
 from app.modules.applications.access import Access, require_app_view
 from app.modules.applications.service import ApplicationsService
 from app.modules.documents.service import ApplicationPdfService
-from app.modules.files.storage import ObjectStorage
 from app.modules.pdf.typst_client import build_typst_client
 from app.shared.errors import ProblemDetail
 from app.shared.filenames import content_disposition, title_token
@@ -42,14 +41,9 @@ def application_pdf_filename(title: str | None, received_on: date | None) -> str
     return "_".join(parts) + ".pdf"
 
 
-def get_pdf_service(
-    session: DbSession, request: Request, settings: SettingsDep
-) -> ApplicationPdfService:
-    """Wire the service: storage from the app state, typst from the settings."""
-    storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
-    return ApplicationPdfService(
-        session, storage=storage, typst=build_typst_client(settings), settings=settings
-    )
+def get_pdf_service(session: DbSession, settings: SettingsDep) -> ApplicationPdfService:
+    """Wire the service: typst from the settings."""
+    return ApplicationPdfService(session, typst=build_typst_client(settings), settings=settings)
 
 
 @router.get(

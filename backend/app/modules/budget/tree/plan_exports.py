@@ -32,7 +32,6 @@ from app.modules.budget.plan_schemas import (
 from app.modules.budget.tree.plans import PlanOps
 from app.modules.budget.tree.view import TreeViewOps
 from app.modules.budget.tree_models import Budget, FiscalYear
-from app.modules.files.cd_resolver import ResolvedCdVariant, resolve_cd_variant_of_gremium
 from app.shared.errors import ForbiddenError, NotFoundError
 
 
@@ -73,22 +72,6 @@ class PlanExportOps(PlanOps, TreeViewOps):
     async def _plan_in(self, fy: FiscalYear | None) -> PlanOut | None:
         plan = await self._plan_of(fy.id) if fy is not None else None
         return await self._plan_out(plan, fy.budget_id) if plan is not None and fy else None
-
-    async def plan_design(self, version_id: UUID) -> ResolvedCdVariant | None:
-        """Return the corporate design of the Gremium of the budget of a version.
-
-        Returns:
-            The design, or `None` when the budget has no Gremium or the Gremium no design.
-
-        Raises:
-            NotFoundError: The version does not exist (404).
-            ServiceUnavailableError: An uploaded logo cannot be read (503).
-        """
-        plan = await self.plan_of_version(version_id)
-        gremium_id = await self.session.scalar(
-            select(Budget.gremium_id).where(Budget.id == plan.budget_id)
-        )
-        return await resolve_cd_variant_of_gremium(self.session, self.storage, gremium_id)
 
     async def plan_export(self, version_id: UUID, today: date) -> PlanExport:
         """Return a version of a Haushaltsplan as the rows of a file.

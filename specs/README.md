@@ -82,6 +82,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/000760](requirements/functional/administration/admin/000760_feature-dependencies.md) | A feature that needs another feature goes off with it | approved |
 | [F/administration/admin/000761](requirements/functional/administration/admin/000761_feature-in-use.md) | A feature in use by the Antrag flow cannot go off | approved |
 | [F/administration/admin/000762](requirements/functional/administration/admin/000762_features-page.md) | The admin page Funktionen holds the feature switches | approved |
+| [F/administration/admin/000891](requirements/functional/administration/admin/000891_export-logo.md) | Exported PDFs carry the export logo of the branding | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |

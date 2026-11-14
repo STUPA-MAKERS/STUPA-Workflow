@@ -13,15 +13,14 @@ tests:
   - "backend/tests/unit/modules/budget/test_plan_export.py:test_the_file_name"
   - "backend/tests/unit/modules/budget/test_plan_export.py:test_a_version_in_progress_shows_its_open_step"
   - "backend/tests/unit/modules/budget/test_plan_router.py:test_the_export_follows_the_read_rule_of_the_budget"
-  - "backend/tests/unit/modules/budget/test_plan_router.py:test_the_pdf_carries_the_design_of_the_gremium"
-  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_export_takes_the_design_of_the_gremium_of_the_budget"
+  - "backend/tests/unit/modules/budget/test_plan_router.py:test_the_pdf_carries_the_export_logo"
   - "typst/tests/test_plan.py:test_the_plan_renders_landscape_with_its_mark_on_each_page"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
 implementation:
   - backend/app/modules/budget/plan_export.py
   - backend/app/modules/budget/tree/plan_exports.py
   - backend/app/modules/budget/plan_router.py
-  - backend/app/modules/files/cd_resolver.py
+  - backend/app/modules/site_config/export_logo.py
   - backend/app/shared/xlsx.py
   - typst/template/plan.typ
   - typst/typst_service/document.py
@@ -55,8 +54,7 @@ Both files must hold:
 
 A decided version must print the names and the keys of the decision (000808). The XLSX
 file must hold the amounts as numbers. The PDF must be A4 landscape in the design of the
-protocols, with the logos of the corporate design of the Gremium of the Haushalt. A
-Haushalt without a Gremium or a Gremium without a design gets the logo of the StuPa. The file name must be `Haushaltsplan_<Haushalt>_<fiscal year>[_Nachtrag-n][_Entwurf]`
+protocols, with the export logo of the branding (000891). The file name must be `Haushaltsplan_<Haushalt>_<fiscal year>[_Nachtrag-n][_Entwurf]`
 with the extension of the format. An export is an entry in the audit log.
 
 Reason: The Finanzordnung (§ 7, § 9) says that the draft goes to the StuPa and the decided

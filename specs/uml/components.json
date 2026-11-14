@@ -391,7 +391,7 @@
       "to": "auth"
     },
     {
-      "count": 6,
+      "count": 4,
       "from": "budget",
       "to": "files"
     },
@@ -419,6 +419,11 @@
       "count": 34,
       "from": "budget",
       "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "budget",
+      "to": "site_config"
     },
     {
       "count": 2,
@@ -566,7 +571,7 @@
       "to": "applications"
     },
     {
-      "count": 4,
+      "count": 1,
       "from": "documents",
       "to": "files"
     },
@@ -599,6 +604,11 @@
       "count": 9,
       "from": "documents",
       "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "documents",
+      "to": "site_config"
     },
     {
       "count": 1,
@@ -1021,7 +1031,7 @@
       "to": "documents"
     },
     {
-      "count": 8,
+      "count": 7,
       "from": "protocol",
       "to": "files"
     },
@@ -1059,6 +1069,11 @@
       "count": 21,
       "from": "protocol",
       "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "protocol",
+      "to": "site_config"
     },
     {
       "count": 7,

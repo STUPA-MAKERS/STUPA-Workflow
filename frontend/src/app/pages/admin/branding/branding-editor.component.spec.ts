@@ -481,6 +481,22 @@ describe('BrandingEditorComponent', () => {
     expect(c.draft().logos.wordmark.mime).toBe('image/png');
   });
 
+  it('offers the export logo with no built-in logo and takes no ICO for it (spec 000891)', async () => {
+    const { toast, container, fixture } = await setupWithStub({});
+    expect(screen.getByRole('button', { name: 'Auswählen: PDF-Exporte' })).toBeInTheDocument();
+    expect(screen.getByText('Kein Logo')).toBeInTheDocument();
+    const inputs = container.querySelectorAll<HTMLInputElement>('input[type="file"]');
+    expect(inputs[3].accept).toBe('image/png,image/jpeg,image/webp');
+    await userEvent.upload(inputs[3], new File(['x'], 'logo.ico', { type: 'image/x-icon' }), {
+      applyAccept: false,
+    });
+    expect(toast.error).toHaveBeenCalledWith('Dateityp nicht erlaubt.');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.onLogoSelected('export', [new File(['raw'], 'logo.png', { type: 'image/png' })]);
+    await waitFor(() => expect(c.draft().logos.export?.filename).toBe('logo.png'));
+  });
+
   it('creates the apply info map on first use', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -20,7 +20,7 @@ scope:
 The Antrag PDF must use the design of the protocol PDF from the typst service, with the fonts
 Blender for headings and DIN for text, and must be tagged as PDF/UA-1 (000524). It must have no
 title page: each page starts with the title of the Antrag at the top of the page, in the same
-form on every page, with no logo above it and with no other running head. The whole Antrag must be in tables of two columns, label and value, drawn like
+form on every page, with no logo above it and with no other running head. The footer of each page carries the export logo of the branding (000891). The whole Antrag must be in tables of two columns, label and value, drawn like
 the table of the Haushaltsplan PDF: a thick rule above and below, a dashed rule between the rows, and
 the section name on a grey band across the table. The tables follow each other with no gap, so
 the Antrag reads as one table. Each value cell must render its Markdown
