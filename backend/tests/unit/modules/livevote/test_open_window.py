@@ -19,6 +19,7 @@ from app.modules.livevote.open_window import (
     MeetingSettingsService,
     OpenWindow,
     check_open,
+    gremium_defaults,
     load_meeting_settings,
     open_window,
 )
@@ -143,3 +144,55 @@ async def test_update_refuses_a_confirm_point_before_the_open() -> None:
     assert session.commits == 0
     assert session.row is not None
     assert session.row.open_lead_minutes == 60
+
+
+async def test_gremium_defaults_start_with_the_values_of_the_satzung() -> None:
+    """A missing row gives the defaults 40, 25, off, off and 120.
+
+    §F/administration/admin/000906.
+    """
+    row = await MeetingSettingsService(_Session()).get()  # type: ignore[arg-type]
+    assert gremium_defaults(row) == {
+        "quorumPercent": 40,
+        "repeatQuorumPercent": 25,
+        "guestsMayVote": False,
+        "allowVoteDelegation": False,
+        "delegationLeadMinutes": 120,
+    }
+
+
+async def test_update_gremium_defaults_audits_only_the_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Replace the defaults: the audit entry names only the changed values.
+
+    §F/administration/admin/000906.
+    """
+    calls: list[dict[str, Any]] = []
+
+    async def _record(_session: Any, **kw: Any) -> None:
+        calls.append(kw)
+
+    monkeypatch.setattr(mod, "audit_record", _record)
+    session = _Session()
+    values = {
+        "quorumPercent": 50,
+        "repeatQuorumPercent": None,
+        "guestsMayVote": False,
+        "allowVoteDelegation": True,
+        "delegationLeadMinutes": 120,
+    }
+    row = await MeetingSettingsService(session).update_gremium_defaults(  # type: ignore[arg-type]
+        values, actor="adm"
+    )
+    assert gremium_defaults(row) == values
+    assert row.updated_by == "adm" and session.commits == 0
+    assert (row.open_lead_minutes, row.confirm_lead_minutes) == (60, 10)
+    [entry] = calls
+    assert entry["data"] == {
+        "gremiumDefaults": {
+            "quorumPercent": {"from": 40, "to": 50},
+            "repeatQuorumPercent": {"from": 25, "to": None},
+            "allowVoteDelegation": {"from": False, "to": True},
+        }
+    }

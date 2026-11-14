@@ -216,6 +216,48 @@ describe('MeetingSettingsDialogComponent', () => {
     http.verify();
   });
 
+  describe('kind, place and form', () => {
+    const FULL = { ...MEETING, kind: 'ordinary', location: 'Raum 9-108', form: 'presence' } as unknown as Meeting;
+
+    /** §F/meetings/meetings/000903, §F/meetings/meetings/000907 */
+    it('sends only what changed', async () => {
+      const { http, fixture, cmp } = await setup(FULL);
+      flushRoster(http, fixture);
+      expect(await optionLabels(screen.getByLabelText('Sitzungsart'))).toContain('Wiederholungssitzung');
+      cmp.save();
+      const same = http.expectOne('/api/meetings/m-1');
+      expect(same.request.body).not.toHaveProperty('kind');
+      expect(same.request.body).not.toHaveProperty('location');
+      expect(same.request.body).not.toHaveProperty('form');
+      same.flush(FULL);
+      cmp.kind.set('repeat');
+      cmp.location.set('  ');
+      cmp.form.set('video');
+      cmp.save();
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).toEqual(
+        expect.objectContaining({ kind: 'repeat', location: null, form: 'video' }),
+      );
+    });
+
+    /** §F/meetings/meetings/000903 */
+    it('locks the kind of a started meeting and refuses a place that is too long', async () => {
+      const { http, fixture, cmp } = await setup({ ...FULL, status: 'live' } as unknown as Meeting);
+      flushRoster(http, fixture);
+      expect(cmp.kindLocked()).toBe(true);
+      cmp.kind.set('repeat');
+      cmp.location.set('x'.repeat(201));
+      fixture.detectChanges();
+      expect(cmp.valid()).toBe(false);
+      expect(screen.getByRole('dialog')).toHaveTextContent('Der Ort darf höchstens 200 Zeichen haben.');
+      cmp.location.set('Aula');
+      cmp.save();
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).not.toHaveProperty('kind');
+      expect(req.request.body).toEqual(expect.objectContaining({ location: 'Aula' }));
+    });
+  });
+
   describe('public participation', () => {
     const LINK = { joinCode: '7KQ4MP', joinUrl: 'https://x.example/j/7KQ4MP', qr: { size: 1, rows: ['1'] } };
     const LIVE = {
@@ -224,16 +266,30 @@ describe('MeetingSettingsDialogComponent', () => {
       canManage: true,
       publicJoin: true,
       guestsMode: 'vote',
+      guestsVoteAllowed: true,
       pendingGuests: 2,
       admittedGuests: 5,
     } as unknown as Meeting;
 
     it('offers the switch only to the lead and sends only the changed fields', async () => {
-      const { http, fixture, cmp } = await setup({ ...MEETING, canManage: true, publicJoin: false, guestsMode: 'vote' } as unknown as Meeting);
+      const { http, fixture, cmp } = await setup({ ...MEETING, canManage: true, publicJoin: false, guestsMode: 'vote', guestsVoteAllowed: true } as unknown as Meeting);
       flushRoster(http, fixture);
       await userEvent.click(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ }));
       await userEvent.click(screen.getByRole('radio', { name: /Gäste schauen nur zu/ }));
       expect(cmp.confirmOff()).toBe(false);
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).toEqual(expect.objectContaining({ publicJoin: true, guestsMode: 'watch' }));
+    });
+
+    /** §F/meetings/meetings/000904 */
+    it('shows no choice and keeps "nur zuschauen" where guests get no ballot', async () => {
+      const { http, fixture, cmp } = await setup({ ...MEETING, canManage: true, publicJoin: false, guestsMode: 'vote', guestsVoteAllowed: false } as unknown as Meeting);
+      flushRoster(http, fixture);
+      expect(cmp.guestsMode()).toBe('watch');
+      await userEvent.click(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ }));
+      expect(screen.getByText('Gäste schauen in diesem Gremium nur zu.')).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /Gäste dürfen abstimmen/ })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       const req = http.expectOne('/api/meetings/m-1');
       expect(req.request.body).toEqual(expect.objectContaining({ publicJoin: true, guestsMode: 'watch' }));
@@ -269,8 +325,8 @@ describe('MeetingSettingsDialogComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       http
         .expectOne('/api/meetings/m-1')
-        .flush({ code: 'public_join_needs_no_quorum' }, { status: 422, statusText: 'x' });
-      expect(toasts()).toContain('Öffentliche Teilnahme ist nur in Gremien ohne Quorum möglich.');
+        .flush({ code: 'guests_vote_needs_no_quorum' }, { status: 422, statusText: 'x' });
+      expect(toasts()).toContain('In diesem Gremium dürfen Gäste nicht abstimmen.');
       expect(toasts()).toContain(
         'Eine Abstimmung mit Gästen ist offen. Schließe sie, bevor Gäste nur noch zuschauen.',
       );

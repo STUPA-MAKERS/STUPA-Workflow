@@ -508,7 +508,7 @@ class LifecycleOps(HandoverOps):
         """
         old_public, old_mode = meeting.public_join, meeting.guests_mode
         new_public = old_public if payload.public_join is None else payload.public_join
-        new_mode = old_mode if payload.guests_mode is None else payload.guests_mode
+        new_mode = await self._new_guests_mode(meeting, payload, new_public)
         if (old_public, old_mode) == (new_public, new_mode):
             return None
         if old_mode == "vote" and new_mode == "watch" and await self._guest_vote_open(meeting.id):
@@ -541,6 +541,22 @@ class LifecycleOps(HandoverOps):
             },
         )
         return events
+
+    async def _new_guests_mode(
+        self, meeting: Meeting, payload: MeetingPatch, new_public: bool
+    ) -> str:
+        """Return the guest mode after the patch.
+
+        A meeting can hold the mode ``vote`` from before its Gremium took the ballot
+        from guests. Switching public participation on without a mode then gives
+        ``watch``, because the guests of this Gremium only watch.
+        """
+        if payload.guests_mode is not None:
+            return payload.guests_mode
+        stale = meeting.guests_mode == "vote" and new_public and not meeting.public_join
+        if stale and not await self.guests_vote_allowed(meeting.gremium_id):
+            return "watch"
+        return meeting.guests_mode
 
     async def _assert_guests_vote_allowed(self, gremium_id: UUID) -> None:
         """Refuse the guest mode ``vote`` where the Gremium gives guests no ballot.

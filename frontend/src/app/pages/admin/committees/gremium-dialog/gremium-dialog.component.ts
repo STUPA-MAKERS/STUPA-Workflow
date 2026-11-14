@@ -54,6 +54,10 @@ export interface GremiumForm {
   readonly quorumPercent: number | null;
   /** The least number of present persons for the quorum. `null` = no least number. */
   readonly quorumMinPresent: number | null;
+  /** The quorum of a Wiederholungssitzung in percent. `null` = the normal quorum. */
+  readonly repeatQuorumPercent: number | null;
+  /** Guests of a public meeting can get a ballot. Counts only without a quorum. */
+  readonly guestsMayVote: boolean;
   /** Extra protocol recipients, one address per line. */
   readonly mailRecipients: string;
   /** The final protocols show on the public protocol page. */
@@ -70,9 +74,18 @@ export function emptyGremiumForm(): GremiumForm {
     delegationAllowExternal: false,
     quorumPercent: null,
     quorumMinPresent: null,
+    repeatQuorumPercent: null,
+    guestsMayVote: false,
     mailRecipients: '',
     protocolsPublic: false,
   };
+}
+
+/** A percent field: empty or invalid gives `null`, else a whole percent from 0 to 100. */
+export function percentOrNull(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null;
 }
 
 /** Split the recipient text into addresses. A newline, a comma or a semicolon separates. */
@@ -87,8 +100,9 @@ export function parseRecipients(raw: string): readonly string[] {
  * The dialog that creates or edits a gremium.
  *
  * It holds every setting of a gremium (gaps N38): name (the slug comes from the name of
- * a new gremium and never changes after), CD variant, default language, quorum, vote
- * delegation with its lead time and the delegation to external persons, and the extra
+ * a new gremium and never changes after), CD variant, default language, quorum, the
+ * quorum of a Wiederholungssitzung, the guest ballot (it counts only without a quorum,
+ * so a quorum locks the switch), vote delegation with its lead time and the delegation to external persons, and the extra
  * protocol recipients (`PUT /admin/committees/{id}/mail-recipients`, after the base data).
  * If the dialog cannot read the recipients, the field stays locked and a save sends only
  * the base data: the PUT replaces the list, so an empty field would delete it.
@@ -211,6 +225,7 @@ export class GremiumDialogComponent {
     if (!g) {
       this.form.set(emptyGremiumForm());
       this.recipientsLoading.set(false);
+      this.loadDefaults();
       return;
     }
     this.form.set({
@@ -222,6 +237,8 @@ export class GremiumDialogComponent {
       delegationAllowExternal: g.delegationAllowExternal ?? false,
       quorumPercent: g.quorumPercent ?? null,
       quorumMinPresent: g.quorumMinPresent ?? null,
+      repeatQuorumPercent: g.repeatQuorumPercent ?? null,
+      guestsMayVote: g.guestsMayVote ?? false,
       mailRecipients: '',
       protocolsPublic: g.protocolsPublic ?? false,
     });
@@ -236,6 +253,34 @@ export class GremiumDialogComponent {
         this.recipientsLoadFailed.set(true);
         this.error.set(this.i18n.translate('admin.gremien.recipientsLoadFailedKept'));
       },
+    });
+  }
+
+  /**
+   * A new Gremium starts with the defaults of the meeting settings (§ 000906). A field
+   * that the admin changed before the answer stays.
+   */
+  private loadDefaults(): void {
+    const empty = emptyGremiumForm();
+    this.api.getGremiumDefaults().subscribe({
+      next: (d) => {
+        if (!this.open() || this.gremium() !== null) return;
+        this.form.update((f) => ({
+          ...f,
+          ...(f.quorumPercent === empty.quorumPercent ? { quorumPercent: d.quorumPercent } : {}),
+          ...(f.repeatQuorumPercent === empty.repeatQuorumPercent
+            ? { repeatQuorumPercent: d.repeatQuorumPercent }
+            : {}),
+          ...(f.guestsMayVote === empty.guestsMayVote ? { guestsMayVote: d.guestsMayVote } : {}),
+          ...(f.allowVoteDelegation === empty.allowVoteDelegation
+            ? { allowVoteDelegation: d.allowVoteDelegation }
+            : {}),
+          ...(f.delegationLeadMinutes === empty.delegationLeadMinutes
+            ? { delegationLeadMinutes: d.delegationLeadMinutes }
+            : {}),
+        }));
+      },
+      error: () => {},
     });
   }
 
@@ -263,13 +308,11 @@ export class GremiumDialogComponent {
   }
 
   /** Quorum: empty gives `null` (no quorum), else a whole percent from 0 to 100. */
-  protected patchQuorum(value: number | string | null): void {
-    if (value === null || value === undefined || String(value).trim() === '') {
-      this.patch('quorumPercent', null);
-      return;
-    }
-    const n = Math.round(Number(value));
-    this.patch('quorumPercent', Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null);
+  protected patchQuorum(
+    value: number | string | null,
+    key: 'quorumPercent' | 'repeatQuorumPercent' = 'quorumPercent',
+  ): void {
+    this.patch(key, percentOrNull(value));
   }
 
   protected close(): void {
@@ -338,6 +381,8 @@ export class GremiumDialogComponent {
       delegationAllowExternal: f.delegationAllowExternal,
       quorumPercent: f.quorumPercent,
       quorumMinPresent: f.quorumMinPresent,
+      repeatQuorumPercent: f.repeatQuorumPercent,
+      guestsMayVote: f.guestsMayVote,
       protocolsPublic: f.protocolsPublic,
     } satisfies GremiumUpdateBody;
     const isNew = this.isNew();

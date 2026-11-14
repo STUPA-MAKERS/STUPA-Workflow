@@ -1385,6 +1385,7 @@ async def put_gremium_defaults(
     row = await service.update_gremium_defaults(
         payload.model_dump(by_alias=True), actor=principal.sub
     )
+    await service.session.commit()
     return GremiumDefaults.model_validate(gremium_defaults(row))
 
 

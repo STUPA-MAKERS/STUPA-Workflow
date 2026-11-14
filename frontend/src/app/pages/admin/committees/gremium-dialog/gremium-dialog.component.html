@@ -78,9 +78,24 @@
           [ngModel]="form().quorumMinPresent"
           (ngModelChange)="patchMinPresent($event)"
         />
+        <app-input
+          type="number"
+          [label]="'admin.gremien.repeatQuorum' | t"
+          name="repeatQuorumPercent"
+          [ngModel]="form().repeatQuorumPercent"
+          (ngModelChange)="patchQuorum($event, 'repeatQuorumPercent')"
+        />
       </div>
 
       <div class="gd__col">
+        <app-switch
+          class="gd__switch"
+          name="guestsMayVote"
+          [disabled]="form().quorumPercent !== null"
+          [ngModel]="form().guestsMayVote"
+          (ngModelChange)="patch('guestsMayVote', $event)"
+          >{{ 'admin.gremien.guestsMayVote' | t }}</app-switch
+        >
         <app-switch
           class="gd__switch"
           name="allowVoteDelegation"

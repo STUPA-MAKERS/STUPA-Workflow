@@ -210,7 +210,7 @@ class MeetingSettingsService:
         """Replace the Gremium defaults and write a ``config_change`` audit entry.
 
         ``values`` holds every default by its JSON key. The method touches no Gremium:
-        only the form of a new Gremium reads the defaults. The method commits.
+        only the form of a new Gremium reads the defaults. The caller commits.
         """
         row = await self.get()
         before = gremium_defaults(row)
@@ -229,6 +229,4 @@ class MeetingSettingsService:
                 }
             },
         )
-        await self.session.commit()
-        await self.session.refresh(row)
         return row

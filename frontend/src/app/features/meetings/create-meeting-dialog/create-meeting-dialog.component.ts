@@ -13,7 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { problemCode } from '@core/api/problem';
-import type { GuestsMode, MeetingDefaults, MeetingMember } from '@core/api/models';
+import type { GuestsMode, MeetingDefaults, MeetingForm, MeetingKind, MeetingMember } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -30,6 +30,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
+import { MEETING_LOCATION_MAX, meetingFormOptions, meetingKindOptions } from '../meeting-kind.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
 import { longDate } from '@shared/date-format';
 import { personLabel } from '@shared/person-label.util';
@@ -37,7 +38,8 @@ import { personLabel } from '@shared/person-label.util';
 /**
  * "Sitzung anlegen" in two steps.
  *
- * Step 1 asks for the Gremium, the date, the start and an optional end. Step 2 asks
+ * Step 1 asks for the Gremium, the kind, the date, the start, an optional end, the
+ * place and the form. Step 2 asks
  * for the title (prefilled from step 1) and the minute-taker. Only members with
  * `protocol.write` in the Gremium can keep the minutes, so the list offers only
  * them. The dialog creates the meeting and opens its page.
@@ -94,8 +96,21 @@ export class CreateMeetingDialogComponent {
   readonly keeper = signal('');
   /** Public participation over a QR code, with the guest mode. */
   readonly publicJoin = signal(false);
-  readonly guestsMode = signal<GuestsMode>('vote');
-  /** What the chosen gremium allows: public participation only without a quorum. */
+  readonly guestsMode = signal<GuestsMode>('watch');
+  /** A new meeting is an ordinary one in presence (§ 000903, § 000907). */
+  readonly kind = signal<MeetingKind>('ordinary');
+  readonly location = signal('');
+  readonly form = signal<MeetingForm>('presence');
+  readonly kindOptions = computed(() => meetingKindOptions(this.i18n));
+  readonly formOptions = computed(() => meetingFormOptions(this.i18n));
+  /** The place is too long for the server. */
+  readonly locationTooLong = computed(() => this.location().trim().length > MEETING_LOCATION_MAX);
+  readonly locationError = computed(() =>
+    this.locationTooLong()
+      ? this.i18n.translate('meetings.location.tooLong', { max: MEETING_LOCATION_MAX })
+      : '',
+  );
+  /** What the chosen Gremium allows: a guest ballot only with its switch and no quorum. */
   readonly defaults = signal<MeetingDefaults | null>(null);
   readonly members = signal<MeetingMember[]>([]);
   readonly gremiumOptions = signal<SelectOption[]>([]);
@@ -119,7 +134,8 @@ export class CreateMeetingDialogComponent {
   });
 
   readonly step1Valid = computed(
-    () => !!this.gremium() && !!this.date().trim() && !!this.time().trim(),
+    () =>
+      !!this.gremium() && !!this.date().trim() && !!this.time().trim() && !this.locationTooLong(),
   );
   readonly step2Valid = computed(() => this.step1Valid() && !!this.title().trim());
 
@@ -139,7 +155,10 @@ export class CreateMeetingDialogComponent {
     this.title.set('');
     this.keeper.set('');
     this.publicJoin.set(false);
-    this.guestsMode.set('vote');
+    this.guestsMode.set('watch');
+    this.kind.set('ordinary');
+    this.location.set('');
+    this.form.set('presence');
     this.members.set([]);
     this.lastPrefill = '';
     this.gremium.set(this.gremiumId());
@@ -188,7 +207,7 @@ export class CreateMeetingDialogComponent {
       next: (d) => {
         if (this.gremium() !== gremiumId) return;
         this.defaults.set(d);
-        if (!d.publicJoinAllowed) this.publicJoin.set(false);
+        this.guestsMode.set(d.guestsVoteAllowed ? 'vote' : 'watch');
       },
       error: () => {},
     });
@@ -247,6 +266,9 @@ export class CreateMeetingDialogComponent {
         startTime: this.time().trim(),
         endTime: this.endTime().trim() || null,
         protokollantId: this.keeper() || null,
+        kind: this.kind(),
+        location: this.location().trim() || null,
+        form: this.form(),
         ...(this.publicJoin() ? { publicJoin: true, guestsMode: this.guestsMode() } : {}),
       })
       .subscribe({
@@ -261,7 +283,9 @@ export class CreateMeetingDialogComponent {
           const code = problemCode(err);
           this.toast.error(
             this.i18n.translate(
-              code === 'public_join_needs_no_quorum' ? 'guests.toast.needsNoQuorum' : 'meetings.toast.createFailed',
+              code === 'guests_vote_off' || code === 'guests_vote_needs_no_quorum'
+                ? 'guests.toast.voteOff'
+                : 'meetings.toast.createFailed',
             ),
           );
         },

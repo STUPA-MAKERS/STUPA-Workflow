@@ -4,6 +4,8 @@
   present (§F/meetings/voting/000900).
 * A Gremium with ``quorumMinPresent`` needs that number of present persons
   (§F/meetings/voting/000901).
+* A vote of a Wiederholungssitzung starts with the repeat quorum of the Gremium
+  (§F/meetings/voting/000902).
 * The dialog of a meeting vote stores ``quorumBasis = present`` and the least number of
   the Gremium, and it refuses guests on a members rule (§F/meetings/voting/000898).
 """
@@ -21,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.meetings.models import MeetingAttendance
+from app.modules.meetings.models import Meeting, MeetingAttendance
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed
 from app.modules.voting.service import VotingService
@@ -165,6 +167,51 @@ async def test_meeting_vote_takes_the_presence_rules_of_the_gremium(
     assert config["quorumBasis"] == "present"
     assert config["quorumMinPresent"] == 3
     assert config["quorum"] == {"type": "percent", "value": 40}
+
+
+async def _draft_quorum(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI, s: Seed
+) -> dict[str, object] | None:
+    """Prepare a vote in the meeting and return the quorum of its config."""
+    body = {"agendaItemId": str(s.item_ids[0]), "question": "Zustimmen?", "draft": True}
+    with TestClient(api) as client:
+        resp = client.post(f"/api/meetings/{s.meeting_id}/votes", json=body)
+    assert resp.status_code in (200, 201), resp.text
+    async with maker() as session:
+        vote = await session.get(Vote, uuid.UUID(resp.json()["votes"][-1]["id"]))
+    assert vote is not None
+    return vote.config.get("quorum")
+
+
+async def test_a_repeat_meeting_uses_the_repeat_quorum(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """A vote of a Wiederholungssitzung takes the repeat quorum of its Gremium.
+
+    Rule: §F/meetings/voting/000902. An ordinary meeting of the same Gremium keeps the
+    normal quorum, and a Gremium without a repeat quorum uses the normal one.
+    """
+    repeat = await seed(maker, status="live")
+    ordinary = await seed(maker, status="live")
+    fallback = await seed(maker, status="live")
+    async with maker() as session:
+        await session.execute(
+            update(Gremium)
+            .where(Gremium.id.in_([repeat.gremium_id, ordinary.gremium_id]))
+            .values(quorum_percent=40, repeat_quorum_percent=25)
+        )
+        await session.execute(
+            update(Gremium).where(Gremium.id == fallback.gremium_id).values(quorum_percent=40)
+        )
+        await session.execute(
+            update(Meeting)
+            .where(Meeting.id.in_([repeat.meeting_id, fallback.meeting_id]))
+            .values(kind="repeat")
+        )
+        await session.commit()
+    assert await _draft_quorum(maker, api, repeat) == {"type": "percent", "value": 25}
+    assert await _draft_quorum(maker, api, ordinary) == {"type": "percent", "value": 40}
+    assert await _draft_quorum(maker, api, fallback) == {"type": "percent", "value": 40}
 
 
 async def test_members_rule_refuses_guest_ballots(

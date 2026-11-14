@@ -22,6 +22,15 @@
       (ngModelChange)="title.set($event)"
     />
     <app-select
+      name="kind"
+      [id]="'msd-kind'"
+      [label]="'meetings.kind.label' | t"
+      [options]="kindOptions()"
+      [disabled]="kindLocked()"
+      [ngModel]="kind()"
+      (ngModelChange)="kind.set($event)"
+    />
+    <app-select
       name="keeper"
       [id]="'msd-keeper'"
       [label]="'meetings.protokollant.label' | t"
@@ -58,13 +67,33 @@
         (ngModelChange)="endTime.set($event)"
       />
     </div>
+    <div class="msd__where">
+      <app-input
+        name="location"
+        [id]="'msd-location'"
+        [label]="'meetings.location.label' | t"
+        [error]="locationError()"
+        [disabled]="locked()"
+        [ngModel]="location()"
+        (ngModelChange)="location.set($event)"
+      />
+      <app-select
+        name="form"
+        [id]="'msd-form'"
+        [label]="'meetings.form.label' | t"
+        [options]="formOptions()"
+        [disabled]="locked()"
+        [ngModel]="form()"
+        (ngModelChange)="form.set($event)"
+      />
+    </div>
     @if (meeting()?.canManage) {
       <app-public-join-settings
         [publicJoin]="publicJoin()"
         (publicJoinChange)="setPublicJoin($event)"
         [(guestsMode)]="guestsMode"
         [disabled]="publicLocked()"
-        [allowed]="meeting()?.publicJoinAllowed ?? true"
+        [voteAllowed]="meeting()?.guestsVoteAllowed ?? false"
         [link]="meeting()?.publicJoin ? link() : null"
         [rotating]="rotating()"
         (rotate)="rotate()"

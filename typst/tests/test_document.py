@@ -93,6 +93,24 @@ def test_backend_document() -> None:
     }
 
 
+def test_the_header_names_the_kind_the_place_and_the_form() -> None:
+    """The kind, the place and the form are the first data rows after the date and time.
+
+    §F/meetings/protocols/000908. A document without a place has no place row.
+    """
+    head = 'sitzungsart: "Wiederholungssitzung"\nort: "Raum 9-108"\nform: "Hybrid"\n'
+    doc = build_document(BACKEND_DOC.replace("protokoll: ", head + "protokoll: "), variant=None)
+    assert doc["data"][2:6] == [
+        ["Sitzungsart", "Wiederholungssitzung"],
+        ["Ort", "Raum 9-108"],
+        ["Form", "Hybrid"],
+        ["Protokoll", "Berta Beispiel"],
+    ]
+    head = 'sitzungsart: "Ordentliche Sitzung"\nform: "Präsenz"\n'
+    doc = build_document(BACKEND_DOC.replace("protokoll: ", head + "protokoll: "), variant=None)
+    assert [row[0] for row in doc["data"][2:5]] == ["Sitzungsart", "Form", "Protokoll"]
+
+
 def test_title_falls_back_to_gremium_and_date() -> None:
     doc = build_document("---\ngremium: StuPa\ndatum: 2026-06-15 18:30\n---\n", variant=None)
     assert doc["title"] == "Protokoll der Sitzung des StuPa vom 15.06.2026"

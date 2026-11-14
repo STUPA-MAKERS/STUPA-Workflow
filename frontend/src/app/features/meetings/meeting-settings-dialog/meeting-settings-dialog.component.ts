@@ -11,7 +11,15 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiClient } from '@core/api/api-client.service';
-import type { Attendance, GuestsMode, JoinLink, Meeting } from '@core/api/models';
+import type {
+  Attendance,
+  GuestsMode,
+  JoinLink,
+  Meeting,
+  MeetingForm,
+  MeetingKind,
+  MeetingPatchBody,
+} from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
@@ -28,6 +36,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { problemCode, problemDetail } from '@core/api/problem';
 import { MeetingGuestsService } from '../meeting-guests.service';
+import { MEETING_LOCATION_MAX, meetingFormOptions, meetingKindOptions } from '../meeting-kind.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
 import { personLabel } from '@shared/person-label.util';
 
@@ -35,8 +44,9 @@ import { personLabel } from '@shared/person-label.util';
 export const MEETING_TITLE_MAX = 200;
 
 /**
- * "Sitzung bearbeiten": the title, the minute-taker, the date, the start and the end
- * of a meeting.
+ * "Sitzung bearbeiten": the title, the kind, the minute-taker, the date, the start, the
+ * end, the place and the form of a meeting. The kind changes only while the meeting is
+ * planned (§ 000903).
  *
  * The dialog opens from a list row, from the detail sheet, from the calendar and from
  * the meeting page. The title can change while the meeting is planned or live. A
@@ -89,7 +99,21 @@ export class MeetingSettingsDialogComponent {
   readonly saving = signal(false);
   /** Public participation: the switch, the mode and the join link. */
   readonly publicJoin = signal(false);
-  readonly guestsMode = signal<GuestsMode>('vote');
+  readonly guestsMode = signal<GuestsMode>('watch');
+  readonly kind = signal<MeetingKind>('ordinary');
+  readonly location = signal('');
+  readonly form = signal<MeetingForm>('presence');
+  readonly kindOptions = computed(() => meetingKindOptions(this.i18n));
+  readonly formOptions = computed(() => meetingFormOptions(this.i18n));
+  /** The place is too long for the server. */
+  readonly locationTooLong = computed(() => this.location().trim().length > MEETING_LOCATION_MAX);
+  readonly locationError = computed(() =>
+    this.locationTooLong()
+      ? this.i18n.translate('meetings.location.tooLong', { max: MEETING_LOCATION_MAX })
+      : '',
+  );
+  /** The kind is fixed from the start of the meeting on. */
+  readonly kindLocked = computed(() => this.meeting()?.status !== 'planned');
   readonly link = signal<JoinLink | null>(null);
   readonly rotating = signal(false);
   /** The confirmation before the public participation goes off in a live meeting. */
@@ -134,6 +158,7 @@ export class MeetingSettingsDialogComponent {
     () =>
       !!this.title().trim() &&
       !this.titleTooLong() &&
+      !this.locationTooLong() &&
       !!this.date().trim() &&
       !!this.time().trim(),
   );
@@ -153,7 +178,10 @@ export class MeetingSettingsDialogComponent {
     this.endTime.set(m.endTime ?? '');
     this.saving.set(false);
     this.publicJoin.set(m.publicJoin);
-    this.guestsMode.set(m.guestsMode);
+    this.guestsMode.set(m.guestsVoteAllowed ? m.guestsMode : 'watch');
+    this.kind.set(m.kind);
+    this.location.set(m.location ?? '');
+    this.form.set(m.form);
     this.link.set(null);
     this.rotating.set(false);
     this.confirmOff.set(false);
@@ -260,6 +288,7 @@ export class MeetingSettingsDialogComponent {
         date: this.date().trim(),
         startTime: this.time().trim(),
         endTime: end || null,
+        ...this.placeChanges(m),
         ...this.publicChanges(m),
       })
       .subscribe({
@@ -274,8 +303,9 @@ export class MeetingSettingsDialogComponent {
             this.toast.error(this.i18n.translate('meetings.toast.needsProtocolWrite'));
             return;
           }
-          if (problemCode(err) === 'public_join_needs_no_quorum') {
-            this.toast.error(this.i18n.translate('guests.toast.needsNoQuorum'));
+          const code = problemCode(err);
+          if (code === 'guests_vote_off' || code === 'guests_vote_needs_no_quorum') {
+            this.toast.error(this.i18n.translate('guests.toast.voteOff'));
             return;
           }
           if (problemCode(err) === 'guest_vote_open') {
@@ -287,6 +317,16 @@ export class MeetingSettingsDialogComponent {
           this.toast.error(detail ? `${base}: ${detail}` : base);
         },
       });
+  }
+
+  /** The changed kind, place and form of the PATCH. A started meeting keeps its kind. */
+  private placeChanges(m: Meeting): Pick<MeetingPatchBody, 'kind' | 'location' | 'form'> {
+    const location = this.location().trim() || null;
+    return {
+      ...(!this.kindLocked() && this.kind() !== m.kind ? { kind: this.kind() } : {}),
+      ...(location !== (m.location ?? null) ? { location } : {}),
+      ...(this.form() !== m.form ? { form: this.form() } : {}),
+    };
   }
 
   /** The changed public participation fields of the PATCH. */

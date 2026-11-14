@@ -3628,6 +3628,18 @@
           "type": "INTEGER"
         },
         {
+          "name": "repeat_quorum_percent",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "guests_may_vote",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "protocols_public",
           "nullable": false,
           "primaryKey": false,
@@ -4273,6 +4285,35 @@
           ]
         },
         {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "ordinary",
+            "extraordinary",
+            "repeat",
+            "constituent"
+          ]
+        },
+        {
+          "name": "location",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "form",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "presence",
+            "hybrid",
+            "video"
+          ]
+        },
+        {
           "name": "started_at",
           "nullable": true,
           "primaryKey": false,
@@ -4669,6 +4710,36 @@
         },
         {
           "name": "confirm_lead_minutes",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "default_quorum_percent",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "default_repeat_quorum_percent",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "default_guests_may_vote",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "default_allow_vote_delegation",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "default_delegation_lead_minutes",
           "nullable": false,
           "primaryKey": false,
           "type": "INTEGER"

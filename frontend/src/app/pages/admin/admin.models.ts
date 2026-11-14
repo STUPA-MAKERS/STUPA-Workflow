@@ -234,6 +234,10 @@ export interface Gremium {
   readonly quorumPercent?: number | null;
   /** The least number of present persons for the quorum of a meeting vote. null = none. */
   readonly quorumMinPresent?: number | null;
+  /** The quorum of a Wiederholungssitzung in percent. null = the normal quorum. */
+  readonly repeatQuorumPercent?: number | null;
+  /** Guests of a public meeting can get a ballot. Only without a quorum. */
+  readonly guestsMayVote?: boolean;
   /** Number of members. Only the admin list (`GET /admin/committees`) gives it. */
   readonly memberCount?: number;
   /** Number of gremium roles, the forced roles included. Admin list only. */
@@ -262,6 +266,10 @@ export interface GremiumCreateBody {
   readonly quorumPercent?: number | null;
   /** The least number of present persons for the quorum of a meeting vote. null = none. */
   readonly quorumMinPresent?: number | null;
+  /** The quorum of a Wiederholungssitzung in percent. null = the normal quorum. */
+  readonly repeatQuorumPercent?: number | null;
+  /** Guests of a public meeting can get a ballot. Only without a quorum. */
+  readonly guestsMayVote?: boolean;
   readonly protocolsPublic?: boolean;
 }
 
@@ -277,6 +285,10 @@ export interface GremiumUpdateBody {
   readonly quorumPercent?: number | null;
   /** The least number of present persons for the quorum of a meeting vote. null = none. */
   readonly quorumMinPresent?: number | null;
+  /** The quorum of a Wiederholungssitzung in percent. null = the normal quorum. */
+  readonly repeatQuorumPercent?: number | null;
+  /** Guests of a public meeting can get a ballot. Only without a quorum. */
+  readonly guestsMayVote?: boolean;
   readonly protocolsPublic?: boolean;
 }
 
@@ -1116,6 +1128,18 @@ export interface LoginSettings {
   readonly pwaSessionDays: number;
   readonly updatedAt?: string | null;
   readonly updatedBy?: string | null;
+}
+
+/**
+ * The values that the form of a new Gremium starts with (P admin.gremien):
+ * `GET/PUT /admin/gremium-defaults`. A change touches no Gremium that exists.
+ */
+export interface GremiumDefaults {
+  readonly quorumPercent: number | null;
+  readonly repeatQuorumPercent: number | null;
+  readonly guestsMayVote: boolean;
+  readonly allowVoteDelegation: boolean;
+  readonly delegationLeadMinutes: number;
 }
 
 /** Upper bound of both {@link MeetingSettings} values (`MAX_LEAD_MINUTES`, one week). */

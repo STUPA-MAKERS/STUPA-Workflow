@@ -1534,6 +1534,12 @@ async def test_gremium_quorum_percent() -> None:
     assert await svc.gremium_quorum_percent(uuid4()) == 50
 
 
+async def test_gremium_repeat_quorum_percent() -> None:
+    """Read the repeat quorum of a Gremium (§F/meetings/voting/000902)."""
+    svc = MeetingService(_QueueSession(executes=[res(25)]))  # type: ignore[arg-type]
+    assert await svc.gremium_repeat_quorum_percent(uuid4()) == 25
+
+
 async def test_vote_eligible_count() -> None:
     """Count the vote-eligible members.
 
@@ -2437,6 +2443,12 @@ class _FakeMeetingService:
 
     async def gremium_quorum_min_present(self, gremium_id: UUID) -> int | None:
         return None
+
+    async def gremium_repeat_quorum_percent(self, gremium_id: UUID) -> int | None:
+        return None
+
+    async def guests_vote_allowed(self, gremium_id: UUID) -> bool:
+        return True
 
     async def vote_eligible_count(self, gremium_id: UUID) -> int:
         return 7

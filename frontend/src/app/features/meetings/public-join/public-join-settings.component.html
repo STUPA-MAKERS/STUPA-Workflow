@@ -1,28 +1,28 @@
 <section class="pj" [attr.aria-label]="'guests.settings.title' | t">
   <app-switch
     [id]="'pj-public'"
-    [disabled]="switchLocked()"
+    [disabled]="disabled()"
     [checked]="publicJoin()"
     (checkedChange)="publicJoin.set($event)"
     ><span class="pj__label">{{ 'guests.settings.title' | t }}</span></app-switch
   >
 
-  @if (!allowed()) {
-    <app-note icon="lock">{{ notAllowedText() }}</app-note>
-  }
-
   @if (publicJoin()) {
-    <div class="pj__group">
-      <span class="pj__cap" id="pj-mode-cap">{{ 'guests.settings.modeCaption' | t }}</span>
-      <app-segmented
-        width="fill"
-        [ariaLabel]="'guests.settings.modeCaption' | t"
-        [options]="modes()"
-        [value]="guestsMode()"
-        [disabled]="disabled()"
-        (valueChange)="setMode($event)"
-      />
-    </div>
+    @if (voteAllowed()) {
+      <div class="pj__group">
+        <span class="pj__cap" id="pj-mode-cap">{{ 'guests.settings.modeCaption' | t }}</span>
+        <app-segmented
+          width="fill"
+          [ariaLabel]="'guests.settings.modeCaption' | t"
+          [options]="modes()"
+          [value]="guestsMode()"
+          [disabled]="disabled()"
+          (valueChange)="setMode($event)"
+        />
+      </div>
+    } @else {
+      <app-note icon="lock">{{ 'guests.settings.watchOnly' | t }}</app-note>
+    }
 
     @if (link(); as l) {
       <app-join-link [link]="l" [rotating]="rotating()" [canRotate]="!disabled()" (rotate)="rotate.emit()" />

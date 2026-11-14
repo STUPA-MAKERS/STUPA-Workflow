@@ -47,6 +47,11 @@ def _gremium_out(row: Gremium) -> GremiumOut:
     )
 
 
+def _guests_vote(row: Gremium) -> bool:
+    """Tell if guests can get a ballot: the switch is on and the Gremium has no quorum."""
+    return bool(row.guests_may_vote) and row.quorum_percent is None
+
+
 def _apply_quorum(row: Gremium, payload: GremiumUpdate) -> None:
     """Write the quorum fields and the guest switch that the patch sent.
 
@@ -226,8 +231,10 @@ class GremiumOps(ConfigServiceBase):
             row.delegation_lead_minutes = payload.delegation_lead_minutes
         if payload.delegation_allow_external is not None:
             row.delegation_allow_external = payload.delegation_allow_external
+        guests_voted = _guests_vote(row)
         _apply_quorum(row, payload)
-        await self._guests_only_watch(row)
+        if guests_voted and not _guests_vote(row):
+            await self._guests_only_watch(row)
         publish = payload.protocols_public
         data: dict[str, object] | None = (
             {"field": "protocolsPublic", "old": bool(row.protocols_public), "new": publish}
@@ -241,13 +248,11 @@ class GremiumOps(ConfigServiceBase):
         return _gremium_out(row)
 
     async def _guests_only_watch(self, row: Gremium) -> None:
-        """Set the open meetings to the guest mode ``watch`` when guests have no ballot.
+        """Set the open meetings of the Gremium to the guest mode ``watch``.
 
         The mode of a meeting must not outlive the rule of its Gremium: a quorum or
         the switch ``guests_may_vote`` off takes the ballot from the guests.
         """
-        if row.guests_may_vote and row.quorum_percent is None:
-            return
         await self.session.execute(
             update(Meeting)
             .where(

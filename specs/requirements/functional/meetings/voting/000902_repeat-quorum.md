@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+tests:
+  - "backend/tests/integration/modules/livevote/test_quorum_present.py:test_a_repeat_meeting_uses_the_repeat_quorum"
+  - "backend/tests/unit/modules/livevote/test_livevote_cov.py:test_gremium_repeat_quorum_percent"
+implementation:
+  - backend/app/modules/gremien/models.py
+  - backend/app/modules/livevote/vote_build.py
+  - backend/app/modules/livevote/service/votes.py
+  - frontend/src/app/pages/admin/committees/gremium-dialog/gremium-dialog.component.html
 scope:
   - backend/app/modules/gremien
   - backend/app/modules/admin
