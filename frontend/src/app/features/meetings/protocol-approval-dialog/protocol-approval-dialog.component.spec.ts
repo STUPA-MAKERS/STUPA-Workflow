@@ -35,14 +35,16 @@ describe('ProtocolApprovalDialogComponent', () => {
     expect(api.listMeetings).not.toHaveBeenCalled();
   });
 
-  it('says when no later meeting exists, also after a failed read, and picks nothing', async () => {
+  it('says when no later meeting exists, and picks nothing', async () => {
     const { picked, cmp, fixture } = await setup({ listMeetings: jest.fn(() => of([])), own: { ...OWN, gremiumId: null } });
     fixture.detectChanges();
     expect(screen.getByText('Es gibt noch keine spätere Sitzung dieses Gremiums.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Markieren' })).toBeDisabled();
     cmp.submit();
     expect(picked).not.toHaveBeenCalled();
-    fixture.destroy();
+  });
+
+  it('offers no meeting after a failed read', async () => {
     const failed = await setup({ listMeetings: jest.fn(() => throwError(() => new Error('x'))) });
     expect(failed.cmp.none()).toBe(true);
   });

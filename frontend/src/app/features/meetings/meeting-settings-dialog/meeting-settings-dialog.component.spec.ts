@@ -131,16 +131,18 @@ describe('MeetingSettingsDialogComponent', () => {
     });
 
     it('stays silent when the periods do not load, for a late answer and after the start', async () => {
-      const { http, fixture, cmp, rerender } = await setup(PLANNED);
+      const { http, fixture, cmp } = await setup(PLANNED);
       const first = http.expectOne('/api/committees/g-1/meeting-defaults');
       flushRoster(http, fixture);
-      await rerender({ inputs: { meeting: { ...PLANNED, id: 'm-2' } as Meeting, protocolFinal: false } });
+      fixture.componentRef.setInput('meeting', { ...PLANNED, id: 'm-2' } as Meeting);
+      fixture.detectChanges();
       first.flush(PERIODS);
       expect(cmp.defaults()).toBeNull();
       http.expectOne('/api/committees/g-1/meeting-defaults').error(new ProgressEvent('x'));
       cmp.date.set(inDays(4));
       expect(cmp.lateInvite()).toBeNull();
-      await rerender({ inputs: { meeting: { ...PLANNED, id: 'm-3', status: 'live' } as Meeting, protocolFinal: false } });
+      fixture.componentRef.setInput('meeting', { ...PLANNED, id: 'm-3', status: 'live' } as Meeting);
+      fixture.detectChanges();
       http.expectNone('/api/committees/g-1/meeting-defaults');
       cmp.date.set(inDays(4));
       expect(cmp.lateInvite()).toBeNull();

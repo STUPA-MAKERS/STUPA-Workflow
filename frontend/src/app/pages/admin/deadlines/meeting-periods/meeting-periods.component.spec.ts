@@ -88,9 +88,9 @@ describe('MeetingPeriodsSettingsComponent', () => {
     await userEvent.clear(field('Protokollentwurf nach'));
     await userEvent.type(field('Protokollentwurf nach'), '21');
     c.discard();
-    await fixture.whenStable();
     fixture.detectChanges();
     await fixture.whenStable();
+    fixture.detectChanges();
     expect(field('Protokollentwurf nach').value).toBe('14');
     expect(c.dirty()).toBe(false);
   });

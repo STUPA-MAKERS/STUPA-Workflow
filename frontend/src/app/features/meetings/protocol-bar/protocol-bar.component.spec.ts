@@ -95,19 +95,19 @@ describe('ProtocolBarComponent', () => {
     it('sends the draft to the members after a confirmation', async () => {
       const { session, fixture } = await withSession(closed(), protocol());
       await userEvent.click(screen.getByRole('button', { name: 'Entwurf senden' }));
-      const confirm = screen.getByRole('alertdialog', { name: 'Entwurf senden?' });
+      const confirm = screen.getByRole('dialog', { name: 'Entwurf senden?' });
       expect(confirm).toHaveTextContent('Wasserzeichen „Entwurf“');
       expect(session.sendProtocolDraft).not.toHaveBeenCalled();
       await userEvent.click(within(confirm).getByRole('button', { name: 'Senden' }));
       fixture.detectChanges();
       expect(session.sendProtocolDraft).toHaveBeenCalledTimes(1);
-      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Entwurf senden?' })).toBeNull();
     });
 
     it('keeps the draft on "Abbrechen", and offers no send to a reader or for a live meeting', async () => {
       const { session, fixture } = await withSession(closed(), protocol());
       await userEvent.click(screen.getByRole('button', { name: 'Entwurf senden' }));
-      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Abbrechen' }));
+      await userEvent.click(within(screen.getByRole('dialog', { name: 'Entwurf senden?' })).getByRole('button', { name: 'Abbrechen' }));
       fixture.detectChanges();
       expect(session.sendProtocolDraft).not.toHaveBeenCalled();
       fixture.componentRef.setInput('meeting', closed({ canWrite: false, canFinalize: false }));

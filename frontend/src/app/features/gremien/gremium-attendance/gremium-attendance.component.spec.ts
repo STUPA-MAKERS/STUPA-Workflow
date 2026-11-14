@@ -206,11 +206,13 @@ describe('GremiumAttendanceComponent', () => {
     expect(view.cmp.exporting()).toBe(false);
   });
 
-  it('hides the XLSX export without the right, and reports a failed export', async () => {
+  it('hides the XLSX export without the right', async () => {
     const plain = await setup();
+    restore = plain.restore;
     expect(screen.queryByRole('button', { name: 'Anwesenheitsliste (XLSX)' })).toBeNull();
-    plain.restore();
-    plain.fixture.destroy();
+  });
+
+  it('reports a failed export', async () => {
     const view = await setup({
       manage: true,
       api: gremienApiMock({ attendanceExport: jest.fn(() => throwError(() => new Error('x'))) }),

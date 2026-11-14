@@ -79,11 +79,12 @@ describe('LateExcuseDialogComponent', () => {
   });
 
   it('closes on "Abbrechen" and starts empty on the next opening', async () => {
-    const { cmp, closed, rerender } = await setup();
+    const { cmp, closed, fixture } = await setup();
     cmp.note.set('Krank');
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(closed).toHaveBeenCalled();
-    await rerender({ inputs: { meetingId: 'm-2', meetingTitle: '36. Sitzung' } });
+    fixture.componentRef.setInput('meetingId', 'm-2');
+    fixture.detectChanges();
     expect(cmp.note()).toBe('');
   });
 });
