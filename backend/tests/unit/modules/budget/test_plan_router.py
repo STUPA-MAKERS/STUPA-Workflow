@@ -32,6 +32,7 @@ from app.modules.budget.plan_schemas import (
 from app.modules.budget.tree_router import get_budget_tree_service
 from app.modules.files.pdf_branding import PdfBranding, RenderGraphic
 from app.modules.pdf.typst_client import TypstError
+from app.shared.errors import NotFoundError
 from app.shared.xlsx import XLSX_MEDIA_TYPE
 
 _TOP = uuid.uuid4()
@@ -376,6 +377,34 @@ def test_the_plan_of_a_version_follows_the_read_rule_of_its_budget(
     shown = _client(_FakePlans(visible=True)).get(url)
     assert (shown.status_code, shown.json()["budgetId"]) == (200, str(_TOP))
     assert _client(_FakePlans(visible=False)).get(url).status_code == 403
+
+
+def test_the_readable_route_answers_200_without_the_read_right(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The question for the read right answers 200 with yes or no, and never 403 or 404.
+
+    Rule: §F/finance/budget/000928.
+    """
+
+    async def _no_gremien(_service: object, _sub: str) -> set[uuid.UUID]:
+        return set()
+
+    class _Gone(_FakePlans):
+        async def plan_of_version(self, version_id: uuid.UUID) -> PlanOut:
+            raise NotFoundError("plan version not found")
+
+    monkeypatch.setattr("app.modules.budget.tree_router._member_gremium_ids", _no_gremien)
+    url = f"/api/budget-plan-versions/{_VERSION}/readable"
+    answers = [
+        _client(fake).get(url)
+        for fake in (_FakePlans(visible=True), _FakePlans(visible=False), _Gone())
+    ]
+    assert [(a.status_code, a.json()) for a in answers] == [
+        (200, {"readable": True}),
+        (200, {"readable": False}),
+        (200, {"readable": False}),
+    ]
 
 
 def test_line_amount_is_validated(client: TestClient, fake: _FakePlans) -> None:

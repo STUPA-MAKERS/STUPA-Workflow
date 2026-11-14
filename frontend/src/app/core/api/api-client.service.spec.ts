@@ -411,13 +411,15 @@ describe('ApiClient', () => {
     req.flush({ id: 'c', authorKind: 'principal', body: '', visibility: 'internal', at: '2026-06-05T13:00:00Z' });
   });
 
-  it('§F/finance/budget/000826: says if the reader may read the Haushaltsplan of a version', () => {
+  it('§F/finance/budget/000826, §F/finance/budget/000928: says if the reader may read the Haushaltsplan of a version', () => {
     const answers: boolean[] = [];
     api.planOfVersionReadable('pv1').subscribe((ok) => answers.push(ok));
-    http.expectOne('/api/budget-plan-versions/pv1/plan').flush({ id: 'p' });
+    http.expectOne('/api/budget-plan-versions/pv1/readable').flush({ readable: true });
     api.planOfVersionReadable('pv1').subscribe((ok) => answers.push(ok));
-    http.expectOne('/api/budget-plan-versions/pv1/plan').flush({}, { status: 403, statusText: 'Forbidden' });
-    expect(answers).toEqual([true, false]);
+    http.expectOne('/api/budget-plan-versions/pv1/readable').flush({ readable: false });
+    api.planOfVersionReadable('pv1').subscribe((ok) => answers.push(ok));
+    http.expectOne('/api/budget-plan-versions/pv1/readable').flush({}, { status: 500, statusText: 'Server Error' });
+    expect(answers).toEqual([true, false, false]);
   });
 
   it('GETs a vote state + tally from /votes/{id}', (done) => {

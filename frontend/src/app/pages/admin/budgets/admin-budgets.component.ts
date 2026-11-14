@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal } from '@angular/core';
+import { closeOnBack } from '@shared/util/close-on-back';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { type Observable, concat, defer, forkJoin, of } from 'rxjs';
@@ -277,6 +278,10 @@ export class AdminBudgetsComponent {
   readonly fyRowId = (row: unknown): string => (row as FiscalYear).id;
 
   constructor() {
+    closeOnBack(
+      computed(() => !!this.editNode()),
+      () => this.closeEdit(),
+    );
     this.reload();
     this.adminApi.listGremienOptions().subscribe({
       next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),

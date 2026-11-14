@@ -251,7 +251,8 @@ class GremiumOps(ConfigServiceBase):
         audit entry each. The objects go only after the commit, because a failed
         commit brings the rows back and a row without its object is a broken file.
 
-        The delete locks the gremium row first. A concurrent insert of a meeting
+        The delete locks the tree of each cost center that names the gremium, and then
+        the gremium row (`_lock_budget_trees`). A concurrent insert of a meeting
         (or a vote of one) takes a key-share lock on that row through its foreign
         key, so it waits for the delete and then fails on the missing gremium. It
         never lands in the cascade without the rules.
@@ -267,6 +268,7 @@ class GremiumOps(ConfigServiceBase):
                 gremium (`gremium_has_budget`), or a vote of the gremium is open
                 (`open_vote`) (409).
         """
+        await self._lock_budget_trees(gremium_id)
         row = await self.session.scalar(
             select(Gremium)
             .where(Gremium.id == gremium_id)
@@ -323,6 +325,34 @@ class GremiumOps(ConfigServiceBase):
         await self._audit(principal.sub, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
         await self.session.commit()
         await files.remove_objects(storage_keys)
+
+    async def _lock_budget_trees(self, gremium_id: UUID) -> None:
+        """Lock the tree of each cost center that names the gremium, before the gremium.
+
+        The delete clears `view_gremium_id` and `decision_gremium_id` of those cost
+        centers through the foreign key, so it writes in their trees. A write in a tree
+        takes the lock of the tree first and the gremium second. The delete keeps that
+        order, because two requests that take the two locks in two orders stop each
+        other and the database ends one of them with an error. The ids are in a fixed
+        order, so two deletes do not wait for each other.
+        """
+        from app.modules.budget.tree.service_base import lock_tree
+        from app.modules.budget.tree_models import Budget
+
+        named = (
+            await self.session.scalars(
+                select(Budget.id)
+                .where(
+                    or_(
+                        Budget.view_gremium_id == gremium_id,
+                        Budget.decision_gremium_id == gremium_id,
+                    )
+                )
+                .order_by(Budget.id)
+            )
+        ).all()
+        for budget_id in named:
+            await lock_tree(self.session, budget_id)
 
     async def _lock_gremium_todos(self, gremium_id: UUID) -> list[UUID]:
         """Lock the to-do board of a gremium and its cards, and return its comment ids.

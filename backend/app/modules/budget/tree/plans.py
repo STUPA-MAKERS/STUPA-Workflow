@@ -46,7 +46,12 @@ from app.modules.budget.plan_schemas import (
 from app.modules.budget.tree.allocations import AllocationOps
 from app.modules.budget.tree.nodes import NodeOps
 from app.modules.budget.tree.service_base import _ZERO
-from app.modules.budget.tree_models import Budget, BudgetAllocation, FiscalYear
+from app.modules.budget.tree_models import (
+    Budget,
+    BudgetAllocation,
+    BudgetExpense,
+    FiscalYear,
+)
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.voting.models import Vote
@@ -1119,6 +1124,8 @@ class PlanOps(NodeOps, AllocationOps):
             ConflictError: `fiscal_year_closed` (409), `plan_version_locked` (409).
             ValidationProblem: `plan_line_has_children` (422) while a child cost
                 center has a line.
+            ConflictError: `plan_line_has_bookings` (409) while the cost center has a
+                booking in the fiscal year of the plan.
         """
         version, plan, _fy, top = await self._version_context(version_id)
         if version.state != "draft":
@@ -1137,6 +1144,20 @@ class PlanOps(NodeOps, AllocationOps):
                 "A child cost centre has a line. Remove it first.",
                 code="plan_line_has_children",
                 errors=[{"field": "budgetId", "msg": "a child cost centre has a line"}],
+            )
+        booked = await self.session.scalar(
+            select(BudgetExpense.id)
+            .where(
+                BudgetExpense.budget_id == budget_id,
+                BudgetExpense.fiscal_year_id == plan.fiscal_year_id,
+            )
+            .limit(1)
+        )
+        if booked is not None:
+            raise ConflictError(
+                "The cost centre has bookings in this fiscal year. Set its amount to 0 "
+                "instead.",
+                code="plan_line_has_bookings",
             )
         raised = self._resum(
             [ln for ln in lines.values() if ln is not line], {n.id: n.parent_id for n in nodes}

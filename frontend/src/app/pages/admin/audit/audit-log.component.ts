@@ -146,6 +146,8 @@ export const AUDIT_ACTIONS = [
   'budget_invoice_delete',
   'budget_assign',
   'budget_move_fiscal_year',
+  'budget_fiscal_year_create',
+  'budget_fiscal_year_update',
   'budget_fiscal_year_delete',
   'budget_fiscal_year_close',
   'budget_fiscal_year_reopen',

@@ -25,6 +25,7 @@ from app.modules.budget.plan_schemas import (
     PlanLineSet,
     PlanNodeCreate,
     PlanOut,
+    PlanReadableOut,
     PlanStateByHand,
     PlanStateSet,
     PlanStepPass,
@@ -41,7 +42,12 @@ from app.modules.files.pdf_branding import (
     export_render_config,
 )
 from app.modules.pdf.typst_client import TypstError, build_typst_client
-from app.shared.errors import BadRequestError, ServiceUnavailableError
+from app.shared.errors import (
+    BadRequestError,
+    ForbiddenError,
+    NotFoundError,
+    ServiceUnavailableError,
+)
 from app.shared.filenames import content_disposition
 from app.shared.xlsx import XLSX_MEDIA_TYPE, build_table_workbook
 
@@ -100,6 +106,31 @@ async def get_plan_of_version(
     out = await service.plan_of_version(version_id)
     await _require_node_view(service, principal, out.budget_id)
     return out
+
+
+@router.get(
+    "/budget-plan-versions/{version_id}/readable",
+    response_model=PlanReadableOut,
+    responses=_errors(401, 422),
+)
+async def get_plan_readable(
+    version_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> PlanReadableOut:
+    """Tell whether the principal reads the Haushaltsplan that holds a version.
+
+    A page that shows a vote on a plan asks here before it offers the link to the
+    plan. The answer is 200 for each signed-in person, because a person without the
+    read right is the normal case there and not an error. A version that does not
+    exist is not readable.
+    """
+    try:
+        out = await service.plan_of_version(version_id)
+        await _require_node_view(service, principal, out.budget_id)
+    except (NotFoundError, ForbiddenError):
+        return PlanReadableOut(readable=False)
+    return PlanReadableOut(readable=True)
 
 
 async def _export_of(
