@@ -13,7 +13,7 @@ The service binds to an `AsyncSession` and drives the protocol lifecycle.
   meeting. It writes `protocol_finalize`.
 * `finalize` renders the Markdown through typst into a PDF. It stores the PDF
   in MinIO and mails it to MAIL_LIST(gremium). It sets `status='final'` and
-  `sent_at`.
+  `finalized_at`, and `sent_at` when the mail goes out.
 
 The service reuses the typst client, the object storage and the mail queue of
 `app.modules.pdf` and `app.modules.notifications` without a change.
@@ -731,11 +731,13 @@ class ProtocolService:
             else await self._render_internal(protocol)
         )
         protocol.status = "final"
-        protocol.sent_at = now
+        protocol.finalized_at = now
         await self.session.flush()
         await self.session.commit()
         await self._store(uploads)
-        await self._send(protocol, mail_pdf)
+        if await self._send(protocol, mail_pdf):
+            protocol.sent_at = now
+            await self.session.commit()
         return await self._to_out(protocol)
 
     async def _render_both(
@@ -1538,7 +1540,7 @@ class ProtocolService:
         except StorageError as exc:
             raise ServiceUnavailableError("Protocol rendering temporarily unavailable.") from exc
 
-    async def _send(self, protocol: Protocol, pdf: bytes | None) -> None:
+    async def _send(self, protocol: Protocol, pdf: bytes | None) -> bool:
         """Mail the protocol to MAIL_LIST(gremium) under an idempotency key.
 
         The mail carries the PDF as an attachment. The subject and the body name the
@@ -1553,13 +1555,18 @@ class ProtocolService:
 
         The public link follows the rule of `public.visible_clause`, applied to the
         protocol in hand.
+
+        Returns:
+            True when the mail went to the queue. False without a mail queue or
+            without a recipient: the caller then sets no `sent_at`, so the page does
+            not say that the protocol was sent.
         """
         if self.mail_queue is None:
-            return
+            return False
         members = await self._recipients(protocol.gremium_id)
         recipients = await filter_recipients_by_preference(self.session, members, "protocol")
         if not recipients:
-            return
+            return False
         gremium = await self.session.get(Gremium, protocol.gremium_id)
         gremium_name = gremium.name if gremium is not None else None
         meeting = await self.session.get(Meeting, protocol.meeting_id)
@@ -1629,6 +1636,7 @@ class ProtocolService:
                 attachments=attachments,
             )
         )
+        return True
 
     async def _recipients(self, gremium_id: UUID) -> list[str]:
         """Build the flat and deduplicated recipient list of the Gremium.

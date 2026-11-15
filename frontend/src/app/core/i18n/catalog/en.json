@@ -1346,7 +1346,7 @@
   "meetings.leadSubstitute.failed": "Could not enter the substitute.",
   "meetings.protocolBar.draft": "The minutes are not sent yet.",
   "meetings.protocolBar.rendering": "The PDF is being made and sent.",
-  "meetings.protocolBar.final": "The minutes are final.",
+  "meetings.protocolBar.final": "The minutes are final. They were not sent, because there are no recipients.",
   "meetings.protocolBar.finalSent": "The minutes are final and were sent.",
   "meetings.protocolBar.needsRight": "Finalizing needs the committee right “Finalize & send minutes”.",
   "meetings.protocolBar.pdf": "PDF",

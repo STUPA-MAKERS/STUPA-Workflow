@@ -402,7 +402,7 @@ class PublicProtocolService:
             title=meeting.title,
             date=meeting_day(meeting),
             semester=semester_of(meeting_day(meeting)),
-            finalizedAt=protocol.sent_at,
+            finalizedAt=protocol.finalized_at,
             gremium=self._ref(gremium),
             tops=[
                 PublicTopSummary(
@@ -537,7 +537,7 @@ class PublicProtocolService:
             title=meeting.title,
             date=meeting_day(meeting),
             semester=semester_of(meeting_day(meeting)),
-            finalizedAt=protocol.sent_at,
+            finalizedAt=protocol.finalized_at,
             gremium=self._ref(gremium),
             lang=gremium.default_lang,
             tops=[

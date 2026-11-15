@@ -197,7 +197,7 @@ async def test_public_document_ids_leave_out_a_non_public_top(
     )
     row = (
         SimpleNamespace(
-            id=PROTOCOL_ID, sent_at=None, public_content=snapshot.model_dump(by_alias=True)
+            id=PROTOCOL_ID, finalized_at=None, public_content=snapshot.model_dump(by_alias=True)
         ),
         SimpleNamespace(title="Sitzung", date=None),
         SimpleNamespace(id=uuid.uuid4(), name="StuPa", slug="stupa"),

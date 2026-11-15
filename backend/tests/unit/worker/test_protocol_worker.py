@@ -53,14 +53,16 @@ def _ctx(
 async def test_render_protocol_success_finalizes() -> None:
     """Finalize the protocol after a successful render.
 
-    The execute calls run ``_get``, then ``_assemble_from_agenda`` with no agenda.
+    The execute calls run ``_get``, then ``_assemble_from_agenda`` with no agenda. The
+    context has no mail queue, so no mail goes out and the protocol has no ``sent_at``.
     """
     proto = _protocol()
     session = FakeSession(store={}, results=[result(proto), result()])
     ctx = _ctx(session, typst=FakeTypst(), storage=FakeStorage())
     assert await render_protocol(ctx, str(PID)) == "final"
     assert proto.status == "final"
-    assert proto.sent_at is not None
+    assert proto.finalized_at is not None
+    assert proto.sent_at is None
 
 
 async def test_render_protocol_transient_retries() -> None:

@@ -1346,7 +1346,7 @@
   "meetings.leadSubstitute.failed": "Vertretung konnte nicht eingetragen werden.",
   "meetings.protocolBar.draft": "Das Protokoll ist noch nicht versandt.",
   "meetings.protocolBar.rendering": "Das PDF wird erstellt und versandt.",
-  "meetings.protocolBar.final": "Das Protokoll ist final.",
+  "meetings.protocolBar.final": "Das Protokoll ist final. Es wurde nicht versandt, weil es keine Empfänger gibt.",
   "meetings.protocolBar.finalSent": "Das Protokoll ist final und wurde versandt.",
   "meetings.protocolBar.needsRight": "Finalisieren braucht das Gremien-Recht „Protokoll finalisieren & senden“.",
   "meetings.protocolBar.pdf": "PDF",

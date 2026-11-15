@@ -66,7 +66,7 @@ def _rows(
 ) -> tuple[Any, Any, Any]:
     protocol = SimpleNamespace(
         id=PID,
-        sent_at=datetime(2026, 10, 2, tzinfo=UTC),
+        finalized_at=datetime(2026, 10, 2, tzinfo=UTC),
         public_content=_snapshot().model_dump(mode="json", by_alias=True),
         public_pdf_storage_key=key,
         public_pdf_size=1234,
