@@ -5,8 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/unit/modules/voting/test_vote_list.py:test_list_keeps_only_the_cancelled_votes_of_an_objection"
 implementation:
-  - backend/app/modules/voting/circular.py
+  - backend/app/modules/voting/listing.py
   - frontend/src/app/features/voting/voting-page/voting.component.ts
 scope:
   - backend/app/modules/voting
@@ -22,5 +24,5 @@ cancelled vote of each other kind must not show in the list.
 Reason: A circular vote has no Antrag and no Sitzung. Without the row in the list, no page
 leads to a cancelled circular vote.
 
-Test: A frontend unit test loads the list with a cancelled circular vote and a cancelled
-motion and finds only the circular vote.
+Test: A backend unit test reads the list with the reason `objection` and finds the filter for
+the cancelled votes in the query.

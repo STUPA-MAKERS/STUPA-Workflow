@@ -1503,6 +1503,8 @@ export interface VoteListQuery {
   readonly q?: string;
   /** Only the motions, the elections or the polls. */
   readonly kind?: VoteKind;
+  /** Of the cancelled votes, only those with this reason. */
+  readonly cancelledReason?: 'objection';
   readonly limit?: number;
   readonly offset?: number;
 }

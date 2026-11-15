@@ -700,6 +700,7 @@ export class ApiClient {
       gremiumId: query.gremiumId || undefined,
       q: query.q || undefined,
       kind: query.kind || undefined,
+      cancelledReason: query.cancelledReason,
       limit: query.limit,
       offset: query.offset,
     });

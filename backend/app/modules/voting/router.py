@@ -43,6 +43,7 @@ from app.modules.voting.poll_mails import notify_poll_started
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,
+    CancelReason,
     CircularCreate,
     CircularRulesOut,
     GremiumVoteCreate,
@@ -378,6 +379,7 @@ async def list_votes(
     gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     kind: Annotated[VoteKind | None, Query()] = None,
+    cancelled_reason: Annotated[CancelReason | None, Query(alias="cancelledReason")] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[VoteListItem]:
@@ -388,7 +390,8 @@ async def list_votes(
     ``application.read``, an eligible voter or a manager of the vote. ``status`` repeats
     (``?status=open&status=closed``). Without it the list leaves out the drafts.
     ``gremiumId`` keeps the votes of one gremium, and ``q`` searches the question and
-    the meeting title. ``kind`` keeps the motions, the elections or the polls. Each row
+    the meeting title. ``kind`` keeps the motions, the elections or the polls.
+    ``cancelledReason`` keeps of the cancelled votes only those with this reason. Each row
     carries ``canCast`` and the own ballot (``myBallot``; a secret vote gives only
     ``cast``) and no tally.
     """
@@ -398,6 +401,7 @@ async def list_votes(
         gremium_id=gremium_id,
         q=q,
         kind=kind,
+        cancelled_reason=cancelled_reason,
         limit=limit,
         offset=offset,
     )

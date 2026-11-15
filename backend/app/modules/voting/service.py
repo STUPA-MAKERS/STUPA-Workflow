@@ -63,6 +63,7 @@ from app.modules.voting import tally as tally_mod
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.schemas import (
     BallotAccepted,
+    CancelReason,
     MyBallot,
     TallyOut,
     VoteClosed,
@@ -1939,6 +1940,7 @@ class VotingService:
         gremium_id: UUID | None = None,
         q: str | None = None,
         kind: VoteKind | None = None,
+        cancelled_reason: CancelReason | None = None,
         limit: int = DEFAULT_LIMIT,
         offset: int = 0,
     ) -> Page[VoteListItem]:
@@ -1956,6 +1958,7 @@ class VotingService:
             gremium_id=gremium_id,
             q=q,
             kind=kind,
+            cancelled_reason=cancelled_reason,
             limit=limit,
             offset=offset,
         )
