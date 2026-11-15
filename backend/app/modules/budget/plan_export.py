@@ -473,7 +473,7 @@ def _pdf_cell(cell: Cell, *, leaf: bool = True) -> str:
     """Return a cell as text. An amount of a line with lines below it stands in brackets.
 
     Such an amount is the sum of the lines below it, so it is not counted again
-    (spec 000965).
+    (spec 000968).
     """
     if not isinstance(cell, Decimal):
         return cell or ""

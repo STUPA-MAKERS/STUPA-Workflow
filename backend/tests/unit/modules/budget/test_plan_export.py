@@ -228,7 +228,7 @@ def test_the_pdf_request_holds_the_table_as_text() -> None:
 
 
 def test_the_pdf_shows_the_amounts_of_a_line_with_lines_below_in_brackets() -> None:
-    """Rule: §F/finance/budget/000965. A line without a line below keeps its plain amounts."""
+    """Rule: §F/finance/budget/000968. A line without a line below keeps its plain amounts."""
     export = _export()
     expense = export.groups[1]
     assert [(r.key, r.leaf) for r in expense.rows] == [("VS-8", False), ("VS-8-9", True)]

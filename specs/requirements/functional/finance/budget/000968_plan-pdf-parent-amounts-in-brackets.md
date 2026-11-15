@@ -1,5 +1,5 @@
 ---
-id: "000965"
+id: "000968"
 title: The plan PDF shows the amounts of a line with lines below it in brackets
 kind: functional
 status: draft
