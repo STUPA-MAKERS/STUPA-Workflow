@@ -233,6 +233,21 @@ async def test_an_objection_cancels_the_vote(session: AsyncSession) -> None:
     assert err.value.code == "vote_not_open"
 
 
+async def test_an_objection_after_the_end_is_refused(session: AsyncSession) -> None:
+    flow = await seed_vote_flow(session)
+    [sub] = await _members(session, flow.gremium_id, 1)
+    service = _service(session)
+    out = await service.create(_body(flow), ADMIN, now=NOW)
+    row = await session.get(Vote, out.id)
+    assert row is not None
+    assert row.closes_at is not None
+
+    with pytest.raises(ConflictError) as err:
+        await service.object(out.id, voter(sub, flow), now=row.closes_at)
+    assert err.value.code == "circular_window_ended"
+    assert row.status == "open"
+
+
 async def test_an_objection_needs_a_circular_vote(session: AsyncSession) -> None:
     flow = await seed_vote_flow(session)
     motion = await add_vote(session, flow)
