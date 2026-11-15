@@ -2,7 +2,7 @@
 id: "000938"
 title: A pool substitute votes in an election
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
