@@ -251,11 +251,30 @@ class FiscalYearOps(BudgetTreeServiceBase):
         ).scalar_one_or_none()
         return found is not None
 
+    async def _has_allocated_money(self, fiscal_year_id: UUID) -> bool:
+        """Tell whether an allocation of the fiscal year holds an amount other than 0.
+
+        An allocation cannot be removed, only set to 0. A row with 0 carries no money,
+        so it does not block the delete of the year and goes with it.
+        """
+        found = (
+            await self.session.execute(
+                select(BudgetAllocation.id)
+                .where(
+                    BudgetAllocation.fiscal_year_id == fiscal_year_id,
+                    BudgetAllocation.allocated != 0,
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return found is not None
+
     async def delete_fiscal_year(self, budget_id: UUID, fiscal_year_id: UUID) -> None:
         """Delete a fiscal year of a top-level budget.
 
         The delete refuses with 409 while money still hangs on the year:
-        bookings, allocations, or applications assigned to it. `budget_expense`
+        bookings, allocations with an amount, or applications assigned to it. An
+        allocation of 0 goes with the year, because it cannot be removed by hand. `budget_expense`
         and `budget_allocation` cascade on the foreign key, so an unguarded
         delete would drop them without a trace. `application.fiscal_year_id`
         has no cascade and would fail on the constraint. The guard mirrors
@@ -280,9 +299,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
             await self._uses_fiscal_year(
                 BudgetExpense.id, BudgetExpense.fiscal_year_id, fiscal_year_id
             ),
-            await self._uses_fiscal_year(
-                BudgetAllocation.id, BudgetAllocation.fiscal_year_id, fiscal_year_id
-            ),
+            await self._has_allocated_money(fiscal_year_id),
             await self._uses_fiscal_year(
                 Application.id, Application.fiscal_year_id, fiscal_year_id
             ),

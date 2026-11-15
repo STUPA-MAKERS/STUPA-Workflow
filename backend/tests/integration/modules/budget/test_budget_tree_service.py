@@ -654,3 +654,21 @@ async def test_the_close_names_open_antraege_and_they_move_to_an_open_year(
     with pytest.raises(ConflictError) as kept:
         await svc.assign_budget(finished.id, AssignBudgetRequest(budgetId=None))
     assert kept.value.code == "fiscal_year_closed"
+
+
+async def test_a_year_with_allocations_of_zero_is_deleted(session: AsyncSession) -> None:
+    """An allocation blocks the delete of its year until it is set to 0.
+
+    Rule: §F/finance/budget/000141.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"DZ{_suffix()}", name="Top", gremiumId=g.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=date.today().year))
+    await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("100")))
+    with pytest.raises(ConflictError) as blocked:
+        await svc.delete_fiscal_year(top.id, fy.id)
+    assert blocked.value.code == "fiscal_year_has_allocations"
+    await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("0")))
+    await svc.delete_fiscal_year(top.id, fy.id)
+    assert [f.id for f in await svc.list_fiscal_years(top.id)] == []

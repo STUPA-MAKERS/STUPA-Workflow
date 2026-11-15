@@ -24,7 +24,7 @@ from app.modules.budget.tree_models import (
     Invoice,
 )
 from app.modules.budget.tree_schemas import ExpenseCreate, ExpenseOut, ExpenseUpdate
-from app.shared.errors import NotFoundError, ValidationProblem
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
 from app.shared.search import dialect_of, trigram_rank
 
