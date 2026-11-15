@@ -1204,6 +1204,7 @@ describe('ExpensesComponent (unit)', () => {
       fiscalYearId: 'fy-1',
       amount: '25',
       description: 'Umbuchung',
+      paymentDate: null,
     });
     req.flush({});
     expect(cmp.saving()).toBe(false);
