@@ -693,8 +693,8 @@ class MeetingVoteOpenBody(WireModel, frozen=True):
     candidates: list[ElectionCandidateIn] = Field(
         default_factory=list, description="Election only: 1 to 50 candidates."
     )
-    # The server counts the eligible voters from the roster of the gremium.
-    quorumPercent: int | None = None
+    # The server counts the eligible voters from the roster of the gremium and takes the
+    # quorum from the settings of the gremium. A quorum on one vote gives 422.
     guestsVote: bool | None = Field(
         default=None,
         description="Public meeting: the admitted guests vote too (no quorum, majority of "

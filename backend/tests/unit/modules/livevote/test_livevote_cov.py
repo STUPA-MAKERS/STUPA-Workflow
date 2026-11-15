@@ -3097,11 +3097,10 @@ async def test_can_run_votes_is_the_protokollant_with_vote_manage(
 def test_open_vote_application_top_with_quorum_and_eligible(
     app: FastAPI, client: TestClient, fakes
 ) -> None:
-    """Open a vote on an application item with a quorum and the server roster.
+    """Open a vote on an application item with the server roster.
 
-    The item has an explicit `quorum_percent`. The router must ignore a client
-    `eligibleCount`, because the quorum denominator always comes from the real roster. The
-    fake `vote_eligible_count` returns 7, and the body tries 9.
+    The router must ignore a client `eligibleCount`, because the quorum denominator always
+    comes from the real roster. The fake `vote_eligible_count` returns 7, and the body tries 9.
     """
     from types import SimpleNamespace
 
@@ -3112,12 +3111,25 @@ def test_open_vote_application_top_with_quorum_and_eligible(
         f"/api/meetings/{uuid4()}/votes",
         json={
             "agendaItemId": str(uuid4()),
-            "quorumPercent": 50,
             "eligibleCount": 9,
         },
     )
     assert r.status_code == 200
     assert fakes["voting"].last_payload.eligible_count == 7
+
+
+def test_open_vote_refuses_a_quorum_on_one_vote_422(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    """§F/meetings/voting/000935: the body of a vote takes no quorum in percent."""
+    fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
+    _login(app)
+    r = client.post(
+        f"/api/meetings/{uuid4()}/votes",
+        json={"agendaItemId": str(uuid4()), "quorumPercent": 0},
+    )
+    assert r.status_code == 422
+    assert r.headers["content-type"] == "application/problem+json"
 
 
 def test_open_vote_application_already_has_vote_conflict(

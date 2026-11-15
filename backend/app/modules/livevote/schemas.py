@@ -447,12 +447,10 @@ class MeetingVoteBody(FrozenCamelModel, frozen=True):
     candidates: list[ElectionCandidateIn] = Field(
         default_factory=list, max_length=ELECTION_MAX_CANDIDATES
     )
-    #: The server always derives the quorum denominator from the current roster
-    #: through ``vote_eligible_count``. It never comes from the client, so nobody can
-    #: manipulate it against the real roster. This field holds an explicit percent
-    #: quorum from 0 to 100. ``None`` selects the Gremium default when the Gremium
-    #: sets one.
-    quorum_percent: int | None = Field(default=None, alias="quorumPercent", ge=0, le=100)
+    #: The body has no quorum. The quorum in percent comes from the settings of the
+    #: Gremium, and the server derives the denominator from the current roster through
+    #: ``vote_eligible_count``, so nobody can set either against the Satzung
+    #: (§F/meetings/voting/000935).
     #: The admitted guests vote too. ``None`` picks the default: on in a meeting
     #: where guests vote, on a public agenda item; else off. Such a vote has no quorum.
     guests_vote: bool | None = Field(default=None, alias="guestsVote")
@@ -463,6 +461,14 @@ class MeetingVoteBody(FrozenCamelModel, frozen=True):
     #: server gives the option ids. ``question`` is required, ``options`` and
     #: ``majorityRule`` do not apply, and a poll has no quorum.
     poll: PollIn | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _no_quorum(cls, data: object) -> object:
+        """Refuse a quorum in percent on one vote (§F/meetings/voting/000935)."""
+        if isinstance(data, dict) and ({"quorumPercent", "quorum_percent"} & data.keys()):
+            raise ValueError("a vote takes its quorum from the Gremium")
+        return data
 
     @model_validator(mode="after")
     def _min_options(self) -> MeetingVoteBody:

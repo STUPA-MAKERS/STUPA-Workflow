@@ -5,6 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/unit/modules/livevote/test_livevote_cov.py:test_open_vote_refuses_a_quorum_on_one_vote_422"
 implementation:
   - backend/app/modules/livevote/vote_build.py
   - backend/app/modules/livevote/schemas.py

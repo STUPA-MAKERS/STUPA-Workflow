@@ -54,7 +54,7 @@ def test_open_poll_builds_the_poll_config(setup: Any) -> None:  # noqa: F811
     meetings._meeting_out = _meeting(True, "vote")
     agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
     resp = client.post(
-        f"/api/meetings/{uuid4()}/votes", json=_poll_body(secret=True, quorumPercent=50)
+        f"/api/meetings/{uuid4()}/votes", json=_poll_body(secret=True)
     )
     assert resp.status_code == 200, resp.text
     config = voting.last_payload.config

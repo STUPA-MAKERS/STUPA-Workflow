@@ -164,8 +164,6 @@ async def build_meeting_vote(
     quorum_percent = (
         None
         if guests_vote or payload.poll is not None
-        else payload.quorum_percent
-        if payload.quorum_percent is not None
         else await _default_quorum_percent(service, meeting)
     )
     quorum: dict[str, object] = (
