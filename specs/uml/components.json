@@ -1066,7 +1066,7 @@
       "to": "shared"
     },
     {
-      "count": 12,
+      "count": 11,
       "from": "protocol",
       "to": "voting"
     },
