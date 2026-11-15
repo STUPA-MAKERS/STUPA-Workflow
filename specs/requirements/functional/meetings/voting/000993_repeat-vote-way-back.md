@@ -2,7 +2,7 @@
 id: "000993"
 title: A repeated application vote moves the application in one step and has a way back
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:
