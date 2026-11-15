@@ -552,7 +552,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/voting/000949](requirements/functional/meetings/voting/000949_circular-in-decisions-only.md) | A circular decision shows in the list of decisions and in no protocol | approved |
 | [F/meetings/voting/000971](requirements/functional/meetings/voting/000971_election-three-rounds.md) | An election by the majority of the members has up to three Wahlgänge | approved |
 | [F/meetings/voting/000993](requirements/functional/meetings/voting/000993_repeat-vote-way-back.md) | A repeated application vote moves the application in one step and has a way back | approved |
-| [F/meetings/voting/000994](requirements/functional/meetings/voting/000994_one-open-vote.md) | A meeting has one open vote at a time | draft |
+| [F/meetings/voting/000994](requirements/functional/meetings/voting/000994_one-open-vote.md) | A meeting has one open vote at a time | approved |
 | [F/meetings/voting/000995](requirements/functional/meetings/voting/000995_cancelled-vote-frees-item.md) | A cancelled vote does not block the vote of an application item | draft |
 | [F/meetings/voting/000996](requirements/functional/meetings/voting/000996_round-and-repeat-lock.md) | The next Wahlgang and the repeat of an election lock each other | draft |
 | [F/public/public-pages/000170](requirements/functional/public/public-pages/000170_no-public-meetings.md) | Meetings are never public | replaced |

@@ -2,7 +2,7 @@
 id: "000994"
 title: A meeting has one open vote at a time
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:
