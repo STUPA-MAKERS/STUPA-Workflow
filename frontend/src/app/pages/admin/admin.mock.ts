@@ -18,6 +18,7 @@ import type {
   FormDraft,
   GuestSettings,
   GremiumDefaults,
+  MeetingPeriods,
   MeetingSettings,
   FeatureSwitches,
   HelpTicketsSettings,
@@ -392,6 +393,16 @@ export const MOCK_GREMIUM_DEFAULTS: GremiumDefaults = {
   delegationMaxPerDelegate: 2,
 };
 export const MOCK_MEETING_SETTINGS: MeetingSettings = { openLeadMinutes: 60, confirmLeadMinutes: 10 };
+
+export const MOCK_MEETING_PERIODS: MeetingPeriods = {
+  inviteDaysOrdinary: 7,
+  inviteDaysExtraordinary: 3,
+  protocolDraftDays: 14,
+  lateExcuseDays: 7,
+  absenceLimit: 3,
+  circularMinDays: 3,
+  termStartMonth: 10,
+};
 
 /** The settings of the page "Hilfe & Tickets", as the backend defaults them. */
 export const MOCK_HELP_TICKETS: HelpTicketsSettings = {

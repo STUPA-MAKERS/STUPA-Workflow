@@ -19,6 +19,7 @@
       [savingAttendance]="savingAttendance()"
       (back)="goBack()"
       (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
+      (lateExcused)="attendance.set($event)"
     />
   } @else {
   <app-meeting-page

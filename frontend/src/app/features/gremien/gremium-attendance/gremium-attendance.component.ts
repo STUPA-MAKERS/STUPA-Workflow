@@ -15,6 +15,7 @@ import {
   type GremiumAttendance,
   type GremiumAttendanceRow,
 } from '@core/api/gremien.service';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -29,6 +30,7 @@ import {
   MEDIA,
   mediaQuery,
   SkeletonComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { AttendanceDetailComponent } from '../attendance-detail/attendance-detail.component';
 import { GREMIEN_NOW } from '../gremien.store';
@@ -47,6 +49,7 @@ import {
   oneDecimal,
   personName,
   presetRange,
+  rangeDays,
   rangeLabel,
   rowTotals,
   semesterOf,
@@ -94,6 +97,10 @@ export interface RowModel {
   readonly role: string;
   readonly totals: RowTotals;
   readonly cells: readonly CellModel[];
+  /** "2 von 3 unentschuldigt" for the current term, '' without an unexcused absence. */
+  readonly unexcused: string;
+  /** The next unexcused absence reaches the limit, or the limit is reached. */
+  readonly nearLimit: boolean;
 }
 
 /**
@@ -115,6 +122,11 @@ export interface RowModel {
  * - The chips "Zeitraum" (last 6, 12 or 24 months, this or the last semester), "Rolle"
  *   and "Sortierung" (quota ascending by default). "Als CSV exportieren" saves the
  *   matrix from the same answer, in the browser.
+ * - Under the name of a person stands the number of unexcused absences of the current
+ *   term with the limit ("2 von 3 unentschuldigt"), in the warning colour from the
+ *   limit minus one on (spec 000920).
+ * - "Anwesenheitsliste (XLSX)" shows with `session.manage` in the Gremium: the server
+ *   builds the list of the chosen range for the Sitzungsgeld (spec 000923).
  * - A phone shows a card per person with a small cell per month; a tap opens the bottom
  *   sheet with every meeting of the range.
  * - A range without a meeting shows a grey skeleton of the matrix, not an error.
@@ -142,6 +154,8 @@ export interface RowModel {
 export class GremiumAttendanceComponent {
   private readonly api = inject(GremienApiService);
   private readonly i18n = inject(I18nService);
+  private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
   private readonly now = inject(GREMIEN_NOW);
 
   readonly gremiumId = input.required<string>();
@@ -158,6 +172,10 @@ export class GremiumAttendanceComponent {
   readonly loading = signal(true);
   readonly error = signal(false);
   readonly data = signal<GremiumAttendance | null>(null);
+  /** The server builds the XLSX list. */
+  readonly exporting = signal(false);
+  /** The person leads meetings of the Gremium (`session.manage`), or is an admin. */
+  readonly canExportList = computed(() => this.auth.canInGremium(this.gremiumId(), 'session.manage'));
   private sub: Subscription | null = null;
 
   readonly range = computed<MonthRange>(() => presetRange(this.preset(), this.now()));
@@ -229,6 +247,10 @@ export class GremiumAttendanceComponent {
         name,
         role: localized(row.roleName, locale, row.roleKey ?? ''),
         totals: rowTotals(row, data.months),
+        unexcused: row.unexcused
+          ? this.i18n.translate('gremien.attendance.unexcused', { n: row.unexcused, limit: data.absenceLimit })
+          : '',
+        nearLimit: row.unexcused >= data.absenceLimit - 1,
         cells: row.cells.map((cell, i) => {
           const view = cellView(cell, data.months[i]?.meetings ?? 0);
           const empty = (data.months[i]?.meetings ?? 0) === 0;
@@ -371,6 +393,23 @@ export class GremiumAttendanceComponent {
       new Blob([toCsv([head, ...body])], { type: 'text/csv;charset=utf-8' }),
       `${fileSlug(this.gremiumName())}-anwesenheit-${range.from}-${range.to}.csv`,
     );
+  }
+
+  /** "Anwesenheitsliste (XLSX)": the list of the chosen range, built by the server. */
+  exportList(): void {
+    if (this.exporting()) return;
+    const days = rangeDays(this.range());
+    this.exporting.set(true);
+    this.api.attendanceExport(this.gremiumId(), days.from, days.to).subscribe({
+      next: (blob) => {
+        this.exporting.set(false);
+        downloadBlob(blob, `${fileSlug(this.gremiumName())}-anwesenheitsliste-${days.from}-${days.to}.xlsx`);
+      },
+      error: () => {
+        this.exporting.set(false);
+        this.toast.error(this.i18n.translate('gremien.attendance.exportFailed'));
+      },
+    });
   }
 
   private presetLabel(preset: RangePreset): string {

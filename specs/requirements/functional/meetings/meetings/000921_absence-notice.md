@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - backend/app/modules/meetings/absence.py
+  - backend/app/modules/livevote/mails.py
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/notifications

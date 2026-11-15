@@ -15,6 +15,9 @@ pages. The rules here follow the pytex protocol variant (`protocol-stupa`,
 * A `footer_graphic` config key names the graphic at the foot of each page: a
   vendored name or an asset. An empty value means no graphic. Without the key
   the page carries the Skyline.
+* A `watermark` config key names a text that lies across every page, for example
+  "Entwurf" on the draft of a protocol. Without the key, or with an empty value, the
+  pages have none. On an Anlage page the text follows the watermark of the Anlage.
 * An `unterschriften` list closes the document with one signature line per
   role.
 * A `keepers` list names every period of a protocol keeper. It replaces the
@@ -329,6 +332,17 @@ def _footer_graphic(
             raise ConversionError("footer_graphic must be a name or empty")
 
 
+def _page_watermark(options: Mapping[str, object]) -> str | None:
+    """Return the text across every page: the `watermark` key, or none."""
+    match options.get("watermark"):
+        case str() as text:
+            return text.strip() or None
+        case None:
+            return None
+        case _:
+            raise ConversionError("watermark must be a text or empty")
+
+
 def _logo_list(options: Mapping[str, object], key: str) -> list[str] | None:
     match options.get(key):
         case list() as items:
@@ -350,13 +364,17 @@ def _default_logos(variant: str | None, options: Mapping[str, object]) -> tuple[
 
 
 def _watermark(options: Mapping[str, object], number: int) -> str:
-    """The watermark of an Anlage: `Anlage <N> zum Protokoll <Sitzungstitel> vom <Datum>`."""
+    """The watermark of an Anlage: `Anlage <N> zum Protokoll <Sitzungstitel> vom <Datum>`.
+
+    The text across every page (`watermark`) goes in front of it.
+    """
     title = _scalar(options, "title", "titel") or _scalar(options, "gremium")
     started_date, _ = _started(options)
     datum = (_scalar(options, "datum", "date") or started_date).split(" ")[0]
     return " ".join(
         part
         for part in (
+            f"{_page_watermark(options)} ·" if _page_watermark(options) else "",
             f"Anlage {number} zum Protokoll",
             title,
             f"vom {format_date(datum)}" if datum else "",
@@ -500,6 +518,7 @@ def build_document(
         "logos": [_logo(n, assets) for n in title_names],
         "footer_logos": [_logo(n, assets) for n in footer_names],
         "footer_graphic": _footer_graphic(options, assets),
+        "watermark": _page_watermark(options),
         "data": _data_lines(options, keepers),
         "body": blocks,
         "numbered": _scalar(options, "typ").lower() not in _UNNUMBERED_TYPES,

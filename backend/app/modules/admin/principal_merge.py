@@ -191,6 +191,7 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("substitutes", DelegationSubstitute.created_by),
     ("meetings", Meeting.created_by),
     ("meetings", Protocol.author),
+    ("meetings", Protocol.approved_by),
     ("budget", BudgetExpense.actor),
     ("budget", Invoice.actor),
     ("config", SiteConfigVersion.created_by),

@@ -83,6 +83,7 @@ from app.modules.admin.schemas import (
     HelpTicketsSettings,
     LoginSettingsOut,
     LoginSettingsUpdate,
+    MeetingPeriods,
     MeetingSettingsOut,
     MeetingSettingsUpdate,
     MergePreviewOut,
@@ -122,6 +123,7 @@ from app.modules.gremien.role_schemas import (
     GremiumRoleUpdate,
 )
 from app.modules.livevote.open_window import MeetingSettingsService, gremium_defaults
+from app.modules.meetings.periods import periods
 from app.modules.site_config.branding import Branding
 from app.modules.site_config.cd_logos import LogoSlot
 from app.modules.site_config.features import FeatureSwitches
@@ -1387,6 +1389,40 @@ async def put_gremium_defaults(
     )
     await service.session.commit()
     return GremiumDefaults.model_validate(gremium_defaults(row))
+
+
+@router.get(
+    "/meeting-periods",
+    response_model=MeetingPeriods,
+    dependencies=[Depends(require_principal("admin.deadlines"))],
+    responses=_errors(401, 403),
+)
+async def get_meeting_periods(service: MeetingSettingsServiceDep) -> MeetingPeriods:
+    """Return the periods of the Geschäftsordnung."""
+    row = await service.get()
+    await service.session.commit()
+    return MeetingPeriods.model_validate(periods(row))
+
+
+@router.put(
+    "/meeting-periods",
+    response_model=MeetingPeriods,
+    responses=_errors(400, 401, 403, 422),
+)
+async def put_meeting_periods(
+    payload: MeetingPeriods,
+    service: MeetingSettingsServiceDep,
+    principal: DeadlinesAdmin,
+) -> MeetingPeriods:
+    """Replace the periods of the Geschäftsordnung.
+
+    The change applies at once: to the warning of the meeting form, to the late
+    excuse, to the absence count and to a new Umlaufverfahren. It writes a
+    ``config_change`` audit entry that the audit log cannot revert.
+    """
+    row = await service.update_periods(payload.model_dump(by_alias=True), actor=principal.sub)
+    await service.session.commit()
+    return MeetingPeriods.model_validate(periods(row))
 
 
 @router.get(

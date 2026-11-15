@@ -988,7 +988,12 @@ async def test_a_gremium_with_a_quorum_lets_guests_only_watch(
         )
         assert refused.status_code == 422
         defaults = lead.get(f"/api/committees/{s.gremium_id}/meeting-defaults").json()
-        assert defaults == {"guestsVoteAllowed": False, "quorumPercent": 50}
+        assert defaults == {
+            "guestsVoteAllowed": False,
+            "quorumPercent": 50,
+            "inviteDaysOrdinary": 7,
+            "inviteDaysExtraordinary": 3,
+        }
 
 
 async def test_guest_mode_follows_the_switch_of_the_gremium(

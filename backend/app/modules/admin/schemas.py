@@ -24,7 +24,7 @@ from app.modules.gremien.models import (
     MAX_DELEGATIONS_PER_DELEGATE,
 )
 from app.modules.gremien.role_schemas import ROLE_KEY_PATTERN
-from app.modules.meetings.models import MAX_LEAD_MINUTES
+from app.modules.meetings.models import MAX_ABSENCE_LIMIT, MAX_LEAD_MINUTES, MAX_PERIOD_DAYS
 from app.modules.site_config.branding import (
     DEFAULT_WIKI_URL,
     Branding,
@@ -951,6 +951,25 @@ class GremiumDefaults(FrozenStrictCamelModel, frozen=True):
     delegation_max_per_delegate: int = Field(
         alias="delegationMaxPerDelegate", ge=1, le=MAX_DELEGATIONS_PER_DELEGATE
     )
+
+
+class MeetingPeriods(FrozenStrictCamelModel, frozen=True):
+    """The periods of the Geschäftsordnung (§F/administration/admin/000917).
+
+    ``GET`` and ``PUT /admin/meeting-periods`` read and replace them. The days count
+    calendar days. ``termStartMonth`` is the month (1 to 12) on whose first day a term
+    starts.
+    """
+
+    invite_days_ordinary: int = Field(alias="inviteDaysOrdinary", ge=0, le=MAX_PERIOD_DAYS)
+    invite_days_extraordinary: int = Field(
+        alias="inviteDaysExtraordinary", ge=0, le=MAX_PERIOD_DAYS
+    )
+    protocol_draft_days: int = Field(alias="protocolDraftDays", ge=0, le=MAX_PERIOD_DAYS)
+    late_excuse_days: int = Field(alias="lateExcuseDays", ge=0, le=MAX_PERIOD_DAYS)
+    absence_limit: int = Field(alias="absenceLimit", ge=1, le=MAX_ABSENCE_LIMIT)
+    circular_min_days: int = Field(alias="circularMinDays", ge=0, le=MAX_PERIOD_DAYS)
+    term_start_month: int = Field(alias="termStartMonth", ge=1, le=12)
 
 
 class GuestSettingsUpdate(FrozenStrictCamelModel, frozen=True):

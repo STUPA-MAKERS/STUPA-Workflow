@@ -22,6 +22,7 @@ import {
   DatepickerComponent,
   DialogComponent,
   InputComponent,
+  NoteComponent,
   SegBarComponent,
   SelectFieldComponent,
   type SelectFieldOption,
@@ -30,7 +31,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
-import { MEETING_LOCATION_MAX, meetingFormOptions, meetingKindOptions } from '../meeting-kind.util';
+import { lateInviteDays, MEETING_LOCATION_MAX, meetingFormOptions, meetingKindOptions } from '../meeting-kind.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
 import { longDate } from '@shared/date-format';
 import { personLabel } from '@shared/person-label.util';
@@ -65,6 +66,7 @@ import { personLabel } from '@shared/person-label.util';
     DatepickerComponent,
     TimeInputComponent,
     InputComponent,
+    NoteComponent,
     SegBarComponent,
   ],
   templateUrl: './create-meeting-dialog.component.html',
@@ -112,6 +114,8 @@ export class CreateMeetingDialogComponent {
   );
   /** What the chosen Gremium allows: a guest ballot only with its switch and no quorum. */
   readonly defaults = signal<MeetingDefaults | null>(null);
+  /** The invitation period that the date misses, else `null`. It never blocks the save (§ 000918). */
+  readonly lateInvite = computed(() => lateInviteDays(this.date(), this.kind(), this.defaults()));
   readonly members = signal<MeetingMember[]>([]);
   readonly gremiumOptions = signal<SelectOption[]>([]);
   /** The Gremium list arrived. Before that an empty list is no "no Gremium" case. */

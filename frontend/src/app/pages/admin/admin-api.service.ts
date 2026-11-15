@@ -39,6 +39,7 @@ import {
   type NotificationSettings,
   type GuestSettings,
   type GremiumDefaults,
+  type MeetingPeriods,
   type MeetingSettings,
   type FeatureSwitches,
   type HelpTicketsSettings,
@@ -114,6 +115,7 @@ import {
   MOCK_GROUP_MAPPINGS,
   MOCK_GUEST_SETTINGS,
   MOCK_GREMIUM_DEFAULTS,
+  MOCK_MEETING_PERIODS,
   MOCK_MEETING_SETTINGS,
   MOCK_FEATURES,
   MOCK_HELP_TICKETS,
@@ -177,6 +179,7 @@ export class AdminApiService {
     mailRecipients: structuredCopy(MOCK_GREMIUM_MAIL_RECIPIENTS),
     guestSettings: structuredCopy(MOCK_GUEST_SETTINGS) as GuestSettings,
     meetingSettings: structuredCopy(MOCK_MEETING_SETTINGS) as MeetingSettings,
+    meetingPeriods: structuredCopy(MOCK_MEETING_PERIODS) as MeetingPeriods,
     gremiumDefaults: structuredCopy(MOCK_GREMIUM_DEFAULTS) as GremiumDefaults,
     loginSettings: structuredCopy(MOCK_LOGIN_SETTINGS) as LoginSettings,
     helpTickets: structuredCopy(MOCK_HELP_TICKETS) as HelpTicketsSettings,
@@ -1284,6 +1287,18 @@ export class AdminApiService {
       return of(structuredCopy(this.store.meetingSettings));
     }
     return this.http.put<MeetingSettings>(`${this.base}/admin/meeting-settings`, body);
+  }
+
+  /** GET /admin/meeting-periods — the periods of the Geschäftsordnung (P admin.deadlines, § 000917). */
+  getMeetingPeriods(): Observable<MeetingPeriods> {
+    if (this.mock) return of(structuredCopy(this.store.meetingPeriods));
+    return this.http.get<MeetingPeriods>(`${this.base}/admin/meeting-periods`, { context: skipLoading() });
+  }
+
+  /** PUT /admin/meeting-periods — replaces every period. */
+  putMeetingPeriods(body: MeetingPeriods): Observable<MeetingPeriods> {
+    if (this.mock) return of({ ...body });
+    return this.http.put<MeetingPeriods>(`${this.base}/admin/meeting-periods`, body);
   }
 
   /** GET /admin/gremium-defaults — the values that the form of a new Gremium starts with. */

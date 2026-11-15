@@ -426,6 +426,11 @@ export interface Attendance {
    * can be substituted. An older server leaves the flag out.
    */
   readonly canVote?: boolean;
+  /**
+   * The end of the late-excuse window: only on the own `absent` row of a closed meeting
+   * while the window is open (§ 000922).
+   */
+  readonly lateExcuseUntil?: string | null;
 }
 
 /** `AgendaItemOut`. An agenda item holds a linked application or free text. */
@@ -1696,6 +1701,11 @@ export interface ProtocolOutWire {
   readonly publicWithheld?: boolean;
   /** The gremium publishes its final protocols on the public protocol page. */
   readonly gremiumProtocolsPublic?: boolean;
+  /** The mark "genehmigt" and the meeting that approved the protocol (§ 000924). */
+  readonly approvedAt?: IsoDateTime | null;
+  readonly approvedMeetingId?: Uuid | null;
+  readonly approvedMeetingTitle?: string | null;
+  readonly approvedMeetingDate?: string | null;
 }
 
 /** Body for `POST /meetings` (`MeetingCreate`). */
@@ -1925,6 +1935,12 @@ export interface Protocol {
   readonly publicWithheld?: boolean;
   /** The gremium publishes its final protocols on the public protocol page. */
   readonly gremiumProtocolsPublic?: boolean;
+  /** The time of the mark "genehmigt", `null` without a mark (§ 000924). */
+  readonly approvedAt?: IsoDateTime | null;
+  /** The meeting that approved the protocol. */
+  readonly approvedMeetingId?: Uuid | null;
+  readonly approvedMeetingTitle?: string | null;
+  readonly approvedMeetingDate?: string | null;
 }
 
 /**
@@ -2134,4 +2150,8 @@ export interface GuestMe {
 export interface MeetingDefaults {
   readonly guestsVoteAllowed: boolean;
   readonly quorumPercent: number | null;
+  /** Days between the invitation and an ordinary meeting (§ 000917). */
+  readonly inviteDaysOrdinary: number;
+  /** Days between the invitation and a meeting of every other kind. */
+  readonly inviteDaysExtraordinary: number;
 }

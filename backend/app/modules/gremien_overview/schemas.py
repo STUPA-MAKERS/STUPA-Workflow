@@ -86,6 +86,8 @@ class GremiumMeetingOut(_GremienOut, frozen=True):
     present_count: int
     member_count: int
     protocol_status: ProtocolStatus | None
+    #: The final protocol carries the approval mark (§F/meetings/protocols/000924).
+    protocol_approved: bool
 
 
 class AttendanceMonthOut(_GremienOut, frozen=True):
@@ -118,14 +120,24 @@ class AttendanceRowOut(_GremienOut, frozen=True):
     role_key: str | None
     role_name: Mapping[str, str] | None
     is_self: bool
+    #: The unexcused absences of the current term: closed ordinary meetings with the
+    #: status ``absent`` (§F/meetings/meetings/000920).
+    unexcused: int
     cells: tuple[AttendanceCellOut, ...]
 
 
 class AttendanceOut(_GremienOut, frozen=True):
-    """The attendance matrix of a gremium for a range of months."""
+    """The attendance matrix of a gremium for a range of months.
+
+    ``unexcused`` of a row counts the current term, whatever the range of months is.
+    """
 
     from_month: str
     to_month: str
+    #: The first day of the current term, and the number of unexcused absences in one
+    #: term that ends a Mandat.
+    term_start: _date
+    absence_limit: int
     months: list[AttendanceMonthOut]
     rows: list[AttendanceRowOut]
 
@@ -139,6 +151,9 @@ class MemberMeetingOut(_GremienOut, frozen=True):
     start_time: _time | None
     status: AttendanceState
     delegate_name: str | None
+    #: The end of the late-excuse window, only on the own ``absent`` row while the
+    #: window is open (§F/meetings/meetings/000922).
+    late_excuse_until: _datetime | None = None
 
 
 class MemberAttendanceOut(_GremienOut, frozen=True):

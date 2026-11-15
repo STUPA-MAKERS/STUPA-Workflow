@@ -85,6 +85,8 @@ from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient, TypstError
+from app.modules.protocol import approval
+from app.modules.protocol.approval import approval_fields
 from app.modules.protocol.circular import circular_block
 from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.markdown import (
@@ -362,6 +364,7 @@ class ProtocolService:
             sentAt=protocol.sent_at,
             publicWithheld=bool(getattr(protocol, "public_withheld", False)),
             gremiumProtocolsPublic=bool(getattr(gremium, "protocols_public", False)),
+            **await approval_fields(self.session, protocol),
         )
 
     async def _by_meeting(self, meeting_id: UUID) -> Protocol | None:
@@ -657,6 +660,26 @@ class ProtocolService:
             await self._audit_publication(protocol, actor, old, withheld)
             await self.session.flush()
         await self.session.commit()
+        return await self._to_out(protocol)
+
+    async def set_approval(
+        self, protocol_id: UUID, meeting_id: UUID | None, *, now: datetime, actor: str
+    ) -> ProtocolOut:
+        """Set or remove the approval mark of a protocol (spec 000924).
+
+        ``meeting_id`` is the meeting that approved the protocol; None removes the mark.
+        The caller commits.
+
+        Raises:
+            ConflictError: The protocol is not final (409 ``protocol_not_final``).
+            ValidationProblem: The meeting is not another meeting of the same Gremium
+                (422 ``invalid_approval_meeting``).
+        """
+        protocol = await self._get(protocol_id, for_update=True)
+        if meeting_id is None:
+            await approval.unapprove(self.session, protocol, actor=actor)
+        else:
+            await approval.approve(self.session, protocol, meeting_id, now=now, actor=actor)
         return await self._to_out(protocol)
 
     async def revert_to_draft(self, protocol_id: UUID) -> None:
@@ -1384,9 +1407,17 @@ class ProtocolService:
         return await pdfs.anlage_assets(ApplicationsService(self.session), items, public=public)
 
     async def _render_pdf(
-        self, protocol: Protocol, markdown: str, *, public: bool = False
+        self,
+        protocol: Protocol,
+        markdown: str,
+        *,
+        public: bool = False,
+        watermark: str | None = None,
     ) -> bytes | None:
         """Render the Markdown with typst and return the PDF bytes.
+
+        `watermark` puts a text across every page (the draft that goes to the members,
+        spec 000925). Such a render is no stored version: it sets no key column.
 
         The render runs BEFORE the commit. The method sets the key column but does
         NOT upload. The storage `put` runs after the commit in `_store`.
@@ -1423,7 +1454,11 @@ class ProtocolService:
             cd = await resolve_cd_variant_by_key(self.session, self.storage, protocol.cd_variant)
             variant = protocol_variant_for(protocol.cd_variant)
             branding = await active_pdf_branding(self.session, self.storage)
-            config = {**(cd_render_config(cd) if cd else {}), **footer_render_config(branding)}
+            config = {
+                **(cd_render_config(cd) if cd else {}),
+                **footer_render_config(branding),
+                **({"watermark": watermark} if watermark else {}),
+            }
             media = MediaService(self.session, storage=self.storage)
             images = await media.render_assets(markdown)
             documents = await media.render_documents(markdown)
@@ -1448,6 +1483,8 @@ class ProtocolService:
                     f"Protocol could not be rendered: {exc}", code="render_failed"
                 ) from exc
             raise ServiceUnavailableError("Protocol rendering temporarily unavailable.") from exc
+        if watermark:
+            return pdf
         key = (
             protocol_public_storage_key(protocol.id)
             if public

@@ -90,7 +90,15 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> _Calls:
     )
     _fake("members", list[GremiumMemberOut]())
     _fake("meetings", list[GremiumMeetingOut]())
-    _fake("attendance", AttendanceOut(from_month="2026-05", to_month="2026-10", months=[], rows=[]))
+    _fake("attendance", AttendanceOut(
+            from_month="2026-05",
+            to_month="2026-10",
+            term_start=date(2025, 10, 1),
+            absence_limit=3,
+            months=[],
+            rows=[],
+        ),
+    )
     _fake(
         "member_attendance",
         MemberAttendanceOut(principal_id=PID, display_name="A", month="2026-10", meetings=[]),

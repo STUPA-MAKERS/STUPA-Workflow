@@ -37,6 +37,7 @@ from app.modules.livevote.events import ErrorEvent
 from app.modules.livevote.guests import GuestService
 from app.modules.livevote.locks import InMemoryLocker, Locker
 from app.modules.livevote.mails import MeetingMailer, get_meeting_mailer
+from app.modules.livevote.open_window import load_meeting_settings
 from app.modules.livevote.schemas import (
     AgendaAddBody,
     AgendaBodyBody,
@@ -47,6 +48,7 @@ from app.modules.livevote.schemas import (
     GuestNameBody,
     JoinLinkOut,
     JoinTargetOut,
+    LateExcuseBody,
     MeetingCreate,
     MeetingDefaultsOut,
     MeetingGremiumOut,
@@ -287,8 +289,12 @@ async def get_meeting_defaults(
     if not await service.can_manage(gremium_id, principal):
         raise ForbiddenError("not allowed to manage meetings for this committee")
     quorum = await service.gremium_quorum_percent(gremium_id)
+    periods = await load_meeting_settings(service.session)
     return MeetingDefaultsOut(
-        guestsVoteAllowed=await service.guests_vote_allowed(gremium_id), quorumPercent=quorum
+        guestsVoteAllowed=await service.guests_vote_allowed(gremium_id),
+        quorumPercent=quorum,
+        inviteDaysOrdinary=periods.invite_days_ordinary,
+        inviteDaysExtraordinary=periods.invite_days_extraordinary,
     )
 
 
@@ -408,7 +414,14 @@ async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: Reade
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def patch_meeting(
-    meeting_id: UUID, payload: MeetingPatch, service: ServiceDep, principal: ReaderDep
+    meeting_id: UUID,
+    payload: MeetingPatch,
+    service: ServiceDep,
+    principal: ReaderDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: MeetingMailerDep,
 ) -> MeetingOut:
     """Control or plan a meeting and broadcast ``meeting_state``.
 
@@ -428,6 +441,10 @@ async def patch_meeting(
     ``meeting_too_early``, and before ``confirmUntil`` it needs ``confirmEarly``, else
     409 ``early_open_unconfirmed``.
 
+    The close of an ordinary meeting sends the mail ``absence_limit`` to the persons
+    with ``session.manage`` for each member whose unexcused absences of the term reach
+    ``absenceLimit`` minus 1 or ``absenceLimit``.
+
     The protocol service is imported locally, because ``protocol`` depends on ``livevote``
     and a module-level import would cycle. The protocol uses the session of the service, so
     the work stays in one transaction and one commit. The route reads the meeting again, so
@@ -439,6 +456,9 @@ async def patch_meeting(
 
         await ProtocolService(service.session).get_or_create(meeting_id, author=principal.sub)
         return await service.get(meeting_id, principal)
+    if payload.status == "closed" and updated.status == "closed":
+        pool = getattr(request.app.state, "arq_pool", None)
+        background.add_task(mailer.absence_limit, settings, meeting_id, pool)
     return updated
 
 
@@ -537,6 +557,34 @@ async def set_own_attendance(
         replace_note=payload.note_given,
         can_write=can_write,
     )
+
+
+@router.post(
+    "/meetings/{meeting_id}/attendance/me/late-excuse",
+    response_model=list[AttendanceOut],
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def excuse_own_absence(
+    meeting_id: UUID,
+    payload: LateExcuseBody,
+    attendance: AttendanceDep,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> list[AttendanceOut]:
+    """Change the own ``absent`` of a closed meeting to ``excused``.
+
+    The reason (``note``) is required. The window ends ``lateExcuseDays`` days after
+    the close (409 ``late_excuse_expired``). A meeting that is not closed answers 409
+    ``meeting_not_closed``, a caller without an ``absent`` record 409 ``not_absent``.
+    The change writes ``attendance_set`` with ``late: true``, never with the reason.
+    """
+    await service.assert_can_read(meeting_id, principal)
+    can_write = await service.can_write_meeting(meeting_id, principal)
+    roster = await attendance.excuse_late(
+        meeting_id, principal.sub, payload.note, now=datetime.now(UTC), can_write=can_write
+    )
+    await attendance.session.commit()
+    return roster
 
 
 async def _require_lead(service: MeetingService, meeting_id: UUID, principal: Principal) -> None:

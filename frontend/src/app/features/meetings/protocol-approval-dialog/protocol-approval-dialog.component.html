@@ -1,0 +1,28 @@
+<app-dialog
+  [open]="open()"
+  [title]="'meetings.approval.title' | t"
+  [subtitle]="meeting().title"
+  [closeLabel]="'action.close' | t"
+  (closed)="cancel()"
+>
+  <form (submit)="$event.preventDefault(); submit()">
+    @if (none()) {
+      <p class="muted" role="status">{{ 'meetings.approval.none' | t }}</p>
+    } @else {
+      <app-select
+        name="approvedBy"
+        [id]="'pad-meeting'"
+        [label]="'meetings.approval.meeting' | t"
+        [options]="options()"
+        [required]="true"
+        [ngModel]="choice()"
+        (ngModelChange)="choice.set($event)"
+      />
+    }
+    <button type="submit" hidden></button>
+  </form>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [loading]="saving()" [disabled]="!choice()" (click)="submit()">
+    {{ 'meetings.approval.submit' | t }}
+  </app-button>
+</app-dialog>

@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - backend/app/modules/meetings/attendance_service.py
+  - frontend/src/app/features/meetings/late-excuse-dialog/late-excuse-dialog.component.ts
 scope:
   - backend/app/modules/meetings
   - frontend/src/app/features/meetings

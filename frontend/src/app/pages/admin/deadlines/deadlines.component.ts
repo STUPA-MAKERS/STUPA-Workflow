@@ -3,6 +3,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ButtonComponent, FabComponent, PageHeaderComponent } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
+import { MeetingPeriodsSettingsComponent } from './meeting-periods/meeting-periods.component';
 import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.component';
 
 /**
@@ -11,7 +12,7 @@ import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.
  * `app-meeting-window-settings` holds the open window of meetings (the earliest open and
  * the early open that asks first). `app-guest-settings` holds the settings for
  * applications without an account: the discard window and the lifetime of the
- * personal link. While one of the two sections has changes, the floating button
+ * personal link. While one of the sections has changes, the floating button
  * "Speichern" saves them.
  */
 @Component({
@@ -25,6 +26,7 @@ import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.
     PageHeaderComponent,
     BreadcrumbsComponent,
     GuestSettingsComponent,
+    MeetingPeriodsSettingsComponent,
     MeetingWindowSettingsComponent,
   ],
   templateUrl: './deadlines.component.html',
@@ -32,10 +34,11 @@ import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.
 })
 export class AdminDeadlinesComponent {
   private readonly meetingWindow = viewChild(MeetingWindowSettingsComponent);
+  private readonly meetingPeriods = viewChild(MeetingPeriodsSettingsComponent);
   private readonly guestSettings = viewChild(GuestSettingsComponent);
   /** The settings sections that have changes that are not saved. */
   private readonly dirtySections = computed(() =>
-    [this.meetingWindow(), this.guestSettings()].filter((s) => !!s && s.dirty()),
+    [this.meetingWindow(), this.meetingPeriods(), this.guestSettings()].filter((s) => !!s && s.dirty()),
   );
   protected readonly settingsDirty = computed(() => this.dirtySections().length > 0);
   protected readonly settingsSaving = computed(() => this.dirtySections().some((s) => s?.saving()));

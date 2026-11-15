@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-14
-implementation: null
+implementation:
+  - backend/app/modules/protocol/draft_mail.py
+  - typst/typst_service/document.py
+  - frontend/src/app/features/meetings/protocol-bar/protocol-bar.component.ts
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/notifications

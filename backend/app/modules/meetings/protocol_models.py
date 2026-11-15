@@ -71,6 +71,13 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     #: Permanent failures of the public build. The hourly heal job skips a protocol
     #: after a few of them; a successful build resets the count.
     public_render_failures: Mapped[int] = mapped_column(Integer, server_default="0")
+    #: The approval of the final protocol by the Gremium: the moment of the mark, the
+    #: meeting that approved it and the person who set the mark. All NULL without it.
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_meeting_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
+    )
+    approved_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('draft','rendering','final')", name="protocol_status"),

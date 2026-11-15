@@ -64,6 +64,9 @@
           (ngModelChange)="endTime.set($event)"
         />
       </div>
+      @if (lateInvite(); as days) {
+        <app-note icon="alert" kind="warn" role="status">{{ 'meetings.lateInvite' | t: { n: days } }}</app-note>
+      }
       <div class="cmd__where">
         <app-input
           name="location"

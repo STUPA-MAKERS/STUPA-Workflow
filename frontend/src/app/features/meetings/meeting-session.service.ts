@@ -561,6 +561,54 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
+  /** The draft mail is on its way to the server. */
+  readonly draftSending = signal(false);
+  /** The mark "genehmigt" is being saved. */
+  readonly approvalSaving = signal(false);
+
+  /** "Entwurf senden": the PDF of the draft goes to the members (§ 000925). */
+  sendProtocolDraft(): void {
+    const proto = this.protocol();
+    if (!proto || this.draftSending()) return;
+    this.draftSending.set(true);
+    this.api.sendProtocolDraft(proto.id).subscribe({
+      next: ({ recipients }) => {
+        this.draftSending.set(false);
+        this.toast.success(this.i18n.translate('meetings.toast.draftSent', { n: recipients }));
+      },
+      error: (err: unknown) => {
+        this.draftSending.set(false);
+        this.actionFailed(err);
+      },
+    });
+  }
+
+  /** Mark the final protocol as approved by a meeting; `null` removes the mark (§ 000924). */
+  setProtocolApproval(meetingId: Uuid | null): void {
+    const proto = this.protocol();
+    if (!proto || this.approvalSaving()) return;
+    this.approvalSaving.set(true);
+    this.api.setProtocolApproval(proto.id, meetingId).subscribe({
+      next: (updated) => {
+        this.approvalSaving.set(false);
+        this.protocol.set(updated);
+        this.toast.success(
+          this.i18n.translate(meetingId ? 'meetings.toast.protocolApproved' : 'meetings.toast.approvalRemoved'),
+        );
+      },
+      error: (err: unknown) => {
+        this.approvalSaving.set(false);
+        this.actionFailed(err);
+      },
+    });
+  }
+
+  private actionFailed(err: unknown): void {
+    const detail = problemDetail(err);
+    const base = this.i18n.translate('meetings.toast.actionFailed');
+    this.toast.error(detail ? `${base}: ${detail}` : base);
+  }
+
   private doFinalize(protocolId: Uuid, opts: { publicWithheld?: boolean } = {}): void {
     this.api.finalizeProtocol(protocolId, opts).subscribe({
       next: (updated) => {

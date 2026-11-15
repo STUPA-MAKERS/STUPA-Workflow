@@ -165,6 +165,8 @@ const BACKEND_AUDIT_ACTIONS = [
   'protocol_delete',
   'protocol_finalize',
   'protocol_publication',
+  'protocol_draft_mail',
+  'protocol_approval',
   'protokollant_handover',
   'vote_delete',
   'vote_open',

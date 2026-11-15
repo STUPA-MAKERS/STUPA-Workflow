@@ -86,6 +86,8 @@ export interface GremiumMeeting {
   /** The members of the meeting window, plus the people with a record. */
   readonly memberCount: number;
   readonly protocolStatus: GremiumProtocolStatus | null;
+  /** The final protocol has the mark "genehmigt" (§ 000924). */
+  readonly protocolApproved?: boolean;
 }
 
 /** One month of the attendance range: `YYYY-MM` and the number of closed meetings. */
@@ -112,6 +114,8 @@ export interface GremiumAttendanceRow {
   readonly roleKey: string | null;
   readonly roleName: LocalizedText | null;
   readonly isSelf: boolean;
+  /** The unexcused absences of the current term (§ 000920). */
+  readonly unexcused: number;
   /** One cell per month of `months`, in the same order. */
   readonly cells: readonly GremiumAttendanceCell[];
 }
@@ -120,6 +124,10 @@ export interface GremiumAttendanceRow {
 export interface GremiumAttendance {
   readonly fromMonth: string;
   readonly toMonth: string;
+  /** The first day of the current term (`YYYY-MM-DD`). `unexcused` counts from it. */
+  readonly termStart: string;
+  /** The number of unexcused absences in one term that ends a Mandat. */
+  readonly absenceLimit: number;
   readonly months: readonly GremiumAttendanceMonth[];
   readonly rows: readonly GremiumAttendanceRow[];
 }
@@ -133,6 +141,8 @@ export interface GremiumMemberMeeting {
   readonly status: GremiumAttendanceState;
   /** The person who received the vote, for `delegated`. */
   readonly delegateName: string | null;
+  /** The end of the late-excuse window, only on an own `absent` row while it is open (§ 000922). */
+  readonly lateExcuseUntil?: string | null;
 }
 
 /** `GET /committees/{id}/attendance/{principalId}?month=`. */
@@ -227,6 +237,18 @@ export class GremienApiService {
     return this.http.get<GremiumAttendance>(`${this.base}/committees/${gremiumId}/attendance`, {
       params,
       context: skipLoading(),
+    });
+  }
+
+  /**
+   * GET /committees/{id}/attendance/export.xlsx — one row per person with the number of
+   * closed ordinary meetings with `present`, for the days `from` to `to` (`YYYY-MM-DD`).
+   * Needs `session.manage` in the Gremium (§ 000923).
+   */
+  attendanceExport(gremiumId: Uuid, from: string, to: string): Observable<Blob> {
+    return this.http.get(`${this.base}/committees/${gremiumId}/attendance/export.xlsx`, {
+      params: new HttpParams().set('from', from).set('to', to),
+      responseType: 'blob',
     });
   }
 

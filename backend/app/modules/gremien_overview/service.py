@@ -26,7 +26,7 @@ from __future__ import annotations
 import base64
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from datetime import date as _date
 from datetime import time as _time
 from decimal import Decimal
@@ -79,8 +79,18 @@ from app.modules.gremien_overview.schemas import (
     MemberMeetingOut,
     NextMeetingOut,
 )
+from app.modules.meetings.absence import unexcused_counts
 from app.modules.meetings.agenda_service import title_of
-from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.meetings.models import (
+    DEFAULT_ABSENCE_LIMIT,
+    DEFAULT_LATE_EXCUSE_DAYS,
+    DEFAULT_TERM_START_MONTH,
+    Meeting,
+    MeetingAgendaItem,
+    MeetingAttendance,
+    MeetingSettings,
+)
+from app.modules.meetings.periods import term_end, term_start
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.site_config.cd_logos import ALLOWED_SQUARE_LOGO_MIME
 from app.modules.site_config.features import Feature, feature_on
@@ -239,6 +249,20 @@ def _member_state(recorded: str | None, *, delegated: bool) -> AttendanceState:
             return "absent"
 
 
+def _late_until(
+    recorded: str | None, closed: datetime | None, window: timedelta | None, *, delegated: bool
+) -> datetime | None:
+    """Return the end of the late-excuse window of an own ``absent`` record, while it is open.
+
+    Only an explicit ``absent`` record can be excused later, so a meeting without a
+    record and a vote transfer give None.
+    """
+    if window is None or closed is None or delegated or recorded != "absent":
+        return None
+    until = closed + window
+    return until if datetime.now(UTC) <= until else None
+
+
 def _kind_filter(kind: DecisionKind | None) -> tuple[ColumnElement[bool], ...]:
     """Return the conditions of the ``kind`` filter of the decision list."""
     match kind:
@@ -350,7 +374,7 @@ def _meeting_row(
     recorded: Mapping[UUID, str],
     members: frozenset[UUID],
     agenda_items: int,
-    protocol_status: str | None,
+    protocol: tuple[str, bool] | None,
 ) -> GremiumMeetingOut:
     """Build one meeting row: the roster is the members plus every recorded principal."""
     return GremiumMeetingOut(
@@ -363,7 +387,8 @@ def _meeting_row(
         agenda_item_count=agenda_items,
         present_count=sum(1 for st in recorded.values() if st == "present"),
         member_count=len(members | recorded.keys()),
-        protocol_status=protocol_status,  # type: ignore[arg-type]
+        protocol_status=protocol[0] if protocol else None,  # type: ignore[arg-type]
+        protocol_approved=bool(protocol and protocol[1]),
     )
 
 
@@ -374,6 +399,7 @@ def _attendance_row(
     months: Sequence[Month],
     cells: Mapping[str, tuple[int, int, int]],
     viewer_sub: str,
+    unexcused: int = 0,
 ) -> AttendanceRowOut:
     """Build one person of the attendance matrix, with a cell for each month."""
     display, sub = person
@@ -384,6 +410,7 @@ def _attendance_row(
         role_key=role.role_key if role else None,
         role_name=role.role_name if role else None,
         is_self=sub is not None and sub == viewer_sub,
+        unexcused=unexcused,
         cells=tuple(_attendance_cell(month_key(m), cells, member=bool(own_terms)) for m in months),
     )
 
@@ -592,9 +619,13 @@ class GremienService:
         )
         items: dict[UUID, int] = {mid: int(n) for mid, n in agenda.all()}
         found = await self.session.execute(
-            select(Protocol.meeting_id, Protocol.status).where(Protocol.meeting_id.in_(ids))
+            select(Protocol.meeting_id, Protocol.status, Protocol.approved_at).where(
+                Protocol.meeting_id.in_(ids)
+            )
         )
-        protocols: dict[UUID, str] = dict(found.all())
+        protocols: dict[UUID, tuple[str, bool]] = {
+            mid: (status, approved is not None) for mid, status, approved in found.all()
+        }
         records = await self.session.execute(
             select(
                 MeetingAttendance.meeting_id,
@@ -662,7 +693,13 @@ class GremienService:
         )
 
         terms = await self._terms(gremium_id)
-        principal_ids = {t.principal_id for t in terms} | set(cells)
+        periods = await self.session.get(MeetingSettings, 1)
+        first_day = term_start(
+            self._today(now),
+            periods.term_start_month if periods else DEFAULT_TERM_START_MONTH,
+        )
+        absences = await unexcused_counts(self.session, gremium_id, first_day, term_end(first_day))
+        principal_ids = {t.principal_id for t in terms} | set(cells) | set(absences)
         people = await self._people(principal_ids)
 
         rows = [
@@ -673,12 +710,15 @@ class GremienService:
                 months,
                 cells.get(pid, {}),
                 principal.sub,
+                absences.get(pid, 0),
             )
             for pid in principal_ids
         ]
         return AttendanceOut(
             from_month=month_key(months[0]),
             to_month=month_key(months[-1]),
+            term_start=first_day,
+            absence_limit=periods.absence_limit if periods else DEFAULT_ABSENCE_LIMIT,
             months=[
                 AttendanceMonthOut(month=month_key(m), meetings=held.get(month_key(m), 0))
                 for m in months
@@ -776,9 +816,11 @@ class GremienService:
         return {pid: (display, sub) for pid, display, sub in rows.all()}
 
     async def member_attendance(
-        self, gremium_id: UUID, principal_id: UUID, month: str
+        self, gremium_id: UUID, principal_id: UUID, month: str, *, requester_sub: str | None = None
     ) -> MemberAttendanceOut:
         """Return the closed meetings of one month with the state of one member.
+
+        The own ``absent`` rows carry the end of the late-excuse window while it is open.
 
         Raises:
             NotFoundError: The principal does not exist, or has neither a membership in
@@ -791,7 +833,7 @@ class GremienService:
         first_month = parse_month(month)
         after = shift_month(first_month, 1)
         found = await self.session.execute(
-            select(Meeting.id, Meeting.title, Meeting.date, Meeting.start_time)
+            select(Meeting.id, Meeting.title, Meeting.date, Meeting.start_time, Meeting.closed_at)
             .where(
                 self._closed_in(
                     gremium_id,
@@ -803,6 +845,7 @@ class GremienService:
         )
         meetings = tuple(found.all())
         records, delegates = await self._member_states(principal_id, [mid for mid, *_ in meetings])
+        window = await self._excuse_window(own=person.sub == requester_sub)
         return MemberAttendanceOut(
             principal_id=principal_id,
             display_name=person.display_name,
@@ -815,10 +858,22 @@ class GremienService:
                     start_time=start,
                     status=_member_state(records.get(mid), delegated=mid in delegates),
                     delegate_name=delegates.get(mid),
+                    late_excuse_until=_late_until(
+                        records.get(mid), closed, window, delegated=mid in delegates
+                    ),
                 )
-                for mid, title, day, start in meetings
+                for mid, title, day, start, closed in meetings
             ],
         )
+
+    async def _excuse_window(self, *, own: bool) -> timedelta | None:
+        """Return the late-excuse period for the own rows, else None."""
+        if not own:
+            return None
+        days = await self.session.scalar(
+            select(MeetingSettings.late_excuse_days).where(MeetingSettings.id == 1)
+        )
+        return timedelta(days=DEFAULT_LATE_EXCUSE_DAYS if days is None else int(days))
 
     async def _member_states(
         self, principal_id: UUID, ids: Sequence[UUID]

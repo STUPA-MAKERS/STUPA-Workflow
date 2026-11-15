@@ -924,6 +924,13 @@
 
 // -- pages --------------------------------------------------------------------
 
+// The text across every page of the document (000925), for example "Entwurf" on the
+// draft of a protocol: the watermark of an A4 page, or nothing without the key.
+#let page-watermark(doc) = {
+  let text-of = doc.at("watermark", default: none)
+  if text-of != none { watermark(text-of, 595.28, 841.89) }
+}
+
 // The footer graphic of every page: the Skyline unless the data names another one,
 // and nothing when `footer_graphic` is none.
 #let footer-graphic(doc) = {
@@ -936,7 +943,7 @@
 #let title-page(doc) = page(
   margin: 2cm,
   background: footer-graphic(doc),
-  foreground: none,
+  foreground: page-watermark(doc),
   {
     // The first logo sits 2cm from the left and 1.5cm from the top edge,
     // 1.4cm high; the next ones follow 0.5cm apart.
@@ -1051,7 +1058,7 @@
     header: none,
     footer: none,
     background: footer-graphic(doc) + footer-logos,
-    foreground: frame,
+    foreground: frame + page-watermark(doc),
   )
 
   if doc.at("cover", default: true) {

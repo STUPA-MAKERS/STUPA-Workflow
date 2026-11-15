@@ -17,6 +17,7 @@ import {
   shiftMonth,
   sortRows,
   toCsv,
+  rangeDays,
 } from './gremien.util';
 
 const MONTHS: GremiumAttendanceMonth[] = [
@@ -32,6 +33,7 @@ function row(name: string | null, cells: [boolean, number][], id = name ?? 'x'):
     roleKey: 'member',
     roleName: { de: 'Mitglied' },
     isSelf: false,
+    unexcused: 0,
     cells: cells.map(([member, present], i) => ({
       month: MONTHS[i].month,
       member,
@@ -158,5 +160,12 @@ describe('gremien.util', () => {
     expect(fileSlug('Fachschaft Wirtschaft & Recht')).toBe('fachschaft-wirtschaft-recht');
     expect(fileSlug('Ärzte-Ausschuss')).toBe('arzte-ausschuss');
     expect(fileSlug('!!!')).toBe('gremium');
+  });
+});
+
+describe('rangeDays', () => {
+  it('gives the first and the last day of a range of months', () => {
+    expect(rangeDays({ from: '2026-10', to: '2027-02' })).toEqual({ from: '2026-10-01', to: '2027-02-28' });
+    expect(rangeDays({ from: '2024-02', to: '2024-02' })).toEqual({ from: '2024-02-01', to: '2024-02-29' });
   });
 });

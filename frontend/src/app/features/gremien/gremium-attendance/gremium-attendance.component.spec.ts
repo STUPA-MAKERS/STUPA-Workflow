@@ -1,7 +1,9 @@
 import { render, screen, within } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
+import { ApiClient } from '@core/api/api-client.service';
 import { GremienApiService } from '@core/api/gremien.service';
-import { downloadBlob, MEDIA } from '@stupa-makers/ui-kit';
+import { AuthService } from '@core/auth/auth.service';
+import { downloadBlob, MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { GREMIEN_TEST_NOW, attendance, gremienApiMock } from '../../../../testing/gremien-fixtures';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
@@ -23,7 +25,9 @@ function readBlob(blob: Blob): Promise<string> {
   });
 }
 
-async function setup(opts: { api?: ReturnType<typeof gremienApiMock>; phone?: boolean; fill?: boolean } = {}) {
+async function setup(
+  opts: { api?: ReturnType<typeof gremienApiMock>; phone?: boolean; fill?: boolean; manage?: boolean } = {},
+) {
   localStorage.setItem('ap.locale', 'de');
   const restore = matchMediaQueries(...(opts.phone ? [MEDIA.phone] : []));
   const api = opts.api ?? gremienApiMock();
@@ -32,9 +36,16 @@ async function setup(opts: { api?: ReturnType<typeof gremienApiMock>; phone?: bo
     providers: [
       { provide: GremienApiService, useValue: api },
       { provide: GREMIEN_NOW, useValue: GREMIEN_TEST_NOW },
+      { provide: AuthService, useValue: { canInGremium: () => opts.manage ?? false } },
+      { provide: ApiClient, useValue: {} },
     ],
   });
-  return { ...view, api, restore, cmp: view.fixture.componentInstance };
+  const toasts = () =>
+    view.fixture.debugElement.injector
+      .get(ToastService)
+      .toasts()
+      .map((t) => t.message);
+  return { ...view, api, restore, toasts, cmp: view.fixture.componentInstance };
 }
 
 describe('GremiumAttendanceComponent', () => {
@@ -166,6 +177,70 @@ describe('GremiumAttendanceComponent', () => {
     expect(lines[3]).toBe('Kai Meier;Mitglied;;;;;0;0;0;0;0;0;');
   });
 
+  /** § 000920 */
+  it('names the unexcused absences of the term with the limit, in the warning colour near it', async () => {
+    const view = await setup();
+    restore = view.restore;
+    const finn = screen.getByRole('rowheader', { name: /Finn Schulze/ });
+    expect(finn).toHaveTextContent('2 von 3 unentschuldigt');
+    expect(finn.querySelector('.gat__absent')?.classList.contains('gat__absent--near')).toBe(true);
+    expect(screen.getByRole('rowheader', { name: /Anna Berg/ }).querySelector('.gat__absent')).toBeNull();
+  });
+
+  it('shows the unexcused absences on a phone card too, plain below the limit', async () => {
+    const data = attendance({ absenceLimit: 5 });
+    const view = await setup({ phone: true, api: gremienApiMock({ attendance: jest.fn(() => of(data)) }) });
+    restore = view.restore;
+    const mark = screen.getByText('2 von 5 unentschuldigt');
+    expect(mark.classList.contains('gat__absent--near')).toBe(false);
+  });
+
+  /** § 000923 */
+  it('exports the attendance list of the range as XLSX for a person who leads meetings', async () => {
+    const view = await setup({ manage: true });
+    restore = view.restore;
+    screen.getByRole('button', { name: 'Anwesenheitsliste (XLSX)' }).click();
+    expect(view.api.attendanceExport).toHaveBeenCalledWith('g-1', '2026-05-01', '2026-10-31');
+    const [, name] = (downloadBlob as jest.Mock).mock.calls[0] as [Blob, string];
+    expect(name).toBe('studierendenparlament-anwesenheitsliste-2026-05-01-2026-10-31.xlsx');
+    expect(view.cmp.exporting()).toBe(false);
+  });
+
+  it('hides the XLSX export without the right', async () => {
+    const plain = await setup();
+    restore = plain.restore;
+    expect(screen.queryByRole('button', { name: 'Anwesenheitsliste (XLSX)' })).toBeNull();
+  });
+
+  it('reports a failed export', async () => {
+    const view = await setup({
+      manage: true,
+      api: gremienApiMock({ attendanceExport: jest.fn(() => throwError(() => new Error('x'))) }),
+    });
+    restore = view.restore;
+    view.cmp.exportList();
+    expect(view.toasts()).toContain('Die Anwesenheitsliste konnte nicht erstellt werden.');
+    expect(downloadBlob).not.toHaveBeenCalled();
+  });
+
+  it('starts no second export while one runs', async () => {
+    const { Subject } = await import('rxjs');
+    const pending = new Subject<Blob>();
+    const view = await setup({ manage: true, api: gremienApiMock({ attendanceExport: jest.fn(() => pending) }) });
+    restore = view.restore;
+    view.cmp.exportList();
+    view.cmp.exportList();
+    expect(view.api.attendanceExport).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads the matrix again after a late excuse', async () => {
+    const view = await setup();
+    restore = view.restore;
+    view.api.attendance.mockClear();
+    view.fixture.debugElement.query((d) => d.name === 'app-attendance-detail').triggerEventHandler('changed');
+    expect(view.api.attendance).toHaveBeenCalledTimes(1);
+  });
+
   it('exports nothing before the data is there', async () => {
     const view = await setup({ api: gremienApiMock({ attendance: jest.fn(() => throwError(() => new Error('x'))) }) });
     restore = view.restore;
@@ -237,6 +312,7 @@ describe('GremiumAttendanceComponent', () => {
           roleKey: null,
           roleName: null,
           isSelf: false,
+          unexcused: 0,
           cells: [{ month: '2026-09', member: true, present: 1, excused: 0, delegated: 0 }, { month: '2026-11', member: true, present: 0, excused: 0, delegated: 0 }, { month: '2026-12', member: true, present: 0, excused: 0, delegated: 0 }],
         },
         { ...data.rows[0], cells: data.rows[0].cells.slice(0, 1) },
