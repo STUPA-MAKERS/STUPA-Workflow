@@ -411,45 +411,60 @@ describe('MeetingPageComponent', () => {
   describe('planned', () => {
     const planned = (over: Partial<Meeting> = {}) => meeting({ status: 'planned', ...over });
 
-    /** The opening is a menu item on every screen; the page opens on the item, not on a checklist. */
-    it.each([[[]], [[MEDIA.wide]], [[MEDIA.phone]]])(
-      'keeps the opening in the menu, disabled without a minute-taker (%j)',
+    /** The opening stands where the close stands: a header button above the phone width (spec 000096). */
+    it.each([[[]], [[MEDIA.wide]]])(
+      'shows the opening as a header button, not in the menu, disabled without a minute-taker (%j)',
       async (media) => {
         const { on } = await setup({ meeting: planned({ protokollantId: null, protokollantName: null }), protocol: null }, media);
-        expect(screen.queryByRole('button', { name: 'Sitzung eröffnen' })).toBeNull();
         expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
+        const start = screen.getByRole('button', { name: 'Sitzung eröffnen' });
+        expect(start).toBeDisabled();
+        expect(start).toHaveAttribute('title', 'Erst die Protokollführung zuweisen.');
         const menu = await openMenu();
-        const start = within(menu).getByRole('menuitem', { name: 'Sitzung eröffnen' });
-        expect(start).toHaveAttribute('aria-disabled', 'true');
-        expect(within(menu).getAllByText('Erst die Protokollführung zuweisen.').length).toBeGreaterThan(0);
-        await userEvent.click(start);
+        expect(within(menu).queryByRole('menuitem', { name: 'Sitzung eröffnen' })).toBeNull();
+        await userEvent.keyboard('{Escape}');
         expect(on.startSession).not.toHaveBeenCalled();
       },
     );
 
-    it('opens from the menu once a minute-taker is set', async () => {
-      const { on } = await setup({ meeting: planned(), protocol: null }, [MEDIA.wide]);
+    it('keeps the opening in the phone menu, disabled without a minute-taker', async () => {
+      const { on } = await setup({ meeting: planned({ protokollantId: null, protokollantName: null }), protocol: null }, [MEDIA.phone]);
+      expect(screen.queryByRole('button', { name: 'Sitzung eröffnen' })).toBeNull();
       const menu = await openMenu();
       const start = within(menu).getByRole('menuitem', { name: 'Sitzung eröffnen' });
+      expect(start).toHaveAttribute('aria-disabled', 'true');
+      expect(within(menu).getAllByText('Erst die Protokollführung zuweisen.').length).toBeGreaterThan(0);
+      await userEvent.click(start);
+      expect(on.startSession).not.toHaveBeenCalled();
+    });
+
+    it('opens from the header button once a minute-taker is set', async () => {
+      const { on } = await setup({ meeting: planned(), protocol: null }, [MEDIA.wide]);
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzung eröffnen' }));
+      expect(on.startSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('opens from the phone menu once a minute-taker is set', async () => {
+      const { on } = await setup({ meeting: planned(), protocol: null }, [MEDIA.phone]);
+      const start = within(await openMenu()).getByRole('menuitem', { name: 'Sitzung eröffnen' });
       expect(start).not.toHaveAttribute('aria-disabled');
       await userEvent.click(start);
       expect(on.startSession).toHaveBeenCalledTimes(1);
     });
 
-    /** The disabled item says when the open window opens. */
+    /** Before the open window the disabled button says when it opens. */
     it('keeps the opening disabled before the open window and says when it opens', async () => {
       const soon = (min: number): string => new Date(Date.now() + min * 60_000).toISOString();
       const { on } = await setup({ meeting: planned({ opensAt: soon(30), confirmUntil: soon(80) }), protocol: null });
-      const menu = await openMenu();
-      const start = within(menu).getByRole('menuitem', { name: 'Sitzung eröffnen' });
-      expect(start).toHaveAttribute('aria-disabled', 'true');
-      expect(start.getAttribute('title')).toMatch(/^Möglich ab /);
+      const start = screen.getByRole('button', { name: /^Möglich ab / });
+      expect(start).toBeDisabled();
       await userEvent.click(start);
       expect(on.startSession).not.toHaveBeenCalled();
     });
 
     it('shows no opening to a reader without session control', async () => {
       await setup({ meeting: planned({ canControl: false, canManage: false }), protocol: null });
+      expect(screen.queryByRole('button', { name: 'Sitzung eröffnen' })).toBeNull();
       expect(within(await openMenu()).queryByRole('menuitem', { name: 'Sitzung eröffnen' })).toBeNull();
     });
 

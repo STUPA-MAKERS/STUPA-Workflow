@@ -752,16 +752,17 @@ describe('MeetingsComponent', () => {
     /**
      * The minute-taker is reassigned in the settings dialog, and that dialog opens from this
      * toolbar. If the toolbar is hidden from everybody else, the meeting is stranded when the
-     * minute-taker drops out. The start sits in the header and in the checklist while the meeting
-     * is planned. Settings and delete are in the session menu. The participant view must not take
+     * minute-taker drops out. The start sits in the header while the meeting is planned (on a
+     * phone in the session menu). Settings and delete are in the session menu. The participant view must not take
      * the page over.
      */
     it('keeps the control toolbar for a manager who is not the minute-taker', async () => {
       await loadOtherProtokollant();
 
       expect(await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sitzung eröffnen' })).toBeEnabled();
       await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
-      expect(await screen.findByRole('menuitem', { name: 'Sitzung eröffnen' })).not.toHaveAttribute('aria-disabled');
+      expect(await screen.findByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Sitzung löschen' })).toBeInTheDocument();
       expect(screen.queryByRole('complementary', { name: 'Teilnahme' })).not.toBeInTheDocument();
