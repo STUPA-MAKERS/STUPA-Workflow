@@ -66,47 +66,35 @@ describe('MeetingSessionService', () => {
   });
 
   /**
-   * The early open sends no PATCH, and the page reads the meeting again for a fresh window. When
-   * the dialog confirms, the PATCH carries confirmEarly and the question closes.
+   * The open before the window sends no PATCH, and the page reads the meeting again for a fresh
+   * window. In the window the open sends the PATCH at once (§F/meetings/meetings/000092).
    */
-  it('refuses an open before the window and asks before an early open', () => {
+  it('refuses an open before the window and opens in it without a question', () => {
     const { http, session, toasts } = setup();
     const at = (min: number): string => new Date(Date.now() + min * 60_000).toISOString();
-    session.meeting.set(M({ opensAt: at(60), confirmUntil: at(110) }));
+    session.meeting.set(M({ opensAt: at(60) }));
     session.startMeeting();
     http.expectOne({ method: 'GET', url: '/api/meetings/m-1' }).flush({ id: 'm-1', title: 'x', status: 'planned', opensAt: at(60), votes: [], createdAt: 'x' });
     http.verify();
     expect(toasts()).toContain('Die Sitzung lässt sich noch nicht eröffnen.');
-    expect(session.earlyOpenAsk()).toBe(false);
 
-    session.meeting.set(M({ opensAt: at(-20), confirmUntil: at(30) }));
+    session.meeting.set(M({ opensAt: at(-20) }));
     session.startMeeting();
-    http.verify();
-    expect(session.earlyOpenAsk()).toBe(true);
-    session.startMeeting(true);
-    expect(session.earlyOpenAsk()).toBe(false);
     const req = http.expectOne('/api/meetings/m-1');
-    expect(req.request.body).toEqual({ status: 'live', confirmEarly: true });
+    expect(req.request.body).toEqual({ status: 'live' });
     req.flush({ id: 'm-1', title: 'x', status: 'live', protocolId: null, votes: [], createdAt: 'x' });
     expect(session.meeting()?.status).toBe('live');
   });
 
   /** The toast shows the German text, not the English server detail. */
-  it('asks when the server still finds the open early, and maps a too-early refusal', () => {
+  it('maps a too-early refusal of the server', () => {
     const { http, session, toasts } = setup();
     session.meeting.set(M());
     session.startMeeting();
     http
       .expectOne('/api/meetings/m-1')
-      .flush({ code: 'early_open_unconfirmed', detail: 'early' }, { status: 409, statusText: 'Conflict' });
-    expect(session.earlyOpenAsk()).toBe(true);
-
-    session.startMeeting(true);
-    http
-      .expectOne('/api/meetings/m-1')
       .flush({ code: 'meeting_too_early', detail: 'too early' }, { status: 409, statusText: 'Conflict' });
     http.expectOne('/api/meetings/m-1').flush({ id: 'm-1', title: 'x', status: 'planned', votes: [], createdAt: 'x' });
-    expect(session.earlyOpenAsk()).toBe(false);
     expect(toasts()).toContain('Die Sitzung lässt sich noch nicht eröffnen.');
     expect(toasts().some((t) => t.includes('too early'))).toBe(false);
   });

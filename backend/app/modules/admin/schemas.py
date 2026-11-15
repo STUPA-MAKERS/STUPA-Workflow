@@ -926,22 +926,17 @@ class GuestSettingsOut(FrozenCamelModel, frozen=True):
 
 
 class MeetingSettingsOut(FrozenCamelModel, frozen=True):
-    """The open window of meetings, in minutes before the planned start."""
+    """The earliest open of meetings, in minutes before the planned start."""
 
     open_lead_minutes: int = Field(serialization_alias="openLeadMinutes")
-    confirm_lead_minutes: int = Field(serialization_alias="confirmLeadMinutes")
     updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
     updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
 
 
 class MeetingSettingsUpdate(FrozenStrictCamelModel, frozen=True):
-    """Full replacement of the meeting settings.
-
-    ``confirmLeadMinutes`` must not be larger than ``openLeadMinutes`` (422).
-    """
+    """Full replacement of the meeting settings."""
 
     open_lead_minutes: int = Field(alias="openLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
-    confirm_lead_minutes: int = Field(alias="confirmLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
 
 
 class GremiumDefaults(FrozenStrictCamelModel, frozen=True):
@@ -976,7 +971,6 @@ class MeetingPeriods(FrozenStrictCamelModel, frozen=True):
     invite_days_extraordinary: int = Field(
         alias="inviteDaysExtraordinary", ge=1, le=MAX_PERIOD_DAYS
     )
-    protocol_draft_days: int = Field(alias="protocolDraftDays", ge=0, le=MAX_PERIOD_DAYS)
     late_excuse_days: int = Field(alias="lateExcuseDays", ge=1, le=MAX_PERIOD_DAYS)
     absence_limit: int = Field(alias="absenceLimit", ge=1, le=MAX_ABSENCE_LIMIT)
     circular_min_days: int = Field(alias="circularMinDays", ge=1, le=MAX_PERIOD_DAYS)

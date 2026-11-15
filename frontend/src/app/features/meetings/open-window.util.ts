@@ -8,21 +8,14 @@ import { clock, dayMonth } from '@shared/date-format';
  * Where "now" is in the open window of a planned meeting.
  *
  * - `tooEarly`: before `opensAt`. The server refuses the open (409 `meeting_too_early`).
- * - `early`: before `confirmUntil`. The open needs the extra confirmation (`confirmEarly`).
  * - `ok`: no window (no date, not planned), or late enough.
  */
-export type OpenWindowState = 'tooEarly' | 'early' | 'ok';
+export type OpenWindowState = 'tooEarly' | 'ok';
 
 /** The state of the open window at `now` (epoch milliseconds). */
-export function openWindowState(
-  m: Pick<Meeting, 'opensAt' | 'confirmUntil'>,
-  now: number,
-): OpenWindowState {
+export function openWindowState(m: Pick<Meeting, 'opensAt'>, now: number): OpenWindowState {
   const opensAt = m.opensAt ? Date.parse(m.opensAt) : Number.NaN;
-  if (!Number.isNaN(opensAt) && now < opensAt) return 'tooEarly';
-  const confirmUntil = m.confirmUntil ? Date.parse(m.confirmUntil) : Number.NaN;
-  if (!Number.isNaN(confirmUntil) && now < confirmUntil) return 'early';
-  return 'ok';
+  return !Number.isNaN(opensAt) && now < opensAt ? 'tooEarly' : 'ok';
 }
 
 /**

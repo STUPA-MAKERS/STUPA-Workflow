@@ -8,9 +8,9 @@ import type { MeetingSettings } from '../../admin.models';
 import { MeetingWindowSettingsComponent } from './meeting-window.component';
 import { loadErrorToast, toastWith } from '../../../../../testing/load-error';
 
-type Body = Pick<MeetingSettings, 'openLeadMinutes' | 'confirmLeadMinutes'>;
+type Body = Pick<MeetingSettings, 'openLeadMinutes'>;
 
-function makeApi(initial: MeetingSettings = { openLeadMinutes: 60, confirmLeadMinutes: 10 }) {
+function makeApi(initial: MeetingSettings = { openLeadMinutes: 60 }) {
   return {
     getMeetingSettings: jest.fn(() => of(initial)),
     putMeetingSettings: jest.fn((b: Body) => of({ ...b, updatedAt: null })),
@@ -37,7 +37,6 @@ async function setup(opts: { api?: Record<string, jest.Mock>; perms?: string[] }
 }
 
 const openField = (): HTMLInputElement => screen.getByLabelText('Frühestens eröffnen');
-const confirmField = (): HTMLInputElement => screen.getByLabelText('Ohne Rückfrage eröffnen ab');
 
 describe('MeetingWindowSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
@@ -47,21 +46,18 @@ describe('MeetingWindowSettingsComponent', () => {
     const { api, toast, c } = await setup();
     expect(screen.getByRole('heading', { name: 'Sitzung eröffnen' })).toBeInTheDocument();
     expect(openField().value).toBe('60');
-    expect(confirmField().value).toBe('10');
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     expect(c.dirty()).toBe(false);
     await userEvent.clear(openField());
     await userEvent.type(openField(), '90');
-    await userEvent.clear(confirmField());
-    await userEvent.type(confirmField(), '0');
     expect(c.dirty()).toBe(true);
     c.save();
-    expect(api.putMeetingSettings).toHaveBeenCalledWith({ openLeadMinutes: 90, confirmLeadMinutes: 0 });
+    expect(api.putMeetingSettings).toHaveBeenCalledWith({ openLeadMinutes: 90 });
     expect(toast.success).toHaveBeenCalled();
     expect(c.dirty()).toBe(false);
   });
 
-  it('refuses a value outside the range and a confirm point before the open', async () => {
+  it('refuses a value outside the range', async () => {
     const { api, c } = await setup();
     await userEvent.clear(openField());
     await userEvent.type(openField(), '10081');
@@ -69,11 +65,6 @@ describe('MeetingWindowSettingsComponent', () => {
     expect(c.valid()).toBe(false);
     await userEvent.clear(openField());
     await userEvent.type(openField(), '5');
-    expect(screen.getByText('Höchstens so viele Minuten wie bei „Frühestens eröffnen“.')).toBeInTheDocument();
-    expect(c.valid()).toBe(false);
-    await userEvent.clear(confirmField());
-    expect(screen.getByText('Eine ganze Zahl von 0 bis 10080 Minuten.')).toBeInTheDocument();
-    await userEvent.type(confirmField(), '5');
     expect(c.valid()).toBe(true);
     expect(api.putMeetingSettings).not.toHaveBeenCalled();
   });
@@ -93,7 +84,7 @@ describe('MeetingWindowSettingsComponent', () => {
   it('does nothing on save without a change or with an invalid field', async () => {
     const { api, c } = await setup();
     c.save();
-    c.patch({ confirm: 'x' });
+    c.patch({ open: 'x' });
     c.save();
     expect(api.putMeetingSettings).not.toHaveBeenCalled();
   });

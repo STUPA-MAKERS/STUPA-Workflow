@@ -1,13 +1,11 @@
 """The open window of a meeting and its settings.
 
 A planned meeting opens (``planned`` to ``live``) at the earliest
-``open_lead_minutes`` before its planned start. Up to ``confirm_lead_minutes``
-before the start the open is early: the lead must confirm it (``confirmEarly`` on
-the patch), and the frontend asks in an extra dialog. After that point, and for a
+``open_lead_minutes`` before its planned start. From that point on, and for a
 meeting that is late, the open needs nothing more. A meeting without a date has
 no window, because it has no planned start.
 
-One row (``meeting_settings``, id=1) holds both values. ``GET/PUT
+One row (``meeting_settings``, id=1) holds the value. ``GET/PUT
 /admin/meeting-settings`` (``admin.deadlines``) reads and writes it. The PUT writes a
 ``config_change`` audit entry without a revision, so the audit log cannot revert it.
 """
@@ -25,7 +23,6 @@ from app.modules.audit.service import record as audit_record
 from app.modules.meetings.models import (
     DEFAULT_ABSENCE_LIMIT,
     DEFAULT_CIRCULAR_MIN_DAYS,
-    DEFAULT_CONFIRM_LEAD_MINUTES,
     DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES,
     DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE,
     DEFAULT_GREMIUM_QUORUM_PERCENT,
@@ -34,14 +31,13 @@ from app.modules.meetings.models import (
     DEFAULT_INVITE_DAYS_ORDINARY,
     DEFAULT_LATE_EXCUSE_DAYS,
     DEFAULT_OPEN_LEAD_MINUTES,
-    DEFAULT_PROTOCOL_DRAFT_DAYS,
     DEFAULT_TERM_START_MONTH,
     Meeting,
     MeetingSettings,
 )
 from app.modules.meetings.periods import PERIOD_FIELDS, periods
 from app.modules.meetings.roster import planned_start_utc
-from app.shared.errors import ConflictError, ValidationProblem
+from app.shared.errors import ConflictError
 
 AUDIT_TARGET_TYPE = "meeting_settings"
 
@@ -65,19 +61,16 @@ def gremium_defaults(row: MeetingSettings) -> dict[str, Any]:
 class OpenWindow:
     """The open window of one planned meeting, in UTC.
 
-    ``opens_at`` is the earliest open. Before ``confirm_until`` the open is early and
-    needs the confirmation.
+    ``opens_at`` is the earliest open.
     """
 
     opens_at: datetime
-    confirm_until: datetime
 
 
 def _defaults() -> MeetingSettings:
     return MeetingSettings(
         id=1,
         open_lead_minutes=DEFAULT_OPEN_LEAD_MINUTES,
-        confirm_lead_minutes=DEFAULT_CONFIRM_LEAD_MINUTES,
         default_quorum_percent=DEFAULT_GREMIUM_QUORUM_PERCENT,
         default_repeat_quorum_percent=DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT,
         default_guests_may_vote=False,
@@ -86,7 +79,6 @@ def _defaults() -> MeetingSettings:
         default_delegation_max_per_delegate=DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE,
         invite_days_ordinary=DEFAULT_INVITE_DAYS_ORDINARY,
         invite_days_extraordinary=DEFAULT_INVITE_DAYS_EXTRAORDINARY,
-        protocol_draft_days=DEFAULT_PROTOCOL_DRAFT_DAYS,
         late_excuse_days=DEFAULT_LATE_EXCUSE_DAYS,
         absence_limit=DEFAULT_ABSENCE_LIMIT,
         circular_min_days=DEFAULT_CIRCULAR_MIN_DAYS,
@@ -99,7 +91,7 @@ async def load_meeting_settings(session: AsyncSession) -> MeetingSettings:
 
     The migration inserts the row. A schema built with ``create_all`` alone (tests)
     can lack it, and so can a test database after the truncate between tests. The
-    defaults then apply: 60 minutes and 10 minutes. The function writes nothing.
+    default then applies: 60 minutes. The function writes nothing.
     """
     row = await session.get(MeetingSettings, 1)
     return row if row is not None else _defaults()
@@ -117,19 +109,14 @@ def open_window(meeting: Meeting, settings: MeetingSettings, tz_name: str) -> Op
     start = planned_start_utc(meeting, tz_name)
     if start is None:
         return None
-    return OpenWindow(
-        opens_at=start - timedelta(minutes=settings.open_lead_minutes),
-        confirm_until=start - timedelta(minutes=settings.confirm_lead_minutes),
-    )
+    return OpenWindow(opens_at=start - timedelta(minutes=settings.open_lead_minutes))
 
 
-def check_open(window: OpenWindow | None, *, now: datetime, confirmed: bool) -> None:
-    """Refuse an open of a meeting outside its window.
+def check_open(window: OpenWindow | None, *, now: datetime) -> None:
+    """Refuse an open of a meeting before its window.
 
     Raises:
-        ConflictError: The open is before ``opens_at`` (``meeting_too_early``), or it
-            is before ``confirm_until`` and not confirmed
-            (``early_open_unconfirmed``).
+        ConflictError: The open is before ``opens_at`` (``meeting_too_early``).
     """
     if window is None:
         return
@@ -138,11 +125,6 @@ def check_open(window: OpenWindow | None, *, now: datetime, confirmed: bool) -> 
             "the meeting cannot open yet — it opens at "
             f"{window.opens_at.isoformat()} at the earliest",
             code="meeting_too_early",
-        )
-    if now < window.confirm_until and not confirmed:
-        raise ConflictError(
-            "the meeting opens before its planned start — confirm the early open",
-            code="early_open_unconfirmed",
         )
 
 
@@ -180,39 +162,16 @@ class MeetingSettingsService:
         await self.session.flush()
         return row
 
-    async def update(
-        self, *, open_lead_minutes: int, confirm_lead_minutes: int, actor: str
-    ) -> MeetingSettings:
-        """Replace both values and write a ``config_change`` audit entry.
+    async def update(self, *, open_lead_minutes: int, actor: str) -> MeetingSettings:
+        """Replace the value and write a ``config_change`` audit entry.
 
-        The confirmation point cannot be before the earliest open, so
-        ``confirm_lead_minutes`` must not be larger than ``open_lead_minutes``. The
-        method commits.
-
-        Raises:
-            ValidationProblem: ``confirmLeadMinutes`` is larger than
-                ``openLeadMinutes`` (422).
+        The method commits.
         """
-        if confirm_lead_minutes > open_lead_minutes:
-            raise ValidationProblem(
-                "confirmLeadMinutes must not be larger than openLeadMinutes",
-                errors=[
-                    {
-                        "field": "confirmLeadMinutes",
-                        "msg": "must not be larger than openLeadMinutes",
-                    }
-                ],
-            )
         row = await self.get()
         data: dict[str, Any] = {
             "openLeadMinutes": {"from": row.open_lead_minutes, "to": open_lead_minutes},
-            "confirmLeadMinutes": {
-                "from": row.confirm_lead_minutes,
-                "to": confirm_lead_minutes,
-            },
         }
         row.open_lead_minutes = open_lead_minutes
-        row.confirm_lead_minutes = confirm_lead_minutes
         row.updated_at = datetime.now(UTC)
         row.updated_by = actor
         await audit_record(

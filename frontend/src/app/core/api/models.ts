@@ -1692,8 +1692,6 @@ export interface MeetingOutWire {
   readonly form?: MeetingForm;
   /** The earliest open of a planned meeting with a date (UTC), else `null`. */
   readonly opensAt?: IsoDateTime | null;
-  /** Before this point the open needs `confirmEarly` (UTC), else `null`. */
-  readonly confirmUntil?: IsoDateTime | null;
 }
 
 /** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
@@ -1774,8 +1772,6 @@ export interface MeetingPatchBody {
   readonly repeatOfId?: Uuid | null;
   readonly location?: string | null;
   readonly form?: MeetingForm;
-  /** Confirms an early open (`status: 'live'` before `confirmUntil`). */
-  readonly confirmEarly?: boolean;
 }
 
 /** Body for `POST /protocols/{id}/votes`. It embeds votes. */
@@ -1924,8 +1920,6 @@ export interface Meeting {
   readonly form: MeetingForm;
   /** The earliest open of a planned meeting with a date (ISO, UTC), else `null`. */
   readonly opensAt: IsoDateTime | null;
-  /** Before this point the open is early and needs a confirmation (ISO, UTC), else `null`. */
-  readonly confirmUntil: IsoDateTime | null;
 }
 
 /** Direction of the meeting timeline relative to *now*. */

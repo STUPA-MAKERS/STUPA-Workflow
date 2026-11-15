@@ -156,7 +156,6 @@ class MeetingServiceBase(MeetingReads):
             eligibleCount=getattr(meeting, "eligible_count", None),
             presentSeats=seats,
             opensAt=window.opens_at if window is not None else None,
-            confirmUntil=window.confirm_until if window is not None else None,
         )
 
     async def _open_windows(self, meetings: Sequence[Meeting]) -> dict[UUID, OpenWindow | None]:

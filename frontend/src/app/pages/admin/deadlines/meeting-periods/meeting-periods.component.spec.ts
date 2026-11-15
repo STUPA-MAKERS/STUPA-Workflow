@@ -12,7 +12,6 @@ import { toastWith } from '../../../../../testing/load-error';
 const STORED: MeetingPeriods = {
   inviteDaysOrdinary: 7,
   inviteDaysExtraordinary: 3,
-  protocolDraftDays: 14,
   lateExcuseDays: 7,
   absenceLimit: 3,
   circularMinDays: 3,
@@ -50,12 +49,11 @@ const field = (label: string): HTMLInputElement => screen.getByLabelText(label);
 describe('MeetingPeriodsSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('shows the seven stored periods and saves a new one with the others', async () => {
+  it('shows the six stored periods and saves a new one with the others', async () => {
     const { api, toast, c } = await setup();
     expect(screen.getByRole('heading', { name: 'Sitzungsfristen' })).toBeInTheDocument();
     expect(field('Ladungsfrist ordentliche Sitzung').value).toBe('7');
     expect(field('Ladungsfrist andere Sitzungen').value).toBe('3');
-    expect(field('Protokollentwurf nach').value).toBe('14');
     expect(field('Nachträgliche Entschuldigung bis').value).toBe('7');
     expect(field('Umlaufverfahren mindestens').value).toBe('3');
     expect(field('Unentschuldigte Abwesenheiten bis zum Mandatsverlust').value).toBe('3');
@@ -93,13 +91,13 @@ describe('MeetingPeriodsSettingsComponent', () => {
 
   it('puts the stored values back on discard', async () => {
     const { fixture, c } = await setup();
-    await userEvent.clear(field('Protokollentwurf nach'));
-    await userEvent.type(field('Protokollentwurf nach'), '21');
+    await userEvent.clear(field('Nachträgliche Entschuldigung bis'));
+    await userEvent.type(field('Nachträgliche Entschuldigung bis'), '21');
     c.discard();
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(field('Protokollentwurf nach').value).toBe('14');
+    expect(field('Nachträgliche Entschuldigung bis').value).toBe('7');
     expect(c.dirty()).toBe(false);
   });
 

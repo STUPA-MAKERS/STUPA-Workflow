@@ -425,12 +425,12 @@ describe('AdminApiService — real mode (contract)', () => {
   it('GETs and PUTs the meeting settings', () => {
     let read: unknown;
     s.getMeetingSettings().subscribe((v) => (read = v));
-    http.expectOne({ method: 'GET', url: '/api/admin/meeting-settings' }).flush({ openLeadMinutes: 60, confirmLeadMinutes: 10 });
-    expect(read).toEqual({ openLeadMinutes: 60, confirmLeadMinutes: 10 });
-    s.putMeetingSettings({ openLeadMinutes: 30, confirmLeadMinutes: 5 }).subscribe();
+    http.expectOne({ method: 'GET', url: '/api/admin/meeting-settings' }).flush({ openLeadMinutes: 60 });
+    expect(read).toEqual({ openLeadMinutes: 60 });
+    s.putMeetingSettings({ openLeadMinutes: 30 }).subscribe();
     const req = http.expectOne({ method: 'PUT', url: '/api/admin/meeting-settings' });
-    expect(req.request.body).toEqual({ openLeadMinutes: 30, confirmLeadMinutes: 5 });
-    req.flush({ openLeadMinutes: 30, confirmLeadMinutes: 5 });
+    expect(req.request.body).toEqual({ openLeadMinutes: 30 });
+    req.flush({ openLeadMinutes: 30 });
   });
 
   /** § 000917 */
@@ -438,7 +438,6 @@ describe('AdminApiService — real mode (contract)', () => {
     const periods = {
       inviteDaysOrdinary: 7,
       inviteDaysExtraordinary: 3,
-      protocolDraftDays: 14,
       lateExcuseDays: 7,
       absenceLimit: 3,
       circularMinDays: 3,
@@ -1124,9 +1123,9 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(await firstValueFrom(s.getGuestSettings())).toEqual({ confirmTtlHours: 12, linkTtlDays: null });
     await firstValueFrom(s.putGuestSettings({ confirmTtlHours: 48, linkTtlDays: 14 }));
     expect(await firstValueFrom(s.getGuestSettings())).toEqual({ confirmTtlHours: 48, linkTtlDays: 14 });
-    expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 60, confirmLeadMinutes: 10 });
-    await firstValueFrom(s.putMeetingSettings({ openLeadMinutes: 120, confirmLeadMinutes: 15 }));
-    expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 120, confirmLeadMinutes: 15 });
+    expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 60 });
+    await firstValueFrom(s.putMeetingSettings({ openLeadMinutes: 120 }));
+    expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 120 });
   });
 
   it('answers the meeting periods in the mock', async () => {

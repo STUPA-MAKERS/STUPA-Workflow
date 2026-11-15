@@ -27,7 +27,6 @@ const DAYS: TranslationKey = 'admin.meetingPeriods.days';
 const FIELDS: readonly Field[] = [
   { key: 'inviteDaysOrdinary', label: 'admin.meetingPeriods.inviteDaysOrdinary', unit: DAYS },
   { key: 'inviteDaysExtraordinary', label: 'admin.meetingPeriods.inviteDaysExtraordinary', unit: DAYS },
-  { key: 'protocolDraftDays', label: 'admin.meetingPeriods.protocolDraftDays', unit: DAYS },
   { key: 'lateExcuseDays', label: 'admin.meetingPeriods.lateExcuseDays', unit: DAYS },
   { key: 'circularMinDays', label: 'admin.meetingPeriods.circularMinDays', unit: DAYS },
   { key: 'absenceLimit', label: 'admin.meetingPeriods.absenceLimit', unit: null },

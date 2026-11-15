@@ -6,15 +6,15 @@ const NOW = Date.parse('2026-10-20T15:30:00Z');
 const iso = (min: number): string => new Date(NOW + min * 60_000).toISOString();
 
 describe('openWindowState', () => {
-  it('is tooEarly before opensAt, early before confirmUntil, else ok', () => {
-    expect(openWindowState({ opensAt: iso(1), confirmUntil: iso(50) }, NOW)).toBe('tooEarly');
-    expect(openWindowState({ opensAt: iso(0), confirmUntil: iso(50) }, NOW)).toBe('early');
-    expect(openWindowState({ opensAt: iso(-60), confirmUntil: iso(0) }, NOW)).toBe('ok');
+  it('is tooEarly before opensAt, else ok', () => {
+    expect(openWindowState({ opensAt: iso(1) }, NOW)).toBe('tooEarly');
+    expect(openWindowState({ opensAt: iso(0) }, NOW)).toBe('ok');
+    expect(openWindowState({ opensAt: iso(-60) }, NOW)).toBe('ok');
   });
 
   it('is ok without a window or with a broken value', () => {
-    expect(openWindowState({ opensAt: null, confirmUntil: null }, NOW)).toBe('ok');
-    expect(openWindowState({ opensAt: 'nonsense', confirmUntil: 'nonsense' }, NOW)).toBe('ok');
+    expect(openWindowState({ opensAt: null }, NOW)).toBe('ok');
+    expect(openWindowState({ opensAt: 'nonsense' }, NOW)).toBe('ok');
   });
 });
 

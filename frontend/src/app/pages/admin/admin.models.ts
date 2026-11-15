@@ -1119,13 +1119,11 @@ export const MAX_LINK_TTL_DAYS = 3650;
 
 /**
  * The open window of meetings (P admin.deadlines): `GET/PUT /admin/meeting-settings`.
- * Both values are minutes before the planned start of a meeting.
+ * The value is minutes before the planned start of a meeting.
  */
 export interface MeetingSettings {
   /** The earliest open (0 to 10080). */
   readonly openLeadMinutes: number;
-  /** Before this point the open needs an extra confirmation (0 to `openLeadMinutes`). */
-  readonly confirmLeadMinutes: number;
 }
 
 /**
@@ -1166,7 +1164,6 @@ export interface MeetingPeriods {
   /** Days between the invitation and a meeting of every other kind. */
   readonly inviteDaysExtraordinary: number;
   /** Days after a meeting until the draft of the protocol is due. */
-  readonly protocolDraftDays: number;
   /** Days after the close of a meeting in which a member can still give an excuse. */
   readonly lateExcuseDays: number;
   /** The number of unexcused absences in one term that ends a Mandat. */
@@ -1183,7 +1180,6 @@ export type MeetingPeriodKey = keyof MeetingPeriods;
 export const MEETING_PERIOD_BOUNDS: Readonly<Record<MeetingPeriodKey, readonly [number, number]>> = {
   inviteDaysOrdinary: [1, 365],
   inviteDaysExtraordinary: [1, 365],
-  protocolDraftDays: [0, 365],
   lateExcuseDays: [1, 365],
   absenceLimit: [1, 50],
   circularMinDays: [1, 365],
