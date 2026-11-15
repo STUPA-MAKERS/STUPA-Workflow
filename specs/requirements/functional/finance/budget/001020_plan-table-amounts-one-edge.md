@@ -24,13 +24,17 @@ In a table with amount fields (000810), the sum of a parent must have the width 
 inner padding of a field, with its € at the place of the € of a field, and the weight of the
 text of a field. So each amount and each € of the column end on one edge.
 
+On a wide screen the rows of the plan tables must stand on surface 2 of the sheet (surface 1),
+with surface 1 between them, as the row groups on a pane do.
+
 An amount field in a table row must have no fill and a thin edge. The hover of a row must
 not hide the box of a field. A display setting that colours the fields (000598, very high
 contrast) must still colour them.
 
 Reason: In one column, "150.475,00 €" in a field, "0 €" in bold beside it and "0,00 €"
 in the next field read as three formats. The fill of a field has the colour of a row under
-the pointer, so the field of that row looks like plain text.
+the pointer, so the field of that row looks like plain text. Rows on the surface of the sheet do not
+stand apart from it.
 
 Test: The component test reads the sum of a parent beside the fields: its width class, its
 digits with cents and its € apart. The other tests of the page read amounts with cents.

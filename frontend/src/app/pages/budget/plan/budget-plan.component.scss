@@ -1,4 +1,13 @@
 @use 'breakpoints' as bp;
+@use 'surface';
+
+/* The sheet of the plan is surface 1. The rows of its tables take the next step, surface 2,
+   with surface 1 between them, as every row group on a pane does. Without the context the
+   rows had the colour of the sheet and only the 2px gaps showed them. On a phone the sheet
+   has no surface of its own, and the rows keep surface 1 on the page. */
+.bd--wide .bd__sheet {
+  @include surface.context(1);
+}
 
 .bp__node {
   display: flex;
