@@ -2,7 +2,7 @@
 id: "000942"
 title: A changed period does not reach a started case
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
