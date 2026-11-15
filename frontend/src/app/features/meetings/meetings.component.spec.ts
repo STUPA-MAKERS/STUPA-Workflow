@@ -362,6 +362,10 @@ describe('MeetingsComponent', () => {
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Finalisieren & senden' }));
+    http.expectNone('/api/protocols/p-1');
+    const ask = await screen.findByRole('dialog', { name: 'Protokoll finalisieren?' });
+    expect(within(ask).queryByRole('switch')).toBeNull();
+    await userEvent.click(within(ask).getByRole('button', { name: 'Finalisieren & senden' }));
     const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');
     expect(saveReq.request.body.markdown).toContain('# Begrüßung');
@@ -558,6 +562,8 @@ describe('MeetingsComponent', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Finalisieren & senden' }),
     );
+    const ask = await screen.findByRole('dialog', { name: 'Protokoll finalisieren?' });
+    await userEvent.click(within(ask).getByRole('button', { name: 'Finalisieren & senden' }));
     http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.method).toBe('POST');
@@ -1681,7 +1687,7 @@ describe('MeetingsComponent — methods', () => {
         AGENDA_ITEM({ id: 't-2', applicationId: null, title: '', body: '' }),
       ] as never);
       cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
-      cmp.finalize();
+      cmp.confirmFinalize({ publicWithheld: false });
       const saveReq = http.expectOne('/api/protocols/p-1');
       expect(saveReq.request.body.markdown).toContain('# Antrag');
       expect(saveReq.request.body.markdown).toContain(':::antrag{#app-1}');
@@ -1701,7 +1707,7 @@ describe('MeetingsComponent — methods', () => {
     it('reports a save error before finalize', async () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
-      cmp.finalize();
+      cmp.confirmFinalize({ publicWithheld: false });
       http.expectOne('/api/protocols/p-1').flush(null, { status: 500, statusText: 'e' });
       expect(cmp.finalizing()).toBe(false);
     });
@@ -1709,7 +1715,7 @@ describe('MeetingsComponent — methods', () => {
     it('reports a finalize error with the server detail', async () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
-      cmp.finalize();
+      cmp.confirmFinalize({ publicWithheld: false });
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http
         .expectOne('/api/protocols/p-1/finalize')
@@ -1720,7 +1726,7 @@ describe('MeetingsComponent — methods', () => {
     it('reports a finalize error without a detail', async () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
-      cmp.finalize();
+      cmp.confirmFinalize({ publicWithheld: false });
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http.expectOne('/api/protocols/p-1/finalize').flush(null, { status: 500, statusText: 'e' });
       expect(cmp.finalizing()).toBe(false);
@@ -1729,11 +1735,11 @@ describe('MeetingsComponent — methods', () => {
     it('ignores finalize without a protocol / when locked / for a live meeting', async () => {
       const { cmp, http } = await loaded();
       cmp.protocol.set(null);
-      cmp.finalize();
+      cmp.confirmFinalize({ publicWithheld: false });
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: true } as never);
-      cmp.finalize();
+      cmp.confirmFinalize({ publicWithheld: false });
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
-      cmp.finalize();
+      cmp.confirmFinalize({ publicWithheld: false });
       http.verify();
     });
 
@@ -1746,7 +1752,7 @@ describe('MeetingsComponent — methods', () => {
       cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
       cmp.onTopBodyChange('t-1', 'Letzter Satz');
-      cmp.finalize();
+      cmp.confirmFinalize({ publicWithheld: false });
       http.expectNone('/api/protocols/p-1');
       const save = http.expectOne('/api/meetings/m-1/agenda/t-1');
       expect(save.request.body).toEqual({ body: 'Letzter Satz' });
@@ -1765,7 +1771,7 @@ describe('MeetingsComponent — methods', () => {
         http.expectOne('/api/meetings/m-1/agenda/t-1').flush(null, { status: 500, statusText: 'e' });
         cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
         cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
-        cmp.finalize();
+        cmp.confirmFinalize({ publicWithheld: false });
         const again = http.expectOne('/api/meetings/m-1/agenda/t-1');
         expect(again.request.body).toEqual({ body: 'Verloren' });
         again.flush([AGENDA_ITEM({ body: 'Verloren' })]);
@@ -1781,7 +1787,7 @@ describe('MeetingsComponent — methods', () => {
       cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
       cmp.onTopBodyChange('t-1', 'Offline');
-      cmp.finalize();
+      cmp.confirmFinalize({ publicWithheld: false });
       http.expectOne('/api/meetings/m-1/agenda/t-1').flush(null, { status: 500, statusText: 'e' });
       http.expectNone('/api/protocols/p-1');
       expect(cmp.finalizing()).toBe(false);
@@ -2152,7 +2158,7 @@ describe('MeetingsComponent — methods', () => {
       try {
         const { cmp, http } = await loaded();
         cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
-        cmp.finalize();
+        cmp.confirmFinalize({ publicWithheld: false });
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
         jest.advanceTimersByTime(4000);
@@ -2362,7 +2368,7 @@ describe('MeetingsComponent — methods', () => {
       try {
         const { cmp, fixture, http } = await loaded();
         cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
-        cmp.finalize();
+        cmp.confirmFinalize({ publicWithheld: false });
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
         cmp.onTopBodyChange('t-1', 'X');
@@ -2421,7 +2427,7 @@ describe('MeetingsComponent — methods', () => {
       try {
         const { cmp, ws, http } = await loaded();
         cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
-        cmp.finalize();
+        cmp.confirmFinalize({ publicWithheld: false });
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
         ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
@@ -2441,7 +2447,7 @@ describe('MeetingsComponent — methods', () => {
       try {
         const { cmp, http } = await loaded();
         cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
-        cmp.finalize();
+        cmp.confirmFinalize({ publicWithheld: false });
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
         cmp.meeting.set(null);
