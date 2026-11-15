@@ -276,14 +276,77 @@ describe('MeetingSettingsDialogComponent', () => {
       expect(same.request.body).not.toHaveProperty('location');
       expect(same.request.body).not.toHaveProperty('form');
       same.flush(FULL);
-      cmp.kind.set('repeat');
+      cmp.kind.set('extraordinary');
       cmp.location.set('  ');
       cmp.form.set('video');
       cmp.save();
       const req = http.expectOne('/api/meetings/m-1');
       expect(req.request.body).toEqual(
-        expect.objectContaining({ kind: 'repeat', location: null, form: 'video' }),
+        expect.objectContaining({ kind: 'extraordinary', location: null, form: 'video' }),
       );
+      expect(req.request.body).not.toHaveProperty('repeatOfId');
+    });
+
+    /** §F/meetings/meetings/000940 */
+    it('asks a planned repeat meeting for its first meeting and sends a new one', async () => {
+      const planned = { ...FULL, gremiumId: 'g-1', date: '2026-11-10' } as unknown as Meeting;
+      const { http, fixture, cmp, toasts } = await setup(planned);
+      flushRoster(http, fixture);
+      http.expectOne('/api/committees/g-1/meeting-defaults').error(new ProgressEvent('x'));
+      http.expectOne('/api/meetings?gremiumId=g-1').flush([
+        { id: 'm-1', title: '35. Sitzung', date: '2026-11-10', status: 'planned', votes: [], createdAt: 'x' },
+        { id: 'm-0', title: '34. Sitzung', date: '2026-11-03', status: 'closed', votes: [], createdAt: 'x' },
+      ]);
+      fixture.detectChanges();
+      expect(screen.queryByLabelText(/Erste Sitzung/)).toBeNull();
+      cmp.kind.set('repeat');
+      fixture.detectChanges();
+      expect(await optionLabels(screen.getByLabelText(/Erste Sitzung/))).toEqual(['34. Sitzung · 03.11.2026']);
+      cmp.save();
+      expect(toasts()).toContain('Eine Wiederholungssitzung braucht ihre erste Sitzung.');
+      http.expectNone('/api/meetings/m-1');
+      cmp.repeatOf.set('m-0');
+      cmp.save();
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).toEqual(expect.objectContaining({ kind: 'repeat', repeatOfId: 'm-0' }));
+      req.flush(
+        { type: 'about:blank', status: 422, code: 'repeat_needs_first_meeting' },
+        { status: 422, statusText: 'Unprocessable' },
+      );
+      expect(toasts()).toContain('Die erste Sitzung muss eine frühere Sitzung des Gremiums sein.');
+    });
+
+    /** §F/meetings/meetings/000940 */
+    it('keeps the first meeting of a started repeat meeting', async () => {
+      const live = { ...FULL, status: 'live', kind: 'repeat', repeatOfId: 'm-0' } as unknown as Meeting;
+      const { http, fixture, cmp } = await setup(live);
+      flushRoster(http, fixture);
+      expect(screen.queryByLabelText(/Erste Sitzung/)).toBeNull();
+      cmp.save();
+      expect(http.expectOne('/api/meetings/m-1').request.body).not.toHaveProperty('repeatOfId');
+    });
+
+    /** §F/meetings/meetings/000940 */
+    it('sends the same first meeting not again, and waits for the list', async () => {
+      const planned = { ...FULL, gremiumId: 'g-1', kind: 'repeat', repeatOfId: 'm-0' } as unknown as Meeting;
+      const { http, fixture, cmp } = await setup(planned);
+      flushRoster(http, fixture);
+      http.expectOne('/api/committees/g-1/meeting-defaults').error(new ProgressEvent('x'));
+      const list = http.expectOne('/api/meetings?gremiumId=g-1');
+      cmp.save();
+      http.expectNone('/api/meetings/m-1');
+      list.flush([{ id: 'm-0', title: '34. Sitzung', status: 'closed', votes: [], createdAt: 'x' }]);
+      cmp.save();
+      expect(http.expectOne('/api/meetings/m-1').request.body).not.toHaveProperty('repeatOfId');
+    });
+
+    it('has no list of first meetings after a failed read', async () => {
+      const planned = { ...FULL, gremiumId: 'g-1', kind: 'repeat', repeatOfId: 'm-0' } as unknown as Meeting;
+      const { http, fixture, cmp } = await setup(planned);
+      flushRoster(http, fixture);
+      http.expectOne('/api/committees/g-1/meeting-defaults').error(new ProgressEvent('x'));
+      http.expectOne('/api/meetings?gremiumId=g-1').error(new ProgressEvent('x'));
+      expect(cmp.repeatOfMissing()).toBe(true);
     });
 
     /** §F/meetings/meetings/000903 */

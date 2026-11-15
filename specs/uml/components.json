@@ -806,7 +806,7 @@
       "to": "gremien"
     },
     {
-      "count": 41,
+      "count": 42,
       "from": "livevote",
       "to": "meetings"
     },
@@ -821,7 +821,7 @@
       "to": "protocol"
     },
     {
-      "count": 31,
+      "count": 32,
       "from": "livevote",
       "to": "shared"
     },

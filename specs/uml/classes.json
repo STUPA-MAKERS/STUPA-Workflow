@@ -526,6 +526,13 @@
       "to": "Gremium"
     },
     {
+      "column": "repeat_of_id",
+      "from": "Meeting",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Meeting"
+    },
+    {
       "column": "current_agenda_item_id",
       "from": "Meeting",
       "multiplicity": "*",
@@ -4389,6 +4396,12 @@
           "nullable": true,
           "primaryKey": false,
           "type": "TEXT"
+        },
+        {
+          "name": "repeat_of_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
         },
         {
           "name": "present_count",

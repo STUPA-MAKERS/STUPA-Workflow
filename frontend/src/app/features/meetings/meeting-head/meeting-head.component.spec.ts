@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { runAxe } from '../../../../testing/a11y';
@@ -23,6 +24,37 @@ describe('MeetingHeadComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Sitzungen' }));
     expect(back).toHaveBeenCalledTimes(1);
     expect(await runAxe(container)).toHaveNoViolations();
+  });
+
+  describe('link', () => {
+    const template = `<header appMeetingHead heading="A" statusText="Geplant" sub="Mo" [link]="link"></header>`;
+    const link = { label: 'Erste Sitzung', to: '/meetings/m-0' };
+    const options = { imports: [MeetingHeadComponent], providers: [provideRouter([])], componentProperties: { link } };
+
+    /** §F/meetings/meetings/000940 */
+    it('shows a link after the sub line', async () => {
+      const { container } = await render(template, options);
+      expect(screen.getByRole('link', { name: 'Erste Sitzung' })).toHaveAttribute('href', '/meetings/m-0');
+      expect(await runAxe(container)).toHaveNoViolations();
+    });
+
+    it('shows the link in the bar on a phone', async () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === MEDIA.phone,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const phone = await render(template, options);
+      await new Promise((r) => setTimeout(r));
+      phone.fixture.detectChanges();
+      const sub = phone.container.querySelector('.ld__barSub')!;
+      expect(sub.querySelector('a')).toHaveAttribute('href', '/meetings/m-0');
+    } finally {
+      window.matchMedia = real;
+    }
+    });
   });
 
   it('leaves the sub line out for null and keeps an empty one', async () => {

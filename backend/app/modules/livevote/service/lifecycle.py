@@ -27,6 +27,7 @@ from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.guests import GuestEvents, GuestService
 from app.modules.livevote.open_window import check_open
+from app.modules.livevote.repeat import first_meeting_id
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service.handover import HandoverOps
 from app.modules.meetings.agenda_service import AgendaService
@@ -57,6 +58,7 @@ _AUDITED_FIELDS: tuple[tuple[str, str], ...] = (
     ("end_time", "endTime"),
     ("protokollant_id", "protokollantId"),
     ("kind", "kind"),
+    ("repeat_of_id", "repeatOfId"),
     ("location", "location"),
     ("form", "form"),
 )
@@ -122,6 +124,13 @@ class LifecycleOps(HandoverOps):
             end_time=payload.end_time,
             status="planned",
             kind=payload.kind,
+            repeat_of_id=await first_meeting_id(
+                self.session,
+                kind=payload.kind,
+                gremium_id=payload.gremium_id,
+                first_id=payload.repeat_of_id,
+                day=payload.date,
+            ),
             location=payload.location or None,
             form=payload.form,
             created_by=principal.sub,
@@ -239,6 +248,7 @@ class LifecycleOps(HandoverOps):
             or "end_time" in payload.model_fields_set
             or "protokollant_id" in payload.model_fields_set
             or "kind" in payload.model_fields_set
+            or "repeat_of_id" in payload.model_fields_set
             or "location" in payload.model_fields_set
             or "form" in payload.model_fields_set
             or wants_public
@@ -337,6 +347,8 @@ class LifecycleOps(HandoverOps):
         if payload.title is not None:
             meeting.title = payload.title
         _apply_kind_place_form(meeting, payload)
+        if {"kind", "repeat_of_id"} & payload.model_fields_set:
+            await self._apply_first_meeting(meeting, payload)
         if "date" in payload.model_fields_set:
             meeting.date = payload.date
         if "start_time" in payload.model_fields_set:
@@ -469,6 +481,22 @@ class LifecycleOps(HandoverOps):
             meeting.gremium_id, payload.protokollant_id
         )
         return False
+
+    async def _apply_first_meeting(self, meeting: Meeting, payload: MeetingPatch) -> None:
+        """Store the first meeting of a repeat meeting, or clear it for another kind.
+
+        The kind of the patch is already on the meeting. A patch without `repeatOfId`
+        keeps the stored first meeting (spec 000940).
+        """
+        named = "repeat_of_id" in payload.model_fields_set
+        meeting.repeat_of_id = await first_meeting_id(
+            self.session,
+            kind=meeting.kind,
+            gremium_id=meeting.gremium_id,
+            first_id=payload.repeat_of_id if named else meeting.repeat_of_id,
+            day=payload.date if "date" in payload.model_fields_set else meeting.date,
+            meeting_id=meeting.id,
+        )
 
     async def _close(
         self, meeting: Meeting, actor: str, now: datetime

@@ -151,6 +151,7 @@ class MeetingServiceBase(MeetingReads):
             admittedGuests=guests[0],
             pendingGuests=guests[1] if can_manage else 0,
             guestsVoteAllowed=guests_vote_allowed,
+            repeatOfId=getattr(meeting, "repeat_of_id", None),
             presentCount=_fixed_present(meeting),
             eligibleCount=getattr(meeting, "eligible_count", None),
             presentSeats=seats,

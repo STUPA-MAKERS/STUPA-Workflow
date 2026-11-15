@@ -30,6 +30,18 @@
       [ngModel]="kind()"
       (ngModelChange)="kind.set($event)"
     />
+    @if (kind() === 'repeat' && !kindLocked()) {
+      <app-select
+        name="repeatOf"
+        [id]="'msd-repeat-of'"
+        [label]="'meetings.repeatOf.label' | t"
+        [placeholder]="'meetings.repeatOf.placeholder' | t"
+        [options]="repeatOfOptions()"
+        [required]="true"
+        [ngModel]="repeatOf()"
+        (ngModelChange)="repeatOf.set($event)"
+      />
+    }
     <app-select
       name="keeper"
       [id]="'msd-keeper'"

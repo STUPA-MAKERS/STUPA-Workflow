@@ -344,6 +344,7 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     presentSeats: wire.presentSeats ?? 0,
     guestsVoteAllowed: wire.guestsVoteAllowed ?? false,
     kind: wire.kind ?? 'ordinary',
+    repeatOfId: wire.repeatOfId ?? null,
     location: wire.location ?? null,
     form: wire.form ?? 'presence',
     opensAt: wire.opensAt ?? null,

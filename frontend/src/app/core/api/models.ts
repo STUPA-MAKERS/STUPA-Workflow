@@ -1683,6 +1683,7 @@ export interface MeetingOutWire {
   readonly guestsVoteAllowed?: boolean;
   /** The kind of the meeting. */
   readonly kind?: MeetingKind;
+  readonly repeatOfId?: Uuid | null;
   /** The place of the meeting, or `null`. */
   readonly location?: string | null;
   /** The form of the meeting. */
@@ -1732,6 +1733,8 @@ export interface MeetingCreateBody {
   readonly publicJoin?: boolean;
   readonly guestsMode?: GuestsMode;
   readonly kind?: MeetingKind;
+  /** The first meeting of a `repeat` meeting (000940). The server needs it for this kind. */
+  readonly repeatOfId?: Uuid | null;
   readonly location?: string | null;
   readonly form?: MeetingForm;
 }
@@ -1763,6 +1766,8 @@ export interface MeetingPatchBody {
   readonly guestsMode?: GuestsMode;
   /** Only while the meeting is planned (409 `meeting_not_planned`). */
   readonly kind?: MeetingKind;
+  /** The first meeting of a `repeat` meeting (000940). The server needs it for this kind. */
+  readonly repeatOfId?: Uuid | null;
   readonly location?: string | null;
   readonly form?: MeetingForm;
   /** Confirms an early open (`status: 'live'` before `confirmUntil`). */
@@ -1907,6 +1912,8 @@ export interface Meeting {
   readonly guestsVoteAllowed: boolean;
   /** The kind of the meeting. Only a planned meeting changes it. */
   readonly kind: MeetingKind;
+  /** The first meeting of a `repeat` meeting (000940), else `null`. */
+  readonly repeatOfId?: Uuid | null;
   /** The place of the meeting, or `null`. */
   readonly location: string | null;
   /** The form of the meeting. */

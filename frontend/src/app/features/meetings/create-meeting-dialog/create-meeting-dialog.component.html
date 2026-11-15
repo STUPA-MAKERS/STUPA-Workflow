@@ -39,6 +39,18 @@
         [ngModel]="kind()"
         (ngModelChange)="kind.set($event)"
       />
+      @if (kind() === 'repeat') {
+        <app-select
+          name="repeatOf"
+          [id]="'cmd-repeat-of'"
+          [label]="'meetings.repeatOf.label' | t"
+          [placeholder]="'meetings.repeatOf.placeholder' | t"
+          [options]="repeatOfOptions()"
+          [required]="true"
+          [ngModel]="repeatOf()"
+          (ngModelChange)="repeatOf.set($event)"
+        />
+      }
       <div class="cmd__when">
         <app-datepicker
           name="date"

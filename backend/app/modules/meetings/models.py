@@ -91,6 +91,12 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     #: `public_join` creates it, and a rotation replaces it. It is unique among the
     #: meetings that are not closed.
     join_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The first meeting of a Wiederholungssitzung (`kind = repeat`, spec 000940): the
+    #: earlier meeting of the same Gremium that had no quorum. NULL for each other kind
+    #: and for a repeat meeting from before the column.
+    repeat_of_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
+    )
     #: The present count and the number of members with a voting right, fixed at the
     #: close (000946). The protocol reads them, so a new render of an old meeting gives
     #: the same count and the same quorum (000357). NULL for a meeting that is not

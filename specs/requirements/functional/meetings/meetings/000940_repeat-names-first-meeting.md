@@ -5,9 +5,16 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/unit/modules/livevote/test_repeat_first_meeting.py:test_a_repeat_meeting_without_a_first_meeting_is_refused"
+  - "backend/tests/integration/modules/livevote/test_public_meeting.py:test_meeting_kind_place_and_form"
+  - "frontend/src/app/features/meetings/create-meeting-dialog/create-meeting-dialog.component.spec.ts:repeatOfId"
+  - "frontend/src/app/features/meetings/meeting-head/meeting-head.component.spec.ts:link"
 implementation:
+  - backend/app/modules/livevote/repeat.py
   - backend/app/modules/livevote/service/lifecycle.py
-  - frontend/src/app/features/meetings
+  - frontend/src/app/features/meetings/meeting-kind.util.ts
+  - frontend/src/app/features/meetings/meeting-head/meeting-head.component.ts
 scope:
   - backend/app/modules/livevote
   - backend/app/modules/meetings

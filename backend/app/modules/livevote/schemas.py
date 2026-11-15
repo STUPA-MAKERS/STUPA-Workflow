@@ -60,6 +60,10 @@ class MeetingCreate(FrozenCamelModel, frozen=True):
     #: The protokollant must be a member of the Gremium.
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
     kind: MeetingKind = "ordinary"
+    #: The first meeting of a Wiederholungssitzung: an earlier meeting of the same
+    #: Gremium. A meeting of the kind ``repeat`` needs it (422); each other kind
+    #: stores none.
+    repeat_of_id: UUID | None = Field(default=None, alias="repeatOfId")
     #: The place as free text. An empty text means no place.
     location: MeetingLocation | None = None
     form: MeetingForm = "presence"
@@ -100,6 +104,9 @@ class MeetingPatch(FrozenCamelModel, frozen=True):
     #: The kind changes only while the meeting is ``planned`` (409). The place and the
     #: form change like the title. ``location: null`` clears the place.
     kind: MeetingKind | None = None
+    #: The first meeting of a Wiederholungssitzung. A patch that makes the meeting a
+    #: ``repeat`` meeting must name it, or the meeting must have one (422).
+    repeat_of_id: UUID | None = Field(default=None, alias="repeatOfId")
     location: MeetingLocation | None = None
     form: MeetingForm | None = None
     #: Public participation and the guest mode. Both need ``canManage``. Switching
@@ -128,6 +135,7 @@ class MeetingPatch(FrozenCamelModel, frozen=True):
             "protokollant_id",
             "current_agenda_item_id",
             "kind",
+            "repeat_of_id",
             "location",
             "form",
         } & self.model_fields_set
@@ -140,7 +148,8 @@ class MeetingPatch(FrozenCamelModel, frozen=True):
         ):
             raise ValueError(
                 "at least one of 'status', 'activeApplicationId', 'currentAgendaItemId', "
-                "'title', 'date', 'startTime', 'endTime', 'protokollantId', 'kind', 'location', "
+                "'title', 'date', 'startTime', 'endTime', 'protokollantId', 'kind', 'repeatOfId', "
+                "'location', "
                 "'form', 'publicJoin' or 'guestsMode' required"
             )
         return self
@@ -297,6 +306,8 @@ class MeetingOut(FrozenCamelModel, frozen=True):
     join_code: str | None = Field(default=None, alias="joinCode")
     admitted_guests: int = Field(default=0, alias="admittedGuests")
     pending_guests: int = Field(default=0, alias="pendingGuests")
+    #: The first meeting of a Wiederholungssitzung (000940), else ``None``.
+    repeat_of_id: UUID | None = Field(default=None, alias="repeatOfId")
     #: The one present count of the meeting (000946). ``presentCount`` and
     #: ``eligibleCount`` hold the values fixed at the close, ``None`` while the meeting
     #: is not closed. A client then counts the present rows with ``canVote`` and adds

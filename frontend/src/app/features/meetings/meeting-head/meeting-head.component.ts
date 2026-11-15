@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
@@ -55,6 +56,7 @@ import {
     IconComponent,
     ListDetailBarComponent,
     NgTemplateOutlet,
+    RouterLink,
     StatusTextComponent,
     TranslatePipe,
   ],
@@ -72,6 +74,8 @@ export class MeetingHeadComponent {
   readonly statusText = input.required<string>();
   /** The sub line, such as the date and the place. `null`: no sub line. */
   readonly sub = input<string | null>(null);
+  /** A link after the sub line, such as the first meeting of a Wiederholungssitzung. */
+  readonly link = input<{ readonly label: string; readonly to: string } | null>(null);
   /** The person pressed "Zurück". */
   readonly back = output<void>();
 

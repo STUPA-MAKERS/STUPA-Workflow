@@ -580,6 +580,12 @@ class MeetingCreate(WireModel, frozen=True):
         default=None,
         description="The kind of the meeting. A new meeting is `ordinary`.",
     )
+    repeatOfId: str | None = Field(
+        default=None,
+        description="The first meeting of a `repeat` meeting: an earlier meeting of the same "
+        "Gremium. A `repeat` meeting needs it (422 `repeat_needs_first_meeting`, "
+        "`repeat_first_meeting_invalid`).",
+    )
     location: str | None = Field(default=None, description="The place, at most 200 characters.")
     form: Literal["presence", "hybrid", "video"] | None = Field(
         default=None, description="The form of the meeting. A new meeting is `presence`."
@@ -609,6 +615,12 @@ class MeetingPatch(WireModel, frozen=True):
         default=None,
         description="The kind of the meeting. It changes only while the meeting is planned "
         "(409 `meeting_not_planned`).",
+    )
+    repeatOfId: str | None = Field(
+        default=None,
+        description="The first meeting of a `repeat` meeting: an earlier meeting of the same "
+        "Gremium. A meeting that becomes `repeat` needs it (422 "
+        "`repeat_needs_first_meeting`, `repeat_first_meeting_invalid`).",
     )
     location: str | None = Field(default=None, description="The place, at most 200 characters.")
     form: Literal["presence", "hybrid", "video"] | None = Field(

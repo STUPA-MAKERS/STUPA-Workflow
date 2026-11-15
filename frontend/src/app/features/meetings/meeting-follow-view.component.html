@@ -8,6 +8,7 @@
   [statusKind]="status().kind"
   [statusText]="status().key | t"
   [sub]="phone() ? phoneSubLine() : subLine()"
+  [link]="firstLink()"
   (back)="back.emit()"
 >
   @if (!wide()) {

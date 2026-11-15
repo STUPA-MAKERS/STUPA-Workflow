@@ -1045,7 +1045,9 @@ async def test_meeting_kind_place_and_form(
     """Create a meeting with a place and a form, and change the kind of a live meeting.
 
     §F/meetings/meetings/000903: a new meeting is `ordinary`, and the kind changes only
-    while the meeting is planned (409). §F/meetings/meetings/000907: the place and the
+    while the meeting is planned (409). §F/meetings/meetings/000940: a repeat meeting
+    names an earlier meeting of the Gremium as its first meeting (422), and another
+    kind stores none. §F/meetings/meetings/000907: the place and the
     form are stored, a new meeting is `presence`, a place over 200 characters gives 422.
     """
     s = await seed(maker, status="live", public_join=False)
@@ -1056,20 +1058,28 @@ async def test_meeting_kind_place_and_form(
         assert plain.status_code == 200, plain.text
         body = plain.json()
         assert (body["kind"], body["location"], body["form"]) == ("ordinary", None, "presence")
-        created = lead.post(
-            "/api/meetings",
-            json={
-                "gremiumId": str(s.gremium_id),
-                "title": "B",
-                **WHEN,
-                "kind": "repeat",
-                "location": "Raum 9-108",
-                "form": "hybrid",
-            },
-        )
+        repeat = {
+            "gremiumId": str(s.gremium_id),
+            "title": "B",
+            **WHEN,
+            "kind": "repeat",
+            "location": "Raum 9-108",
+            "form": "hybrid",
+        }
+        alone = lead.post("/api/meetings", json=repeat)
+        assert alone.status_code == 422, alone.text
+        assert alone.json()["code"] == "repeat_needs_first_meeting"
+        unknown = lead.post("/api/meetings", json={**repeat, "repeatOfId": str(uuid.uuid4())})
+        assert unknown.status_code == 422, unknown.text
+        assert unknown.json()["code"] == "repeat_first_meeting_invalid"
+        created = lead.post("/api/meetings", json={**repeat, "repeatOfId": str(s.meeting_id)})
         assert created.status_code == 200, created.text
         body = created.json()
         assert (body["kind"], body["location"], body["form"]) == ("repeat", "Raum 9-108", "hybrid")
+        assert body["repeatOfId"] == str(s.meeting_id)
+        itself = lead.patch(f"/api/meetings/{body['id']}", json={"repeatOfId": body["id"]})
+        assert itself.status_code == 422, itself.text
+        assert itself.json()["code"] == "repeat_first_meeting_invalid"
         patched = lead.patch(
             f"/api/meetings/{body['id']}",
             json={"kind": "extraordinary", "location": None, "form": "video"},
@@ -1077,6 +1087,7 @@ async def test_meeting_kind_place_and_form(
         assert patched.status_code == 200, patched.text
         body = patched.json()
         assert (body["kind"], body["location"], body["form"]) == ("extraordinary", None, "video")
+        assert body["repeatOfId"] is None
         too_long = lead.patch(f"/api/meetings/{body['id']}", json={"location": "x" * 201})
         assert too_long.status_code == 422
         live = lead.patch(f"/api/meetings/{s.meeting_id}", json={"kind": "repeat"})
