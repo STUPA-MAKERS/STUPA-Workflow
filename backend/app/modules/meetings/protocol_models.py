@@ -78,6 +78,8 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
         ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
     )
     approved_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The last send of the draft by mail to the members; NULL without a send.
+    draft_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('draft','rendering','final')", name="protocol_status"),

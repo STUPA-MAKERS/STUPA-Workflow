@@ -38,6 +38,7 @@ import {
   liveOpenedVote,
 } from './meetings-display.util';
 import { problemCode, problemDetail } from '@core/api/problem';
+import type { TranslationKey } from '@core/i18n/translations';
 import { withEntry } from '@shared/util/immutable';
 
 /** The shortest time between two live drafts of the protokollant. */
@@ -49,6 +50,13 @@ const DRAFT_INTERVAL_MS = 300;
  * RBAC here gates the UI only. The server authorizes every action.
  * Provided by MeetingsComponent.
  */
+/** The refusals of the draft mail and of the approval mark, with their text. */
+const PROTOCOL_REFUSALS: Readonly<Record<string, TranslationKey>> = {
+  meeting_live: 'meetings.toast.draftLive',
+  protocol_not_final: 'meetings.toast.protocolNotFinal',
+  invalid_approval_meeting: 'meetings.toast.approvalMeetingInvalid',
+};
+
 @Injectable()
 export class MeetingSessionService implements OnDestroy {
   private readonly api = inject(ApiClient);
@@ -294,9 +302,13 @@ export class MeetingSessionService implements OnDestroy {
    * meeting may have changed in another tab.
    */
   private statusChangeFailed(err: unknown): void {
-    const detail = problemDetail(err);
-    const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.error(detail ? `${base}: ${detail}` : base);
+    if (problemCode(err) === 'quorum_not_met') {
+      this.toast.error(this.i18n.translate('meetings.toast.quorumNotMet'));
+    } else {
+      const detail = problemDetail(err);
+      const base = this.i18n.translate('meetings.toast.actionFailed');
+      this.toast.error(detail ? `${base}: ${detail}` : base);
+    }
     const m = this.meeting();
     if (m) {
       this.api.getMeeting(m.id, { quiet: true }).subscribe({
@@ -396,9 +408,13 @@ export class MeetingSessionService implements OnDestroy {
   /** Show the server reason (for example 409) and reload the meeting. The vote
    *  may have changed on the server, for example to cancelled. */
   private voteActionFailed(err: unknown): void {
-    const detail = problemDetail(err);
-    const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.error(detail ? `${base}: ${detail}` : base);
+    if (problemCode(err) === 'quorum_not_met') {
+      this.toast.error(this.i18n.translate('meetings.toast.quorumNotMet'));
+    } else {
+      const detail = problemDetail(err);
+      const base = this.i18n.translate('meetings.toast.actionFailed');
+      this.toast.error(detail ? `${base}: ${detail}` : base);
+    }
     const m = this.meeting();
     if (m) {
       this.api.getMeeting(m.id, { quiet: true }).subscribe({
@@ -572,13 +588,22 @@ export class MeetingSessionService implements OnDestroy {
     if (!proto || this.draftSending()) return;
     this.draftSending.set(true);
     this.api.sendProtocolDraft(proto.id).subscribe({
-      next: ({ recipients }) => {
+      next: ({ recipients, draftSentAt }) => {
         this.draftSending.set(false);
-        this.toast.success(this.i18n.translate('meetings.toast.draftSent', { n: recipients }));
+        if (draftSentAt) this.protocol.update((p) => (p?.id === proto.id ? { ...p, draftSentAt } : p));
+        if (recipients === 0) {
+          this.toast.show(this.i18n.translate('meetings.toast.draftNoRecipient'), 'warning');
+          return;
+        }
+        this.toast.success(
+          this.i18n.translate(recipients === 1 ? 'meetings.toast.draftSent1' : 'meetings.toast.draftSent', {
+            n: recipients,
+          }),
+        );
       },
       error: (err: unknown) => {
         this.draftSending.set(false);
-        this.actionFailed(err);
+        this.protocolRefused(err);
       },
     });
   }
@@ -598,9 +623,21 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.approvalSaving.set(false);
-        this.actionFailed(err);
+        this.protocolRefused(err);
       },
     });
+  }
+
+  /**
+   * A refused draft mail or approval mark: the toast says the cause in the language of
+   * the page, and the bar reads the protocol again, because a 409 means that its state
+   * moved.
+   */
+  private protocolRefused(err: unknown): void {
+    const known = PROTOCOL_REFUSALS[problemCode(err) ?? ''];
+    if (!known) return this.actionFailed(err);
+    this.toast.error(this.i18n.translate(known));
+    this.refreshProtocol();
   }
 
   private actionFailed(err: unknown): void {
@@ -691,6 +728,8 @@ export class MeetingSessionService implements OnDestroy {
         this.savingAttendance.set(false);
         this.attendance.set(rows);
         if (this.attendanceConflict() === principalId) this.attendanceConflict.set(null);
+        // A correction after the close counts the meeting again (§ 000951).
+        if (this.meeting()?.status === 'closed') this.reloadMeeting();
       },
       error: (err: unknown) => {
         this.savingAttendance.set(false);

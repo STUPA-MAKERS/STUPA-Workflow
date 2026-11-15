@@ -52,6 +52,7 @@ import {
 import { type DockPanel, SessionDockComponent } from '../session-dock/session-dock.component';
 import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.component';
 import { VoteCardComponent } from '../vote-card/vote-card.component';
+import { firstMeetingLink } from '../meeting-kind.util';
 import { voteSnippet, votesInText } from '../meetings.util';
 import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
@@ -296,6 +297,9 @@ export class MeetingPageComponent {
     ].join(' · ');
   });
 
+  /** The first meeting of a Wiederholungssitzung (§ 000940). */
+  protected readonly firstLink = computed(() => firstMeetingLink(this.meeting(), this.i18n));
+
   /** Presence is shown to the people who run the meeting, while it is live. */
   protected readonly showPresence = computed(() => {
     const m = this.meeting();
@@ -427,6 +431,16 @@ export class MeetingPageComponent {
    */
   protected readonly anyOpenVote = computed(() =>
     this.meeting().votes.some((v) => v.status === 'open'),
+  );
+
+  /** The elections of the open item that a next Wahlgang continues (§ 000971). */
+  protected readonly continuedIds = computed(
+    () =>
+      new Set(
+        this.votes()
+          .filter((v) => v.parentVoteId && v.status !== 'cancelled')
+          .map((v) => v.parentVoteId as string),
+      ),
   );
 
   /** The closed votes of the open item whose repeat opened: their cards say "Wiederholt". */

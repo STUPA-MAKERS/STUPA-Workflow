@@ -463,9 +463,10 @@ describe('VotingComponent', () => {
     it('reads the filters from the URL and sends them', async () => {
       const { listVotes, cmp } = await start('/voting?status=ended&committee=g2&q=Haushalt');
       expect(listVotes).toHaveBeenCalledWith({
-        status: ['closed'],
+        status: ['closed', 'cancelled'],
         gremiumId: 'g2',
         q: 'Haushalt',
+        cancelledReason: 'objection',
         limit: 30,
         offset: 0,
       });
@@ -473,10 +474,15 @@ describe('VotingComponent', () => {
       expect(cmp.gremiumChipLabel()).toBe('Gremium: g2');
     });
 
-    it('ignores an unknown status and sends the default without cancelled votes', async () => {
+    it('ignores an unknown status and asks for the objections among the cancelled votes', async () => {
       const { listVotes, cmp } = await start('/voting?status=running');
       expect(cmp.statusFilter()).toBe('');
-      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: ['open', 'closed'] }));
+      expect(listVotes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: ['open', 'closed', 'cancelled'],
+          cancelledReason: 'objection',
+        }),
+      );
     });
 
     /** An emptied field shows the whole list at once. */
@@ -554,7 +560,12 @@ describe('VotingComponent', () => {
       const { cmp, listVotes } = await start('/voting?status=draft');
       expect(cmp.statusFilter()).toBe('');
       expect(cmp.statusChipLabel()).toBe('Status');
-      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: ['open', 'closed'] }));
+      expect(listVotes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: ['open', 'closed', 'cancelled'],
+          cancelledReason: 'objection',
+        }),
+      );
     });
 
     /** A member has no draft option, so the chip shows the raw value. */

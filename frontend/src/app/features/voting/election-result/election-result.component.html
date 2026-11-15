@@ -73,3 +73,16 @@
 @if (lotNote(); as note) {
   <app-note icon="info">{{ note }}</app-note>
 }
+
+@if (nextRoundLotNote(); as note) {
+  <app-note icon="info">{{ note }}</app-note>
+}
+
+@if (nextRound(); as label) {
+  <div class="er__next">
+    <app-button variant="fill" [block]="true" [loading]="busy() === 'next'" (click)="startNextRound()">
+      <app-icon name="repeat" />
+      {{ label | t }}
+    </app-button>
+  </div>
+}

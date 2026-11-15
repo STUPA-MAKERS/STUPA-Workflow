@@ -28,7 +28,7 @@ from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import ColumnElement, Date, Select, and_, cast, func, or_, select
+from sqlalchemy import ColumnElement, Date, Select, Text, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.storage import ObjectStorage, StorageError
@@ -37,6 +37,10 @@ from app.modules.media.refs import document_ids_in, image_ids_in
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.filename import protocol_pdf_filename
+from app.modules.voting.circular import CIRCULAR
+from app.modules.voting.models import Vote
+from app.modules.voting.schemas import VoteOut
+from app.modules.voting.service import VotingService
 from app.shared.config_schemas import ElectionConfig, MajorityRule
 from app.shared.errors import NotFoundError, ServiceUnavailableError
 from app.shared.schemas import FrozenCamelModel
@@ -452,6 +456,30 @@ class PublicProtocolService:
             meeting_day_expr().desc(), Meeting.created_at.desc(), Protocol.id
         )
         return [(p, m, g) for p, m, g in (await self.session.execute(stmt)).all()]
+
+    async def circular_votes(self, flt: PublicFilter) -> list[tuple[VoteOut, Gremium]]:
+        """Read the closed circular votes of the public gremien, newest close first.
+
+        A circular vote stands in no protocol, so its row is the source
+        (§F/meetings/voting/000949). Only the gremium filter applies here: the caller
+        filters by the day of the close and by the question.
+        """
+        stmt = (
+            select(Vote.id, Gremium)
+            .join(Gremium, Vote.eligible_group == cast(Gremium.id, Text))
+            .where(
+                Vote.kind == CIRCULAR,
+                Vote.status == "closed",
+                Gremium.protocols_public.is_(True),
+                *([Gremium.id.in_(flt.gremium_ids)] if flt.gremium_ids else []),
+            )
+            .order_by(Vote.closed_at.desc(), Vote.id)
+        )
+        voting = VotingService(self.session)
+        return [
+            (await voting.get(vote_id), gremium)
+            for vote_id, gremium in (await self.session.execute(stmt)).all()
+        ]
 
     async def list_semesters(self, flt: PublicFilter) -> list[PublicSemesterOut]:
         """Count the visible protocols per semester, newest semester first.

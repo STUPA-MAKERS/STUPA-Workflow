@@ -288,24 +288,21 @@ export class MeetingsComponent {
     return this.myChoices()[voteId] ?? null;
   }
 
-  /** "Protokoll finalisieren?": open for the protocol of a public gremium. */
+  /** "Protokoll finalisieren?" is open. */
   readonly finalizeDialogOpen = signal(false);
 
   /**
-   * Finalize the protocol. A gremium that publishes its protocols asks first: the
-   * dialog reminds of the public page and can hold this protocol back.
+   * Finalize the protocol. The page asks first, because a final protocol does not change
+   * and the mail goes out at once (§ 000952). For a gremium that publishes its protocols
+   * the dialog also reminds of the public page and can hold this protocol back.
    */
   finalize(): void {
-    if (this.protocol()?.gremiumProtocolsPublic) {
-      this.finalizeDialogOpen.set(true);
-      return;
-    }
-    this.session.finalize();
+    this.finalizeDialogOpen.set(true);
   }
 
   confirmFinalize(opts: { publicWithheld: boolean }): void {
     this.finalizeDialogOpen.set(false);
-    this.session.finalize(opts);
+    this.session.finalize(this.protocol()?.gremiumProtocolsPublic ? opts : undefined);
   }
 
   setAttendance(member: Attendance, status: AttendanceStatus, note?: string | null): void {

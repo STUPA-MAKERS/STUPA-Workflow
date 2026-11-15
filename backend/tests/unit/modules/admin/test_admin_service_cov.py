@@ -187,6 +187,7 @@ def gremium_row(**kw: Any) -> Any:
         "quorum_min_present": None,
         "repeat_quorum_percent": None,
         "guests_may_vote": False,
+        "term_start_month": 10,
         "protocols_public": False,
         "protocol_recipients": [],
     }

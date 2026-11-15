@@ -120,7 +120,7 @@ class AttendanceRowOut(_GremienOut, frozen=True):
     role_key: str | None
     role_name: Mapping[str, str] | None
     is_self: bool
-    #: The unexcused absences of the current term: closed ordinary meetings with the
+    #: The unexcused absences of the chosen term: closed ordinary meetings with the
     #: status ``absent`` (§F/meetings/meetings/000920).
     unexcused: int
     cells: tuple[AttendanceCellOut, ...]
@@ -129,14 +129,17 @@ class AttendanceRowOut(_GremienOut, frozen=True):
 class AttendanceOut(_GremienOut, frozen=True):
     """The attendance matrix of a gremium for a range of months.
 
-    ``unexcused`` of a row counts the current term, whatever the range of months is.
+    ``unexcused`` of a row counts the term that starts on ``termStart``, whatever the
+    range of months is. ``terms`` holds the first day of each term on offer, the newest
+    first (§F/meetings/meetings/000941).
     """
 
     from_month: str
     to_month: str
-    #: The first day of the current term, and the number of unexcused absences in one
+    #: The first day of the chosen term, and the number of unexcused absences in one
     #: term that ends a Mandat.
     term_start: _date
+    terms: list[_date]
     absence_limit: int
     months: list[AttendanceMonthOut]
     rows: list[AttendanceRowOut]

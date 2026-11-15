@@ -339,8 +339,12 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     joinCode: wire.joinCode ?? null,
     admittedGuests: wire.admittedGuests ?? 0,
     pendingGuests: wire.pendingGuests ?? 0,
+    presentCount: wire.presentCount ?? null,
+    eligibleCount: wire.eligibleCount ?? null,
+    presentSeats: wire.presentSeats ?? 0,
     guestsVoteAllowed: wire.guestsVoteAllowed ?? false,
     kind: wire.kind ?? 'ordinary',
+    repeatOfId: wire.repeatOfId ?? null,
     location: wire.location ?? null,
     form: wire.form ?? 'presence',
     opensAt: wire.opensAt ?? null,
@@ -372,6 +376,7 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
     approvedMeetingId: wire.approvedMeetingId ?? null,
     approvedMeetingTitle: wire.approvedMeetingTitle ?? null,
     approvedMeetingDate: wire.approvedMeetingDate ?? null,
+    draftSentAt: wire.draftSentAt ?? null,
   };
 }
 

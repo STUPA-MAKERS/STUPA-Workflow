@@ -11,7 +11,7 @@ const OWN = meeting({ id: 'm-1', gremiumId: 'g-1', date: '2026-10-15', status: '
 async function setup(opts: { open?: boolean; listMeetings?: jest.Mock; own?: Meeting } = {}) {
   const picked = jest.fn();
   const closed = jest.fn();
-  const api = { listMeetings: opts.listMeetings ?? jest.fn(() => of([meeting({ id: 'm-2', title: '34. Sitzung', date: '2026-10-29' })])) };
+  const api = { listMeetings: opts.listMeetings ?? jest.fn(() => of([meeting({ id: 'm-2', title: '34. Sitzung', date: '2026-10-29', status: 'closed' })])) };
   const view = await render(ProtocolApprovalDialogComponent, {
     inputs: { open: opts.open ?? true, meeting: opts.own ?? OWN, saving: false },
     on: { picked, closed },
@@ -38,15 +38,20 @@ describe('ProtocolApprovalDialogComponent', () => {
   it('says when no later meeting exists, and picks nothing', async () => {
     const { picked, cmp, fixture } = await setup({ listMeetings: jest.fn(() => of([])), own: { ...OWN, gremiumId: null } });
     fixture.detectChanges();
-    expect(screen.getByText('Es gibt noch keine spätere Sitzung dieses Gremiums.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Markieren' })).toBeDisabled();
+    expect(screen.getByText('Keine spätere Sitzung dieses Gremiums hat begonnen.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Als genehmigt markieren' })).toBeDisabled();
     cmp.submit();
     expect(picked).not.toHaveBeenCalled();
   });
 
-  it('offers no meeting after a failed read', async () => {
-    const failed = await setup({ listMeetings: jest.fn(() => throwError(() => new Error('x'))) });
-    expect(failed.cmp.none()).toBe(true);
+  it('shows the error after a failed read, not the empty list, and reads again', async () => {
+    const listMeetings = jest.fn(() => throwError(() => new Error('x')));
+    const failed = await setup({ listMeetings });
+    expect(failed.cmp.none()).toBe(false);
+    expect(failed.cmp.state()).toBe('error');
+    expect(screen.queryByText('Keine spätere Sitzung dieses Gremiums hat begonnen.')).toBeNull();
+    failed.cmp.load();
+    expect(listMeetings).toHaveBeenCalledTimes(2);
   });
 
   it('sends no second pick while the first saves', async () => {
@@ -60,10 +65,11 @@ describe('ProtocolApprovalDialogComponent', () => {
 describe('approvalCandidates', () => {
   it('keeps the later meetings in the order of their date, without the own one', () => {
     const all = [
-      meeting({ id: 'a', date: '2026-11-12' }),
-      meeting({ id: 'b', date: '2026-10-01' }),
-      meeting({ id: 'c', date: '2026-10-29' }),
-      meeting({ id: 'd', date: null }),
+      meeting({ id: 'a', date: '2026-11-12', status: 'live' }),
+      meeting({ id: 'b', date: '2026-10-01', status: 'closed' }),
+      meeting({ id: 'c', date: '2026-10-29', status: 'closed' }),
+      meeting({ id: 'd', date: null, status: 'closed' }),
+      meeting({ id: 'e', date: '2026-12-03', status: 'planned' }),
       OWN,
     ];
     expect(approvalCandidates(OWN, all).map((m) => m.id)).toEqual(['c', 'a']);

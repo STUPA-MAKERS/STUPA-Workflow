@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from app.modules.livevote.schemas import MeetingOut, MeetingVoteBody
 from app.modules.livevote.service import MeetingService
-from app.modules.livevote.vote_open import eligible_count
+from app.modules.livevote.vote_open import eligible_count, quorum_rules
 from app.modules.meetings.models import MeetingAgendaItem
 from app.modules.voting.poll import build_config as build_poll_config
 from app.modules.voting.schemas import VoteCreateInternal
@@ -42,22 +42,6 @@ def _vote_config(
                 secret=secret_only(payload.secret, field="secret"),
                 guests_vote=guests_vote,
             )
-
-
-async def _default_quorum_percent(service: MeetingService, meeting: MeetingOut) -> int | None:
-    """Return the quorum that a vote of this meeting starts with.
-
-    A Wiederholungssitzung (kind ``repeat``) uses the repeat quorum of its Gremium.
-    Without that value, and in every other meeting, the quorum of the Gremium applies.
-    """
-    repeat = (
-        await service.gremium_repeat_quorum_percent(meeting.gremium_id)
-        if meeting.kind == "repeat"
-        else None
-    )
-    return (
-        repeat if repeat is not None else await service.gremium_quorum_percent(meeting.gremium_id)
-    )
 
 
 async def build_meeting_vote(
@@ -161,30 +145,12 @@ async def build_meeting_vote(
             "guestsVote": guests_vote,
         }
     )
-    quorum_percent = (
-        None
-        if guests_vote or payload.poll is not None
-        else payload.quorum_percent
-        if payload.quorum_percent is not None
-        else await _default_quorum_percent(service, meeting)
-    )
-    quorum: dict[str, object] = (
-        {} if quorum_percent is None else {"quorum": {"type": "percent", "value": quorum_percent}}
-    )
-    min_present = (
-        None
-        if guests_vote or payload.poll is not None
-        else await service.gremium_quorum_min_present(meeting.gremium_id)
-    )
-    presence: dict[str, object] = (
-        {}
-        if payload.poll is not None
-        else {
-            "quorumBasis": "present",
-            **({} if min_present is None else {"quorumMinPresent": min_present}),
-        }
-    )
-    config_data = {**base, **quorum, **presence}
+    config_data = {
+        **base,
+        **await quorum_rules(
+            service, meeting, guests_vote=guests_vote, poll=payload.poll is not None
+        ),
+    }
     if election:
         await service.assert_candidates_exist(
             [c.principal_id for c in payload.candidates if c.principal_id is not None]

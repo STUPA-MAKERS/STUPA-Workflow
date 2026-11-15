@@ -31,6 +31,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
+from app.modules.gremien.models import DEFAULT_TERM_START_MONTH
 
 
 class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
@@ -91,6 +92,22 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     #: `public_join` creates it, and a rotation replaces it. It is unique among the
     #: meetings that are not closed.
     join_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The first meeting of a Wiederholungssitzung (`kind = repeat`, spec 000940): the
+    #: earlier meeting of the same Gremium that had no quorum. NULL for each other kind
+    #: and for a repeat meeting from before the column.
+    repeat_of_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
+    )
+    #: `lateExcuseDays` of the settings at the time the meeting was made (spec 000942):
+    #: a later change of the setting does not move the window of this meeting. NULL for
+    #: a meeting from before the column: a reader then takes the setting.
+    late_excuse_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The present count and the number of members with a voting right, fixed at the
+    #: close (000946). The protocol reads them, so a new render of an old meeting gives
+    #: the same count and the same quorum (000357). NULL for a meeting that is not
+    #: closed or that closed before the columns existed: a reader then counts now.
+    present_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    eligible_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('planned','live','closed')", name="meeting_status"),
@@ -343,7 +360,6 @@ DEFAULT_INVITE_DAYS_EXTRAORDINARY = 3
 DEFAULT_PROTOCOL_DRAFT_DAYS = 14
 DEFAULT_LATE_EXCUSE_DAYS = 7
 DEFAULT_ABSENCE_LIMIT = 3
-DEFAULT_TERM_START_MONTH = 10
 MAX_PERIOD_DAYS = 365
 MAX_ABSENCE_LIMIT = 50
 

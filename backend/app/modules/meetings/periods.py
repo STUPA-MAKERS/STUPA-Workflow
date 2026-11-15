@@ -11,6 +11,12 @@ invitation periods with ``GET /committees/{id}/meeting-defaults``.
 - ``absenceLimit``: the number of unexcused absences in one term that ends a Mandat.
 - ``circularMinDays``: the least number of days of an Umlaufverfahren.
 - ``termStartMonth``: the month on whose first day a term (Amtszeit) starts.
+
+A changed period does not reach a started case (§F/administration/admin/000942). A
+meeting keeps ``lateExcuseDays`` of the time it was made (``meeting.late_excuse_days``),
+because this period is the only one that a stored meeting reads again: the invitation
+periods give only a warning in the meeting form, and an Umlaufverfahren checks
+``circularMinDays`` only at its open and takes no change of its end after that.
 """
 
 from __future__ import annotations
@@ -18,7 +24,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from app.modules.meetings.models import MeetingSettings
+from app.modules.meetings.models import DEFAULT_LATE_EXCUSE_DAYS, MeetingSettings
 
 #: The periods of the settings row, as (model attribute, JSON key).
 PERIOD_FIELDS: tuple[tuple[str, str], ...] = (
@@ -51,3 +57,15 @@ def term_start(today: date, start_month: int) -> date:
 def term_end(start: date) -> date:
     """Return the first day after the term that starts on ``start``."""
     return date(start.year + 1, start.month, 1)
+
+
+def kept_late_excuse_days(kept: int | None, current: int | None) -> int:
+    """Return the late-excuse period of one meeting, in days.
+
+    ``kept`` is the value that the meeting stored when it was made. A meeting from
+    before the column has none and takes ``current``, the value of the settings row; a
+    database without this row takes the default.
+    """
+    if kept is not None:
+        return kept
+    return DEFAULT_LATE_EXCUSE_DAYS if current is None else int(current)

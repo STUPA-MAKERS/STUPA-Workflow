@@ -45,6 +45,8 @@
       [counts]="v.counts ?? {}"
       [voteId]="v.id"
       [canManage]="canManage() && !locked()"
+      [round]="v.round ?? 1"
+      [canNextRound]="canManage() && !locked() && meetingStatus() === 'live' && !continued()"
       (changed)="electionChanged.emit($event)"
     />
   } @else if (showCounts()) {

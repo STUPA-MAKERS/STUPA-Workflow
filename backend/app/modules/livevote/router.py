@@ -570,6 +570,10 @@ async def excuse_own_absence(
     attendance: AttendanceDep,
     service: ServiceDep,
     principal: ReaderDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: MeetingMailerDep,
 ) -> list[AttendanceOut]:
     """Change the own ``absent`` of a closed meeting to ``excused``.
 
@@ -577,6 +581,8 @@ async def excuse_own_absence(
     the close (409 ``late_excuse_expired``). A meeting that is not closed answers 409
     ``meeting_not_closed``, a caller without an ``absent`` record 409 ``not_absent``.
     The change writes ``attendance_set`` with ``late: true``, never with the reason.
+    The excuse applies at once. The mail ``late_excuse`` tells the persons with
+    ``session.manage`` in the Gremium of it, with the reason.
     """
     await service.assert_can_read(meeting_id, principal)
     can_write = await service.can_write_meeting(meeting_id, principal)
@@ -584,6 +590,8 @@ async def excuse_own_absence(
         meeting_id, principal.sub, payload.note, now=datetime.now(UTC), can_write=can_write
     )
     await attendance.session.commit()
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(mailer.late_excuse, settings, meeting_id, principal.sub, pool)
     return roster
 
 

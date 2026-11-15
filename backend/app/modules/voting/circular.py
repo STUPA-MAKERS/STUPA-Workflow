@@ -43,6 +43,7 @@ OBJECTION = "objection"
 #: 409 codes of the Umlaufverfahren.
 NOT_CIRCULAR = "not_circular"
 CIRCULAR_WINDOW_OPEN = "circular_window_open"
+CIRCULAR_WINDOW_ENDED = "circular_window_ended"
 #: 422 code of a cast window that is shorter than ``circularMinDays``.
 CIRCULAR_WINDOW_TOO_SHORT = "circular_window_too_short"
 
@@ -178,8 +179,9 @@ class CircularService:
         The caller commits.
 
         Raises:
-            ConflictError: The vote is no circular vote (``not_circular``) or it is not
-                open (``vote_not_open``).
+            ConflictError: The vote is no circular vote (``not_circular``), it is not
+                open (``vote_not_open``) or its cast window has ended
+                (``circular_window_ended``).
             ForbiddenError: The principal holds no ballot in the vote, or acts with an
                 OAuth token (403).
         """
@@ -190,6 +192,10 @@ class CircularService:
             raise ForbiddenError("Only an eligible member objects to an Umlaufverfahren.")
         if vote.status != "open":
             raise ConflictError(f"vote is {vote.status}, cannot object.", code="vote_not_open")
+        if vote.closes_at is not None and vote.closes_at <= now:
+            raise ConflictError(
+                "The cast window of the Umlaufverfahren has ended.", code=CIRCULAR_WINDOW_ENDED
+            )
         _store_objection(vote)
         await self.voting._mark_cancelled(vote, now=now, actor=principal.sub, reason=OBJECTION)
         await self.session.flush()

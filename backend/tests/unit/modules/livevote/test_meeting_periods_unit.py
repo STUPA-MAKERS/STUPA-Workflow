@@ -12,8 +12,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
+from pydantic import ValidationError
 
 from app.main import create_app
+from app.modules.admin.schemas import MeetingPeriods
 from app.modules.gremien_overview.attendance_export import (
     AttendanceExport,
     ExportRow,
@@ -26,14 +28,16 @@ from app.modules.livevote.router import (
     get_meeting_service,
     get_voting_service,
 )
-from app.modules.meetings.absence import AbsenceNotice
+from app.modules.meetings.absence import AbsenceNotice, absence_notices
 from app.modules.meetings.attendance_service import (
     AttendanceService,
     _open_window,
     late_excuse_until,
 )
-from app.modules.meetings.periods import term_end, term_start
+from app.modules.meetings.periods import kept_late_excuse_days, term_end, term_start
 from app.shared.errors import ConflictError, ForbiddenError
+from tests._support.auth_fakes import fake_session as auth_session
+from tests._support.auth_fakes import result as auth_result
 from tests._support.flow_fakes import FakeSession, result
 from tests.unit.modules.livevote.test_livevote_cov import (
     _FakeAgendaService,
@@ -81,6 +85,50 @@ def test_term_runs_one_year_from_the_start_month(today: date, month: int, start:
     assert term_end(start) == date(start.year + 1, start.month, 1)
 
 
+@pytest.mark.parametrize(
+    ("month", "first", "end"),
+    [(4, date(2026, 4, 1), date(2027, 4, 1)), (10, date(2025, 10, 1), date(2026, 10, 1))],
+)
+async def test_absences_count_in_the_term_of_the_gremium(
+    month: int, first: date, end: date
+) -> None:
+    """§F/meetings/meetings/000948: two Gremien, two start months, two terms.
+
+    The meeting is on 2026-05-10. The Gremium with the start month April counts from
+    April 2026, the Gremium with October from October 2025. The start month of the
+    settings has no part in it.
+    """
+    pid = uuid4()
+    meeting: Any = SimpleNamespace(
+        id=uuid4(), gremium_id=uuid4(), status="closed", kind="ordinary", date=date(2026, 5, 10)
+    )
+    session = auth_session(
+        auth_result(month),
+        auth_result(pid),
+        auth_result((pid, 2)),
+        auth_result((pid, "Anna", "anna@x")),
+    )
+    asked: list[Any] = []
+    execute, scalars = session.execute, session.scalars
+
+    async def spy_execute(stmt: Any) -> Any:
+        asked.append(stmt)
+        return await execute(stmt)
+
+    async def spy_scalars(stmt: Any) -> Any:
+        asked.append(stmt)
+        return await scalars(stmt)
+
+    session.execute, session.scalars = spy_execute, spy_scalars
+    settings: Any = SimpleNamespace(term_start_month=1, absence_limit=3)
+    notices = await absence_notices(session, meeting, settings)
+    assert [(n.name, n.count, n.reached) for n in notices] == [("Anna", 2, False)]
+    counted = [s for s in asked if "meeting_attendance.status" in str(s)]
+    assert len(counted) == 2
+    for stmt in counted:
+        assert {first, end} <= set(stmt.compile().params.values())
+
+
 def test_absence_notice_tells_the_limit_from_the_warning() -> None:
     pid = uuid4()
     assert AbsenceNotice(pid, "A", 2, 3).reached is False
@@ -122,7 +170,51 @@ def _meeting(status: str = "closed", closed_at: datetime | None = NOW) -> Any:
 def test_late_excuse_window_needs_a_closed_meeting() -> None:
     assert late_excuse_until(_meeting("live", None), 7) is None
     assert late_excuse_until(_meeting("closed", None), 7) is None
-    assert late_excuse_until(_meeting(), 7) == NOW + timedelta(days=7)
+
+
+def test_the_late_excuse_window_ends_with_its_last_day() -> None:
+    """Closed on 1 July at 14:00 local time, 7 days: open until 8 July, 23:59:59 local."""
+    assert late_excuse_until(_meeting(), 7) == datetime(2026, 7, 8, 21, 59, 59, tzinfo=UTC)
+
+
+def test_a_meeting_keeps_its_late_excuse_period() -> None:
+    """§F/administration/admin/000942: the kept value wins over the setting."""
+    assert kept_late_excuse_days(14, 2) == 14
+    assert kept_late_excuse_days(None, 2) == 2
+    assert kept_late_excuse_days(None, None) == 7
+
+
+async def test_excuse_late_reads_the_period_of_the_meeting_not_the_setting() -> None:
+    """The setting went down to 1 day after the meeting was made with 7 days."""
+    meeting = _meeting()
+    meeting.late_excuse_days = 7
+    row = SimpleNamespace(status="absent", source="lead", note=None)
+    session = _session(meeting, result(row), scalars=[uuid4()])
+    service = AttendanceService(session)  # type: ignore[arg-type]
+    assert await service._late_excuse_days(meeting) == 7
+    late = NOW + timedelta(days=8)
+    with pytest.raises(ConflictError) as error:
+        await service.excuse_late(meeting.id, "me", "ill", now=late)
+    assert error.value.code == "late_excuse_expired"
+
+
+@pytest.mark.parametrize(
+    "key", ["inviteDaysOrdinary", "inviteDaysExtraordinary", "lateExcuseDays", "circularMinDays"]
+)
+def test_a_period_of_0_days_is_refused(key: str) -> None:
+    """§F/administration/admin/000942: each of these periods is 1 day or more."""
+    values = {
+        "inviteDaysOrdinary": 7,
+        "inviteDaysExtraordinary": 3,
+        "protocolDraftDays": 0,
+        "lateExcuseDays": 7,
+        "absenceLimit": 3,
+        "circularMinDays": 3,
+        "termStartMonth": 10,
+    }
+    assert MeetingPeriods.model_validate(values).protocol_draft_days == 0
+    with pytest.raises(ValidationError):
+        MeetingPeriods.model_validate({**values, key: 0})
 
 
 def test_open_window_is_for_the_own_absence_only() -> None:
@@ -172,7 +264,7 @@ async def test_excuse_late_ends_with_the_window() -> None:
     meeting = _meeting()
     row = SimpleNamespace(status="absent", source="lead", note=None)
     session = _session(meeting, result(row), scalars=[7, uuid4()])
-    late = NOW + timedelta(days=7, seconds=1)
+    late = NOW + timedelta(days=8)
     with pytest.raises(ConflictError) as error:
         await AttendanceService(session).excuse_late(meeting.id, "me", "ill", now=late)  # type: ignore[arg-type]
     assert error.value.code == "late_excuse_expired"
@@ -184,6 +276,9 @@ class _Mailer:
         self.meetings: list[UUID] = []
 
     async def absence_limit(self, _settings: Any, meeting_id: UUID, _pool: Any) -> None:
+        self.meetings.append(meeting_id)
+
+    async def late_excuse(self, _settings: Any, meeting_id: UUID, sub: str, _pool: Any) -> None:
         self.meetings.append(meeting_id)
 
 
@@ -230,8 +325,12 @@ def test_late_excuse_route_passes_the_reason(
 
     fakes["attendance"].excuse_late = excuse_late
     fakes["attendance"].session = fakes["meeting"].session
+    mailer = _Mailer()
+    app.dependency_overrides[get_meeting_mailer] = lambda: mailer
     _login(app)
-    url = f"/api/meetings/{uuid4()}/attendance/me/late-excuse"
+    meeting_id = uuid4()
+    url = f"/api/meetings/{meeting_id}/attendance/me/late-excuse"
     assert client.post(url, json={"note": "ill"}).status_code == 200
     assert calls == [("p", "ill", True)]
     assert client.post(url, json={"note": " "}).status_code == 422
+    assert mailer.meetings == [meeting_id]

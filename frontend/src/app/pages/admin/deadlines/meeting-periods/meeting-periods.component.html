@@ -6,15 +6,25 @@
         <form class="gs__grid" (submit)="$event.preventDefault(); save()">
           @for (field of fields; track field.key) {
             <div class="gs__field">
-              <app-input
-                type="number"
-                [label]="field.label | t"
-                [error]="errors()[field.key]"
-                [name]="field.key"
-                [ngModel]="draft()[field.key]"
-                (ngModelChange)="patch(field.key, $event)"
-                [suffix]="field.unit ? (field.unit | t) : ''"
-              />
+              @if (field.key === 'termStartMonth') {
+                <app-select
+                  [label]="field.label | t"
+                  [options]="months()"
+                  [name]="field.key"
+                  [ngModel]="draft()[field.key]"
+                  (ngModelChange)="patch(field.key, $event)"
+                />
+              } @else {
+                <app-input
+                  type="number"
+                  [label]="field.label | t"
+                  [error]="errors()[field.key]"
+                  [name]="field.key"
+                  [ngModel]="draft()[field.key]"
+                  (ngModelChange)="patch(field.key, $event)"
+                  [suffix]="field.unit ? (field.unit | t) : ''"
+                />
+              }
             </div>
           }
         </form>

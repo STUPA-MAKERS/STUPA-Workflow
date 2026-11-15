@@ -46,6 +46,24 @@ BUILTIN_ABSENCE_LIMIT_BODY = {
     "The member is to be warned.{% endif %}\n",
 }
 
+#: The mail to the persons with ``session.manage`` when a member hands in a late
+#: excuse for a closed meeting (§F/meetings/meetings/000943).
+BUILTIN_LATE_EXCUSE_SUBJECT = {
+    "de": "Nachträgliche Entschuldigung: {{ memberName }}{% if gremiumName %} "
+    "({{ gremiumName }}){% endif %}",
+    "en": "Late excuse: {{ memberName }}{% if gremiumName %} ({{ gremiumName }}){% endif %}",
+}
+BUILTIN_LATE_EXCUSE_BODY = {
+    "de": "Hallo,\n\n{{ memberName }} hat sich für die Sitzung „{{ meetingTitle }}“"
+    "{% if meetingDate %} am {{ meetingDate }}{% endif %} nachträglich entschuldigt. "
+    "Die Entschuldigung gilt sofort, das Fehlen zählt nicht mehr als unentschuldigt.\n\n"
+    "Grund: {{ reason }}\n",
+    "en": "Hello,\n\n{{ memberName }} handed in a late excuse for the meeting "
+    '"{{ meetingTitle }}"{% if meetingDate %} on {{ meetingDate }}{% endif %}. '
+    "The excuse applies at once, the absence no longer counts as unexcused.\n\n"
+    "Reason: {{ reason }}\n",
+}
+
 #: Builtin subject of a meeting-bound delegation mail to the substitute. The context
 #: names the meeting, the Gremium and the delegating member.
 BUILTIN_DELEGATION_GRANTED_SUBJECT = {

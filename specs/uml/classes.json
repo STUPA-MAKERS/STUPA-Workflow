@@ -526,6 +526,13 @@
       "to": "Gremium"
     },
     {
+      "column": "repeat_of_id",
+      "from": "Meeting",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Meeting"
+    },
+    {
       "column": "current_agenda_item_id",
       "from": "Meeting",
       "multiplicity": "*",
@@ -3653,6 +3660,12 @@
           "type": "INTEGER"
         },
         {
+          "name": "term_start_month",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "guests_may_vote",
           "nullable": false,
           "primaryKey": false,
@@ -4389,6 +4402,30 @@
           "nullable": true,
           "primaryKey": false,
           "type": "TEXT"
+        },
+        {
+          "name": "repeat_of_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "late_excuse_days",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "present_count",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "eligible_count",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
         },
         {
           "name": "id",
@@ -5305,6 +5342,12 @@
           "nullable": true,
           "primaryKey": false,
           "type": "TEXT"
+        },
+        {
+          "name": "draft_sent_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
         },
         {
           "name": "id",
@@ -6989,6 +7032,12 @@
         },
         {
           "name": "present_guests",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "present_seats",
           "nullable": true,
           "primaryKey": false,
           "type": "INTEGER"

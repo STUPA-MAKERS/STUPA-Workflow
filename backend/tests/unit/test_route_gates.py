@@ -190,6 +190,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("DELETE", "/api/protocols/{protocol_id}"): _PROTOCOL_WRITE,
     ("POST", "/api/protocols/{protocol_id}/finalize"): "ProtocolService.authorize_finalize",
     ("POST", "/api/protocols/{protocol_id}/draft-mail"): "ProtocolService.authorize_write",
+    ("GET", "/api/protocols/{protocol_id}/draft-pdf"): _PROTOCOL_READ,
     ("PUT", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
     ("DELETE", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
     ("GET", "/api/protocols/{protocol_id}/pdf"): _PROTOCOL_READ,
@@ -260,6 +261,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/votes/{vote_id}/cancel"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/close"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/draw-lot"): _MANAGE_VOTE,
+    ("POST", "/api/votes/{vote_id}/next-round"): _MANAGE_VOTE,
     ("POST", "/api/votes/{vote_id}/objection"): (
         "CircularService.object (VotingService.can_cast_own: roster of the vote)"
     ),

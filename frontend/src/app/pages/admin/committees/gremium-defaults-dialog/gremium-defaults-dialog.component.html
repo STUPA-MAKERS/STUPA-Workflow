@@ -32,6 +32,7 @@
           <app-switch
             class="gdd__switch"
             name="guestsMayVote"
+            [disabled]="f.quorumPercent !== null"
             [ngModel]="f.guestsMayVote"
             (ngModelChange)="patch({ guestsMayVote: $event })"
             >{{ 'admin.gremien.guestsMayVote' | t }}</app-switch
@@ -43,20 +44,24 @@
             (ngModelChange)="patch({ allowVoteDelegation: $event })"
             >{{ 'admin.gremien.delegation' | t }}</app-switch
           >
-          <app-input
-            type="number"
-            [label]="'admin.gremien.delegationLead' | t"
-            name="delegationLeadMinutes"
-            [ngModel]="f.delegationLeadMinutes"
-            (ngModelChange)="patchLead($event)"
-          />
-          <app-input
-            type="number"
-            [label]="'admin.gremien.delegationMax' | t"
-            name="delegationMaxPerDelegate"
-            [ngModel]="f.delegationMaxPerDelegate"
-            (ngModelChange)="patchMax($event)"
-          />
+          @if (f.allowVoteDelegation) {
+            <div class="gdd__nested">
+              <app-input
+                type="number"
+                [label]="'admin.gremien.delegationLead' | t"
+                name="delegationLeadMinutes"
+                [ngModel]="f.delegationLeadMinutes"
+                (ngModelChange)="patchLead($event)"
+              />
+              <app-input
+                type="number"
+                [label]="'admin.gremien.delegationMax' | t"
+                name="delegationMaxPerDelegate"
+                [ngModel]="f.delegationMaxPerDelegate"
+                (ngModelChange)="patchMax($event)"
+              />
+            </div>
+          }
           <button type="submit" hidden></button>
         </form>
       }

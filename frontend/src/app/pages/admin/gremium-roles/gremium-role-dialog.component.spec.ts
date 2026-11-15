@@ -77,7 +77,7 @@ describe('GremiumRoleDialogComponent', () => {
       'Abstimmungen führen',
       'Abstimmen',
       'Protokoll führen',
-      'Protokoll freigeben',
+      'Protokoll finalisieren & senden',
     ]) {
       expect(screen.getByRole('checkbox', { name })).toBeInTheDocument();
     }
@@ -88,7 +88,7 @@ describe('GremiumRoleDialogComponent', () => {
       '/admin/group-mappings',
     );
 
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Protokoll freigeben' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Protokoll finalisieren & senden' }));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(api.updateGremiumRole).toHaveBeenCalledWith('gr-p', {
       name: { de: 'Protokoll', en: 'Minutes' },

@@ -15,10 +15,17 @@ import type { Attendance, Uuid } from '@core/api/models';
 import { problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, DialogComponent, InputComponent, ToastService } from '@stupa-makers/ui-kit';
+import type { TranslationKey } from '@core/i18n/translations';
+import { ButtonComponent, DialogComponent, TextareaComponent, ToastService } from '@stupa-makers/ui-kit';
 
 /** The longest reason that the server accepts (`ATTENDANCE_NOTE_MAX`). */
 export const LATE_EXCUSE_NOTE_MAX = 500;
+
+/** The refusals that a second try cannot change, with their text. */
+const FINAL_REFUSALS: Readonly<Record<string, TranslationKey>> = {
+  late_excuse_expired: 'meetings.lateExcuse.expired',
+  not_absent: 'meetings.lateExcuse.notAbsent',
+};
 
 /**
  * "Nachträglich entschuldigen": a member changes the own absence of a closed meeting to
@@ -26,13 +33,14 @@ export const LATE_EXCUSE_NOTE_MAX = 500;
  *
  * The dialog is open while `meetingId` is set. The reason is required. The server
  * refuses after the period `lateExcuseDays` (409 `late_excuse_expired`) and when the
- * record is no absence (409 `not_absent`); the toast then names the cause.
+ * record is no absence (409 `not_absent`); the toast then names the cause and the
+ * dialog closes, because a second try gets the same answer.
  */
 @Component({
   selector: 'app-late-excuse-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, DialogComponent, ButtonComponent, InputComponent],
+  imports: [FormsModule, TranslatePipe, DialogComponent, ButtonComponent, TextareaComponent],
   templateUrl: './late-excuse-dialog.component.html',
 })
 export class LateExcuseDialogComponent {
@@ -42,8 +50,6 @@ export class LateExcuseDialogComponent {
 
   /** The meeting of the absence. The dialog is open while it is set. */
   readonly meetingId = input<Uuid | null>(null);
-  /** The title of the meeting, as the line under the dialog title. */
-  readonly meetingTitle = input('');
   readonly closed = output<void>();
   /** The server stored the excuse. Carries the new roster of the meeting. */
   readonly excused = output<Attendance[]>();
@@ -52,9 +58,8 @@ export class LateExcuseDialogComponent {
   readonly saving = signal(false);
   readonly tooLong = computed(() => this.note().trim().length > LATE_EXCUSE_NOTE_MAX);
   readonly valid = computed(() => !!this.note().trim() && !this.tooLong());
-  readonly error = computed(() =>
-    this.tooLong() ? this.i18n.translate('meetings.lateExcuse.tooLong', { max: LATE_EXCUSE_NOTE_MAX }) : '',
-  );
+  /** The field takes no longer reason, so the limit needs no error text. */
+  protected readonly max = LATE_EXCUSE_NOTE_MAX;
 
   constructor() {
     effect(() => {
@@ -84,15 +89,9 @@ export class LateExcuseDialogComponent {
       error: (err: unknown) => {
         this.saving.set(false);
         const code = problemCode(err);
-        this.toast.error(
-          this.i18n.translate(
-            code === 'late_excuse_expired'
-              ? 'meetings.lateExcuse.expired'
-              : code === 'not_absent'
-                ? 'meetings.lateExcuse.notAbsent'
-                : 'meetings.toast.actionFailed',
-          ),
-        );
+        const final = FINAL_REFUSALS[code ?? ''];
+        this.toast.error(this.i18n.translate(final ?? 'meetings.toast.actionFailed'));
+        if (final) this.closed.emit();
       },
     });
   }

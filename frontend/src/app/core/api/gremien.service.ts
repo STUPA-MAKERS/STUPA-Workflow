@@ -114,7 +114,7 @@ export interface GremiumAttendanceRow {
   readonly roleKey: string | null;
   readonly roleName: LocalizedText | null;
   readonly isSelf: boolean;
-  /** The unexcused absences of the current term (§ 000920). */
+  /** The unexcused absences of the chosen term (§ 000920, § 000941). */
   readonly unexcused: number;
   /** One cell per month of `months`, in the same order. */
   readonly cells: readonly GremiumAttendanceCell[];
@@ -124,8 +124,10 @@ export interface GremiumAttendanceRow {
 export interface GremiumAttendance {
   readonly fromMonth: string;
   readonly toMonth: string;
-  /** The first day of the current term (`YYYY-MM-DD`). `unexcused` counts from it. */
+  /** The first day of the chosen term (`YYYY-MM-DD`). `unexcused` counts from it. */
   readonly termStart: string;
+  /** The first day of each term on offer, the newest first; the first one is the current term. */
+  readonly terms: readonly string[];
   /** The number of unexcused absences in one term that ends a Mandat. */
   readonly absenceLimit: number;
   readonly months: readonly GremiumAttendanceMonth[];
@@ -231,9 +233,20 @@ export class GremienApiService {
     });
   }
 
-  /** The months `from` to `to` (`YYYY-MM`). Without them the server gives the last six. */
-  attendance(gremiumId: Uuid, range: { from?: string; to?: string } = {}): Observable<GremiumAttendance> {
-    const params = httpParams({ from: range.from || undefined, to: range.to || undefined });
+  /**
+   * The months `from` to `to` (`YYYY-MM`). Without them the server gives the last six.
+   * `term` is a day (`YYYY-MM-DD`) of the term that `unexcused` counts; with it and
+   * without a range the server gives the months of this term (§ 000941).
+   */
+  attendance(
+    gremiumId: Uuid,
+    range: { from?: string; to?: string; term?: string } = {},
+  ): Observable<GremiumAttendance> {
+    const params = httpParams({
+      from: range.from || undefined,
+      to: range.to || undefined,
+      term: range.term || undefined,
+    });
     return this.http.get<GremiumAttendance>(`${this.base}/committees/${gremiumId}/attendance`, {
       params,
       context: skipLoading(),

@@ -13,7 +13,14 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { problemCode } from '@core/api/problem';
-import type { GuestsMode, MeetingDefaults, MeetingForm, MeetingKind, MeetingMember } from '@core/api/models';
+import type {
+  GuestsMode,
+  Meeting,
+  MeetingDefaults,
+  MeetingForm,
+  MeetingKind,
+  MeetingMember,
+} from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -31,7 +38,13 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
-import { lateInviteDays, MEETING_LOCATION_MAX, meetingFormOptions, meetingKindOptions } from '../meeting-kind.util';
+import {
+  firstMeetingOptions,
+  lateInviteDays,
+  MEETING_LOCATION_MAX,
+  meetingFormOptions,
+  meetingKindOptions,
+} from '../meeting-kind.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
 import { longDate } from '@shared/date-format';
 import { personLabel } from '@shared/person-label.util';
@@ -40,7 +53,8 @@ import { personLabel } from '@shared/person-label.util';
  * "Sitzung anlegen" in two steps.
  *
  * Step 1 asks for the Gremium, the kind, the date, the start, an optional end, the
- * place and the form. Step 2 asks
+ * place and the form. A Wiederholungssitzung also asks for its first meeting (§ 000940).
+ * Step 2 asks
  * for the title (prefilled from step 1) and the minute-taker. Only members with
  * `protocol.write` in the Gremium can keep the minutes, so the list offers only
  * them. The dialog creates the meeting and opens its page.
@@ -101,6 +115,17 @@ export class CreateMeetingDialogComponent {
   readonly guestsMode = signal<GuestsMode>('watch');
   /** A new meeting is an ordinary one in presence (§ 000903, § 000907). */
   readonly kind = signal<MeetingKind>('ordinary');
+  /** The first meeting of a Wiederholungssitzung (§ 000940). */
+  readonly repeatOf = signal('');
+  /** The meetings of the chosen Gremium. */
+  readonly meetings = signal<Meeting[]>([]);
+  readonly repeatOfOptions = computed(() =>
+    firstMeetingOptions(this.meetings(), this.i18n.formatLocale(), this.date()),
+  );
+  /** A Wiederholungssitzung names a first meeting that the list still holds. */
+  readonly repeatOfMissing = computed(
+    () => this.kind() === 'repeat' && !this.repeatOfOptions().some((o) => o.value === this.repeatOf()),
+  );
   readonly location = signal('');
   readonly form = signal<MeetingForm>('presence');
   readonly kindOptions = computed(() => meetingKindOptions(this.i18n));
@@ -139,7 +164,11 @@ export class CreateMeetingDialogComponent {
 
   readonly step1Valid = computed(
     () =>
-      !!this.gremium() && !!this.date().trim() && !!this.time().trim() && !this.locationTooLong(),
+      !!this.gremium() &&
+      !!this.date().trim() &&
+      !!this.time().trim() &&
+      !this.locationTooLong() &&
+      !this.repeatOfMissing(),
   );
   readonly step2Valid = computed(() => this.step1Valid() && !!this.title().trim());
 
@@ -161,6 +190,8 @@ export class CreateMeetingDialogComponent {
     this.publicJoin.set(false);
     this.guestsMode.set('watch');
     this.kind.set('ordinary');
+    this.repeatOf.set('');
+    this.meetings.set([]);
     this.location.set('');
     this.form.set('presence');
     this.members.set([]);
@@ -201,7 +232,9 @@ export class CreateMeetingDialogComponent {
   onGremiumChange(id: string): void {
     this.gremium.set(id);
     this.keeper.set('');
+    this.repeatOf.set('');
     this.members.set([]);
+    this.meetings.set([]);
     if (id) this.loadMembers(id);
   }
 
@@ -220,6 +253,12 @@ export class CreateMeetingDialogComponent {
   /** A late answer for a Gremium that the user changed since then is stale. */
   private loadMembers(gremiumId: string): void {
     this.loadDefaults(gremiumId);
+    this.api.listMeetings(gremiumId).subscribe({
+      next: (rows) => {
+        if (this.gremium() === gremiumId) this.meetings.set(rows);
+      },
+      error: () => this.meetings.set([]),
+    });
     this.api.listMeetingMembers(gremiumId).subscribe({
       next: (rows) => {
         if (this.gremium() === gremiumId) this.members.set(rows);
@@ -271,6 +310,7 @@ export class CreateMeetingDialogComponent {
         endTime: this.endTime().trim() || null,
         protokollantId: this.keeper() || null,
         kind: this.kind(),
+        ...(this.kind() === 'repeat' ? { repeatOfId: this.repeatOf() } : {}),
         location: this.location().trim() || null,
         form: this.form(),
         ...(this.publicJoin() ? { publicJoin: true, guestsMode: this.guestsMode() } : {}),
@@ -285,13 +325,13 @@ export class CreateMeetingDialogComponent {
         error: (err: unknown) => {
           this.creating.set(false);
           const code = problemCode(err);
-          this.toast.error(
-            this.i18n.translate(
-              code === 'guests_vote_off' || code === 'guests_vote_needs_no_quorum'
-                ? 'guests.toast.voteOff'
-                : 'meetings.toast.createFailed',
-            ),
-          );
+          const key =
+            code === 'guests_vote_off' || code === 'guests_vote_needs_no_quorum'
+              ? 'guests.toast.voteOff'
+              : code === 'repeat_first_meeting_invalid' || code === 'repeat_needs_first_meeting'
+                ? 'meetings.repeatOf.invalid'
+                : 'meetings.toast.createFailed';
+          this.toast.error(this.i18n.translate(key));
         },
       });
   }

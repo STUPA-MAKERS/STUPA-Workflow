@@ -94,7 +94,7 @@ describe('VoteOpenDialogComponent', () => {
     expect(screen.queryByText(/änderbar/)).toBeNull();
     await pickOption(
       screen.getByRole('combobox', { name: 'Mehrheitsregel' }),
-      'Zweidrittelmehrheit der Stimmen',
+      'Zweidrittelmehrheit der abgegebenen Stimmen',
     );
     const question = screen.getByLabelText('Beschlussfrage');
     await userEvent.clear(question);
@@ -151,8 +151,8 @@ describe('VoteOpenDialogComponent', () => {
     expect(cmp.majorityRule()).toBe('simple');
     expect(cmp.ruleOptions().map((o) => o.label)).toEqual([
       'Einfache Mehrheit',
-      'Absolute Mehrheit der Stimmen',
-      'Zweidrittelmehrheit der Stimmen',
+      'Absolute Mehrheit der abgegebenen Stimmen',
+      'Zweidrittelmehrheit der abgegebenen Stimmen',
       'Mehrheit der Mitglieder',
       'Zweidrittelmehrheit der Mitglieder',
     ]);
@@ -364,7 +364,7 @@ describe('VoteOpenDialogComponent', () => {
       expect(screen.getByLabelText('Beschlussfrage')).toHaveValue('Fördern wir die Party?');
       await waitFor(() =>
         expect(screen.getByRole('combobox', { name: 'Mehrheitsregel' })).toHaveTextContent(
-          'Absolute Mehrheit der Stimmen',
+          'Absolute Mehrheit der abgegebenen Stimmen',
         ),
       );
       expect(screen.queryByRole('button', { name: 'Vorbereiten' })).toBeNull();

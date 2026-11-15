@@ -21,8 +21,13 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.service import FilesService
 from app.modules.gremien.gremium_roles import GremiumRoleService
-from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.meetings.models import Meeting
+from app.modules.gremien.models import (
+    DEFAULT_TERM_START_MONTH,
+    Gremium,
+    GremiumMembership,
+    GremiumRole,
+)
+from app.modules.meetings.models import Meeting, MeetingSettings
 from app.modules.site_config.models import CdVariant
 from app.modules.todos.boards import ensure_gremium_board
 from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
@@ -45,6 +50,7 @@ def _gremium_out(row: Gremium) -> GremiumOut:
         quorum_min_present=row.quorum_min_present,
         repeat_quorum_percent=row.repeat_quorum_percent,
         guests_may_vote=bool(row.guests_may_vote),
+        term_start_month=row.term_start_month,
         protocols_public=bool(row.protocols_public),
     )
 
@@ -55,7 +61,7 @@ def _guests_vote(row: Gremium) -> bool:
 
 
 def _apply_quorum(row: Gremium, payload: GremiumUpdate) -> None:
-    """Write the quorum fields and the guest switch that the patch sent.
+    """Write the quorum fields, the guest switch and the term start that the patch sent.
 
     The three quorum fields can be cleared to null.
     """
@@ -63,6 +69,11 @@ def _apply_quorum(row: Gremium, payload: GremiumUpdate) -> None:
     writes: dict[str, int | bool | None] = {
         **{name: getattr(payload, name) for name in nullable if name in payload.model_fields_set},
         **({} if payload.guests_may_vote is None else {"guests_may_vote": payload.guests_may_vote}),
+        **(
+            {}
+            if payload.term_start_month is None
+            else {"term_start_month": payload.term_start_month}
+        ),
     }
     for name, value in writes.items():
         setattr(row, name, value)
@@ -159,6 +170,7 @@ class GremiumOps(ConfigServiceBase):
             quorum_min_present=payload.quorum_min_present,
             repeat_quorum_percent=payload.repeat_quorum_percent,
             guests_may_vote=payload.guests_may_vote,
+            term_start_month=await self._term_start_month(payload.term_start_month),
             protocols_public=payload.protocols_public,
         )
         self.session.add(row)
@@ -174,6 +186,18 @@ class GremiumOps(ConfigServiceBase):
         )
         await self.session.commit()
         return _gremium_out(row)
+
+    async def _term_start_month(self, given: int | None) -> int:
+        """Return the term start of a new gremium: the given month, else the setting.
+
+        The value of the meeting settings is only this start value (000948).
+        """
+        if given is not None:
+            return given
+        stored = await self.session.scalar(
+            select(MeetingSettings.term_start_month).where(MeetingSettings.id == 1)
+        )
+        return DEFAULT_TERM_START_MONTH if stored is None else int(stored)
 
     async def gremium_protocols_public(self, gremium_id: UUID) -> bool:
         """Return the flag ``protocols_public`` of a gremium, False when it is missing."""

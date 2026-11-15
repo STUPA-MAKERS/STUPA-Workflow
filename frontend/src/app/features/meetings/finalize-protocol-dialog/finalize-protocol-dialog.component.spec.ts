@@ -2,11 +2,11 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { FinalizeProtocolDialogComponent } from './finalize-protocol-dialog.component';
 
-async function setup(initialWithheld = false) {
+async function setup(initialWithheld = false, publicGremium = true) {
   const closed = jest.fn();
   const confirmed = jest.fn();
   const view = await render(FinalizeProtocolDialogComponent, {
-    inputs: { open: true, meetingTitle: '34. Sitzung', finalizing: false, initialWithheld },
+    inputs: { open: true, meetingTitle: '34. Sitzung', finalizing: false, initialWithheld, publicGremium },
     on: { closed, confirmed },
   });
   return { ...view, closed, confirmed };
@@ -27,16 +27,27 @@ describe('FinalizeProtocolDialogComponent', () => {
     );
   });
 
+  /** askBeforeFinalize (§ 000952): a gremium without public protocols gets the bare question. */
+  it('asks without the public notice for a gremium that does not publish', async () => {
+    const { confirmed } = await setup(false, false);
+    const dialog = screen.getByRole('dialog', { name: 'Protokoll finalisieren?' });
+    expect(dialog).toHaveTextContent('Danach ist es nicht mehr änderbar.');
+    expect(dialog).not.toHaveTextContent('Dieses Protokoll wird öffentlich.');
+    expect(screen.queryByRole('switch')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
+    expect(confirmed).toHaveBeenCalled();
+  });
+
   it('finalizes for the public page by default', async () => {
     const { confirmed } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
     expect(confirmed).toHaveBeenCalledWith({ publicWithheld: false });
   });
 
   it('holds the protocol back, and starts again with "publish" on the next opening', async () => {
     const { confirmed, fixture } = await setup();
     await userEvent.click(screen.getByRole('switch', { name: /Nicht veröffentlichen/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
     expect(confirmed).toHaveBeenCalledWith({ publicWithheld: true });
     fixture.componentRef.setInput('open', false);
     fixture.detectChanges();
@@ -54,7 +65,7 @@ describe('FinalizeProtocolDialogComponent', () => {
       'aria-checked',
       'true',
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
     expect(confirmed).toHaveBeenCalledWith({ publicWithheld: true });
   });
 

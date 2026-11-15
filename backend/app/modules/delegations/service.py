@@ -35,7 +35,8 @@ The server enforces these invariants:
   does not count. The delegator cannot vote in that meeting. See
   `voting_delegation_check`. The audit log records every use.
 * Elections. An election takes the ballot of a delegation only with the gremium
-  switch `delegation_in_elections` (`counted_in`). A pool seat always counts.
+  switch `delegation_in_elections` (`counted_in`). A substitution from the pool always
+  counts, also one that the lead entered.
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, or_, select
+from sqlalchemy import ColumnElement, and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -166,7 +167,9 @@ class Represented:
 
     sub: str
     principal_id: UUID
-    #: True for a seat that a pool substitute claimed for itself.
+    #: True for a substitution from the pool: a seat that the substitute claimed or
+    #: that the lead entered. It is no transfer of the voting right
+    #: (§F/meetings/delegations/000938).
     pool: bool
 
 
@@ -183,8 +186,9 @@ def counted_in(
 ) -> tuple[Represented, ...]:
     """Return the represented members that a cast in `vote` writes a ballot for.
 
-    A pool seat is a substitution, not a transfer of the voting right, so it counts
-    in every vote. A delegation counts where `takes_delegations` says so.
+    A substitution from the pool is no transfer of the voting right, so it counts in
+    every vote, for a seat that the substitute claimed and for an entry of the lead
+    (§F/meetings/delegations/000938). A delegation counts where `takes_delegations` says so.
     """
     if takes_delegations(vote, in_elections=in_elections):
         return incoming
@@ -211,7 +215,8 @@ async def voting_delegation_check(
     * Each incoming row with `delegate_voting` gives one represented member. One cast
       of the caller writes one ballot under the `sub` of each of them, so it is a
       transfer and not a duplicate. The caller can therefore vote even as an external
-      user.
+      user. A row of a person who left the Gremium gives no ballot: the delegation
+      ends with the membership.
 
     `now` keeps the signature equal to the other checks. A delegation is bound to a meeting, not to
     a time.
@@ -229,12 +234,26 @@ async def voting_delegation_check(
     delegator = aliased(PrincipalRow)
     delegate = aliased(PrincipalRow)
     is_delegator = MeetingDelegation.delegator_principal_id == pid_subq
+    # For an own row: the substitute claimed the seat itself, so the member is not
+    # blocked. For a received row: any substitution from the pool.
+    substitution = or_(
+        pool_seat_clause(delegate),
+        and_(not_(is_delegator), MeetingDelegation.via_pool.is_(True)),
+    )
+    still_member = (
+        select(GremiumMembership.principal_id)
+        .where(
+            GremiumMembership.gremium_id == gremium_id,
+            GremiumMembership.principal_id == delegator.id,
+        )
+        .exists()
+    )
     rows = (
         await session.execute(
             select(
                 is_delegator,
                 MeetingDelegation.delegate_voting,
-                pool_seat_clause(delegate),
+                substitution,
                 delegator.sub,
                 delegator.id,
             )
@@ -246,6 +265,7 @@ async def voting_delegation_check(
             .where(
                 MeetingDelegation.meeting_id == meeting_id,
                 MeetingDelegation.gremium_id == gremium_id,
+                still_member,
                 or_(
                     MeetingDelegation.delegator_principal_id == pid_subq,
                     MeetingDelegation.delegate_principal_id == pid_subq,
@@ -888,8 +908,10 @@ class DelegationService:
             await self._own_delegations(meeting.id, me.id, now) if me is not None else (None, [])
         )
         candidates = await self._candidates(gremium.id, me.id) if me is not None else []
+        full = await self._full_delegates(meeting.id, gremium.delegation_max_per_delegate)
         recipients = sorted(
-            candidates, key=lambda r: (not r.via_pool, (r.display_name or "").lower())
+            (r for r in candidates if r.via_pool or r.principal_id not in full),
+            key=lambda r: (not r.via_pool, (r.display_name or "").lower()),
         )
 
         return MeetingDelegationContext(
@@ -948,10 +970,28 @@ class DelegationService:
             if gremium.delegation_allow_external and needle
             else []
         )
+        full = await self._full_delegates(meeting.id, gremium.delegation_max_per_delegate)
         return sorted(
-            (*local, *external),
+            (r for r in (*local, *external) if r.via_pool or r.principal_id not in full),
             key=lambda r: (not r.via_pool, not r.is_member, (r.display_name or "").lower()),
         )[:20]
+
+    async def _full_delegates(self, meeting_id: UUID, limit: int) -> frozenset[UUID]:
+        """Return the persons who hold the most delegations of the meeting already.
+
+        The dialog does not offer them, because the create would answer 409
+        ``delegate_limit``. A pool seat does not count, as in the create.
+        """
+        rows = await self.session.execute(
+            select(MeetingDelegation.delegate_principal_id)
+            .where(
+                MeetingDelegation.meeting_id == meeting_id,
+                MeetingDelegation.via_pool.is_(False),
+            )
+            .group_by(MeetingDelegation.delegate_principal_id)
+            .having(func.count() >= limit)
+        )
+        return frozenset(rows.scalars().all())
 
     async def _external_recipients(
         self, needle: str, seen: AbstractSet[UUID]
@@ -1065,7 +1105,8 @@ class DelegationService:
         incoming = [
             d.delegator_principal_id
             for d, seat in rows
-            if d.delegator_principal_id != me.id and (transfers or seat)
+            if d.delegator_principal_id != me.id
+            and (transfers or seat or bool(getattr(d, "via_pool", False)))
         ]
         outgoing = [
             d.delegate_principal_id

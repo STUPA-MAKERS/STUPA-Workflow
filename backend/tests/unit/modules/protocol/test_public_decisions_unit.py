@@ -26,7 +26,7 @@ from app.modules.protocol.public import (
     PublicSnapshot,
     PublicTop,
 )
-from app.modules.protocol.public_decisions import list_public_decisions
+from app.modules.protocol.public_decisions import last_results, list_public_decisions
 from app.modules.protocol.public_router import get_public_protocol_service
 from app.settings import get_settings
 from app.shared import antiabuse
@@ -79,17 +79,32 @@ def _row() -> tuple[Any, Any, Any]:
 class _Rows:
     """Stand-in for `PublicProtocolService`: answers `visible_rows` and keeps the filter."""
 
-    def __init__(self, rows: list[Any]) -> None:
+    def __init__(self, rows: list[Any], circular: list[Any] | None = None) -> None:
         self.rows = rows
+        self.circular = circular or []
         self.filters: list[PublicFilter] = []
+
+    async def circular_votes(self, _flt: PublicFilter) -> list[Any]:
+        return list(self.circular)
 
     async def visible_rows(self, flt: PublicFilter) -> list[Any]:
         self.filters.append(flt)
         return list(self.rows)
 
 
-def _service(rows: list[Any]) -> Any:
-    return _Rows(rows)
+def _service(rows: list[Any], circular: list[Any] | None = None) -> Any:
+    return _Rows(rows, circular)
+
+
+def _circular(question: str, closed_at: datetime | None, **over: Any) -> tuple[Any, Any]:
+    """A closed circular vote of the public Gremium, as `circular_votes` gives it."""
+    view = SimpleNamespace(
+        question=question,
+        closed_at=closed_at,
+        result=over.get("result", "passed"),
+        tally=SimpleNamespace(counts=over.get("counts", {"yes": 5, "no": 1})),
+    )
+    return view, SimpleNamespace(id=GID, name="StuPa", slug="stupa")
 
 
 async def test_list_holds_the_public_decisions_only() -> None:
@@ -115,6 +130,56 @@ async def test_list_holds_the_public_decisions_only() -> None:
     assert "Intern" not in dumped
 
 
+async def test_list_holds_the_circular_votes_of_a_public_gremium() -> None:
+    """§F/meetings/voting/000949: a circular decision shows from its close, by its day.
+
+    The vote of 20.11. stands in front of the decisions of the meeting of 03.11., the
+    vote of 20.10. after them. A vote without the time of its close stays out.
+    """
+    circular = [
+        _circular("Lastenanhänger beschaffen", datetime(2026, 11, 20, 23, 30, tzinfo=UTC)),
+        _circular("Beamer ersetzen", datetime(2026, 10, 20, 9, 0, tzinfo=UTC), result="rejected"),
+        _circular("Ohne Ende", None),
+    ]
+    page = await list_public_decisions(
+        _service([_row()], circular), PublicFilter(), limit=20, offset=0
+    )
+    assert [d.question for d in page.items] == [
+        "Lastenanhänger beschaffen",
+        "Zuschuss Sommerfest",
+        "Wahl Vorsitz",
+        "Beamer ersetzen",
+    ]
+    first = page.items[0]
+    assert first.kind == "circular"
+    assert first.date == _date(2026, 11, 21)
+    assert first.protocol_id is None
+    assert first.meeting_title is None
+    assert first.result == "passed"
+    assert first.counts == {"yes": 5, "no": 1}
+
+
+async def test_list_filters_the_circular_votes_by_day_and_question() -> None:
+    """§F/meetings/voting/000949: the semester, the year and the search apply."""
+    circular = [
+        _circular("Lastenanhänger beschaffen", datetime(2026, 11, 20, 12, 0, tzinfo=UTC)),
+        _circular("Beamer ersetzen", datetime(2026, 6, 2, 9, 0, tzinfo=UTC)),
+    ]
+    svc = _service([], circular)
+
+    async def questions(flt: PublicFilter) -> list[str | None]:
+        page = await list_public_decisions(svc, flt, limit=20, offset=0)
+        return [d.question for d in page.items]
+
+    assert await questions(PublicFilter(semester="ss-2026")) == ["Beamer ersetzen"]
+    assert await questions(PublicFilter(year=2026)) == [
+        "Lastenanhänger beschaffen",
+        "Beamer ersetzen",
+    ]
+    assert await questions(PublicFilter(year=2025)) == []
+    assert await questions(PublicFilter(q=" BEAMER ")) == ["Beamer ersetzen"]
+
+
 async def test_list_searches_the_question_and_cuts_the_page() -> None:
     svc = _service([_row(), _row()])
     hits = await list_public_decisions(svc, PublicFilter(q="SOMMERFEST"), limit=20, offset=0)
@@ -123,6 +188,18 @@ async def test_list_searches_the_question_and_cuts_the_page() -> None:
     assert page.total == 4
     assert [d.question for d in page.items] == ["Wahl Vorsitz"]
     assert (page.limit, page.offset) == (1, 3)
+
+
+def test_a_repeated_vote_shows_its_last_result_only() -> None:
+    """§F/public/public-pages/000945: one question on one TOP gives one row."""
+    first = PublicDecision(question="Zuschuss", counts={"ja": 2, "nein": 3}, result="rejected")
+    again = PublicDecision(question="Zuschuss", counts={"ja": 4, "nein": 1}, result="passed")
+    other = PublicDecision(question="Vertagung", counts={"ja": 5}, result="passed")
+    round_one = PublicDecision(question="Wahl Vorsitz", kind="election", round=1)
+    round_two = PublicDecision(question="Wahl Vorsitz", kind="election", round=2)
+    unnamed = PublicDecision(counts={"ja": 1}, result="passed")
+    kept = last_results([first, round_one, other, again, unnamed, round_two, unnamed])
+    assert kept == [other, again, unnamed, round_two, unnamed]
 
 
 async def test_list_without_a_public_protocol_is_empty() -> None:

@@ -21,6 +21,7 @@ from app.modules.applications.models import (
 from app.modules.auth.models import MAX_SESSION_DAYS
 from app.modules.gremien.models import (
     DEFAULT_DELEGATION_MAX_PER_DELEGATE,
+    DEFAULT_TERM_START_MONTH,
     MAX_DELEGATIONS_PER_DELEGATE,
 )
 from app.modules.gremien.role_schemas import ROLE_KEY_PATTERN
@@ -169,6 +170,10 @@ class GremiumOut(FrozenCamelModel, frozen=True):
     )
     #: Admitted guests of a public meeting may vote. A quorum overrides the switch.
     guests_may_vote: bool = Field(default=False, serialization_alias="guestsMayVote")
+    #: The month on whose first day a term (Amtszeit) of the gremium starts.
+    term_start_month: int = Field(
+        default=DEFAULT_TERM_START_MONTH, serialization_alias="termStartMonth"
+    )
     #: The final protocols of the gremium appear on the public protocols page.
     protocols_public: bool = Field(default=False, serialization_alias="protocolsPublic")
 
@@ -210,6 +215,8 @@ class GremiumCreate(FrozenCamelModel, frozen=True):
         default=None, alias="repeatQuorumPercent", ge=0, le=100
     )
     guests_may_vote: bool = Field(default=False, alias="guestsMayVote")
+    #: Without a value the gremium takes ``termStartMonth`` of the meeting settings.
+    term_start_month: int | None = Field(default=None, alias="termStartMonth", ge=1, le=12)
     protocols_public: bool = Field(default=False, alias="protocolsPublic")
 
 
@@ -236,6 +243,7 @@ class GremiumUpdate(FrozenCamelModel, frozen=True):
         default=None, alias="repeatQuorumPercent", ge=0, le=100
     )
     guests_may_vote: bool | None = Field(default=None, alias="guestsMayVote")
+    term_start_month: int | None = Field(default=None, alias="termStartMonth", ge=1, le=12)
     protocols_public: bool | None = Field(default=None, alias="protocolsPublic")
 
 
@@ -958,17 +966,20 @@ class MeetingPeriods(FrozenStrictCamelModel, frozen=True):
 
     ``GET`` and ``PUT /admin/meeting-periods`` read and replace them. The days count
     calendar days. ``termStartMonth`` is the month (1 to 12) on whose first day a term
-    starts.
+    starts; it is only the start value of a new Gremium, because each Gremium has its
+    own (§F/meetings/meetings/000948). The two invitation periods, ``lateExcuseDays``
+    and ``circularMinDays`` are 1 day or more, because a period of 0 days is no period
+    (§F/administration/admin/000942).
     """
 
-    invite_days_ordinary: int = Field(alias="inviteDaysOrdinary", ge=0, le=MAX_PERIOD_DAYS)
+    invite_days_ordinary: int = Field(alias="inviteDaysOrdinary", ge=1, le=MAX_PERIOD_DAYS)
     invite_days_extraordinary: int = Field(
-        alias="inviteDaysExtraordinary", ge=0, le=MAX_PERIOD_DAYS
+        alias="inviteDaysExtraordinary", ge=1, le=MAX_PERIOD_DAYS
     )
     protocol_draft_days: int = Field(alias="protocolDraftDays", ge=0, le=MAX_PERIOD_DAYS)
-    late_excuse_days: int = Field(alias="lateExcuseDays", ge=0, le=MAX_PERIOD_DAYS)
+    late_excuse_days: int = Field(alias="lateExcuseDays", ge=1, le=MAX_PERIOD_DAYS)
     absence_limit: int = Field(alias="absenceLimit", ge=1, le=MAX_ABSENCE_LIMIT)
-    circular_min_days: int = Field(alias="circularMinDays", ge=0, le=MAX_PERIOD_DAYS)
+    circular_min_days: int = Field(alias="circularMinDays", ge=1, le=MAX_PERIOD_DAYS)
     term_start_month: int = Field(alias="termStartMonth", ge=1, le=12)
 
 

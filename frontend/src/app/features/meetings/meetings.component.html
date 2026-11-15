@@ -193,6 +193,7 @@
   [open]="finalizeDialogOpen()"
   [meetingTitle]="meeting()?.title ?? ''"
   [finalizing]="finalizing()"
+  [publicGremium]="protocol()?.gremiumProtocolsPublic ?? false"
   [initialWithheld]="protocol()?.publicWithheld ?? false"
   (closed)="finalizeDialogOpen.set(false)"
   (confirmed)="confirmFinalize($event)"

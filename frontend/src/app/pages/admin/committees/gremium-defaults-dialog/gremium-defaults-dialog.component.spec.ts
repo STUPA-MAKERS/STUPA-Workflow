@@ -56,10 +56,15 @@ describe('GremiumDefaultsDialogComponent', () => {
     expect(screen.getByRole('dialog', { name: 'Vorgaben für neue Gremien' })).toBeInTheDocument();
     const quorum = screen.getByRole('spinbutton', { name: 'Quorum (%)' });
     await waitFor(() => expect(quorum).toHaveValue(40));
+    const guests = screen.getByRole('switch', { name: 'Gäste dürfen abstimmen' });
+    expect(guests).toBeDisabled();
+    expect(screen.queryByRole('spinbutton', { name: 'Vorlauf für Delegationen (Minuten)' })).toBeNull();
     await userEvent.clear(quorum);
     const repeat = screen.getByRole('spinbutton', { name: 'Quorum der Wiederholungssitzung (%)' });
     await userEvent.clear(repeat);
     await userEvent.type(repeat, '150');
+    await userEvent.click(guests);
+    await userEvent.click(screen.getByRole('switch', { name: 'Stimm-Delegation erlauben' }));
     const lead = screen.getByRole('spinbutton', { name: 'Vorlauf für Delegationen (Minuten)' });
     await userEvent.clear(lead);
     await userEvent.type(lead, '90');
@@ -67,8 +72,6 @@ describe('GremiumDefaultsDialogComponent', () => {
     expect(most).toHaveValue(2);
     await userEvent.clear(most);
     await userEvent.type(most, '3');
-    await userEvent.click(screen.getByRole('switch', { name: 'Gäste dürfen abstimmen' }));
-    await userEvent.click(screen.getByRole('switch', { name: 'Stimm-Delegation erlauben' }));
     await userEvent.click(saveButton());
     expect(api.putGremiumDefaults).toHaveBeenCalledWith({
       quorumPercent: null,
