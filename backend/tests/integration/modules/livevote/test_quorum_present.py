@@ -29,7 +29,7 @@ from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed
 from app.modules.voting.service import VotingService
 from app.shared.errors import ConflictError
-from tests.integration.modules.livevote.conftest import Seed, seed
+from tests.integration.modules.livevote.conftest import ADMIN_SUB, Seed, seed
 
 pytestmark = pytest.mark.integration
 
@@ -286,8 +286,17 @@ async def test_a_draft_takes_the_quorum_of_its_open(
         await session.commit()
     assert await _draft_quorum(maker, api, s) == {"type": "percent", "value": 40}
     async with maker() as session:
+        keeper = (
+            await session.execute(select(PrincipalRow).where(PrincipalRow.sub == ADMIN_SUB))
+        ).scalar_one_or_none()
+        if keeper is None:
+            keeper = PrincipalRow(sub=ADMIN_SUB, display_name="Admin", email="admin@x.de")
+            session.add(keeper)
+            await session.flush()
         await session.execute(
-            update(Meeting).where(Meeting.id == s.meeting_id).values(kind="repeat")
+            update(Meeting)
+            .where(Meeting.id == s.meeting_id)
+            .values(kind="repeat", protokollant_id=keeper.id)
         )
         vote_id = (
             await session.scalars(select(Vote.id).where(Vote.meeting_id == s.meeting_id))
