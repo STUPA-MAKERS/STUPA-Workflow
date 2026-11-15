@@ -2,7 +2,7 @@
 id: "000936"
 title: The vote list shows a circular vote that an objection ended
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
