@@ -28,8 +28,9 @@ from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.models import GremiumMembership, GremiumRole
 from app.modules.livevote import mails as meeting_mails
 from app.modules.livevote.mails import MeetingMailer, get_meeting_mailer
+from app.modules.livevote.open_window import load_meeting_settings
 from app.modules.meetings.absence import absence_notices
-from app.modules.meetings.models import Meeting, MeetingAttendance, MeetingSettings
+from app.modules.meetings.models import Meeting, MeetingAttendance
 from app.settings import Settings, load_settings
 from tests.integration.modules.livevote.conftest import admin, audit_actions, seed
 
@@ -329,8 +330,8 @@ async def test_close_mails_the_managers_when_a_member_nears_the_limit(
 
     async with maker() as session:
         meeting = await session.get(Meeting, s.meeting_id)
-        settings_row = await session.get(MeetingSettings, 1)
-        assert meeting is not None and settings_row is not None
+        settings_row = await load_meeting_settings(session)
+        assert meeting is not None
         notices = await absence_notices(session, meeting, settings_row)
     assert [(n.principal_id, n.count, n.limit, n.reached) for n in notices] == [
         (anna, 2, 3, False)
@@ -364,8 +365,7 @@ async def test_third_absence_reaches_the_limit_and_no_manager_means_no_mail(
     )
     quiet = await _closed_meeting(maker, s.gremium_id, date(2026, 5, 7), ())
     async with maker() as session:
-        settings_row = await session.get(MeetingSettings, 1)
-        assert settings_row is not None
+        settings_row = await load_meeting_settings(session)
         reached = await absence_notices(
             session, await session.get_one(Meeting, third), settings_row
         )

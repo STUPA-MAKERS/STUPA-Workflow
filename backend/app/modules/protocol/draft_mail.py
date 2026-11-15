@@ -34,9 +34,10 @@ from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.public import meeting_day
 from app.modules.protocol.service import ProtocolService
 from app.settings import get_settings
-from app.shared.errors import ServiceUnavailableError
+from app.shared.errors import ConflictError, ServiceUnavailableError
 
 WATERMARK = "Entwurf"
+PROTOCOL_NOT_DRAFT = "protocol_not_draft"
 _BODY = (
     "Der Entwurf des Sitzungsprotokolls liegt als PDF bei. Er ist noch nicht "
     "finalisiert. Anmerkungen gehen an die Protokollführung."
@@ -62,7 +63,8 @@ class DraftMailer:
         """
         svc = self.service
         protocol = await svc._get(protocol_id)
-        svc._ensure_draft(protocol)
+        if protocol.status != "draft":
+            raise ConflictError("Only a draft can be sent as a draft.", code=PROTOCOL_NOT_DRAFT)
         public = await svc._mails_public(protocol)
         markdown = await svc._build_document(protocol, public=public)
         pdf = await svc._render_pdf(protocol, markdown, public=public, watermark=WATERMARK)
