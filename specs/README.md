@@ -418,7 +418,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/delegations/000909](requirements/functional/meetings/delegations/000909_delegate-limit.md) | A delegate holds a limited number of delegations | approved |
 | [F/meetings/delegations/000910](requirements/functional/meetings/delegations/000910_no-delegation-in-election.md) | An election takes no delegation ballot | approved |
 | [F/meetings/delegations/000938](requirements/functional/meetings/delegations/000938_pool-substitute-votes-in-election.md) | A pool substitute votes in an election | approved |
-| [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | draft |
+| [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | approved |
 | [F/meetings/meetings/000093](requirements/functional/meetings/meetings/000093_state-order.md) | Meeting states move only forward | approved |
 | [F/meetings/meetings/000094](requirements/functional/meetings/meetings/000094_close-with-open-vote.md) | A meeting with an open vote does not close | approved |
 | [F/meetings/meetings/000095](requirements/functional/meetings/meetings/000095_prepare-before-open.md) | The protocol and votes can be prepared before the open | approved |
