@@ -193,6 +193,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/protocols/{protocol_id}/draft-pdf"): _PROTOCOL_READ,
     ("PUT", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
     ("DELETE", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
+    ("POST", "/api/protocols/{protocol_id}/reopen"): "ProtocolService.authorize_finalize",
     ("GET", "/api/protocols/{protocol_id}/pdf"): _PROTOCOL_READ,
     ("GET", "/api/protocols/{protocol_id}/pdf/public"): _PROTOCOL_READ,
     ("POST", "/api/protocols/{protocol_id}/votes"): _PROTOCOL_WRITE,
