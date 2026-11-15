@@ -5,6 +5,7 @@ kind: functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-15
+implementation: null
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/livevote
