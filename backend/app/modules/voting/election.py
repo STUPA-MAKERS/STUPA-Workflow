@@ -255,7 +255,7 @@ class ElectionService:
         return await self.voting.get(vote.id)
 
     async def next_round(self, vote_id: UUID, principal: Principal, *, now: datetime) -> VoteOut:
-        """Create the draft of the next Wahlgang of an election without a majority.
+        """Create the draft of the next Wahlgang of an election without a majority (no commit).
 
         Only a closed ``members_majority`` election with the result ``no_majority``
         takes the call, and only its first and its second Wahlgang. The second Wahlgang
@@ -286,7 +286,7 @@ class ElectionService:
             else config.candidate_ids
         )
         kept = [c for c in config.candidates if c.id in standing]
-        draft = await self.voting._insert(
+        return await self.voting._insert(
             None,
             VoteCreateInternal(
                 config=config.model_copy(update={"candidates": kept}),
@@ -300,8 +300,6 @@ class ElectionService:
             agenda_item_id=vote.agenda_item_id,
             actor=principal.sub,
         )
-        await self.session.commit()
-        return await self.voting.get(draft.id)
 
     async def _has_next_round(self, vote_id: UUID) -> bool:
         """Tell whether a Wahlgang that is not cancelled continues this election."""

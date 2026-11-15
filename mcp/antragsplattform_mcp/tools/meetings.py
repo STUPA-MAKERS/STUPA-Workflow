@@ -59,6 +59,21 @@ async def vote_draw_lot(vote_id: str) -> dict:
 
 
 @group.tool
+async def vote_next_round(vote_id: str) -> dict:
+    """Create the next Wahlgang of an election without the majority of the members.
+
+    Only a closed election with `majorityRule: "members_majority"` and the result
+    `no_majority` takes the call, after its first or its second Wahlgang. The answer is
+    the draft of the next Wahlgang on the same agenda item; the protokollant opens it.
+    The third Wahlgang takes the simple majority and has the two candidates with the
+    most votes; the server draws the lot for a tied place. 409 `no_next_round`,
+    `next_round_exists`, `not_an_election` or `meeting_closed`. Requires the gremium
+    permission `vote.manage` or `session.manage` in the gremium of the vote (or admin).
+    """
+    return await api().post(f"/votes/{vote_id}/next-round")
+
+
+@group.tool
 async def create_application_vote(application_id: str, vote: S.VoteCreate) -> dict:
     """Create a vote bound to an application.
 

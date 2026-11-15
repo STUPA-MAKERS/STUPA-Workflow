@@ -381,7 +381,9 @@ async def next_round(
     right (the meeting lead). A draft sends no event: the caller shows it from the answer.
     """
     await service.assert_can_manage_vote(vote_id, principal)
-    return await ElectionService(service).next_round(vote_id, principal, now=datetime.now(UTC))
+    draft = await ElectionService(service).next_round(vote_id, principal, now=datetime.now(UTC))
+    await service.session.commit()
+    return await service.get(draft.id)
 
 
 @router.get(

@@ -114,6 +114,8 @@ export class VoteCardComponent {
    * its agenda item has no prepared or open vote.
    */
   readonly canRepeat = input(false);
+  /** A next Wahlgang continues this election: the card offers no second one (§ 000971). */
+  readonly continued = input(false);
 
   readonly close = output<Uuid>();
   readonly cancel = output<Uuid>();
