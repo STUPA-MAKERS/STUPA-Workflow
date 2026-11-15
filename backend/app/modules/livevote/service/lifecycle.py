@@ -49,6 +49,16 @@ logger = logging.getLogger(__name__)
 #: no-op and not in this set.
 _TRANSITIONS: frozenset[tuple[str, str]] = frozenset({("planned", "live"), ("live", "closed")})
 
+#: The planning values that close with the meeting. The settings dialog sends each value
+#: with every save, so the same value again is no change.
+_CLOSED_WITH_MEETING: tuple[str, ...] = (
+    "protokollant_id",
+    "kind",
+    "repeat_of_id",
+    "public_join",
+    "guests_mode",
+)
+
 #: The planning fields that MEETING_UPDATE records, as (model attribute, JSON key).
 _AUDITED_FIELDS: tuple[tuple[str, str], ...] = (
     ("status", "status"),
@@ -211,7 +221,10 @@ class LifecycleOps(HandoverOps):
 
         The status runs only forward. A repeat of the current status is a no-op. ``closed``
         is terminal, and a meeting that does not take place is deleted, not closed. A closed
-        meeting is frozen, because the protocol refers to its planning data. The open window
+        meeting keeps its protokollant, its kind and its guest settings. Its title, date,
+        times, place and form stay open until the protocol is final
+        (§F/meetings/meetings/000982), because the keeper finds an error in them when the
+        keeper writes the protocol. The open window
         reads the stored planning before this patch changes it, so a date change in the same
         patch cannot move the window.
 
@@ -238,8 +251,10 @@ class LifecycleOps(HandoverOps):
                 to ``closed`` (``invalid_status_transition``), the meeting still has an
                 open vote on close (``open_vote``), an election waits for the lot on close
                 (``lot_pending``), the start has no protokollant, the
-                start is before the open window (``meeting_too_early``), or the
-                meeting is closed and the patch changes its planning.
+                start is before the open window (``meeting_too_early``), the meeting
+                is closed and the patch changes a value that closed with it
+                (``meeting_closed``), or the protocol of the closed meeting is no longer
+                a draft (``protocol_final``).
         """
         wants_public = payload.public_join is not None or payload.guests_mode is not None
         wants_manage = (
@@ -311,10 +326,7 @@ class LifecycleOps(HandoverOps):
             )
 
         if meeting.status == "closed" and wants_manage:
-            raise ConflictError(
-                "the session is closed — its settings can no longer be changed",
-                code="meeting_closed",
-            )
+            await self._assert_correction(meeting, payload)
 
         if (
             payload.kind is not None
@@ -684,6 +696,39 @@ class LifecycleOps(HandoverOps):
         """
         if self.publisher is not None:
             await self.publisher.agenda_changed(meeting_id, item_id)
+
+    async def _assert_correction(self, meeting: Meeting, payload: MeetingPatch) -> None:
+        """Refuse a patch of a closed meeting that is no correction of its head data.
+
+        The title, the date, the times, the place and the form of a closed meeting stay
+        open until the protocol is final (§F/meetings/meetings/000982). A protocol in
+        its render counts as final.
+
+        Raises:
+            ConflictError: The patch changes another planning value (``meeting_closed``),
+                or the protocol is no longer a draft (``protocol_final``).
+        """
+        if any(
+            name in payload.model_fields_set
+            and getattr(payload, name) is not None
+            and getattr(payload, name) != getattr(meeting, name)
+            for name in _CLOSED_WITH_MEETING
+        ):
+            raise ConflictError(
+                "the session is closed — only its title, date, times, place and form can "
+                "still change",
+                code="meeting_closed",
+            )
+        from app.modules.meetings.protocol_models import Protocol
+
+        state = await self.session.scalar(
+            select(Protocol.status).where(Protocol.meeting_id == meeting.id)
+        )
+        if state in ("rendering", "final"):
+            raise ConflictError(
+                "the protocol is final — the session can no longer change",
+                code="protocol_final",
+            )
 
     async def _protocol_final(self, meeting_id: UUID) -> bool:
         """Report whether the protocol of the meeting is final.

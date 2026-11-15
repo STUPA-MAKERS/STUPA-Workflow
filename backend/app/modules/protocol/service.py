@@ -194,10 +194,14 @@ class HeaderMeta:
 
 
 def _mark_final(protocol: Protocol, now: datetime, *, sent: bool) -> None:
-    """Set a protocol to final at `now`, with the mark of the mail only when one goes out."""
+    """Set a protocol to final at `now`, with the mark of the mail only when one goes out.
+
+    A protocol that went back to draft keeps the mark of its first mail, because that
+    mail is out and the draft must stay (spec 000983).
+    """
     protocol.status = "final"
     protocol.finalized_at = now
-    protocol.sent_at = now if sent else None
+    protocol.sent_at = now if sent else protocol.sent_at
 
 
 class ProtocolService:
@@ -489,12 +493,20 @@ class ProtocolService:
         The `protocol_vote_ref` rows cascade on the foreign key. The audit log
         records the removal, because the draft text itself is not recoverable.
 
+        A draft that was final once (spec 000983) went out by mail, so it stays a
+        record and answers 409 too.
+
         Raises:
             NotFoundError: No protocol has this id (404).
-            ConflictError: The protocol is final or under render (409).
+            ConflictError: The protocol is final, under render, or was final once (409).
         """
         protocol = await self._get(protocol_id)
         self._ensure_draft(protocol)
+        if getattr(protocol, "sent_at", None) is not None:
+            raise ConflictError(
+                "The protocol went out once and is a record. It cannot be deleted.",
+                code="protocol_finalized",
+            )
         await audit_record(
             self.session,
             actor=actor,
@@ -691,6 +703,20 @@ class ProtocolService:
             await approval.approve(self.session, protocol, meeting_id, now=now, actor=actor)
         return await self._to_out(protocol)
 
+    async def reopen(self, protocol_id: UUID, *, actor: str) -> ProtocolOut:
+        """Set a final protocol back to draft (spec 000983). The caller commits.
+
+        The protocol leaves the public pages, because they show a final protocol only.
+        The next finalization renders and sends again.
+
+        Raises:
+            ConflictError: The protocol is not final (409 ``protocol_not_final``), or it
+                has an approval mark (409 ``protocol_approved``).
+        """
+        protocol = await self._get(protocol_id, for_update=True)
+        await approval.reopen(self.session, protocol, actor=actor)
+        return await self._to_out(protocol)
+
     async def revert_to_draft(self, protocol_id: UUID) -> None:
         """Roll a protocol back from `rendering` to `draft`.
 
@@ -742,7 +768,7 @@ class ProtocolService:
         await self.session.flush()
         await self.session.commit()
         await self._store(uploads)
-        await self._send(protocol, mail_pdf, recipients)
+        await self._send(protocol, mail_pdf, recipients, at=now)
         return await self._to_out(protocol)
 
     async def _mail_recipients(self, protocol: Protocol) -> list[str]:
@@ -1558,12 +1584,20 @@ class ProtocolService:
             raise ServiceUnavailableError("Protocol rendering temporarily unavailable.") from exc
 
     async def _send(
-        self, protocol: Protocol, pdf: bytes | None, to: Sequence[str] | None = None
+        self,
+        protocol: Protocol,
+        pdf: bytes | None,
+        to: Sequence[str] | None = None,
+        *,
+        at: datetime,
     ) -> None:
         """Mail the protocol to MAIL_LIST(gremium) under an idempotency key.
 
         `to` holds the recipients that the finalization already read. Without it the
         method reads them itself.
+
+        The key holds the time of the finalization, so a protocol that went back to
+        draft sends again on its next finalization (spec 000983).
 
         The mail carries the PDF as an attachment. The subject and the body name the
         Gremium and the meeting. The HTML version uses the branded mail layout.
@@ -1648,7 +1682,9 @@ class ProtocolService:
                 subject=subject,
                 text=text,
                 html=html,
-                idempotency_key=compute_idempotency_key("protocol_finalized", str(protocol.id)),
+                idempotency_key=compute_idempotency_key(
+                    "protocol_finalized", str(protocol.id), at.isoformat()
+                ),
                 attachments=attachments,
             )
         )

@@ -42,8 +42,16 @@ import { TopBadgeComponent } from '../top-badge/top-badge.component';
 type AgendaAction = 'done' | 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo' | 'link';
 
 /**
- * Add, rename, reorder and remove agenda items: the meeting lead with write access, while
- * the meeting is planned or live and the protocol is not locked.
+ * Rename an agenda item and set its mark "nicht öffentlich": the meeting lead with write
+ * access, until the protocol is locked. A closed meeting keeps both (§ 000982).
+ */
+export function canEditTop(meeting: Meeting, locked: boolean): boolean {
+  return meeting.canWrite && !locked;
+}
+
+/**
+ * Add, reorder and remove agenda items: the meeting lead with write access, while the
+ * meeting is planned or live and the protocol is not locked.
  */
 export function canChangeAgenda(meeting: Meeting, locked: boolean): boolean {
   return meeting.canWrite && !locked && meeting.status !== 'closed';
@@ -183,9 +191,9 @@ export class AgendaPaneComponent {
     return !!gremiumId && this.auth.canInGremium(gremiumId, 'todo.write');
   });
 
-  /** Set the non-public flag: the meeting lead with write access, protocol not locked. */
-  protected readonly canEditAgenda = computed(() => this.meeting().canWrite && !this.locked());
-  /** Add, rename, reorder and remove: also only while the meeting is planned or live. */
+  /** Rename and set the non-public flag: the meeting lead with write access, protocol not locked. */
+  protected readonly canEditAgenda = computed(() => canEditTop(this.meeting(), this.locked()));
+  /** Add, reorder and remove: also only while the meeting is planned or live. */
   protected readonly canChangeAgenda = computed(() =>
     canChangeAgenda(this.meeting(), this.locked()),
   );
@@ -288,12 +296,13 @@ export class AgendaPaneComponent {
       icon: 'lock',
       checked: item.nonPublic === true,
     };
-    if (!this.canChangeAgenda()) return [{ items: [nonPublic] }];
+    const rename: RowMenuItem = { id: 'rename', label: t('meetings.agenda.rename'), icon: 'edit' };
+    if (!this.canChangeAgenda()) return [{ items: [rename] }, { items: [nonPublic] }];
 
     const up: RowMenuItem = { id: 'up', label: t('meetings.agenda.moveUp'), icon: 'up' };
     const down: RowMenuItem = { id: 'down', label: t('meetings.agenda.moveDown'), icon: 'down' };
     const edit: readonly RowMenuItem[] = [
-      { id: 'rename', label: t('meetings.agenda.rename'), icon: 'edit' },
+      rename,
       ...(index > 0 ? [up] : []),
       ...(index < this.agenda().length - 1 ? [down] : []),
     ];

@@ -228,6 +228,12 @@ class _Protocols:
     def __init__(self) -> None:
         self.allowed = True
 
+    async def authorize_read_meeting(self, meeting_id: uuid.UUID, _principal: object) -> None:
+        if meeting_id != MEETING_ID:
+            raise NotFoundError("meeting not found")
+        if not self.allowed:
+            raise ForbiddenError("not allowed to read this meeting")
+
     async def authorize_write_meeting(self, meeting_id: uuid.UUID, _principal: object) -> None:
         if meeting_id != MEETING_ID:
             raise NotFoundError("meeting not found")
@@ -329,7 +335,9 @@ def test_download_is_an_attachment_and_inline_is_framable(
     app: FastAPI, client: TestClient, session: MediaSession, storage: MediaStorage
 ) -> None:
     """§000869: the download streams through the API with the attachment PDF headers."""
-    doc = add_document(session, storage, b"%PDF-data", name="Haushaltsplan.pdf", pages=4)
+    doc = add_document(
+        session, storage, b"%PDF-data", name="Haushaltsplan.pdf", pages=4, meeting_id=MEETING_ID
+    )
     assert client.get(f"/api/media/documents/{doc}").status_code == 401
     _as_principal(app)
     r = client.get(f"/api/media/documents/{doc}")
@@ -346,14 +354,46 @@ def test_download_is_an_attachment_and_inline_is_framable(
     assert (info["name"], info["pages"]) == ("Haushaltsplan.pdf", 4)
 
 
-def test_an_applicant_reads_a_pdf(
+def test_only_a_reader_of_the_sitzung_reads_a_pdf(
+    app: FastAPI,
+    client: TestClient,
+    session: MediaSession,
+    storage: MediaStorage,
+    protocols: _Protocols,
+) -> None:
+    """§NF/security/files/000979: no read right of the Sitzung gives 404, like no PDF."""
+    doc = add_document(session, storage, b"%PDF-data", meeting_id=MEETING_ID)
+    loose = add_document(session, storage, b"%PDF-loose")
+    other = add_document(session, storage, b"%PDF-other", meeting_id=uuid.uuid4())
+    _as_principal(app)
+    assert client.get(f"/api/media/documents/{doc}").status_code == 200
+    assert client.get(f"/api/media/documents/{loose}").status_code == 404
+    assert client.get(f"/api/media/documents/{other}/info").status_code == 404
+    assert client.get(f"/api/media/documents/{uuid.uuid4()}").status_code == 404
+    protocols.allowed = False
+    assert client.get(f"/api/media/documents/{doc}").status_code == 404
+    assert client.get(f"/api/media/documents/{doc}/info").status_code == 404
+
+
+def test_an_applicant_does_not_read_a_pdf(
     app: FastAPI, client: TestClient, session: MediaSession, storage: MediaStorage
 ) -> None:
-    doc = add_document(session, storage, b"%PDF-data")
+    """§NF/security/files/000979: an applicant session gets 404."""
+    doc = add_document(session, storage, b"%PDF-data", meeting_id=MEETING_ID)
     app.dependency_overrides[get_current_applicant] = lambda: Applicant(
         application_id=str(uuid.uuid4())
     )
-    assert client.get(f"/api/media/documents/{doc}").status_code == 200
+    assert client.get(f"/api/media/documents/{doc}").status_code == 404
+    assert client.get(f"/api/media/documents/{doc}/info").status_code == 404
+
+
+def test_the_upload_stores_the_sitzung(
+    app: FastAPI, client: TestClient, session: MediaSession
+) -> None:
+    """§NF/security/files/000979: the row of an upload names its Sitzung."""
+    _as_principal(app)
+    body = _upload(client, make_pdf(1)).json()
+    assert client.get(f"/api/media/documents/{body['id']}/info").status_code == 200
 
 
 def test_public_download_only_for_a_pdf_of_the_public_text(

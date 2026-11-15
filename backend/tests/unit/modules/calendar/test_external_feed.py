@@ -124,6 +124,16 @@ def test_fast_or_broken_rule_gives_the_first_date(rule: str) -> None:
     assert [e.starts_on for e in entries] == [date(2026, 11, 5)]
 
 
+@pytest.mark.parametrize("part", ["BYHOUR=0,1", "BYMINUTE=0,30", "BYSECOND=0,1"])
+def test_rule_with_times_of_the_day_gives_the_first_date(part: str) -> None:
+    """§F/meetings/calendar/000973: such a rule from 1900 must not walk each date."""
+    entries = parse_feed(
+        _feed(f"UID:a\nDTSTART:19000101T100000Z\nRRULE:FREQ=DAILY;{part}\nSUMMARY:Dicht"),
+        TODAY,
+    )
+    assert [e.starts_on for e in entries] == [date(1900, 1, 1)]
+
+
 def test_event_without_start_or_title_is_skipped() -> None:
     entries = parse_feed(
         _feed(

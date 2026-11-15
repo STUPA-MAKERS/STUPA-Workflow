@@ -1138,7 +1138,7 @@ async def set_agenda_done(
 
     The gate is the gate of the item text: ``canWrite``, and in a live meeting with a
     protokollant only the protokollant (403 ``not_protokollant``). A closed meeting
-    whose protocol is no longer a draft answers 409 ``protocol_locked``. Writes
+    whose protocol is no longer a draft answers 409 ``protocol_final``. Writes
     ``agenda_item_done`` or ``agenda_item_reopened`` and sends ``agenda_changed``.
     """
     meeting = await service.get(meeting_id, principal)

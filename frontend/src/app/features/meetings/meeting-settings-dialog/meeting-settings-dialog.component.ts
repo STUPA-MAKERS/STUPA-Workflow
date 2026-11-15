@@ -155,9 +155,14 @@ export class MeetingSettingsDialogComponent {
   /** The confirmation before the public participation goes off in a live meeting. */
   readonly confirmOff = signal(false);
 
-  /** A closed meeting locks every setting. */
-  readonly locked = computed(() => this.meeting()?.status === 'closed');
-  readonly keeperLocked = computed(() => this.locked() || this.protocolFinal());
+  /** The meeting is closed: its minute-taker, its kind and its guest settings stay. */
+  readonly closedMeeting = computed(() => this.meeting()?.status === 'closed');
+  /**
+   * A closed meeting with a final protocol locks every setting. Until then the title, the
+   * date, the times, the place and the form stay open (§ 000982).
+   */
+  readonly locked = computed(() => this.closedMeeting() && this.protocolFinal());
+  readonly keeperLocked = computed(() => this.closedMeeting() || this.protocolFinal());
 
   /** Members with `protocol.write`, and the current minute-taker. */
   readonly keeperOptions = computed<SelectFieldOption[]>(() => {
@@ -175,7 +180,7 @@ export class MeetingSettingsDialogComponent {
   });
 
   /** Only the meeting lead (`canManage`) changes the public participation. */
-  readonly publicLocked = computed(() => this.locked() || !this.meeting()?.canManage);
+  readonly publicLocked = computed(() => this.closedMeeting() || !this.meeting()?.canManage);
   /** The counts that the confirmation names: open requests and admitted guests. */
   readonly offCounts = computed(() => ({
     pending: this.meeting()?.pendingGuests ?? 0,
@@ -367,6 +372,10 @@ export class MeetingSettingsDialogComponent {
           this.saving.set(false);
           if (problemCode(err) === 'protokollant_needs_protocol_write') {
             this.toast.error(this.i18n.translate('meetings.toast.needsProtocolWrite'));
+            return;
+          }
+          if (problemCode(err) === 'protocol_final') {
+            this.toast.error(this.i18n.translate('meetings.settings.closedHint'));
             return;
           }
           const code = problemCode(err);

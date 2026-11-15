@@ -5,7 +5,7 @@
 # needs ships in the image: the fonts, the HSRT design (the `src/` directory
 # of the hsrtreport-typst submodule) and the mitex package. The container
 # therefore needs no network at run time.
-FROM python:3.13-slim
+FROM python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -19,6 +19,7 @@ ARG TYPST_SHA256_AMD64=a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389de
 ARG TYPST_SHA256_ARM64=5aa8d74a3d906e60ea12a66ac2f37f8eef1b14cbad7182a745e393a10c23dcee
 
 RUN set -eux; \
+    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries; \
     apt-get update; \
     apt-get install -y --no-install-recommends curl ca-certificates xz-utils; \
     case "$(dpkg --print-architecture)" in \
@@ -27,7 +28,7 @@ RUN set -eux; \
         *) echo "unsupported arch: $(dpkg --print-architecture)" >&2; exit 1 ;; \
     esac; \
     url="https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-${target}.tar.xz"; \
-    curl --proto '=https' --tlsv1.2 -fsSL "$url" -o /tmp/typst.tar.xz; \
+    curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors "$url" -o /tmp/typst.tar.xz; \
     echo "${sha256}  /tmp/typst.tar.xz" | sha256sum -c -; \
     tar -xJf /tmp/typst.tar.xz -C /tmp; \
     install -m 0755 "/tmp/typst-${target}/typst" /usr/local/bin/typst; \

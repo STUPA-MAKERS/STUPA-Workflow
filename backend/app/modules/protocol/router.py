@@ -50,6 +50,7 @@ from app.modules.protocol.schemas import (
 )
 from app.modules.protocol.service import ProtocolService
 from app.settings import Settings
+from app.shared.antiabuse import rate_limit_pdf_render
 from app.shared.errors import ProblemDetail
 from app.shared.filenames import content_disposition
 
@@ -324,7 +325,8 @@ async def send_protocol_draft(
 
 @router.get(
     "/protocols/{protocol_id}/draft-pdf",
-    responses=_errors(400, 401, 403, 404, 409, 503),
+    dependencies=[Depends(rate_limit_pdf_render)],
+    responses=_errors(400, 401, 403, 404, 409, 429, 503),
     response_class=Response,
 )
 async def get_protocol_draft_pdf(
@@ -351,6 +353,27 @@ async def get_protocol_draft_pdf(
             "Cache-Control": "no-store",
         },
     )
+
+
+@router.post(
+    "/protocols/{protocol_id}/reopen",
+    response_model=ProtocolOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def reopen_protocol(
+    protocol_id: UUID, service: ServiceDep, principal: PrincipalDep
+) -> ProtocolOut:
+    """Set a final protocol back to draft (§F/meetings/protocols/000983).
+
+    The caller needs ``protocol.finalize`` in the Gremium. A protocol that is not final
+    answers 409 ``protocol_not_final``, a protocol with an approval mark 409
+    ``protocol_approved``. The protocol leaves the public pages until its next
+    finalization, which sends the PDF again. Writes ``protocol_reopen``.
+    """
+    await service.authorize_finalize(protocol_id, principal)
+    out = await service.reopen(protocol_id, actor=principal.sub)
+    await service.session.commit()
+    return out
 
 
 @router.put(

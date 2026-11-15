@@ -941,6 +941,13 @@ describe('ApiClient', () => {
     expect(approved).toMatchObject({ approvedAt: null, approvedMeetingId: null, approvedMeetingTitle: null, approvedMeetingDate: null });
   });
 
+  it('POSTs the reopen of a final protocol', () => {
+    let draft: unknown;
+    api.reopenProtocol('p-1').subscribe((v) => (draft = v));
+    http.expectOne({ method: 'POST', url: '/api/protocols/p-1/reopen' }).flush({ id: 'p-1', meetingId: 'm-1', markdown: '', status: 'draft' });
+    expect(draft).toMatchObject({ id: 'p-1', status: 'draft', isFinal: false });
+  });
+
   it('PUTs the reason of an excuse only when given', () => {
     api.setOwnAttendance('m-1', 'excused', 'Krank').subscribe();
     expect(http.expectOne('/api/meetings/m-1/attendance/me').request.body).toEqual({

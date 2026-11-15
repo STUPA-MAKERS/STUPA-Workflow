@@ -95,7 +95,7 @@ class MeetingPatch(FrozenCamelModel, frozen=True):
     complete_agenda_item_id: UUID | None = Field(default=None, alias="completeAgendaItemId")
     status: MeetingStatus | None = None
     #: A new title. Needs ``canManage``, like the date and the time. A closed meeting
-    #: keeps its title (409), because the sent protocol names the meeting.
+    #: takes it until its protocol is final (409 ``protocol_final``, spec 000982).
     title: MeetingTitle | None = None
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")

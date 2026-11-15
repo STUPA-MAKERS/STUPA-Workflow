@@ -211,7 +211,7 @@
       "to": "notifications"
     },
     {
-      "count": 52,
+      "count": 53,
       "from": "applications",
       "to": "shared"
     },
@@ -416,7 +416,7 @@
       "to": "pdf"
     },
     {
-      "count": 34,
+      "count": 35,
       "from": "budget",
       "to": "shared"
     },
@@ -596,7 +596,7 @@
       "to": "pdf"
     },
     {
-      "count": 9,
+      "count": 10,
       "from": "documents",
       "to": "shared"
     },
@@ -806,7 +806,7 @@
       "to": "gremien"
     },
     {
-      "count": 44,
+      "count": 45,
       "from": "livevote",
       "to": "meetings"
     },
@@ -1011,7 +1011,7 @@
       "to": "audit"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "protocol",
       "to": "auth"
     },
@@ -1041,7 +1041,7 @@
       "to": "livevote"
     },
     {
-      "count": 10,
+      "count": 11,
       "from": "protocol",
       "to": "media"
     },
@@ -1061,7 +1061,7 @@
       "to": "pdf"
     },
     {
-      "count": 26,
+      "count": 27,
       "from": "protocol",
       "to": "shared"
     },

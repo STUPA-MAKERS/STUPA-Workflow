@@ -4,6 +4,9 @@ The Gremium approves each protocol in its next meeting. A person with
 ``protocol.finalize`` sets the mark on a final protocol and names the meeting that
 approved it. The mark is three columns of ``protocol``: ``approved_at``,
 ``approved_meeting_id`` and ``approved_by``.
+
+Until the mark is set, the same person can set the final protocol back to draft
+(``reopen``, §F/meetings/protocols/000983).
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from app.modules.meetings.protocol_models import Protocol
 from app.shared.errors import ConflictError, ValidationProblem
 
 PROTOCOL_NOT_FINAL = "protocol_not_final"
+PROTOCOL_APPROVED = "protocol_approved"
 #: The states of a meeting that can approve a protocol.
 SITTING = ("live", "closed")
 INVALID_APPROVAL_MEETING = "invalid_approval_meeting"
@@ -144,3 +148,31 @@ async def unapprove(session: AsyncSession, protocol: Protocol, *, actor: str) ->
     _write(protocol, at=None, meeting_id=None, by=None)
     await session.flush()
     await _audit(session, protocol, actor)
+
+
+async def reopen(session: AsyncSession, protocol: Protocol, *, actor: str) -> None:
+    """Set a final protocol back to draft (§F/meetings/protocols/000983).
+
+    The caller commits. The protocol keeps the time of its last send, so a draft that
+    went out once stays a record: it is not deletable.
+
+    Raises:
+        ConflictError: The protocol is not final (``protocol_not_final``), or it has an
+            approval mark (``protocol_approved``).
+    """
+    if protocol.status != "final":
+        raise ConflictError("Only a final protocol can go back to draft.", code=PROTOCOL_NOT_FINAL)
+    if getattr(protocol, "approved_at", None) is not None:
+        raise ConflictError(
+            "The protocol is approved. Remove the approval mark first.", code=PROTOCOL_APPROVED
+        )
+    protocol.status = "draft"
+    await audit_record(
+        session,
+        actor=actor,
+        action=AuditAction.PROTOCOL_REOPEN,
+        target_type="protocol",
+        target_id=str(protocol.id),
+        data={"meetingId": str(protocol.meeting_id), "gremiumId": str(protocol.gremium_id)},
+    )
+    await session.flush()

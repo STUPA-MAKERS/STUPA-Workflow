@@ -331,12 +331,27 @@ async def test_same_title_writes_no_audit(
     assert audit == []
 
 
-async def test_closed_meeting_keeps_its_title(
+async def test_closed_meeting_takes_a_title_until_the_protocol_is_final(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    """§F/meetings/meetings/000982: a closed meeting takes a correction of its title."""
+    m = _meeting("closed")
+    await MeetingService(_Session([m], scalars=["draft"])).patch(  # type: ignore[arg-type]
+        m.id, MeetingPatch(title="Neu"), _admin()
+    )
+    assert m.title == "Neu"
+    assert [entry["data"]["changes"] for entry in audit] == [{"title": {"from": "GV", "to": "Neu"}}]
+
+
+async def test_closed_meeting_with_a_final_protocol_keeps_its_title(
     audit: list[dict[str, Any]], voting: SimpleNamespace
 ) -> None:
     m = _meeting("closed")
-    with pytest.raises(ConflictError):
-        await _service(m).patch(m.id, MeetingPatch(title="Neu"), _admin())
+    with pytest.raises(ConflictError) as ei:
+        await MeetingService(_Session([m], scalars=["final"])).patch(  # type: ignore[arg-type]
+            m.id, MeetingPatch(title="Neu"), _admin()
+        )
+    assert ei.value.code == "protocol_final"
     assert m.title == "GV"
     assert audit == []
 

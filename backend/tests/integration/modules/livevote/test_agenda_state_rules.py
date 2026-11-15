@@ -37,7 +37,6 @@ async def test_closed_meeting_refuses_agenda_changes(
         responses = [
             client.post(base, json={"title": "Neu"}),
             client.put(f"{base}/order", json={"itemIds": [str(i) for i in s.item_ids[::-1]]}),
-            client.patch(f"{base}/{s.item_ids[0]}", json={"title": "Umbenannt"}),
             client.delete(f"{base}/{s.item_ids[0]}"),
         ]
     for resp in responses:
@@ -183,7 +182,7 @@ async def test_body_after_close_with_locked_protocol_is_refused(
             f"/api/meetings/{s.meeting_id}/agenda/{s.item_ids[0]}", json={"body": "spät"}
         )
     assert resp.status_code == 409, resp.text
-    assert resp.json()["code"] == "protocol_locked"
+    assert resp.json()["code"] == "protocol_final"
 
 
 async def _protocol_writer(maker: async_sessionmaker[AsyncSession], gremium_id: uuid.UUID) -> str:

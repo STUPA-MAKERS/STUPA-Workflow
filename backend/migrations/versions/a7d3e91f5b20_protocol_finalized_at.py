@@ -10,7 +10,7 @@ Idempotent. A fresh database already gets the column from the ``create_all`` bas
 The downgrade drops the column.
 
 Revision ID: a7d3e91f5b20
-Revises: c4f9a2e6d815
+Revises: 5d1e8a3c9b72
 Create Date: 2026-11-15 21:00:00.000000
 """
 
@@ -21,7 +21,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "a7d3e91f5b20"
-down_revision: str | None = "c4f9a2e6d815"
+down_revision: str | None = "5d1e8a3c9b72"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

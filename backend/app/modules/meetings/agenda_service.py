@@ -8,16 +8,17 @@ items in the protocol.
 
 State rules:
 
-* Add, reorder, rename and remove need a `planned` or `live` meeting. A closed
-  meeting gives 409 `meeting_closed`.
+* Add, reorder and remove need a `planned` or `live` meeting. A closed
+  meeting gives 409 `meeting_closed`: the list and the order of the items close with
+  the meeting (§F/meetings/meetings/000982).
 * Remove gives 409 `agenda_item_has_vote` while the item has an open or closed vote.
   It deletes the draft and cancelled votes of the item first, each with a
   `vote_delete` audit entry. To delete these votes the caller needs the
   `canManageVotes` right, else 403.
 * Add and remove lock the meeting row, as the meeting close and the vote open do.
-* The Markdown body and the `nonPublic` flag are open from the planning until the
-  protocol leaves the draft. The minute-taker can thus write the minutes of an item
-  before the meeting starts.
+* The title, the Markdown body and the `nonPublic` flag are open from the planning
+  until the protocol leaves the draft (409 `protocol_final`). The minute-taker can
+  thus write the minutes of an item before the meeting starts.
 
 The done mark of an item ("TOP abhaken") follows the minutes window too. A person
 sets and removes it by hand, and the move to the next item sets it for the item that
@@ -154,14 +155,14 @@ class AgendaService:
             )
 
     async def _assert_minutes_open(self, meeting: Meeting) -> None:
-        """Refuse a body or ``nonPublic`` edit outside the minutes window.
+        """Refuse a title, body or ``nonPublic`` edit outside the minutes window.
 
         The window is a ``planned`` or ``live`` meeting, or a closed meeting whose
         protocol is still a draft. A ``planned`` meeting has no protocol yet, but the
         text of its items is already the start of the minutes.
 
         Raises:
-            ConflictError: The protocol is no longer a draft (``protocol_locked``).
+            ConflictError: The protocol is no longer a draft (``protocol_final``).
         """
         if meeting.status == "closed":
             status = await self.session.scalar(
@@ -170,7 +171,7 @@ class AgendaService:
             if status != "draft":
                 raise ConflictError(
                     "the protocol is no longer a draft — the minutes can no longer change",
-                    code="protocol_locked",
+                    code="protocol_final",
                 )
 
     async def _audit(
@@ -317,10 +318,7 @@ class AgendaService:
         """
         meeting = await self._meeting(meeting_id)
         row = await self.item(meeting_id, item_id)
-        renames = title is not None
-        if renames:
-            self._assert_agenda_open(meeting)
-        if body is not None or non_public is not None:
+        if title is not None or body is not None or non_public is not None:
             await self._assert_minutes_open(meeting)
         new_body = body is not None and body != row.body
         if body is not None and new_body:
@@ -371,7 +369,7 @@ class AgendaService:
 
         Raises:
             NotFoundError: The meeting has no agenda item with this id.
-            ConflictError: The protocol is no longer a draft (``protocol_locked``).
+            ConflictError: The protocol is no longer a draft (``protocol_final``).
         """
         meeting = await self._meeting(meeting_id)
         await self.set_done_in_tx(meeting, item_id, done=done, actor=actor)
@@ -397,7 +395,7 @@ class AgendaService:
 
         Raises:
             NotFoundError: The meeting has no agenda item with this id.
-            ConflictError: The protocol is no longer a draft (``protocol_locked``).
+            ConflictError: The protocol is no longer a draft (``protocol_final``).
         """
         row = await self.item(meeting.id, item_id)
         await self._assert_minutes_open(meeting)

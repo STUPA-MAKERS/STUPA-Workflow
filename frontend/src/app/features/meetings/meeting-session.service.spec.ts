@@ -211,6 +211,29 @@ describe('MeetingSessionService', () => {
     expect(toasts()).toContain('Aktion fehlgeschlagen.: Andere Sitzung');
   });
 
+  /** § 000983 */
+  it('sets the final protocol back to draft and reports a refusal', () => {
+    const { http, session, toasts } = setup();
+    session.reopenProtocol();
+    http.verify();
+    session.protocol.set({ ...PROTOCOL, status: 'final' as const, isFinal: true, isLocked: true });
+    session.reopenProtocol();
+    session.reopenProtocol();
+    const post = http.expectOne('/api/protocols/p-1/reopen');
+    expect(post.request.method).toBe('POST');
+    post.flush({ ...PROTOCOL, status: 'draft' });
+    expect(session.protocol()?.isFinal).toBe(false);
+    expect(session.reopenSaving()).toBe(false);
+    expect(toasts()).toContain('Das Protokoll ist wieder ein Entwurf.');
+    session.reopenProtocol();
+    http
+      .expectOne('/api/protocols/p-1/reopen')
+      .flush({ code: 'protocol_approved' }, { status: 409, statusText: 'Conflict' });
+    expect(session.reopenSaving()).toBe(false);
+    expect(toasts()).toContain('Das Protokoll ist genehmigt. Entferne zuerst die Genehmigung.');
+    http.match(() => true);
+  });
+
   /** A member receives no code and no requests, so the meeting keeps its values. */
   it('passes the lead events to the guest list and takes the guest counts', () => {
     TestBed.configureTestingModule({

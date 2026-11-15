@@ -100,7 +100,7 @@ images of a protocol for the typst render.
 **Embedded PDFs (specs 000862-000869):**
 - Reference `[<name>](/api/media/documents/<uuid>)` (`refs.document_path`,
   `document_ids_in`), table `markdown_document` (id, storage_key
-  `media/documents/<id>`, name, size, pages; no uploader column).
+  `media/documents/<id>`, name, size, pages, meeting_id; no uploader column).
 - Upload `POST /api/meetings/{meeting_id}/documents` lives in
   `protocol/documents_router.py`, because only a person who can write the protocol
   (`ProtocolService.authorize_write_meeting`) may upload. `enforce_document_body_cap`,
@@ -109,7 +109,11 @@ images of a protocol for the typst render.
   not encrypted, 1-100 pages). The stored bytes are the client's: a PDF has no clean
   re-encode. 415 no PDF / unreadable / encrypted / infected, 413 over 20 MiB or 100 pages.
 - `GET /api/media/documents/{id}` (download, `?inline=true` framable preview with
-  `DOCUMENT_PREVIEW_CSP` + `X-Frame-Options: SAMEORIGIN`) and `/info` (name, pages).
+  `DOCUMENT_PREVIEW_CSP` + `X-Frame-Options: SAMEORIGIN`) and `/info` (name, pages) live
+  in `protocol/documents_router.py` too: `require_document_reader` lets only a person
+  pass who can read the Sitzung of the PDF (`markdown_document.meeting_id`,
+  §NF/security/files/000979). An applicant session, no read right and a PDF without a
+  Sitzung give 404. Both routes belong to the feature Sitzungen (000980).
   Public twins under `/api/public/protocols/{pid}/documents/{did}` answer 404 unless
   `public_document_ids` holds the id, so a PDF of a non-public TOP stays internal.
   nginx routes both download paths through the attachment-download location (frame

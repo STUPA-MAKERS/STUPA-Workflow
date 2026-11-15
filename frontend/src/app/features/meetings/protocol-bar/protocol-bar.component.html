@@ -43,6 +43,12 @@
         </app-button>
       }
     }
+    @if (canReopen()) {
+      <app-button variant="text" size="sm" [loading]="reopenSaving()" (click)="confirmReopen.set(true)">
+        <app-icon name="edit" />
+        {{ 'meetings.protocolBar.reopen' | t }}
+      </app-button>
+    }
     @if (canPublish()) {
       <app-button variant="text" size="sm" [loading]="publicationSaving()" (click)="togglePublication()">
         <app-icon [name]="publication() === 'withheld' ? 'globe' : 'eyeslash'" />
@@ -92,6 +98,16 @@
   [confirmLabel]="'action.remove' | t"
   (confirm)="unapprove()"
   (cancel)="confirmUnapprove.set(false)"
+/>
+
+<app-confirm-dialog
+  [open]="confirmReopen()"
+  [title]="'meetings.reopen.title' | t"
+  [body]="'meetings.reopen.body' | t"
+  [confirmLabel]="'meetings.reopen.confirm' | t"
+  [danger]="false"
+  (confirm)="reopen()"
+  (cancel)="confirmReopen.set(false)"
 />
 
 @if (approvalOpen()) {

@@ -111,6 +111,12 @@ export class ProtocolBarComponent {
     () => this.protocol().isFinal && !!this.meeting().canFinalize && this.session !== null,
   );
 
+  /** "Zurück in Entwurf": a final protocol without the mark and the right to finalize (§ 000983). */
+  protected readonly canReopen = computed(() => this.canApprove() && !this.protocol().approvedAt);
+  protected readonly reopenSaving = computed(() => this.session?.reopenSaving() ?? false);
+  /** The confirmation of "Zurück in Entwurf" is open. */
+  protected readonly confirmReopen = signal(false);
+
   /** "Genehmigt in der Sitzung … am …", or '' without the mark. */
   protected readonly approvedText = computed(() => {
     const p = this.protocol();
@@ -139,6 +145,11 @@ export class ProtocolBarComponent {
     this.approve(null);
   }
 
+  protected reopen(): void {
+    this.confirmReopen.set(false);
+    this.session?.reopenProtocol();
+  }
+
   protected approve(meetingId: Uuid | null): void {
     this.session?.setProtocolApproval(meetingId);
   }
@@ -165,7 +176,12 @@ export class ProtocolBarComponent {
         text: 'meetings.protocolBar.rendering',
       };
     }
-    return { icon: 'edit', tone: 'muted', label: 'meetings.protocol.draft', text: 'meetings.protocolBar.draft' };
+    return {
+      icon: 'edit',
+      tone: 'muted',
+      label: 'meetings.protocol.draft',
+      text: p.sentAt ? 'meetings.protocolBar.draftAgain' : 'meetings.protocolBar.draft',
+    };
   });
 
   /** Finalize: a closed meeting, a draft and the right. */

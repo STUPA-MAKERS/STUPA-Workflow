@@ -8,7 +8,9 @@ Every time becomes a local ``Europe/Berlin`` value without a zone, like the time
 meeting and a Termin. A recurring event is one entry per date inside a window of 12
 months back and 24 months ahead. The rule runs on the local values, so a weekly event at
 18:00 stays at 18:00 across a change of the clock. A rule with a frequency below a day
-gives only the first date, because such a rule can hold millions of dates. A rule that
+gives only the first date, because such a rule can hold millions of dates. A rule with
+``BYHOUR``, ``BYMINUTE`` or ``BYSECOND`` gives only the first date too, because it makes up
+to 86 400 dates for each day (§F/meetings/calendar/000973). A rule that
 the reader cannot understand gives the first date too. A changed
 date of a series (``RECURRENCE-ID``) replaces the date of the rule.
 """
@@ -42,6 +44,8 @@ _TAG = re.compile(r"<[^>]*>")
 _BLANKS = re.compile(r"[ \t\r\f\v]+")
 _LINES = re.compile(r"\n{3,}")
 _FAST = ("SECONDLY", "MINUTELY", "HOURLY")
+#: The rule parts that put more than one date on a day.
+_DAY_TIMES = frozenset({"BYHOUR", "BYMINUTE", "BYSECOND"})
 _DAY = timedelta(days=1)
 
 
@@ -169,6 +173,12 @@ def _rule_text(rule: Mapping[str, Any]) -> str:
     return vRecur(local).to_ical().decode()
 
 
+def _too_dense(rule: Mapping[str, Any]) -> bool:
+    """Tell whether the rule can put more than one date on a day."""
+    fast = any(str(freq).upper() in _FAST for freq in rule.get("FREQ", ()))
+    return fast or any(str(key).upper() in _DAY_TIMES for key in rule)
+
+
 def _starts(event: _Event, taken: frozenset[datetime], today: date) -> tuple[datetime, ...]:
     """Return the starts of an event: its one start, or the dates of its rule in the window.
 
@@ -177,7 +187,7 @@ def _starts(event: _Event, taken: frozenset[datetime], today: date) -> tuple[dat
     from dateutil.rrule import rrulestr
 
     rule = event.rule
-    if rule is None or any(str(freq).upper() in _FAST for freq in rule.get("FREQ", ())):
+    if rule is None or _too_dense(rule):
         return (event.start,)
     try:
         series = rrulestr(_rule_text(rule), dtstart=event.start)

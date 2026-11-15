@@ -164,7 +164,9 @@ async def test_finalize_public_gremium_renders_public_version(
             protocol.pdf_storage_key = protocol_storage_key(protocol.id)
         return f"%PDF-{markdown}".encode()
 
-    async def _send(protocol: Protocol, pdf: bytes | None, to: object = None) -> None:
+    async def _send(
+        protocol: Protocol, pdf: bytes | None, to: object = None, *, at: datetime
+    ) -> None:
         mailed.append(pdf)
 
     monkeypatch.setattr(svc, "_has_non_public", _has_non_public)
@@ -476,9 +478,7 @@ async def test_assemble_puts_the_time_of_a_reached_top_above_its_heading(
     The note uses the local time zone, also for a non-public TOP of the public text.
     """
     items = [
-        SimpleNamespace(
-            id=uuid4(), title="Haushalt", body="", non_public=False, started_at=NOW
-        ),
+        SimpleNamespace(id=uuid4(), title="Haushalt", body="", non_public=False, started_at=NOW),
         SimpleNamespace(
             id=uuid4(), title="Personal", body="Geheim", non_public=True, started_at=NOW
         ),
