@@ -312,7 +312,13 @@
                     >
                       <app-file-picker #pdfFile [accept]="pdfAccept" (picked)="onPdfAssetSelected(slot, $event)" />
                       @let asset = pdfAssets()[slot];
-                      <span class="br__thumb br__thumb--none"><app-icon [name]="asset && !asset.builtin ? 'file' : 'image'" /></span>
+                      @if (asset?.builtin) {
+                        <span class="br__thumb br__thumb--wide br__thumb--paper" [class.br__thumb--strip]="slot === 'footer'"
+                          ><img [src]="pdfDefault[slot]" alt=""
+                        /></span>
+                      } @else {
+                        <span class="br__thumb br__thumb--none"><app-icon [name]="asset ? 'file' : 'image'" /></span>
+                      }
                       <span class="br__logoText">
                         <span class="br__logoName">{{ pdfLabel(slot) }}</span>
                         @if (!asset) {
