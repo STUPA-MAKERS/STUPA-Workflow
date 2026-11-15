@@ -433,13 +433,17 @@ export class MeetingPageComponent {
     this.meeting().votes.some((v) => v.status === 'open'),
   );
 
-  /** The elections of the open item that a next Wahlgang continues (§ 000971). */
+  /**
+   * The votes of the open item that another vote continues: a next Wahlgang (§ 000971) or a
+   * repeat that is not cancelled. Such a vote takes no further Wahlgang and no further repeat.
+   */
   protected readonly continuedIds = computed(
     () =>
       new Set(
         this.votes()
-          .filter((v) => v.parentVoteId && v.status !== 'cancelled')
-          .map((v) => v.parentVoteId as string),
+          .filter((v) => v.status !== 'cancelled')
+          .flatMap((v) => [v.parentVoteId, v.repeatOfId])
+          .filter((id): id is string => !!id),
       ),
   );
 
@@ -453,15 +457,13 @@ export class MeetingPageComponent {
       ),
   );
   /**
-   * The closed votes of the open item that can be voted on again: no repeat of them is
-   * prepared, open or closed, and the item has no prepared or open vote.
+   * The closed votes of the open item that can be voted on again: no repeat and no next
+   * Wahlgang of them is prepared, open or closed, and the item has no prepared or open vote.
    */
   protected readonly repeatableIds = computed(() => {
     const own = this.votes();
     if (own.some((v) => v.status === 'draft' || v.status === 'open')) return new Set<string>();
-    const taken = new Set(
-      own.filter((v) => v.repeatOfId && v.status !== 'cancelled').map((v) => v.repeatOfId),
-    );
+    const taken = this.continuedIds();
     return new Set(own.filter((v) => v.status === 'closed' && !taken.has(v.id)).map((v) => v.id));
   });
 

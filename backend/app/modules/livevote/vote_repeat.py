@@ -40,14 +40,16 @@ async def repeat_source(
     """Load the closed vote that a new vote repeats, and check that it can repeat.
 
     The vote must be a closed vote of this meeting on this agenda item. Only one repeat
-    of a vote exists at a time (a cancelled repeat does not count), and no other vote
-    of the item may be prepared or open, so the room never runs two votes on one
+    of a vote exists at a time (a cancelled repeat does not count), an election with a
+    next Wahlgang repeats that Wahlgang and not itself, and no other vote of the item
+    may be prepared or open, so the room never runs two votes on one
     question.
 
     Raises:
         NotFoundError: The meeting has no such vote on this agenda item.
         ConflictError: The vote is not closed (``vote_not_closed``), it already has a
-            repeat (``repeat_exists``), or the item has a prepared or open vote
+            repeat (``repeat_exists``), a next Wahlgang continues it
+            (``next_round_exists``), or the item has a prepared or open vote
             (``vote_pending``).
     """
     source = (
@@ -65,7 +67,7 @@ async def repeat_source(
         raise ConflictError("Only a closed vote can be repeated.", code="vote_not_closed")
     others = (
         await session.execute(
-            select(Vote.status, Vote.repeat_of_id).where(
+            select(Vote.status, Vote.repeat_of_id, Vote.parent_vote_id).where(
                 Vote.agenda_item_id == item_id,
                 Vote.id != source.id,
                 Vote.status != "cancelled",
@@ -74,6 +76,10 @@ async def repeat_source(
     ).all()
     if any(row.repeat_of_id == source.id for row in others):
         raise ConflictError("This vote already has a repeat.", code="repeat_exists")
+    if any(row.parent_vote_id == source.id for row in others):
+        raise ConflictError(
+            "This election has a next Wahlgang; vote on that again.", code="next_round_exists"
+        )
     if any(row.status in ("draft", "open") for row in others):
         raise ConflictError(
             "The agenda item has a prepared or open vote; finish it first.",

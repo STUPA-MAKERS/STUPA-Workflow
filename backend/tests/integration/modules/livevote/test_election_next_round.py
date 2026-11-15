@@ -76,6 +76,12 @@ async def test_three_rounds_then_the_lot(
         again = client.post(f"/api/votes/{first}/next-round")
         assert again.status_code == 409
         assert again.json()["code"] == "next_round_exists"
+        repeat = client.post(
+            f"/api/meetings/{s.meeting_id}/votes",
+            json={"agendaItemId": str(s.item_ids[0]), "repeatOf": str(first)},
+        )
+        assert repeat.status_code == 409, repeat.text
+        assert repeat.json()["code"] == "next_round_exists"
 
         closed_second = await _closed(maker, s, {"c1": 3, "c2": 2, "c3": 2}, round_=2, parent=first)
         third = client.post(f"/api/votes/{closed_second}/next-round")
