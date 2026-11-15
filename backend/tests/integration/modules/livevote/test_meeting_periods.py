@@ -266,9 +266,15 @@ class _Mailer(MeetingMailer):
 
     def __init__(self) -> None:
         self.closed: list[uuid.UUID] = []
+        self.excused: list[tuple[uuid.UUID, str]] = []
 
     async def absence_limit(self, settings: Any, meeting_id: uuid.UUID, pool: object) -> None:
         self.closed.append(meeting_id)
+
+    async def late_excuse(
+        self, settings: Any, meeting_id: uuid.UUID, member_sub: str, pool: object
+    ) -> None:
+        self.excused.append((meeting_id, member_sub))
 
     async def meeting_created(self, settings: Any, meeting_id: uuid.UUID, pool: object) -> None:
         return None
@@ -388,3 +394,43 @@ async def test_third_absence_reaches_the_limit_and_no_manager_means_no_mail(
     monkeypatch.setattr(meeting_mails, "mail_queue_from_pool", lambda _pool: queue)
     await MeetingMailer().absence_limit(_settings(migrated[1]), third, pool=object())
     assert queue.messages == []
+
+
+async def test_late_excuse_mails_the_managers_with_the_reason(
+    api: FastAPI,
+    maker: async_sessionmaker[AsyncSession],
+    migrated: tuple[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """§F/meetings/meetings/000943: the persons with ``session.manage`` get the mail."""
+    s = await seed(maker, status="live", items=0)
+    sub, pid = await _member(maker, s.gremium_id, "Anna")
+    ben_sub, _ = await _member(maker, s.gremium_id, "Ben")
+    lead_sub, _ = await _member(maker, s.gremium_id, "Lea", ("session.manage",))
+    url = f"/api/meetings/{s.meeting_id}/attendance/me/late-excuse"
+    mailer = _Mailer()
+    api.dependency_overrides[get_meeting_mailer] = lambda: mailer
+    with TestClient(api) as client:
+        client.put(f"/api/meetings/{s.meeting_id}/attendance/{pid}", json={"status": "absent"})
+        client.patch(f"/api/meetings/{s.meeting_id}", json={"status": "closed"})
+        _as(api, ben_sub)
+        refused = client.post(url, json={"note": "Krank"})
+        _as(api, sub)
+        excused = client.post(url, json={"note": "Krank"})
+    assert refused.status_code == 409, refused.text
+    assert excused.status_code == 200, excused.text
+    assert mailer.excused == [(s.meeting_id, sub)]
+
+    queue = _Queue()
+    monkeypatch.setattr(meeting_mails, "get_sessionmaker", lambda: maker)
+    monkeypatch.setattr(meeting_mails, "mail_queue_from_pool", lambda _pool: queue)
+    settings = _settings(migrated[1])
+    await MeetingMailer().late_excuse(settings, s.meeting_id, sub, pool=object())
+    await MeetingMailer().late_excuse(settings, s.meeting_id, ben_sub, pool=object())
+    await MeetingMailer().late_excuse(settings, s.meeting_id, "nobody", pool=object())
+    await MeetingMailer().late_excuse(settings, uuid.uuid4(), sub, pool=object())
+    assert len(queue.messages) == 1
+    message = queue.messages[0]
+    assert message.to == (f"{lead_sub}@x.de",)
+    assert "Anna" in message.subject
+    assert "Krank" in message.text

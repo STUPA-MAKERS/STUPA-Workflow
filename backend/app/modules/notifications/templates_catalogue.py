@@ -209,6 +209,21 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         },
     ),
     MailTemplateSpec(
+        "late_excuse",
+        "meeting",
+        meetings.BUILTIN_LATE_EXCUSE_SUBJECT,
+        meetings.BUILTIN_LATE_EXCUSE_BODY,
+        {
+            "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
+            "memberName": "Name des Mitglieds",
+            "reason": "Grund der Entschuldigung",
+            "meetingTitle": "Titel der Sitzung",
+            "meetingDate": "Datum",
+            "gremiumName": "Gremium",
+            "meetingId": "ID der Sitzung",
+        },
+    ),
+    MailTemplateSpec(
         "delegation_granted",
         "delegation",
         meetings.BUILTIN_DELEGATION_GRANTED_SUBJECT,

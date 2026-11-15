@@ -186,6 +186,9 @@ class _Mailer:
     async def absence_limit(self, _settings: Any, meeting_id: UUID, _pool: Any) -> None:
         self.meetings.append(meeting_id)
 
+    async def late_excuse(self, _settings: Any, meeting_id: UUID, sub: str, _pool: Any) -> None:
+        self.meetings.append(meeting_id)
+
 
 @pytest.mark.parametrize(("status", "sent"), [("closed", 1), ("live", 0)])
 def test_close_of_a_meeting_starts_the_absence_mail(
@@ -230,8 +233,12 @@ def test_late_excuse_route_passes_the_reason(
 
     fakes["attendance"].excuse_late = excuse_late
     fakes["attendance"].session = fakes["meeting"].session
+    mailer = _Mailer()
+    app.dependency_overrides[get_meeting_mailer] = lambda: mailer
     _login(app)
-    url = f"/api/meetings/{uuid4()}/attendance/me/late-excuse"
+    meeting_id = uuid4()
+    url = f"/api/meetings/{meeting_id}/attendance/me/late-excuse"
     assert client.post(url, json={"note": "ill"}).status_code == 200
     assert calls == [("p", "ill", True)]
     assert client.post(url, json={"note": " "}).status_code == 422
+    assert mailer.meetings == [meeting_id]

@@ -5,9 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/integration/modules/livevote/test_meeting_periods.py:test_late_excuse_mails_the_managers_with_the_reason"
+  - "backend/tests/unit/modules/livevote/test_meeting_periods_unit.py:test_late_excuse_route_passes_the_reason"
 implementation:
-  - backend/app/modules/meetings/absence.py
-  - backend/app/modules/notifications
+  - backend/app/modules/livevote/mails.py
+  - backend/app/modules/livevote/router.py
+  - backend/app/modules/notifications/texts/meetings.py
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/livevote
