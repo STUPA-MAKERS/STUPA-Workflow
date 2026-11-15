@@ -2,7 +2,7 @@
 id: "000943"
 title: A late excuse sends a mail to the lead
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
