@@ -61,10 +61,17 @@ class Watchdog:
         return (self.clock() - self.last_beat) > self.limit_seconds
 
     async def beat_forever(self) -> None:
-        """Beat on the event loop until the task is cancelled."""
-        while True:
-            self.beat()
-            await asyncio.sleep(self.beat_seconds)
+        """Beat on the event loop until the task is cancelled.
+
+        The end of the task stops the check thread, so a loop that closes without the
+        shutdown hook leaves no thread that ends the process later.
+        """
+        try:
+            while True:
+                self.beat()
+                await asyncio.sleep(self.beat_seconds)
+        finally:
+            self.stop.set()
 
     def check(self) -> bool:
         """End the process when the loop is stalled. Return whether it was."""

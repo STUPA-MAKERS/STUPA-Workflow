@@ -81,7 +81,9 @@ async def test_the_beat_task_stores_the_time() -> None:
     clock.now = 2000.0
     await asyncio.sleep(0.05)
     task.cancel()
+    await asyncio.sleep(0)
     assert watchdog.last_beat == 2000.0
+    assert watchdog.stop.is_set()
 
 
 async def test_startup_and_shutdown() -> None:
