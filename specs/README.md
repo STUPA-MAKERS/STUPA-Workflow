@@ -16,7 +16,7 @@ specs/
     functional/
       administration/  accounts, admin, audit, backups, files, privacy, translations
       applications/    applications, dashboard, flow, forms
-      collaboration/   notifications, search, tickets, todos
+      collaboration/   committees, notifications, search, tickets, todos
       finance/         budget, invoices
       integrations/    external, mcp, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
@@ -184,6 +184,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/000288](requirements/functional/applications/forms/000288_finite-numbers.md) | Numbers are finite decimals | approved |
 | [F/applications/forms/000289](requirements/functional/applications/forms/000289_form-revision.md) | A form change is versioned and audited | approved |
 | [F/applications/forms/000471](requirements/functional/applications/forms/000471_type-retention.md) | Antrag types can keep their own retention | approved |
+| [F/collaboration/committees/000950](requirements/functional/collaboration/committees/000950_info-tab.md) | A Gremium has an Info tab | draft |
+| [F/collaboration/committees/000951](requirements/functional/collaboration/committees/000951_info-edit-permission.md) | Only info.write edits the Info of a Gremium | draft |
+| [F/collaboration/committees/000952](requirements/functional/collaboration/committees/000952_info-links.md) | An Info link has a label and a web address | draft |
+| [F/collaboration/committees/000953](requirements/functional/collaboration/committees/000953_info-markdown.md) | The Info text is sanitized Markdown | draft |
+| [F/collaboration/committees/000954](requirements/functional/collaboration/committees/000954_info-save.md) | An Info save is versioned and audited | draft |
+| [F/collaboration/committees/000955](requirements/functional/collaboration/committees/000955_info-empty.md) | An empty Info tab shows only to its editors | draft |
 | [F/collaboration/notifications/000151](requirements/functional/collaboration/notifications/000151_task-mail-recipients.md) | Task mails go only to who can act | approved |
 | [F/collaboration/notifications/000152](requirements/functional/collaboration/notifications/000152_team-mails-opt-in.md) | Team mails about Anträge are off by default | approved |
 | [F/collaboration/notifications/000153](requirements/functional/collaboration/notifications/000153_sandboxed-templates.md) | Mail placeholders use camelCase | approved |
