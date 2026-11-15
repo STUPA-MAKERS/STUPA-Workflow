@@ -273,7 +273,7 @@
   "expenses.sub.loadError": "Could not load sub-bookings.",
   "expenses.moreActions": "More actions",
   "expenses.rowMenu": "Actions for “{description}”",
-  "expenses.lateDate": "The fiscal year has ended. The date must lie in that year.",
+  "expenses.lateDate": "The date is not in the fiscal year.",
   "expenses.transfers.samePair": "Pick a cost centre other than the one in “From cost centre”.",
   "expenses.field.invoice": "Invoice",
   "expenses.field.invoicePlaceholder": "No invoice",

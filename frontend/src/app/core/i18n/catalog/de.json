@@ -270,7 +270,7 @@
   "expenses.sub.loadError": "Unterbuchungen konnten nicht geladen werden.",
   "expenses.moreActions": "Weitere Aktionen",
   "expenses.rowMenu": "Aktionen für „{description}“",
-  "expenses.lateDate": "Das Haushaltsjahr ist abgelaufen. Das Datum muss in diesem Jahr liegen.",
+  "expenses.lateDate": "Das Datum liegt nicht im Haushaltsjahr.",
   "expenses.transfers.samePair": "Wähle eine andere Kostenstelle als bei „Von Kostenstelle“.",
   "expenses.field.invoice": "Rechnung",
   "expenses.field.invoicePlaceholder": "Keine Rechnung",
