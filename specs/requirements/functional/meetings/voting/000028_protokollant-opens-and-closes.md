@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
   - backend/app/modules/voting/router.py
 scope:
   - backend/app/modules/voting

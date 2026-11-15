@@ -181,14 +181,25 @@ def audit_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     """
     import app.modules.meetings.agenda_service as agenda_mod
     import app.modules.meetings.attendance_service as attendance_mod
-    import app.modules.voting.service as voting_service_mod
+    import app.modules.voting.service.cast as voting_cast_mod
+    import app.modules.voting.service.close as voting_close_mod
+    import app.modules.voting.service.create as voting_create_mod
+    import app.modules.voting.service.delete as voting_delete_mod
 
     calls: list[dict[str, Any]] = []
 
     async def _record(_session: Any, **kw: Any) -> None:
         calls.append(kw)
 
-    for mod in (agenda_mod, attendance_mod, lifecycle_mod, voting_service_mod):
+    for mod in (
+        agenda_mod,
+        attendance_mod,
+        lifecycle_mod,
+        voting_cast_mod,
+        voting_close_mod,
+        voting_create_mod,
+        voting_delete_mod,
+    ):
         monkeypatch.setattr(mod, "audit_record", _record)
     return calls
 

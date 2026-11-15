@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
   - frontend/src/app/features/voting/vote-cast.component.ts
 scope:
   - backend/app/modules/voting

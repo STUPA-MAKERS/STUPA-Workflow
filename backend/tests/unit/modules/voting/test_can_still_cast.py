@@ -18,10 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.delegations.service import Represented
-from app.modules.voting import service as voting_mod
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import MyBallot
 from app.modules.voting.service import VotingService
+from app.modules.voting.service import access as access_mod
+from app.modules.voting.service import cast as voting_mod
 
 NOW = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
 GID = str(uuid4())
@@ -64,7 +65,8 @@ def world(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     async def _my_ballot(_self: Any, _vote: Any, sub: str) -> MyBallot:
         return MyBallot(cast=sub in state.cast_by)
 
-    monkeypatch.setattr(voting_mod, "voting_delegation_check", _check)
+    for mod in (voting_mod, access_mod):
+        monkeypatch.setattr(mod, "voting_delegation_check", _check)
     monkeypatch.setattr(VotingService, "my_ballot", _my_ballot)
     monkeypatch.setattr(VotingService, "_all_cast", _all_cast)
     return state

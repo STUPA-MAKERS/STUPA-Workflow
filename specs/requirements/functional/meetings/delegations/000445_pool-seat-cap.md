@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/delegations/pool_seat.py
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
 scope:
   - backend/app/modules/delegations
   - frontend/src/app/features/meetings

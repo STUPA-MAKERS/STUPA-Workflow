@@ -8,7 +8,7 @@ updated: 2026-11-15
 tests:
   - "backend/tests/integration/modules/voting/test_circular_vote.py:test_a_draft_counts_the_members_at_its_open"
 implementation:
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
   - backend/app/modules/voting/circular.py
 scope:
   - backend/app/modules/voting
