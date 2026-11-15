@@ -1094,7 +1094,7 @@
   "circular.toast.started": "Umlaufverfahren gestartet",
   "circular.object.action": "Widersprechen",
   "circular.object.title": "Dem Umlaufverfahren widersprechen?",
-  "circular.object.body": "Der Widerspruch bricht das Umlaufverfahren ab. Das lässt sich nicht rückgängig machen.",
+  "circular.object.body": "Der Widerspruch beendet die Abstimmung für alle Mitglieder. Das lässt sich nicht rückgängig machen.",
   "circular.object.done": "Umlaufverfahren durch Widerspruch abgebrochen",
   "circular.status.objection": "Abgebrochen durch Widerspruch",
   "election.tag.tie": "Gleichstand",

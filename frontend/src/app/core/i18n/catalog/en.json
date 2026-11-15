@@ -1094,7 +1094,7 @@
   "circular.toast.started": "Circular vote started",
   "circular.object.action": "Object",
   "circular.object.title": "Object to the circular vote?",
-  "circular.object.body": "The objection cancels the circular vote. This cannot be undone.",
+  "circular.object.body": "The objection ends the vote for all members. This cannot be undone.",
   "circular.object.done": "Circular vote cancelled by an objection",
   "circular.status.objection": "Cancelled by an objection",
   "election.tag.tie": "tie",

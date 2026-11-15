@@ -54,8 +54,14 @@
             (castFailed)="onCastFailed($event)"
             (changed)="onElectionChanged()"
           >
-            @if ((!phone() && beamerLink()) || hasMenu()) {
+            @if ((!phone() && beamerLink()) || hasMenu() || canObject()) {
               <span vpnActions class="vc__actions">
+                @if (canObject()) {
+                  <app-button variant="danger" size="sm" (click)="confirmObject.set(true)">
+                    <app-icon name="x" />
+                    {{ 'circular.object.action' | t }}
+                  </app-button>
+                }
                 @if (!phone() && beamerLink()) {
                   <app-button variant="tonal" size="sm" (click)="goBeamer()">
                     <app-icon name="monitor" />

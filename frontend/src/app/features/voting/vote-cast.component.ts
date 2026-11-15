@@ -239,7 +239,10 @@ export class VoteCastComponent implements OnDestroy {
     if (vote.status === 'draft') return 'start';
     return vote.status === 'open' && !circular ? 'close' : null;
   });
-  /** An eligible member can object to an open Umlaufverfahren; this cancels it. */
+  /**
+   * An eligible member can object to an open Umlaufverfahren; this cancels it. The action
+   * is a button, not a menu item (§F/meetings/voting/000947).
+   */
   readonly canObject = computed(() => {
     const vote = this.loaded();
     return vote?.kind === 'circular' && vote.status === 'open' && vote.canCast === true;
@@ -258,13 +261,9 @@ export class VoteCastComponent implements OnDestroy {
     const planItems: readonly RowMenuItem[] = this.planReadable()
       ? [{ id: 'plan', label: this.i18n.translate('voting.plan.open'), icon: 'link' }]
       : [];
-    const objectItems: readonly RowMenuItem[] = this.canObject()
-      ? [{ id: 'object', label: this.i18n.translate('circular.object.action'), icon: 'x' }]
-      : [];
     const pollItems: readonly RowMenuItem[] = [
       ...planItems,
       ...(action ? [this.pollMenuItem(action)] : []),
-      ...objectItems,
     ];
     const deleteItems: readonly RowMenuItem[] = this.canDelete()
       ? [
@@ -349,9 +348,6 @@ export class VoteCastComponent implements OnDestroy {
       case 'start':
       case 'close':
         this.runPoll(id);
-        return;
-      case 'object':
-        this.confirmObject.set(true);
         return;
       case 'plan':
         void this.router.navigate(['/budget/plan'], { queryParams: { planVersion: this.loaded()?.planVersionId } });
