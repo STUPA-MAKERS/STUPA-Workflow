@@ -50,6 +50,18 @@ async function setup(over: Partial<Inputs> = {}) {
   return { ...view, on };
 }
 
+const MENU = 'Aktionen der Abstimmung';
+
+/** Open the menu (⋮) of the card and give the item, or `null` without menu or item. */
+async function menuItem(name: string): Promise<HTMLElement | null> {
+  const trigger = screen.queryByRole('button', { name: MENU });
+  if (!trigger) return null;
+  await userEvent.click(trigger);
+  const item = screen.queryByRole('menuitem', { name });
+  if (!item) await userEvent.keyboard('{Escape}');
+  return item;
+}
+
 describe('VoteCardComponent', () => {
   describe('an open vote', () => {
     /** The lead gets no interim tally and no line that explains it. */
@@ -111,25 +123,26 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('0 %')).toBeInTheDocument();
     });
 
-    /** An open vote is part of the record, so there is no delete. */
-    it('closes and cancels; close and cancel are both danger actions', async () => {
+    /** An open vote is part of the record, so there is no delete (§ 001007). */
+    it('closes with the one button and cancels from the menu, both as danger', async () => {
       const { on, container } = await setup();
       const close = screen.getByRole('button', { name: 'Abstimmung schließen' });
       expect(close).toHaveClass('btn--danger');
       await userEvent.click(close);
       expect(on.close).toHaveBeenCalledWith('v-1');
-      const cancel = screen.getByRole('button', { name: 'Abstimmung abbrechen' });
-      expect(cancel).toHaveClass('btn--danger');
-      await userEvent.click(cancel);
+      expect(container.querySelectorAll('.vc__actions app-button')).toHaveLength(1);
+      expect(screen.queryByRole('button', { name: 'Abstimmung abbrechen' })).toBeNull();
+      const cancel = await menuItem('Abstimmung abbrechen');
+      expect(cancel).not.toBeNull();
+      expect(screen.queryByRole('menuitem', { name: 'Beschlussfrage löschen' })).toBeNull();
+      await userEvent.click(cancel!);
       expect(on.cancel).toHaveBeenCalledWith('v-1');
-      expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
-      expect(container.querySelectorAll('.vc__actions app-button')).toHaveLength(2);
     });
 
     it('lets a lead who does not keep the minutes neither close nor cancel', async () => {
       const { container } = await setup({ canRun: false });
       expect(screen.queryByRole('button', { name: 'Abstimmung schließen' })).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Abstimmung abbrechen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: MENU })).toBeNull();
       expect(container.querySelector('.vc__actions')).toBeNull();
     });
 
@@ -172,15 +185,15 @@ describe('VoteCardComponent', () => {
     });
 
     /** A closed vote is part of the record (409 `vote_not_deletable`). */
-    it('shows the result, the counts and the insert into the text', async () => {
+    it('shows the result once, the counts and the insert into the text', async () => {
       const { on } = await setup({ vote: closed, canInsert: true });
-      expect(screen.getByText('Abstimmung geschlossen')).toBeInTheDocument();
-      expect(screen.getByText('Angenommen')).toBeInTheDocument();
+      expect(screen.queryByText('Abstimmung geschlossen')).toBeNull();
+      expect(screen.getAllByText('Angenommen')).toHaveLength(1);
       expect(screen.getByText(/beendet \d\d:02/)).toBeInTheDocument();
       expect(screen.getByText('Enthaltung')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));
       expect(on.insertResult).toHaveBeenCalledWith(closed);
-      expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: MENU })).toBeNull();
     });
 
     /** The folded card leaves the result to the text. */
@@ -188,12 +201,40 @@ describe('VoteCardComponent', () => {
       await setup({ vote: closed, canInsert: true, inProtocol: true });
       expect(screen.getByText('Im Protokoll')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
-      expect(screen.queryByText('Angenommen')).toBeNull();
+      expect(screen.getByText('Angenommen')).toBeInTheDocument();
+      expect(screen.queryByText('Ja')).toBeNull();
     });
 
     it('names a rejection, also a tie, and a missed quorum', async () => {
       await setup({ vote: vote({ status: 'closed', result: 'tie', counts: { yes: 1, no: 1 } }) });
       expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
+    });
+
+    /** The pending lot is the next step; the insert waits in the menu (§ 001006, § 001007). */
+    it('states a pending lot once and makes "Los ziehen" the one button', async () => {
+      const tie = vote({
+        status: 'closed',
+        result: 'tie',
+        kind: 'election',
+        counts: { c1: 2, c2: 2, abstain: 0 },
+        revealed: true,
+        election: { seats: 1, candidates: [{ id: 'c1', name: 'A' }, { id: 'c2', name: 'B' }], secret: true },
+        electionResult: {
+          counts: { c1: 2, c2: 2 },
+          abstentions: 0,
+          ballots: 4,
+          elected: [],
+          lot: { among: ['c1', 'c2'], seats: 1, drawn: null },
+        },
+      });
+      const { container } = await setup({ vote: tie, canInsert: true, canRepeat: true });
+      expect(screen.getByText('Los steht aus')).toBeInTheDocument();
+      expect(screen.queryByText(/Gleichstand zwischen/)).toBeNull();
+      expect(screen.queryByText(/das Los steht aus/)).toBeNull();
+      expect(screen.getByRole('button', { name: 'Los ziehen' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
+      expect(container.querySelector('.vc__actions')).toBeNull();
+      expect(await menuItem('Ins Protokoll übernehmen')).not.toBeNull();
     });
 
     it('names the missed quorum', async () => {
@@ -210,7 +251,7 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('Absolute Mehrheit')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung öffnen' }));
       expect(on.open).toHaveBeenCalledWith('v-1');
-      await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage löschen' }));
+      await userEvent.click((await menuItem('Beschlussfrage löschen'))!);
       expect(on.remove).toHaveBeenCalledWith('v-1');
     });
 
@@ -223,33 +264,34 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('Erst die offene Abstimmung schließen oder abbrechen.')).toHaveClass('vc__hint');
       await userEvent.click(open);
       expect(on.open).not.toHaveBeenCalled();
-      expect(screen.getByRole('button', { name: 'Beschlussfrage löschen' })).toBeEnabled();
+      expect(await menuItem('Beschlussfrage löschen')).not.toBeNull();
     });
 
     it('does not open a planned vote before the meeting runs', async () => {
       await setup({ vote: vote({ status: 'draft' }), meetingStatus: 'planned' });
       expect(screen.queryByRole('button', { name: 'Abstimmung öffnen' })).toBeNull();
       expect(screen.getByText('Öffnen kannst du sie, sobald die Sitzung eröffnet ist.')).toHaveClass('vc__hint');
-      expect(screen.getByRole('button', { name: 'Beschlussfrage löschen' })).toBeInTheDocument();
+      expect(await menuItem('Beschlussfrage löschen')).not.toBeNull();
     });
 
-    it('deletes a cancelled vote, with the delete in flight shown', async () => {
-      await setup({ vote: vote({ status: 'cancelled', closedAt: null }), deleting: 'v-1' });
+    it('deletes a cancelled vote, but not twice while the delete is in flight', async () => {
+      const { on } = await setup({ vote: vote({ status: 'cancelled', closedAt: null }), deleting: 'v-1' });
       expect(screen.getByText('Abstimmung abgebrochen')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Beschlussfrage löschen' })).toBeDisabled();
+      await userEvent.click((await menuItem('Beschlussfrage löschen'))!);
+      expect(on.remove).not.toHaveBeenCalled();
     });
 
     it('keeps the votes of a closed meeting, of a locked protocol and of a reader', async () => {
       const { fixture } = await setup({ vote: vote({ status: 'cancelled' }), meetingStatus: 'closed' });
-      expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: MENU })).toBeNull();
       fixture.componentRef.setInput('meetingStatus', 'live');
       fixture.componentRef.setInput('locked', true);
       fixture.detectChanges();
-      expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: MENU })).toBeNull();
       fixture.componentRef.setInput('locked', false);
       fixture.componentRef.setInput('canManage', false);
       fixture.detectChanges();
-      expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: MENU })).toBeNull();
     });
 
     it('names an untitled question and leaves out an empty rules line', async () => {
@@ -298,26 +340,26 @@ describe('VoteCardComponent', () => {
     it('lets the manager change a prepared vote', async () => {
       const draft = vote({ status: 'draft' });
       const { on } = await setup({ vote: draft, meetingStatus: 'planned' });
-      await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+      await userEvent.click((await menuItem('Bearbeiten'))!);
       expect(on.edit).toHaveBeenCalledWith(draft);
     });
 
     it('offers no edit without the manage right or after the close', async () => {
       await setup({ vote: vote({ status: 'draft' }), canManage: false });
-      expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+      expect(screen.queryByRole('button', { name: MENU })).toBeNull();
     });
 
     it('repeats a closed vote in a live meeting', async () => {
       const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3 } });
       const { on } = await setup({ vote: closed, canRepeat: true });
-      await userEvent.click(screen.getByRole('button', { name: 'Erneut abstimmen' }));
+      await userEvent.click((await menuItem('Erneut abstimmen'))!);
       expect(on.repeat).toHaveBeenCalledWith(closed);
     });
 
     it('offers no repeat while the item waits or in a planned meeting', async () => {
       const closed = vote({ status: 'closed', result: 'passed' });
       await setup({ vote: closed, canRepeat: false });
-      expect(screen.queryByRole('button', { name: 'Erneut abstimmen' })).toBeNull();
+      expect(await menuItem('Erneut abstimmen')).toBeNull();
     });
 
     it('names a repeated election "Wahlgang wiederholen"', async () => {
@@ -331,7 +373,7 @@ describe('VoteCardComponent', () => {
         }),
         canRepeat: true,
       });
-      expect(screen.getByRole('button', { name: 'Wahlgang wiederholen' })).toBeInTheDocument();
+      expect(await menuItem('Wahlgang wiederholen')).not.toBeNull();
     });
 
     it('marks the repeated vote and names the attempt of the repeat', async () => {

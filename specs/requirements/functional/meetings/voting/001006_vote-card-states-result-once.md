@@ -2,7 +2,7 @@
 id: "001006"
 title: The vote card states the result once
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:

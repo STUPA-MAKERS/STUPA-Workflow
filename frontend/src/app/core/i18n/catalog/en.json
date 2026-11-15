@@ -1207,6 +1207,7 @@
   "meetings.viewers.title": "Viewing live",
   "meetings.viewers.empty": "Nobody has the session open right now.",
   "meetings.vote.untitled": "Decision question",
+  "meetings.vote.menu": "Vote actions",
   "meetings.vote.delete": "Delete decision question",
   "meetings.vote.addQuestion": "Add a decision question",
   "meetings.vote.count": "Votes",

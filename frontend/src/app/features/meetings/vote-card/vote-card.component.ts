@@ -13,7 +13,15 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { MeetingStatus, MeetingVote, MyBallot, Uuid, Vote } from '@core/api/models';
-import { ButtonComponent, IconComponent, StatusTextComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  IconComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { meetingVoteStatus, voteResultStatus, type StatusView } from '@shared/status-kind.util';
 import {
   BallotComponent,
@@ -21,7 +29,13 @@ import {
   type BallotFailure,
 } from '../../voting/ballot/ballot.component';
 import { ElectionResultComponent } from '../../voting/election-result/election-result.component';
-import { electionCaption, electionOf, electionStatus } from '../../voting/election.util';
+import {
+  electionCaption,
+  electionOf,
+  electionStatus,
+  lotPending,
+  nextRoundOf,
+} from '../../voting/election.util';
 import { VoteProgressComponent } from '../../voting/vote-progress/vote-progress.component';
 import { PollResultComponent } from '../../voting/poll-result/poll-result.component';
 import { pollCaption, pollOf, pollStatus } from '../../voting/poll.util';
@@ -36,6 +50,11 @@ import { problemDetail } from '@core/api/problem';
 
 /**
  * One vote of the open agenda item, as a card beside the sheet.
+ *
+ * The card reads: the question with the menu (⋮), one status line, one muted rule line,
+ * the counts, and at most one button, the next step of the vote (§ 001006, § 001007).
+ * The status line of a closed vote says only its result ("Angenommen", "Los steht aus"),
+ * never "Abstimmung geschlossen". Every action that is not the next step is in the menu.
  *
  * An open vote shows the question and the progress ("14 von 19 Anwesenden haben
  * abgestimmt"), without a status caption, a rule line or the attendance box: the item
@@ -71,6 +90,7 @@ import { problemDetail } from '@core/api/problem';
     ElectionResultComponent,
     IconComponent,
     PollResultComponent,
+    RowMenuComponent,
     VoteProgressComponent,
     StatusTextComponent,
   ],
@@ -239,6 +259,97 @@ export class VoteCardComponent {
     const s = this.vote().status;
     return this.canEdit() && (s === 'draft' || s === 'cancelled');
   });
+
+  /** The status line: the result of a closed vote, else the state; an open vote has none. */
+  protected readonly headStatus = computed<{ kind: StatusView['kind']; key: TranslationKey } | null>(() => {
+    const status = this.vote().status;
+    if (status === 'open') return null;
+    const r = status === 'closed' ? this.result() : null;
+    if (r) return r;
+    return { kind: this.status().kind, key: this.capKey() };
+  });
+
+  /** The rule line: "Wahl · 1 Posten · Einfache Mehrheit · beendet 20:20". */
+  protected readonly ruleLine = computed(() => {
+    const folded = this.folded();
+    const parts = [
+      this.attemptCap(),
+      folded ? null : this.electionCap(),
+      folded || this.vote().status === 'open' ? null : this.meta(),
+    ];
+    return parts.filter((p) => !!p).join(' · ');
+  });
+
+  /** A closed election offers its own next step: the lot or the next Wahlgang. */
+  private readonly electionStep = computed(() => {
+    const v = this.vote();
+    if (v.status !== 'closed' || this.folded() || !this.canManage() || this.locked()) return false;
+    if (lotPending(v.result, v.electionResult ?? null)) return true;
+    return (
+      this.meetingStatus() === 'live' &&
+      !this.continued() &&
+      nextRoundOf(this.election(), v.result, v.round) !== null
+    );
+  });
+
+  /** The one button below the counts: the next step of the vote, or `null` (§ 001007). */
+  protected readonly primary = computed<'close' | 'open' | 'insert' | null>(() => {
+    const v = this.vote();
+    if (v.status === 'open' && this.canManage() && this.canRun()) return 'close';
+    if (v.status === 'draft' && this.canEdit() && this.canRun() && this.meetingStatus() === 'live') {
+      return 'open';
+    }
+    if (v.status === 'closed' && this.canInsert() && !this.inProtocol() && !this.electionStep()) {
+      return 'insert';
+    }
+    return null;
+  });
+
+  /** The menu: every action that is not the next step; the danger items in their own section. */
+  protected readonly menu = computed<RowMenuSection[]>(() => {
+    const v = this.vote();
+    const t = (key: TranslationKey) => this.i18n.translate(key);
+    const live = this.meetingStatus() === 'live';
+    const closed = v.status === 'closed';
+    const insert = closed && this.canInsert() && !this.inProtocol() && this.primary() !== 'insert';
+    const repeat = closed && this.canRepeat() && this.canEdit() && live;
+    const edit = v.status === 'draft' && this.canEdit();
+    const cancel = v.status === 'open' && this.canManage() && this.canRun();
+    const repeatKey = this.election() ? 'meetings.vote.repeatElection' : 'meetings.vote.repeat';
+    const items: RowMenuItem[] = [
+      ...(insert ? [{ id: 'insert', label: t('meetings.dock.insertResult'), icon: 'fileplus' as const }] : []),
+      ...(repeat ? [{ id: 'repeat', label: t(repeatKey), icon: 'repeat' as const }] : []),
+      ...(edit ? [{ id: 'edit', label: t('meetings.vote.edit'), icon: 'edit' as const }] : []),
+    ];
+    const danger: RowMenuItem[] = [
+      ...(cancel ? [{ id: 'cancel', label: t('meetings.vote.cancel'), icon: 'x' as const, danger: true }] : []),
+      ...(this.canDelete()
+        ? [{ id: 'delete', label: t('meetings.vote.delete'), icon: 'trash' as const, danger: true }]
+        : []),
+    ];
+    return [{ items }, { items: danger }].filter((section) => section.items.length > 0);
+  });
+
+  protected onMenu(item: RowMenuItem): void {
+    const v = this.vote();
+    switch (item.id) {
+      case 'insert':
+        this.insertResult.emit(v);
+        break;
+      case 'repeat':
+        this.repeat.emit(v);
+        break;
+      case 'edit':
+        this.edit.emit(v);
+        break;
+      case 'cancel':
+        this.cancel.emit(v.id);
+        break;
+      case 'delete':
+        if (this.deleting() !== v.id) this.remove.emit(v.id);
+        break;
+    }
+  }
 
   protected optionLabel(opt: string): string {
     return voteOptionLabel(opt, (key) => this.i18n.translate(key));

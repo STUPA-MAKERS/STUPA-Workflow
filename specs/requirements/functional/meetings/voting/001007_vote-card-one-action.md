@@ -2,7 +2,7 @@
 id: "001007"
 title: The vote card has one main action and a menu
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:
