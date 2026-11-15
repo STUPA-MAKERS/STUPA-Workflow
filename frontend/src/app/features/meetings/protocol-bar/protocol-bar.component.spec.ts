@@ -145,7 +145,7 @@ describe('ProtocolBarComponent', () => {
       expect(api.listMeetings).toHaveBeenCalledWith('g-1');
       const dialog = screen.getByRole('dialog', { name: 'Als genehmigt markieren' });
       expect(within(dialog).getByLabelText(/Genehmigt in der Sitzung/)).toHaveTextContent('34. Sitzung · 29. Oktober 2026');
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Markieren' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Als genehmigt markieren' }));
       expect(session.setProtocolApproval).toHaveBeenCalledWith('m-2');
       fixture.componentRef.setInput(
         'protocol',
@@ -153,8 +153,12 @@ describe('ProtocolBarComponent', () => {
       );
       fixture.detectChanges();
       expect(screen.queryByRole('dialog', { name: 'Als genehmigt markieren' })).toBeNull();
-      expect(screen.getByRole('status')).toHaveTextContent('Genehmigt in: 34. Sitzung · 29. Oktober 2026');
+      expect(screen.getByRole('status')).toHaveTextContent('Genehmigt in: 34. Sitzung · 29. Oktober 2026.');
       await userEvent.click(screen.getByRole('button', { name: 'Genehmigung entfernen' }));
+      fixture.detectChanges();
+      expect(session.setProtocolApproval).toHaveBeenCalledTimes(1);
+      const ask = screen.getByRole('dialog', { name: 'Genehmigung entfernen?' });
+      await userEvent.click(within(ask).getByRole('button', { name: 'Entfernen' }));
       expect(session.setProtocolApproval).toHaveBeenLastCalledWith(null);
     });
 

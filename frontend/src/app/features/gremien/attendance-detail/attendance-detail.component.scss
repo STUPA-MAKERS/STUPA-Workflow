@@ -71,6 +71,7 @@
 }
 .gad__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-3);
   padding: 10px var(--space-4);
@@ -94,4 +95,9 @@
 .gad__note {
   color: var(--color-text-muted);
   font-size: var(--fs-small);
+}
+
+/* The late excuse has a long label: it takes its own line at the end of the row. */
+.gad__excuse {
+  margin-left: auto;
 }

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from datetime import date as _date
 from typing import cast
 
@@ -218,10 +218,25 @@ async def test_approval_needs_a_final_protocol_and_another_meeting_of_the_gremiu
         nxt = Meeting(
             gremium_id=s.gremium_id, title="Folgesitzung", date=_date(2026, 7, 4), status="closed"
         )
-        session.add(nxt)
+        own = await session.get(Meeting, s.meeting_id)
+        assert own is not None and own.date is not None
+        before = Meeting(
+            gremium_id=s.gremium_id,
+            title="Vorher",
+            date=own.date - timedelta(days=7),
+            status="closed",
+        )
+        planned = Meeting(
+            gremium_id=s.gremium_id, title="Geplant", date=_date(2026, 8, 1), status="planned"
+        )
+        session.add_all([nxt, before, planned])
         await session.commit()
     url = f"/api/protocols/{s.protocol_id}/approval"
     with TestClient(api) as client:
+        for wrong in (before, planned):
+            refused = client.put(url, json={"meetingId": str(wrong.id)})
+            assert refused.status_code == 422, refused.text
+            assert refused.json()["code"] == "invalid_approval_meeting"
         on_draft = client.put(
             f"/api/protocols/{draft.protocol_id}/approval", json={"meetingId": str(nxt.id)}
         )
@@ -260,3 +275,23 @@ async def test_approval_needs_a_final_protocol_and_another_meeting_of_the_gremiu
         if e.action == "protocol_approval"
     ]
     assert marks == [str(nxt.id), None]
+
+
+async def test_the_delete_of_the_approving_meeting_removes_the_mark(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """§F/meetings/protocols/000924: a mark names its meeting, so it goes with it."""
+    s = await seed(maker, status="closed", items=0, protocol="final")
+    async with maker() as session:
+        nxt = Meeting(
+            gremium_id=s.gremium_id, title="Folgesitzung", date=_date(2027, 1, 9), status="closed"
+        )
+        session.add(nxt)
+        await session.commit()
+    url = f"/api/protocols/{s.protocol_id}/approval"
+    with TestClient(api) as client:
+        assert client.put(url, json={"meetingId": str(nxt.id)}).status_code == 200
+        assert client.delete(f"/api/meetings/{nxt.id}").status_code in (200, 204)
+        read = client.get(f"/api/meetings/{s.meeting_id}/protocol")
+    assert read.json()["approvedAt"] is None
+    assert read.json()["approvedMeetingId"] is None

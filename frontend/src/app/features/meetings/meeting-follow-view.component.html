@@ -315,7 +315,6 @@
 
 <app-late-excuse-dialog
   [meetingId]="lateExcuseOpen() ? meeting().id : null"
-  [meetingTitle]="meeting().title"
   (closed)="lateExcuseOpen.set(false)"
   (excused)="onLateExcused($event)"
 />

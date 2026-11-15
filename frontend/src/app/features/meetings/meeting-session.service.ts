@@ -38,6 +38,7 @@ import {
   liveOpenedVote,
 } from './meetings-display.util';
 import { problemCode, problemDetail } from '@core/api/problem';
+import type { TranslationKey } from '@core/i18n/translations';
 import { withEntry } from '@shared/util/immutable';
 
 /** The shortest time between two live drafts of the protokollant. */
@@ -49,6 +50,13 @@ const DRAFT_INTERVAL_MS = 300;
  * RBAC here gates the UI only. The server authorizes every action.
  * Provided by MeetingsComponent.
  */
+/** The refusals of the draft mail and of the approval mark, with their text. */
+const PROTOCOL_REFUSALS: Readonly<Record<string, TranslationKey>> = {
+  meeting_live: 'meetings.toast.draftLive',
+  protocol_not_final: 'meetings.toast.protocolNotFinal',
+  invalid_approval_meeting: 'meetings.toast.approvalMeetingInvalid',
+};
+
 @Injectable()
 export class MeetingSessionService implements OnDestroy {
   private readonly api = inject(ApiClient);
@@ -575,11 +583,19 @@ export class MeetingSessionService implements OnDestroy {
       next: ({ recipients, draftSentAt }) => {
         this.draftSending.set(false);
         if (draftSentAt) this.protocol.update((p) => (p?.id === proto.id ? { ...p, draftSentAt } : p));
-        this.toast.success(this.i18n.translate('meetings.toast.draftSent', { n: recipients }));
+        if (recipients === 0) {
+          this.toast.show(this.i18n.translate('meetings.toast.draftNoRecipient'), 'warning');
+          return;
+        }
+        this.toast.success(
+          this.i18n.translate(recipients === 1 ? 'meetings.toast.draftSent1' : 'meetings.toast.draftSent', {
+            n: recipients,
+          }),
+        );
       },
       error: (err: unknown) => {
         this.draftSending.set(false);
-        this.actionFailed(err);
+        this.protocolRefused(err);
       },
     });
   }
@@ -599,9 +615,21 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.approvalSaving.set(false);
-        this.actionFailed(err);
+        this.protocolRefused(err);
       },
     });
+  }
+
+  /**
+   * A refused draft mail or approval mark: the toast says the cause in the language of
+   * the page, and the bar reads the protocol again, because a 409 means that its state
+   * moved.
+   */
+  private protocolRefused(err: unknown): void {
+    const known = PROTOCOL_REFUSALS[problemCode(err) ?? ''];
+    if (!known) return this.actionFailed(err);
+    this.toast.error(this.i18n.translate(known));
+    this.refreshProtocol();
   }
 
   private actionFailed(err: unknown): void {

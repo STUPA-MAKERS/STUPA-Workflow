@@ -186,6 +186,8 @@ describe('MeetingSessionService', () => {
     session.sendProtocolDraft();
     http.expectOne('/api/protocols/p-1/draft-mail').flush({ recipients: 0, draftSentAt: null });
     expect(session.protocol()?.draftSentAt).toBeUndefined();
+    expect(toasts()).toContain('Kein Mitglied des Gremiums hat eine E-Mail-Adresse. Der Entwurf ging an niemanden.');
+    expect(toasts()).not.toContain('Entwurf an 0 Adressen gesendet.');
     session.sendProtocolDraft();
     http.expectOne('/api/protocols/p-1/draft-mail').flush({}, { status: 503, statusText: 'Unavailable' });
     expect(session.draftSending()).toBe(false);

@@ -800,7 +800,13 @@ class LifecycleOps(HandoverOps):
 
         The session flushes at once, because a Gremium delete that follows must not cascade
         over a meeting row that the session still has to delete.
+
+        A protocol that this meeting approved loses its mark (§F/meetings/protocols/000924):
+        without the meeting the mark names nothing. The import is local, because
+        ``protocol`` depends on ``livevote``.
         """
+        from app.modules.protocol.approval import drop_approvals_by
+
         data: dict[str, Any] = {
             "title": meeting.title,
             "gremiumId": str(meeting.gremium_id),
@@ -817,5 +823,6 @@ class LifecycleOps(HandoverOps):
             target_id=str(meeting.id),
             data=data,
         )
+        await drop_approvals_by(self.session, meeting.id)
         await self.session.delete(meeting)
         await self.session.flush()

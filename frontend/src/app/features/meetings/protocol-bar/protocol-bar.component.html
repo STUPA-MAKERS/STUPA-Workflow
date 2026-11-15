@@ -32,7 +32,8 @@
     }
     @if (canApprove()) {
       @if (p.approvedAt) {
-        <app-button variant="text" size="sm" [loading]="approvalSaving()" (click)="approve(null)">
+        <app-button variant="text" size="sm" [loading]="approvalSaving()" (click)="confirmUnapprove.set(true)">
+          <app-icon name="x" />
           {{ 'meetings.protocolBar.unapprove' | t }}
         </app-button>
       } @else {
@@ -70,8 +71,17 @@
   [title]="'meetings.draftMail.title' | t"
   [body]="draftBody()"
   [confirmLabel]="'meetings.draftMail.confirm' | t"
+  [danger]="false"
   (confirm)="sendDraft()"
   (cancel)="confirmDraft.set(false)"
+/>
+
+<app-confirm-dialog
+  [open]="confirmUnapprove()"
+  [title]="'meetings.approval.removeTitle' | t"
+  [confirmLabel]="'action.remove' | t"
+  (confirm)="unapprove()"
+  (cancel)="confirmUnapprove.set(false)"
 />
 
 @if (approvalOpen()) {

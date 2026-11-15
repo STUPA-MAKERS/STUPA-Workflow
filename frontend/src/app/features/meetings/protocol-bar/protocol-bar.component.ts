@@ -33,7 +33,7 @@ interface BarState {
  *   second send names the date of the last one in the confirmation (§ 000937).
  * - Final, for a holder of `canFinalize`: "Als genehmigt markieren" asks for the meeting
  *   that approved the protocol. With the mark the bar names that meeting and offers
- *   "Genehmigung entfernen" (§ 000924).
+ *   "Genehmigung entfernen", which asks before it removes the mark (§ 000924).
  *
  * The finalize is a step of its own after the close; a live meeting has no bar.
  */
@@ -86,6 +86,8 @@ export class ProtocolBarComponent {
   });
   /** The dialog "Als genehmigt markieren" is open. */
   protected readonly approvalOpen = signal(false);
+  /** The confirmation of "Genehmigung entfernen" is open. */
+  protected readonly confirmUnapprove = signal(false);
 
   /** "Entwurf senden": a closed meeting, a draft and write access. */
   protected readonly canSendDraft = computed(() => {
@@ -119,6 +121,11 @@ export class ProtocolBarComponent {
   protected sendDraft(): void {
     this.confirmDraft.set(false);
     this.session?.sendProtocolDraft();
+  }
+
+  protected unapprove(): void {
+    this.confirmUnapprove.set(false);
+    this.approve(null);
   }
 
   protected approve(meetingId: Uuid | null): void {
