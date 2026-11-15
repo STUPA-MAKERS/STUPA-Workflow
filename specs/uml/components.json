@@ -1001,7 +1001,7 @@
       "to": "voting"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "protocol",
       "to": "applications"
     },
@@ -1011,7 +1011,7 @@
       "to": "audit"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "protocol",
       "to": "auth"
     },
@@ -1046,7 +1046,7 @@
       "to": "media"
     },
     {
-      "count": 17,
+      "count": 18,
       "from": "protocol",
       "to": "meetings"
     },

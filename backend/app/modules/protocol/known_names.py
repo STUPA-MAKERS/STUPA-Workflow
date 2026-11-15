@@ -39,11 +39,8 @@ def name_pair(name: str | None) -> tuple[str, str] | None:
 
 def name_pairs(names: Iterable[str | None]) -> list[tuple[str, str]]:
     """Return the pairs of the names once each, compared without case, sorted."""
-    pairs: dict[tuple[str, str], tuple[str, str]] = {}
-    for name in names:
-        pair = name_pair(name)
-        if pair is not None:
-            pairs.setdefault((pair[0].casefold(), pair[1].casefold()), pair)
+    found = [pair for pair in map(name_pair, names) if pair is not None]
+    pairs = {(first.casefold(), last.casefold()): (first, last) for first, last in reversed(found)}
     return [pairs[key] for key in sorted(pairs)]
 
 
