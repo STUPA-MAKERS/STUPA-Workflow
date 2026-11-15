@@ -33,8 +33,10 @@
   color: var(--color-text);
   text-decoration: none;
 
-  &:hover {
-    background: var(--color-surface-3);
+  @media (hover: hover) {
+    &:hover {
+      background: var(--color-surface-3);
+    }
   }
   &:focus-visible {
     outline: 2px solid var(--color-focus-ring);
@@ -43,7 +45,7 @@
 }
 .gi__icon {
   flex: none;
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 .gi__body {
   display: flex;
