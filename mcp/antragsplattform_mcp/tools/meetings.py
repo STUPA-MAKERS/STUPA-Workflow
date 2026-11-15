@@ -344,7 +344,7 @@ async def update_agenda_item(
     or protocol.write in its gremium, the assigned minute-taker, or admin.
 
     The `body` needs a live meeting, or a closed meeting whose protocol is still a
-    draft (409 `meeting_not_started` or `protocol_locked` otherwise). The `title`
+    draft (409 `meeting_not_started` or `protocol_final` otherwise). The `title`
     needs a planned or live meeting (409 `meeting_closed` otherwise).
     """
     return await api().patch(
@@ -629,6 +629,20 @@ async def set_protocol_approval(protocol_id: str, approved_in_meeting_id: str | 
     if approved_in_meeting_id is None:
         return await api().delete(path)
     return await api().put(path, json={"meetingId": approved_in_meeting_id})
+
+
+@group.tool
+async def reopen_protocol(protocol_id: str) -> dict:
+    """Set a final protocol back to draft, so that it can be corrected.
+
+    Requires the gremium permission protocol.finalize. A protocol that is not final
+    gives 409 `protocol_not_final`, and one with an approval mark 409
+    `protocol_approved`: remove the mark first. The public pages no longer show the
+    protocol until it is final again, and the next finalize sends the PDF to the mailing
+    list again, so ask the user before you call this. The change goes into the audit log
+    (`protocol_reopen`).
+    """
+    return await api().post(f"/protocols/{protocol_id}/reopen")
 
 
 @group.tool

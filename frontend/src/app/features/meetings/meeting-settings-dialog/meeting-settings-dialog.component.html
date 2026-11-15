@@ -8,6 +8,8 @@
   <form class="msd" (submit)="$event.preventDefault(); save()">
     @if (locked()) {
       <app-note icon="lock">{{ 'meetings.settings.closedHint' | t }}</app-note>
+    } @else if (closedMeeting()) {
+      <app-note icon="lock">{{ 'meetings.settings.closedOpenHint' | t }}</app-note>
     } @else if (keeperLocked()) {
       <app-note icon="lock">{{ 'meetings.protokollant.lockedHint' | t }}</app-note>
     }

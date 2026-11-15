@@ -87,6 +87,8 @@ describe('ProtocolBarComponent', () => {
         publicationSaving: signal(false),
         draftSending: signal(false),
         approvalSaving: signal(false),
+        reopenSaving: signal(false),
+        reopenProtocol: jest.fn(),
         setPublicWithheld: jest.fn(),
         sendProtocolDraft: jest.fn(),
         setProtocolApproval: jest.fn(),
@@ -183,6 +185,32 @@ describe('ProtocolBarComponent', () => {
       expect(screen.queryByRole('button', { name: 'Als genehmigt markieren' })).toBeNull();
     });
 
+    /** § 000983 (reopenProtocol) */
+    it('sets a final protocol back to draft after a confirmation, and not an approved one', async () => {
+      const { session, fixture } = await withSession(closed(), final());
+      await userEvent.click(screen.getByRole('button', { name: 'Zurück in Entwurf' }));
+      fixture.detectChanges();
+      expect(session.reopenProtocol).not.toHaveBeenCalled();
+      const ask = screen.getByRole('dialog', { name: 'Protokoll zurück in den Entwurf setzen?' });
+      await userEvent.click(within(ask).getByRole('button', { name: 'Zurück in Entwurf' }));
+      expect(session.reopenProtocol).toHaveBeenCalledTimes(1);
+      fixture.componentRef.setInput('protocol', final({ approvedAt: '2026-10-29T18:00:00Z' }));
+      fixture.detectChanges();
+      expect(screen.queryByRole('button', { name: 'Zurück in Entwurf' })).toBeNull();
+      fixture.componentRef.setInput('protocol', final());
+      fixture.componentRef.setInput('meeting', closed({ canFinalize: false }));
+      fixture.detectChanges();
+      expect(screen.queryByRole('button', { name: 'Zurück in Entwurf' })).toBeNull();
+    });
+
+    /** § 000983 */
+    it('says that a draft was final before', async () => {
+      await withSession(closed(), protocol({ sentAt: '2026-10-16T08:00:00Z' }));
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Entwurf · Das Protokoll ist wieder ein Entwurf. Die letzte Fassung wurde versandt.',
+      );
+    });
+
     it('closes the pick on "Abbrechen"', async () => {
       const { session, fixture } = await withSession(closed(), final());
       await userEvent.click(screen.getByRole('button', { name: 'Als genehmigt markieren' }));
@@ -203,6 +231,7 @@ describe('ProtocolBarComponent', () => {
         publicationSaving: signal(false),
         draftSending: signal(false),
         approvalSaving: signal(false),
+        reopenSaving: signal(false),
         setPublicWithheld: jest.fn(),
       };
       await render(ProtocolBarComponent, {

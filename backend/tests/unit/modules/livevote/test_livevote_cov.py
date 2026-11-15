@@ -1239,13 +1239,27 @@ async def test_patch_closed_reopen_conflict() -> None:
         await svc.patch(m.id, MeetingPatch(status="live"), _admin())
 
 
-async def test_patch_closed_settings_frozen() -> None:
+@pytest.mark.parametrize("state", ["rendering", "final"])
+async def test_patch_closed_settings_frozen(state: str) -> None:
+    """§F/meetings/meetings/000982: a final protocol closes the head data."""
+    m = _meeting(status="closed")
+    from app.modules.livevote.schemas import MeetingPatch
+
+    svc = MeetingService(_QueueSession(executes=[res(m)], scalar_q=[state]))  # type: ignore[arg-type]
+    with pytest.raises(ConflictError) as ei:
+        await svc.patch(m.id, MeetingPatch(date=date(2026, 7, 1)), _admin())
+    assert ei.value.code == "protocol_final"
+
+
+async def test_patch_closed_keeps_its_kind() -> None:
+    """§F/meetings/meetings/000982: the kind closes with the meeting."""
     m = _meeting(status="closed")
     from app.modules.livevote.schemas import MeetingPatch
 
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
-    with pytest.raises(ConflictError):
-        await svc.patch(m.id, MeetingPatch(date=date(2026, 7, 1)), _admin())
+    with pytest.raises(ConflictError) as ei:
+        await svc.patch(m.id, MeetingPatch(kind="extraordinary"), _admin())
+    assert ei.value.code == "meeting_closed"
 
 
 async def test_patch_end_before_start_bad_request() -> None:
@@ -1886,18 +1900,18 @@ async def test_set_body_after_close_with_locked_protocol_conflicts(
     kwargs: dict[str, Any] = {"body": "x"} if field == "body" else {"non_public": True}
     with pytest.raises(ConflictError) as ei:
         await AgendaService(sess).set_body(m.id, item.id, **kwargs)  # type: ignore[arg-type]
-    assert ei.value.code == "protocol_locked"
+    assert ei.value.code == "protocol_final"
     assert item.body == "old"
 
 
-async def test_rename_after_close_conflicts() -> None:
-    """A rename is a change of the agenda and stops with the close."""
+async def test_rename_after_close_follows_the_protocol() -> None:
+    """§F/meetings/meetings/000982: a rename is open until the protocol is final."""
     m = _meeting(status="closed")
     item = _agenda_item(application_id=None, title="old")
-    sess = _QueueSession(executes=[res(m), res(item)])
+    sess = _QueueSession(executes=[res(m), res(item)], scalar_q=["final"])
     with pytest.raises(ConflictError) as ei:
         await AgendaService(sess).set_body(m.id, item.id, title="new")  # type: ignore[arg-type]
-    assert ei.value.code == "meeting_closed"
+    assert ei.value.code == "protocol_final"
     assert item.title == "old"
 
 
@@ -4090,7 +4104,7 @@ async def test_set_done_after_close_with_locked_protocol_conflicts(
     sess = _QueueSession(executes=[res(m), res(item)], scalar_q=[protocol_status])
     with pytest.raises(ConflictError) as ei:
         await AgendaService(sess).set_done(m.id, item.id, done=True, actor="mgr")  # type: ignore[arg-type]
-    assert ei.value.code == "protocol_locked"
+    assert ei.value.code == "protocol_final"
     assert item.done_at is None
 
 

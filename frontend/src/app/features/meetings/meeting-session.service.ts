@@ -55,6 +55,7 @@ const PROTOCOL_REFUSALS: Readonly<Record<string, TranslationKey>> = {
   meeting_live: 'meetings.toast.draftLive',
   protocol_not_final: 'meetings.toast.protocolNotFinal',
   invalid_approval_meeting: 'meetings.toast.approvalMeetingInvalid',
+  protocol_approved: 'meetings.toast.protocolApprovedLocked',
 };
 
 @Injectable()
@@ -606,6 +607,26 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.approvalSaving.set(false);
+        this.protocolRefused(err);
+      },
+    });
+  }
+
+  readonly reopenSaving = signal(false);
+
+  /** Set the final protocol back to draft, until it has an approval mark (§ 000983). */
+  reopenProtocol(): void {
+    const proto = this.protocol();
+    if (!proto || this.reopenSaving()) return;
+    this.reopenSaving.set(true);
+    this.api.reopenProtocol(proto.id).subscribe({
+      next: (updated) => {
+        this.reopenSaving.set(false);
+        this.protocol.set(updated);
+        this.toast.success(this.i18n.translate('meetings.toast.protocolReopened'));
+      },
+      error: (err: unknown) => {
+        this.reopenSaving.set(false);
         this.protocolRefused(err);
       },
     });

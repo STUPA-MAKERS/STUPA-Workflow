@@ -83,9 +83,11 @@ describe('boardPicker (§000617)', () => {
 });
 
 describe('protocolBand (§000605, §000614)', () => {
-  it('gives the band of the protocol white ink on its black surface, the edge, and filled PDF buttons', () => {
+  it('gives the band of the protocol white ink on its black surface, the edge, and filled buttons of one height', () => {
     expect(RULES).toMatch(/\n {2}\.pb \{\s*@include vh\.ink\(var\(--vh-fg\)\);\s*border: var\(--vh-edge\);/);
-    expect(selectorsOf('  .pb__pdf {', 'fill')).toContain('.pb__pdf');
+    const filled = selectorsOf('  .pb__pdf,', 'fill');
+    expect(filled).toContain('.pb__pdf');
+    expect(filled).toContain('.pb .btn');
   });
 });
 

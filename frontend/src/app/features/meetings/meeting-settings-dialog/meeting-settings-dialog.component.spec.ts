@@ -160,14 +160,33 @@ describe('MeetingSettingsDialogComponent', () => {
     });
   });
 
-  it('locks every field of a closed meeting and saves nothing', async () => {
-    const { http, fixture, cmp } = await setup({ ...MEETING, status: 'closed' } as Meeting);
+  /** § 000982 */
+  it('locks every field of a closed meeting with a final protocol and saves nothing', async () => {
+    const { http, fixture, cmp } = await setup({ ...MEETING, status: 'closed' } as Meeting, true);
     flushRoster(http, fixture);
-    expect(screen.getByText(/Sitzung ist geschlossen/)).toBeInTheDocument();
+    expect(screen.getByText(/Das Protokoll ist final/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
     expect(screen.getByLabelText(/Titel/)).toBeDisabled();
     cmp.save();
     http.verify();
+  });
+
+  /** § 000982 (closedMeeting) */
+  it('keeps the title of a closed meeting open until the protocol is final', async () => {
+    const { http, fixture, cmp, toasts } = await setup({ ...MEETING, status: 'closed' } as Meeting);
+    flushRoster(http, fixture);
+    expect(screen.getByText(/Sitzung ist geschlossen/)).toBeInTheDocument();
+    expect(cmp.keeperLocked()).toBe(true);
+    expect(cmp.publicLocked()).toBe(true);
+    const field = screen.getByLabelText(/Titel/);
+    expect(field).toBeEnabled();
+    await userEvent.clear(field);
+    await userEvent.type(field, 'Korrigiert');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const req = http.expectOne('/api/meetings/m-1');
+    expect(req.request.body).toMatchObject({ title: 'Korrigiert' });
+    req.flush({ code: 'protocol_final' }, { status: 409, statusText: 'Conflict' });
+    expect(toasts()).toContain('Das Protokoll ist final — die Sitzung kann nicht mehr geändert werden.');
   });
 
   it('saves a new title, without the outer blanks', async () => {
