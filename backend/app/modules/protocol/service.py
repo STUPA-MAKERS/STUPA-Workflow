@@ -121,6 +121,7 @@ from app.modules.protocol.schemas import ProtocolOut
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import ElectionResultOut, PollResultOut, VoteOut
 from app.modules.voting.service import VotingService
+from app.modules.voting.tally import meeting_quorate
 from app.settings import Settings, get_settings
 from app.shared.blackout import black_out, has_open_marker
 from app.shared.config_schemas import ElectionConfig, PollConfig, PollOption
@@ -1049,8 +1050,11 @@ class ProtocolService:
         A closed meeting gives the member count that its close fixed, so a new render
         gives the same quorum (§F/meetings/protocols/000357). A meeting that is not
         closed, and a meeting without a fixed count, counts the members of the Gremium
-        whose role holds `vote.cast` now. The threshold is `gremium.quorum_percent` when
-        that value is set. If not, the threshold is more than half of the members.
+        whose role holds `vote.cast` now. The rule is the one that closes the votes of
+        the meeting (`meeting_quorate`): the quorum of the Gremium in percent, in a
+        Wiederholungssitzung its repeat quorum when that is set, and the least number
+        of present persons. A Gremium without a quorum is always quorate, as its votes
+        are.
 
         Returns:
             The quorum result, or `None` when the Gremium or its members are missing.
@@ -1065,13 +1069,20 @@ class ProtocolService:
             if fixed is not None and getattr(meeting, "status", None) == "closed"
             else await self._voting_members(gremium_id)
         )
-        percent = getattr(gremium, "quorum_percent", None)
-        quorate = (
-            present_count * 100 >= percent * members
-            if percent is not None
-            else present_count * 2 > members
+        repeat: int | None = (
+            getattr(gremium, "repeat_quorum_percent", None)
+            if getattr(meeting, "kind", None) == "repeat"
+            else None
         )
-        return None if members == 0 else quorate
+        percent: int | None = (
+            repeat if repeat is not None else getattr(gremium, "quorum_percent", None)
+        )
+        min_present: int | None = getattr(gremium, "quorum_min_present", None)
+        return (
+            None
+            if members == 0
+            else meeting_quorate(percent, min_present, present=present_count, members=members)
+        )
 
     async def _header_meta(self, meeting: Meeting | None, *, public: bool = False) -> HeaderMeta:
         """Resolve the protocol keepers and the attendance groups for the header.

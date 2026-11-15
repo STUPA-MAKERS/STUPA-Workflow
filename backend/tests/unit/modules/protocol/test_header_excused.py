@@ -87,7 +87,7 @@ async def test_the_header_of_a_closed_meeting_shows_the_fixed_present_count() ->
 async def test_the_quorum_of_a_closed_meeting_uses_the_fixed_member_count() -> None:
     """§F/meetings/protocols/000357: a new render reads the member count of the close."""
     service = _service(_AttendanceSession([]))
-    gremium = SimpleNamespace(id=GID, quorum_percent=None)
+    gremium = SimpleNamespace(id=GID, quorum_percent=75)
     closed = _meeting(status="closed", eligible_count=4)
     assert await service._quorate(gremium, closed, 3) is True
     assert await service._quorate(gremium, closed, 2) is False

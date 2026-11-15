@@ -443,15 +443,38 @@ async def test_quorate_percent_not_met() -> None:
     assert await svc._quorate(gremium, None, present_count=5) is False
 
 
-async def test_quorate_default_majority_rule() -> None:
-    """Without quorum_percent the rule is more than half (present*2 > members)."""
+async def test_quorate_without_a_quorum_is_always_met() -> None:
+    """A Gremium without a quorum is quorate, as each of its votes is (000357)."""
     session = FakeSession()
     svc = _service(session)
     session.scalar_results = [10]
-    gremium = _gremium(quorum_percent=None)
-    assert await svc._quorate(gremium, None, present_count=6) is True
+    assert await svc._quorate(_gremium(quorum_percent=None), None, present_count=1) is True
+
+
+async def test_quorate_uses_the_least_number_of_present_persons() -> None:
+    """The least number of present persons counts beside the percent (000357)."""
+    session = FakeSession()
+    svc = _service(session)
+    gremium = _gremium(quorum_percent=50, quorum_min_present=7)
     session.scalar_results = [10]
-    assert await svc._quorate(gremium, None, present_count=5) is False
+    assert await svc._quorate(gremium, None, present_count=6) is False
+    session.scalar_results = [10]
+    assert await svc._quorate(gremium, None, present_count=7) is True
+
+
+async def test_quorate_of_a_wiederholungssitzung_uses_the_repeat_quorum() -> None:
+    """A meeting of the kind repeat uses the repeat quorum when it is set (000357)."""
+    session = FakeSession()
+    svc = _service(session)
+    gremium = _gremium(quorum_percent=50, repeat_quorum_percent=20)
+    repeat = SimpleNamespace(kind="repeat", status="live", eligible_count=None)
+    normal = SimpleNamespace(kind="ordinary", status="live", eligible_count=None)
+    session.scalar_results = [10]
+    assert await svc._quorate(gremium, repeat, present_count=2) is True
+    session.scalar_results = [10]
+    assert await svc._quorate(gremium, normal, present_count=2) is False
+    session.scalar_results = [10]
+    assert await svc._quorate(_gremium(quorum_percent=50), repeat, present_count=2) is False
 
 
 async def test_quorate_none_without_gremium() -> None:
