@@ -2,7 +2,7 @@
 id: "000945"
 title: The public decisions show the last result of a TOP
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
