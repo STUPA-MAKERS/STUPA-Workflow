@@ -4,7 +4,7 @@ title: The fiscal year is chosen with a chip
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-11
+updated: 2026-11-16
 tests:
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
 implementation:
@@ -23,4 +23,4 @@ for the year.
 Reason: The number of fiscal years grows each year. A chip keeps its width, a segmented
 control gets one segment more each year.
 
-Test: A unit test of the Budget tab expects the year chip and no segmented control.
+Test: A unit test of the Haushalt tab expects the year chip and no segmented control.

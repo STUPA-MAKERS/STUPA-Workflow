@@ -87,7 +87,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python3 scripts/check_functional.py
       # Service commits, fake sessions and import exceptions can only go down
-      # (specs 000640, 000642, 000646).
+      # (specs 000640, 000642, 000651).
       - run: python3 scripts/check_ratchets.py
       # Images and actions are pinned, and a build download repeats (specs 000978, 000981).
       - run: python3 scripts/check_build_pins.py
@@ -108,7 +108,7 @@ jobs:
       - name: Ruff lint
         run: ruff check .
       # The layers of the modules and the shared code (specs 000643, 000644). An entry of
-      # `ignore_imports` that matches no import fails too (000646).
+      # `ignore_imports` that matches no import fails too (000651).
       - name: Import contracts
         run: lint-imports
       # `ruff format --check` runs locally through pre-commit (.pre-commit-config.yaml).

@@ -1,10 +1,10 @@
 ---
 id: "000833"
-title: The allocation of a year without a plan in force is set in the Budget tab
+title: The allocation of a year without a plan in force is set in the Haushalt tab
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-16
 tests:
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
 implementation:
@@ -13,7 +13,7 @@ scope:
   - frontend/src/app/pages/budget
 ---
 
-# The allocation of a year without a plan in force is set in the Budget tab
+# The allocation of a year without a plan in force is set in the Haushalt tab
 
 For a fiscal year without a plan, and for a year whose plan has no version in force yet
 (000854), the detail of a selected Kostenstelle in the view Bewirtschaftung must let a person

@@ -2,11 +2,10 @@
 id: "000387"
 title: Memberships and roles are read-only in the MCP
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - mcp/antragsplattform_mcp/tools
+updated: 2026-11-16
+replaced_by: F/administration/accounts/000154
 scope:
   - mcp/
 ---

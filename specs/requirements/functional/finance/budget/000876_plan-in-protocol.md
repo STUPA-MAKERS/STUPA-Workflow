@@ -4,7 +4,7 @@ title: A plan on the agenda is an Anlage of the protocol
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-16
 tests:
   - "backend/tests/integration/modules/livevote/test_plan_agenda_vote.py:test_a_draft_is_an_agenda_item_for_a_reading"
   - "backend/tests/integration/modules/livevote/test_plan_agenda_vote.py:test_the_protocol_appends_the_plans_of_its_agenda"
@@ -31,7 +31,7 @@ scope:
 
 A draft of a Haushaltsplan can be a TOP of a meeting for a reading, without a request
 for a decision. The meeting must be one of a Gremium that decides the plan of the
-Haushalt in a step (000826). The person who edits the agenda picks the draft from the
+Haushalt in a step (000838). The person who edits the agenda picks the draft from the
 drafts of these Haushalte that this person can read. Such a TOP has no motion and no
 vote, and the version stays a draft. A plan is at most one TOP of a meeting (000838).
 

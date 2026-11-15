@@ -4,7 +4,7 @@ title: An unbalanced draft cannot go to the vote
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-16
 tests:
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
 implementation:
@@ -16,7 +16,7 @@ scope:
 # An unbalanced draft cannot go to the vote
 
 The actions that take a draft out of the draft must be disabled while the draft has no
-line or is not balanced: "Schritt abschließen", "Abstimmung anlegen" and "In Kraft setzen".
+line or is not balanced: "Schritt abschließen", "Beschluss anfragen" and "In Kraft setzen".
 Each disabled action must name the cause. The plan page must show a warning note with the
 difference while the draft is not balanced.
 

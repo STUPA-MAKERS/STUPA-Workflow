@@ -4,7 +4,7 @@ title: Product terms stay as the UI shows them
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-16
 implementation:
   - specs/
 scope:
@@ -14,6 +14,7 @@ scope:
 # Product terms stay as the UI shows them
 
 A spec must use the German UI term where the UI shows it, for example `Antrag`, `TOP` or
-`Kostenstelle`. STUPA must be in capitals. AStA keeps its spelling.
+`Kostenstelle`. STUPA and AStA keep the spelling of every repository text
+(000035).
 
 Reason: The reader must find the term in the application.

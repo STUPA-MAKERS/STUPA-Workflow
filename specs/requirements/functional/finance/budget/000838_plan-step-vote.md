@@ -4,7 +4,7 @@ title: The vote of a plan step runs in a meeting of its Gremium
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-16
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_step_waits_for_its_gremium_after_the_request"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_plan_vote_opens_only_while_its_step_waits"
@@ -16,6 +16,10 @@ tests:
   - "backend/tests/integration/modules/livevote/test_plan_agenda_vote.py:test_a_removed_plan_item_goes_into_another_meeting"
   - "backend/tests/unit/modules/budget/test_plan_rules.py:test_step_request_and_title"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_an_accepted_vote_of_the_gremium_passes_its_step"
+  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_vote_decides_only_the_step_it_belongs_to"
+  - "backend/tests/unit/modules/budget/test_plan_rules.py:test_step_vote"
+  - "frontend/src/app/features/voting/vote-cast.component.spec.ts:VoteCastComponent"
 implementation:
   - backend/app/modules/budget/tree/plans.py
   - backend/app/modules/budget/plan_rules.py
@@ -25,6 +29,7 @@ implementation:
   - backend/app/modules/livevote/vote_build.py
   - backend/app/modules/meetings/agenda_service.py
   - frontend/src/app/pages/budget/plan/budget-plan.component.ts
+  - frontend/src/app/features/voting/vote-cast.component.ts
 scope:
   - backend/app/modules/budget
   - backend/app/modules/voting
@@ -65,10 +70,13 @@ motion, secret, with the quorum of the Gremium and the eligible count of the ros
 `plan_step_not_waiting`, and only one vote of a step must be open at a time, else 409
 `plan_step_vote_runs`. Only the members of the Gremium must vote on it, never the guests
 of the meeting. An election or a poll must not be possible on this TOP. The close
-of an accepted vote must pass the step. The close of a vote that is not accepted (refused,
+of an accepted vote must pass the step, and the step must keep the link to the vote. The close of a vote that is not accepted (refused,
 a tie, or without the quorum) must send the version back to the start: each step that the version passed is open again, and the version is a
 draft again (000792), so the plan can change and then takes each step again from the first
-one. The steps that were passed before stay in the audit log.
+one. The steps that were passed before stay in the audit log. A vote must decide only the next
+step of its version: the close of a vote must change nothing in the plan, and must not fail,
+when the version went back to draft, when the step is already passed or when the fiscal year
+is closed.
 
 The TOP of a plan can be removed under the rules of each TOP (000098). The step then still
 waits and can go into another meeting. A version that goes back to the draft no longer

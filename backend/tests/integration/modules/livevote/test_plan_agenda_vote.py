@@ -206,7 +206,7 @@ async def test_the_vote_of_the_meeting_decides_the_step(
 ) -> None:
     """An accepted vote passes the step, a refused vote sends the version back to the draft.
 
-    Rules: §F/finance/budget/000838, §F/finance/budget/000826.
+    Rules: §F/finance/budget/000838.
     """
     s = await seed(maker, status="live", items=0)
     vid = await _waiting(maker, s.gremium_id)

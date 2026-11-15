@@ -4,7 +4,7 @@ title: The draft of a protocol reads as a PDF after the meeting
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-15
+updated: 2026-11-16
 tests:
   - "backend/tests/integration/modules/protocol/test_protocol_draft_and_approval.py:test_draft_pdf_gives_both_variants_and_stores_nothing"
   - "backend/tests/integration/modules/protocol/test_protocol_draft_and_approval.py:test_draft_pdf_route_needs_a_draft_and_a_render_service"
@@ -27,7 +27,8 @@ protocol. The download must be refused while the meeting is live. The protocol b
 show the two links while the protocol is a draft.
 
 Reason: The members and the keeper must see the internal and the public result before the
-finalization, because a finalized protocol cannot change. A draft from a live Sitzung is not
+finalization, because a finalized protocol goes to the members by mail and changes only on the way back to
+the draft (000983). A draft from a live Sitzung is not
 complete.
 
 Test: An integration test that reads both variants of a draft, finds no stored PDF and gets

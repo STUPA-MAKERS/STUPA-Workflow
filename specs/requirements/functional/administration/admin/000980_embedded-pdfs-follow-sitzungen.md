@@ -4,7 +4,7 @@ title: The embedded PDFs belong to the feature Sitzungen
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-15
+updated: 2026-11-16
 implementation:
   - backend/app/feature_routes.py
 scope:
@@ -15,7 +15,7 @@ scope:
 # The embedded PDFs belong to the feature Sitzungen
 
 The routes under `/api/media/documents` must answer 404 `feature_disabled` while `Sitzungen` is
-off (§F/administration/admin/000757).
+off (F/administration/admin/000757).
 
 Reason: An embedded PDF exists only in a protocol. Without the rule its route stays open while
 each other route of the protocols is closed.

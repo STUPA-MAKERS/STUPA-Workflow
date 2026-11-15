@@ -10,8 +10,8 @@ The non-negotiables. Source of truth: this skill, `.github/pull_request_template
 
 ## Workflow
 
-- **TDD: Red → Green → Refactor.** Write the failing test first, then minimal code, then clean up.
-  No `skip`/`xfail` without a written reason.
+- **A change comes with its tests** (spec 000044). Write the code and its tests, then let CI run
+  them: no local test suite (spec 000048). No `skip`/`xfail` without a written reason.
 - **Finish the job:** branch → commit → push → PR, then watch CI and fix failures.
 - **Ask before design decisions.** A fork with more than one reasonable answer goes to the user.
 

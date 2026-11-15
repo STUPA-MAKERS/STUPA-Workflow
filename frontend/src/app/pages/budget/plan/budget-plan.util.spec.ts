@@ -89,7 +89,7 @@ describe('BudgetPlanUtil', () => {
     expect(nextStep(version())).toBeNull();
   });
 
-  it('§F/finance/budget/000826: a vote runs while it is a draft or open', () => {
+  it('§F/finance/budget/000838: a vote runs while it is a draft or open', () => {
     const step = { name: 'Beschluss', gremiumId: 'g1' };
     expect(voteRuns({ ...step, voteStatus: 'draft' })).toBe(true);
     expect(voteRuns({ ...step, voteStatus: 'open' })).toBe(true);
@@ -128,7 +128,7 @@ describe('BudgetPlanUtil', () => {
     expect(versionBefore(versions, versions[0])).toBeNull();
   });
 
-  it('§F/finance/budget/000826: links the vote of the next step, else the last vote', () => {
+  it('§F/finance/budget/000838: links the vote of the next step, else the last vote', () => {
     const step = { name: 'Beschluss', gremiumId: 'g1' };
     const vote = (id: string, passedAt: string | null = null) => ({ ...step, voteId: id, voteStatus: 'closed' as const, passedAt });
     expect(voteStep(version({ steps: [step] }))).toBeNull();

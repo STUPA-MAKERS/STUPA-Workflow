@@ -32,7 +32,7 @@ Closes #
 - [ ] **Frontend self-check with the visual harness** — before/after screenshots taken and reviewed, no "looks fine to me". Link or attach the affected screens below.
 
 ### Tests & Gates
-- [ ] Tests written test-first, all green. The coverage gate holds (critical modules 100 % branch).
+- [ ] Tests written with the change (000044), all green in CI. The coverage gate holds (critical modules 100 % branch).
 - [ ] `ruff` + `basedpyright` (BE) / `eslint` + `tsc` (FE) report **0** errors.
 - [ ] No `skip` or `xfail` without a linked reason.
 

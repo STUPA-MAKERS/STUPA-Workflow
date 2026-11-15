@@ -4,9 +4,10 @@ title: The import contract has no exception
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-11
+updated: 2026-11-16
 tests:
   - "backend/tests/unit/modules/attachments/test_no_import_exception.py:test_import_contract_has_no_entry_in_ignore_imports"
+  - "backend/tests/unit/scripts/test_check_ratchets.py:test_import_exceptions_are_counted_per_contract"
 implementation:
   - backend/pyproject.toml
   - backend/app/modules/attachments/router.py
@@ -18,9 +19,14 @@ implementation:
   - backend/app/modules/admin/forms_router.py
   - backend/app/modules/flow/webhook_actions.py
   - backend/app/modules/budget/form_options.py
+  - scripts/check_ratchets.py
+  - scripts/ratchet-baseline/import-exceptions.json
+  - .github/workflows/ci.yml
 scope:
   - backend/app/modules
   - backend/pyproject.toml
+  - scripts/
+  - .github/workflows
 ---
 
 # The import contract has no exception
@@ -48,8 +54,7 @@ app wires in. It must not import `budget`.
 
 The move must change no URL and no response.
 
-Reason: With an empty list the layers hold for all code, and the ratchet of 000646 has nothing
-left to count. An exception that stays teaches the next change to add one more.
+Reason: With an empty list the layers hold for all code. An exception that stays teaches the next change to add one more.
 
 Test: A unit test reads the import contract in `backend/pyproject.toml` and finds no entry in
 `ignore_imports`.

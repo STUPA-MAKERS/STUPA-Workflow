@@ -2,20 +2,10 @@
 id: "000826"
 title: An accepted vote of the Gremium passes its step
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-13
-tests:
-  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_an_accepted_vote_of_the_gremium_passes_its_step"
-  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_refused_vote_sends_the_version_back_to_the_draft"
-  - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_vote_decides_only_the_step_it_belongs_to"
-  - "backend/tests/unit/modules/budget/test_plan_rules.py:test_step_vote"
-  - "frontend/src/app/features/voting/vote-cast.component.spec.ts:VoteCastComponent"
-implementation:
-  - backend/app/modules/budget/tree/plans.py
-  - backend/app/modules/budget/plan_rules.py
-  - backend/app/modules/voting/service
-  - frontend/src/app/features/voting/vote-cast.component.ts
+updated: 2026-11-16
+replaced_by: F/finance/budget/000838
 scope:
   - backend/app/modules/budget
   - backend/app/modules/voting

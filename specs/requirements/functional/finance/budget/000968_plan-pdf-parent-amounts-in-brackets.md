@@ -2,9 +2,9 @@
 id: "000968"
 title: The plan PDF shows the amounts of a line with lines below it in brackets
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-15
+updated: 2026-11-16
 tests:
   - "backend/tests/unit/modules/budget/test_plan_export.py:test_the_pdf_shows_the_amounts_of_a_line_with_lines_below_in_brackets"
 implementation:

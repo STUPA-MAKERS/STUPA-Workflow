@@ -1434,7 +1434,7 @@ async def test_a_step_waits_for_its_gremium_after_the_request(session: AsyncSess
 async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSession) -> None:
     """The vote of a meeting of the Gremium decides the step, and the accepted vote passes it.
 
-    Rules: §F/finance/budget/000826, §F/finance/budget/000838, §F/finance/budget/000802.
+    Rules: §F/finance/budget/000838, §F/finance/budget/000802.
     """
     t = await _tree(session)
     gremium = await _gremium(session)
@@ -1482,7 +1482,7 @@ async def test_an_accepted_vote_of_the_gremium_passes_its_step(session: AsyncSes
 async def test_a_refused_vote_sends_the_version_back_to_the_draft(session: AsyncSession) -> None:
     """A refused vote opens each passed step again, and the version is a draft again.
 
-    Rules: §F/finance/budget/000826, §F/finance/budget/000838.
+    Rules: §F/finance/budget/000838.
     """
     t = await _tree(session)
     gremium = await _gremium(session)
@@ -1580,7 +1580,7 @@ async def test_a_plan_vote_opens_only_while_its_step_waits(session: AsyncSession
 async def test_back_to_draft_ends_the_votes_of_the_version(session: AsyncSession) -> None:
     """A draft vote is deleted and an open vote is cancelled.
 
-    Rules: §F/finance/budget/000826, §F/finance/budget/000839.
+    Rules: §F/finance/budget/000838, §F/finance/budget/000839.
     """
     t = await _tree(session)
     gremium = await _gremium(session)
@@ -1645,7 +1645,7 @@ async def test_a_step_of_a_deleted_gremium_takes_no_request(session: AsyncSessio
 
 
 async def test_a_vote_decides_only_the_step_it_belongs_to(session: AsyncSession) -> None:
-    """§F/finance/budget/000826: the close of a vote never fails for the state of the plan."""
+    """§F/finance/budget/000838: the close of a vote never fails for the state of the plan."""
     t = await _tree(session)
     gremium = await _gremium(session)
     await _steps(t, "Beschluss", gremium_id=gremium)
@@ -2281,7 +2281,7 @@ async def test_a_key_taken_at_the_same_moment_is_a_conflict(
 ) -> None:
     """A key that another request took after the read answers 409, not a 500.
 
-    Rules: §F/finance/budget/000246, §F/finance/budget/000817, §F/finance/budget/000842.
+    Rules: §F/finance/budget/000246, §F/finance/budget/000853, §F/finance/budget/000842.
     """
     t = await _tree(session)
     vid = _version(await _draft(t)).id

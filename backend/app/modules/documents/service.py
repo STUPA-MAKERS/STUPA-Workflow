@@ -62,11 +62,12 @@ LANG = "de"
 
 logger = logging.getLogger("app.documents")
 
-#: The results of a motion vote as the Antrag PDF prints them.
+#: The results of a motion vote as the Antrag PDF prints them. A tie rejects a motion
+#: (§F/meetings/voting/000026), so a stored ``tie`` prints as a rejection.
 _RESULTS: dict[str, str] = {
     "passed": "Angenommen",
     "rejected": "Abgelehnt",
-    "tie": "Stimmengleichheit",
+    "tie": "Abgelehnt",
 }
 
 _ANLAGE_NAMESPACE = uuid.UUID("6f1c4d1e-9a51-4c43-8f0e-2b7d3c9a8e15")

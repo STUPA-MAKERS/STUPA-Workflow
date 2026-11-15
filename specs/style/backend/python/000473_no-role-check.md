@@ -2,11 +2,10 @@
 id: "000473"
 title: A permission check never reads principal.roles
 kind: style
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/auth/principal.py
+updated: 2026-11-16
+replaced_by: NF/security/access/000463
 scope:
   - backend/app/
 ---

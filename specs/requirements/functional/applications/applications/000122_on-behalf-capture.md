@@ -4,7 +4,7 @@ title: An Antrag can be captured on behalf of a person
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-16
 implementation:
   - backend/app/modules/applications/service/on_behalf.py
   - backend/app/modules/applications/router.py
@@ -18,4 +18,4 @@ scope:
 
 A holder of `application.create_on_behalf` must be able to capture an Antrag for an existing
 account or for a guest with name and e-mail. The Antrag must belong to the applicant. The
-capture dialog must follow the pattern of "Buchung hinzufügen".
+capture dialog must follow the pattern of "Buchung anlegen" (000666).

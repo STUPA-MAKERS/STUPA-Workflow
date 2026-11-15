@@ -2,12 +2,10 @@
 id: "000472"
 title: The public Antrag POST is protected
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/applications/router.py
-  - backend/app/shared/antiabuse.py
+updated: 2026-11-16
+replaced_by: NF/security/access/000180
 scope:
   - backend/app/modules/applications
   - backend/app/shared/antiabuse.py

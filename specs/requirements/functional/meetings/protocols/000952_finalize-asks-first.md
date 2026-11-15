@@ -4,7 +4,7 @@ title: The finalize of a protocol asks first
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-15
+updated: 2026-11-16
 tests:
   - "frontend/src/app/features/meetings/finalize-protocol-dialog/finalize-protocol-dialog.component.spec.ts:askBeforeFinalize"
 implementation:
@@ -22,7 +22,8 @@ must close the dialog and must not change the protocol. For a Gremium that publi
 protocols, the dialog must also show the notice about the public page and the switch "Nicht
 veröffentlichen". For each other Gremium, the dialog must not show them.
 
-Reason: A final protocol cannot change, and the mail to the members goes out at once. One
+Reason: A final protocol changes only on the way back to the draft (000983), and the mail to
+the members goes out at once. One
 tap by mistake must not cause this.
 
 Test: A frontend unit test that opens the dialog for a Gremium that does not publish, finds

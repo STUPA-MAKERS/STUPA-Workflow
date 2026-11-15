@@ -33,7 +33,7 @@ UML = ROOT / "specs" / "uml"
 COMPOSE = ROOT / "deploy" / "docker-compose.yml"
 
 SHARED = ("app.shared", "app.db", "app.settings", "app.logging_config")
-SHARED_LAYER = 6
+SHARED_LAYER = 7
 IN_LIST = re.compile(r"^\s*\(?\s*(\w+)\s+IN\s*\((.*)\)\s*\)?\s*$", re.IGNORECASE | re.DOTALL)
 GENERATED = ("components", "classes", "deployment")
 

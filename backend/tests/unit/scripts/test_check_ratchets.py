@@ -68,7 +68,7 @@ def test_measure_reads_a_folder(tmp_path: Path) -> None:
 
 
 def test_import_exceptions_are_counted_per_contract(tmp_path: Path) -> None:
-    """§S/backend/python/000646: each entry of `ignore_imports` counts for its contract."""
+    """§S/backend/python/000651: each entry of `ignore_imports` counts for its contract."""
     pyproject = (
         "[[tool.importlinter.contracts]]\n"
         'id = "layers"\n'

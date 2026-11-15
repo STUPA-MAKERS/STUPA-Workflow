@@ -411,7 +411,7 @@ describe('ApiClient', () => {
     req.flush({ id: 'c', authorKind: 'principal', body: '', visibility: 'internal', at: '2026-06-05T13:00:00Z' });
   });
 
-  it('§F/finance/budget/000826, §F/finance/budget/000928: says if the reader may read the Haushaltsplan of a version', () => {
+  it('§F/finance/budget/000838, §F/finance/budget/000928: says if the reader may read the Haushaltsplan of a version', () => {
     const answers: boolean[] = [];
     api.planOfVersionReadable('pv1').subscribe((ok) => answers.push(ok));
     http.expectOne('/api/budget-plan-versions/pv1/readable').flush({ readable: true });
