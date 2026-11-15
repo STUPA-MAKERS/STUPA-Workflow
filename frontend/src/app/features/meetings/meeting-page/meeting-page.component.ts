@@ -491,7 +491,9 @@ export class MeetingPageComponent {
     const m = this.meeting();
     const t = this.top();
     if (!t || !m.canManageVotes || this.locked() || m.status === 'closed' || t.planReading) return false;
-    return !(t.applicationId || t.planVersionId) || this.votes().length === 0;
+    return (
+      !(t.applicationId || t.planVersionId) || this.votes().every((v) => v.status === 'cancelled')
+    );
   });
 
   /** The add button of an application item: open the vote, or only prepare it. */
