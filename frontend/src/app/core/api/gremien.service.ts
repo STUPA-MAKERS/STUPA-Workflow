@@ -1,5 +1,6 @@
 /**
- * API of the tab "Gremien" (`/api/committees`). Every call reads only.
+ * API of the tab "Gremien" (`/api/committees`). Every call reads, except `saveInfo`, the
+ * save of the Info tab (gremium permission `info.write`).
  *
  * The server shows a gremium to an active member, to `gremium.view_all` and to the admin
  * role. Any other caller gets 404 for a gremium, so a hidden gremium looks like a missing
@@ -203,6 +204,30 @@ export interface GremiumDecisionQuery {
   readonly since?: string | null;
 }
 
+/** One labelled link of the Info tab: a label and an `https`, `http` or `mailto` URL. */
+export interface GremiumInfoLink {
+  readonly label: string;
+  readonly url: string;
+}
+
+/** The Info tab of a gremium (specs 001010-001015). An unsaved Info has version 0. */
+export interface GremiumInfo {
+  readonly bodyMd: string;
+  readonly links: readonly GremiumInfoLink[];
+  readonly version: number;
+  readonly updatedAt: IsoDateTime | null;
+  readonly updatedByName: string | null;
+  /** The caller holds `info.write` in the gremium. */
+  readonly canEdit: boolean;
+}
+
+/** A save of the Info tab: text and links together, with the version that was read. */
+export interface GremiumInfoSave {
+  readonly bodyMd: string;
+  readonly links: readonly GremiumInfoLink[];
+  readonly version: number;
+}
+
 /**
  * The API calls of the tab "Gremien". Every view of the tab has its own skeleton, so no call
  * shows the global overlay.
@@ -284,5 +309,17 @@ export class GremienApiService {
       params,
       context: skipLoading(),
     });
+  }
+
+  /** The Info tab of a gremium: the Markdown text, the links and `canEdit`. */
+  info(gremiumId: Uuid): Observable<GremiumInfo> {
+    return this.http.get<GremiumInfo>(`${this.base}/committees/${gremiumId}/info`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** Save text and links; a stale `version` gives 409 `gremium_info_version_conflict`. */
+  saveInfo(gremiumId: Uuid, body: GremiumInfoSave): Observable<GremiumInfo> {
+    return this.http.put<GremiumInfo>(`${this.base}/committees/${gremiumId}/info`, body);
   }
 }

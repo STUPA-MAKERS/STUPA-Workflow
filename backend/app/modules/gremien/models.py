@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -107,7 +109,8 @@ class GremiumRole(UUIDPkMixin, Base):
     key: Mapped[str] = mapped_column(Text)
     name_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     #: Granular meeting-domain permissions of this role, as a list of keys:
-    #: session.manage, vote.manage, vote.cast, protocol.write, protocol.finalize.
+    #: session.manage, vote.manage, vote.cast, protocol.write, protocol.finalize,
+    #: todo.write, todo.configure, info.write.
     permissions: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
 
     __table_args__ = (UniqueConstraint("gremium_id", "key", name="uq_gremium_role_gremium_key"),)
@@ -222,4 +225,29 @@ class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
             postgresql_where=text("member_principal_id IS NULL"),
         ),
         Index("ix_delegation_substitute_gremium", "gremium_id"),
+    )
+
+
+class GremiumInfo(Base):
+    """The Info tab of a Gremium: one Markdown text and a list of labelled links.
+
+    One row per Gremium, created by the first save. ``links`` holds the list as
+    ``[{"label": ..., "url": ...}]`` in the order of the editor, because text and links
+    save together in one request. ``version`` counts the saves: a save sends the version
+    it read, so two editors cannot overwrite each other unseen (409).
+    """
+
+    __tablename__ = "gremium_info"
+
+    gremium_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gremium.id", ondelete="CASCADE"), primary_key=True
+    )
+    body_md: Mapped[str] = mapped_column(Text, server_default="")
+    links: Mapped[list[dict[str, str]]] = mapped_column(JSONB, server_default="[]")
+    version: Mapped[int] = mapped_column(Integer, server_default="0")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("principal.id", ondelete="SET NULL"), nullable=True, index=True
     )

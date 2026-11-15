@@ -6,6 +6,7 @@
  */
 import type {
   GremiumAttendanceCell,
+  GremiumInfo,
   GremiumAttendanceMonth,
   GremiumAttendanceRow,
   LocalizedText,
@@ -287,4 +288,37 @@ export function fileSlug(name: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return slug || 'gremium';
+}
+
+/** The schemes that an Info link may use (spec 001012); the server refuses every other. */
+const INFO_SCHEMES = ['https://', 'http://', 'mailto:'] as const;
+/** The most links of one Info (spec 001012). */
+export const INFO_MAX_LINKS = 30;
+/** The longest label of an Info link (spec 001012). */
+export const INFO_MAX_LABEL = 80;
+/** The longest Info text (spec 001013). */
+export const INFO_MAX_TEXT = 20_000;
+
+/** The URL starts with `https://`, `http://` or `mailto:` and has more after it. */
+export function infoUrlValid(url: string): boolean {
+  const lower = url.trim().toLowerCase();
+  return INFO_SCHEMES.some((s) => lower.startsWith(s) && lower.length > s.length);
+}
+
+/** The Info has no text and no link. */
+export function infoEmpty(info: GremiumInfo): boolean {
+  return info.bodyMd.trim() === '' && info.links.length === 0;
+}
+
+/**
+ * The tab "Info" shows while the Info loads, after a load error, to an editor and when
+ * the Info has content. A reader never sees an empty tab (spec 001015).
+ */
+export function infoTabShown(info: GremiumInfo | null | undefined): boolean {
+  return info === undefined || info === null || info.canEdit || !infoEmpty(info);
+}
+
+/** The URL as the link list shows it: an e-mail address without `mailto:`, else whole. */
+export function infoUrlShown(url: string): string {
+  return url.toLowerCase().startsWith('mailto:') ? url.slice('mailto:'.length) : url;
 }

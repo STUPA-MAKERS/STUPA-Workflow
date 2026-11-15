@@ -1,49 +1,47 @@
 @if (error()) {
   <app-load-error [message]="'gremien.decisions.error' | t" (retry)="load()" />
 }
-<app-sticky-bar [sticky]="phone()">
-  <div class="gdc__tools">
-    <app-search-pill
-      class="gdc__search"
-      size="md"
-      [placeholder]="'gremien.decisions.search' | t"
-      [label]="'gremien.decisions.searchLabel' | t"
-      [clearable]="true"
-      [busy]="search.pending()"
-      [value]="search.text()"
-      (valueChange)="search.set($event)"
-      (commit)="search.flush()"
+<div class="gdc__tools">
+  <app-search-pill
+    class="gdc__search"
+    size="md"
+    [placeholder]="'gremien.decisions.search' | t"
+    [label]="'gremien.decisions.searchLabel' | t"
+    [clearable]="true"
+    [busy]="search.pending()"
+    [value]="search.text()"
+    (valueChange)="search.set($event)"
+    (commit)="search.flush()"
+  />
+  <div class="gdc__chips" role="group" [attr.aria-label]="'gremien.filters' | t">
+    <app-filter-select
+      [label]="'gremien.decisions.result' | t"
+      [options]="resultOptions()"
+      [value]="result()"
+      (valueChange)="setResult($event)"
+      [text]="resultText()"
+      filled
     />
-    <div class="gdc__chips" role="group" [attr.aria-label]="'gremien.filters' | t">
+    <app-filter-select
+      [label]="'gremien.decisions.kind' | t"
+      [options]="kindOptions()"
+      [value]="kind()"
+      (valueChange)="setKind($event)"
+      [text]="kindText()"
+      filled
+    />
+    @if (!phone()) {
       <app-filter-select
-        [label]="'gremien.decisions.result' | t"
-        [options]="resultOptions()"
-        [value]="result()"
-        (valueChange)="setResult($event)"
-        [text]="resultText()"
+        [label]="'gremien.decisions.since' | t"
+        [options]="sinceOptions()"
+        [value]="since()"
+        (valueChange)="setSince($event)"
+        [text]="sinceText()"
         filled
       />
-      <app-filter-select
-        [label]="'gremien.decisions.kind' | t"
-        [options]="kindOptions()"
-        [value]="kind()"
-        (valueChange)="setKind($event)"
-        [text]="kindText()"
-        filled
-      />
-      @if (!phone()) {
-        <app-filter-select
-          [label]="'gremien.decisions.since' | t"
-          [options]="sinceOptions()"
-          [value]="since()"
-          (valueChange)="setSince($event)"
-          [text]="sinceText()"
-          filled
-        />
-      }
-    </div>
+    }
   </div>
-</app-sticky-bar>
+</div>
 
 @if (loading() && !items().length) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.decisions.loading' | t" />

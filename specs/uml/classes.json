@@ -436,6 +436,20 @@
     },
     {
       "column": "gremium_id",
+      "from": "GremiumInfo",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "updated_by",
+      "from": "GremiumInfo",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "gremium_id",
       "from": "GremiumMembership",
       "multiplicity": "*",
       "onDelete": "CASCADE",
@@ -3708,6 +3722,51 @@
       "name": "Gremium",
       "path": "backend/app/modules/gremien/models.py",
       "table": "gremium"
+    },
+    {
+      "attributes": [
+        {
+          "name": "gremium_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "body_md",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "links",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "GremiumInfo",
+      "module": "gremien",
+      "name": "GremiumInfo",
+      "path": "backend/app/modules/gremien/models.py",
+      "table": "gremium_info"
     },
     {
       "attributes": [

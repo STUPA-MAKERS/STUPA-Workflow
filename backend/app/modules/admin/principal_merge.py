@@ -112,7 +112,13 @@ from app.modules.calendar.models import Invitation as CalendarInvitation
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.forms.models import FormVersion
 from app.modules.gremien.membership_sync import sync_principal_memberships
-from app.modules.gremien.models import DelegationSubstitute, Gremium, GremiumMembership, GremiumRole
+from app.modules.gremien.models import (
+    DelegationSubstitute,
+    Gremium,
+    GremiumInfo,
+    GremiumMembership,
+    GremiumRole,
+)
 from app.modules.meetings.models import (
     Meeting,
     MeetingAttendance,
@@ -218,6 +224,7 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("meetings", ProtocolKeeperPeriod.principal_id),
     ("meetings", MeetingGuest.decided_by),
     ("config", FormVersion.created_by),
+    ("config", GremiumInfo.updated_by),
     ("tickets", Ticket.reporter_principal_id),
     ("tickets", Ticket.assignee_id),
     ("tickets", TicketNote.author_id),

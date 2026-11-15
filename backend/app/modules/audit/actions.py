@@ -155,6 +155,9 @@ class AuditAction(StrEnum):
             contents. A restore replaces the database, so the BACKUP_RESTORE entry
             lands in the chain of the restored state, after the safety backup that the
             restore takes first.
+        GREMIUM_INFO_UPDATE: A save of the Info tab of a Gremium (``info.write``).
+            ``data`` carries the gremium id, the new version, the length of the text
+            and the number of links, never the text or a link.
     """
 
     LOGIN = "login"
@@ -266,6 +269,7 @@ class AuditAction(StrEnum):
     BACKUP_EXPORT = "backup_export"
     BACKUP_IMPORT = "backup_import"
     BACKUP_RESTORE = "backup_restore"
+    GREMIUM_INFO_UPDATE = "gremium_info_update"
 
 
 REVERTABLE_BUDGET_ACTIONS: frozenset[AuditAction] = frozenset(

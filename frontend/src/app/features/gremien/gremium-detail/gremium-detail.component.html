@@ -106,6 +106,15 @@
     <ng-template #page let-id let-g="g">
       @if (visited().has(id)) {
         @switch (id) {
+          @case ('info') {
+            <app-gremium-info
+              [gremiumId]="g.id"
+              [gremiumName]="g.name"
+              [info]="info()"
+              (changed)="onInfoChanged($event)"
+              (reload)="reloadInfo()"
+            />
+          }
           @case ('meetings') {
             <app-gremium-meetings [gremiumId]="g.id" />
           }

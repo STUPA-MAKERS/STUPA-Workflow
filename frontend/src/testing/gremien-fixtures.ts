@@ -8,6 +8,7 @@ import type {
   GremienApiService,
   GremiumAttendance,
   GremiumDecision,
+  GremiumInfo,
   GremiumMeeting,
   GremiumMember,
   GremiumMemberAttendance,
@@ -151,6 +152,19 @@ export function decision(over: Partial<GremiumDecision> = {}): GremiumDecision {
   };
 }
 
+/** The Info of a gremium; the default is empty and not editable, so the tab hides. */
+export function gremiumInfo(over: Partial<GremiumInfo> = {}): GremiumInfo {
+  return {
+    bodyMd: '',
+    links: [],
+    version: 0,
+    updatedAt: null,
+    updatedByName: null,
+    canEdit: false,
+    ...over,
+  };
+}
+
 export type GremienApiMock = { [K in keyof GremienApiService]: jest.Mock };
 
 /** The API of the tab, answering with the data above. */
@@ -163,6 +177,8 @@ export function gremienApiMock(over: Partial<GremienApiMock> = {}): GremienApiMo
     attendanceExport: jest.fn(() => of(new Blob(['x']))),
     memberAttendance: jest.fn(() => of(memberAttendance())),
     decisions: jest.fn(() => of({ items: [decision()], nextCursor: null })),
+    info: jest.fn(() => of(gremiumInfo())),
+    saveInfo: jest.fn(() => of(gremiumInfo({ version: 1, canEdit: true }))),
     ...over,
   };
 }

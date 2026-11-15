@@ -66,7 +66,12 @@ from app.modules.calendar.models import Appointment as CalendarAppointment
 from app.modules.config_revision.models import ConfigRevision
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.forms.models import FormVersion
-from app.modules.gremien.models import DelegationSubstitute, GremiumMembership, GremiumRole
+from app.modules.gremien.models import (
+    DelegationSubstitute,
+    GremiumInfo,
+    GremiumMembership,
+    GremiumRole,
+)
 from app.modules.meetings.models import (
     Meeting,
     MeetingAgendaItem,
@@ -497,6 +502,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     entity_type="flow", entity_id=f"merge-{tag}", version=1, created_by=old.sub
                 ),
                 FormVersion(application_type_id=seed.type_id, version=99, created_by=old.id),
+                GremiumInfo(gremium_id=seed.gremium_id, updated_by=old.id),
                 RoleAssignment(principal_id=old.id, role_id=role.id, granted_by="bootstrap"),
                 RoleAssignment(
                     principal_id=other.id,

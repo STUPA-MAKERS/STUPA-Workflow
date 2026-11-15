@@ -35,7 +35,6 @@ import {
   SearchPillComponent,
   SkeletonComponent,
   StatusTextComponent,
-  StickyBarComponent,
   SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { electionStatus } from '../../voting/election.util';
@@ -107,7 +106,6 @@ function decisionKey(d: GremiumDecision): string {
     SectionComponent,
     RowChevronComponent,
     LoadErrorComponent,
-    StickyBarComponent,
     TranslatePipe,
     ButtonComponent,
     IconComponent,

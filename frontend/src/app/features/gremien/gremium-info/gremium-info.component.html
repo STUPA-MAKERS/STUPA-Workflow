@@ -1,0 +1,58 @@
+@if (info(); as i) {
+  @if (empty()) {
+    <app-empty-state icon="info" [heading]="'gremien.info.empty' | t">
+      <app-button variant="tonal" (click)="editOpen.set(true)">
+        <app-icon name="edit" />
+        {{ 'gremien.info.edit' | t }}
+      </app-button>
+    </app-empty-state>
+  } @else {
+    @if (i.canEdit) {
+      <div class="gi__tools">
+        <app-button variant="tonal" (click)="editOpen.set(true)">
+          <app-icon name="edit" />
+          {{ 'gremien.info.edit' | t }}
+        </app-button>
+      </div>
+    }
+    @if (i.bodyMd.trim()) {
+      <app-markdown-view class="gi__text" [src]="i.bodyMd" />
+    }
+    @if (i.links.length) {
+      <app-section class="gi__sec" [heading]="'gremien.info.links' | t">
+        <ul class="rowgroup gi__links">
+          @for (link of i.links; track $index) {
+            <li>
+              <a class="gi__link" [href]="link.url" target="_blank" rel="noopener">
+                <app-icon class="gi__icon" [name]="mail(link.url) ? 'mail' : 'link'" [size]="18" />
+                <span class="gi__body">
+                  <span class="gi__label">{{ link.label }}</span>
+                  <span class="gi__url">{{ shownUrl(link.url) }}</span>
+                </span>
+                <app-icon class="gi__ext" name="ext" [size]="16" />
+              </a>
+            </li>
+          }
+        </ul>
+      </app-section>
+    }
+    @if (changedLine()) {
+      <p class="gi__meta">{{ changedLine() }}</p>
+    }
+  }
+  @if (i.canEdit) {
+    <app-gremium-info-dialog
+      [open]="editOpen()"
+      [gremiumId]="gremiumId()"
+      [gremiumName]="gremiumName()"
+      [info]="i"
+      (closed)="editOpen.set(false)"
+      (saved)="changed.emit($event)"
+      (stale)="reload.emit()"
+    />
+  }
+} @else if (info() === null) {
+  <app-load-error [message]="'gremien.info.error' | t" (retry)="reload.emit()" />
+} @else {
+  <app-skeleton variant="lines" [count]="4" [label]="'gremien.info.loading' | t" />
+}

@@ -37,7 +37,7 @@ Configure it in your MCP client. Set the platform URL with `ANTRAGSPLATTFORM_URL
 - `ANTRAGSPLATTFORM_URL` (required) — the platform base URL.
 - `ANTRAGSPLATTFORM_SCOPE` (optional) — space-separated OAuth scopes. The default is the
   full curated set (`read applications:write votes:write budget:write meetings:write
-  tickets:write todos:write forms:write flows:write admin:write`). Narrow it to limit what the agent can do.
+  tickets:write todos:write committees:write forms:write flows:write admin:write`). Narrow it to limit what the agent can do.
 
 The platform must have OIDC configured. It must also register the public client id of
 this server (`antragsplattform-mcp`, set with `OAUTH_MCP_CLIENT_ID`). The platform accepts
