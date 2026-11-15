@@ -7037,6 +7037,12 @@
           "type": "INTEGER"
         },
         {
+          "name": "present_seats",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "kind",
           "nullable": false,
           "primaryKey": false,

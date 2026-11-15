@@ -142,11 +142,13 @@ export class MeetingSettingsDialogComponent {
   readonly defaults = signal<MeetingDefaults | null>(null);
   /**
    * The invitation period that a new date misses, else `null`. Only a planned meeting
-   * with a changed date warns, and the warning never blocks the save (§ 000918).
+   * with a changed date or a changed kind warns, because the kind sets the period, and
+   * the warning never blocks the save (§ 000918).
    */
   readonly lateInvite = computed(() => {
     const m = this.meeting();
-    if (m?.status !== 'planned' || this.date().trim() === m.date) return null;
+    if (m?.status !== 'planned') return null;
+    if (this.date().trim() === m.date && this.kind() === m.kind) return null;
     return lateInviteDays(this.date(), this.kind(), this.defaults());
   });
   /** The kind is fixed from the start of the meeting on. */

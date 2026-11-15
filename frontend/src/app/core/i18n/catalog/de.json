@@ -1553,7 +1553,7 @@
   "admin.meetingPeriods.lateExcuseDays": "Nachträgliche Entschuldigung bis",
   "admin.meetingPeriods.circularMinDays": "Umlaufverfahren mindestens",
   "admin.meetingPeriods.absenceLimit": "Unentschuldigte Abwesenheiten bis zum Mandatsverlust",
-  "admin.meetingPeriods.termStartMonth": "Beginn der Amtszeit neuer Gremien (Monat)",
+  "admin.meetingPeriods.termStartMonth": "Beginn der Amtszeit neuer Gremien",
   "admin.meetingPeriods.days": "Tage",
   "admin.meetingPeriods.range": "Eine ganze Zahl von {min} bis {max}.",
   "admin.loginSettings.title": "Anmeldung",

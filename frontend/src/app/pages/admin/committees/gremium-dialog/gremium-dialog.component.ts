@@ -1,3 +1,4 @@
+import { monthOptions } from '@shared/month-options';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -224,13 +225,7 @@ export class GremiumDialogComponent {
     this.i18n.locales().map((code) => ({ value: code, label: this.i18n.languageName(code) })),
   );
   /** The twelve months by name, for the start of the term. */
-  protected readonly monthOptions = computed<SelectOption[]>(() => {
-    const name = new Intl.DateTimeFormat(this.i18n.formatLocale(), { month: 'long', timeZone: 'UTC' });
-    return Array.from({ length: 12 }, (_, i) => ({
-      value: String(i + 1),
-      label: name.format(new Date(Date.UTC(2024, i, 1))),
-    }));
-  });
+  protected readonly monthOptions = computed(() => monthOptions(this.i18n.formatLocale()));
   protected readonly canSave = computed(() => !!this.form().name.trim() && !this.saving());
 
   constructor() {

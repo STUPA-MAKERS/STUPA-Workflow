@@ -816,7 +816,7 @@
       "to": "notifications"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "livevote",
       "to": "protocol"
     },
@@ -886,7 +886,7 @@
       "to": "gremien"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "meetings",
       "to": "shared"
     },

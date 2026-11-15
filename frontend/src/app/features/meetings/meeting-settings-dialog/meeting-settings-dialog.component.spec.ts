@@ -130,6 +130,17 @@ describe('MeetingSettingsDialogComponent', () => {
       expect(http.expectOne('/api/meetings/m-1').request.body.date).toBe(inDays(4));
     });
 
+    it('warns when a new kind has a longer period than the date keeps', async () => {
+      localStorage.setItem('ap.locale', 'de');
+      const special = { ...PLANNED, kind: 'extraordinary', date: inDays(5) } as Meeting;
+      const { http, fixture, cmp } = await setup(special);
+      http.expectOne('/api/committees/g-1/meeting-defaults').flush(PERIODS);
+      flushRoster(http, fixture);
+      expect(cmp.lateInvite()).toBeNull();
+      cmp.kind.set('ordinary');
+      expect(cmp.lateInvite()).toBe(7);
+    });
+
     it('stays silent when the periods do not load, for a late answer and after the start', async () => {
       const { http, fixture, cmp } = await setup(PLANNED);
       const first = http.expectOne('/api/committees/g-1/meeting-defaults');

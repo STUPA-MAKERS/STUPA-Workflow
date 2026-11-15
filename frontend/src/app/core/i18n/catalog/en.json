@@ -1553,7 +1553,7 @@
   "admin.meetingPeriods.lateExcuseDays": "Late excuse until",
   "admin.meetingPeriods.circularMinDays": "Circular vote at least",
   "admin.meetingPeriods.absenceLimit": "Unexcused absences until the seat is lost",
-  "admin.meetingPeriods.termStartMonth": "Start of the term of a new committee (month)",
+  "admin.meetingPeriods.termStartMonth": "Start of the term of a new committee",
   "admin.meetingPeriods.days": "days",
   "admin.meetingPeriods.range": "A whole number from {min} to {max}.",
   "admin.loginSettings.title": "Sign-in",
