@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -127,3 +128,32 @@ def test_the_plan_renders_landscape_with_its_mark_on_each_page(tmp_path: Path) -
     ]
     assert all("ENTWURF" in text and "Bezeichnung" in text for text in texts)
     assert "Summe Ausgaben" in texts[-1]
+
+
+def _word_tops(path: Path) -> dict[str, float]:
+    """Return the top of the first word of each text on page 1, in pt from the page top."""
+    out = subprocess.run(
+        ["pdftotext", "-f", "1", "-l", "1", "-bbox", str(path), "-"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    tops: dict[str, float] = {}
+    for top, word in re.findall(r'yMin="([\d.]+)"[^>]*>([^<]+)</word>', out):
+        tops.setdefault(word, float(top))
+    return tops
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    shutil.which("typst") is None or shutil.which("pdftotext") is None,
+    reason="needs the typst CLI and poppler (nix develop .#typst)",
+)
+def test_the_head_line_sits_tight_between_the_title_and_the_table(tmp_path: Path) -> None:
+    """The head line of the plan has no more space than one line above and below it."""
+    doc = build_document(SOURCE, variant="plan", config=_plan(title="Plantitel"))
+    path = tmp_path / "plan.pdf"
+    path.write_bytes(asyncio.run(default_compiler().compile(doc, {})))
+    tops = _word_tops(path)
+    assert tops["Haushalt"] - tops["Plantitel"] <= 26
+    assert tops["Schlüssel"] - tops["Haushalt"] <= 20

@@ -80,17 +80,18 @@
     v(0.5cm)
   }
   block(below: 4pt, text(font: head-font, size: size.Huge * 0.72, weight: "bold", hyphenate: false, p.title))
+  // The rule, the head line and the table follow each other tightly: the
+  // block spacing of the flow (1.2em) would add to every gap, so the head
+  // sets its own space above and below and the table none.
   rect(width: 100%, height: 0.5mm, fill: black, stroke: none)
-  v(0.15cm)
-  {
+  block(above: 0.2cm, below: 0.25cm, {
     set text(size: size.small * 0.85)
     grid(
       columns: (auto,) * (2 * p.head.len()),
       column-gutter: (0.45em, 1.6em) * p.head.len(),
       ..p.head.map(pair => (text(fill: palette.gray, pair.at(0)), strong(pair.at(1)))).flatten(),
     )
-  }
-  v(0.25cm)
+  })
 
   let money = p.money
   table(
