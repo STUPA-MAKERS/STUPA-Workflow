@@ -2347,3 +2347,20 @@ async def test_update_invoice_returns_linked_bookings() -> None:
     sess = fake_session(result(row), gets=[inv])
     out = await BudgetTreeService(sess).update_invoice(inv.id, InvoiceUpdate(note="n"))
     assert [b.budget_id for b in out.linked_bookings] == [bid]
+
+
+async def test_update_of_one_transfer_leg_409() -> None:
+    """One side of a transfer keeps its amount and its cost center.
+
+    The gets are the booking and its fiscal year (missing, so open). The fake session
+    serves ``_child_counts``. Rule: §F/finance/budget/000256.
+    """
+    _tid, out, _income = _transfer_pair()
+    for payload in (ExpenseUpdate(amount=Decimal("5")), ExpenseUpdate(budgetId=uuid.uuid4())):
+        sess = fake_session(result(), gets=[out, None])
+        with pytest.raises(ConflictError) as refused:
+            await BudgetTreeService(sess).update_expense(out.id, payload)
+        assert refused.value.code == "transfer_leg_fixed"
+        assert sess.committed == 0
+    assert str(out.amount) == "100.00"
+

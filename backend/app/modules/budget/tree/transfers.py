@@ -48,12 +48,18 @@ class TransferOps(ExpenseOps):
         The service books an expense on the source and an income on the target.
         Both bookings use the same fiscal year.
 
-        The fiscal year must belong to the top level of both cost centers.
+        The fiscal year must belong to the top level of both cost centers. A past
+        year that is not closed takes the transfer when its payment date lies in the
+        year.
         """
         src = await self._get_node(payload.from_budget_id)
         dst = await self._get_node(payload.to_budget_id)
-        fy_src = await self._resolve_fiscal_year(src, payload.fiscal_year_id)
-        fy_dst = await self._resolve_fiscal_year(dst, payload.fiscal_year_id)
+        fy_src = await self._resolve_fiscal_year(
+            src, payload.fiscal_year_id, late=True, on=payload.payment_date
+        )
+        fy_dst = await self._resolve_fiscal_year(
+            dst, payload.fiscal_year_id, late=True, on=payload.payment_date
+        )
         if fy_src != fy_dst:
             raise ValidationProblem(
                 "Both cost centres must share the fiscal year.",
@@ -66,6 +72,7 @@ class TransferOps(ExpenseOps):
             fiscal_year_id=fy_src,
             transfer_id=transfer_id,
             kind="expense",
+            payment_date=payload.payment_date,
             amount=payload.amount,
             currency=src.currency,
             description=payload.description,
@@ -77,6 +84,7 @@ class TransferOps(ExpenseOps):
             fiscal_year_id=fy_dst,
             transfer_id=transfer_id,
             kind="income",
+            payment_date=payload.payment_date,
             amount=payload.amount,
             currency=dst.currency,
             description=payload.description,

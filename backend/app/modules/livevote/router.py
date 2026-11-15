@@ -64,6 +64,7 @@ from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.livevote.vote_build import build_meeting_vote
 from app.modules.livevote.vote_open import (
     assert_application_votable,
+    assert_no_open_vote,
     assert_vote_window,
     draft_open_checks,
 )
@@ -721,6 +722,8 @@ async def open_meeting_vote(
     if not payload.draft:
         await service.assert_can_run_votes(meeting_id, principal)
     assert_vote_window(meeting, draft=payload.draft)
+    if not payload.draft:
+        assert_no_open_vote(meeting)
     item = await agenda.item(meeting_id, payload.agenda_item_id)
     plan_version_id: UUID | None = getattr(item, "plan_version_id", None)
     source = (
@@ -874,6 +877,8 @@ async def delete_meeting_vote(
     the close the vote is part of the record, and the route answers 409
     ``meeting_closed``. Only a ``draft`` or ``cancelled`` vote can go: an open or
     closed vote gives 409 ``vote_not_deletable``. Every delete writes ``vote_delete``.
+    The delete of a prepared repeat gives the application back the decision of the
+    vote that it repeated, when the repeat already moved the application back.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:

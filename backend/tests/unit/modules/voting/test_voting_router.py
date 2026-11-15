@@ -90,13 +90,9 @@ class _FakeService:
         The real service holds the scope gate and sets the flags of the caller.
         """
         out = await self.get(vote_id)
-        return out.model_copy(
-            update={"can_manage": _MANAGER in principal.groups, "can_cast": True}
-        )
+        return out.model_copy(update={"can_manage": _MANAGER in principal.groups, "can_cast": True})
 
-    async def cast(
-        self, vote_id, principal, choice, *, now, as_delegation=False
-    ):
+    async def cast(self, vote_id, principal, choice, *, now, as_delegation=False):
         self.cast_args = {
             "vote_id": vote_id,
             "choice": choice,
@@ -256,9 +252,7 @@ def test_cancel_missing_perm_403(app: FastAPI, client: TestClient) -> None:
     assert client.post(f"/api/votes/{uuid4()}/cancel").status_code == 403
 
 
-def test_cancel_ok_broadcasts(
-    app: FastAPI, client: TestClient, fake_service: _FakeService
-) -> None:
+def test_cancel_ok_broadcasts(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
     from app.modules.meetings.publisher import get_meeting_publisher
 
     class _Pub:
@@ -276,6 +270,37 @@ def test_cancel_ok_broadcasts(
     assert r.json()["status"] == "cancelled"
     assert len(pub.cancelled) == 1
     assert fake_service.cancel_actor == "p"
+
+
+def test_cancel_of_a_repeat_restores_the_first_decision(
+    app: FastAPI,
+    client: TestClient,
+    fake_service: _FakeService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The cancel of a repeat hands the application and the repeated vote to the restore."""
+    from app.modules.voting import router as voting_router
+
+    source, session = uuid4(), object()
+    repeat = _vote_out("cancelled").model_copy(update={"repeat_of_id": source})
+    restored: list[tuple[object, ...]] = []
+
+    async def _cancel(vote_id: object, *, now: object = None, actor: object = None) -> VoteOut:
+        return repeat
+
+    async def _restore(
+        db: object, application_id: object, repeat_of_id: object, *, actor: str
+    ) -> bool:
+        restored.append((db, application_id, repeat_of_id, actor))
+        return True
+
+    monkeypatch.setattr(fake_service, "cancel", _cancel)
+    monkeypatch.setattr(fake_service, "session", session, raising=False)
+    monkeypatch.setattr(voting_router, "restore_repeated_decision", _restore)
+    _as_manager(app)
+    r = client.post(f"/api/votes/{uuid4()}/cancel")
+    assert r.status_code == 200, r.text
+    assert restored == [(session, repeat.application_id, source, "p")]
 
 
 def test_cancel_meeting_vote_needs_protokollant_403(

@@ -530,6 +530,9 @@ class TransferCreate(WireModel, frozen=True):
     fiscalYearId: str
     amount: str = Field(description="Decimal string > 0")
     description: str
+    paymentDate: str | None = Field(
+        default=None, description="ISO date; a past fiscal year needs one inside the year"
+    )
 
 
 class InvoiceCreate(WireModel, frozen=True):

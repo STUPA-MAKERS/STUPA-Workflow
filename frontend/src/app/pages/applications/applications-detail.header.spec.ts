@@ -631,7 +631,7 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(screen.getByText('Kostenstelle · HHJ 2026')).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: 'Kostenstelle ändern' }));
-      const pair = { budgetId: 'b1', budgetName: 'VS-Mittel', fiscalYearId: 'fy1', display: '2026', current: true };
+      const pair = { budgetId: 'b1', budgetName: 'VS-Mittel', fiscalYearId: 'fy1', display: '2026', current: true, past: false, startDate: '2026-01-01', endDate: '2026-12-31' };
       http.expectOne('/api/budget-years').flush([pair]);
       detectChanges();
       const c = cmp as unknown as {

@@ -276,3 +276,17 @@ def test_a_year_is_choosable_when_it_is_open_not_past_and_decided() -> None:
     assert not r.is_choosable_year(end, today, closed=True, plan_in_force=None)
     assert not r.is_choosable_year(date(2026, 11, 13), today, closed=False, plan_in_force=None)
     assert not r.is_choosable_year(end, today, closed=False, plan_in_force=False)
+
+
+def test_a_past_year_takes_a_late_booking_with_a_date_in_the_year() -> None:
+    """Rule: §F/finance/budget/000990."""
+    today = date(2027, 1, 20)
+    start, end = date(2026, 1, 1), date(2026, 12, 31)
+    assert r.is_choosable_year(end, today, closed=False, plan_in_force=None, late=True)
+    assert not r.is_choosable_year(end, today, closed=True, plan_in_force=None, late=True)
+    assert not r.is_choosable_year(end, today, closed=False, plan_in_force=False, late=True)
+    assert r.late_booking_date_fits(start, end, today, date(2026, 12, 30))
+    assert r.late_booking_date_fits(start, end, today, start)
+    assert not r.late_booking_date_fits(start, end, today, None)
+    assert not r.late_booking_date_fits(start, end, today, date(2027, 1, 2))
+    assert r.late_booking_date_fits(start, end, date(2026, 6, 1), None)

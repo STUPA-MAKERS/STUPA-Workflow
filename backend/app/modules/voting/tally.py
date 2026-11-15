@@ -158,6 +158,26 @@ def _quorum_reached(
     return enough and _quorum_met(quorum, turnout, eligible)
 
 
+def meeting_quorate(
+    percent: int | None, min_present: int | None, *, present: int, members: int
+) -> bool:
+    """Say if a meeting has its quorum, by the rule that closes its votes.
+
+    ``percent`` is the quorum of the Gremium for the kind of the meeting, and
+    ``min_present`` its least number of present persons. A Gremium with neither has
+    no quorum, and each of its votes meets the quorum, so the meeting does too. The
+    protocol reads this function, so its statement never differs from the votes.
+    """
+    return _quorum_reached(
+        None if percent is None else Quorum(type="percent", value=percent),
+        "present",
+        min_present,
+        ballots=present,
+        eligible=members,
+        present=present,
+    )
+
+
 def _by_sign(margin: int) -> VoteResult:
     """Give passed for a positive margin, rejected for a negative one and tie for zero."""
     return "passed" if margin > 0 else ("rejected" if margin < 0 else "tie")

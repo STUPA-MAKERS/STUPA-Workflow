@@ -41,6 +41,7 @@ from app.modules.voting.circular import CircularService
 from app.modules.voting.election import ElectionService
 from app.modules.voting.poll import PollService
 from app.modules.voting.poll_mails import MAIL_KINDS, notify_poll_started
+from app.modules.voting.repeat import restore_repeated_decision
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,
@@ -232,13 +233,18 @@ async def cancel_vote(
 
     The vote moves from ``open`` to ``cancelled``. It gets no result and fires no
     branch. The application stays in the ``vote`` state. This is the escape hatch when
-    the vote does not reach the quorum, because ``close`` is then blocked.
+    the vote does not reach the quorum, because ``close`` is then blocked. The cancel
+    of a repeat gives the application back the decision of the vote that it repeated.
     Gremium-scoped manage right. A meeting vote also needs the protokollant of the
     meeting, as open and close do: the cancel ends the vote of the room.
     """
     await service.assert_can_run_vote(vote_id, principal)
     vote = await service.cancel(vote_id, now=datetime.now(UTC), actor=principal.sub)
     await publisher.vote_cancelled(vote)
+    if vote.repeat_of_id is not None:
+        await restore_repeated_decision(
+            service.session, vote.application_id, vote.repeat_of_id, actor=principal.sub
+        )
     return vote
 
 

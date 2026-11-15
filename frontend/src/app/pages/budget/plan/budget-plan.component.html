@@ -533,6 +533,9 @@
     @if (stateTarget() === 'in_force') {
       <app-note kind="warn" icon="alert">{{ 'budget.plan.inForce.body' | t }}</app-note>
     }
+    @if (version()?.state === 'in_force' && stateTarget() && stateTarget() !== 'in_force') {
+      <app-note kind="warn" icon="alert">{{ 'budget.plan.setState.leavesForce' | t }}</app-note>
+    }
     <button type="submit" hidden></button>
   </form>
   <div dialog-footer>

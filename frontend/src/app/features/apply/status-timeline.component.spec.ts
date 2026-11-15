@@ -293,6 +293,7 @@ describe('StatusTimelineComponent', () => {
     expect(comp.noteText('vote:rejected')).toBe('Abstimmungsergebnis: Abgelehnt');
     expect(comp.noteText('Bitte nachreichen')).toBe('Bitte nachreichen');
     expect(comp.noteText('vote:repeat')).toBe('Erneute Abstimmung');
+    expect(comp.noteText('vote:repeat-cancelled')).toBe('Erneute Abstimmung abgebrochen');
   });
 
   it('offers no edit in a locked status and says why', async () => {

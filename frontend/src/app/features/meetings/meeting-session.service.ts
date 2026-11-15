@@ -443,10 +443,16 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  /** An application TOP and a plan TOP hold exactly one vote, a draft plan for a reading none. A freetext TOP holds any number. */
+  /**
+   * An application TOP and a plan TOP hold exactly one vote, a draft plan for a reading none. A
+   * cancelled vote does not count, as on the server. A freetext TOP holds any number.
+   */
   canAddVote(item: AgendaItem): boolean {
     if (item.planReading) return false;
-    return !(item.applicationId || item.planVersionId) || this.votesForTop(item.id).length === 0;
+    return (
+      !(item.applicationId || item.planVersionId) ||
+      this.votesForTop(item.id).every((v) => v.status === 'cancelled')
+    );
   }
 
   /** Re-read an existing protocol with GET, which keeps the write rate limit intact. */

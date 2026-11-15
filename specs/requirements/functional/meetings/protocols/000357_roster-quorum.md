@@ -23,7 +23,12 @@ number of the members with a voting right. A closed meeting must give the two va
 close fixed. It must not use the members of today. A meeting that is not closed, and a meeting
 that closed before the platform fixed the values, must count the members of the moment.
 
-Reason: A new render of an old meeting then gives the same quorum.
+The rule must be the one that closes the votes of the meeting: the quorum of the Gremium in
+percent, in a Wiederholungssitzung the repeat quorum when it is set (000902), and the least
+number of present persons. A Gremium without a quorum must count as quorate.
+
+Reason: A new render of an old meeting then gives the same quorum. A protocol that states
+another quorum than the votes of its meeting says "not quorate" over valid decisions.
 
 Test: A backend test reads the quorum of a closed meeting with a fixed member count and of a
 meeting without one.

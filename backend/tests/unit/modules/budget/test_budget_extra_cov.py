@@ -771,7 +771,10 @@ async def test_budget_years_follow_the_view_of_the_reader(
     asked: list[set[uuid.UUID] | None] = []
 
     class _Pairs:
-        async def choosable_pairs(self, scope: set[uuid.UUID] | None) -> list[object]:
+        async def choosable_pairs(
+            self, scope: set[uuid.UUID] | None, *, late: bool = False
+        ) -> list[object]:
+            assert late is False
             asked.append(scope)
             return []
 

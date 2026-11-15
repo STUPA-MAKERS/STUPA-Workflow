@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import InstrumentedAttribute
 
 from app.modules.applications.models import Application
@@ -18,10 +18,12 @@ from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpen
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import (
     BudgetYearOut,
+    FiscalYearCloseCheck,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
 )
+from app.modules.flow.models import State
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
@@ -62,12 +64,15 @@ class FiscalYearOps(BudgetTreeServiceBase):
             for f in await self._fiscal_years_of(top.id)
         ]
 
-    async def choosable_pairs(self, member_gremium_ids: set[UUID] | None) -> list[BudgetYearOut]:
+    async def choosable_pairs(
+        self, member_gremium_ids: set[UUID] | None, *, late: bool = False
+    ) -> list[BudgetYearOut]:
         """List each top-level budget with each fiscal year that a booking can take.
 
         `member_gremium_ids` is `None` for the full view. Otherwise the list holds
         only the budgets with a cost center that one of the Gremien reads. The order
-        is the budget, then the year (spec 000879).
+        is the budget, then the year (spec 000879). `late` adds the past years that
+        are not closed, for the form of a booking and of a transfer (spec 000990).
         """
         tops = (
             await self.session.scalars(
@@ -98,10 +103,13 @@ class FiscalYearOps(BudgetTreeServiceBase):
                     fy.year, top.fiscal_start_month, top.fiscal_start_day
                 ),
                 current=fy.start_date <= today <= fy.end_date,
+                past=fy.end_date < today,
+                startDate=fy.start_date,
+                endDate=fy.end_date,
             )
             for top in tops
             if seen is None or top.tree_path in seen
-            for fy in await self.choosable_years(top)
+            for fy in await self.choosable_years(top, late=late)
         ]
 
     async def _root_of(self, node: Budget) -> Budget:
@@ -243,11 +251,30 @@ class FiscalYearOps(BudgetTreeServiceBase):
         ).scalar_one_or_none()
         return found is not None
 
+    async def _has_allocated_money(self, fiscal_year_id: UUID) -> bool:
+        """Tell whether an allocation of the fiscal year holds an amount other than 0.
+
+        An allocation cannot be removed, only set to 0. A row with 0 carries no money,
+        so it does not block the delete of the year and goes with it.
+        """
+        found = (
+            await self.session.execute(
+                select(BudgetAllocation.id)
+                .where(
+                    BudgetAllocation.fiscal_year_id == fiscal_year_id,
+                    BudgetAllocation.allocated != 0,
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return found is not None
+
     async def delete_fiscal_year(self, budget_id: UUID, fiscal_year_id: UUID) -> None:
         """Delete a fiscal year of a top-level budget.
 
         The delete refuses with 409 while money still hangs on the year:
-        bookings, allocations, or applications assigned to it. `budget_expense`
+        bookings, allocations with an amount, or applications assigned to it. An
+        allocation of 0 goes with the year, because it cannot be removed by hand. `budget_expense`
         and `budget_allocation` cascade on the foreign key, so an unguarded
         delete would drop them without a trace. `application.fiscal_year_id`
         has no cascade and would fail on the constraint. The guard mirrors
@@ -272,9 +299,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
             await self._uses_fiscal_year(
                 BudgetExpense.id, BudgetExpense.fiscal_year_id, fiscal_year_id
             ),
-            await self._uses_fiscal_year(
-                BudgetAllocation.id, BudgetAllocation.fiscal_year_id, fiscal_year_id
-            ),
+            await self._has_allocated_money(fiscal_year_id),
             await self._uses_fiscal_year(
                 Application.id, Application.fiscal_year_id, fiscal_year_id
             ),
@@ -355,6 +380,34 @@ class FiscalYearOps(BudgetTreeServiceBase):
         if fy.budget_id != top.id:
             raise NotFoundError(f"fiscal year {fiscal_year_id} does not belong to budget {top.id}")
         return fy
+
+    async def close_check(self, budget_id: UUID, fiscal_year_id: UUID) -> FiscalYearCloseCheck:
+        """Say what the close of a fiscal year leaves open.
+
+        The close itself refuses nothing of this. The dialog of the close names the
+        Anträge of the year that are not in an end state, because they can then only
+        move to an open year, and a Nachtrag in draft, because the close freezes it.
+
+        Raises:
+            NotFoundError: The budget or the fiscal year does not exist, or the
+                fiscal year belongs to another top-level budget (404).
+            ValidationProblem: `budget_id` is not a top-level budget (422).
+        """
+        top = await self._require_top_level(budget_id)
+        fy = await self._own_fiscal_year(top, fiscal_year_id)
+        open_applications = (
+            await self.session.execute(
+                select(func.count())
+                .select_from(Application)
+                .join(State, State.id == Application.current_state_id)
+                .where(Application.fiscal_year_id == fy.id, State.is_terminal.is_(False))
+            )
+        ).scalar_one()
+        states = await self._plan_states(fy.id)
+        return FiscalYearCloseCheck(
+            openApplications=open_applications,
+            draftSupplement="in_force" in states and "draft" in states,
+        )
 
     async def set_fiscal_year_closed(
         self, budget_id: UUID, fiscal_year_id: UUID, *, closed: bool

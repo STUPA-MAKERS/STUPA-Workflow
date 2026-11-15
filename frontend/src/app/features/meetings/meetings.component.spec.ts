@@ -1596,7 +1596,7 @@ describe('MeetingsComponent — methods', () => {
 
     /**
      * A free-text TOP always allows another vote. An application TOP without a vote allows one, and
-     * an application TOP with a bound vote is locked.
+     * an application TOP with a bound vote is locked. A cancelled vote does not lock it.
      */
     it('decides whether a TOP may get another vote', async () => {
       const { cmp, fixture } = await loaded();
@@ -1615,6 +1615,11 @@ describe('MeetingsComponent — methods', () => {
           AGENDA_ITEM({ id: 't-y', applicationId: null, planVersionId: 'pv-1', planReading: true }) as never,
         ),
       ).toBe(false);
+      cmp.meeting.set({
+        ...cmp.meeting()!,
+        votes: [{ ...cmp.meeting()!.votes[0], agendaItemId: 't-x', status: 'cancelled' }],
+      });
+      expect(session.canAddVote(AGENDA_ITEM({ id: 't-x', applicationId: 'app-1' }) as never)).toBe(true);
     });
 
     it('casts a ballot and records the local choice', async () => {

@@ -53,6 +53,7 @@ from app.modules.budget.tree_schemas import (
     ExpenseKind,
     ExpenseOut,
     ExpenseUpdate,
+    FiscalYearCloseCheck,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
@@ -792,17 +793,22 @@ async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
 async def list_budget_years(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal())],
+    late: Annotated[bool, Query()] = False,
 ) -> list[BudgetYearOut]:
     """List the pairs of a budget and a fiscal year that a new booking can take.
 
     A form asks for the pair before the cost center. A year is in the list when it is
     not closed and not past, and in a budget with a plan only when its plan is in
-    force. The full view gives every budget. Without it the list holds the budgets
-    with a cost center that a Gremium of the principal reads.
+    force. `late` adds the past years that are not closed: the form of a booking and
+    of a transfer asks for them, the assignment of an Antrag does not. The full view
+    gives every budget. Without it the list holds the budgets with a cost center that
+    a Gremium of the principal reads.
     """
     if _has_full_view(principal):
-        return await service.choosable_pairs(None)
-    return await service.choosable_pairs(await _member_gremium_ids(service, principal.sub))
+        return await service.choosable_pairs(None, late=late)
+    return await service.choosable_pairs(
+        await _member_gremium_ids(service, principal.sub), late=late
+    )
 
 
 @router.get(
@@ -856,6 +862,25 @@ async def update_fiscal_year(
 ) -> FiscalYearOut:
     """Update a fiscal year. The route checks the disjointness again."""
     return await service.update_fiscal_year(budget_id, fiscal_year_id, payload)
+
+
+@router.get(
+    "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/close-check",
+    response_model=FiscalYearCloseCheck,
+    responses=_errors(401, 403, 404, 422),
+)
+async def check_fiscal_year_close(
+    budget_id: UUID,
+    fiscal_year_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.structure"))],
+) -> FiscalYearCloseCheck:
+    """Say what the close of a fiscal year leaves open.
+
+    The answer names the Anträge of the year that are not in an end state and a
+    Nachtrag of the plan in draft. The dialog of the close shows both.
+    """
+    return await service.close_check(budget_id, fiscal_year_id)
 
 
 @router.post(

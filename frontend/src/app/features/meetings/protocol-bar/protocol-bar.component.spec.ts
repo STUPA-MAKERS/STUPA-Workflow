@@ -64,7 +64,9 @@ describe('ProtocolBarComponent', () => {
     expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
     fixture.componentRef.setInput('protocol', protocol({ status: 'final', isFinal: true, isLocked: true, pdfUrl: '/p.pdf' }));
     fixture.detectChanges();
-    expect(screen.getByRole('status')).toHaveTextContent('Final · Das Protokoll ist final.');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Final · Das Protokoll ist final. Es wurde nicht versandt, weil es keine Empfänger gibt.',
+    );
     expect(screen.getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/p.pdf');
     expect(screen.queryByRole('link', { name: 'PDF öffentlich' })).toBeNull();
   });

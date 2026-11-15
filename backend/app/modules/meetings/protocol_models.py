@@ -3,7 +3,8 @@
 `Protocol` holds the minutes of one meeting, one row per meeting. The UNIQUE
 constraint on `meeting_id` makes `POST /meetings/{id}/protocol` idempotent: it
 creates the row or loads it. The `markdown` column backs the editor.
-`finalize` sets `status='final'` plus `pdf_storage_key` and `sent_at`.
+`finalize` sets `status='final'` plus `pdf_storage_key` and `finalized_at`, and `sent_at`
+when the mail of the protocol goes out.
 
 `ProtocolVoteRef` holds one embedded vote. The UNIQUE constraint on
 (protocol_id, vote_id) makes the embedding idempotent, so a snippet never
@@ -53,6 +54,10 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     public_pdf_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     author: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="draft")
+    #: The moment of the finalization. The public protocols page shows it.
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: The moment of the mail of the final protocol. NULL when no mail went out,
+    #: because the Gremium has no recipient or the mail queue is off.
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: CD-variant key of the gremium, snapshotted at creation. `stupa` and `asta`
     #: select the render variant `protocol-stupa` and `protocol-asta`.

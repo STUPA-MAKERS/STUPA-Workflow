@@ -26,7 +26,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import case, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import AuditAction
@@ -56,6 +56,7 @@ LOT_ALREADY_DRAWN = "lot_already_drawn"
 #: 409 codes of the next Wahlgang.
 NO_NEXT_ROUND = "no_next_round"
 NEXT_ROUND_EXISTS = "next_round_exists"
+REPEAT_EXISTS = "repeat_exists"
 
 
 def is_election(vote: object) -> bool:
@@ -268,7 +269,8 @@ class ElectionService:
         Raises:
             ConflictError: The vote is no closed election (``not_an_election``), it
                 takes no next Wahlgang (``no_next_round``), it has one
-                (``next_round_exists``) or its meeting is not live (``meeting_closed``).
+                (``next_round_exists``), it is voted on again (``repeat_exists``) or
+                its meeting is not live (``meeting_closed``).
         """
         meeting_id = (await self.voting._get_vote(vote_id)).meeting_id
         if meeting_id is not None:
@@ -278,7 +280,10 @@ class ElectionService:
         round_ = getattr(vote, "round", 1) or 1
         if vote.result != "no_majority" or not tally_mod.needs_members_majority(config, round_):
             raise ConflictError("The election takes no next Wahlgang.", code=NO_NEXT_ROUND)
-        if await self._has_next_round(vote.id):
+        continued = await self._continuation(vote.id)
+        if continued == "repeat":
+            raise ConflictError("The election is voted on again.", code=REPEAT_EXISTS)
+        if continued is not None:
             raise ConflictError("The election has a next Wahlgang.", code=NEXT_ROUND_EXISTS)
         standing = (
             await self._third_round_candidates(vote, config, result, principal, now)
@@ -301,10 +306,18 @@ class ElectionService:
             actor=principal.sub,
         )
 
-    async def _has_next_round(self, vote_id: UUID) -> bool:
-        """Tell whether a Wahlgang that is not cancelled continues this election."""
-        stmt = select(Vote.id).where(Vote.parent_vote_id == vote_id, Vote.status != "cancelled")
-        return (await self.session.scalar(stmt.limit(1))) is not None
+    async def _continuation(self, vote_id: UUID) -> object | None:
+        """Tell what continues this election: a next Wahlgang or a repeat, or None.
+
+        A cancelled vote does not count. The value is ``"repeat"`` for a vote that
+        repeats this one. The next Wahlgang and the repeat lock each other, so the
+        election has one line of Wahlgänge.
+        """
+        stmt = select(case((Vote.repeat_of_id == vote_id, "repeat"), else_="round")).where(
+            or_(Vote.parent_vote_id == vote_id, Vote.repeat_of_id == vote_id),
+            Vote.status != "cancelled",
+        )
+        return await self.session.scalar(stmt.limit(1))
 
     async def _third_round_candidates(
         self,

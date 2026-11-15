@@ -41,6 +41,9 @@ class _Rows:
     def all(self) -> list[Any]:
         return list(self._rows)
 
+    def first(self) -> Any:
+        return self._rows[0] if self._rows else None
+
 
 class _Session:
     """``AsyncSession`` double: ``execute`` serves a FIFO queue, empty by default."""
@@ -147,8 +150,8 @@ def _meeting(status: str = "planned") -> Meeting:
 def _service(meeting: Meeting, *extra: list[Any], publisher: Any = None) -> MeetingService:
     """Build the service on a fake session.
 
-    The session answers `_get` and then the open-vote check of a close, which is empty
-    unless a test queues a vote.
+    The session answers `_get`, then the open-vote check of a close and then its lot
+    check. Each check is empty unless a test queues a row for it.
     """
     return MeetingService(_Session([meeting], *extra), publisher)  # type: ignore[arg-type]
 
@@ -187,6 +190,19 @@ async def test_close_with_open_vote_conflicts(
     assert ei.value.code == "open_vote"
     assert m.status == "live"
     assert m.closed_at is None
+    assert voting.cancel_calls == []
+    assert audit == []
+
+
+async def test_close_with_a_pending_lot_conflicts(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _meeting("live")
+    svc = _service(m, [], [(uuid4(),)])
+    with pytest.raises(ConflictError) as ei:
+        await svc.patch(m.id, MeetingPatch(status="closed"), _admin())
+    assert ei.value.code == "lot_pending"
+    assert m.status == "live"
     assert voting.cancel_calls == []
     assert audit == []
 

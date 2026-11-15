@@ -64,6 +64,23 @@ describe('CloseMeetingDialogComponent', () => {
     http.verify();
   });
 
+  it('§F/meetings/voting/000027: blocks the close while an election waits for the lot', async () => {
+    const tie = { id: 'e-1', status: 'closed', kind: 'election', result: 'tie' } as unknown as MeetingVote;
+    const { http, cmp } = await setup({ ...LIVE, votes: [tie] } as Meeting);
+    expect(screen.getByRole('alert')).toHaveTextContent('Ziehe zuerst das Los');
+    expect(screen.getByRole('button', { name: 'Sitzung schließen' })).toBeDisabled();
+    cmp.confirm();
+    http.verify();
+  });
+
+  it('§F/meetings/voting/000027: an election that was voted on again does not block the close', async () => {
+    const tie = { id: 'e-1', status: 'closed', kind: 'election', result: 'tie' } as unknown as MeetingVote;
+    const again = { id: 'e-2', status: 'closed', kind: 'election', result: 'elected', repeatOfId: 'e-1' } as unknown as MeetingVote;
+    await setup({ ...LIVE, votes: [tie, again] } as Meeting);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Sitzung schließen' })).toBeEnabled();
+  });
+
   it('closes with one PATCH and never finalizes the protocol', async () => {
     const { http, meetingClosed, toasts } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Sitzung schließen' }));

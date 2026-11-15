@@ -13,7 +13,7 @@ The service binds to an `AsyncSession` and drives the protocol lifecycle.
   meeting. It writes `protocol_finalize`.
 * `finalize` renders the Markdown through typst into a PDF. It stores the PDF
   in MinIO and mails it to MAIL_LIST(gremium). It sets `status='final'` and
-  `sent_at`.
+  `finalized_at`, and `sent_at` when the mail goes out.
 
 The service reuses the typst client, the object storage and the mail queue of
 `app.modules.pdf` and `app.modules.notifications` without a change.
@@ -113,6 +113,7 @@ from app.modules.protocol.schemas import ProtocolOut
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import ElectionResultOut, PollResultOut, VoteOut
 from app.modules.voting.service import VotingService
+from app.modules.voting.tally import meeting_quorate
 from app.settings import Settings, get_settings
 from app.shared.blackout import black_out, has_open_marker
 from app.shared.config_schemas import ElectionConfig, PollConfig, PollOption
@@ -182,6 +183,17 @@ class HeaderMeta:
     absent_count: int = 0
     guest_count: int = 0
     datalines: Sequence[str] = field(default_factory=list)
+
+
+def _mark_final(protocol: Protocol, now: datetime, *, sent: bool) -> None:
+    """Set a protocol to final at `now`, with the mark of the mail only when one goes out.
+
+    A protocol that went back to draft keeps the mark of its first mail, because that
+    mail is out and the draft must stay (spec 000983).
+    """
+    protocol.status = "final"
+    protocol.finalized_at = now
+    protocol.sent_at = now if sent else protocol.sent_at
 
 
 class ProtocolService:
@@ -743,13 +755,25 @@ class ProtocolService:
             if mail_public or bool(getattr(gremium, "protocols_public", False))
             else await self._render_internal(protocol)
         )
-        protocol.status = "final"
-        protocol.sent_at = now
+        recipients = await self._mail_recipients(protocol)
+        _mark_final(protocol, now, sent=bool(recipients))
         await self.session.flush()
         await self.session.commit()
         await self._store(uploads)
-        await self._send(protocol, mail_pdf, at=now)
+        await self._send(protocol, mail_pdf, recipients, at=now)
         return await self._to_out(protocol)
+
+    async def _mail_recipients(self, protocol: Protocol) -> list[str]:
+        """Return the addresses that get the mail of the final protocol.
+
+        The list is empty without a mail queue and for a Gremium without a recipient.
+        The finalization then sets no `sent_at`, so the page does not say that the
+        protocol was sent.
+        """
+        if self.mail_queue is None:
+            return []
+        members = await self._recipients(protocol.gremium_id)
+        return list(await filter_recipients_by_preference(self.session, members, "protocol"))
 
     async def _render_both(
         self, protocol: Protocol, *, mail_public: bool
@@ -1063,8 +1087,11 @@ class ProtocolService:
         A closed meeting gives the member count that its close fixed, so a new render
         gives the same quorum (§F/meetings/protocols/000357). A meeting that is not
         closed, and a meeting without a fixed count, counts the members of the Gremium
-        whose role holds `vote.cast` now. The threshold is `gremium.quorum_percent` when
-        that value is set. If not, the threshold is more than half of the members.
+        whose role holds `vote.cast` now. The rule is the one that closes the votes of
+        the meeting (`meeting_quorate`): the quorum of the Gremium in percent, in a
+        Wiederholungssitzung its repeat quorum when that is set, and the least number
+        of present persons. A Gremium without a quorum is always quorate, as its votes
+        are.
 
         Returns:
             The quorum result, or `None` when the Gremium or its members are missing.
@@ -1079,13 +1106,20 @@ class ProtocolService:
             if fixed is not None and getattr(meeting, "status", None) == "closed"
             else await self._voting_members(gremium_id)
         )
-        percent = getattr(gremium, "quorum_percent", None)
-        quorate = (
-            present_count * 100 >= percent * members
-            if percent is not None
-            else present_count * 2 > members
+        repeat: int | None = (
+            getattr(gremium, "repeat_quorum_percent", None)
+            if getattr(meeting, "kind", None) == "repeat"
+            else None
         )
-        return None if members == 0 else quorate
+        percent: int | None = (
+            repeat if repeat is not None else getattr(gremium, "quorum_percent", None)
+        )
+        min_present: int | None = getattr(gremium, "quorum_min_present", None)
+        return (
+            None
+            if members == 0
+            else meeting_quorate(percent, min_present, present=present_count, members=members)
+        )
 
     async def _header_meta(self, meeting: Meeting | None, *, public: bool = False) -> HeaderMeta:
         """Resolve the protocol keepers and the attendance groups for the header.
@@ -1541,8 +1575,18 @@ class ProtocolService:
         except StorageError as exc:
             raise ServiceUnavailableError("Protocol rendering temporarily unavailable.") from exc
 
-    async def _send(self, protocol: Protocol, pdf: bytes | None, *, at: datetime) -> None:
+    async def _send(
+        self,
+        protocol: Protocol,
+        pdf: bytes | None,
+        to: Sequence[str] | None = None,
+        *,
+        at: datetime,
+    ) -> None:
         """Mail the protocol to MAIL_LIST(gremium) under an idempotency key.
+
+        `to` holds the recipients that the finalization already read. Without it the
+        method reads them itself.
 
         The key holds the time of the finalization, so a protocol that went back to
         draft sends again on its next finalization (spec 000983).
@@ -1562,8 +1606,7 @@ class ProtocolService:
         """
         if self.mail_queue is None:
             return
-        members = await self._recipients(protocol.gremium_id)
-        recipients = await filter_recipients_by_preference(self.session, members, "protocol")
+        recipients = to if to is not None else await self._mail_recipients(protocol)
         if not recipients:
             return
         gremium = await self.session.get(Gremium, protocol.gremium_id)

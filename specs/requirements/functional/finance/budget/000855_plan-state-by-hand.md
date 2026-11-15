@@ -4,7 +4,7 @@ title: A person with an own permission sets the state of a plan by hand
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-15
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_state_by_hand_moves_forwards_and_backwards"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_state_by_hand_checks_the_step_and_the_draft"
@@ -54,6 +54,10 @@ reason, the actor and each allocation that changed (000802).
 The plan page must offer "Zustand setzen" in the menu of the newest version to a person
 with the permission. The dialog must take the state, the step and the reason, must name
 that a version in force sets the allocations, and must save only with a reason.
+
+When the person moves a version in force back to the draft or to a step, the dialog must say
+before the save that the fiscal year then has no plan in force and takes no new booking,
+transfer or assignment (000879), and that the allocations stay.
 
 Reason: The plans of the years that ran before the platform have their decisions on
 paper. A person with an own permission records their state, and the audit log keeps who

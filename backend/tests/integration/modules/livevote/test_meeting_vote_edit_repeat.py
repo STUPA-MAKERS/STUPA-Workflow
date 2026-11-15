@@ -54,6 +54,46 @@ async def test_update_draft_replaces_question_and_rules(
     assert "question" not in entry.data
 
 
+async def _admin_keeps_minutes(
+    maker: async_sessionmaker[AsyncSession], meeting_id: uuid.UUID
+) -> None:
+    """Make the admin the protokollant, because only the protokollant opens a vote."""
+    async with maker() as session:
+        row = (
+            await session.execute(select(PrincipalRow).where(PrincipalRow.sub == ADMIN_SUB))
+        ).scalar_one_or_none()
+        if row is None:
+            row = PrincipalRow(sub=ADMIN_SUB, display_name="Admin", email="admin@x.de")
+            session.add(row)
+            await session.flush()
+        meeting = await session.get(Meeting, meeting_id)
+        assert meeting is not None
+        meeting.protokollant_id = row.id
+        await session.commit()
+
+
+async def test_a_vote_does_not_open_beside_an_open_vote(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    s = await seed(maker, status="live", votes=("open", "draft"))
+    await _admin_keeps_minutes(maker, s.meeting_id)
+    with TestClient(api) as client:
+        created = client.post(
+            f"/api/meetings/{s.meeting_id}/votes",
+            json={"agendaItemId": str(s.item_ids[0]), "question": "Zweite Frage?"},
+        )
+        opened = client.post(f"/api/meetings/{s.meeting_id}/votes/{s.vote_ids['draft']}/open")
+        prepared = client.post(
+            f"/api/meetings/{s.meeting_id}/votes",
+            json={"agendaItemId": str(s.item_ids[0]), "question": "Dritte Frage?", "draft": True},
+        )
+    assert created.status_code == 409, created.text
+    assert created.json()["code"] == "vote_open_exists"
+    assert opened.status_code == 409, opened.text
+    assert opened.json()["code"] == "vote_open_exists"
+    assert prepared.status_code == 200, prepared.text
+
+
 async def test_update_draft_to_a_poll(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
@@ -285,6 +325,38 @@ async def test_repeat_opened_at_once_moves_the_application_back(
     assert closed.status_code == 200, closed.text
     assert closed.json()["branchFired"] is True
     assert await _state(maker, app_id) == states["rejected"]
+
+
+async def test_cancelled_repeat_gives_the_application_its_first_decision_back(
+    maker: async_sessionmaker[AsyncSession], app_api: FastAPI
+) -> None:
+    meeting_id, item_id, app_id, states = await _application_meeting(maker)
+    with TestClient(app_api) as client:
+        [first] = client.post(
+            f"/api/meetings/{meeting_id}/votes", json={"agendaItemId": str(item_id)}
+        ).json()["votes"]
+        assert client.post(f"/api/votes/{first['id']}/close").status_code == 200
+        again = client.post(
+            f"/api/meetings/{meeting_id}/votes",
+            json={"agendaItemId": str(item_id), "repeatOf": first["id"]},
+        )
+        assert again.status_code == 200, again.text
+        repeat = next(v for v in again.json()["votes"] if v["id"] != first["id"])
+        assert await _state(maker, app_id) == states["voting"]
+        cancelled = client.post(f"/api/votes/{repeat['id']}/cancel")
+        assert cancelled.status_code == 200, cancelled.text
+    assert await _state(maker, app_id) == states["rejected"]
+    async with maker() as session:
+        last = (
+            await session.execute(
+                select(StatusEvent)
+                .where(StatusEvent.application_id == app_id)
+                .order_by(StatusEvent.at.desc())
+                .limit(1)
+            )
+        ).scalar_one()
+        assert last.note == "vote:repeat-cancelled"
+        assert last.from_state_id == states["voting"]
 
 
 async def test_repeat_refuses_an_application_that_moved_on(

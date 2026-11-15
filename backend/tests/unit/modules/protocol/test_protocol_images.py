@@ -145,7 +145,7 @@ class _PublicSession:
 def _visibleadd_image(snapshot: PublicSnapshot) -> tuple[Any, Any, Any]:
     protocol = SimpleNamespace(
         id=uuid.uuid4(),
-        sent_at=datetime(2026, 10, 2, tzinfo=UTC),
+        finalized_at=datetime(2026, 10, 2, tzinfo=UTC),
         public_content=snapshot.model_dump(mode="json", by_alias=True),
     )
     meeting = SimpleNamespace(title="Sitzung", date=_date(2026, 9, 29))

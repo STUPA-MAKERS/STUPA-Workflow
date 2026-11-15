@@ -249,7 +249,8 @@ class LifecycleOps(HandoverOps):
         Raises:
             ConflictError: The status change is not ``planned`` to ``live`` or ``live``
                 to ``closed`` (``invalid_status_transition``), the meeting still has an
-                open vote on close (``open_vote``), the start has no protokollant, the
+                open vote on close (``open_vote``), an election waits for the lot on close
+                (``lot_pending``), the start has no protokollant, the
                 start is before the open window (``meeting_too_early``), the meeting
                 is closed and the patch changes a value that closed with it
                 (``meeting_closed``), or the protocol of the closed meeting is no longer
@@ -317,6 +318,11 @@ class LifecycleOps(HandoverOps):
             raise ConflictError(
                 "a vote of this meeting is still open — close or cancel it first",
                 code="open_vote",
+            )
+        if closing and await self.lot_pending(meeting.id):
+            raise ConflictError(
+                "an election of this meeting ended in a tie — draw the lot first",
+                code="lot_pending",
             )
 
         if meeting.status == "closed" and wants_manage:

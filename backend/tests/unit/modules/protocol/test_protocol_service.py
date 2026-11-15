@@ -300,6 +300,7 @@ async def test_finalize_renders_stores_and_mails() -> None:
 
     assert out.status == "final"
     assert out.sent_at == NOW
+    assert proto.finalized_at == NOW
     assert proto.pdf_storage_key == protocol_storage_key(PID)
     assert storage.puts and storage.puts[0][2] == "application/pdf"
     assert typst.calls and typst.calls[0][1] == "protocol-stupa"
@@ -313,6 +314,27 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert f"Protokoll öffnen: {SETTINGS_BASE}/meetings/{MID}" in mail.sent[0].text
     assert f'href="{SETTINGS_BASE}/meetings/{MID}"' in (mail.sent[0].html or "")
     assert "/protocols/" not in mail.sent[0].text
+
+
+async def test_finalize_without_a_recipient_marks_no_send() -> None:
+    """A Gremium without a recipient: the protocol is final, and it does not count as sent.
+
+    The fake session serves the empty agenda and finds no member and no extra address.
+    """
+    proto = _protocol()
+    mail = FakeMailQueue()
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium("stupa")},
+        results=[result(proto), result(), result(), result(), result()],
+    )
+    out = await _service(
+        session, storage=FakeStorage(), typst=FakeTypst(pdf=b"%PDF-1.4 ok"), mail_queue=mail
+    ).finalize(PID, now=NOW)
+
+    assert out.status == "final"
+    assert proto.finalized_at == NOW
+    assert out.sent_at is None
+    assert mail.sent == []
 
 
 async def test_protocol_mail_links_the_public_version_when_public() -> None:

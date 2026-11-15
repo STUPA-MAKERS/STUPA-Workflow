@@ -154,6 +154,18 @@ async def test_no_next_round_for_another_result_round_or_rule(
     assert world.inserted == []
 
 
+async def test_an_election_that_is_voted_on_again_takes_no_next_round(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vote = _missed({"c1": 3, "c2": 2, "c3": 2})
+    world = _World(monkeypatch, vote, child=False)
+    world.db.scalar_results = ["repeat"]
+    with pytest.raises(ConflictError) as err:
+        await world.service.next_round(vote.id, LEAD, now=NOW)
+    assert err.value.code == "repeat_exists"
+    assert world.inserted == []
+
+
 async def test_an_election_has_one_next_round(monkeypatch: pytest.MonkeyPatch) -> None:
     vote = _missed({"c1": 3, "c2": 2, "c3": 2})
     world = _World(monkeypatch, vote, child=True)

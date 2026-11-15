@@ -74,6 +74,8 @@ export interface TransferCreate {
   readonly fiscalYearId: Uuid;
   readonly amount: string;
   readonly description: string;
+  /** A past fiscal year needs it, and it must lie in that year. */
+  readonly paymentDate?: string | null;
 }
 
 /**
@@ -450,6 +452,14 @@ export interface BudgetNodeUpdate {
 }
 
 /** A top-level budget with one fiscal year that a new booking can take (spec 000879). */
+/** What the dialog of the close of a fiscal year names before the person confirms. */
+export interface FiscalYearCloseCheck {
+  /** The Anträge of the year that are not in an end state. */
+  readonly openApplications: number;
+  /** The plan of the year has a Nachtrag that is still a draft. */
+  readonly draftSupplement: boolean;
+}
+
 export interface BudgetYear {
   readonly budgetId: Uuid;
   readonly budgetName: string;
@@ -458,6 +468,10 @@ export interface BudgetYear {
   readonly display: string;
   /** The year that holds the date of today. */
   readonly current: boolean;
+  /** The year has ended: it takes a booking only with a date in the year. */
+  readonly past: boolean;
+  readonly startDate: string;
+  readonly endDate: string;
 }
 
 export interface FiscalYearCreate {
@@ -547,9 +561,15 @@ export class BudgetTreeApi {
     return this.http.delete<void>(`${this.base}/budgets/${id}`);
   }
 
-  /** The pairs of a budget and a fiscal year that a new booking can take. */
-  listBudgetYears(): Observable<BudgetYear[]> {
-    return this.http.get<BudgetYear[]>(`${this.base}/budget-years`, { context: skipLoading() });
+  /**
+   * The pairs of a budget and a fiscal year that a new booking can take. `late` adds the
+   * past years that are not closed, for a booking and a transfer.
+   */
+  listBudgetYears(late = false): Observable<BudgetYear[]> {
+    return this.http.get<BudgetYear[]>(`${this.base}/budget-years`, {
+      context: skipLoading(),
+      params: late ? { late: 'true' } : {},
+    });
   }
 
   listFiscalYears(topId: Uuid): Observable<FiscalYear[]> {
@@ -585,6 +605,14 @@ export class BudgetTreeApi {
    *  bookings, allocations or applications still reference the year. */
   deleteFiscalYear(topId: Uuid, fyId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}`);
+  }
+
+  /** What the close of a fiscal year leaves open. Needs P(`budget.structure`). */
+  fiscalYearCloseCheck(topId: Uuid, fyId: Uuid): Observable<FiscalYearCloseCheck> {
+    return this.http.get<FiscalYearCloseCheck>(
+      `${this.base}/budgets/${topId}/fiscal-years/${fyId}/close-check`,
+      { context: skipLoading() },
+    );
   }
 
   /** Close a fiscal year, or reopen it. Needs P(`budget.structure`). */

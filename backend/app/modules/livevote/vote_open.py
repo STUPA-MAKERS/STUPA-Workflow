@@ -52,15 +52,16 @@ async def draft_open_checks(
     """Refuse the open of a draft that the current state does not allow.
 
     A prepared repeat of a closed application vote first moves the application back
-    into its vote state (``vote_repeat.reopen_application``, commits), so the repeat
-    can decide it again.
+    into its vote state (``vote_repeat.reopen_application``), so the repeat can decide
+    it again. The open of the vote commits the move, and a refusal leaves it undone.
 
     Returns:
         The quorum denominator from the current roster.
 
     Raises:
         NotFoundError: The meeting has no such vote.
-        ConflictError: The meeting is not live, the vote is no longer a draft, guests
+        ConflictError: The meeting is not live, the vote is no longer a draft, another
+            vote of the meeting is open (``vote_open_exists``), guests
             no longer vote on it (``guests_vote_unavailable``), its application
             cannot be decided now, or the application of a repeat changed its status
             after the repeated vote (``application_moved_on``).
@@ -71,6 +72,7 @@ async def draft_open_checks(
         raise NotFoundError(f"vote {vote_id} not found in this meeting")
     if vote.status != "draft":
         raise ConflictError(f"vote is {vote.status}, cannot open.", code="vote_not_draft")
+    assert_no_open_vote(meeting)
     if vote.guests_vote:
         guests_allowed = meeting.public_join and meeting.guests_mode == "vote"
         non_public = (
@@ -129,6 +131,22 @@ def assert_vote_window(meeting: MeetingOut, *, draft: bool) -> None:
         raise ConflictError(
             "the meeting has not started — start it before opening a vote",
             code="meeting_not_started",
+        )
+
+
+def assert_no_open_vote(meeting: MeetingOut) -> None:
+    """Refuse the open of a vote while another vote of the meeting is open.
+
+    The room and the beamer show one vote at a time. A draft waits beside an open
+    vote.
+
+    Raises:
+        ConflictError: The meeting has an open vote (``vote_open_exists``).
+    """
+    if any(v.status == "open" for v in meeting.votes):
+        raise ConflictError(
+            "another vote of the meeting is open — close or cancel it first",
+            code="vote_open_exists",
         )
 
 

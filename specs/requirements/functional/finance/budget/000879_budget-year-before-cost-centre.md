@@ -4,7 +4,7 @@ title: A person chooses Haushalt and Haushaltsjahr before the Kostenstelle
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-15
 tests:
   - "backend/tests/unit/modules/budget/test_budget_tree_rules.py:test_a_year_is_choosable_when_it_is_open_not_past_and_decided"
   - "backend/tests/integration/modules/budget/test_budget_tree_service.py:test_a_new_booking_takes_only_a_year_that_is_not_past"
@@ -35,8 +35,9 @@ that is not past and not closed. The current Haushaltsjahr must be preselected. 
 more than one Haushalt, the Haushalt that the person chose last comes first, else the
 first one.
 
-The server must refuse a new booking, a new transfer and an assignment with any other
-year with the code `fiscal_year_not_choosable`. A transfer stays inside one pair. A
+A booking and a transfer also take a past year that is not closed, with a date in the year
+(000990). The server must refuse a new booking, a new transfer and an assignment with any
+other year with the code `fiscal_year_not_choosable`. A transfer stays inside one pair. A
 booking or an assignment that exists in a past year stays readable and stays as it is,
 and a booking that moves to another Kostenstelle keeps its year. The action of the flow
 that assigns a Kostenstelle takes the current year and does nothing when the Haushalt

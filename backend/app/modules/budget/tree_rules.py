@@ -211,14 +211,28 @@ def pick_fiscal_year[T](candidates: Sequence[tuple[T, date, date]], today: date)
             return None
 
 
-def is_choosable_year(end: date, today: date, *, closed: bool, plan_in_force: bool | None) -> bool:
+def is_choosable_year(
+    end: date, today: date, *, closed: bool, plan_in_force: bool | None, late: bool = False
+) -> bool:
     """Say if a new booking or assignment can take a fiscal year (spec 000879).
 
     The year must not be closed and must not be past. `plan_in_force` is `None` for a
     budget without a plan. For a budget with a plan it says if the plan of the year is
-    in force, because money moves only on a decided plan.
+    in force, because money moves only on a decided plan. `late` is for a booking or a
+    transfer: it also takes a past year, because a payment of the last weeks of a year
+    is often entered after the year has ended (spec 000990).
     """
-    return not closed and end >= today and plan_in_force is not False
+    return not closed and (late or end >= today) and plan_in_force is not False
+
+
+def late_booking_date_fits(start: date, end: date, today: date, on: date | None) -> bool:
+    """Say if the date of a booking fits a fiscal year that may be past (spec 000990).
+
+    A year that is not past takes a booking with any date or with none. A past year
+    takes only a booking whose date lies in the year, because the date is then the
+    only sign that the money belongs to that year.
+    """
+    return end >= today or (on is not None and start <= on <= end)
 
 
 def is_valid_fiscal_start(start_month: int, start_day: int) -> bool:

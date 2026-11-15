@@ -502,10 +502,14 @@ export class StatusTimelineComponent {
 
   /**
    * Make the machine note of a vote readable; a tie is a rejection. `vote:repeat` marks
-   * the move back into the vote state when a meeting votes on the application again.
+   * the move back into the vote state when a meeting votes on the application again, and
+   * `vote:repeat-cancelled` the return to the first decision after a cancelled repeat.
    */
   noteText(note: string): string {
     if (note === 'vote:repeat') return this.i18n.translate('status.history.voteRepeat');
+    if (note === 'vote:repeat-cancelled') {
+      return this.i18n.translate('status.history.voteRepeatCancelled');
+    }
     const resultKeys = {
       'vote:passed': 'vote.result.passed',
       'vote:rejected': 'vote.result.rejected',

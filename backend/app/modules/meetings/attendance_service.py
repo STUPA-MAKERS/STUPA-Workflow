@@ -593,8 +593,14 @@ class AttendanceService:
         The router checks `canWrite` before the call. The change writes
         `attendance_set` with the status before and after it.
 
+        In a closed meeting the change is a correction of the record. It also takes a
+        former member who has a record in the meeting, because the roster still lists
+        this person. It frees no pool seat and checks no delegation, because the
+        votes of the meeting are over and the substitutions belong to its record.
+
         Raises:
-            NotFoundError: The principal is not a current member of the Gremium.
+            NotFoundError: The principal is not a current member of the Gremium, and
+                the meeting is not closed or holds no record of the principal.
             ConflictError: The protocol of the closed meeting is final (code
                 `protocol_final`), the status is `present` while a
                 delegation of the member exists (code `delegation_active`), or
@@ -602,12 +608,20 @@ class AttendanceService:
         """
         meeting = await self._meeting(meeting_id, for_write=True)
         await self._ensure_lead_open(meeting)
+        closed = meeting.status == "closed"
         members = await self._current_members(meeting.gremium_id)
-        if not any(m.id == principal_id for m in members):
+        is_member = any(m.id == principal_id for m in members)
+        if not is_member and not closed:
             raise NotFoundError("principal is not a current member of this committee")
-        if status == "present" and await self._delegated(meeting_id, principal_id, requester_sub):
+        if (
+            not closed
+            and status == "present"
+            and await self._delegated(meeting_id, principal_id, requester_sub)
+        ):
             raise ConflictError(_DELEGATION_ACTIVE, code="delegation_active")
         existing = await self._record(meeting_id, principal_id)
+        if not is_member and existing is None:
+            raise NotFoundError("principal has no attendance record in this meeting")
         before = existing.status if existing is not None else None
         before_source = existing.source if existing is not None else None
         self._write(

@@ -164,7 +164,9 @@ async def test_finalize_public_gremium_renders_public_version(
             protocol.pdf_storage_key = protocol_storage_key(protocol.id)
         return f"%PDF-{markdown}".encode()
 
-    async def _send(protocol: Protocol, pdf: bytes | None, *, at: datetime) -> None:
+    async def _send(
+        protocol: Protocol, pdf: bytes | None, to: object = None, *, at: datetime
+    ) -> None:
         mailed.append(pdf)
 
     monkeypatch.setattr(svc, "_has_non_public", _has_non_public)
