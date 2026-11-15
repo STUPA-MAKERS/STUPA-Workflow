@@ -360,7 +360,13 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     requested_at=datetime.now(UTC),
                     decided_by=old.id,
                 ),
-                Protocol(meeting_id=meeting.id, gremium_id=seed.gremium_id, author=old.sub),
+                Protocol(
+                    meeting_id=meeting.id,
+                    gremium_id=seed.gremium_id,
+                    author=old.sub,
+                    approved_by=old.sub,
+                    approved_at=datetime.now(UTC),
+                ),
                 MeetingAttendance(
                     meeting_id=meeting.id, principal_id=old.id, status="present", source="self"
                 ),
