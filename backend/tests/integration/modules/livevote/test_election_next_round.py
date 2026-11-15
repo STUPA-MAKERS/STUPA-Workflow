@@ -94,6 +94,7 @@ async def test_three_rounds_then_the_lot(
     async with maker() as session:
         stored = await session.get(Vote, closed_second)
     assert stored is not None
+    assert stored.election_result is not None
     lot = stored.election_result["nextRoundLot"]
     assert lot["among"] == ["c2", "c3"]
     assert lot["drawn"] == [standing[1]]
