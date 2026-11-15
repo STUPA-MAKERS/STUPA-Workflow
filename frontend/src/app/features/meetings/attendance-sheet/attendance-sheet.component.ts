@@ -165,6 +165,8 @@ export class AttendanceSheetComponent {
   protected readonly phone = mediaQuery(MEDIA.phone);
 
   readonly open = model(false);
+  /** The protocol of the meeting is final or in its render. */
+  readonly protocolLocked = input(false);
   readonly meeting = input.required<Meeting>();
   readonly attendance = input.required<Attendance[]>();
   readonly saving = input(false);
@@ -223,9 +225,14 @@ export class AttendanceSheetComponent {
     effect(() => this.noteInput()?.nativeElement.focus());
   }
 
-  /** The lead sets every row. A closed meeting freezes the attendance. */
+  /**
+   * The lead sets every row. A closed meeting freezes the own report; the lead still
+   * corrects a row until the protocol is final (§ 000951).
+   */
   protected readonly lead = computed(() => this.meeting().canControl);
-  protected readonly locked = computed(() => this.meeting().status === 'closed');
+  protected readonly locked = computed(
+    () => this.meeting().status === 'closed' && (!this.lead() || this.protocolLocked()),
+  );
   /** The line below the title of the delegation dialog. */
   protected readonly meetingLine = computed(() =>
     meetingLine(this.meeting(), this.i18n.formatLocale()),

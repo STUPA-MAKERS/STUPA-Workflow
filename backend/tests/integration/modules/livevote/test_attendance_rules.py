@@ -23,7 +23,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.models import GremiumMembership, GremiumRole
-from app.modules.meetings.models import MeetingAttendance
+from app.modules.meetings.models import Meeting, MeetingAttendance
 from tests.integration.modules.livevote.conftest import ADMIN_SUB, admin, audit_actions, seed
 
 pytestmark = pytest.mark.integration
@@ -266,19 +266,49 @@ async def test_lead_changes_are_audited_without_the_note(
     assert rows == []
 
 
-async def test_closed_meeting_freezes_the_attendance(
+async def test_closed_meeting_freezes_the_own_report_and_the_lead_corrects(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    s = await seed(maker, status="closed", items=0)
+    """§F/meetings/meetings/000951: the lead corrects until the protocol is final."""
+    s = await seed(maker, status="closed", items=0, protocol="draft")
     sub, pid = await _member(maker, s.gremium_id, "Anna")
+    async with maker() as session:
+        meeting = await session.get(Meeting, s.meeting_id)
+        assert meeting is not None
+        meeting.present_count = 0
+        await session.commit()
+    url = f"/api/meetings/{s.meeting_id}/attendance"
+    with TestClient(api) as client:
+        lead_set = client.put(f"{url}/{pid}", json={"status": "present"})
+        async with maker() as session:
+            counted = await session.scalar(
+                select(Meeting.present_count).where(Meeting.id == s.meeting_id)
+            )
+        lead_reset = client.delete(f"{url}/{pid}")
+        _as(api, sub)
+        own = client.put(f"{url}/me", json={"status": "present"})
+    assert (lead_set.status_code, lead_reset.status_code) == (200, 200), lead_set.text
+    assert counted == 1
+    assert (own.status_code, own.json()["code"]) == (409, "meeting_closed")
+    async with maker() as session:
+        assert (
+            await session.scalar(select(Meeting.present_count).where(Meeting.id == s.meeting_id))
+        ) == 0
+    actions = [e.action for e in await audit_actions(maker, target_id=s.meeting_id)]
+    assert actions == ["attendance_set", "attendance_reset"]
+
+
+async def test_final_protocol_freezes_the_attendance(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    s = await seed(maker, status="closed", items=0, protocol="final")
+    _, pid = await _member(maker, s.gremium_id, "Anna")
     url = f"/api/meetings/{s.meeting_id}/attendance"
     with TestClient(api) as client:
         lead_set = client.put(f"{url}/{pid}", json={"status": "absent"})
         lead_reset = client.delete(f"{url}/{pid}")
-        _as(api, sub)
-        own = client.put(f"{url}/me", json={"status": "present"})
-    for resp in (lead_set, lead_reset, own):
-        assert resp.status_code == 409, resp.text
+    for resp in (lead_set, lead_reset):
+        assert (resp.status_code, resp.json()["code"]) == (409, "protocol_final"), resp.text
     assert await audit_actions(maker, target_id=s.meeting_id) == []
 
 

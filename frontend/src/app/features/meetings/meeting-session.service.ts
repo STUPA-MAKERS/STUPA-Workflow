@@ -728,6 +728,8 @@ export class MeetingSessionService implements OnDestroy {
         this.savingAttendance.set(false);
         this.attendance.set(rows);
         if (this.attendanceConflict() === principalId) this.attendanceConflict.set(null);
+        // A correction after the close counts the meeting again (§ 000951).
+        if (this.meeting()?.status === 'closed') this.reloadMeeting();
       },
       error: (err: unknown) => {
         this.savingAttendance.set(false);

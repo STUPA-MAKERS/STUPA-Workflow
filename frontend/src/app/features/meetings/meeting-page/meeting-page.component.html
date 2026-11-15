@@ -113,6 +113,7 @@
   [open]="panel() === 'attendance'"
   (openChange)="$event || panel.set('none')"
   [meeting]="m"
+  [protocolLocked]="locked()"
   [attendance]="attendance()"
   [saving]="savingAttendance()"
   [viewers]="viewers()"
