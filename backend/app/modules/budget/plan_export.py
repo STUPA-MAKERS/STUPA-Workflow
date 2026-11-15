@@ -105,6 +105,8 @@ class ExportRow:
     coverable: bool
     blocked: Decimal
     note: str
+    #: No line of the version sits below this one.
+    leaf: bool = True
 
     @property
     def marks(self) -> str:
@@ -221,6 +223,11 @@ def _rows(
     line = lines.get(node.id)
     if line is None:
         return ()
+    below = tuple(
+        pair
+        for child in node.children
+        for pair in _rows(child, depth + 1, lines, base, prev, prev_fiscal_year_id)
+    )
     row = ExportRow(
         key=line.path_key or node.path_key,
         name=line.name or node.name,
@@ -233,11 +240,7 @@ def _rows(
         coverable=line.coverable,
         blocked=line.blocked,
         note=line.note or "",
-    )
-    below = tuple(
-        pair
-        for child in node.children
-        for pair in _rows(child, depth + 1, lines, base, prev, prev_fiscal_year_id)
+        leaf=not below,
     )
     return ((line.side, row), *below)
 
@@ -314,6 +317,8 @@ class SheetRow:
     kind: RowKind
     depth: int
     cells: tuple[Cell, ...]
+    #: A line with no line below it. Only a line can be other than a leaf.
+    leaf: bool = True
 
 
 def _columns(
@@ -411,6 +416,7 @@ def _group_rows(export: PlanExport, group: ExportGroup) -> tuple[SheetRow, ...]:
                 blocked=r.blocked or None,
                 note=r.note,
             ),
+            leaf=r.leaf,
         )
         for r in group.rows
     )
@@ -463,8 +469,15 @@ def money(value: Decimal) -> str:
     return f"−{text}" if value < 0 else text
 
 
-def _pdf_cell(cell: Cell) -> str:
-    return money(cell) if isinstance(cell, Decimal) else (cell or "")
+def _pdf_cell(cell: Cell, *, leaf: bool = True) -> str:
+    """Return a cell as text. An amount of a line with lines below it stands in brackets.
+
+    Such an amount is the sum of the lines below it, so it is not counted again
+    (spec 000965).
+    """
+    if not isinstance(cell, Decimal):
+        return cell or ""
+    return money(cell) if leaf else f"({money(cell)})"
 
 
 def pdf_source(export: PlanExport) -> str:
@@ -486,7 +499,11 @@ def pdf_config(export: PlanExport) -> dict[str, object]:
             "headers": list(sheet_headers(export)),
             "money": sorted(money_columns(export)),
             "rows": [
-                {"kind": row.kind, "depth": row.depth, "cells": [_pdf_cell(c) for c in row.cells]}
+                {
+                    "kind": row.kind,
+                    "depth": row.depth,
+                    "cells": [_pdf_cell(c, leaf=row.leaf) for c in row.cells],
+                }
                 for row in sheet_rows(export)
             ],
         }
