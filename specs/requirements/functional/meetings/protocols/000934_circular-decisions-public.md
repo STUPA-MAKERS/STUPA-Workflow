@@ -2,7 +2,7 @@
 id: "000934"
 title: A circular decision is public where the protocol is public
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
