@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
 from app.modules.flow.dispatch import DispatchedAction
@@ -18,7 +18,7 @@ from tests._support.webhooks_fakes import FakeSession, FakeWebhookQueue
 
 def _maker(session: FakeSession) -> Callable[[], AbstractAsyncContextManager[FakeSession]]:
     @asynccontextmanager
-    async def open_session() -> AsyncIterator[FakeSession]:
+    async def open_session() -> AsyncGenerator[FakeSession]:
         yield session
 
     return open_session
