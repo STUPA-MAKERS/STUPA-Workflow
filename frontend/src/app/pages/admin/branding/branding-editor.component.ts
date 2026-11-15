@@ -125,6 +125,14 @@ export class BrandingEditorComponent {
   protected readonly logoSlots: readonly LogoSlot[] = ['wordmark', 'imagemark', 'favicon'];
   protected readonly pdfAccept = PDF_ASSET_ACCEPT_MIME.join(',');
   protected readonly pdfSlots: readonly PdfSlot[] = ['logo', 'footer'];
+  /**
+   * The built-in graphics of the render service, copied to the assets (spec 001005): the row
+   * of a slot that holds the default shows its graphic, as the logo rows above do.
+   */
+  protected readonly pdfDefault: Readonly<Record<PdfSlot, string>> = {
+    logo: 'assets/logos/pdf-stupa.svg',
+    footer: 'assets/logos/pdf-skyline.svg',
+  };
   /** The PDF branding (specs 000891, 000892). It saves at once, not with the draft. */
   protected readonly pdfAssets = signal<Record<PdfSlot, PdfAsset | null>>({ logo: null, footer: null });
   /** The PDF slot that a file is dragged over. */
