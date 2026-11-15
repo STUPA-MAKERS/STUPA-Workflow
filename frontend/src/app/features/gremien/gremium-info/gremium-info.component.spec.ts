@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/angular';
-import { GremienApiService } from '@core/api/gremien.service';
+import { GremienApiService, type GremiumInfo } from '@core/api/gremien.service';
 import { runAxe } from '../../../../testing/a11y';
 import { gremienApiMock, gremiumInfo } from '../../../../testing/gremien-fixtures';
 import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
@@ -16,7 +16,7 @@ const FILLED = gremiumInfo({
   updatedByName: 'Mara Keller',
 });
 
-async function setup(info: unknown) {
+async function setup(info: GremiumInfo | null | undefined) {
   localStorage.setItem('ap.locale', 'de');
   const api = gremienApiMock();
   const view = await render(GremiumInfoComponent, {
