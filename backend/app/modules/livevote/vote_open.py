@@ -52,8 +52,8 @@ async def draft_open_checks(
     """Refuse the open of a draft that the current state does not allow.
 
     A prepared repeat of a closed application vote first moves the application back
-    into its vote state (``vote_repeat.reopen_application``, commits), so the repeat
-    can decide it again.
+    into its vote state (``vote_repeat.reopen_application``), so the repeat can decide
+    it again. The open of the vote commits the move, and a refusal leaves it undone.
 
     Returns:
         The quorum denominator from the current roster.

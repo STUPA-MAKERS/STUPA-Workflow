@@ -287,6 +287,38 @@ async def test_repeat_opened_at_once_moves_the_application_back(
     assert await _state(maker, app_id) == states["rejected"]
 
 
+async def test_cancelled_repeat_gives_the_application_its_first_decision_back(
+    maker: async_sessionmaker[AsyncSession], app_api: FastAPI
+) -> None:
+    meeting_id, item_id, app_id, states = await _application_meeting(maker)
+    with TestClient(app_api) as client:
+        [first] = client.post(
+            f"/api/meetings/{meeting_id}/votes", json={"agendaItemId": str(item_id)}
+        ).json()["votes"]
+        assert client.post(f"/api/votes/{first['id']}/close").status_code == 200
+        again = client.post(
+            f"/api/meetings/{meeting_id}/votes",
+            json={"agendaItemId": str(item_id), "repeatOf": first["id"]},
+        )
+        assert again.status_code == 200, again.text
+        repeat = next(v for v in again.json()["votes"] if v["id"] != first["id"])
+        assert await _state(maker, app_id) == states["voting"]
+        cancelled = client.post(f"/api/votes/{repeat['id']}/cancel")
+        assert cancelled.status_code == 200, cancelled.text
+    assert await _state(maker, app_id) == states["rejected"]
+    async with maker() as session:
+        last = (
+            await session.execute(
+                select(StatusEvent)
+                .where(StatusEvent.application_id == app_id)
+                .order_by(StatusEvent.at.desc())
+                .limit(1)
+            )
+        ).scalar_one()
+        assert last.note == "vote:repeat-cancelled"
+        assert last.from_state_id == states["voting"]
+
+
 async def test_repeat_refuses_an_application_that_moved_on(
     maker: async_sessionmaker[AsyncSession], app_api: FastAPI
 ) -> None:

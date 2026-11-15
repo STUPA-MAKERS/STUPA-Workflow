@@ -987,6 +987,7 @@
   "meetings.vote.attemptElection": "{n}. Wahlgang",
   "meetings.toast.voteSaved": "Abstimmung gespeichert.",
   "status.history.voteRepeat": "Erneute Abstimmung",
+  "status.history.voteRepeatCancelled": "Erneute Abstimmung abgebrochen",
   "meetings.vote.opensLater": "Öffnen kannst du sie, sobald die Sitzung eröffnet ist.",
   "meetings.vote.open": "Abstimmung öffnen",
   "meetings.vote.openBlocked": "Erst die offene Abstimmung schließen oder abbrechen.",

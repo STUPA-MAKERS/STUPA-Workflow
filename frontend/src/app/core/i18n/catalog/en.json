@@ -987,6 +987,7 @@
   "meetings.vote.attemptElection": "Ballot {n}",
   "meetings.toast.voteSaved": "Vote saved.",
   "status.history.voteRepeat": "Vote repeated",
+  "status.history.voteRepeatCancelled": "Repeated vote cancelled",
   "meetings.vote.opensLater": "You can open it once the meeting is open.",
   "meetings.vote.open": "Open vote",
   "meetings.vote.openBlocked": "Close or cancel the open vote first.",

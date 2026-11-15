@@ -874,6 +874,8 @@ async def delete_meeting_vote(
     the close the vote is part of the record, and the route answers 409
     ``meeting_closed``. Only a ``draft`` or ``cancelled`` vote can go: an open or
     closed vote gives 409 ``vote_not_deletable``. Every delete writes ``vote_delete``.
+    The delete of a prepared repeat gives the application back the decision of the
+    vote that it repeated, when the repeat already moved the application back.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:

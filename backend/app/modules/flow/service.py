@@ -980,6 +980,7 @@ class FlowService:
         reverted_status_event_id: UUID | None = None,
         decision_swap: DecisionSwap | None = None,
         note: str = "revert",
+        commit: bool = True,
     ) -> UUID:
         """Undo an audited status change (audit-log revert).
 
@@ -1013,6 +1014,11 @@ class FlowService:
 
         `note` is the note of the new status event: `revert` for the audit-log revert,
         `vote:repeat` when a meeting repeats the vote that made the change.
+
+        `commit=False` leaves the commit to the caller. The repeat of a meeting vote
+        uses it: the move back and the open of the new vote then succeed or fail
+        together, so no application stays in a vote state without a vote. The caller
+        gets no `vote_cancelled` broadcast then, because the transaction is still open.
 
         Returns:
             The id of the new status event.
@@ -1092,8 +1098,9 @@ class FlowService:
                 **swap_data,
             },
         )
-        await self.session.commit()
-        await self._publish_cancelled(cancelled)
+        if commit:
+            await self.session.commit()
+            await self._publish_cancelled(cancelled)
         return status_event_id
 
     async def list_states(

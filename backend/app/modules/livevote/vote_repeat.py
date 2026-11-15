@@ -10,9 +10,11 @@ opens, ``reopen_application`` moves the application back into the vote state tha
 closed vote decided, through the same path as an audit-log revert: a status event with
 the note ``vote:repeat``, a ``status_change`` audit entry, and the decision of the
 closed vote gives way to the decision before it. The close of the repeat fires the
-branch again. The move back works only while the application still sits in the state
-that the closed vote put it in, because a later change (for example a payment) is not
-undone by a repeat.
+branch again. The move back commits with the create or the open of the repeat. An
+open repeat that is cancelled gives the application back the decision of the closed
+vote (``voting.repeat.restore_repeated_decision``). The move back works only while
+the application still sits in the state that the closed vote put it in, because a
+later change (for example a payment) is not undone by a repeat.
 """
 
 from __future__ import annotations
@@ -28,10 +30,8 @@ from app.modules.audit.models import AuditEntry
 from app.modules.flow.models import State
 from app.modules.flow.service import FlowService
 from app.modules.voting.models import Vote
+from app.modules.voting.repeat import REPEAT_NOTE
 from app.shared.errors import ConflictError, NotFoundError
-
-#: The note of the status event that moves an application back for a repeat.
-REPEAT_NOTE = "vote:repeat"
 
 
 async def repeat_source(
@@ -132,10 +132,11 @@ async def assert_reopenable(session: AsyncSession, source: Vote) -> StatusEvent 
 
 
 async def reopen_application(session: AsyncSession, source: Vote, *, actor: str) -> None:
-    """Move the application of a repeated vote back into its vote state (commits).
+    """Move the application of a repeated vote back into its vote state (no commit).
 
     Nothing happens for a vote without an application or an application that is still
-    in a vote state.
+    in a vote state. The caller commits with the create or the open of the repeat, so
+    a refused open leaves the application where it is.
 
     Raises:
         ConflictError: The application moved on after the close of the vote
@@ -168,4 +169,5 @@ async def reopen_application(session: AsyncSession, source: Vote, *, actor: str)
         reverted_audit_id=audit_id,
         reverted_status_event_id=event.id,
         note=REPEAT_NOTE,
+        commit=False,
     )
