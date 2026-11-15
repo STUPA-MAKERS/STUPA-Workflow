@@ -2,7 +2,7 @@
 id: "001020"
 title: The amounts of a plan table end on one edge
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

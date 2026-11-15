@@ -303,7 +303,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000805](requirements/functional/finance/budget/000805_planning-list.md) | The list of Planung shows the plan as a tree | approved |
 | [F/finance/budget/000806](requirements/functional/finance/budget/000806_plan-page-steps.md) | The plan page shows the steps of the version | approved |
 | [F/finance/budget/000807](requirements/functional/finance/budget/000807_plan-page-sums.md) | The plan page shows the sums and the balance | approved |
-| [F/finance/budget/000808](requirements/functional/finance/budget/000808_plan-page-tables.md) | The plan page lists income and expenses in two tables | draft |
+| [F/finance/budget/000808](requirements/functional/finance/budget/000808_plan-page-tables.md) | The plan page lists income and expenses in two tables | approved |
 | [F/finance/budget/000809](requirements/functional/finance/budget/000809_plan-page-nachtrag-columns.md) | A Nachtrag is shown beside the version in force | approved |
 | [F/finance/budget/000810](requirements/functional/finance/budget/000810_draft-edit-in-table.md) | A draft is edited in the table | approved |
 | [F/finance/budget/000811](requirements/functional/finance/budget/000811_plan-submit-needs-balance.md) | An unbalanced draft cannot go to the vote | approved |
@@ -354,7 +354,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000877](requirements/functional/finance/budget/000877_rename-in-draft.md) | A Kostenstelle of a Haushalt with a plan gets a new key or name in a draft | approved |
 | [F/finance/budget/000878](requirements/functional/finance/budget/000878_path-key-one-hyphen.md) | The path key of a Kostenstelle has one hyphen | approved |
 | [F/finance/budget/000879](requirements/functional/finance/budget/000879_budget-year-before-cost-centre.md) | A person chooses Haushalt and Haushaltsjahr before the Kostenstelle | approved |
-| [F/finance/budget/000889](requirements/functional/finance/budget/000889_year-before-needs-plan.md) | The columns of the year before show only when that year has a plan | draft |
+| [F/finance/budget/000889](requirements/functional/finance/budget/000889_year-before-needs-plan.md) | The columns of the year before show only when that year has a plan | approved |
 | [F/finance/budget/000890](requirements/functional/finance/budget/000890_deciding-gremium-reads-haushalt.md) | A Gremium that decides a plan reads the Haushalt | approved |
 | [F/finance/budget/000927](requirements/functional/finance/budget/000927_gremium-delete-takes-tree-lock.md) | The delete of a Gremium takes the lock of each tree that names it | approved |
 | [F/finance/budget/000928](requirements/functional/finance/budget/000928_plan-readable-question.md) | A page asks whether the reader reads a plan and gets no 403 | approved |
@@ -365,8 +365,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000990](requirements/functional/finance/budget/000990_late-booking-in-past-year.md) | A past fiscal year that is not closed takes a booking with a date in the year | approved |
 | [F/finance/budget/000991](requirements/functional/finance/budget/000991_close-names-open-antraege.md) | The close of a fiscal year names what stays open, and an Antrag can leave a closed year | approved |
 | [F/finance/budget/000992](requirements/functional/finance/budget/000992_stichtag-keeps-closed-years.md) | A new Stichtag moves only the fiscal years that are not closed | approved |
-| [F/finance/budget/001020](requirements/functional/finance/budget/001020_plan-table-amounts-one-edge.md) | The amounts of a plan table end on one edge | draft |
-| [F/finance/budget/001021](requirements/functional/finance/budget/001021_plan-change-needs-comparison.md) | A plan shows the Änderung only against an Ansatz | draft |
+| [F/finance/budget/001020](requirements/functional/finance/budget/001020_plan-table-amounts-one-edge.md) | The amounts of a plan table end on one edge | approved |
+| [F/finance/budget/001021](requirements/functional/finance/budget/001021_plan-change-needs-comparison.md) | A plan shows the Änderung only against an Ansatz | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | replaced |

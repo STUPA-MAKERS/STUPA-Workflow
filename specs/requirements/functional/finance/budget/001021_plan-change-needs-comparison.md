@@ -2,7 +2,7 @@
 id: "001021"
 title: A plan shows the Änderung only against an Ansatz
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
