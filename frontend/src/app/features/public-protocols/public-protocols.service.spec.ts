@@ -39,6 +39,8 @@ describe('PublicProtocolsService', () => {
     http.expectOne('/api/public/protocols?limit=3').flush({ items: [], total: 0, limit: 3, offset: 0 });
     api.list().subscribe();
     http.expectOne('/api/public/protocols').flush({ items: [], total: 0, limit: 20, offset: 0 });
+    api.decisions({ gremium: ['g-1'], q: 'a' }).subscribe();
+    http.expectOne('/api/public/decisions?gremium=g-1&q=a').flush({ items: [], total: 0, limit: 20, offset: 0 });
     api.semesters({ gremium: ['g-1'], q: 'a', semester: 'ss-2026' }).subscribe();
     http.expectOne('/api/public/protocols/semesters?gremium=g-1&q=a').flush([]);
     api.semesters().subscribe();

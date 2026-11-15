@@ -64,6 +64,7 @@ describe('PublicProtocolsComponent', () => {
     );
     expect(within(card).getByText('PDF · 212 KB · finalisiert 02.10.2026')).toBeInTheDocument();
     expect(screen.getByText('1 Protokoll')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Beschlüsse' })).toHaveAttribute('href', '/decisions');
     expect(document.body.textContent).not.toContain('g-1');
     expect(TestBed.inject(Meta).getTag('name="robots"')?.content).toBe('noindex');
   });

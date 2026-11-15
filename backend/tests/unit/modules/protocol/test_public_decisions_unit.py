@@ -1,7 +1,8 @@
 """Unit tests of the public decisions (spec 000926, no database).
 
 They cover the list over a fake session: the fields of a motion and of an election,
-the decisions that stay out (internal TOP), the search, the page cut, and the route
+the decisions that stay out (internal TOP; the visibility of a protocol is the
+rule of `visible_rows`, tested with the protocol list), the search, the page cut, and the route
 without a session.
 """
 
@@ -22,7 +23,6 @@ from app.main import create_app
 from app.modules.protocol.public import (
     PublicDecision,
     PublicFilter,
-    PublicProtocolService,
     PublicSnapshot,
     PublicTop,
 )
@@ -76,31 +76,24 @@ def _row() -> tuple[Any, Any, Any]:
     return protocol, meeting, gremium
 
 
-class _Result:
-    def __init__(self, rows: list[Any]) -> None:
-        self._rows = rows
+class _Rows:
+    """Stand-in for `PublicProtocolService`: answers `visible_rows` and keeps the filter."""
 
-    def all(self) -> list[Any]:
-        return list(self._rows)
-
-
-class _Session:
     def __init__(self, rows: list[Any]) -> None:
         self.rows = rows
-        self.statements: list[str] = []
+        self.filters: list[PublicFilter] = []
 
-    async def execute(self, stmt: Any) -> _Result:
-        self.statements.append(str(stmt))
-        return _Result(self.rows)
+    async def visible_rows(self, flt: PublicFilter) -> list[Any]:
+        self.filters.append(flt)
+        return list(self.rows)
 
 
-def _service(rows: list[Any]) -> tuple[PublicProtocolService, _Session]:
-    session = _Session(rows)
-    return PublicProtocolService(session), session  # type: ignore[arg-type]
+def _service(rows: list[Any]) -> Any:
+    return _Rows(rows)
 
 
 async def test_list_holds_the_public_decisions_only() -> None:
-    svc, session = _service([_row()])
+    svc = _service([_row()])
     page = await list_public_decisions(svc, PublicFilter(), limit=20, offset=0)
     assert page.total == 2
     motion, election = page.items
@@ -120,14 +113,10 @@ async def test_list_holds_the_public_decisions_only() -> None:
     dumped = page.model_dump_json(by_alias=True)
     assert "Musterfrau" not in dumped
     assert "Intern" not in dumped
-    sql = " ".join(session.statements)
-    assert "protocols_public IS true" in sql
-    assert "public_withheld IS false" in sql
-    assert "public_content IS NOT NULL" in sql
 
 
 async def test_list_searches_the_question_and_cuts_the_page() -> None:
-    svc, _ = _service([_row(), _row()])
+    svc = _service([_row(), _row()])
     hits = await list_public_decisions(svc, PublicFilter(q="SOMMERFEST"), limit=20, offset=0)
     assert [d.question for d in hits.items] == ["Zuschuss Sommerfest"] * 2
     page = await list_public_decisions(svc, PublicFilter(), limit=1, offset=3)
@@ -137,7 +126,7 @@ async def test_list_searches_the_question_and_cuts_the_page() -> None:
 
 
 async def test_list_without_a_public_protocol_is_empty() -> None:
-    svc, _ = _service([])
+    svc = _service([])
     page = await list_public_decisions(svc, PublicFilter(), limit=20, offset=0)
     assert page.items == [] and page.total == 0
 
@@ -145,10 +134,7 @@ async def test_list_without_a_public_protocol_is_empty() -> None:
 @pytest.fixture
 def client() -> Iterator[TestClient]:
     app: FastAPI = create_app(get_settings())
-    session = _Session([_row()])
-    app.dependency_overrides[get_public_protocol_service] = lambda: PublicProtocolService(
-        session  # type: ignore[arg-type]
-    )
+    app.dependency_overrides[get_public_protocol_service] = lambda: _service([_row()])
     app.dependency_overrides[antiabuse.get_rate_limiter] = InMemoryRateLimiter
     yield TestClient(app)
     app.dependency_overrides.clear()

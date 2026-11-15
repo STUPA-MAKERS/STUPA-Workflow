@@ -4472,5 +4472,18 @@
   "admin.gremien.defaults.loadFailed": "Die Vorgaben konnten nicht geladen werden.",
   "admin.gremien.defaults.loading": "Vorgaben werden geladen …",
   "admin.gremien.defaults.saveFailed": "Die Vorgaben konnten nicht gespeichert werden.",
-  "admin.gremien.quorumMinPresent": "Mindestzahl Anwesender"
+  "admin.gremien.quorumMinPresent": "Mindestzahl Anwesender",
+  "publicDecisions.title": "Beschlüsse",
+  "publicDecisions.search": "Beschluss suchen",
+  "publicDecisions.loading": "Beschlüsse werden geladen …",
+  "publicDecisions.error": "Die Beschlüsse konnten nicht geladen werden. Versuche es später noch einmal.",
+  "publicDecisions.more": "Weitere Beschlüsse laden",
+  "publicDecisions.empty.none": "Noch keine öffentlichen Beschlüsse",
+  "publicDecisions.empty.noneBody": "Ein Beschluss erscheint hier, sobald das Protokoll seiner Sitzung öffentlich ist.",
+  "publicDecisions.empty.filtered": "Keine Beschlüsse gefunden",
+  "publicDecisions.empty.filteredBody": "Zu deiner Suche und den Filtern gibt es keinen öffentlichen Beschluss.",
+  "publicDecisions.noQuestion": "Beschluss ohne Frage",
+  "publicDecisions.election": "Wahl",
+  "publicDecisions.protocol": "Zum Protokoll",
+  "publicDecisions.link": "Beschlüsse"
 }

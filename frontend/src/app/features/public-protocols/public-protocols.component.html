@@ -7,6 +7,10 @@
     </nav>
     <h1 class="pp__title">{{ 'publicProtocols.title' | t }}</h1>
     <p class="pp__lede">{{ 'publicProtocols.lede' | t }}</p>
+    <a class="pp__btn pp__btn--tonal pp__decisions" routerLink="/decisions">
+      <app-icon name="vote" [size]="16" />
+      {{ 'publicDecisions.link' | t }}
+    </a>
   </header>
 
   @if (!loading() && !error() && total() === 0 && !hasFilters()) {

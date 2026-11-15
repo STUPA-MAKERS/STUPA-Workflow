@@ -4,6 +4,7 @@ import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import { skipLoading } from '@stupa-makers/ui-kit';
 import type {
+  PublicDecisionPage,
   PublicGremium,
   PublicProtocolDetail,
   PublicProtocolPage,
@@ -43,6 +44,14 @@ export class PublicProtocolsService {
   /** GET /public/protocols — one page of protocols, newest first. */
   list(query: PublicProtocolQuery = {}): Observable<PublicProtocolPage> {
     return this.http.get<PublicProtocolPage>(`${this.base}/public/protocols`, {
+      params: protocolParams(query),
+      context: skipLoading(),
+    });
+  }
+
+  /** GET /public/decisions — one page of the public decisions, newest first. */
+  decisions(query: PublicProtocolQuery = {}): Observable<PublicDecisionPage> {
+    return this.http.get<PublicDecisionPage>(`${this.base}/public/decisions`, {
       params: protocolParams(query),
       context: skipLoading(),
     });

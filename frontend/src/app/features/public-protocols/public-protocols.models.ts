@@ -119,3 +119,28 @@ export interface PublicProtocolQuery {
   readonly limit?: number;
   readonly offset?: number;
 }
+
+/**
+ * One public decision (`GET /public/decisions`, spec 000926). An election has its
+ * question and its date only: no meeting title, no result and no counts.
+ */
+export interface PublicDecisionRow {
+  readonly protocolId: string;
+  readonly gremium: PublicGremiumRef;
+  /** The meeting date, `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly semester: string;
+  readonly kind: 'motion' | 'election';
+  readonly question: string | null;
+  readonly meetingTitle: string | null;
+  readonly result: PublicVoteResult | null;
+  readonly counts: Record<string, number>;
+}
+
+/** One page of the public decisions. */
+export interface PublicDecisionPage {
+  readonly items: readonly PublicDecisionRow[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
+}

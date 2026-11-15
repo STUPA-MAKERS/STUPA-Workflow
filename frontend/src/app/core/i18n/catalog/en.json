@@ -4472,5 +4472,18 @@
   "admin.gremien.defaults.loadFailed": "The defaults could not be loaded.",
   "admin.gremien.defaults.loading": "Loading the defaults …",
   "admin.gremien.defaults.saveFailed": "The defaults could not be saved.",
-  "admin.gremien.quorumMinPresent": "Least number present"
+  "admin.gremien.quorumMinPresent": "Least number present",
+  "publicDecisions.title": "Decisions",
+  "publicDecisions.search": "Search decisions",
+  "publicDecisions.loading": "Loading decisions …",
+  "publicDecisions.error": "The decisions could not be loaded. Try again later.",
+  "publicDecisions.more": "Load more decisions",
+  "publicDecisions.empty.none": "No public decisions yet",
+  "publicDecisions.empty.noneBody": "A decision appears here as soon as the minutes of its meeting are public.",
+  "publicDecisions.empty.filtered": "No decisions found",
+  "publicDecisions.empty.filteredBody": "No public decision matches your search and filters.",
+  "publicDecisions.noQuestion": "Decision without a question",
+  "publicDecisions.election": "Election",
+  "publicDecisions.protocol": "Open minutes",
+  "publicDecisions.link": "Decisions"
 }

@@ -4,8 +4,11 @@ title: The decisions of a public Gremium are public
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
-implementation: null
+updated: 2026-11-15
+implementation:
+  - backend/app/modules/protocol/public_decisions.py
+  - backend/app/modules/protocol/public_router.py
+  - frontend/src/app/features/public-protocols/public-decisions.component.ts
 scope:
   - backend/app/modules/gremien_overview
   - backend/app/modules/protocol
