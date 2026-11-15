@@ -446,6 +446,13 @@ class PublicProtocolService:
             offset=offset,
         )
 
+    async def visible_rows(self, flt: PublicFilter) -> list[tuple[Protocol, Meeting, Gremium]]:
+        """Return every visible protocol of the filters, newest meeting first."""
+        stmt = self._filtered(self._base(), flt).order_by(
+            meeting_day_expr().desc(), Meeting.created_at.desc(), Protocol.id
+        )
+        return [(p, m, g) for p, m, g in (await self.session.execute(stmt)).all()]
+
     async def list_semesters(self, flt: PublicFilter) -> list[PublicSemesterOut]:
         """Count the visible protocols per semester, newest semester first.
 

@@ -560,3 +560,38 @@ async def test_withheld_draft_stays_withheld_on_plain_finalize(
     entries = await _audit(maker, protocol_id)
     assert [e.data["publicWithheld"] for e in entries if e.action == "protocol_finalize"] == [True]
     assert len([e for e in entries if e.action == "protocol_publication"]) == 1
+
+
+async def test_public_decisions_list(api: FastAPI, maker: async_sessionmaker[AsyncSession]) -> None:
+    """The decisions of a public protocol are public, without a session (spec 000926).
+
+    The decision of a protocol that is not final stays out, and no answer holds a name
+    or a part of the non-public TOP.
+    """
+    storage = _Storage()
+    gremium_id, _, protocol_id = await _seed(maker)
+    draft_gid, _, _ = await _seed(maker)
+    await _finalize(maker, protocol_id, storage)
+
+    with TestClient(api) as client:
+        _enter(client, api, storage)
+        res = client.get("/api/public/decisions", params={"gremium": str(gremium_id)})
+        assert res.status_code == 200
+        assert res.headers["X-Robots-Tag"] == "noindex"
+        body = res.json()
+        assert body["total"] == 1
+        item = body["items"][0]
+        assert item["protocolId"] == str(protocol_id)
+        assert item["question"] == QUESTION
+        assert item["date"] == "2026-09-29"
+        assert item["meetingTitle"] == "34. Sitzung"
+        assert item["result"] == "passed"
+        assert item["kind"] == "motion"
+        assert isinstance(item["counts"], dict)
+        _assert_no_names(body)
+        hidden = client.get("/api/public/decisions", params={"gremium": str(draft_gid)}).json()
+        assert hidden["total"] == 0
+        none = client.get(
+            "/api/public/decisions", params={"gremium": str(gremium_id), "q": "Sitzung"}
+        ).json()
+        assert none["total"] == 0
