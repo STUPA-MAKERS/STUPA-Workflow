@@ -1,14 +1,21 @@
 """Branded HTML mail layout: one frame in code, the content from templates.
 
 The layout wraps every outgoing mail in the same frame. The frame holds a
-header with the platform name, a content card, and a footer. The footer shows
-the trigger hint and a link to the notification settings. DB templates provide
-only the **inner** content. When a template has no HTML body, the code escapes
-and wraps the text body. A text-only template therefore still gets a usable
-HTML alternative.
+header with the logo or the name of the platform, a content card, and a footer.
+The footer shows the trigger hint, the footer text of the branding, a link to
+the notification settings, the legal links and the copyright line. DB templates
+provide only the **inner** content. When a template has no HTML body, the code
+escapes and wraps the text body. A text-only template therefore still gets a
+usable HTML alternative.
 
-The layout uses inline CSS because some mail clients ignore <style>. It loads
-no external resources.
+The name, the logo, the accent colour and the footer come from the branding
+(`brand`, § F/collaboration/notifications/000998 to 001003).
+
+The layout uses inline CSS for the light colours because some mail clients
+ignore <style>. A <style> block holds only the dark colours
+(§ F/collaboration/notifications/001004): a client that ignores it shows the
+light mail. The layout loads no external resources: the logo is an inline part
+of the mail, and the frame shows it by its content id.
 """
 
 from __future__ import annotations
@@ -16,7 +23,12 @@ from __future__ import annotations
 import html
 import re
 
+from app.modules.notifications.brand import LOGO_CID, MailBrand, brand_text
+from app.modules.notifications.colours import DARK, LIGHT, on_fill, readable
 from app.shared.i18n import pick_lang
+
+#: The place of the platform name in a footer reason.
+_NAME = "{name}"
 
 #: Footer reason per mail kind ("you receive this email because ...").
 _REASONS: dict[str, dict[str, str]] = {
@@ -25,10 +37,8 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because an access link was requested for your address.",
     },
     "application_captured": {
-        "de": "Sie erhalten diese E-Mail, weil für Sie ein Antrag auf der "
-        "Antragsplattform erfasst wurde.",
-        "en": "You are receiving this email because an application was entered "
-        "for you on the application platform.",
+        "de": "Sie erhalten diese E-Mail, weil für Sie ein Antrag bei {name} erfasst wurde.",
+        "en": "You are receiving this email because an application was entered for you on {name}.",
     },
     "application_observer_added": {
         "de": "Sie erhalten diese E-Mail, weil Sie jemand als Beobachter:in eines "
@@ -132,8 +142,8 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because you were mentioned.",
     },
     "generic": {
-        "de": "Sie erhalten diese E-Mail von der Antragsplattform.",
-        "en": "You are receiving this email from the application platform.",
+        "de": "Sie erhalten diese E-Mail von {name}.",
+        "en": "You are receiving this email from {name}.",
     },
 }
 
@@ -142,33 +152,39 @@ _SETTINGS_HINT = {
     "en": "Manage notifications",
 }
 
-_BODY_STYLE = (
-    "margin:0;padding:0;background:#f2f4f8;"
-    "font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
-    "color:#1f2933;"
-)
+_FONT = "font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
+_BODY_STYLE = f"margin:0;padding:0;background:{LIGHT.page};{_FONT}color:{LIGHT.text};"
 _CARD_STYLE = (
-    "background:#ffffff;border:1px solid #e0e4ea;border-radius:8px;padding:24px 24px 28px;"
+    f"background:{LIGHT.card};border:1px solid {LIGHT.border};border-radius:8px;"
+    f"padding:24px 24px 28px;color:{LIGHT.text};"
 )
-_HEAD_LINK_STYLE = "font-size:18px;font-weight:700;color:#1f2933;text-decoration:none;"
-_BUTTON_STYLE = (
-    "display:inline-block;background:#0b6e4f;color:#ffffff;font-weight:600;"
-    "text-decoration:none;border-radius:6px;padding:10px 18px;"
-)
-_FOOTER_STYLE = "padding:16px 16px 0;font-size:12px;line-height:1.5;color:#6b7686;"
+_HEAD_LINK_STYLE = f"font-size:18px;font-weight:700;color:{LIGHT.text};text-decoration:none;"
+_FOOTER_STYLE = f"padding:16px 16px 0;font-size:12px;line-height:1.5;color:{LIGHT.muted};"
+_FOOTER_LINK_STYLE = f"color:{LIGHT.muted};"
 
 
-def reason_text(kind: str, lang: str) -> str:
-    """Return the footer hint for a mail kind (fallback: generic hint, DE)."""
+def reason_text(kind: str, lang: str, name: str) -> str:
+    """Return the footer hint for a mail kind (fallback: generic hint, DE).
+
+    ``name`` is the platform name of the branding; a hint that names the platform uses it.
+    """
     table = _REASONS.get(kind, _REASONS["generic"])
-    return pick_lang(table, lang)
+    return pick_lang(table, lang).replace(_NAME, name)
 
 
 #: URL in the escaped text; it ends before whitespace or "<". The linker splits off
 #: trailing punctuation, so "https://x.de/y." stays clickable.
 _URL_RE = re.compile(r"https?://[^\s<]+")
 _TRAILING_PUNCT = ".,;:!?)]"
-_LINK_STYLE = "color:#0b6e4f;word-break:break-all;"
+_LINK_STYLE = "word-break:break-all;"
+#: The style attribute of a link that `_linkify` wrote. The frame adds the colour to
+#: it, because the colour depends on the branding and on the place of the link.
+_LINK_ATTR = f'style="{_LINK_STYLE}"'
+
+
+def _coloured(linked: str, colour: str) -> str:
+    """Give the links that `_linkify` wrote the inline colour ``colour``."""
+    return linked.replace(_LINK_ATTR, f'style="{_LINK_STYLE}color:{colour};"')
 
 
 def _linkify(escaped: str) -> str:
@@ -199,13 +215,119 @@ def append_link_text(text: str, url: str, label: str) -> str:
     return f"{text.rstrip()}\n\n{label}: {url}\n"
 
 
-def _action_button(url: str, label: str) -> str:
-    """Return the call-to-action button of the layout (escaped)."""
+def _action_button(url: str, label: str, accent: str) -> str:
+    """Return the call-to-action button of the layout (escaped), filled with the accent."""
+    style = (
+        f"display:inline-block;background:{accent};color:{on_fill(accent)};font-weight:600;"
+        "text-decoration:none;border-radius:6px;padding:10px 18px;"
+    )
     return (
         '<p style="margin:20px 0 0;">'
-        f'<a href="{html.escape(url)}" style="{_BUTTON_STYLE}">{html.escape(label)}</a>'
+        f'<a class="m-btn" href="{html.escape(url)}" style="{style}">{html.escape(label)}</a>'
         "</p>"
     )
+
+
+def _absolute(url: str, base_url: str) -> str:
+    """Return ``url`` as a full URL: a path of the platform gets the public base URL."""
+    return base_url.rstrip("/") + url if url.startswith("/") else url
+
+
+def _legal_links(brand: MailBrand, lang: str, base_url: str) -> tuple[tuple[str, str], ...]:
+    """Return ``(label, full URL)`` of each legal link that has a label for ``lang``."""
+    pairs = (
+        (brand_text(link.label, lang), _absolute(link.url, base_url)) for link in brand.legal_links
+    )
+    return tuple((label, url) for label, url in pairs if label)
+
+
+def append_brand_text(text: str, brand: MailBrand, lang: str, base_url: str) -> str:
+    """End a plain-text body with the footer text and the legal links of the branding.
+
+    The copyright line stays out of the plain-text part
+    (§ F/collaboration/notifications/001001 to 001003).
+    """
+    footer = brand_text(brand.footer_text, lang)
+    links = "\n".join(f"{label}: {url}" for label, url in _legal_links(brand, lang, base_url))
+    blocks = [block for block in (footer, links) if block]
+    return text.rstrip() + "\n\n" + "\n\n".join(blocks) + "\n" if blocks else text
+
+
+def _head(brand: MailBrand, base: str) -> str:
+    """Return the head: the Wortmarke, or the Bildmarke and the name, or the name.
+
+    The logo has the platform name as its alternative text, so the head still names the
+    platform in a client that hides images (§ F/collaboration/notifications/000999).
+    """
+    name = html.escape(brand.name)
+    logo = brand.logo
+    if logo is None:
+        return f'<a href="{base}" style="{_HEAD_LINK_STYLE}">{name}</a>'
+    image = (
+        f'<img class="m-logo" src="cid:{LOGO_CID}" alt="{name}" width="{logo.width}" '
+        f'height="{logo.height}" style="display:inline-block;border:0;vertical-align:middle;">'
+    )
+    if logo.kind == "wordmark":
+        return f'<a href="{base}" style="{_HEAD_LINK_STYLE}">{image}</a>'
+    decorative = image.replace(f'alt="{name}"', 'alt=""')
+    return (
+        f'<a href="{base}" style="{_HEAD_LINK_STYLE}">{decorative}'
+        f'<span style="vertical-align:middle;padding-left:10px;">{name}</span></a>'
+    )
+
+
+def _footer(brand: MailBrand, *, reason: str, lang: str, base: str, base_url: str) -> str:
+    """Return the footer lines; the copyright line is the last one."""
+    hint = html.escape(pick_lang(_SETTINGS_HINT, lang))
+    footer_text = brand_text(brand.footer_text, lang)
+    legal = " · ".join(
+        f'<a href="{html.escape(url)}" style="{_FOOTER_LINK_STYLE}">{html.escape(label)}</a>'
+        for label, url in _legal_links(brand, lang, base_url)
+    )
+    copyright_line = brand_text(brand.copyright, lang)
+    lines = (
+        f'<p style="margin:0 0 4px;">{html.escape(reason)}</p>',
+        (
+            '<p style="margin:0 0 4px;">'
+            + _coloured(_linkify(html.escape(footer_text)), LIGHT.muted).replace("\n", "<br>")
+            + "</p>"
+            if footer_text
+            else ""
+        ),
+        (
+            '<p style="margin:0 0 4px;">'
+            f'<a href="{base}/account/notifications" style="{_FOOTER_LINK_STYLE}">{hint}</a>'
+            f' · <a href="{base}" style="{_FOOTER_LINK_STYLE}">{html.escape(brand.name)}</a></p>'
+        ),
+        f'<p style="margin:0 0 4px;">{legal}</p>' if legal else "",
+        f'<p style="margin:0;">{html.escape(copyright_line)}</p>' if copyright_line else "",
+    )
+    return "\n            ".join(line for line in lines if line)
+
+
+def _dark_style(accent: str) -> str:
+    """Return the <style> block with the dark colours.
+
+    ``!important`` lets a rule win over the inline light colour of the same element. The
+    logo gets a light plate, because the branding has one logo and a logo for a light
+    page can be unreadable on a dark one.
+    """
+    link = readable(accent, DARK.card)
+    return f"""<style>
+@media (prefers-color-scheme: dark) {{
+  .m-page {{ background: {DARK.page} !important; color: {DARK.text} !important; }}
+  .m-head a {{ color: {DARK.text} !important; }}
+  .m-logo {{ background: #ffffff !important; border-radius: 6px; padding: 6px; }}
+  .m-card {{ background: {DARK.card} !important; border-color: {DARK.border} !important;
+    color: {DARK.text} !important; }}
+  .m-card a {{ color: {link} !important; }}
+  .m-card a.m-btn {{ color: {on_fill(accent)} !important; }}
+  .m-card .m-muted {{ color: {DARK.muted} !important; }}
+  .m-card .m-strong {{ color: {DARK.text} !important; }}
+  .m-card .m-bubble {{ background: {DARK.border} !important; color: {DARK.text} !important; }}
+  .m-foot, .m-foot a {{ color: {DARK.muted} !important; }}
+}}
+</style>"""
 
 
 def text_to_html(text: str) -> str:
@@ -228,7 +350,7 @@ def render_layout(
     *,
     content_html: str,
     title: str,
-    site_name: str,
+    brand: MailBrand,
     base_url: str,
     reason: str,
     lang: str = "de",
@@ -243,18 +365,24 @@ def render_layout(
 
     `action_url` adds a button to the element of the mail below the content. The
     layout omits the button when the content already links the URL.
+
+    The links of the content take the accent colour of the branding, darkened until it
+    has 4.5:1 on the card (§ F/collaboration/notifications/001000). A link that
+    `text_to_html` wrote gets the colour inline, and a link of a template HTML gets it
+    from the <style> rule of the card.
     """
     esc_title = html.escape(title)
-    esc_site = html.escape(site_name)
-    esc_reason = html.escape(reason)
     base = html.escape(base_url.rstrip("/"))
-    settings_url = f"{base}/account/notifications"
-    hint = html.escape(pick_lang(_SETTINGS_HINT, lang))
-    if action_url and action_label and html.escape(action_url) not in content_html:
-        content_html = content_html + "\n" + _action_button(action_url, action_label)
+    link_colour = readable(brand.accent, LIGHT.card)
+    content = _coloured(content_html, link_colour)
+    with_button = (
+        content + "\n" + _action_button(action_url, action_label, brand.accent)
+        if action_url and action_label and html.escape(action_url) not in content_html
+        else content
+    )
     table_open = (
-        '<table role="presentation" width="100%" cellpadding="0" '
-        'cellspacing="0" style="background:#f2f4f8;padding:24px 0;">'
+        '<table class="m-page" role="presentation" width="100%" cellpadding="0" '
+        f'cellspacing="0" style="background:{LIGHT.page};padding:24px 0;">'
     )
     inner_open = (
         '<table role="presentation" width="600" cellpadding="0" '
@@ -265,34 +393,34 @@ def render_layout(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>{esc_title}</title>
+<style>.m-card a {{ color: {link_colour}; }}</style>
+{_dark_style(brand.accent)}
 </head>
-<body style="{_BODY_STYLE}">
+<body class="m-page" style="{_BODY_STYLE}">
   {table_open}
     <tr><td align="center">
       {inner_open}
         <tr>
-          <td style="padding:0 16px 12px;">
-            <a href="{base}" style="{_HEAD_LINK_STYLE}">{esc_site}</a>
+          <td class="m-head" style="padding:0 16px 12px;">
+            {_head(brand, base)}
           </td>
         </tr>
         <tr>
-          <td style="{_CARD_STYLE}">
+          <td class="m-card" style="{_CARD_STYLE}">
             <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">
               {esc_title}
             </h1>
             <div style="font-size:15px;line-height:1.55;">
-{content_html}
+{with_button}
             </div>
           </td>
         </tr>
         <tr>
-          <td style="{_FOOTER_STYLE}">
-            <p style="margin:0 0 4px;">{esc_reason}</p>
-            <p style="margin:0;">
-              <a href="{settings_url}" style="color:#6b7686;">{hint}</a>
-              · <a href="{base}" style="color:#6b7686;">{esc_site}</a>
-            </p>
+          <td class="m-foot" style="{_FOOTER_STYLE}">
+            {_footer(brand, reason=reason, lang=lang, base=base, base_url=base_url)}
           </td>
         </tr>
       </table>

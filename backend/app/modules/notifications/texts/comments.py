@@ -52,14 +52,15 @@ CHAT_BUBBLE_HTML = (
     ' style="margin:16px 0 0;">'
     "<tr>"
     '<td style="vertical-align:top;padding-right:8px;">'
-    '<div style="width:28px;height:28px;border-radius:50%;background:#e5e9f0;'
+    '<div class="m-bubble" style="width:28px;height:28px;border-radius:50%;'
+    "background:#e5e9f0;"
     "color:#6b7686;font-size:11px;font-weight:600;text-align:center;"
     'line-height:28px;">{{ commentAuthorInitials }}</div>'
     "</td>"
     '<td style="vertical-align:top;">'
-    '<div style="font-size:12px;color:#6b7686;margin:0 0 3px;">'
-    '<strong style="color:#1f2933;">{{ commentAuthor }}</strong></div>'
-    '<div style="background:#eef1f5;border-radius:0 12px 12px 12px;'
+    '<div class="m-muted" style="font-size:12px;color:#6b7686;margin:0 0 3px;">'
+    '<strong class="m-strong" style="color:#1f2933;">{{ commentAuthor }}</strong></div>'
+    '<div class="m-bubble" style="background:#eef1f5;border-radius:0 12px 12px 12px;'
     'padding:8px 12px;font-size:14px;line-height:1.5;color:#1f2933;">'
     "{{ comment | e | replace('\\n', '<br>' | safe) }}</div>"
     "</td>"

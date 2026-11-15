@@ -206,7 +206,7 @@
       "to": "meetings"
     },
     {
-      "count": 32,
+      "count": 30,
       "from": "applications",
       "to": "notifications"
     },
@@ -916,9 +916,14 @@
       "to": "gremien"
     },
     {
-      "count": 13,
+      "count": 16,
       "from": "notifications",
       "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "notifications",
+      "to": "site_config"
     },
     {
       "count": 1,
@@ -1051,7 +1056,7 @@
       "to": "meetings"
     },
     {
-      "count": 12,
+      "count": 14,
       "from": "protocol",
       "to": "notifications"
     },
