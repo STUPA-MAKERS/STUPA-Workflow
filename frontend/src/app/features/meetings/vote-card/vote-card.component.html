@@ -1,25 +1,27 @@
 @let v = vote();
 <section class="vc" [attr.aria-label]="v.question || ('meetings.vote.untitled' | t)">
-  @if (v.status !== 'open') {
-    <div class="vc__status">
-      <app-status-text class="vc__cap" [kind]="status().kind">{{ capKey() | t }}</app-status-text>
-      @if (!folded() && result(); as r) {
-        <app-status-text class="vc__result" [kind]="r.kind">{{ r.key | t }}</app-status-text>
+  <div class="vc__head">
+    <h3 class="vc__q">{{ v.question || ('meetings.vote.untitled' | t) }}</h3>
+    @if (menu().length > 0) {
+      <app-row-menu class="vc__menu" [label]="'meetings.vote.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
+    }
+  </div>
+  @if (headStatus() || repeated() || ruleLine()) {
+    <div class="vc__lines">
+      @if (headStatus() || repeated()) {
+        <p class="vc__status">
+          @if (headStatus(); as hs) {
+            <app-status-text class="vc__result" [kind]="hs.kind">{{ hs.key | t }}</app-status-text>
+          }
+          @if (repeated()) {
+            <app-status-text class="vc__result" kind="muted">{{ 'meetings.vote.repeated' | t }}</app-status-text>
+          }
+        </p>
       }
-      @if (repeated()) {
-        <app-status-text class="vc__result" kind="muted">{{ 'meetings.vote.repeated' | t }}</app-status-text>
+      @if (ruleLine()) {
+        <p class="vc__meta">{{ ruleLine() }}</p>
       }
     </div>
-  }
-  @if (attemptCap(); as cap) {
-    <p class="vc__meta">{{ cap }}</p>
-  }
-  @if (!folded() && electionCap(); as cap) {
-    <p class="vc__meta">{{ cap }}</p>
-  }
-  <h3 class="vc__q">{{ v.question || ('meetings.vote.untitled' | t) }}</h3>
-  @if (v.status !== 'open' && !folded() && meta()) {
-    <p class="vc__meta">{{ meta() }}</p>
   }
   @if (!folded() && v.result === 'rejected' && v.failedReason === 'quorum') {
     <p class="vc__fail">{{ 'vote.failedQuorum' | t }}</p>
@@ -47,6 +49,7 @@
       [canManage]="canManage() && !locked()"
       [round]="v.round ?? 1"
       [canNextRound]="canManage() && !locked() && meetingStatus() === 'live' && !continued()"
+      [inCard]="true"
       (changed)="electionChanged.emit($event)"
     />
   } @else if (showCounts()) {
@@ -90,13 +93,6 @@
     </div>
   }
 
-  @if (v.status === 'open' && canManage() && canRun()) {
-    <div class="vc__actions">
-      <app-button variant="danger" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
-      <app-button variant="danger" [block]="true" (click)="cancel.emit(v.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
-    </div>
-  }
-
   @if (guestResult(); as gr) {
     <dl class="vc__counts vc__sum" [attr.aria-label]="'guests.vote.resultCaption' | t">
       @if (composition(); as comp) {
@@ -116,26 +112,8 @@
     </dl>
   }
 
-  @if (v.status === 'draft' && canEdit()) {
-    <div class="vc__actions">
-      <app-button variant="tonal" [block]="true" (click)="edit.emit(v)">
-        <app-icon name="edit" />
-        {{ 'meetings.vote.edit' | t }}
-      </app-button>
-    </div>
-  }
-
   @if (v.status === 'draft' && canEdit() && meetingStatus() === 'planned') {
     <p class="vc__hint">{{ 'meetings.vote.opensLater' | t }}</p>
-  }
-
-  @if (v.status === 'draft' && canEdit() && canRun() && meetingStatus() === 'live') {
-    <div class="vc__actions">
-      <app-button variant="fill" [block]="true" [disabled]="otherOpen()" [title]="(otherOpen() ? 'meetings.vote.openBlocked' : 'meetings.vote.open') | t" (click)="open.emit(v.id)">{{ 'meetings.vote.open' | t }}</app-button>
-    </div>
-    @if (otherOpen()) {
-      <p class="vc__hint">{{ 'meetings.vote.openBlocked' | t }}</p>
-    }
   }
 
   @if (v.status === 'closed' && inProtocol()) {
@@ -143,27 +121,29 @@
       <app-icon name="check" [size]="16" />
       {{ 'meetings.voteResult.inProtocol' | t }}
     </p>
-  } @else if (v.status === 'closed' && canInsert()) {
-    <div class="vc__actions">
-      <app-button variant="tonal" [block]="true" (click)="insertResult.emit(v)">
-        <app-icon name="fileplus" />
-        {{ 'meetings.dock.insertResult' | t }}
-      </app-button>
-    </div>
   }
 
-  @if (v.status === 'closed' && canRepeat() && canEdit() && meetingStatus() === 'live') {
-    <div class="vc__actions">
-      <app-button variant="tonal" [block]="true" (click)="repeat.emit(v)">
-        <app-icon name="repeat" />
-        {{ (election() ? 'meetings.vote.repeatElection' : 'meetings.vote.repeat') | t }}
-      </app-button>
-    </div>
-  }
-
-  @if (canDelete()) {
-    <div class="vc__actions">
-      <app-button variant="danger" [block]="true" [loading]="deleting() === v.id" (click)="remove.emit(v.id)">{{ 'meetings.vote.delete' | t }}</app-button>
-    </div>
+  @switch (primary()) {
+    @case ('close') {
+      <div class="vc__actions">
+        <app-button variant="danger" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
+      </div>
+    }
+    @case ('open') {
+      <div class="vc__actions">
+        <app-button variant="fill" [block]="true" [disabled]="otherOpen()" [title]="(otherOpen() ? 'meetings.vote.openBlocked' : 'meetings.vote.open') | t" (click)="open.emit(v.id)">{{ 'meetings.vote.open' | t }}</app-button>
+      </div>
+      @if (otherOpen()) {
+        <p class="vc__hint">{{ 'meetings.vote.openBlocked' | t }}</p>
+      }
+    }
+    @case ('insert') {
+      <div class="vc__actions">
+        <app-button variant="fill" [block]="true" (click)="insertResult.emit(v)">
+          <app-icon name="fileplus" />
+          {{ 'meetings.dock.insertResult' | t }}
+        </app-button>
+      </div>
+    }
   }
 </section>

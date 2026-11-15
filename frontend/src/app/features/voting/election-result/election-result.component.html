@@ -1,4 +1,4 @@
-@if (status(); as s) {
+@if (!inCard() && status(); as s) {
   <p class="bars__status">
     <app-status-text class="bars__result" [kind]="s.kind">{{ s.text }}</app-status-text>
   </p>
@@ -41,34 +41,46 @@
 }
 
 @if (lot(); as text) {
-  <div class="er__banner" role="status">
-    <p class="er__bannerText">
-      <app-icon name="swap" [size]="18" />
-      <span>{{ text }}</span>
-    </p>
-    @if (canManage() && voteId()) {
-      <div #lotActions class="er__actions">
-        @if (lotArmed()) {
-          <p class="er__hint">{{ 'election.lot.confirmHint' | t }}</p>
-          <app-button variant="text" (click)="cancelLot()">
-            {{ 'election.lot.cancel' | t }}
-          </app-button>
-        }
-        <app-button
-          class="er__lot"
-          variant="fill"
-          [loading]="busy() === 'lot'"
-          [ariaLabel]="lotArmed() ? ('election.lot.confirm' | t) + '. ' + ('election.lot.confirmHint' | t) : ''"
-          (click)="drawLot($event)"
-        >
-          {{ (lotArmed() ? 'election.lot.confirm' : 'election.lot.draw') | t }}
-        </app-button>
-      </div>
-    } @else {
-      <p class="er__hint">{{ 'election.lot.waiting' | t }}</p>
-    }
-  </div>
+  @if (inCard()) {
+    <ng-container *ngTemplateOutlet="lotActionsTpl" />
+  } @else {
+    <div class="er__banner" role="status">
+      <p class="er__bannerText">
+        <app-icon name="swap" [size]="18" />
+        <span>{{ text }}</span>
+      </p>
+      <ng-container *ngTemplateOutlet="lotActionsTpl" />
+    </div>
+  }
 }
+
+<ng-template #lotActionsTpl>
+  @if (canManage() && voteId()) {
+    <div #lotActions class="er__actions">
+      @if (lotArmed()) {
+        <p class="er__hint">{{ 'election.lot.confirmHint' | t }}</p>
+        <app-button variant="text" (click)="cancelLot()">
+          {{ 'election.lot.cancel' | t }}
+        </app-button>
+      }
+      <app-button
+        class="er__lot"
+        variant="fill"
+        [block]="inCard()"
+        [loading]="busy() === 'lot'"
+        [ariaLabel]="lotArmed() ? ('election.lot.confirm' | t) + '. ' + ('election.lot.confirmHint' | t) : ''"
+        (click)="drawLot($event)"
+      >
+        @if (inCard()) {
+          <app-icon name="swap" />
+        }
+        {{ (lotArmed() ? 'election.lot.confirm' : 'election.lot.draw') | t }}
+      </app-button>
+    </div>
+  } @else {
+    <p class="er__hint">{{ 'election.lot.waiting' | t }}</p>
+  }
+</ng-template>
 
 @if (lotNote(); as note) {
   <app-note icon="info">{{ note }}</app-note>

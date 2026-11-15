@@ -36,6 +36,7 @@ async function setup(over: {
   counts?: Record<string, number>;
   round?: number;
   canNextRound?: boolean;
+  inCard?: boolean;
 }) {
   const changed = jest.fn();
   const view = await render(ElectionResultComponent, {
@@ -48,6 +49,7 @@ async function setup(over: {
       canManage: over.canManage ?? true,
       round: over.round ?? 1,
       canNextRound: over.canNextRound ?? false,
+      inCard: over.inCard ?? false,
     },
     on: { changed },
     providers: [provideHttpClient(), provideHttpClientTesting()],
@@ -141,6 +143,28 @@ describe('ElectionResultComponent', () => {
     http.expectOne({ method: 'POST', url: '/api/votes/e1/draw-lot' }).flush({ id: 'e1' });
     expect(changed).toHaveBeenCalledWith({ id: 'e1' });
     expect(toasts()).toContain('Das Los ist gezogen.');
+  });
+
+  /** The meeting card states the result itself (§ 001006). */
+  it('leaves the result heading and the lot banner to the meeting card', async () => {
+    const tie: ElectionResult = {
+      counts: { c1: 2, c2: 2, c3: 0, c4: 0 },
+      abstentions: 0,
+      ballots: 4,
+      elected: [],
+      lot: { among: ['c1', 'c2'], seats: 1, drawn: null },
+    };
+    const { container } = await setup({
+      result: 'tie',
+      electionResult: tie,
+      election: { ...ELECTION, seats: 1 },
+      inCard: true,
+    });
+    expect(screen.queryByText('Gleichstand: das Los steht aus')).toBeNull();
+    expect(screen.queryByText(/Das Los entscheidet/)).toBeNull();
+    expect(container.querySelector('.er__banner')).toBeNull();
+    expect(screen.getAllByText('Gleichstand')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Los ziehen' })).toBeInTheDocument();
   });
 
   it('tells a member that the lead draws the lot, and shows a drawn lot', async () => {
