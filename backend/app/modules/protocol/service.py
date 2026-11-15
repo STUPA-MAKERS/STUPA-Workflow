@@ -193,6 +193,13 @@ class HeaderMeta:
     datalines: Sequence[str] = field(default_factory=list)
 
 
+def _mark_final(protocol: Protocol, now: datetime, *, sent: bool) -> None:
+    """Set a protocol to final at `now`, with the mark of the mail only when one goes out."""
+    protocol.status = "final"
+    protocol.finalized_at = now
+    protocol.sent_at = now if sent else None
+
+
 class ProtocolService:
     """Run the protocol operations and the finalization over the shared render stack."""
 
@@ -730,23 +737,25 @@ class ProtocolService:
             if mail_public or bool(getattr(gremium, "protocols_public", False))
             else await self._render_internal(protocol)
         )
-        protocol.status = "final"
-        protocol.finalized_at = now
+        recipients = await self._mail_recipients(protocol)
+        _mark_final(protocol, now, sent=bool(recipients))
         await self.session.flush()
         await self.session.commit()
         await self._store(uploads)
-        if await self._send(protocol, mail_pdf):
-            await self._mark_sent(protocol, now)
+        await self._send(protocol, mail_pdf, recipients)
         return await self._to_out(protocol)
 
-    async def _mark_sent(self, protocol: Protocol, now: datetime) -> None:
-        """Store the moment of the mail of the final protocol (commits).
+    async def _mail_recipients(self, protocol: Protocol) -> list[str]:
+        """Return the addresses that get the mail of the final protocol.
 
-        The mark comes after the mail went to the queue, so a protocol without a
-        recipient never counts as sent.
+        The list is empty without a mail queue and for a Gremium without a recipient.
+        The finalization then sets no `sent_at`, so the page does not say that the
+        protocol was sent.
         """
-        protocol.sent_at = now
-        await self.session.commit()
+        if self.mail_queue is None:
+            return []
+        members = await self._recipients(protocol.gremium_id)
+        return list(await filter_recipients_by_preference(self.session, members, "protocol"))
 
     async def _render_both(
         self, protocol: Protocol, *, mail_public: bool
@@ -1548,8 +1557,13 @@ class ProtocolService:
         except StorageError as exc:
             raise ServiceUnavailableError("Protocol rendering temporarily unavailable.") from exc
 
-    async def _send(self, protocol: Protocol, pdf: bytes | None) -> bool:
+    async def _send(
+        self, protocol: Protocol, pdf: bytes | None, to: Sequence[str] | None = None
+    ) -> None:
         """Mail the protocol to MAIL_LIST(gremium) under an idempotency key.
+
+        `to` holds the recipients that the finalization already read. Without it the
+        method reads them itself.
 
         The mail carries the PDF as an attachment. The subject and the body name the
         Gremium and the meeting. The HTML version uses the branded mail layout.
@@ -1563,18 +1577,12 @@ class ProtocolService:
 
         The public link follows the rule of `public.visible_clause`, applied to the
         protocol in hand.
-
-        Returns:
-            True when the mail went to the queue. False without a mail queue or
-            without a recipient: the caller then sets no `sent_at`, so the page does
-            not say that the protocol was sent.
         """
         if self.mail_queue is None:
-            return False
-        members = await self._recipients(protocol.gremium_id)
-        recipients = await filter_recipients_by_preference(self.session, members, "protocol")
+            return
+        recipients = to if to is not None else await self._mail_recipients(protocol)
         if not recipients:
-            return False
+            return
         gremium = await self.session.get(Gremium, protocol.gremium_id)
         gremium_name = gremium.name if gremium is not None else None
         meeting = await self.session.get(Meeting, protocol.meeting_id)
@@ -1644,7 +1652,6 @@ class ProtocolService:
                 attachments=attachments,
             )
         )
-        return True
 
     async def _recipients(self, gremium_id: UUID) -> list[str]:
         """Build the flat and deduplicated recipient list of the Gremium.
