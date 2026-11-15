@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Webhook delivery",
+  "description": "The body of one webhook delivery (P/integrations/webhooks/000963).",
+  "type": "object",
+  "required": ["event", "applicationId", "transitionId", "statusEventId"],
+  "additionalProperties": false,
+  "properties": {
+    "event": {
+      "description": "The event name. It is the same as the header X-Webhook-Event.",
+      "type": "string",
+      "enum": ["application.transition"]
+    },
+    "applicationId": {
+      "description": "The ID of the Antrag.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "transitionId": {
+      "description": "The ID of the flow transition that fired.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "statusEventId": {
+      "description": "The ID of the status event that the transition wrote.",
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

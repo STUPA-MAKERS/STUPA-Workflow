@@ -4,7 +4,9 @@ title: A webhook fires only through a flow action
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-15
+protocols:
+  - "P/integrations/webhooks/000963"
 implementation:
   - backend/app/modules/webhooks/models.py
   - backend/app/modules/admin/schemas.py
