@@ -2,7 +2,7 @@
 id: "000952"
 title: The finalize of a protocol asks first
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:
