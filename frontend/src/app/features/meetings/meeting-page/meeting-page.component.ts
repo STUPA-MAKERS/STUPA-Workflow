@@ -44,6 +44,7 @@ import {
   type AgendaMove,
   AgendaPaneComponent,
   canChangeAgenda,
+  canEditTop,
 } from '../agenda-pane/agenda-pane.component';
 import {
   type AttendanceChange,
@@ -269,6 +270,8 @@ export class MeetingPageComponent {
 
   /** "TOP hinzufügen" in the header of the agenda sheet, and the rename by a click on the title. */
   protected readonly canAddTop = computed(() => canChangeAgenda(this.meeting(), this.locked()));
+  /** The title of the open item changes until the protocol is locked (§ 000982). */
+  protected readonly canRenameTop = computed(() => canEditTop(this.meeting(), this.locked()));
 
   /**
    * The row of the application of the open item, the first row of the linked list above

@@ -113,8 +113,12 @@
     border: var(--vh-edge);
     color: var(--vh-fg);
   }
-  .pb__pdf {
+  // The buttons of the band take the same fill as its PDF links: the black edge of a
+  // button in the pane would make them lower than the links on the black band.
+  .pb__pdf,
+  .pb .btn {
     @include vh.fill;
+    border-color: var(--vh-hi) !important;
   }
 
   // A menu (000617): the rows of the help menu and of the account menu.

@@ -215,7 +215,7 @@ export class TopSheetComponent {
    */
   readonly barControls = input(true);
   /**
-   * The viewer may rename the item (`canChangeAgenda`). A click on the title then opens
+   * The viewer may rename the item (`canEditTop`). A click on the title then opens
    * the title field in place of the heading. An application item keeps the title of its
    * application in its row below the title.
    */

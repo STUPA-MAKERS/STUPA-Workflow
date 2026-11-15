@@ -106,9 +106,7 @@ async def test_draft_mail_goes_to_the_members_and_keeps_the_draft(
     people = await _members(maker, s.gremium_id, ("anna", "ben"))
     async with maker() as session:
         session.add(
-            NotificationPreference(
-                principal_id=people["ben"].id, kind="protocol", enabled=False
-            )
+            NotificationPreference(principal_id=people["ben"].id, kind="protocol", enabled=False)
         )
         await session.commit()
     typst, queue = _Typst(), _Queue()
@@ -355,3 +353,40 @@ async def test_the_delete_of_the_approving_meeting_removes_the_mark(
         read = client.get(f"/api/meetings/{s.meeting_id}/protocol")
     assert read.json()["approvedAt"] is None
     assert read.json()["approvedMeetingId"] is None
+
+
+async def test_a_final_protocol_goes_back_to_draft_until_it_is_approved(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """§F/meetings/protocols/000983: back to draft without a mark, 409 with one."""
+    s = await seed(maker, status="closed", items=0, protocol="final")
+    marked = await seed(maker, status="closed", items=0, protocol="final")
+    async with maker() as session:
+        nxt = Meeting(
+            gremium_id=marked.gremium_id,
+            title="Folgesitzung",
+            date=_date(2026, 7, 4),
+            status="closed",
+        )
+        session.add(nxt)
+        sent = await session.get(Protocol, s.protocol_id)
+        assert sent is not None
+        sent.sent_at = datetime(2026, 6, 21, 9, 0, tzinfo=UTC)
+        await session.commit()
+    with TestClient(api) as client:
+        client.put(f"/api/protocols/{marked.protocol_id}/approval", json={"meetingId": str(nxt.id)})
+        approved = client.post(f"/api/protocols/{marked.protocol_id}/reopen")
+        reopened = client.post(f"/api/protocols/{s.protocol_id}/reopen")
+        again = client.post(f"/api/protocols/{s.protocol_id}/reopen")
+        text = client.patch(f"/api/meetings/{s.meeting_id}", json={"title": "Korrigierter Titel"})
+        gone = client.delete(f"/api/protocols/{s.protocol_id}")
+        missing = client.post(f"/api/protocols/{uuid.uuid4()}/reopen")
+    assert (approved.status_code, approved.json()["code"]) == (409, "protocol_approved")
+    assert reopened.status_code == 200, reopened.text
+    assert reopened.json()["status"] == "draft"
+    assert (again.status_code, again.json()["code"]) == (409, "protocol_not_final")
+    assert text.status_code == 200, text.text
+    assert (gone.status_code, gone.json()["code"]) == (409, "protocol_finalized")
+    assert missing.status_code == 404, missing.text
+    actions = [e.action for e in await audit_actions(maker, target_id=s.protocol_id)]
+    assert actions == ["protocol_reopen"]

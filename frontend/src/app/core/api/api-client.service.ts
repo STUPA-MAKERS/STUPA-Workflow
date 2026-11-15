@@ -1362,6 +1362,16 @@ export class ApiClient {
     return req.pipe(map(mapProtocol));
   }
 
+  /**
+   * POST /protocols/{id}/reopen — set a final protocol back to draft. Needs the right to
+   * finalize; 409 `protocol_approved` with an approval mark (§ 000983).
+   */
+  reopenProtocol(protocolId: Uuid): Observable<Protocol> {
+    return this.http
+      .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/reopen`, {})
+      .pipe(map(mapProtocol));
+  }
+
   /** POST /protocols/{id}/finalize — →PDF (typst) → MinIO + MAIL_LIST.
    *  `publicWithheld` keeps the protocol of a public gremium off the public page. */
   finalizeProtocol(
