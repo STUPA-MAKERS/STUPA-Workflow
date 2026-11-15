@@ -2328,6 +2328,44 @@ async def test_set_for_not_member_not_found() -> None:
         await svc.set_for(meeting.id, uuid4(), "absent", "lead-sub")
 
 
+async def test_set_for_corrects_a_former_member_of_a_closed_meeting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Correct the record of a former member after the close, without a delegation check.
+
+    The fake session returns, in order: the meeting, the current members (not the
+    person) and the record of the person. The recount and the roster have their own
+    tests.
+    """
+    meeting = _meeting(status="closed")
+    former = _member(sub="former")
+    existing = SimpleNamespace(principal_id=former.id, status="absent", source="self", note=None)
+    sess = _QueueSession(executes=[res(meeting), res(_member()), res(existing)])
+
+    async def _no_seat(*_a: object, **_kw: object) -> bool:
+        raise AssertionError("a correction after the close frees no pool seat")
+
+    async def _nothing(*_a: object, **_kw: object) -> list[object]:
+        return []
+
+    monkeypatch.setattr("app.modules.meetings.attendance_service.release_pool_seat", _no_seat)
+    monkeypatch.setattr(AttendanceService, "_recount", _nothing)
+    monkeypatch.setattr(AttendanceService, "roster", _nothing)
+    svc = AttendanceService(sess)  # type: ignore[arg-type]
+    await svc.set_for(meeting.id, former.id, "present", "lead-sub")
+    assert existing.status == "present"
+    assert existing.source == "lead"
+
+
+async def test_set_for_unknown_person_of_a_closed_meeting_not_found() -> None:
+    """Answer 404 for a person without membership and without a record."""
+    meeting = _meeting(status="closed")
+    sess = _QueueSession(executes=[res(meeting), res(_member()), res()])
+    svc = AttendanceService(sess)  # type: ignore[arg-type]
+    with pytest.raises(NotFoundError):
+        await svc.set_for(meeting.id, uuid4(), "absent", "lead-sub")
+
+
 async def test_set_for_ok() -> None:
     """Store a lead report.
 
