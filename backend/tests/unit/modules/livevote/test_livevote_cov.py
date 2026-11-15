@@ -3402,6 +3402,21 @@ def test_open_prepared_vote_needs_a_live_meeting(
     assert r.json()["code"] == code
 
 
+def test_open_prepared_vote_waits_for_the_open_vote(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    """A draft does not open while another vote of the meeting is open."""
+    from app.modules.livevote.schemas import MeetingVoteOut
+
+    out, vote_id = _with_vote()
+    running = MeetingVoteOut(id=uuid4(), status="open")
+    fakes["meeting"]._meeting_out = out.model_copy(update={"votes": [*out.votes, running]})
+    _login(app)
+    r = client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open")
+    assert r.status_code == 409
+    assert r.json()["code"] == "vote_open_exists"
+
+
 def test_open_prepared_vote_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
     out, vote_id = _with_vote(can_manage_votes=False)
     fakes["meeting"]._meeting_out = out

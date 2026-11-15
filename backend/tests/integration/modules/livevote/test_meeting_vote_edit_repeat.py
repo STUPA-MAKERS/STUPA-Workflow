@@ -54,6 +54,27 @@ async def test_update_draft_replaces_question_and_rules(
     assert "question" not in entry.data
 
 
+async def test_a_vote_does_not_open_beside_an_open_vote(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    s = await seed(maker, status="live", votes=("open", "draft"))
+    with TestClient(api) as client:
+        created = client.post(
+            f"/api/meetings/{s.meeting_id}/votes",
+            json={"agendaItemId": str(s.item_ids[0]), "question": "Zweite Frage?"},
+        )
+        opened = client.post(f"/api/meetings/{s.meeting_id}/votes/{s.vote_ids['draft']}/open")
+        prepared = client.post(
+            f"/api/meetings/{s.meeting_id}/votes",
+            json={"agendaItemId": str(s.item_ids[0]), "question": "Dritte Frage?", "draft": True},
+        )
+    assert created.status_code == 409, created.text
+    assert created.json()["code"] == "vote_open_exists"
+    assert opened.status_code == 409, opened.text
+    assert opened.json()["code"] == "vote_open_exists"
+    assert prepared.status_code == 200, prepared.text
+
+
 async def test_update_draft_to_a_poll(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
