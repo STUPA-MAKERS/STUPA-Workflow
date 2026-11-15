@@ -2,7 +2,7 @@
 id: "000991"
 title: The close of a fiscal year names what stays open, and an Antrag can leave a closed year
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:
