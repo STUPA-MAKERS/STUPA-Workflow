@@ -500,10 +500,12 @@ export class BudgetPlanComponent {
       { key: 'node', label: this.i18n.translate('budget.plan.col.title'), card: 'title' },
       own,
       ...rest,
-      ...(tight ? [] : [money('change', this.i18n.translate('budget.plan.col.change'))]),
+      ...(tight || !this.compared() ? [] : [money('change', this.i18n.translate('budget.plan.col.change'))]),
     ];
   });
   readonly rowId = (row: unknown): string => (row as PlanRow).id;
+  /** The plan has an Ansatz to compare against: the version before a Nachtrag, or a plan of the year before. */
+  readonly compared = computed(() => this.nachtrag() || this.canCopy());
 
   /** The name of the Ansatz of the shown version: "Ansatz 2026" or "Ansatz 1. Nachtrag". */
   readonly amountLabel = computed(() => {
@@ -1562,7 +1564,13 @@ export class BudgetPlanComponent {
   }
 
   money(value: number | null): string {
-    return value === null ? '–' : formatMoney(value, this.i18n.formatLocale(), { whole: Number.isInteger(value) });
+    return value === null ? '–' : formatMoney(value, this.i18n.formatLocale());
+  }
+
+  /** The digits of a sum in a table with amount fields: "150.475,00", without the sign. */
+  sumDigits(value: number): string {
+    const locale = this.i18n.formatLocale();
+    return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
   }
 
   /** "Budget: VS-Mittel": the name of a chip, a colon and its value. */

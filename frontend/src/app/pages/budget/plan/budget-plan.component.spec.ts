@@ -201,7 +201,7 @@ describe('BudgetPlanComponent', () => {
   describe('list and detail', () => {
     it('§F/finance/budget/000805: lists the Kostenstellen of the plan in two groups with their sums', async () => {
       const view = await setup();
-      expect(texts(view, '.bp__group')).toEqual(['Einnahmen100 €', 'Ausgaben100 €']);
+      expect(texts(view, '.bp__group')).toEqual(['Einnahmen100,00 €', 'Ausgaben100,00 €']);
       expect(texts(view, '.bd__tree .tn__name')).toEqual(['VS-Mittel', 'Beiträge', 'Personal', 'Löhne', 'Zuschüsse']);
       expect(screen.getByRole('button', { name: /Haushaltsjahr/ })).toHaveTextContent('HHJ 2026/27');
       expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: Haushaltsplan');
@@ -261,7 +261,7 @@ describe('BudgetPlanComponent', () => {
       expect(primary()).toHaveAttribute('title', 'Der Plan ist nicht ausgeglichen.');
       const less = version({ lines: [line('fees', '200'), line('grants', '130')] });
       await setup({ plans: { 'fy-26': plan([less]) } });
-      expect(screen.getByRole('status')).toHaveTextContent('Die Einnahmen liegen 70 € über den Ausgaben.');
+      expect(screen.getByRole('status')).toHaveTextContent('Die Einnahmen liegen 70,00 € über den Ausgaben.');
     });
 
     it('§F/finance/budget/000811: an empty draft cannot come into force', async () => {
@@ -290,15 +290,15 @@ describe('BudgetPlanComponent', () => {
         'Änderung',
       ]);
       const cells = within(income).getAllByRole('row').at(-1) as HTMLElement;
-      expect(text(cells)).toContain('80 €');
-      expect(text(cells)).toContain('+20 €');
+      expect(text(cells)).toContain('80,00 €');
+      expect(text(cells)).toContain('+20,00 €');
     });
 
     it('§F/finance/budget/000889: a year before without a plan in force shows neither its Ansatz nor its Ist', async () => {
       const before = plan([version({ id: 'p', lines: [line('fees', '80')] })], 'fy-25');
       const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before } });
       const income = view.container.querySelectorAll('app-data-table')[0] as HTMLElement;
-      expect(within(income).getAllByRole('columnheader').map(text)).toEqual(['Titel', 'Ansatz 2026/27', 'Änderung']);
+      expect(within(income).getAllByRole('columnheader').map(text)).toEqual(['Titel', 'Ansatz 2026/27']);
       const detail = await setup({ plans: { 'fy-26': plan(), 'fy-25': before }, query: { costCentre: 'fees' } });
       const figures = text(detail.container.querySelector('.bp__lineFigs') as HTMLElement);
       expect(figures).not.toContain('2025/26');
@@ -316,13 +316,15 @@ describe('BudgetPlanComponent', () => {
       ]);
       const first = await setup({ years: [FY26], tight: true });
       const alone = first.container.querySelectorAll('app-data-table')[0] as HTMLElement;
-      expect(within(alone).getAllByRole('columnheader').map(text)).toEqual(['Titel', 'Ansatz 2026/27', 'Änderung']);
+      expect(within(alone).getAllByRole('columnheader').map(text)).toEqual(['Titel', 'Ansatz 2026/27']);
     });
 
-    it('has no columns of the year before in the first year', async () => {
+    it('§F/finance/budget/001021: has no columns of the year before and no Änderung in the first year', async () => {
       const view = await setup({ years: [FY26] });
       const income = view.container.querySelectorAll('app-data-table')[0] as HTMLElement;
-      expect(within(income).getAllByRole('columnheader').map(text)).toEqual(['Titel', 'Ansatz 2026/27', 'Änderung']);
+      expect(within(income).getAllByRole('columnheader').map(text)).toEqual(['Titel', 'Ansatz 2026/27']);
+      const detail = await setup({ years: [FY26], query: { costCentre: 'fees' } });
+      expect(text(detail.container.querySelector('.bp__lineFigs') as HTMLElement)).not.toContain('Änderung');
     });
 
     it('§F/finance/budget/000809: shows a Nachtrag beside the version before it', async () => {
@@ -337,7 +339,7 @@ describe('BudgetPlanComponent', () => {
         'Ansatz Haushaltsplan',
         'Änderung',
       ]);
-      expect(text(expense)).toContain('+15 €');
+      expect(text(expense)).toContain('+15,00 €');
       await pickChip(/^Version/, 'Haushaltsplan');
       expect(view.navigate).toHaveBeenLastCalledWith(
         [],
@@ -354,9 +356,9 @@ describe('BudgetPlanComponent', () => {
       const nachtrag = version({ id: 'v1', number: 1, lines: [line('fees', '100'), line('grants', '45')] });
       const view = await setup({ plans: { 'fy-26': plan([stamm, nachtrag]) }, query: { costCentre: 'grants' } });
       const figures = text(view.container.querySelector('.bd__figs'));
-      expect(figures).toContain('Ansatz 1. Nachtrag45 €');
-      expect(figures).toContain('Ansatz Haushaltsplan30 €');
-      expect(figures).toContain('Änderung+15 €');
+      expect(figures).toContain('Ansatz 1. Nachtrag45,00 €');
+      expect(figures).toContain('Ansatz Haushaltsplan30,00 €');
+      expect(figures).toContain('Änderung+15,00 €');
     });
 
     it('§F/finance/budget/000815: shows one line with its child Kostenstellen', async () => {
@@ -549,7 +551,7 @@ describe('BudgetPlanComponent', () => {
       late.next(plan([version({ lines: [line('fees', '77')] })]));
       view.fixture.detectChanges();
       expect(settings()).toBe(first);
-      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('77 €');
+      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('77,00 €');
       const failed = new Subject<BudgetPlan>();
       view.api.plan.mockReturnValueOnce(failed).mockReturnValueOnce(throwError(() => problem(500)));
       view.fixture.componentInstance.refreshPlan();
@@ -567,7 +569,7 @@ describe('BudgetPlanComponent', () => {
       other.next(plan([version({ lines: [line('fees', '55')] })]));
       gone.error(problem(500));
       view.fixture.detectChanges();
-      expect(view.container.textContent).not.toContain('55 €');
+      expect(view.container.textContent).not.toContain('55,00 €');
       expect(view.api.plan.mock.calls.length).toBeGreaterThan(reads);
       expect(view.container.querySelector('.bd__sheetBody app-load-error')).toBeNull();
       view.api.plan.mockReturnValueOnce(throwError(() => problem(404, 'plan_not_found')));
@@ -958,7 +960,7 @@ describe('BudgetPlanComponent', () => {
         lines: [line('fees', '30'), line('grants', '30', { transferable: true, coverable: true, blocked: '5' })],
       });
       const view = await setup({ plans: { 'fy-26': plan([draft]) } });
-      expect(text(view.container.querySelectorAll('app-data-table')[1])).toContain('ÜbertragbarDeckungsfähigGesperrt: 5 €');
+      expect(text(view.container.querySelectorAll('app-data-table')[1])).toContain('ÜbertragbarDeckungsfähigGesperrt: 5,00 €');
     });
 
     it('§F/finance/budget/000793: a version in progress and a reader have no field to write', async () => {
@@ -1109,6 +1111,15 @@ describe('BudgetPlanComponent', () => {
       expect(field()).toHaveClass('bp__field--wide');
     });
 
+    it('§F/finance/budget/001020: the sum of a parent beside the fields has the width of a field, with cents and the € apart', async () => {
+      const large = plan([version({ lines: [line('fees', '10000000'), line('staff', '70'), line('wages', '60'), line('grants', '30')] })]);
+      const view = await setup({ plans: { 'fy-26': large } });
+      const sum = view.container.querySelector('.bp__sum') as HTMLElement;
+      expect(sum).toHaveClass('bp__field', 'bp__field--wide');
+      expect(text(sum.querySelector('.bp__sumDigits') as HTMLElement)).toBe('70,00');
+      expect(text(sum.querySelector('.bp__sumSign') as HTMLElement)).toBe('€');
+    });
+
     it('§F/finance/budget/000810: the amount fields of a table are wide for a plan that holds an Ansatz from 10 million euro', async () => {
       const large = plan([version({ lines: [line('fees', '10000000'), line('staff', '70'), line('wages', '60'), line('grants', '30')] })]);
       const view = await setup({ plans: { 'fy-26': large } });
@@ -1195,7 +1206,7 @@ describe('BudgetPlanComponent', () => {
       first.complete();
       view.fixture.detectChanges();
       expect(view.api.plan.mock.calls.length).toBe(reads + 1);
-      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('80 €');
+      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('80,00 €');
     });
 
     it('§F/finance/budget/000848: another budget takes the selected Kostenstelle of the budget before off the page', async () => {
@@ -1217,14 +1228,14 @@ describe('BudgetPlanComponent', () => {
       await typeAmount(input(view, 'line-amount-fees'), '777');
       read.next(plan([version({ lines: [line('fees', '1')] })]));
       view.fixture.detectChanges();
-      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('777 €');
+      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('777,00 €');
       const first = new Subject<BudgetPlan>();
       view.api.setLine.mockReturnValueOnce(first).mockReturnValueOnce(of(plan([version({ lines: [line('fees', '9')] })])));
       await typeAmount(input(view, 'line-amount-fees'), '8');
       await typeAmount(input(view, 'line-amount-fees'), '9');
       first.next(plan([version({ lines: [line('fees', '8')] })]));
       view.fixture.detectChanges();
-      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('9 €');
+      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('9,00 €');
       const tree = new Subject<BudgetTreeNode[]>();
       view.treeApi.tree.mockReturnValueOnce(tree);
       view.fixture.componentInstance.onCreated({ id: null, plan: plan([version({ lines: [line('fees', '5')] })]) });
@@ -1232,7 +1243,7 @@ describe('BudgetPlanComponent', () => {
       await typeAmount(input(view, 'line-amount-fees'), '6');
       tree.next([TOP, QSM]);
       view.fixture.detectChanges();
-      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('6 €');
+      expect(text(view.container.querySelector('.bp__lineFigs'))).toContain('6,00 €');
     });
   });
 
@@ -1647,7 +1658,7 @@ describe('BudgetPlanComponent', () => {
       late.next(plan([version({ lines: [line('fees', '100', { side: 'expense' }), line('grants', '30')] })]));
       late.complete();
       view.fixture.detectChanges();
-      expect(texts(view, '.bp__group')).toEqual(['Einnahmen0 €', 'Ausgaben130 €']);
+      expect(texts(view, '.bp__group')).toEqual(['Einnahmen0,00 €', 'Ausgaben130,00 €']);
       expect(screen.getByRole('heading', { name: 'Vermerke' })).toBeInTheDocument();
       await userEvent.click(select());
       await userEvent.click(await screen.findByRole('option', { name: 'Ausgabe' }));
@@ -1669,7 +1680,7 @@ describe('BudgetPlanComponent', () => {
     it('§F/finance/budget/000853: lists a Titel without a side in its own group and keeps the version in the draft', async () => {
       const lines = [line('noside', '5'), line('fees', '30'), line('grants', '30')];
       const view = await setup({ plans: { 'fy-26': plan([version({ lines })]) } });
-      expect(texts(view, '.bp__group')).toEqual(['Ohne Seite', 'Einnahmen30 €', 'Ausgaben30 €']);
+      expect(texts(view, '.bp__group')).toEqual(['Ohne Seite', 'Einnahmen30,00 €', 'Ausgaben30,00 €']);
       expect(texts(view, '.bd__tree .tn__name')).toEqual(['VS-Mittel', 'Ohne Seite', 'Beiträge', 'Zuschüsse']);
       expect(screen.getByRole('heading', { level: 3, name: 'Ohne Seite' })).toBeInTheDocument();
       expect(primary()).toBeDisabled();

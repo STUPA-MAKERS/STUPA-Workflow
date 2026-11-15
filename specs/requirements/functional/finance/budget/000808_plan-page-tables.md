@@ -2,9 +2,9 @@
 id: "000808"
 title: The plan page lists income and expenses in two tables
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-16
 tests:
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
 implementation:
@@ -17,7 +17,8 @@ scope:
 
 The detail of the plan must show the lines in the two tables "Einnahmen" and "Ausgaben". Each table
 must have the columns Kostenstelle, Ansatz, Ansatz of the year before, Ist of the year
-before and Änderung. In a window from 1200 px to below 1340 px, a table with the two
+before and Änderung. The columns of the year before and the Änderung show only when the plan
+has an Ansatz to compare against (000889, 001021). In a window from 1200 px to below 1340 px, a table with the two
 columns of the year before must not show the column Änderung; the detail of a line shows
 the Änderung at every width. The Vermerke of a line must show below its name. A child Kostenstelle
 must be indented below its parent.
