@@ -404,6 +404,9 @@ describe('AdminBudgetsComponent', () => {
       expect(view.api.updateNode).not.toHaveBeenCalled();
       await retype(labelled(dialog, 'Monat'), '12');
       await userEvent.click(button(dialog, 'Speichern'));
+      expect(view.api.updateNode).not.toHaveBeenCalled();
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Abgeschlossene Jahre behalten ihre Daten');
+      await userEvent.click(button(dialog, 'Stichtag ändern'));
       expect(view.api.updateNode).toHaveBeenCalledWith('qsm', {
         key: 'qsm',
         name: 'QS-Mittel',

@@ -672,3 +672,19 @@ async def test_a_year_with_allocations_of_zero_is_deleted(session: AsyncSession)
     await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("0")))
     await svc.delete_fiscal_year(top.id, fy.id)
     assert [f.id for f in await svc.list_fiscal_years(top.id)] == []
+
+
+async def test_a_new_stichtag_moves_only_the_years_that_are_not_closed(
+    session: AsyncSession,
+) -> None:
+    """Rule: §F/finance/budget/000992."""
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"ST{_suffix()}", name="Top", gremiumId=g.id))
+    done = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2024))
+    running = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2025))
+    await svc.set_fiscal_year_closed(top.id, done.id, closed=True)
+    await svc.update_node(top.id, BudgetNodeUpdate(fiscalStartMonth=4, fiscalStartDay=1))
+    years = {f.id: (f.start_date, f.end_date) for f in await svc.list_fiscal_years(top.id)}
+    assert years[done.id] == (date(2024, 1, 1), date(2024, 12, 31))
+    assert years[running.id] == (date(2025, 4, 1), date(2026, 3, 31))

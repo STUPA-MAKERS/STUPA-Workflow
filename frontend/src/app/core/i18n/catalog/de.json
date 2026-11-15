@@ -1703,6 +1703,8 @@
   "admin.budgets.stepAdd": "Schritt hinzufügen",
   "admin.budgets.stepsLoadError": "Die Schritte konnten nicht geladen werden.",
   "admin.budgets.stepsEmpty": "Keine Schritte",
+  "admin.budgets.stichtagAsk": "Der neue Stichtag verschiebt Beginn und Ende aller offenen Haushaltsjahre. Abgeschlossene Jahre behalten ihre Daten, und jede Buchung bleibt in ihrem Jahr.",
+  "admin.budgets.stichtagConfirm": "Stichtag ändern",
   "admin.budgets.deleteTitle": "Haushalt löschen?",
   "admin.budgets.toast.created": "Haushalt angelegt.",
   "admin.budgets.toast.deleted": "Haushalt gelöscht.",

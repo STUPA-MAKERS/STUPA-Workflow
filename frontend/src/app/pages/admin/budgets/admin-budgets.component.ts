@@ -16,6 +16,7 @@ import {
   IconComponent,
   InputComponent,
   MoveButtonsComponent,
+  NoteComponent,
   PageHeaderComponent,
   RowMenuComponent,
   type RowMenuItem,
@@ -119,6 +120,7 @@ const STEP_NAME_MAX = 120;
     InputComponent,
     LoadStateComponent,
     MoveButtonsComponent,
+    NoteComponent,
     PageHeaderComponent,
     RowMenuComponent,
     SectionComponent,
@@ -161,6 +163,17 @@ export class AdminBudgetsComponent {
   readonly stepsState = signal<LoadState>('ok');
   /** The person pressed "Speichern": the fields now show what is missing. */
   readonly showErrors = signal(false);
+  /**
+   * The save of a new Stichtag asks first: the note names what the change moves, and the
+   * second press on the button saves.
+   */
+  readonly stichtagAsked = signal(false);
+  /** The form holds another Stichtag than the budget. */
+  readonly stichtagChanged = computed(() => {
+    const node = this.editNode();
+    const form = this.form();
+    return !!node && !!form && (form.day !== node.fiscalStartDay || form.month !== node.fiscalStartMonth);
+  });
   readonly canAddStep = computed(() => (this.form()?.steps.length ?? 0) < MAX_STEPS);
   readonly keyError = computed(() => {
     const key = this.form()?.key.trim() ?? '';
@@ -386,6 +399,7 @@ export class AdminBudgetsComponent {
   openEdit(budget: BudgetTreeNode): void {
     this.savedSteps = [];
     this.showErrors.set(false);
+    this.stichtagAsked.set(false);
     this.editNode.set(budget);
     this.form.set({
       key: budget.key,
@@ -463,7 +477,8 @@ export class AdminBudgetsComponent {
    * brings the first such field into view. The order of the save is: the plan switch when it
    * changed, then the settings of the budget, then the steps when they changed. A request
    * goes out only after the one before it succeeded. The deciding Gremium goes out only on a
-   * change, because each sent field is audited.
+   * change, because each sent field is audited. A new Stichtag saves only with the second
+   * press, after the note that says which fiscal years it moves.
    */
   saveEdit(): void {
     const node = this.editNode();
@@ -472,6 +487,10 @@ export class AdminBudgetsComponent {
     this.showErrors.set(true);
     if (!this.formValid()) {
       setTimeout(() => this.host.nativeElement.ownerDocument.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+      return;
+    }
+    if (this.stichtagChanged() && !this.stichtagAsked()) {
+      this.stichtagAsked.set(true);
       return;
     }
     this.saveRest(node, form);

@@ -1703,6 +1703,8 @@
   "admin.budgets.stepAdd": "Add step",
   "admin.budgets.stepsLoadError": "The steps could not be loaded.",
   "admin.budgets.stepsEmpty": "No steps",
+  "admin.budgets.stichtagAsk": "The new start date moves the start and the end of every open fiscal year. Closed years keep their dates, and each booking stays in its year.",
+  "admin.budgets.stichtagConfirm": "Change start date",
   "admin.budgets.deleteTitle": "Delete budget?",
   "admin.budgets.toast.created": "Budget created.",
   "admin.budgets.toast.deleted": "Budget deleted.",

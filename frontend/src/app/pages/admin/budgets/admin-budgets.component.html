@@ -217,12 +217,15 @@
           </app-load-state>
         </app-section>
       }
+      @if (stichtagAsked() && stichtagChanged()) {
+        <app-note kind="warn" icon="alert" role="alert">{{ 'admin.budgets.stichtagAsk' | t }}</app-note>
+      }
       <button type="submit" hidden></button>
     </form>
   }
   <div dialog-footer>
     <app-button variant="text" (click)="closeEdit()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="saveEdit()" [disabled]="busy()" [loading]="busy()">{{ 'budget.tree.save' | t }}</app-button>
+    <app-button variant="fill" (click)="saveEdit()" [disabled]="busy()" [loading]="busy()">{{ (stichtagAsked() && stichtagChanged() ? 'admin.budgets.stichtagConfirm' : 'budget.tree.save') | t }}</app-button>
   </div>
 </app-dialog>
 

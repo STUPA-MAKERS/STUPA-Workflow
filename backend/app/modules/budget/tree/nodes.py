@@ -331,7 +331,8 @@ class NodeOps(BudgetTreeServiceBase):
         re-derives the `path_key` of the node and of every descendant.
         Everything else references `budget_id`, not the path. A new fiscal start
         date on a top-level budget re-derives the start and end date of every
-        existing fiscal year. The year stays and the dates follow.
+        fiscal year that is not closed. The year stays and the dates follow. A closed
+        year keeps its dates, because its books are done.
 
         The audit entry holds the prior and the new values of the changed fields. The
         revert uses the new values to detect a later edit and answers 409 instead of
@@ -374,7 +375,7 @@ class NodeOps(BudgetTreeServiceBase):
         if new_key is not None and new_key != node.key:
             await self._rename_key(node, new_key)
         if stichtag_changed and node.parent_id is None:
-            for fy in await self._fiscal_years_of(budget_id):
+            for fy in (f for f in await self._fiscal_years_of(budget_id) if f.closed_at is None):
                 fy.start_date, fy.end_date = self._fiscal_year_bounds(
                     fy.year, node.fiscal_start_month, node.fiscal_start_day
                 )
