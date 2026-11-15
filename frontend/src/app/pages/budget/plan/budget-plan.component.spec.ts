@@ -1744,6 +1744,13 @@ describe('BudgetPlanComponent', () => {
       await setup({ perms: PERMS, plans: { 'fy-26': stepped({ state: 'in_progress', steps: passed(1) }) } });
       await choose('Zustand setzen');
       expect(await options(await dialog())).toEqual(['Entwurf', 'Beschluss', 'In Kraft']);
+      expect(within(await dialog()).queryByText(/keinen Plan in Kraft/)).toBeNull();
+
+      await setup({ perms: PERMS, plans: { 'fy-26': stepped({ state: 'in_force', steps: passed(2) }) } });
+      await choose('Zustand setzen');
+      const back = await dialog();
+      await pickState(back, 'Entwurf');
+      expect(within(back).getByText(/Das Haushaltsjahr hat dann keinen Plan in Kraft/)).toBeInTheDocument();
       await setup({ perms: PERMS, plans: { 'fy-26': stepped({ state: 'in_progress', steps: passed(2) }) } });
       await choose('Zustand setzen');
       expect(await options(await dialog())).toEqual(['Entwurf', 'Beschluss', 'Genehmigung', 'In Kraft']);

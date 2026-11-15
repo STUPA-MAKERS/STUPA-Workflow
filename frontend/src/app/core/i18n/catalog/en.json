@@ -4340,6 +4340,7 @@
   "budget.plan.action.add": "Add line",
   "budget.plan.action.remove": "Remove line",
   "budget.plan.inForce.title": "Put the version into force?",
+  "budget.plan.setState.leavesForce": "The fiscal year then has no plan in force. It takes no new bookings, transfers and assignments until a plan is in force again. The allocations stay.",
   "budget.plan.inForce.body": "The planned amounts become the allocations of the fiscal year. After that only an amendment changes the plan.",
   "budget.plan.line.heading": "Planned amount and explanation",
   "budget.plan.line.note": "Explanation",

@@ -4340,6 +4340,7 @@
   "budget.plan.action.add": "Zeile hinzufügen",
   "budget.plan.action.remove": "Zeile entfernen",
   "budget.plan.inForce.title": "Version in Kraft setzen?",
+  "budget.plan.setState.leavesForce": "Das Haushaltsjahr hat dann keinen Plan in Kraft. Es nimmt keine neuen Buchungen, Umschichtungen und Zuordnungen an, bis wieder ein Plan in Kraft ist. Die Zuteilungen bleiben stehen.",
   "budget.plan.inForce.body": "Die Ansätze gelten dann für das Haushaltsjahr. Danach ändert nur ein Nachtrag den Plan.",
   "budget.plan.line.heading": "Ansatz und Erläuterung",
   "budget.plan.line.note": "Erläuterung",
