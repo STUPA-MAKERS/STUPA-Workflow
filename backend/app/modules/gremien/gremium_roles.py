@@ -40,6 +40,7 @@ from app.shared.errors import ConflictError, NotFoundError
 #:   todo.write      — read and work on the to-do board of the gremium (cards,
 #:                     moves, comments, checklists, links)
 #:   todo.configure  — edit the name, the columns and the labels of that board
+#:   info.write      — edit the Markdown text and the links of the Info tab
 #: An OAuth token caps these permissions through its scope. See
 #: ``app.modules.auth.policy``.
 GREMIUM_PERMISSIONS: tuple[str, ...] = (
@@ -50,6 +51,7 @@ GREMIUM_PERMISSIONS: tuple[str, ...] = (
     "protocol.finalize",
     "todo.write",
     "todo.configure",
+    "info.write",
 )
 _ALL_PERMS: list[str] = list(GREMIUM_PERMISSIONS)
 

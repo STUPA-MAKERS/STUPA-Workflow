@@ -1,6 +1,8 @@
-"""Routes of the tab "Gremien" under ``/api/committees``. Every route reads only.
+"""Routes of the tab "Gremien" under ``/api/committees``.
 
-The attendance export writes one ``export`` audit entry and nothing else.
+Every route reads, except ``PUT /committees/{id}/info``, the save of the Info tab
+(gremium permission ``info.write``, see ``info``). The attendance export writes one
+``export`` audit entry and nothing else.
 
 ``GET /committees/overview`` lists the gremien that the caller sees. Every route of one
 gremium (``/committees/{id}/...``) first runs the gate ``access.require_gremium``: an
@@ -20,12 +22,15 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.policy import has_gremium_permission
 from app.modules.gremien.access import require_gremium
+from app.modules.gremien_overview import info as gremium_info
 from app.modules.gremien_overview.attendance_export import attendance_export, export_workbook
 from app.modules.gremien_overview.schemas import (
     AttendanceOut,
     DecisionKind,
     DecisionPageOut,
     DecisionResultFilter,
+    GremiumInfoIn,
+    GremiumInfoOut,
     GremiumMeetingOut,
     GremiumMemberOut,
     GremiumOverviewOut,
@@ -217,3 +222,39 @@ async def gremium_decisions(
     return await service.decisions(
         gremium_id, principal, cursor=cursor, q=q, result=result, kind=kind, since=since
     )
+
+
+@router.get(
+    "/{gremium_id}/info",
+    response_model=GremiumInfoOut,
+    responses=_errors(401, 404),
+)
+async def read_gremium_info(
+    gremium_id: UUID, principal: ReaderDep, db: DbSession
+) -> GremiumInfoOut:
+    """Give the Info tab of a gremium: the Markdown text, the links and ``canEdit``.
+
+    A gremium without a saved Info gives the empty Info with version 0.
+    """
+    await require_gremium(db, principal, gremium_id)
+    return await gremium_info.read_info(db, principal, gremium_id)
+
+
+@router.put(
+    "/{gremium_id}/info",
+    response_model=GremiumInfoOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def save_gremium_info(
+    gremium_id: UUID, body: GremiumInfoIn, principal: ReaderDep, db: DbSession
+) -> GremiumInfoOut:
+    """Save the text and the links of the Info tab together.
+
+    The caller needs ``info.write`` in the gremium (403). ``version`` is the version
+    that the editor read: another version gives 409 ``gremium_info_version_conflict``.
+    The save writes a ``gremium_info_update`` audit entry.
+    """
+    await require_gremium(db, principal, gremium_id)
+    saved = await gremium_info.save_info(db, principal, gremium_id, body)
+    await db.commit()
+    return saved

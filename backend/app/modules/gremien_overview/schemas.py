@@ -1,7 +1,8 @@
 """Response models of the tab "Gremien" (camelCase JSON).
 
-Every model reads only. The excuse text of an attendance (``meeting_attendance.note``)
-is in no model, also not for the person: the tab shows the status only.
+Every model reads only, except ``GremiumInfoIn``, the save of the Info tab. The excuse
+text of an attendance (``meeting_attendance.note``) is in no model, also not for the
+person: the tab shows the status only.
 """
 
 from __future__ import annotations
@@ -11,10 +12,10 @@ from datetime import date as _date
 from datetime import datetime as _datetime
 from datetime import time as _time
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Final, Literal
 from uuid import UUID
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field, StringConstraints, field_validator
 from pydantic.alias_generators import to_camel
 
 from app.shared.schemas import FrozenStrictCamelModel
@@ -199,3 +200,48 @@ class DecisionPageOut(_GremienOut, frozen=True):
 
     items: list[DecisionOut]
     next_cursor: str | None
+
+
+#: The schemes that an Info link may use. Every other scheme (``javascript:``,
+#: ``data:``, ...) would run in the browser of every reader, so the server refuses it.
+INFO_LINK_SCHEMES: Final = ("https://", "http://", "mailto:")
+INFO_MAX_LINKS: Final = 30
+INFO_MAX_TEXT: Final = 20_000
+
+
+class GremiumInfoLink(_GremienOut, frozen=True):
+    """One labelled link of the Info tab: a label of 1 to 80 characters and a URL."""
+
+    label: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+    url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+
+    @field_validator("url")
+    @classmethod
+    def _known_scheme(cls, value: str) -> str:
+        """Refuse a URL whose scheme is not ``https``, ``http`` or ``mailto``."""
+        lower = value.lower()
+        if not any(lower.startswith(s) and len(lower) > len(s) for s in INFO_LINK_SCHEMES):
+            raise ValueError("the url must start with https://, http:// or mailto:")
+        return value
+
+
+class GremiumInfoIn(_GremienOut, frozen=True):
+    """A save of the Info tab: the text, the links in their order and the version read."""
+
+    body_md: str = Field(default="", max_length=INFO_MAX_TEXT)
+    links: tuple[GremiumInfoLink, ...] = Field(default=(), max_length=INFO_MAX_LINKS)
+    version: int = Field(ge=0)
+
+
+class GremiumInfoOut(_GremienOut, frozen=True):
+    """The Info tab of a Gremium. An unsaved Info is empty with version 0.
+
+    ``canEdit`` tells if the caller holds ``info.write`` in the Gremium.
+    """
+
+    body_md: str
+    links: tuple[GremiumInfoLink, ...]
+    version: int
+    updated_at: _datetime | None
+    updated_by_name: str | None
+    can_edit: bool

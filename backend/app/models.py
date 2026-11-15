@@ -55,7 +55,7 @@ from app.modules.delegations.models import MeetingDelegation
 from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
-from app.modules.gremien.models import DelegationSubstitute, Gremium
+from app.modules.gremien.models import DelegationSubstitute, Gremium, GremiumInfo
 from app.modules.media.models import MarkdownDocument, MarkdownImage
 from app.modules.meetings.models import (
     Meeting,
@@ -122,6 +122,7 @@ __all__ = [
     "FormField",
     "FormVersion",
     "Gremium",
+    "GremiumInfo",
     "GroupMapping",
     "GuestApplicationSettings",
     "MagicLink",
