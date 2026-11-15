@@ -29,14 +29,14 @@ describe('FinalizeProtocolDialogComponent', () => {
 
   it('finalizes for the public page by default', async () => {
     const { confirmed } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
     expect(confirmed).toHaveBeenCalledWith({ publicWithheld: false });
   });
 
   it('holds the protocol back, and starts again with "publish" on the next opening', async () => {
     const { confirmed, fixture } = await setup();
     await userEvent.click(screen.getByRole('switch', { name: /Nicht veröffentlichen/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
     expect(confirmed).toHaveBeenCalledWith({ publicWithheld: true });
     fixture.componentRef.setInput('open', false);
     fixture.detectChanges();
@@ -54,7 +54,7 @@ describe('FinalizeProtocolDialogComponent', () => {
       'aria-checked',
       'true',
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
     expect(confirmed).toHaveBeenCalledWith({ publicWithheld: true });
   });
 

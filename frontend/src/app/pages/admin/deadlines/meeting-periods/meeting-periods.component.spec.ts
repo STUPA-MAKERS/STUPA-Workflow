@@ -56,8 +56,8 @@ describe('MeetingPeriodsSettingsComponent', () => {
     expect(field('Ladungsfrist andere Sitzungen').value).toBe('3');
     expect(field('Protokollentwurf nach').value).toBe('14');
     expect(field('Nachträgliche Entschuldigung bis').value).toBe('7');
-    expect(field('Umlaufbeschluss mindestens').value).toBe('3');
-    expect(field('Unentschuldigte Fehlzeiten bis zum Mandatsverlust').value).toBe('3');
+    expect(field('Umlaufverfahren mindestens').value).toBe('3');
+    expect(field('Unentschuldigte Abwesenheiten bis zum Mandatsverlust').value).toBe('3');
     expect(field('Beginn der Amtszeit neuer Gremien (Monat)').value).toBe('10');
     expect(c.dirty()).toBe(false);
     await userEvent.clear(field('Ladungsfrist ordentliche Sitzung'));

@@ -23,19 +23,19 @@ describe('ProtocolBarComponent', () => {
   it('offers the finalize of a draft to a holder of the right', async () => {
     const { finalize } = await setup(closed(), protocol());
     expect(screen.getByRole('status')).toHaveTextContent('Entwurf · Das Protokoll ist noch nicht versandt.');
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
     expect(finalize).toHaveBeenCalled();
   });
 
   it('offers no finalize while the meeting is live', async () => {
     await setup(meeting(), protocol());
-    expect(screen.queryByRole('button', { name: 'Finalisieren & versenden' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
   });
 
   it('says what is missing to a writer without the right, and nothing to a reader', async () => {
     const { fixture } = await setup(closed({ canFinalize: false }), protocol());
-    expect(screen.queryByRole('button', { name: 'Finalisieren & versenden' })).toBeNull();
-    expect(screen.getByText(/Gremien-Recht „Protokoll finalisieren & versenden“/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
+    expect(screen.getByText(/Gremien-Recht „Protokoll finalisieren & senden“/)).toBeInTheDocument();
     fixture.componentRef.setInput('meeting', closed({ canFinalize: false, canWrite: false }));
     fixture.detectChanges();
     expect(screen.queryByText(/Gremien-Recht/)).toBeNull();
@@ -61,7 +61,7 @@ describe('ProtocolBarComponent', () => {
     expect(screen.getByRole('link', { name: 'PDF intern' })).toHaveAttribute('href', '/p.pdf');
     expect(screen.getByRole('link', { name: 'PDF öffentlich' })).toHaveAttribute('href', '/pub.pdf');
     expect(screen.getByRole('link', { name: 'PDF intern' })).toHaveAttribute('target', '_blank');
-    expect(screen.queryByRole('button', { name: 'Finalisieren & versenden' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
     fixture.componentRef.setInput('protocol', protocol({ status: 'final', isFinal: true, isLocked: true, pdfUrl: '/p.pdf' }));
     fixture.detectChanges();
     expect(screen.getByRole('status')).toHaveTextContent('Final · Das Protokoll ist final.');

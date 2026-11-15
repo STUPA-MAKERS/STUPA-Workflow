@@ -292,10 +292,10 @@ describe('GremiumAttendanceComponent', () => {
     restore = view.restore;
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Als CSV exportieren' })).toBeNull();
-    const cards = screen.getAllByRole('button', { name: /anwesend$/ });
+    const cards = screen.getAllByRole('button', { name: /anwesend/ });
     expect(cards.map((c) => c.getAttribute('aria-label'))).toEqual([
       'Anna Berg, 2 von 2 anwesend',
-      'Finn Schulze, 1 von 2 anwesend',
+      'Finn Schulze, 1 von 2 anwesend, 2 von 3 unentschuldigt',
       'Kai Meier, 0 von 0 anwesend',
     ]);
     expect(cards[1].querySelector('.gat__dot--ex')).toBeTruthy();

@@ -396,7 +396,7 @@ describe('TopSheetComponent', () => {
     const bar = screen.getByRole('status');
     expect(bar).toHaveTextContent('Entwurf · Das Protokoll ist noch nicht versandt.');
     expect(container.querySelector('.ts__foot')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
     expect(finalize).toHaveBeenCalled();
     fixture.componentRef.setInput(
       'protocol',
@@ -407,7 +407,7 @@ describe('TopSheetComponent', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Final · Das Protokoll ist final und wurde versandt.');
     expect(screen.getByRole('link', { name: 'PDF intern' })).toHaveAttribute('href', '/p.pdf');
     expect(screen.getByRole('link', { name: 'PDF öffentlich' })).toHaveAttribute('href', '/pub.pdf');
-    expect(screen.queryByRole('button', { name: 'Finalisieren & versenden' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
     expect(screen.queryByText('Gespeichert')).toBeNull();
   });
 

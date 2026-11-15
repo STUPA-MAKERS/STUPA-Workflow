@@ -80,7 +80,7 @@
       />
     </div>
     @if (lateInvite(); as days) {
-      <app-note icon="alert" kind="warn" role="status">{{ 'meetings.lateInvite' | t: { n: days } }}</app-note>
+      <app-note icon="alert" kind="warn" role="status">{{ (days === 1 ? 'meetings.lateInvite1' : 'meetings.lateInvite') | t: { n: days } }}</app-note>
     }
     <div class="msd__where">
       <app-input
