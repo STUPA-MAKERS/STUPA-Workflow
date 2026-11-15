@@ -198,6 +198,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/notifications/000309](requirements/functional/collaboration/notifications/000309_mail-preferences.md) | A person controls their mail kinds | approved |
 | [F/collaboration/notifications/000310](requirements/functional/collaboration/notifications/000310_mail-languages.md) | Mail texts are in German and English | approved |
 | [F/collaboration/notifications/000312](requirements/functional/collaboration/notifications/000312_task-reminders.md) | Task reminders follow the admin setting | approved |
+| [F/collaboration/notifications/000998](requirements/functional/collaboration/notifications/000998_mail-platform-name.md) | A mail names the platform by its branding name | draft |
+| [F/collaboration/notifications/000999](requirements/functional/collaboration/notifications/000999_mail-logo.md) | The head of a mail shows the logo of the branding | draft |
+| [F/collaboration/notifications/001000](requirements/functional/collaboration/notifications/001000_mail-accent.md) | The button and the links of a mail use the accent colour | draft |
+| [F/collaboration/notifications/001001](requirements/functional/collaboration/notifications/001001_mail-footer-text.md) | The footer of a mail shows the E-Mail-Fußzeile | draft |
+| [F/collaboration/notifications/001002](requirements/functional/collaboration/notifications/001002_mail-footer-copyright.md) | The footer of a mail shows the copyright line | draft |
+| [F/collaboration/notifications/001003](requirements/functional/collaboration/notifications/001003_mail-footer-legal-links.md) | The footer of a mail shows the legal links | draft |
+| [F/collaboration/notifications/001004](requirements/functional/collaboration/notifications/001004_mail-dark-colours.md) | A mail has light and dark colours | draft |
 | [F/collaboration/search/000328](requirements/functional/collaboration/search/000328_reuse-gates.md) | Search reuses the gate of each module | approved |
 | [F/collaboration/search/000329](requirements/functional/collaboration/search/000329_query-length.md) | Search needs two characters | approved |
 | [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows 5 hits per kind | approved |
