@@ -31,6 +31,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
+from app.modules.gremien.models import DEFAULT_TERM_START_MONTH
 
 
 class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
@@ -359,7 +360,6 @@ DEFAULT_INVITE_DAYS_EXTRAORDINARY = 3
 DEFAULT_PROTOCOL_DRAFT_DAYS = 14
 DEFAULT_LATE_EXCUSE_DAYS = 7
 DEFAULT_ABSENCE_LIMIT = 3
-DEFAULT_TERM_START_MONTH = 10
 MAX_PERIOD_DAYS = 365
 MAX_ABSENCE_LIMIT = 50
 

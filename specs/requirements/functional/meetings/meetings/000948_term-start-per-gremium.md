@@ -5,9 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/unit/modules/livevote/test_meeting_periods_unit.py:test_absences_count_in_the_term_of_the_gremium"
+  - "frontend/src/app/pages/admin/committees/gremium-dialog/gremium-dialog.component.spec.ts:termStartMonth"
 implementation:
   - backend/app/modules/gremien/models.py
   - backend/app/modules/meetings/absence.py
+  - backend/app/modules/admin/service/gremien.py
+  - backend/migrations/versions/a7d3e9b15c64_gremium_term_start_month.py
 scope:
   - backend/app/modules/gremien
   - backend/app/modules/meetings

@@ -28,7 +28,7 @@ from app.modules.livevote.router import (
     get_meeting_service,
     get_voting_service,
 )
-from app.modules.meetings.absence import AbsenceNotice
+from app.modules.meetings.absence import AbsenceNotice, absence_notices
 from app.modules.meetings.attendance_service import (
     AttendanceService,
     _open_window,
@@ -36,6 +36,8 @@ from app.modules.meetings.attendance_service import (
 )
 from app.modules.meetings.periods import kept_late_excuse_days, term_end, term_start
 from app.shared.errors import ConflictError, ForbiddenError
+from tests._support.auth_fakes import fake_session as auth_session
+from tests._support.auth_fakes import result as auth_result
 from tests._support.flow_fakes import FakeSession, result
 from tests.unit.modules.livevote.test_livevote_cov import (
     _FakeAgendaService,
@@ -81,6 +83,50 @@ def client(app: FastAPI) -> TestClient:
 def test_term_runs_one_year_from_the_start_month(today: date, month: int, start: date) -> None:
     assert term_start(today, month) == start
     assert term_end(start) == date(start.year + 1, start.month, 1)
+
+
+@pytest.mark.parametrize(
+    ("month", "first", "end"),
+    [(4, date(2026, 4, 1), date(2027, 4, 1)), (10, date(2025, 10, 1), date(2026, 10, 1))],
+)
+async def test_absences_count_in_the_term_of_the_gremium(
+    month: int, first: date, end: date
+) -> None:
+    """§F/meetings/meetings/000948: two Gremien, two start months, two terms.
+
+    The meeting is on 2026-05-10. The Gremium with the start month April counts from
+    April 2026, the Gremium with October from October 2025. The start month of the
+    settings has no part in it.
+    """
+    pid = uuid4()
+    meeting: Any = SimpleNamespace(
+        id=uuid4(), gremium_id=uuid4(), status="closed", kind="ordinary", date=date(2026, 5, 10)
+    )
+    session = auth_session(
+        auth_result(month),
+        auth_result(pid),
+        auth_result((pid, 2)),
+        auth_result((pid, "Anna", "anna@x")),
+    )
+    asked: list[Any] = []
+    execute, scalars = session.execute, session.scalars
+
+    async def spy_execute(stmt: Any) -> Any:
+        asked.append(stmt)
+        return await execute(stmt)
+
+    async def spy_scalars(stmt: Any) -> Any:
+        asked.append(stmt)
+        return await scalars(stmt)
+
+    session.execute, session.scalars = spy_execute, spy_scalars
+    settings: Any = SimpleNamespace(term_start_month=1, absence_limit=3)
+    notices = await absence_notices(session, meeting, settings)
+    assert [(n.name, n.count, n.reached) for n in notices] == [("Anna", 2, False)]
+    counted = [s for s in asked if "meeting_attendance.status" in str(s)]
+    assert len(counted) == 2
+    for stmt in counted:
+        assert {first, end} <= set(stmt.compile().params.values())
 
 
 def test_absence_notice_tells_the_limit_from_the_warning() -> None:

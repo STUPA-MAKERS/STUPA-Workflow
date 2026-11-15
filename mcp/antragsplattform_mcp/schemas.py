@@ -245,6 +245,12 @@ class GremiumCreate(WireModel, frozen=True):
     delegationMaxPerDelegate: int = Field(default=2, ge=1, le=20)
     delegationInElections: bool = False
     quorumPercent: int | None = Field(default=None, ge=0, le=100)
+    termStartMonth: int | None = Field(
+        default=None,
+        ge=1,
+        le=12,
+        description="The month in which a term (Amtszeit) starts. Without it the setting counts.",
+    )
     repeatQuorumPercent: int | None = Field(
         default=None,
         ge=0,
@@ -275,6 +281,7 @@ class GremiumUpdate(WireModel, frozen=True):
     delegationMaxPerDelegate: int | None = Field(default=None, ge=1, le=20)
     delegationInElections: bool | None = None
     quorumPercent: int | None = None
+    termStartMonth: int | None = Field(default=None, ge=1, le=12)
     repeatQuorumPercent: int | None = None
     guestsMayVote: bool | None = None
     protocolsPublic: bool | None = Field(

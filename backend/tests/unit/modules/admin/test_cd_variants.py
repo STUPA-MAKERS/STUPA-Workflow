@@ -174,6 +174,7 @@ def gremium_row(**kw: Any) -> Gremium:
         delegation_max_per_delegate=2,
         delegation_in_elections=False,
         quorum_percent=None,
+        term_start_month=10,
     )
     row.id = kw.pop("id", uuid.uuid4())
     return row

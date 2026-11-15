@@ -108,14 +108,22 @@ async def gremium_attendance(
     service: ServiceDep,
     from_month: Annotated[str | None, Query(alias="from", pattern=_MONTH)] = None,
     to_month: Annotated[str | None, Query(alias="to", pattern=_MONTH)] = None,
+    term: Annotated[date | None, Query()] = None,
 ) -> AttendanceOut:
     """Give the attendance per member and month (``YYYY-MM``, at most 24 months).
 
     Without a range the matrix holds the last six months. A start after the end or a
-    longer range gives 422 ``invalid_month_range``.
+    longer range gives 422 ``invalid_month_range``. ``term`` is a day of the term whose
+    unexcused absences the rows count, the current term without it. With ``term`` and
+    without a range the matrix holds the months of this term. A day out of the range
+    of the calendar gives 422 ``invalid_date_range``.
     """
     await require_gremium(db, principal, gremium_id)
-    return await service.attendance(gremium_id, principal, from_month=from_month, to_month=to_month)
+    if term is not None and not _FIRST_DAY <= term <= _LAST_DAY:
+        raise ValidationProblem("term is out of the calendar", code="invalid_date_range")
+    return await service.attendance(
+        gremium_id, principal, from_month=from_month, to_month=to_month, term=term
+    )
 
 
 @router.get(

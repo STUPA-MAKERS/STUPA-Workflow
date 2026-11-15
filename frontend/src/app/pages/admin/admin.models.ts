@@ -242,6 +242,8 @@ export interface Gremium {
   readonly repeatQuorumPercent?: number | null;
   /** Guests of a public meeting can get a ballot. Only without a quorum. */
   readonly guestsMayVote?: boolean;
+  /** The month (1 to 12) on whose first day a term of the gremium starts (§ 000948). */
+  readonly termStartMonth?: number;
   /** Number of members. Only the admin list (`GET /admin/committees`) gives it. */
   readonly memberCount?: number;
   /** Number of gremium roles, the forced roles included. Admin list only. */
@@ -276,6 +278,8 @@ export interface GremiumCreateBody {
   readonly repeatQuorumPercent?: number | null;
   /** Guests of a public meeting can get a ballot. Only without a quorum. */
   readonly guestsMayVote?: boolean;
+  /** Without a value the gremium takes the month of the meeting periods. */
+  readonly termStartMonth?: number;
   readonly protocolsPublic?: boolean;
 }
 
@@ -297,6 +301,7 @@ export interface GremiumUpdateBody {
   readonly repeatQuorumPercent?: number | null;
   /** Guests of a public meeting can get a ballot. Only without a quorum. */
   readonly guestsMayVote?: boolean;
+  readonly termStartMonth?: number;
   readonly protocolsPublic?: boolean;
 }
 

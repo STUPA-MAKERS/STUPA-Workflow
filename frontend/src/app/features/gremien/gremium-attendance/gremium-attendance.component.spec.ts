@@ -61,9 +61,9 @@ describe('GremiumAttendanceComponent', () => {
   it('shows the matrix with the counts, the marks, the sums and the average', async () => {
     const view = await setup({ fill: true });
     restore = view.restore;
-    expect(view.api.attendance).toHaveBeenCalledWith('g-1', { from: '2026-05', to: '2026-10' });
+    expect(view.api.attendance).toHaveBeenCalledWith('g-1', { term: '2026-10-15' });
     expect((view.container as HTMLElement).classList.contains('gat-host--fill')).toBe(true);
-    expect(view.cmp.rangeText()).toBe('Zeitraum: Mai – Okt 2026');
+    expect(view.cmp.rangeText()).toBe('Zeitraum: Okt 2026 – Sep 2027');
 
     const table = screen.getByRole('table');
     const heads = within(table).getAllByRole('columnheader').map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
@@ -144,7 +144,10 @@ describe('GremiumAttendanceComponent', () => {
   it('reads another range with each preset and names the semesters', async () => {
     const view = await setup();
     restore = view.restore;
+    expect(view.cmp.preset()).toBe('term');
     expect(view.cmp.rangeOptions().map((o) => o.label)).toEqual([
+      'Amtszeit Okt 2026 – Sep 2027',
+      'Amtszeit Okt 2025 – Sep 2026',
       'Letzte 6 Monate',
       'Letzte 12 Monate',
       'Letzte 24 Monate',
@@ -157,8 +160,12 @@ describe('GremiumAttendanceComponent', () => {
     view.cmp.setPreset('prevSemester');
     view.fixture.detectChanges();
     expect(view.api.attendance).toHaveBeenLastCalledWith('g-1', { from: '2026-04', to: '2026-09' });
+    view.cmp.setPreset('term:2025-10-01');
+    view.fixture.detectChanges();
+    expect(view.api.attendance).toHaveBeenLastCalledWith('g-1', { term: '2025-10-01' });
+    expect(view.cmp.rangeText()).toBe('Zeitraum: Okt 2025 – Sep 2026');
     view.cmp.setPreset('odd');
-    expect(view.cmp.preset()).toBe('last6');
+    expect(view.cmp.preset()).toBe('term');
   });
 
   it('exports the matrix as CSV', async () => {
@@ -166,7 +173,7 @@ describe('GremiumAttendanceComponent', () => {
     restore = view.restore;
     screen.getByRole('button', { name: 'Als CSV exportieren' }).click();
     const [blob, name] = (downloadBlob as jest.Mock).mock.calls[0] as [Blob, string];
-    expect(name).toBe('studierendenparlament-anwesenheit-2026-05-2026-10.csv');
+    expect(name).toBe('studierendenparlament-anwesenheit-2026-10-2027-09.csv');
     const lines = (await readBlob(blob)).replace(String.fromCharCode(0xfeff), '').split('\r\n');
     expect(lines[0]).toBe(
       'Mitglied;Rolle;September 2026 Sitzungen;September 2026 anwesend;September 2026 entschuldigt;September 2026 übertragen;' +
@@ -200,9 +207,9 @@ describe('GremiumAttendanceComponent', () => {
     const view = await setup({ manage: true });
     restore = view.restore;
     screen.getByRole('button', { name: 'Anwesenheitsliste (XLSX)' }).click();
-    expect(view.api.attendanceExport).toHaveBeenCalledWith('g-1', '2026-05-01', '2026-10-31');
+    expect(view.api.attendanceExport).toHaveBeenCalledWith('g-1', '2026-10-01', '2027-09-30');
     const [, name] = (downloadBlob as jest.Mock).mock.calls[0] as [Blob, string];
-    expect(name).toBe('studierendenparlament-anwesenheitsliste-2026-05-01-2026-10-31.xlsx');
+    expect(name).toBe('studierendenparlament-anwesenheitsliste-2026-10-01-2027-09-30.xlsx');
     expect(view.cmp.exporting()).toBe(false);
   });
 
@@ -297,7 +304,7 @@ describe('GremiumAttendanceComponent', () => {
     view.fixture.detectChanges();
     expect(view.api.memberAttendance).toHaveBeenCalledWith('g-1', 'p-1', '2026-09');
     expect(screen.getByRole('dialog', { name: 'Finn Schulze' })).toHaveTextContent(
-      'Mitglied · 1 von 2 anwesend · Mai – Okt 2026',
+      'Mitglied · 1 von 2 anwesend · Okt 2026 – Sep 2027',
     );
     expect(await runAxe(view.container)).toHaveNoViolations();
   });

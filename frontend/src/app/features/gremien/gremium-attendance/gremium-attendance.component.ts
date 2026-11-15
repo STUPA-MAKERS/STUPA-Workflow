@@ -53,15 +53,31 @@ import {
   rangeLabel,
   rowTotals,
   semesterOf,
+  shiftMonth,
   sortRows,
   toCsv,
 } from '../gremien.util';
-import { monthShort, monthYear } from '@shared/date-format';
+import { localToday, monthShort, monthYear } from '@shared/date-format';
 import { assertNever } from '@shared/util/immutable';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 const PRESETS: readonly RangePreset[] = ['last6', 'last12', 'last24', 'semester', 'prevSemester'];
+/** The choice of the current term in "Zeitraum"; a named term is `term:YYYY-MM-DD`. */
+const CURRENT_TERM = 'term';
+const TERM = /^term(:\d{4}-\d{2}-\d{2})?$/;
+
+type AttendanceQuery = MonthRange | { readonly term: string };
+
+function isTerm(preset: string): boolean {
+  return TERM.test(preset);
+}
+
+/** The twelve months of the term that starts on `start` (`YYYY-MM-DD`). */
+function termRange(start: string): MonthRange {
+  const from = start.slice(0, 7);
+  return { from, to: shiftMonth(from, 11) };
+}
 const SORTS: readonly AttendanceSort[] = ['quotaAsc', 'quotaDesc', 'name'];
 const SORT_KEYS: Record<AttendanceSort, TranslationKey> = {
   quotaAsc: 'gremien.attendance.sortQuotaAsc',
@@ -119,11 +135,12 @@ export interface RowModel {
  *   "Ø anwesend je Sitzung". The head row and the first column stick while the matrix
  *   scrolls in both directions.
  * - A click on a cell opens the meetings of that month (`AttendanceDetailComponent`).
- * - The chips "Zeitraum" (last 6, 12 or 24 months, this or the last semester), "Rolle"
+ * - The chips "Zeitraum" (each term of the Gremium, the current one at the start; last 6,
+ *   12 or 24 months, this or the last semester; spec 000941), "Rolle"
  *   and "Sortierung" (quota ascending by default). "Als CSV exportieren" saves the
  *   matrix from the same answer, in the browser.
- * - Under the name of a person stands the number of unexcused absences of the current
- *   term with the limit ("2 von 3 unentschuldigt"), in the warning colour from the
+ * - Under the name of a person stands the number of unexcused absences of the chosen
+ *   term (the current one with a range of months) with the limit ("2 von 3 unentschuldigt"), in the warning colour from the
  *   limit minus one on (spec 000920).
  * - "Anwesenheitsliste (XLSX)" shows with `session.manage` in the Gremium: the server
  *   builds the list of the chosen range for the Sitzungsgeld (spec 000923).
@@ -166,7 +183,10 @@ export class GremiumAttendanceComponent {
   readonly phone = mediaQuery(MEDIA.phone);
   private readonly detail = viewChild(AttendanceDetailComponent);
 
-  readonly preset = signal<RangePreset>('last6');
+  /** A preset of months, or a term: `term` is the current one, `term:YYYY-MM-DD` a named one. */
+  readonly preset = signal<string>(CURRENT_TERM);
+  /** The first day of each term on offer, from the last answer. */
+  private readonly terms = signal<readonly string[]>([]);
   readonly role = signal('');
   readonly sort = signal<AttendanceSort>('quotaAsc');
   readonly loading = signal(true);
@@ -178,11 +198,35 @@ export class GremiumAttendanceComponent {
   readonly canExportList = computed(() => this.auth.canInGremium(this.gremiumId(), 'session.manage'));
   private sub: Subscription | null = null;
 
-  readonly range = computed<MonthRange>(() => presetRange(this.preset(), this.now()));
+  /** What the server gets: a day of the term, or the months of the preset. */
+  private readonly query = computed<AttendanceQuery>(() => {
+    const preset = this.preset();
+    if (!isTerm(preset)) return presetRange(preset as RangePreset, this.now());
+    return { term: preset.slice(CURRENT_TERM.length + 1) || localToday(this.now()) };
+  });
 
-  readonly rangeOptions = computed<FilterSelectOption[]>(() =>
-    PRESETS.map((p) => ({ value: p, label: this.presetLabel(p) })),
-  );
+  readonly range = computed<MonthRange>(() => {
+    const preset = this.preset();
+    if (!isTerm(preset)) return presetRange(preset as RangePreset, this.now());
+    const start = preset.slice(CURRENT_TERM.length + 1) || this.terms()[0];
+    return start ? termRange(start) : presetRange('last12', this.now());
+  });
+
+  readonly rangeOptions = computed<FilterSelectOption[]>(() => {
+    const locale = this.i18n.locale();
+    const term = (value: string, range: MonthRange): FilterSelectOption => ({
+      value,
+      label: this.i18n.translate('gremien.attendance.term', {
+        range: rangeLabel(range.from, range.to, locale),
+      }),
+    });
+    const [current, ...past] = this.terms();
+    return [
+      term(CURRENT_TERM, current ? termRange(current) : this.range()),
+      ...past.map((start) => term(`${CURRENT_TERM}:${start}`, termRange(start))),
+      ...PRESETS.map((p) => ({ value: p, label: this.presetLabel(p) })),
+    ];
+  });
   readonly rangeText = computed(() => {
     const r = this.range();
     return `${this.i18n.translate('gremien.attendance.range')}: ${rangeLabel(r.from, r.to, this.i18n.locale())}`;
@@ -276,17 +320,18 @@ export class GremiumAttendanceComponent {
   constructor() {
     effect(() => {
       const id = this.gremiumId();
-      const range = this.range();
-      untracked(() => this.load(id, range));
+      const query = this.query();
+      untracked(() => this.load(id, query));
     });
   }
 
-  load(id = this.gremiumId(), range = this.range()): void {
+  load(id = this.gremiumId(), query = this.query()): void {
     this.sub?.unsubscribe();
     this.loading.set(true);
     this.error.set(false);
-    this.sub = this.api.attendance(id, range).subscribe({
+    this.sub = this.api.attendance(id, query).subscribe({
       next: (data) => {
+        this.terms.set(data.terms);
         this.data.set(data);
         this.loading.set(false);
       },
@@ -299,7 +344,7 @@ export class GremiumAttendanceComponent {
   }
 
   setPreset(value: string): void {
-    this.preset.set((PRESETS as readonly string[]).includes(value) ? (value as RangePreset) : 'last6');
+    this.preset.set(isTerm(value) || (PRESETS as readonly string[]).includes(value) ? value : CURRENT_TERM);
   }
 
   setSort(value: string): void {

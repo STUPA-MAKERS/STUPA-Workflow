@@ -265,15 +265,17 @@ async def test_meetings_counts_the_roster() -> None:
 async def test_attendance_matrix_rows() -> None:
     me_id, guest_id = uuid.uuid4(), uuid.uuid4()
     service = _svc(
+        result(4),
         result(("2026-05", 2)),
         result((me_id, "2026-05", 2, 0, 0), (guest_id, "2026-05", 1, 1, 1)),
         result((me_id, "vorstand", {"de": "Vorstand"})),
         result((guest_id, 2)),
         result((me_id, "Me", "me"), (guest_id, "Gast", "g")),
-        gets=(SimpleNamespace(term_start_month=4, absence_limit=5),),
+        gets=(SimpleNamespace(absence_limit=5),),
     )
     out = await service.attendance(G1, ME, from_month="2026-05", to_month="2026-06")
     assert out.absence_limit == 5 and (out.term_start.month, out.term_start.day) == (4, 1)
+    assert out.terms == [out.term_start]
     assert {r.display_name: r.unexcused for r in out.rows} == {"Gast": 2, "Me": 0}
     assert out.from_month == "2026-05" and out.to_month == "2026-06"
     assert [(m.month, m.meetings) for m in out.months] == [("2026-05", 2), ("2026-06", 0)]
@@ -296,9 +298,50 @@ async def test_attendance_without_people() -> None:
     assert out.absence_limit == 3 and out.term_start.month == 10
 
 
+async def test_attendance_of_a_past_term_counts_this_term_only() -> None:
+    """§F/meetings/meetings/000941: a past term gives its months, its count, each term.
+
+    The Gremium starts its term in April (§F/meetings/meetings/000948). The chosen
+    day lies in the term from April 2024, so the count reads this term and the matrix
+    holds its twelve months. The Gremium had meetings in two terms, and the current
+    term is on offer too.
+    """
+    pid = uuid.uuid4()
+    session = fake_session(
+        result(4),
+        result(),
+        result(),
+        result(),
+        result((pid, 2)),
+        result((pid, "Anna", "anna")),
+        result(date(2024, 5, 2), date(2024, 6, 6), date(2025, 1, 9), date(2025, 4, 3)),
+    )
+    asked: list[Any] = []
+    execute = session.execute
+
+    async def spy(stmt: Any) -> Any:
+        asked.append(stmt)
+        return await execute(stmt)
+
+    session.execute = spy
+    out = await GremienService(session, TZ).attendance(
+        G1, ME, from_month=None, to_month=None, term=date(2024, 11, 20)
+    )
+    assert out.term_start == date(2024, 4, 1)
+    assert (out.from_month, out.to_month, len(out.months)) == ("2024-04", "2025-03", 12)
+    assert [r.unexcused for r in out.rows] == [2]
+    assert out.terms[1:] == [date(2025, 4, 1), date(2024, 4, 1)]
+    assert out.terms[0] >= date(2025, 4, 1)
+    absences = next(s for s in asked if "meeting_attendance.status" in str(s))
+    bounds = set(absences.compile().params.values())
+    assert {date(2024, 4, 1), date(2025, 4, 1)} <= bounds
+
+
 async def test_attendance_unknown_principal_row() -> None:
     pid = uuid.uuid4()
-    out = await _svc(result(), result((pid, "2026-05", 1, 0, 0)), result(), result()).attendance(
+    out = await _svc(
+        result(), result(), result((pid, "2026-05", 1, 0, 0)), result(), result()
+    ).attendance(
         G1, ME, from_month="2026-05", to_month="2026-05"
     )
     assert out.rows[0].display_name is None and not out.rows[0].is_self

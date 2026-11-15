@@ -5,6 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/unit/modules/gremien_overview/test_gremien_service.py:test_attendance_of_a_past_term_counts_this_term_only"
+  - "backend/tests/unit/modules/gremien_overview/test_gremien_router.py:test_attendance_passes_the_term"
+  - "frontend/src/app/features/gremien/gremium-attendance/gremium-attendance.component.spec.ts:term"
 implementation:
   - backend/app/modules/gremien_overview/service.py
   - frontend/src/app/features/gremien

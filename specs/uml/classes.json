@@ -3660,6 +3660,12 @@
           "type": "INTEGER"
         },
         {
+          "name": "term_start_month",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "guests_may_vote",
           "nullable": false,
           "primaryKey": false,
