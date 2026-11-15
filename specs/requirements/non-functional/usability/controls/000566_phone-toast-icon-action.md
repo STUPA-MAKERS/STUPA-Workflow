@@ -2,14 +2,10 @@
 id: "000566"
 title: A phone toast action is an icon button
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-09
-implementation:
-  - frontend/vendor/ui-kit/src/lib/toast/toast.component.html
-  - frontend/vendor/ui-kit/src/lib/toast/toast.component.scss
-  - frontend/src/app/pages/applications/applications-list.component.ts
-  - frontend/src/app/pages/invoices/invoices.component.ts
+updated: 2026-11-16
+replaced_by: NF/usability/controls/000565
 scope:
   - frontend/vendor/ui-kit
   - frontend/src/app/

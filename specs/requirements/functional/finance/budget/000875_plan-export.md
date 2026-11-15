@@ -4,7 +4,7 @@ title: A version of a Haushaltsplan exports as XLSX and as PDF
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-16
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_version_exports_with_the_year_before_and_the_version_before"
   - "backend/tests/unit/modules/budget/test_plan_export.py:test_the_rows_follow_the_tree_and_the_sides"
@@ -52,12 +52,12 @@ Both files must hold:
   amount and the note;
 - for a Nachtrag: the Ansatz of the version before it and the change.
 
-A decided version must print the names and the keys of the decision (000808). The XLSX
+A decided version must print the names and the keys of the decision (000821). The XLSX
 file must hold the amounts as numbers. The PDF must be A4 landscape in the design of the
 protocols, with the export logo of the branding (000891). The file name must be `Haushaltsplan_<Haushalt>_<fiscal year>[_Nachtrag-n][_Entwurf]`
 with the extension of the format. An export is an entry in the audit log.
 
-Reason: The Finanzordnung (§ 7, § 9) says that the draft goes to the StuPa and the decided
+Reason: The Finanzordnung (§ 7, § 9) says that the draft goes to the STUPA and the decided
 plan to the Präsidium. Both get a file. The person who can read the plan on the page gets
 no more data from the file.
 

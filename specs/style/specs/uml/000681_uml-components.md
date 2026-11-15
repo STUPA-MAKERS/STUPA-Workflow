@@ -4,7 +4,7 @@ title: The component view shows the backend modules, their layers and their impo
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-11
+updated: 2026-11-16
 tests:
   - "backend/tests/unit/scripts/test_build_uml.py:test_component_view_has_the_layer_of_each_module"
 implementation:
@@ -20,8 +20,8 @@ scope:
 
 `components.json` must hold one element for each package in `backend/app/modules` and one
 element `shared` for the shared code (000644). Each module element must have its `layer`, the
-number from 1 (top) to 5 (bottom) of the import contract in `backend/pyproject.toml` (000643).
-The element `shared` must have the layer 6.
+number from 1 (top) to 6 (bottom) of the import contract in `backend/pyproject.toml` (000643).
+The element `shared` must have the layer 7.
 
 The file must hold one edge for each pair of modules where the first module imports the second
 one, also through an import inside a function. The edge must have `count`, the number of import

@@ -4,7 +4,7 @@ title: A TOP text is editable until the protocol is final
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-16
 implementation:
   - backend/app/modules/meetings/agenda_service.py
 scope:
@@ -15,5 +15,5 @@ scope:
 
 # A TOP text is editable until the protocol is final
 
-The protokollant must be able to edit a TOP text while the meeting is live or closed and the
-protocol is a draft.
+The protokollant must be able to edit a TOP text while the meeting is planned (000095), live or
+closed and the protocol is a draft.

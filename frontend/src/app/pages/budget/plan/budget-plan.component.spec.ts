@@ -522,7 +522,7 @@ describe('BudgetPlanComponent', () => {
       expect(screen.getByRole('button', { name: /^Version/ })).toHaveTextContent('Version: 1. Nachtrag');
     });
 
-    it('§F/finance/budget/000826: opens the plan of the version that a vote names', async () => {
+    it('§F/finance/budget/000838: opens the plan of the version that a vote names', async () => {
       const old = plan([version({ id: 'old', state: 'replaced' }), version({ id: 'now', number: 1, state: 'in_force' })], 'fy-25');
       const view = await setup({ plans: { 'fy-25': old, 'fy-26': plan() }, query: { planVersion: 'old' } });
       expect(view.api.planOfVersion).toHaveBeenCalledWith('old');
@@ -1386,7 +1386,7 @@ describe('BudgetPlanComponent', () => {
       expect(await openMenu()).toEqual(['Zur Abstimmung', ...FILES]);
     });
 
-    it('§F/finance/budget/000826: a cancelled vote leaves the step waiting for a meeting', async () => {
+    it('§F/finance/budget/000838: a cancelled vote leaves the step waiting for a meeting', async () => {
       const view = await setup({ plans: { 'fy-26': withVote('cancelled') } });
       expect(text(view.container.querySelector('.bp__stepper'))).toContain('Wartet auf eine Sitzung: StuPa');
       expect(await openMenu()).toEqual(['Zur Abstimmung', 'Zurück in den Entwurf', ...FILES]);

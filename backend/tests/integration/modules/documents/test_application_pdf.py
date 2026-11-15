@@ -251,6 +251,15 @@ async def test_a_vote_without_a_decision_row_still_gives_the_beschluss(
     assert "\n".join(field_row("Ergebnis", ["Abgelehnt"])) in source
     assert "[!feld] Bewilligter Betrag" not in source
 
+    async with maker() as session:
+        latest = start + timedelta(minutes=15)
+        session.add(Vote(**common, status="closed", result="tie", closed_at=latest))
+        await session.commit()
+    assert reader.get(f"/api/applications/{app_id}/pdf").status_code == 200
+    source = typst.sources[-1]
+    assert "\n".join(field_row("Ergebnis", ["Abgelehnt"])) in source
+    assert "Stimmengleichheit" not in source
+
 
 async def test_the_switch_of_the_antragsart_adds_the_signature_section(
     migrated: tuple[str, str],

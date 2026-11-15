@@ -4,7 +4,7 @@ title: A draft version can be deleted
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-16
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_draft_version_is_deleted"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
@@ -29,5 +29,5 @@ confirmation first (000840).
 Reason: A Nachtrag or a plan that a person created by mistake must not stay until a body
 decides it (000161). A decided version is a record and stays.
 
-Test: The backend test deletes a draft Nachtrag, a draft Stammplan and a decided version. The
+Test: The backend test deletes a draft Nachtrag, a draft first version and a decided version. The
 component test deletes a draft after the confirmation.

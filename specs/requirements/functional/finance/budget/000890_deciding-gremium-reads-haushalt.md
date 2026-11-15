@@ -4,7 +4,7 @@ title: A Gremium that decides a plan reads the Haushalt
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-16
 tests:
   - "backend/tests/integration/modules/applications/test_committee_read_scope.py:test_a_gremium_that_decides_the_plan_reads_the_haushalt"
 implementation:
@@ -21,7 +21,7 @@ scope:
 
 # A Gremium that decides a plan reads the Haushalt
 
-A member of a Gremium that decides the plan of a Haushalt in a step (000826) must read
+A member of a Gremium that decides the plan of a Haushalt in a step (000838) must read
 this Haushalt like a member of its view Gremium (000259): the Kostenstellen with their
 amounts, the Haushaltsplan with every version and its export, and the Anträge of its
 Kostenstellen. A substitute of the pool of the Gremium reads like a member. The rule

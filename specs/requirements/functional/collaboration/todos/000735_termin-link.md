@@ -4,7 +4,7 @@ title: A card can link a Termin
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-11
+updated: 2026-11-16
 implementation:
   - backend/app/modules/todos/links.py
   - backend/app/modules/todos/link_view.py
@@ -19,8 +19,8 @@ scope:
 # A card can link a Termin
 
 The section `Verknüpft` of a card must offer the kind `Termin`. The link picker must find only the
-Termine that the person can read (§F/meetings/calendar/000718). The detail of a Termin must show
-the cards that link it (§F/collaboration/todos/000573).
+Termine that the person can read (F/meetings/calendar/000718). The detail of a Termin must show
+the cards that link it (F/collaboration/todos/000573).
 
 A person who can read the card but not the Termin must read only the title, the start, the end
 and the place of the linked Termin. That person must never read its description, its invited

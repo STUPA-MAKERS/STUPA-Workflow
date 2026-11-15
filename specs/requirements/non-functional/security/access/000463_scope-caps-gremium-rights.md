@@ -4,16 +4,20 @@ title: A scope caps every gremium right of a token
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-16
 implementation:
   - backend/app/modules/auth/principal.py
   - backend/app/modules/auth/policy.py
 scope:
   - backend/app/modules/auth
   - backend/app/modules/livevote/service/permissions.py
+  - backend/app/
 ---
 
 # A scope caps every gremium right of a token
 
 A gremium permission check must pass `Principal.scope_allows(perm)`. A module must not decide a
-right from `principal.roles`.
+right from `principal.roles`: a permission check must call `principal.has()` or
+`scope_allows()` and must never test `"admin" in principal.roles`.
+
+Reason: A role test skips the scope cap of a token.

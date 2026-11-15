@@ -4,7 +4,7 @@ title: An embedded PDF needs the read right of its Sitzung
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-15
+updated: 2026-11-16
 implementation:
   - backend/app/modules/media/router.py
   - backend/app/modules/media/service.py
@@ -19,8 +19,8 @@ scope:
 The server must store the Sitzung of each embedded PDF at the upload. `GET
 /api/media/documents/{id}` and its info route must answer only a person who can read that
 Sitzung, and 404 for each other session. The public route of a public protocol stays as it is
-(§F/meetings/protocols/000867). The images of the Markdown texts stay readable for each session
-(§NF/security/files/000344).
+(F/meetings/protocols/000867). The images of the Markdown texts stay readable for each session
+(NF/security/files/000344).
 
 Reason: A PDF of a protocol can hold the papers of a non-public item. The id alone is not a
 protection, because a text, a mail or a browser history can show it to a person without the

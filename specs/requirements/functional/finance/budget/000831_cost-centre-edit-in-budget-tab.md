@@ -1,10 +1,10 @@
 ---
 id: "000831"
-title: A Kostenstelle is edited in the Budget tab
+title: A Kostenstelle is edited in the Haushalt tab
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-16
 tests:
   - "frontend/src/app/pages/budget/cost-centre/cost-centre-settings.component.spec.ts:CostCentreSettingsComponent"
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
@@ -17,9 +17,9 @@ scope:
   - frontend/src/app/pages/budget
 ---
 
-# A Kostenstelle is edited in the Budget tab
+# A Kostenstelle is edited in the Haushalt tab
 
-The detail of a selected Kostenstelle in the Budget tab must show the section
+The detail of a selected Kostenstelle in the Haushalt tab must show the section
 "Kostenstelle" with its key, its name, its colour, the switch "Aktiv", the Gremium that
 sees it and the Gremium that decides. The section must show no side (000853). When the person selects another
 Kostenstelle, each field must show the saved value of that Kostenstelle, also after a text
@@ -31,8 +31,9 @@ A refused save must show its cause and the saved value of its field again, also 
 select and in the switch, and it must show its cause once. A tree read that fails after a refused save must show no
 message of its own on the tab Bewirtschaftung, because a phone shows one message at a time
 and the cause of the refusal must stay. A person without
-`budget.structure` must not see the section. The state of the plan version must not lock
-these fields, because a decided version keeps its own name and key (000821).
+`budget.structure` must not see the section. In a Haushalt with the plan switch on, the key and
+the name must change only in a draft version (000877). The state of the plan version must
+not lock the other fields.
 
 Reason: The settings of a Kostenstelle stand beside its amounts, so one place holds all
 that a person sets on it.

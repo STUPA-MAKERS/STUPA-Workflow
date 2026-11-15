@@ -2,11 +2,10 @@
 id: "000304"
 title: No agent token reaches a backup
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/auth/oauth.py
+updated: 2026-11-16
+replaced_by: F/integrations/mcp/000462
 scope:
   - backend/app/modules/backup
   - backend/worker/backup.py

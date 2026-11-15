@@ -4,7 +4,7 @@ title: The public calendar shows the meetings of Gremien with public protocols
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-11
+updated: 2026-11-16
 implementation:
   - backend/app/modules/calendar/public.py
   - frontend/src/app/features/calendar/public-entry/public-entry.component.html
@@ -18,9 +18,9 @@ scope:
 
 The public calendar must show each meeting of a Gremium that has `protocols_public`. A public
 meeting must show its title, its date, its start time, its end time, the name of its Gremium and
-the titles of its TOPs that are not internal (§F/public/public-pages/000172). A past meeting
+the titles of its public TOPs (F/public/public-pages/000172). A past meeting
 must also show a link to its public protocol when that protocol is public
-(§F/public/public-pages/000171). A public meeting must never show an internal TOP, the text or
+(F/public/public-pages/000171). A public meeting must never show a non-public TOP, the text or
 the attachments of a TOP, the attendance, the votes, the live state or a link into the meeting.
 A meeting of a Gremium without `protocols_public` must never be public.
 
@@ -30,5 +30,5 @@ Reason: A Gremium that publishes its protocols meets in public, so the date of i
 public too. The content of a meeting stays internal until its protocol is final.
 
 Test: A backend unit test reads the public entries without a session, finds the meeting of a
-Gremium with `protocols_public` with these fields and without its internal TOP, and does not find the meeting of a
+Gremium with `protocols_public` with these fields and without its non-public TOP, and does not find the meeting of a
 Gremium without it.

@@ -1,10 +1,10 @@
 ---
 id: "000832"
-title: A Kostenstelle is deleted in the Budget tab
+title: A Kostenstelle is deleted in the Haushalt tab
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-16
 tests:
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
@@ -15,13 +15,13 @@ scope:
   - frontend/src/app/pages/budget
 ---
 
-# A Kostenstelle is deleted in the Budget tab
+# A Kostenstelle is deleted in the Haushalt tab
 
-The Budget tab must offer the action "Kostenstelle löschen" for the selected Kostenstelle
+The Haushalt tab must offer the action "Kostenstelle löschen" for the selected Kostenstelle
 to a person with `budget.structure`, after a confirmation. The page must show the refusal
 of a Kostenstelle that is in use (000254) or in a plan (000820) as a message.
 
-Reason: Verwaltung does not list a Kostenstelle below a budget (000828), so the Budget tab
+Reason: Verwaltung does not list a Kostenstelle below a budget (000828), so the Haushalt tab
 is the only place for the action.
 
 Test: The page tests delete a Kostenstelle after the confirmation and read the message of a

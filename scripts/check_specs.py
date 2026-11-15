@@ -4,7 +4,8 @@
 The script checks the rules for specs (`specs/style/specs/`): the file name, the
 place in the tree, the front matter (also `implementation`), the heading, the labels, `must` in the rule
 text, the scope paths, `replaced_by`, unique numbers, the index, and every `§`
-reference in the code. For a protocol spec it also checks `version`, `media_type`, the fixed
+reference in the code. It finds a `§` before a rule in a spec (000032), and a number that
+`origin/development` gave to a different spec after the branch left it (000006). For a protocol spec it also checks `version`, `media_type`, the fixed
 sections and the schema file, and for a requirement the `protocols` list. It needs only the
 Python standard library; `scripts/check_protocols.py` validates the schemas and the examples.
 
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -61,6 +63,9 @@ DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LABEL = re.compile(r"^(Reason|Test):", re.MULTILINE)
 MUST = re.compile(r"\bmust\b")
 SECTION_REF = re.compile(r"§ ?((?:F|NF|S|P)/[a-z0-9/-]+/[0-9]{6})")
+SPEC_SECTION_REF = re.compile(r"§ ?(?:(?:F|NF|S|P)/[a-z0-9/-]+/)?[0-9]{6}\b")
+INLINE_CODE = re.compile(r"`[^`\n]*`")
+BASE_REF = "origin/development"
 CODE_DIRS = ["backend/app", "backend/worker", "backend/tests", "frontend/src", "mcp", "typst"]
 CODE_SUFFIXES = {".py", ".ts", ".html", ".scss"}
 INDEX_START = "## Index\n"
@@ -373,6 +378,65 @@ def _section_refs(ids: dict[str, Spec]) -> list[str]:
     return errors
 
 
+def spec_section_refs(body: str) -> list[str]:
+    """Return each `§` before a rule in the text of a spec (000032).
+
+    Inline code does not count, because a spec shows the form of a code reference there. A
+    `§` before the paragraph of a law has no six-digit number and does not count either.
+    """
+    return SPEC_SECTION_REF.findall(INLINE_CODE.sub("", body))
+
+
+def base_collisions(
+    local: dict[str, str], base: dict[str, str], fork: dict[str, str]
+) -> list[str]:
+    """Return an error for each number that the base branch gave to a different spec (000006).
+
+    Each argument maps a number to the path of its spec: in the working tree, on the base
+    branch, and at the commit where the branch left the base branch. A number collides when
+    the base branch added it after that commit and the working tree has it at another path.
+    """
+    return [
+        f"{path}: number {number} is {base[number]} on {BASE_REF}; give the spec a new number (000006)"
+        for number, path in sorted(local.items())
+        if number in base and number not in fork and base[number] != path
+    ]
+
+
+def _git_numbers(ref: str) -> dict[str, str] | None:
+    """Return number to spec path at a git ref, or None when git cannot read the ref."""
+    try:
+        out = subprocess.run(
+            ["git", "ls-tree", "-r", "--name-only", ref, "--", "specs"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    paths = [Path(line) for line in out.splitlines() if FILE_NAME.match(Path(line).name)]
+    return {p.name[:6]: p.relative_to("specs").as_posix() for p in paths}
+
+
+def _base_errors(numbers: dict[str, Path]) -> list[str]:
+    """Compare the numbers with the base branch. A checkout without the ref checks nothing."""
+    try:
+        fork_ref = subprocess.run(
+            ["git", "merge-base", "HEAD", BASE_REF],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    base, fork = _git_numbers(BASE_REF), _git_numbers(fork_ref)
+    if base is None or fork is None:
+        return []
+    return base_collisions({n: p.as_posix() for n, p in numbers.items()}, base, fork)
+
+
 def main(argv: list[str]) -> int:
     """Run every check. Return 1 when one fails."""
     specs, errors = load()
@@ -385,6 +449,11 @@ def main(argv: list[str]) -> int:
         numbers[number] = spec.path.relative_to(SPECS)
         errors += _check_meta(spec, ids)
         errors += _check_body(spec)
+        errors += [
+            f"{spec.path.relative_to(SPECS)}: a spec refers to a rule without § (000032): {ref}"
+            for ref in spec_section_refs(spec.body)
+        ]
+    errors += _base_errors(numbers)
     if "--write" in argv:
         README.write_text(_readme(specs), encoding="utf-8")
     elif README.read_text(encoding="utf-8") != _readme(specs):

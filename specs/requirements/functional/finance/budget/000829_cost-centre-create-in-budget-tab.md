@@ -1,10 +1,10 @@
 ---
 id: "000829"
-title: A Kostenstelle is created in the Budget tab
+title: A Kostenstelle is created in the Haushalt tab
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-16
 tests:
   - "frontend/src/app/pages/budget/cost-centre/cost-centre-create.component.spec.ts:CostCentreCreateComponent"
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
@@ -19,10 +19,10 @@ scope:
   - backend/app/modules/budget
 ---
 
-# A Kostenstelle is created in the Budget tab
+# A Kostenstelle is created in the Haushalt tab
 
-The Budget tab must offer the action "Kostenstelle anlegen" to a person with
-`budget.structure`, as the main action of the page (000209). The form must take the parent
+The Haushalt tab must offer the action "Kostenstelle anlegen" to a person with
+`budget.structure`, as the main action of the page (000198). The form must take the parent
 (the budget or a Kostenstelle below it), the key and the name. The form of the view
 Bewirtschaftung must take no side, because a node holds none (000853). The view
 Bewirtschaftung must offer the action for a fiscal year without a version in force. The view Planung must offer it only while the shown

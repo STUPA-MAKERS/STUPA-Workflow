@@ -4,7 +4,7 @@ title: A new plan can copy the plan of another year
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-16
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_create_plan_copies_the_plan_in_force_of_another_year"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
@@ -19,7 +19,7 @@ scope:
 # A new plan can copy the plan of another year
 
 The create of a Haushaltsplan can name a different fiscal year of the same budget
-(`copyFromFiscalYearId`). The new Stammplan must then start in `draft` with a copy of the
+(`copyFromFiscalYearId`). The first version of the new plan must then start in `draft` with a copy of the
 lines of the version in force of that year: the side (000853), the Ansatz, the Erläuterung,
 the Vermerke and the gesperrt amount. Each parent of the copy must hold the sum of its children (000794). A
 year without a version in force and a year of a different budget must answer 422

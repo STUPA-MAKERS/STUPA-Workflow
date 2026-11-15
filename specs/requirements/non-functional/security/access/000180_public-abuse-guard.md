@@ -9,9 +9,11 @@ implementation:
   - backend/app/shared/antiabuse.py
   - backend/app/shared/ratelimit.py
   - backend/app/shared/altcha.py
+  - backend/app/modules/applications/router.py
 scope:
   - backend/app/modules/antiabuse
   - backend/app/shared/antiabuse.py
+  - backend/app/modules/applications
 ---
 
 # Public input is protected against abuse

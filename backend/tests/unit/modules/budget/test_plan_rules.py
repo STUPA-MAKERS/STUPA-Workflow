@@ -68,7 +68,7 @@ def test_step_snapshot_and_pass() -> None:
 def test_step_vote() -> None:
     """A step keeps its vote, and only the vote of the next step decides.
 
-    Rule: §F/finance/budget/000826.
+    Rule: §F/finance/budget/000838.
     """
     steps = plan_rules.step_snapshot([("Beschluss", uuid.uuid4()), ("Genehmigung", None)])
     voted = plan_rules.with_step_vote(steps, 0, "v1")

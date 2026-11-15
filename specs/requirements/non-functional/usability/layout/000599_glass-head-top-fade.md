@@ -2,14 +2,10 @@
 id: "000599"
 title: A glass list head fades into the page colour at the top screen edge
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-10
-implementation:
-  - frontend/vendor/ui-kit/src/styles/_frosted.scss
-  - frontend/vendor/ui-kit/src/styles/list-detail.scss
-  - frontend/vendor/ui-kit/src/lib/sticky-bar/sticky-bar.component.scss
-  - frontend/vendor/ui-kit/src/lib/list-group/list-group.component.scss
+updated: 2026-11-16
+replaced_by: NF/usability/layout/000193
 scope:
   - frontend/vendor/ui-kit
 ---

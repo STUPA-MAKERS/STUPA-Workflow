@@ -4,7 +4,7 @@ title: A Haushaltsplan starts as a draft
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-16
 tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_plan_switch_gives_open_years_a_draft"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_plan_switch_goes_off_only_without_a_decision"
@@ -33,12 +33,13 @@ When a person sets the plan switch (000814) to on, the platform must give each o
 year of the Haushalt that has no Haushaltsplan a Haushaltsplan with one draft version. The
 draft must hold a line for each node below the Haushalt. The Ansatz of a node without a
 child must equal its allocation, a parent must hold the sum of its children (000794), and
-no Titel has a side (000853). The switch must change no allocation and must ask for
-nothing. A closed fiscal year must get no Haushaltsplan (000801).
+no Titel has a side (000853). The switch must change no allocation, so the request has no preview and no
+confirmation, and the edit form of the Haushalt asks for nothing. A closed fiscal year must get no Haushaltsplan (000801).
 
 While a fiscal year has no version in force, the Bewirtschaftung must work with the
 allocations as they are, and a person with `budget.structure` must set them by hand as in
-a year without a plan (000833). From the first version in force on, 000797 and 000798 hold.
+a year without a plan (000833). Such a year must take no new booking, transfer or
+assignment (000879). From the first version in force on, 000797 and 000798 hold.
 
 The migration of this rule must turn each Haushaltsplan that only the switch made (one
 version in force that passed no step, in an open fiscal year) back into a draft and must

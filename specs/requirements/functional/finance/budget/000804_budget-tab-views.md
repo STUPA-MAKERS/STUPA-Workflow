@@ -1,10 +1,10 @@
 ---
 id: "000804"
-title: The Budget tab has the views Bewirtschaftung and Planung
+title: The Haushalt tab has the views Bewirtschaftung and Planung
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-16
 tests:
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
@@ -16,9 +16,9 @@ scope:
   - frontend/src/app/pages/budget
 ---
 
-# The Budget tab has the views Bewirtschaftung and Planung
+# The Haushalt tab has the views Bewirtschaftung and Planung
 
-The Budget tab must have the two views "Bewirtschaftung" and "Planung". The view Planung is
+The Haushalt tab must have the two views "Bewirtschaftung" and "Planung". The view Planung is
 the plan page. A segmented switch
 above the search field of the list must change the view. On a phone the switch must be below
 the title. The view Planung must have the route `/budget/plan`. The switch must show only

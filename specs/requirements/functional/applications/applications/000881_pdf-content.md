@@ -4,7 +4,7 @@ title: The Antrag PDF shows the Antrag like the detail page
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-16
 implementation:
   - backend/app/modules/documents
   - frontend/src/app/pages/applications
@@ -61,8 +61,8 @@ The PDF must hold, in this order:
    the conditions. If the Antrag has no valid decision, it is the newest closed vote on the
    Antrag that has a result: a vote that passed "as requested" and a vote that was rejected
    write no decision, and the PDF must still show them. The section must name the day and, for
-   a decision by a vote, the Gremium that ran the vote and the result ("Angenommen",
-   "Abgelehnt" or "Stimmengleichheit"). A decision without a vote must name no Gremium. A vote
+   a decision by a vote, the Gremium that ran the vote and the result ("Angenommen" or
+   "Abgelehnt": 000026). A decision without a vote must name no Gremium. A vote
    that did not pass must show no approved amount. The conditions must stand in one cell, one
    below the other, with a dashed rule between two, and not as a list.
 

@@ -2,9 +2,9 @@
 id: "000964"
 title: The head line of the plan PDF sits tight between the title and the table
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-15
+updated: 2026-11-16
 tests:
   - "typst/tests/test_plan.py:test_the_head_line_sits_tight_between_the_title_and_the_table"
 implementation:

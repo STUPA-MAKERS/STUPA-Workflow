@@ -2,12 +2,10 @@
 id: "000568"
 title: A wide-screen toast is the same glass card
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-09
-implementation:
-  - frontend/vendor/ui-kit/src/lib/toast/toast.component.scss
-  - frontend/vendor/ui-kit/src/lib/toast/toast.component.html
+updated: 2026-11-16
+replaced_by: NF/usability/controls/000565
 scope:
   - frontend/vendor/ui-kit
 ---
