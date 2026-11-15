@@ -1220,7 +1220,9 @@ class VotingService:
         that would be fail-open. Without it a percent quorum stays fail-closed and
         never counts as met. A prepared meeting vote waits as a draft while the roster
         can change, so its caller counts the roster again and gives
-        ``eligible_count``, which replaces the count of the create.
+        ``eligible_count``, which replaces the count of the create. A vote without a
+        meeting counts the roster of its Gremium again here, so a draft does not keep
+        the count of the day it was made (§F/meetings/voting/000939).
 
         A meeting vote opens only in a ``live`` meeting. The method locks the meeting
         row before the vote row, as the meeting close does.
@@ -1258,6 +1260,9 @@ class VotingService:
         config = self._config(vote)
         if eligible_count is not None:
             vote.eligible_count = eligible_count
+        elif vote.meeting_id is None:
+            counted = await self._roster_count(vote)
+            vote.eligible_count = vote.eligible_count if counted is None else counted
         vote.opens_at = now
         vote.status = "open"
         data: dict[str, object] = {
@@ -1280,6 +1285,19 @@ class VotingService:
         return self._to_out(
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
+
+    async def _roster_count(self, vote: Vote) -> int | None:
+        """Count the eligible members of the Gremium of ``vote`` now.
+
+        An old row with a free group key has no Gremium and gives None.
+        """
+        from app.modules.meetings.rules import MeetingRules
+
+        try:
+            gremium_id = UUID(vote.eligible_group)
+        except (ValueError, TypeError):
+            return None
+        return await MeetingRules(self.session).vote_eligible_count(gremium_id)
 
     async def cast(
         self,

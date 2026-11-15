@@ -159,13 +159,18 @@ async def test_create_internal_unknown_application_404() -> None:
         await VotingService(db).create_internal(uuid4(), payload)
 
 
-async def test_open_sets_window_keeps_roster_eligible() -> None:
-    """The open sets the window and keeps the eligible count of the roster.
+async def test_open_sets_window_and_counts_the_roster(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The open sets the window and counts the roster of the Gremium again.
 
-    The roster sets eligible_count at create time and never counts logged-in users, so
-    the open reads only the vote and recounts nothing. The open writes a vote_open audit
-    entry with id references only.
+    §F/meetings/voting/000939: a vote without a meeting takes the roster count of its
+    open, not the count of its draft. The count never comes from the logged-in users.
+    The open writes a vote_open audit entry with id references only.
     """
+
+    async def _count(self: VotingService, vote: Any) -> int | None:
+        return 23
+
+    monkeypatch.setattr(VotingService, "_roster_count", _count)
     vote = _vote(status="draft", eligible_count=20)
     db = fake_session(result(vote))
     out = await VotingService(db).open(vote.id, now=NOW, actor="mgr")
@@ -173,12 +178,26 @@ async def test_open_sets_window_keeps_roster_eligible() -> None:
     assert out.opens_at == NOW
     assert out.opened_at == NOW
     assert out.closed_at is None
-    assert out.tally.eligible == 20
+    assert out.tally.eligible == 23
     entries = [a for a in db.added if type(a).__name__ == "AuditEntry"]
     assert [e.action for e in entries] == ["vote_open"]
     assert entries[0].actor == "mgr"
     assert entries[0].data["applicationId"] == str(vote.application_id)
     assert entries[0].data["meetingId"] is None
+
+
+async def test_open_with_a_free_group_key_keeps_the_count() -> None:
+    """An old vote with a free group key has no Gremium to count."""
+    vote = _vote(status="draft", eligible_count=20, eligible_group="legacy-key")
+    db = fake_session(result(vote))
+    assert await VotingService(db)._roster_count(vote) is None
+    out = await VotingService(db).open(vote.id, now=NOW, actor="mgr")
+    assert out.tally.eligible == 20
+
+
+async def test_roster_count_reads_the_members_of_the_gremium() -> None:
+    db = fake_session(result())
+    assert await VotingService(db)._roster_count(_vote()) == 0
 
 
 async def test_open_non_draft_409() -> None:

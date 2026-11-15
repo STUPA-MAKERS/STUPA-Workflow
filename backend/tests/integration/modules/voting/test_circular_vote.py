@@ -132,6 +132,24 @@ async def test_create_with_a_short_or_naive_window_422(
     assert err.value.code == "circular_window_too_short"
 
 
+async def test_a_draft_counts_the_members_at_its_open(session: AsyncSession) -> None:
+    """§F/meetings/voting/000939: the open reads the roster, not the draft."""
+    flow = await seed_vote_flow(session)
+    await _members(session, flow.gremium_id, 2)
+    voting = VotingService(session)
+    draft = await CircularService(voting).create(_body(flow, draft=True), ADMIN, now=NOW)
+    before = await session.get(Vote, draft.id)
+    assert before is not None
+    counted = before.eligible_count
+    await _members(session, flow.gremium_id, 3)
+    await voting.open(draft.id, now=NOW, actor="adm")
+    after = await session.get(Vote, draft.id)
+    assert after is not None
+    await session.refresh(after)
+    assert counted is not None
+    assert after.eligible_count == counted + 3
+
+
 async def test_open_a_draft_without_an_end_422(session: AsyncSession) -> None:
     flow = await seed_vote_flow(session)
     voting = VotingService(session)
