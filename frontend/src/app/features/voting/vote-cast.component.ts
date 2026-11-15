@@ -1,3 +1,4 @@
+import { pollRefusalMessage } from './poll-refusal';
 import { castRefusalText } from './ballot/ballot-refusal';
 import {
   ChangeDetectionStrategy,
@@ -394,9 +395,7 @@ export class VoteCastComponent implements OnDestroy {
       },
       error: (err: unknown) => {
         this.pollBusy.set(false);
-        const detail = problemDetail(err);
-        const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.error(detail ? `${base}: ${detail}` : base);
+        this.toast.error(pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)));
         this.reload();
       },
     });

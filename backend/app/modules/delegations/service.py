@@ -46,7 +46,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, not_, or_, select
+from sqlalchemy import ColumnElement, and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -908,8 +908,10 @@ class DelegationService:
             await self._own_delegations(meeting.id, me.id, now) if me is not None else (None, [])
         )
         candidates = await self._candidates(gremium.id, me.id) if me is not None else []
+        full = await self._full_delegates(meeting.id, gremium.delegation_max_per_delegate)
         recipients = sorted(
-            candidates, key=lambda r: (not r.via_pool, (r.display_name or "").lower())
+            (r for r in candidates if r.via_pool or r.principal_id not in full),
+            key=lambda r: (not r.via_pool, (r.display_name or "").lower()),
         )
 
         return MeetingDelegationContext(
@@ -968,10 +970,28 @@ class DelegationService:
             if gremium.delegation_allow_external and needle
             else []
         )
+        full = await self._full_delegates(meeting.id, gremium.delegation_max_per_delegate)
         return sorted(
-            (*local, *external),
+            (r for r in (*local, *external) if r.via_pool or r.principal_id not in full),
             key=lambda r: (not r.via_pool, not r.is_member, (r.display_name or "").lower()),
         )[:20]
+
+    async def _full_delegates(self, meeting_id: UUID, limit: int) -> frozenset[UUID]:
+        """Return the persons who hold the most delegations of the meeting already.
+
+        The dialog does not offer them, because the create would answer 409
+        ``delegate_limit``. A pool seat does not count, as in the create.
+        """
+        rows = await self.session.execute(
+            select(MeetingDelegation.delegate_principal_id)
+            .where(
+                MeetingDelegation.meeting_id == meeting_id,
+                MeetingDelegation.via_pool.is_(False),
+            )
+            .group_by(MeetingDelegation.delegate_principal_id)
+            .having(func.count() >= limit)
+        )
+        return frozenset(rows.scalars().all())
 
     async def _external_recipients(
         self, needle: str, seen: AbstractSet[UUID]

@@ -136,6 +136,25 @@ async def test_one_delegation_more_than_the_limit_conflicts(
     assert raised.status_code == 201, raised.text
 
 
+async def test_the_dialog_does_not_offer_a_person_at_the_limit(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """§F/meetings/delegations/000909: Dora holds 2 of 2 delegations and is no choice."""
+    w = await _world(maker)
+    with TestClient(api) as client:
+        act(api, w.subs["Cem"])
+        before = client.get(f"/api/delegations/meetings/{w.meeting_id}/context").json()
+        assert _delegate(client, api, w, "Anna", "Dora").status_code == 201
+        assert _delegate(client, api, w, "Ben", "Dora").status_code == 201
+        act(api, w.subs["Cem"])
+        after = client.get(f"/api/delegations/meetings/{w.meeting_id}/context").json()
+        found = client.get(f"/api/delegations/meetings/{w.meeting_id}/recipients?q=Dora").json()
+    dora = str(w.ids["Dora"])
+    assert dora in {r["principalId"] for r in before["recipients"]}
+    assert dora not in {r["principalId"] for r in after["recipients"]}
+    assert dora not in {r["principalId"] for r in found}
+
+
 async def test_one_cast_writes_the_own_and_each_represented_ballot(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:

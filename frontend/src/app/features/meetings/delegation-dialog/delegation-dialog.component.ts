@@ -50,6 +50,13 @@ import {
  * The server checks every rule again (deadline, recipients, no chains). The dialog
  * reports the new delegation through `created`.
  */
+/** The refusals of a new delegation that have their own text, by the code of the server. */
+const REFUSAL_TEXT: Readonly<Record<string, TranslationKey>> = {
+  delegate_limit: 'delegation.toast.limit',
+  delegate_already_voting: 'delegation.toast.alreadyVoting',
+  delegation_exists: 'delegation.toast.exists',
+};
+
 @Component({
   selector: 'app-delegation-dialog',
   standalone: true,
@@ -167,9 +174,12 @@ export class DelegationDialogComponent {
           this.toast.success(this.i18n.translate('delegation.toast.created'));
           this.created.emit(d);
         },
-        error: (err: { error?: { detail?: string } }) => {
+        error: (err: { error?: { detail?: string; code?: string } }) => {
           this.busy.set(false);
-          this.toast.error(err.error?.detail ?? this.i18n.translate('delegation.toast.createFailed'));
+          const own = REFUSAL_TEXT[err.error?.code ?? ''];
+          this.toast.error(
+            own ? this.i18n.translate(own) : (err.error?.detail ?? this.i18n.translate('delegation.toast.createFailed')),
+          );
         },
       });
   }
