@@ -1348,6 +1348,22 @@ async def test_patch_going_live_ok_with_publisher() -> None:
     assert len(pub.states) == 1
 
 
+async def test_patch_close_waits_for_a_pending_lot() -> None:
+    """Refuse the close while an election waits for the lot (§F/meetings/voting/000027).
+
+    After `_get` the open-vote check finds nothing and the lot check finds an election.
+    """
+    m = _meeting(status="live")
+    from app.modules.livevote.schemas import MeetingPatch
+
+    session = _QueueSession(executes=[res(m), res(), res(m.id)])
+    svc = MeetingService(session)  # type: ignore[arg-type]
+    with pytest.raises(ConflictError) as refused:
+        await svc.patch(m.id, MeetingPatch(status="closed"), _admin())
+    assert refused.value.code == "lot_pending"
+    assert m.status == "live" and session.committed == 0
+
+
 async def test_patch_close_stamps_closed_at() -> None:
     """Stamp `closed_at` on the close.
 

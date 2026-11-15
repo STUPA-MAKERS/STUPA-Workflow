@@ -19,6 +19,12 @@
           <span>{{ 'meetings.closeConfirm.noOpenVote' | t }}</span>
         </li>
       }
+      @if (lotPending()) {
+        <li class="cmc__row cmc__row--blocked">
+          <app-icon class="cmc__icon" name="x" [size]="18" />
+          <span role="alert">{{ 'meetings.closeConfirm.lotPending' | t }}</span>
+        </li>
+      }
       @if (hasDrafts()) {
         <li class="cmc__row">
           <app-icon class="cmc__icon" name="x" [size]="18" />
@@ -40,7 +46,7 @@
   <app-button
     dialog-footer
     variant="danger"
-    [disabled]="openVote()"
+    [disabled]="openVote() || lotPending()"
     [loading]="closing()"
     (click)="confirm()"
   >

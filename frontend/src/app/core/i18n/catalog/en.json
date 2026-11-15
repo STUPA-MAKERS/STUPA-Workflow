@@ -1217,6 +1217,7 @@
   "meetings.closeConfirm.body": "Closing is final. The attendance is locked afterwards.",
   "meetings.closeConfirm.confirm": "Close session",
   "meetings.closeConfirm.noOpenVote": "No open vote",
+  "meetings.closeConfirm.lotPending": "An election ended in a tie. Draw the lot first.",
   "meetings.closeConfirm.openVote": "A vote is still open. Close or cancel it first.",
   "meetings.closeConfirm.draftsCancelled": "Planned votes are cancelled",
   "meetings.closeConfirm.finalizeLater": "You finalize the minutes afterwards, as a separate step",

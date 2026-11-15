@@ -1217,6 +1217,7 @@
   "meetings.closeConfirm.body": "Das Schließen ist unwiderruflich. Die Anwesenheit ist danach gesperrt.",
   "meetings.closeConfirm.confirm": "Sitzung schließen",
   "meetings.closeConfirm.noOpenVote": "Keine offene Abstimmung",
+  "meetings.closeConfirm.lotPending": "Eine Wahl endete mit Stimmengleichheit. Ziehe zuerst das Los.",
   "meetings.closeConfirm.openVote": "Eine Abstimmung ist noch offen. Schließe sie oder brich sie zuerst ab.",
   "meetings.closeConfirm.draftsCancelled": "Geplante Abstimmungen werden abgebrochen",
   "meetings.closeConfirm.finalizeLater": "Das Protokoll finalisierst du danach als eigenen Schritt",

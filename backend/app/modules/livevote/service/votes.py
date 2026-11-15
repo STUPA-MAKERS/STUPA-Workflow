@@ -453,6 +453,31 @@ class VoteReadOps(MeetingServiceBase):
             for v in votes
         }
 
+    async def lot_pending(self, meeting_id: UUID) -> bool:
+        """Tell if an election of this meeting ended in a tie and still waits for the lot.
+
+        The lead draws the lot in the room. A meeting that closes before the draw has
+        an election without a result, and a later draw would differ from the protocol,
+        so the close waits for the lot. An election that was voted on again does not
+        count: its repeat gives the result.
+        """
+        repeat = aliased(Vote)
+        return (
+            await self.session.execute(
+                select(Vote.id)
+                .where(
+                    Vote.meeting_id == meeting_id,
+                    Vote.kind == "election",
+                    Vote.status == "closed",
+                    Vote.result == "tie",
+                    ~select(repeat.id)
+                    .where(repeat.repeat_of_id == Vote.id, repeat.status.in_(("open", "closed")))
+                    .exists(),
+                )
+                .limit(1)
+            )
+        ).first() is not None
+
     async def open_vote(self, meeting_id: UUID) -> Vote | None:
         """Return the open vote of this meeting for the `subscribe` reconnect state."""
         return (
