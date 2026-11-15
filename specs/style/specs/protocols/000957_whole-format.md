@@ -2,7 +2,7 @@
 id: "000957"
 title: A protocol spec describes one whole format
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

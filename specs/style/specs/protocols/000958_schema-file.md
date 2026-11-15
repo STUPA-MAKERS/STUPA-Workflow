@@ -2,7 +2,7 @@
 id: "000958"
 title: A JSON format has a JSON Schema file beside its spec
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

@@ -2,7 +2,7 @@
 id: "NNNNNN"
 title: Short title of the format
 kind: protocol
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: YYYY-MM-DD
 version: 1

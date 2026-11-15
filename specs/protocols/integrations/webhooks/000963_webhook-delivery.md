@@ -2,7 +2,7 @@
 id: "000963"
 title: A webhook delivery is a signed JSON POST
 kind: protocol
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 version: 1

@@ -2,7 +2,7 @@
 id: "000961"
 title: A test checks the output of the code against the schema
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
