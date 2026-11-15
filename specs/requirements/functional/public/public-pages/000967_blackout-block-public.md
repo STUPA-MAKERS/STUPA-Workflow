@@ -2,9 +2,11 @@
 id: "000967"
 title: The public variants show a blackout block as one bar
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "typst/tests/test_markdown.py:test_empty_blackout_block_is_one_full_bar"
 implementation:
   - backend/app/shared/blackout.py
   - backend/app/modules/protocol/service.py

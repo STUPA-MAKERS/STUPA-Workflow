@@ -509,3 +509,25 @@ def test_a_signature_row_is_a_field_row_with_its_signer() -> None:
     assert [texts(r["label"]) for r in rows] == ["Sachlich richtig", "Ohne Rolle"]
     assert [r["sign"] for r in rows] == ["Finanzreferent:in", ""]
     assert [r["c"] for r in rows] == [[], []]
+
+
+def test_blackout_block_keeps_its_content_in_the_internal_variant() -> None:
+    """§000965 §000689: the fence lines go, the content prints as normal Markdown."""
+    blocks = conv("Vorher.\n%%\nGeheim %%Anna%%\n\n- Punkt\n%%\nDanach.")
+    assert [b["t"] for b in blocks] == ["par", "par", "list", "par"]
+    assert texts(blocks[1]) == "Geheim Anna"
+    assert "%%" not in "".join(texts(b) for b in blocks)
+
+
+def test_empty_blackout_block_is_one_full_bar() -> None:
+    """§000967: the empty block of the public variant is the paragraph of one block bar."""
+    blocks = conv("Vorher.\n%%\n%%\nDanach.")
+    assert blocks[1] == {"t": "par", "c": [{"t": "blockbar"}]}
+    assert texts(blocks[0]) == "Vorher."
+    assert texts(blocks[2]) == "Danach."
+
+
+def test_blackout_fence_in_code_stays_code() -> None:
+    """§000965: a `%%` line in a code block is code, not a fence."""
+    (code,) = conv("```\n%%\n```")
+    assert code["t"] == "codeblock"

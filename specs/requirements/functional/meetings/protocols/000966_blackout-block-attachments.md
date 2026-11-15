@@ -2,9 +2,12 @@
 id: "000966"
 title: An attachment in a blackout block stays out of the public protocol
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/unit/shared/test_blackout.py:test_black_out_drops_the_pdf_of_a_block"
+  - "backend/tests/integration/modules/protocol/test_protocol_blackout.py:test_public_document_drops_a_block_and_its_pdf"
 implementation:
   - backend/app/shared/blackout.py
   - backend/app/modules/protocol/public.py

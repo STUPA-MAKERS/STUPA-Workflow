@@ -1,4 +1,4 @@
-"""Integration tests of the blackout marks in a protocol (specs 000686, 000687, 000691).
+"""Integration tests of the blackout marks in a protocol (000686, 000687, 000691, 000966, 000967).
 
 A TOP body and the free text mark a name as `%%Name%%`. The internal document keeps
 the mark, so the render service prints the name as plain text. The public document,
@@ -125,6 +125,24 @@ async def test_public_document_and_snapshot_black_out_the_name(session: AsyncSes
     assert "%%%% stellt den Antrag vor." in public
     assert _NAME not in snapshot.search_text()
     assert snapshot.tops[0].markdown == "Die Antragstellerin %%%% stellt den Antrag vor."
+
+
+async def test_public_document_drops_a_block_and_its_pdf(session: AsyncSession) -> None:
+    """§000966 §000967: the public document holds the empty block, no text and no PDF of it."""
+    doc = "[Brief.pdf](/api/media/documents/0b9d1d3e-7a39-4b3f-9a4e-3c1f2a5b6c7d)"
+    body = f"Vorher.\n%%\nStellungnahme von {_NAME}.\n\n{doc}\n%%\nDanach."
+    protocol = await _seed(session, body=body)
+    svc = ProtocolService(session)
+
+    internal = await svc._build_document(protocol, public=False)
+    snapshot = PublicSnapshot()
+    public = await svc._build_document(protocol, public=True, snapshot=snapshot)
+
+    assert doc in internal
+    assert _NAME not in public
+    assert "/api/media/documents/" not in public
+    assert snapshot.tops[0].markdown == "Vorher.\n%%\n%%\nDanach."
+    assert _NAME not in snapshot.search_text()
 
 
 async def test_public_free_text_blacks_out_the_name(session: AsyncSession) -> None:

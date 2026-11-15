@@ -2,7 +2,7 @@
 id: "000690"
 title: The format bar marks a segment for blackout
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

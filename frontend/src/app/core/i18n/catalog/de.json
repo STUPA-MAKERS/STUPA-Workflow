@@ -4254,6 +4254,7 @@
   "meetings.editor.blackout": "Schwärzen (Strg+Umschalt+X)",
   "markdown.blackout.mark": "Wird öffentlich geschwärzt",
   "markdown.blackout.bar": "geschwärzt",
+  "markdown.blackout.block": "Abschnitt geschwärzt",
   "meetings.editor.blackoutOpen": "Eine Schwärzung ist nicht geschlossen: Das schließende %% fehlt. So bleibt der Name öffentlich sichtbar, und das Protokoll lässt sich nicht finalisieren.",
   "meetings.toast.blackoutOpen": "Eine Schwärzung ist nicht geschlossen ({where}). Ergänze das schließende %%.",
   "meetings.toast.blackoutOpenFree": "im Freitext",

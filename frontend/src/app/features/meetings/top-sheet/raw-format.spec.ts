@@ -101,3 +101,30 @@ describe('insertRawInline', () => {
     expect(insertRawInline({ text: 'A weg B', start: 2, end: 5 }, '[a](x)').text).toBe('A [a](x) B');
   });
 });
+
+describe('applyRawFormat blackout block (000690, 000965)', () => {
+  it('puts the fence lines around the lines of a selection over two paragraphs', () => {
+    const text = 'Vorher\nErster\n\nZweiter\nDanach';
+    const out = applyRawFormat({ text, start: 9, end: 20 }, 'blackout');
+    expect(out.text).toBe('Vorher\n%%\nErster\n\nZweiter\n%%\nDanach');
+    expect(out.text.slice(out.start, out.end)).toBe(text.slice(9, 20));
+  });
+
+  it('opens an empty block on an empty line', () => {
+    const out = applyRawFormat({ text: 'A\n\nB', start: 2, end: 2 }, 'blackout');
+    expect(out.text).toBe('A\n%%\n\n%%\nB');
+  });
+
+  it('removes the block that holds the caret', () => {
+    const text = 'Vorher\n%%\nErster\n\nZweiter\n%%\nDanach';
+    const out = applyRawFormat({ text, start: 12, end: 12 }, 'blackout');
+    expect(out.text).toBe('Vorher\nErster\n\nZweiter\nDanach');
+    expect(out.start).toBe(9);
+  });
+
+  it('keeps the inline mark in a block for its own selection', () => {
+    const text = '%%\nEs spricht %%Lena%%.\n%%';
+    const out = applyRawFormat({ text, start: 16, end: 20 }, 'blackout');
+    expect(out.text).toBe('%%\nEs spricht Lena.\n%%');
+  });
+});

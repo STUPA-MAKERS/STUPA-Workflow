@@ -2,7 +2,7 @@
 id: "000686"
 title: An open blackout marker stops the finalize
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:

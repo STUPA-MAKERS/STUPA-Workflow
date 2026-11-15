@@ -178,6 +178,19 @@
         clip: true,
         place(center + horizon, text(fill: black, size: 0.55em)[geschwärzt]),
       )
+    } else if t == "blockbar" {
+      // A blacked-out block (000967): one bar of the full text width and the height
+      // of the segment bar, whatever the length of the block. The black words on the
+      // black bar are the text that a screen reader and a copy of the text get.
+      box(
+        width: 100%,
+        height: 1em,
+        baseline: 0.12em,
+        fill: black,
+        radius: 1pt,
+        clip: true,
+        place(center + horizon, text(fill: black, size: 0.55em)[Abschnitt geschwärzt]),
+      )
     } else if t == "sym" {
       math.equation(block: false, alt: n.v, math-symbols.at(n.v, default: n.v))
     } else if t == "math" {

@@ -2,9 +2,12 @@
 id: "000965"
 title: Protocol text marks a block for blackout
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/unit/shared/test_blackout.py:test_black_out_parses_a_block_with_paragraphs_and_a_pdf"
+  - "typst/tests/test_markdown.py:test_blackout_block_keeps_its_content_in_the_internal_variant"
 implementation:
   - backend/app/shared/blackout.py
   - typst/typst_service/markdown.py
