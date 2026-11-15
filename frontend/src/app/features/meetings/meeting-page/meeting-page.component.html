@@ -17,10 +17,20 @@
     <app-join-qr [meeting]="m" [button]="false" [(open)]="qrOpen" />
   }
 
-  @if (!phone() && mainAction() === 'close') {
-    <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
-      {{ 'meetings.control.closeSession' | t }}
-    </app-button>
+  @if (!phone()) {
+    @switch (mainAction()) {
+      @case ('open') {
+        <app-button variant="fill" [disabled]="!!openBlocked()" [title]="openBlocked() || ('meetings.control.open' | t)" (click)="startSession.emit()">
+          <app-icon name="play" />
+          {{ opensAtText() || ('meetings.control.open' | t) }}
+        </app-button>
+      }
+      @case ('close') {
+        <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
+          {{ 'meetings.control.closeSession' | t }}
+        </app-button>
+      }
+    }
   }
 
   <app-row-menu [sections]="menu()" [label]="'meetings.page.menu' | t" (selected)="onMenu($event)" />

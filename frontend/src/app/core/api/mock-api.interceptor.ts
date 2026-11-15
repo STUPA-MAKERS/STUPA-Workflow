@@ -1011,7 +1011,7 @@ const MOCK_PLANNED_MEETING: MeetingOutWire = {
   guestsVoteAllowed: false,
   votes: [],
   createdAt: '2026-06-01T10:00:00Z',
-  /** The demo user leads it and nobody keeps the minutes yet: "Sitzung eröffnen" in the menu says why it is disabled. */
+  /** The demo user leads it and nobody keeps the minutes yet: "Sitzung eröffnen" says why it is disabled. */
   protocolId: null,
   protokollantId: null,
   protokollantName: null,
