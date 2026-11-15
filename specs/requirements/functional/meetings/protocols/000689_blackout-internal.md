@@ -4,7 +4,7 @@ title: Internal views show a marked segment as marked
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-11
+updated: 2026-11-15
 tests:
   - "typst/tests/test_markdown.py:test_blackout_bar_and_internal_mark"
 implementation:
@@ -21,8 +21,9 @@ scope:
 # Internal views show a marked segment as marked
 
 The internal views must show the marked text with a dashed outline and the tooltip "Wird
-öffentlich geschwärzt". The internal PDF must show the marked text as normal text, without a
-mark. In the very high contrast view the outline must be solid.
+öffentlich geschwärzt". A blackout block (000965) must show its content in one box with the same
+dashed outline and tooltip. The internal PDF must show the marked text and the content of a
+block as normal text, without a mark. In the very high contrast view the outline must be solid.
 
 Reason: The keeper must see what the public will not see. The internal PDF is the full record.
 

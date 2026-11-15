@@ -93,6 +93,7 @@ export class MarkdownViewComponent {
         blackout: {
           mark: this.i18n.translate('markdown.blackout.mark'),
           bar: this.i18n.translate('markdown.blackout.bar'),
+          block: this.i18n.translate('markdown.blackout.block'),
         },
         documents: this.documentSrc()
           ? {

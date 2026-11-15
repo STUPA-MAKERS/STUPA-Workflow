@@ -350,3 +350,50 @@ describe('hasOpenBlackout (000686)', () => {
   });
 });
 
+
+describe('blackout blocks (000965, 000967)', () => {
+  const blackout = { mark: 'Wird öffentlich geschwärzt', bar: 'geschwärzt', block: 'Abschnitt geschwärzt' };
+  const doc = '[Brief.pdf](/api/media/documents/0b9d1d3e-7a39-4b3f-9a4e-3c1f2a5b6c7d)';
+
+  it('renders the blocks of a block in one box with the mark', () => {
+    const html = markdownToSafeHtml(`Vorher.\n%%\nErster Absatz\n\n- Punkt\n\n${doc}\n%%\nDanach.`, { blackout });
+    expect(html).toContain('<div class="md-blackout-block" title="Wird öffentlich geschwärzt">');
+    expect(html).toContain('<p>Erster Absatz</p>');
+    expect(html).toContain('<li>Punkt</li>');
+    expect(html).toContain('<p>Vorher.</p>');
+    expect(html).toContain('<p>Danach.</p>');
+    expect(html).not.toContain('%%');
+  });
+
+  it('renders the empty block as the bar of a block', () => {
+    const html = markdownToSafeHtml('Vorher.\n%%\n%%\nDanach.', { blackout });
+    expect(html).toContain('<div class="md-bar-block" role="img" aria-label="Abschnitt geschwärzt"></div>');
+  });
+
+  it.each([
+    ['Text\n%%\nGeheim', true],
+    ['%%\nGeheim\n%%', false],
+    ['%%\nA %%B%%\n%%', false],
+    ['%%\nA\n%%\n%%\nB', true],
+  ])('hasOpenBlackout(%j) gives %s', (text, open) => {
+    expect(hasOpenBlackout(text)).toBe(open);
+  });
+});
+
+describe('blackout blocks, edge cases (000686, 000967)', () => {
+  it('renders an open block as text', () => {
+    const html = markdownToSafeHtml('Vorher.\n%%\nOffen', { blackout: { mark: 'm', bar: 'b' } });
+    expect(html).toContain('<p>%%</p>');
+    expect(html).toContain('<p>Offen</p>');
+    expect(html).not.toContain('md-blackout-block');
+  });
+
+  it('labels the bar of a block with the bar text when no block text is given', () => {
+    const html = markdownToSafeHtml('%%\n%%', { blackout: { mark: 'm', bar: 'geschwärzt' } });
+    expect(html).toContain('aria-label="geschwärzt"');
+  });
+
+  it('renders a block without blackout texts', () => {
+    expect(markdownToSafeHtml('%%\nText\n%%')).toContain('<div class="md-blackout-block" title="">');
+  });
+});
