@@ -468,6 +468,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000946](requirements/functional/meetings/meetings/000946_one-present-count.md) | A meeting shows one count of present members | approved |
 | [F/meetings/meetings/000948](requirements/functional/meetings/meetings/000948_term-start-per-gremium.md) | Each Gremium has its own start month of the term | approved |
 | [F/meetings/meetings/000951](requirements/functional/meetings/meetings/000951_attendance-until-final.md) | The lead corrects the attendance until the protocol is final | approved |
+| [F/meetings/meetings/000982](requirements/functional/meetings/meetings/000982_closed-meeting-open-until-final.md) | A closed meeting stays open for corrections until its protocol is final | draft |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |
