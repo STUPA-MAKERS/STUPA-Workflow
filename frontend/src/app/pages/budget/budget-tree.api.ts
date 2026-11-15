@@ -452,6 +452,14 @@ export interface BudgetNodeUpdate {
 }
 
 /** A top-level budget with one fiscal year that a new booking can take (spec 000879). */
+/** What the dialog of the close of a fiscal year names before the person confirms. */
+export interface FiscalYearCloseCheck {
+  /** The Anträge of the year that are not in an end state. */
+  readonly openApplications: number;
+  /** The plan of the year has a Nachtrag that is still a draft. */
+  readonly draftSupplement: boolean;
+}
+
 export interface BudgetYear {
   readonly budgetId: Uuid;
   readonly budgetName: string;
@@ -597,6 +605,14 @@ export class BudgetTreeApi {
    *  bookings, allocations or applications still reference the year. */
   deleteFiscalYear(topId: Uuid, fyId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}`);
+  }
+
+  /** What the close of a fiscal year leaves open. Needs P(`budget.structure`). */
+  fiscalYearCloseCheck(topId: Uuid, fyId: Uuid): Observable<FiscalYearCloseCheck> {
+    return this.http.get<FiscalYearCloseCheck>(
+      `${this.base}/budgets/${topId}/fiscal-years/${fyId}/close-check`,
+      { context: skipLoading() },
+    );
   }
 
   /** Close a fiscal year, or reopen it. Needs P(`budget.structure`). */

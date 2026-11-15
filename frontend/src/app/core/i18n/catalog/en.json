@@ -1825,6 +1825,8 @@
   "budget.tree.fyReopen": "Reopen",
   "budget.tree.fyCloseTitle": "Close fiscal year {year}?",
   "budget.tree.fyCloseConfirm": "After that, no bookings, transfers, allocations and application assignments are possible in this year until it is reopened.",
+  "budget.tree.fyCloseOpenApplications": "Open applications in this year: {count}. After the close they can only move to an open year.",
+  "budget.tree.fyCloseDraftSupplement": "The supplement in draft stays frozen until the year is reopened.",
   "budget.tree.fyReopenTitle": "Reopen fiscal year {year}?",
   "budget.tree.fyReopenConfirm": "After that, bookings, transfers, allocations and application assignments in this year can be changed again.",
   "budget.tree.fyNew": "Create fiscal year",

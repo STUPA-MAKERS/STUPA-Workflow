@@ -36,7 +36,12 @@ import { SimplifyPathPipe } from '@shared/budget-path';
 import type { LoadState } from '@shared/forms/settings-form';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
-import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../../budget/budget-tree.api';
+import {
+  BudgetTreeApi,
+  type BudgetTreeNode,
+  type FiscalYear,
+  type FiscalYearCloseCheck,
+} from '../../budget/budget-tree.api';
 import { ColourFieldComponent, isColour } from '../../budget/cost-centre/colour-field.component';
 import { costCentreError, keyProblem, NAME_MAX } from '../../budget/cost-centre/cost-centre.util';
 import { BudgetPlanApi } from '../../budget/plan/budget-plan.api';
@@ -231,10 +236,21 @@ export class AdminBudgetsComponent {
     const fy = this.fyCloseTarget();
     if (!fy) return null;
     const t = (key: TranslationKey): string => this.i18n.translate(key, { year: fy.display });
-    return fy.closedAt
-      ? { title: t('budget.tree.fyReopenTitle'), body: t('budget.tree.fyReopenConfirm'), confirm: t('budget.tree.fyReopen') }
-      : { title: t('budget.tree.fyCloseTitle'), body: t('budget.tree.fyCloseConfirm'), confirm: t('budget.tree.fyClose') };
+    if (fy.closedAt) {
+      return { title: t('budget.tree.fyReopenTitle'), body: t('budget.tree.fyReopenConfirm'), confirm: t('budget.tree.fyReopen') };
+    }
+    const check = this.fyCloseCheck();
+    const body = [
+      t('budget.tree.fyCloseConfirm'),
+      ...(check?.openApplications
+        ? [this.i18n.translate('budget.tree.fyCloseOpenApplications', { count: check.openApplications })]
+        : []),
+      ...(check?.draftSupplement ? [t('budget.tree.fyCloseDraftSupplement')] : []),
+    ].join(' ');
+    return { title: t('budget.tree.fyCloseTitle'), body, confirm: t('budget.tree.fyClose') };
   });
+  /** What the close of the target year leaves open: the dialog names it. */
+  readonly fyCloseCheck = signal<FiscalYearCloseCheck | null>(null);
   readonly fyTitle = computed(() =>
     this.i18n.translate('admin.budgets.fyTitle', { name: this.fyBudget()?.name ?? '' }),
   );
@@ -638,7 +654,17 @@ export class AdminBudgetsComponent {
   onFyMenu(fy: FiscalYear, item: RowMenuItem): void {
     this.fyOpen.set(false);
     if (item.id !== 'delete') {
+      this.fyCloseCheck.set(null);
       this.fyCloseTarget.set(fy);
+      const budget = this.fyBudget();
+      if (budget && !fy.closedAt) {
+        this.api.fiscalYearCloseCheck(budget.id, fy.id).subscribe({
+          next: (check) => {
+            if (this.fyCloseTarget()?.id === fy.id) this.fyCloseCheck.set(check);
+          },
+          error: () => undefined,
+        });
+      }
       return;
     }
     this.fyDelete.set(fy);

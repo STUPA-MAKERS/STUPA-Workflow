@@ -1825,6 +1825,8 @@
   "budget.tree.fyReopen": "Wieder öffnen",
   "budget.tree.fyCloseTitle": "Haushaltsjahr {year} abschließen?",
   "budget.tree.fyCloseConfirm": "Danach sind in diesem Jahr keine Buchungen, Umschichtungen, Zuteilungen und Antragszuordnungen mehr möglich, bis es wieder geöffnet wird.",
+  "budget.tree.fyCloseOpenApplications": "Offene Anträge in diesem Jahr: {count}. Sie lassen sich danach nur noch in ein offenes Jahr verschieben.",
+  "budget.tree.fyCloseDraftSupplement": "Der Nachtrag im Entwurf bleibt eingefroren, bis das Jahr wieder geöffnet wird.",
   "budget.tree.fyReopenTitle": "Haushaltsjahr {year} wieder öffnen?",
   "budget.tree.fyReopenConfirm": "Danach können Buchungen, Umschichtungen, Zuteilungen und Antragszuordnungen in diesem Jahr wieder geändert werden.",
   "budget.tree.fyNew": "Haushaltsjahr anlegen",

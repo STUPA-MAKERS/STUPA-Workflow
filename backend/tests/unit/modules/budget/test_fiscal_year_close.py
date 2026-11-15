@@ -8,7 +8,7 @@ that must answer 409 `fiscal_year_closed` on a closed year.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -264,18 +264,18 @@ async def test_assign_budget_out_of_closed_year_409() -> None:
     assert app.budget_id is not None and app.fiscal_year_id == fy.id
 
 
-async def test_move_out_of_closed_year_409() -> None:
+async def test_move_out_of_closed_year_into_an_open_year() -> None:
+    """Rule: §F/finance/budget/000991."""
     top = _budget(id=uuid.uuid4())
     current = _closed_fy(budget_id=top.id, year=2025)
-    target = _fy(budget_id=top.id, year=2026)
+    target = _fy(budget_id=top.id, year=date.today().year)
     app = _app(budget_id=top.id, fiscal_year_id=current.id)
-    sess = fake_session(result(app), result(top), result(top), result(target), gets=[current])
-    with pytest.raises(ConflictError) as ei:
-        await BudgetTreeService(sess).move_fiscal_year(
-            app.id, MoveFiscalYearRequest(fiscalYearId=target.id)
-        )
-    assert _is_closed_error(ei)
-    assert app.fiscal_year_id == current.id
+    sess = fake_session(result(app), result(top), result(top), result(target))
+    out = await BudgetTreeService(sess).move_fiscal_year(
+        app.id, MoveFiscalYearRequest(fiscalYearId=target.id)
+    )
+    assert out.fiscal_year_id == target.id
+    assert app.fiscal_year_id == target.id
 
 
 async def test_move_into_closed_year_409() -> None:

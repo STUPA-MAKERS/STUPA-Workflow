@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import InstrumentedAttribute
 
 from app.modules.applications.models import Application
@@ -18,10 +18,12 @@ from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpen
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import (
     BudgetYearOut,
+    FiscalYearCloseCheck,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
 )
+from app.modules.flow.models import State
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
@@ -361,6 +363,34 @@ class FiscalYearOps(BudgetTreeServiceBase):
         if fy.budget_id != top.id:
             raise NotFoundError(f"fiscal year {fiscal_year_id} does not belong to budget {top.id}")
         return fy
+
+    async def close_check(self, budget_id: UUID, fiscal_year_id: UUID) -> FiscalYearCloseCheck:
+        """Say what the close of a fiscal year leaves open.
+
+        The close itself refuses nothing of this. The dialog of the close names the
+        Anträge of the year that are not in an end state, because they can then only
+        move to an open year, and a Nachtrag in draft, because the close freezes it.
+
+        Raises:
+            NotFoundError: The budget or the fiscal year does not exist, or the
+                fiscal year belongs to another top-level budget (404).
+            ValidationProblem: `budget_id` is not a top-level budget (422).
+        """
+        top = await self._require_top_level(budget_id)
+        fy = await self._own_fiscal_year(top, fiscal_year_id)
+        open_applications = (
+            await self.session.execute(
+                select(func.count())
+                .select_from(Application)
+                .join(State, State.id == Application.current_state_id)
+                .where(Application.fiscal_year_id == fy.id, State.is_terminal.is_(False))
+            )
+        ).scalar_one()
+        states = await self._plan_states(fy.id)
+        return FiscalYearCloseCheck(
+            openApplications=open_applications,
+            draftSupplement="in_force" in states and "draft" in states,
+        )
 
     async def set_fiscal_year_closed(
         self, budget_id: UUID, fiscal_year_id: UUID, *, closed: bool

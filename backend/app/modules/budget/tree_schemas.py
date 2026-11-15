@@ -262,6 +262,18 @@ class FiscalYearOut(FrozenCamelModel, frozen=True):
     closed_at: datetime | None = Field(default=None, alias="closedAt")
 
 
+class FiscalYearCloseCheck(FrozenCamelModel, frozen=True):
+    """What the close of a fiscal year names before a person confirms it.
+
+    `openApplications` counts the Anträge of the year that are not in an end state.
+    `draftSupplement` says that the plan of the year has a version in force and a
+    Nachtrag that is still a draft.
+    """
+
+    open_applications: int = Field(alias="openApplications")
+    draft_supplement: bool = Field(alias="draftSupplement")
+
+
 class AllocationSet(FrozenCamelModel, frozen=True):
     """Set the top-down allocation with `PUT .../allocations/{fiscalYearId}`."""
 

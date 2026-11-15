@@ -30,11 +30,13 @@ from app.modules.budget.tree.service_base import _subtree_ids
 from app.modules.budget.tree_models import Budget
 from app.modules.budget.tree_schemas import (
     AllocationSet,
+    AssignBudgetRequest,
     BudgetNodeCreate,
     BudgetNodeUpdate,
     ExpenseCreate,
     FiscalYearCreate,
     InvoiceCreate,
+    MoveFiscalYearRequest,
     TransferCreate,
 )
 from app.modules.flow.models import FlowVersion, State
@@ -590,3 +592,65 @@ async def test_a_past_open_year_takes_a_booking_with_a_date_in_the_year(
     await svc.set_fiscal_year_closed(top.id, past.id, closed=True)
     with pytest.raises(ConflictError):
         await svc.book_expense(booking(date(this - 1, 12, 30)), actor="tester")
+
+
+async def test_the_close_names_open_antraege_and_they_move_to_an_open_year(
+    session: AsyncSession,
+) -> None:
+    """The close check counts the open Anträge of a year, and a closed year lets them go.
+
+    An Antrag in an end state does not count. After the close, the Antrag moves to an
+    open year and takes a cost center in an open year, and its assignment cannot be
+    cleared. Rule: §F/finance/budget/000991.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"CC{_suffix()}", name="Top", gremiumId=g.id))
+    leaf = await svc.create_node(BudgetNodeCreate(key="01", name="Leaf", parentId=top.id))
+    this = date.today().year
+    old = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this - 1))
+    now = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this))
+
+    app_type = ApplicationType(key=f"t-{_suffix()}", name_i18n={})
+    session.add(app_type)
+    await session.flush()
+    fv = FormVersion(application_type_id=app_type.id, version=1)
+    flv = FlowVersion(version=1)
+    session.add_all([fv, flv])
+    await session.flush()
+    running = State(flow_version_id=flv.id, key="review", label_i18n={}, kind="normal")
+    done = State(
+        flow_version_id=flv.id, key="done", label_i18n={}, kind="normal", is_terminal=True
+    )
+    session.add_all([running, done])
+    await session.flush()
+
+    def application(state: State) -> Application:
+        return Application(
+            type_id=app_type.id,
+            form_version_id=fv.id,
+            flow_version_id=flv.id,
+            current_state_id=state.id,
+            budget_id=leaf.id,
+            fiscal_year_id=old.id,
+            amount=Decimal("10"),
+        )
+
+    first, second, finished = application(running), application(running), application(done)
+    session.add_all([first, second, finished])
+    await session.commit()
+
+    check = await svc.close_check(top.id, old.id)
+    assert (check.open_applications, check.draft_supplement) == (2, False)
+    assert (await svc.close_check(top.id, now.id)).open_applications == 0
+
+    await svc.set_fiscal_year_closed(top.id, old.id, closed=True)
+    moved = await svc.move_fiscal_year(first.id, MoveFiscalYearRequest(fiscalYearId=now.id))
+    assert moved.fiscal_year_id == now.id
+    assigned = await svc.assign_budget(
+        second.id, AssignBudgetRequest(budgetId=top.id, fiscalYearId=now.id)
+    )
+    assert (assigned.budget_id, assigned.fiscal_year_id) == (top.id, now.id)
+    with pytest.raises(ConflictError) as kept:
+        await svc.assign_budget(finished.id, AssignBudgetRequest(budgetId=None))
+    assert kept.value.code == "fiscal_year_closed"

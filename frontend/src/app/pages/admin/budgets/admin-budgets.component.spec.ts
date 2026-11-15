@@ -49,6 +49,9 @@ async function setup(opts: Opts = {}) {
     createFiscalYear: jest.fn(ok),
     updateFiscalYear: jest.fn(ok),
     setFiscalYearClosed: jest.fn(ok),
+    fiscalYearCloseCheck: jest.fn(
+      (..._args: unknown[]): Observable<unknown> => of({ openApplications: 0, draftSupplement: false }),
+    ),
     deleteFiscalYear: jest.fn(ok),
   };
   const planApi = {
@@ -637,6 +640,17 @@ describe('AdminBudgetsComponent', () => {
       expect(view.error).toHaveBeenLastCalledWith('Das Haushaltsjahr konnte nicht gespeichert werden.');
       await userEvent.click(button(await screen.findByRole('dialog', { name: 'Haushaltsjahr bearbeiten' }), 'Abbrechen'));
       expect(await screen.findByRole('dialog', { name: 'Haushaltsjahre: VS-Mittel' })).toBeInTheDocument();
+    });
+
+    it('names the open Anträge and a draft Nachtrag in the dialog of the close', async () => {
+      const view = await setup({ years: [closed, FY25] });
+      view.api.fiscalYearCloseCheck.mockReturnValueOnce(of({ openApplications: 2, draftSupplement: true }));
+      await openYears();
+      await rowMenu('2025/26', 'Abschließen');
+      const close = await screen.findByRole('dialog', { name: 'Haushaltsjahr 2025/26 abschließen?' });
+      expect(view.api.fiscalYearCloseCheck).toHaveBeenLastCalledWith('vsm', 'fy-25');
+      expect(close).toHaveTextContent('Offene Anträge in diesem Jahr: 2.');
+      expect(close).toHaveTextContent('Der Nachtrag im Entwurf bleibt eingefroren');
     });
 
     it('closes an open year and reopens a closed one after the confirmation', async () => {
