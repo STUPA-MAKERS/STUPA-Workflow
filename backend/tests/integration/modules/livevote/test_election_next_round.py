@@ -78,7 +78,7 @@ async def test_three_rounds_then_the_lot(
         assert again.json()["code"] == "next_round_exists"
         repeat = client.post(
             f"/api/meetings/{s.meeting_id}/votes",
-            json={"agendaItemId": str(s.item_ids[0]), "repeatOf": str(first)},
+            json={"agendaItemId": str(s.item_ids[0]), "repeatOf": str(first), "draft": True},
         )
         assert repeat.status_code == 409, repeat.text
         assert repeat.json()["code"] == "next_round_exists"

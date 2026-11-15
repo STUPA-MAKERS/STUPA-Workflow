@@ -54,10 +54,29 @@ async def test_update_draft_replaces_question_and_rules(
     assert "question" not in entry.data
 
 
+async def _admin_keeps_minutes(
+    maker: async_sessionmaker[AsyncSession], meeting_id: uuid.UUID
+) -> None:
+    """Make the admin the protokollant, because only the protokollant opens a vote."""
+    async with maker() as session:
+        row = (
+            await session.execute(select(PrincipalRow).where(PrincipalRow.sub == ADMIN_SUB))
+        ).scalar_one_or_none()
+        if row is None:
+            row = PrincipalRow(sub=ADMIN_SUB, display_name="Admin", email="admin@x.de")
+            session.add(row)
+            await session.flush()
+        meeting = await session.get(Meeting, meeting_id)
+        assert meeting is not None
+        meeting.protokollant_id = row.id
+        await session.commit()
+
+
 async def test_a_vote_does_not_open_beside_an_open_vote(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
     s = await seed(maker, status="live", votes=("open", "draft"))
+    await _admin_keeps_minutes(maker, s.meeting_id)
     with TestClient(api) as client:
         created = client.post(
             f"/api/meetings/{s.meeting_id}/votes",

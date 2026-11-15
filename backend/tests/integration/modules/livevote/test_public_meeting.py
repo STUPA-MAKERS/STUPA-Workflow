@@ -864,7 +864,8 @@ async def test_guest_websocket_filters_names_and_non_public_votes(
     """Filter the names and the non-public votes on the guest socket.
 
     Another request reaches the lead, never this guest. The vote of the non-public item
-    never arrives. A missing or unknown token closes the handshake.
+    never arrives: not its open and not its cancel. The lead cancels it first, because a
+    meeting has one open vote at a time. A missing or unknown token closes the handshake.
     """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
@@ -890,6 +891,7 @@ async def test_guest_websocket_filters_names_and_non_public_votes(
             status = _drain_until(ws, "guest_status", seen=seen)
             assert status["status"] == "admitted"
             np_vote = open_vote(lead, s, s.np_item)
+            assert lead.post(f"/api/votes/{np_vote['id']}/cancel").status_code == 200
             public_vote = open_vote(lead, s, s.public_item)
             opened = _drain_until(ws, "vote_opened", seen=seen)
             assert opened["voteId"] == public_vote["id"]
