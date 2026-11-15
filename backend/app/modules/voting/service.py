@@ -257,7 +257,7 @@ def _check_closable(vote: Vote, *, quorum_met: bool, now: datetime | None) -> No
     window_expired = now is not None and vote.closes_at is not None and now >= vote.closes_at
     if not quorum_met and not window_expired:
         raise ConflictError(
-            "quorum not met — the vote cannot be closed; collect more ballots or cancel the vote.",
+            "The quorum is not met. Cancel the vote, or close it when the quorum is met.",
             code="quorum_not_met",
         )
 
@@ -724,7 +724,8 @@ class VotingService:
         case only for a closed vote. Every vote is secret, so a running vote never
         shows an interim tally: only ``voted`` and ``present`` travel. ``voted`` of a
         running vote counts the persons who cast (``voters``), against the present
-        persons. After the close it counts the ballots.
+        persons. After the close it counts the ballots. A person who cast and then left
+        stays in the base, so ``present`` of a running vote is never below ``voted``.
 
         A vote with guests counts the admitted guests as present too: they are
         expected ballots. ``presentMembers`` and ``presentGuests`` give the attendance
@@ -739,11 +740,13 @@ class VotingService:
         counted = await self._counted(vote, config, counts, eligible)
         members, guests, present = await self._attendance(vote, config)
         revealed = vote.status == "closed"
+        running = vote.status == "open"
+        voted = await self.voters(vote.id) if running else counted.voted
         return TallyOut(
             counts=counted.counts if revealed else {},
             eligible=eligible,
-            voted=await self.voters(vote.id) if vote.status == "open" else counted.voted,
-            present=present,
+            voted=voted,
+            present=max(present, voted) if running else present,
             revealed=revealed,
             quorumMet=counted.quorum_met,
             leading=counted.leading if revealed else None,
@@ -871,14 +874,19 @@ class VotingService:
         Only a meeting vote with ``quorumBasis = present`` has one: the persons with the
         attendance status ``present`` plus the pool substitutes on a seat. A member who
         gave a delegation is not present, so the ballot of a delegation does not count.
-        A closed vote takes the present members fixed at its close.
+        A closed vote takes the members and the seats fixed at its close.
         """
         if vote.meeting_id is None or config.quorum_basis != "present":
             return None
-        fixed: int | None = getattr(vote, "present_members", None)
+        closed = vote.status == "closed"
+        fixed: int | None = getattr(vote, "present_members", None) if closed else None
+        seats: int | None = getattr(vote, "present_seats", None) if closed else None
+        if fixed is not None and seats is not None:
+            return fixed + seats
         presence = await self._presence(vote)
-        members = fixed if vote.status == "closed" and fixed is not None else presence.members
-        return members + presence.seats
+        return (presence.members if fixed is None else fixed) + (
+            presence.seats if seats is None else seats
+        )
 
     async def _poll_outcome(self, vote: Vote) -> tally_mod.PollOutcome:
         """Tally a poll from its stored ballots."""
@@ -2416,9 +2424,11 @@ class VotingService:
         a meeting keeps its count.
         """
         if vote.meeting_id is not None:
-            members = await self._present_count(vote)
+            here = await self._presence(vote)
+            members = here.members
             guests = await self._guest_attendance(vote, config)
             vote.present_members = members
+            vote.present_seats = here.seats
             vote.present_guests = guests
             if config.guests_vote:
                 vote.eligible_count = members + guests

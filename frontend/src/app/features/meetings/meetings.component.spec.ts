@@ -1571,6 +1571,21 @@ describe('MeetingsComponent — methods', () => {
       http.expectOne('/api/meetings/m-1').flush(MEETING);
     });
 
+    it('says in the language of the page that the quorum is missed', async () => {
+      const { cmp, http, fixture } = await loaded();
+      cmp.closeVote('v-1');
+      http
+        .expectOne('/api/votes/v-1/close')
+        .flush({ code: 'quorum_not_met', detail: 'x' }, { status: 409, statusText: 'Conflict' });
+      http.expectOne('/api/meetings/m-1').flush(MEETING);
+      const toasts = fixture.debugElement.injector.get(ToastService).toasts();
+      expect(toasts).toContainEqual(
+        expect.objectContaining({
+          message: 'Die Beschlussfähigkeit ist nicht erreicht. Die Abstimmung lässt sich so nur abbrechen.',
+        }),
+      );
+    });
+
     it('swallows a meeting-reload error after a vote action failure', async () => {
       const { cmp, http } = await loaded();
       cmp.cancelVote('v-1');

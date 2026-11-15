@@ -302,9 +302,13 @@ export class MeetingSessionService implements OnDestroy {
    * meeting may have changed in another tab.
    */
   private statusChangeFailed(err: unknown): void {
-    const detail = problemDetail(err);
-    const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.error(detail ? `${base}: ${detail}` : base);
+    if (problemCode(err) === 'quorum_not_met') {
+      this.toast.error(this.i18n.translate('meetings.toast.quorumNotMet'));
+    } else {
+      const detail = problemDetail(err);
+      const base = this.i18n.translate('meetings.toast.actionFailed');
+      this.toast.error(detail ? `${base}: ${detail}` : base);
+    }
     const m = this.meeting();
     if (m) {
       this.api.getMeeting(m.id, { quiet: true }).subscribe({
@@ -404,9 +408,13 @@ export class MeetingSessionService implements OnDestroy {
   /** Show the server reason (for example 409) and reload the meeting. The vote
    *  may have changed on the server, for example to cancelled. */
   private voteActionFailed(err: unknown): void {
-    const detail = problemDetail(err);
-    const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.error(detail ? `${base}: ${detail}` : base);
+    if (problemCode(err) === 'quorum_not_met') {
+      this.toast.error(this.i18n.translate('meetings.toast.quorumNotMet'));
+    } else {
+      const detail = problemDetail(err);
+      const base = this.i18n.translate('meetings.toast.actionFailed');
+      this.toast.error(detail ? `${base}: ${detail}` : base);
+    }
     const m = this.meeting();
     if (m) {
       this.api.getMeeting(m.id, { quiet: true }).subscribe({

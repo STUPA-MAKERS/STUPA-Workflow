@@ -1,3 +1,4 @@
+import { castRefusalText } from './ballot/ballot-refusal';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -447,7 +448,7 @@ export class VoteCastComponent implements OnDestroy {
     if (error.status === 403) {
       if (failure.asDelegation) this.proxyRefused.set(true);
       else this.notEligible.set(true);
-      this.toast.error(this.i18n.translate('voting.cast.notEligible'));
+      this.toast.error(this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'));
       this.reload();
       const id = this.loaded()?.id;
       if (id) this.loadDelegation(id);
@@ -456,7 +457,8 @@ export class VoteCastComponent implements OnDestroy {
     if (error.status === 409) {
       this.toast.error(
         this.i18n.translate(
-          failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict',
+          castRefusalText(failure) ??
+            (failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict'),
         ),
       );
       this.reload();

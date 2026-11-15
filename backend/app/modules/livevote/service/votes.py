@@ -99,6 +99,8 @@ def _meeting_vote_out(vote: Vote, meeting_id: UUID, reads: _VoteReads) -> Meetin
         else here.total
     )
     revealed = vote.status == "closed"
+    running = vote.status == "open"
+    voted_now = reads.voters.get(vote.id, 0) if running else voted
     return MeetingVoteOut(
         id=vote.id,
         applicationId=vote.application_id,
@@ -109,8 +111,8 @@ def _meeting_vote_out(vote: Vote, meeting_id: UUID, reads: _VoteReads) -> Meetin
         result=vote.result,
         counts=counts if revealed else {},
         leading=leading if revealed else None,
-        voted=reads.voters.get(vote.id, 0) if vote.status == "open" else voted,
-        present=present,
+        voted=voted_now,
+        present=max(present, voted_now) if running else present,
         revealed=revealed,
         failedReason=reason,
         majorityRule=config.majority_rule,
@@ -141,15 +143,16 @@ def _quorum_present(vote: Vote, presence: Mapping[UUID, Present]) -> int | None:
     """Return the present count for the quorum of a meeting vote, or None.
 
     Only a vote with ``quorumBasis = present`` has one: the present members plus the
-    pool substitutes on a seat. A closed vote takes the members fixed at its close, a
-    running vote the present members of its meeting now.
+    pool substitutes on a seat. A closed vote takes the members and the seats fixed at
+    its close, a running vote the present count of its meeting now.
     """
     if vote.meeting_id is None or not _counts_present(vote):
         return None
-    fixed: int | None = getattr(vote, "present_members", None)
+    closed = vote.status == "closed"
+    fixed: int | None = getattr(vote, "present_members", None) if closed else None
+    seats: int | None = getattr(vote, "present_seats", None) if closed else None
     here = presence.get(vote.meeting_id, NOBODY)
-    members = fixed if vote.status == "closed" and fixed is not None else here.members
-    return members + here.seats
+    return (here.members if fixed is None else fixed) + (here.seats if seats is None else seats)
 
 
 def _reload_tally(vote: Vote, choices: list[str | None], present: int | None) -> _Tally:

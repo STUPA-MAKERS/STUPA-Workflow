@@ -17,11 +17,12 @@ import uuid
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.meetings.models import Meeting, MeetingAttendance
 from app.modules.voting.models import Vote
@@ -126,6 +127,60 @@ async def test_close_misses_the_quorum_with_too_few_present(
         await _close(maker, vote_id)
 
 
+async def test_a_closed_vote_keeps_the_seats_of_its_close(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """One member and one pool substitute are present; the seat goes after the close.
+
+    The closed vote still shows the quorum as met, because the close fixed the seats.
+    Rule: §F/meetings/voting/000900.
+    """
+    s, vote_id = await _world(maker, present=1)
+    async with maker() as session:
+        absent = (
+            await session.scalars(
+                select(GremiumMembership.principal_id)
+                .where(GremiumMembership.gremium_id == s.gremium_id)
+                .where(
+                    GremiumMembership.principal_id.not_in(
+                        select(MeetingAttendance.principal_id).where(
+                            MeetingAttendance.meeting_id == s.meeting_id
+                        )
+                    )
+                )
+            )
+        ).first()
+        assert absent is not None
+        pool = PrincipalRow(sub="pool-seat", display_name="Pool", email="pool-seat@x.de")
+        session.add(pool)
+        await session.flush()
+        session.add(
+            MeetingDelegation(
+                meeting_id=s.meeting_id,
+                gremium_id=s.gremium_id,
+                delegator_principal_id=absent,
+                delegate_principal_id=pool.id,
+                delegate_voting=True,
+                via_pool=True,
+            )
+        )
+        await session.commit()
+    closed = await _close(maker, vote_id)
+    assert closed.tally.quorum_met is True
+    async with maker() as session:
+        await session.execute(
+            delete(MeetingDelegation).where(MeetingDelegation.meeting_id == s.meeting_id)
+        )
+        await session.commit()
+    async with maker() as session:
+        vote = await session.get(Vote, vote_id)
+        assert vote is not None
+        assert vote.present_seats == 1
+        out = await VotingService(session).get(vote_id)
+    assert out.tally is not None
+    assert out.tally.quorum_met is True
+
+
 async def test_close_needs_the_least_number_of_present_members(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -212,6 +267,41 @@ async def test_a_repeat_meeting_uses_the_repeat_quorum(
     assert await _draft_quorum(maker, api, repeat) == {"type": "percent", "value": 25}
     assert await _draft_quorum(maker, api, ordinary) == {"type": "percent", "value": 40}
     assert await _draft_quorum(maker, api, fallback) == {"type": "percent", "value": 40}
+
+
+async def test_a_draft_takes_the_quorum_of_its_open(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """A draft of an ordinary meeting opens with the repeat quorum after a change of kind.
+
+    Rule: §F/meetings/voting/000902.
+    """
+    s = await seed(maker, status="live")
+    async with maker() as session:
+        await session.execute(
+            update(Gremium)
+            .where(Gremium.id == s.gremium_id)
+            .values(quorum_percent=40, repeat_quorum_percent=25)
+        )
+        await session.commit()
+    assert await _draft_quorum(maker, api, s) == {"type": "percent", "value": 40}
+    async with maker() as session:
+        await session.execute(
+            update(Meeting).where(Meeting.id == s.meeting_id).values(kind="repeat")
+        )
+        vote_id = (
+            await session.scalars(select(Vote.id).where(Vote.meeting_id == s.meeting_id))
+        ).one()
+        await session.commit()
+    with TestClient(api) as client:
+        resp = client.post(f"/api/meetings/{s.meeting_id}/votes/{vote_id}/open")
+    assert resp.status_code == 200, resp.text
+    async with maker() as session:
+        vote = await session.get(Vote, vote_id)
+    assert vote is not None
+    assert vote.status == "open"
+    assert vote.config["quorum"] == {"type": "percent", "value": 25}
+    assert vote.config["quorumBasis"] == "present"
 
 
 async def test_members_rule_refuses_guest_ballots(

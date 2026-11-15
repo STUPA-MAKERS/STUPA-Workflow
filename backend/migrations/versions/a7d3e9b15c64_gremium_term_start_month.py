@@ -28,8 +28,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     """Add the start month and copy the value of the settings to each Gremium."""
     op.execute(
-        "ALTER TABLE gremium ADD COLUMN IF NOT EXISTS term_start_month integer "
-        "NOT NULL DEFAULT 10"
+        "ALTER TABLE gremium ADD COLUMN IF NOT EXISTS term_start_month integer NOT NULL DEFAULT 10"
     )
     op.execute(
         "UPDATE gremium SET term_start_month = s.term_start_month "

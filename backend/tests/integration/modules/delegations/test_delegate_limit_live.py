@@ -20,14 +20,14 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import Response
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.deps import get_current_principal
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.delegations.models import MeetingDelegation
-from app.modules.gremien.models import Gremium
+from app.modules.gremien.models import Gremium, GremiumMembership
 from app.modules.voting.models import Vote, VotedMarker
 from app.shared.config_schemas import VoteConfig
 from tests.integration.modules.delegations.conftest import (
@@ -169,6 +169,30 @@ async def test_one_cast_writes_the_own_and_each_represented_ballot(
     assert (again.status_code, late.status_code) == (409, 409)
     assert anna.status_code == 403, anna.text
     assert await _voters(maker, vote_id) == {w.subs["Dora"], w.subs["Anna"], w.subs["Ben"]}
+
+
+async def test_a_delegation_ends_with_the_membership(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """Anna leaves the Gremium after her delegation: Dora casts the own ballot only.
+
+    Rule: §F/meetings/voting/000932.
+    """
+    w = await _world(maker)
+    with TestClient(api) as client:
+        assert _delegate(client, api, w, "Anna", "Dora").status_code == 201
+        async with maker() as session:
+            await session.execute(
+                delete(GremiumMembership).where(GremiumMembership.principal_id == w.ids["Anna"])
+            )
+            await session.commit()
+        await set_status(maker, w.meeting_id, "live")
+        vote_id = await _vote(maker, w)
+        _as_member(api, w, "Dora")
+        cast = _cast(client, vote_id, "yes")
+    assert cast.status_code == 200, cast.text
+    assert cast.json()["ballots"] == 1
+    assert await _voters(maker, vote_id) == {w.subs["Dora"]}
 
 
 async def test_an_external_delegate_casts_for_every_represented_member(

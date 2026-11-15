@@ -1,3 +1,4 @@
+import { castRefusalText } from '../../voting/ballot/ballot-refusal';
 import { Injectable, Injector, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
@@ -136,14 +137,15 @@ export class ParticipantVoteService {
     if (error.status === 403) {
       if (failure.asDelegation) this.proxyRefused.set(true);
       else this.notEligible.set(true);
-      this.toast.error(this.i18n.translate('voting.cast.notEligible'));
+      this.toast.error(this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'));
       this.reload(true);
       return;
     }
     if (error.status === 409) {
       this.toast.error(
         this.i18n.translate(
-          failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict',
+          castRefusalText(failure) ??
+            (failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict'),
         ),
       );
       this.reload();

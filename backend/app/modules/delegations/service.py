@@ -215,7 +215,8 @@ async def voting_delegation_check(
     * Each incoming row with `delegate_voting` gives one represented member. One cast
       of the caller writes one ballot under the `sub` of each of them, so it is a
       transfer and not a duplicate. The caller can therefore vote even as an external
-      user.
+      user. A row of a person who left the Gremium gives no ballot: the delegation
+      ends with the membership.
 
     `now` keeps the signature equal to the other checks. A delegation is bound to a meeting, not to
     a time.
@@ -239,6 +240,14 @@ async def voting_delegation_check(
         pool_seat_clause(delegate),
         and_(not_(is_delegator), MeetingDelegation.via_pool.is_(True)),
     )
+    still_member = (
+        select(GremiumMembership.principal_id)
+        .where(
+            GremiumMembership.gremium_id == gremium_id,
+            GremiumMembership.principal_id == delegator.id,
+        )
+        .exists()
+    )
     rows = (
         await session.execute(
             select(
@@ -256,6 +265,7 @@ async def voting_delegation_check(
             .where(
                 MeetingDelegation.meeting_id == meeting_id,
                 MeetingDelegation.gremium_id == gremium_id,
+                still_member,
                 or_(
                     MeetingDelegation.delegator_principal_id == pid_subq,
                     MeetingDelegation.delegate_principal_id == pid_subq,
