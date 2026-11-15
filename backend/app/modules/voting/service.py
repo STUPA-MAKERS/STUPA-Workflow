@@ -54,7 +54,13 @@ from app.modules.delegations.pool_seat import (
 from app.modules.delegations.service import Represented, counted_in, voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService, StagedFire
-from app.modules.meetings.present import NOBODY, Present, present_count
+from app.modules.meetings.present import (
+    NOBODY,
+    Present,
+    fixed_present,
+    present_count,
+    quorum_present,
+)
 from app.modules.meetings.protocol_models import ProtocolVoteRef
 from app.modules.voting import circular as circular_mod
 from app.modules.voting import election as election_mod
@@ -878,15 +884,9 @@ class VotingService:
         """
         if vote.meeting_id is None or config.quorum_basis != "present":
             return None
-        closed = vote.status == "closed"
-        fixed: int | None = getattr(vote, "present_members", None) if closed else None
-        seats: int | None = getattr(vote, "present_seats", None) if closed else None
-        if fixed is not None and seats is not None:
-            return fixed + seats
-        presence = await self._presence(vote)
-        return (presence.members if fixed is None else fixed) + (
-            presence.seats if seats is None else seats
-        )
+        fixed = fixed_present(vote)
+        here = await self._presence(vote) if None in fixed else NOBODY
+        return quorum_present(fixed, here)
 
     async def _poll_outcome(self, vote: Vote) -> tally_mod.PollOutcome:
         """Tally a poll from its stored ballots."""
