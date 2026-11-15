@@ -63,3 +63,9 @@
 .er__next {
   margin-top: var(--space-3);
 }
+
+/* The meeting card: the lot button fills the width, like the next Wahlgang. */
+:host(.er--card) .er__actions {
+  flex-direction: column;
+  align-items: stretch;
+}

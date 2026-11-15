@@ -69,18 +69,10 @@ from app.modules.meetings.keepers import agenda_positions, keeper_periods, princ
 from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.meetings.present import VOTE_PERMISSION, meeting_present
 from app.modules.meetings.protocol_models import Protocol, ProtocolVoteRef
-from app.modules.notifications.layout import (
-    append_link_text,
-    reason_text,
-    render_layout,
-    text_to_html,
-)
+from app.modules.notifications.brand import load_mail_brand
+from app.modules.notifications.compose import branded_mail
 from app.modules.notifications.links import protocol_link, public_protocol_url
-from app.modules.notifications.mail import (
-    MailAttachment,
-    MailMessage,
-    compute_idempotency_key,
-)
+from app.modules.notifications.mail import MailAttachment, compute_idempotency_key
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import filter_recipients_by_preference
@@ -1655,7 +1647,6 @@ class ProtocolService:
             else "Das Sitzungsprotokoll wurde finalisiert."
         )
         body = intro + ("\n\n" + "\n".join(lines) if lines else "") + "\n"
-        text = append_link_text(body, link.url, link.label("de"))
         filename = (
             protocol_pdf_filename(meeting.title, meeting_day(meeting))
             if meeting is not None
@@ -1666,25 +1657,19 @@ class ProtocolService:
             if pdf is not None
             else ()
         )
-        html = render_layout(
-            content_html=text_to_html(body),
-            title=subject,
-            site_name=settings.mail_from_name,
-            base_url=settings.public_base_url,
-            reason=reason_text("protocol", "de"),
-            lang="de",
-            action_url=link.url,
-            action_label=link.label("de"),
-        )
         await self.mail_queue.enqueue(
-            MailMessage(
+            branded_mail(
+                brand=await load_mail_brand(self.session, settings),
+                settings=settings,
                 to=tuple(recipients),
                 subject=subject,
-                text=text,
-                html=html,
+                text=body,
+                reason="protocol",
+                lang="de",
                 idempotency_key=compute_idempotency_key(
                     "protocol_finalized", str(protocol.id), at.isoformat()
                 ),
+                link=link,
                 attachments=attachments,
             )
         )

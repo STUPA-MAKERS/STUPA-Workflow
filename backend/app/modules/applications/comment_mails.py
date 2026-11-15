@@ -37,9 +37,7 @@ from app.modules.applications.service.service_base import gremium_actor_name
 from app.modules.flow.actionable import actionable_principal_emails
 from app.modules.flow.models import State
 from app.modules.notifications.chat_mail import initials
-from app.modules.notifications.layout import append_link_text
 from app.modules.notifications.links import application_link
-from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService, filter_recipients_by_preference
 from app.modules.notifications.templating import (
@@ -183,18 +181,12 @@ async def send_comment_notifications(
             subject_i18n=builtin[0],
             body_i18n=builtin[1],
             body_html_i18n=builtin[2],
-            context=context,
+            context=await service.render_context(context),
             lang=lang,
             default_lang=settings.mail_default_lang,
         )
     except TemplateRenderError as exc:
         logger.warning("comment builtin render failed: %s", exc)
         return 0
-    msg = MailMessage(
-        to=tuple(recipients),
-        subject=rendered.subject,
-        text=append_link_text(rendered.text, link.url, link.label(rendered.lang)),
-        html=service._layout_html(rendered, "comment", link),
-        idempotency_key=compute_idempotency_key(*idem),
-    )
+    msg = await service._message(rendered, recipients, "comment", idem, link)
     return int(await service._enqueue(msg))

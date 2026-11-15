@@ -92,6 +92,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/000917](requirements/functional/administration/admin/000917_meeting-periods.md) | The meeting settings hold the periods of the Geschäftsordnung | approved |
 | [F/administration/admin/000942](requirements/functional/administration/admin/000942_periods-fixed-at-start.md) | A changed period does not reach a started case | approved |
 | [F/administration/admin/000980](requirements/functional/administration/admin/000980_embedded-pdfs-follow-sitzungen.md) | The embedded PDFs belong to the feature Sitzungen | approved |
+| [F/administration/admin/001005](requirements/functional/administration/admin/001005_pdf-default-preview.md) | The branding page shows the built-in PDF graphics | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -199,6 +200,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/notifications/000309](requirements/functional/collaboration/notifications/000309_mail-preferences.md) | A person controls their mail kinds | approved |
 | [F/collaboration/notifications/000310](requirements/functional/collaboration/notifications/000310_mail-languages.md) | Mail texts are in German and English | approved |
 | [F/collaboration/notifications/000312](requirements/functional/collaboration/notifications/000312_task-reminders.md) | Task reminders follow the admin setting | approved |
+| [F/collaboration/notifications/000998](requirements/functional/collaboration/notifications/000998_mail-platform-name.md) | A mail names the platform by its branding name | approved |
+| [F/collaboration/notifications/000999](requirements/functional/collaboration/notifications/000999_mail-logo.md) | The head of a mail shows the logo of the branding | approved |
+| [F/collaboration/notifications/001000](requirements/functional/collaboration/notifications/001000_mail-accent.md) | The button and the links of a mail use the accent colour | approved |
+| [F/collaboration/notifications/001001](requirements/functional/collaboration/notifications/001001_mail-footer-text.md) | The footer of a mail shows the E-Mail-Fußzeile | approved |
+| [F/collaboration/notifications/001002](requirements/functional/collaboration/notifications/001002_mail-footer-copyright.md) | The footer of a mail shows the copyright line | approved |
+| [F/collaboration/notifications/001003](requirements/functional/collaboration/notifications/001003_mail-footer-legal-links.md) | The footer of a mail shows the legal links | approved |
+| [F/collaboration/notifications/001004](requirements/functional/collaboration/notifications/001004_mail-dark-colours.md) | A mail has light and dark colours | approved |
 | [F/collaboration/search/000328](requirements/functional/collaboration/search/000328_reuse-gates.md) | Search reuses the gate of each module | approved |
 | [F/collaboration/search/000329](requirements/functional/collaboration/search/000329_query-length.md) | Search needs two characters | approved |
 | [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows 5 hits per kind | approved |
@@ -560,6 +568,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/voting/000994](requirements/functional/meetings/voting/000994_one-open-vote.md) | A meeting has one open vote at a time | approved |
 | [F/meetings/voting/000995](requirements/functional/meetings/voting/000995_cancelled-vote-frees-item.md) | A cancelled vote does not block the vote of an application item | approved |
 | [F/meetings/voting/000996](requirements/functional/meetings/voting/000996_round-and-repeat-lock.md) | The next Wahlgang and the repeat of an election lock each other | approved |
+| [F/meetings/voting/001006](requirements/functional/meetings/voting/001006_vote-card-states-result-once.md) | The vote card states the result once | approved |
+| [F/meetings/voting/001007](requirements/functional/meetings/voting/001007_vote-card-one-action.md) | The vote card has one main action and a menu | approved |
 | [F/public/public-pages/000170](requirements/functional/public/public-pages/000170_no-public-meetings.md) | Meetings are never public | replaced |
 | [F/public/public-pages/000171](requirements/functional/public/public-pages/000171_public-protocols.md) | Only final protocols of public Gremien are public | approved |
 | [F/public/public-pages/000172](requirements/functional/public/public-pages/000172_public-protocol-content.md) | A public protocol has no names and no internal TOPs | approved |

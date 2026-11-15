@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -50,7 +51,9 @@ import {
  *   creates the draft, and the protokollant opens it (§ 000971).
  *
  * The meeting card, the vote page and the beamer use it. The beamer never gets the
- * actions (`canManage` stays off).
+ * actions (`canManage` stays off). In the meeting card (`inCard`) the card states the
+ * result: the bars come without the result heading, and a pending lot shows only the
+ * tags and the button (§ 001006).
  *
  * One button serves both steps, so the focus stays on it and the second click of a double click
  * does not confirm.
@@ -60,6 +63,7 @@ import {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     ButtonComponent,
     IconComponent,
     NoteComponent,
@@ -69,6 +73,7 @@ import {
   ],
   host: {
     '[class.bars--beamer]': "variant() === 'beamer'",
+    '[class.er--card]': 'inCard()',
   },
   templateUrl: './election-result.component.html',
   styleUrls: ['../vote-bars.component.scss', './election-result.component.scss'],
@@ -94,6 +99,11 @@ export class ElectionResultComponent {
   readonly round = input(1);
   /** The caller may start the next Wahlgang: the election has none yet (§ 000971). */
   readonly canNextRound = input(false);
+  /**
+   * The meeting card: no result heading above the bars and no banner text for the lot,
+   * because the status line of the card states the result once (§ 001006).
+   */
+  readonly inCard = input(false);
 
   /** The lot was drawn or the next Wahlgang created: the caller reads the votes again. */
   readonly changed = output<Vote>();
