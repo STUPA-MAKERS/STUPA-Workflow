@@ -6,14 +6,15 @@ import {
   computed,
   effect,
   inject,
+  linkedSignal,
   signal,
   untracked,
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { catchError, map, of, switchMap } from 'rxjs';
+import { catchError, map, of, startWith, switchMap } from 'rxjs';
 import { TodosApiService } from '@core/api/todos.service';
-import type { GremiumOverview } from '@core/api/gremien.service';
+import { GremienApiService, type GremiumInfo, type GremiumOverview } from '@core/api/gremien.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -40,17 +41,18 @@ import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/ca
 import { CreateMeetingDialogComponent } from '../../meetings/create-meeting-dialog/create-meeting-dialog.component';
 import { GremienComponent } from '../gremien-page/gremien.component';
 import { GremienStore } from '../gremien.store';
-import { localized } from '../gremien.util';
+import { infoTabShown, localized } from '../gremien.util';
 import { GremiumAttendanceComponent } from '../gremium-attendance/gremium-attendance.component';
 import { FeatureService } from '@core/features/feature.service';
 import { GremiumDecisionsComponent } from '../gremium-decisions/gremium-decisions.component';
+import { GremiumInfoComponent } from '../gremium-info/gremium-info.component';
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
 import { GremiumMeetingsComponent } from '../gremium-meetings/gremium-meetings.component';
 import { GremiumMembersComponent } from '../gremium-members/gremium-members.component';
 import { GremiumTodosComponent } from '../gremium-todos/gremium-todos.component';
 
 /** The sub-tabs of a gremium, as they stand in `?tab=`. */
-export const GREMIUM_TABS = ['meetings', 'members', 'attendance', 'decisions', 'todos'] as const;
+export const GREMIUM_TABS = ['info', 'meetings', 'members', 'attendance', 'decisions', 'todos'] as const;
 export type GremiumTab = (typeof GREMIUM_TABS)[number];
 
 /**
@@ -63,9 +65,10 @@ export type GremiumTab = (typeof GREMIUM_TABS)[number];
  * the create dialog of the meetings with the gremium chosen; "Nächste Sitzung öffnen"
  * opens the live or the next meeting.
  *
- * Four sub-tabs follow, kept in `?tab=` so a link opens one of them: Sitzungen,
- * Mitglieder, Anwesenheit, Beschlüsse. A tab loads its data when it opens first and keeps
- * it while the gremium stays open.
+ * The sub-tabs follow, kept in `?tab=` so a link opens one of them: Info (first, spec
+ * 000950), Sitzungen, Mitglieder, Anwesenheit, Beschlüsse, To-Dos. A tab loads its data
+ * when it opens first and keeps it while the gremium stays open; only the Info loads with
+ * the gremium, because an empty Info hides its tab from a reader (spec 000955).
  *
  * On a phone the header holds the title and one action; the rest moves into the ⋮ menu.
  */
@@ -95,6 +98,7 @@ export type GremiumTab = (typeof GREMIUM_TABS)[number];
     GremiumMembersComponent,
     GremiumAttendanceComponent,
     GremiumDecisionsComponent,
+    GremiumInfoComponent,
   ],
   templateUrl: './gremium-detail.component.html',
   styleUrl: './gremium-detail.component.scss',
@@ -108,6 +112,7 @@ export class GremiumDetailComponent {
   protected readonly store = inject(GremienStore);
   private readonly todos = inject(TodosApiService);
   private readonly features = inject(FeatureService);
+  private readonly gremienApi = inject(GremienApiService);
 
   readonly phone = mediaQuery(MEDIA.phone);
   /** The list sits beside the sheet: the sheet fills the pane and scrolls inside. */
@@ -138,12 +143,40 @@ export class GremiumDetailComponent {
     ),
     { initialValue: undefined },
   );
+  /** A new read of the Info: after a load error and after a 409 of the editor. */
+  private readonly infoReads = signal(0);
+  /** The Info as loaded: `undefined` while it loads, `null` after a load error. */
+  private readonly loadedInfo = toSignal(
+    toObservable(computed(() => ({ id: this.id(), read: this.infoReads() }))).pipe(
+      switchMap(({ id }) =>
+        id
+          ? this.gremienApi.info(id).pipe(
+              catchError(() => of(null)),
+              startWith(undefined),
+            )
+          : of(null),
+      ),
+    ),
+    { initialValue: undefined },
+  );
+  /** The Info of the gremium; a save sets it at once (`onInfoChanged`). */
+  readonly info = linkedSignal<GremiumInfo | null | undefined>(() => this.loadedInfo());
+
+  onInfoChanged(info: GremiumInfo): void {
+    this.info.set(info);
+  }
+
+  reloadInfo(): void {
+    this.infoReads.update((n) => n + 1);
+  }
+
   /**
    * The sub-tabs that this platform has (spec 000758): "Sitzungen" and "Anwesenheit" need
    * `Sitzungen`, "Beschlüsse" needs `Abstimmungen`, "To-Dos" needs `Boards`.
    */
   readonly shownTabs = computed<readonly GremiumTab[]>(() => {
     const on: Record<GremiumTab, boolean> = {
+      info: infoTabShown(this.info()),
       meetings: this.features.isOn('meetings'),
       members: true,
       attendance: this.features.isOn('meetings'),

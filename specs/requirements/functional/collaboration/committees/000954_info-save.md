@@ -2,10 +2,14 @@
 id: "000954"
 title: An Info save is versioned and audited
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+tests:
+  - "backend/tests/integration/modules/gremien/test_gremium_info.py:test_stale_version_conflicts"
+implementation:
+  - backend/app/modules/gremien_overview/info.py
+  - backend/app/modules/audit/actions.py
 scope:
   - backend/app/modules/gremien_overview
   - backend/app/modules/audit

@@ -2,10 +2,14 @@
 id: "000953"
 title: The Info text is sanitized Markdown
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+tests:
+  - "backend/tests/integration/modules/gremien/test_gremium_info.py:test_long_text_gives_422"
+implementation:
+  - backend/app/modules/gremien_overview/schemas.py
+  - frontend/src/app/features/gremien/gremium-info
 scope:
   - backend/app/modules/gremien_overview
   - frontend/src/app/features/gremien

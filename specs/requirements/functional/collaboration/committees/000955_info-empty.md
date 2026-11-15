@@ -2,10 +2,12 @@
 id: "000955"
 title: An empty Info tab shows only to its editors
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+implementation:
+  - frontend/src/app/features/gremien/gremien.util.ts
+  - frontend/src/app/features/gremien/gremium-info
 scope:
   - frontend/src/app/features/gremien
 ---

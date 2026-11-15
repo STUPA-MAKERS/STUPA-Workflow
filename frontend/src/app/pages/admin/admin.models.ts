@@ -850,6 +850,7 @@ export const GREMIUM_PERMISSIONS = [
   'vote.cast',
   'protocol.write',
   'protocol.finalize',
+  'info.write',
 ] as const;
 
 /**

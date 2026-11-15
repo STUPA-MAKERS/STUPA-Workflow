@@ -2,10 +2,15 @@
 id: "000950"
 title: A Gremium has an Info tab
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+tests:
+  - "backend/tests/integration/modules/gremien/test_gremium_info.py:test_empty_info_reads_for_member_and_view_all"
+implementation:
+  - backend/app/modules/gremien_overview/info.py
+  - frontend/src/app/features/gremien/gremium-info
+  - frontend/src/app/features/gremien/gremium-detail/gremium-detail.component.ts
 scope:
   - backend/app/modules/gremien_overview
   - frontend/src/app/features/gremien

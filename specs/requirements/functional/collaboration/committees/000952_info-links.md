@@ -2,10 +2,14 @@
 id: "000952"
 title: An Info link has a label and a web address
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+tests:
+  - "backend/tests/integration/modules/gremien/test_gremium_info.py:test_invalid_links_give_422"
+implementation:
+  - backend/app/modules/gremien_overview/schemas.py
+  - frontend/src/app/features/gremien/gremium-info-dialog
 scope:
   - backend/app/modules/gremien_overview
   - frontend/src/app/features/gremien

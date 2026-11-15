@@ -1,0 +1,92 @@
+<app-dialog
+  [open]="open()"
+  [title]="'gremien.info.editTitle' | t"
+  [subtitle]="gremiumName()"
+  [closeLabel]="'action.close' | t"
+  size="form"
+  (closed)="cancel()"
+>
+  <form class="gid" (submit)="$event.preventDefault(); save()">
+    @if (conflict()) {
+      <p class="gid__error" role="alert">{{ 'gremien.info.conflict' | t }}</p>
+    }
+    <app-segmented
+      width="fill"
+      [ariaLabel]="'gremien.info.mode' | t"
+      [options]="modeOptions()"
+      [value]="mode()"
+      (valueChange)="setMode($event)"
+    />
+    @if (mode() === 'write') {
+      <app-textarea class="gid__text" [label]="'gremien.info.text' | t" [grow]="true">
+        <textarea
+          name="bodyMd"
+          rows="8"
+          [attr.maxlength]="maxText"
+          appMarkdownImageUpload
+          [ngModel]="body()"
+          (ngModelChange)="body.set($event)"
+        ></textarea>
+      </app-textarea>
+    } @else {
+      <div class="gid__preview" role="region" [attr.aria-label]="'gremien.info.preview' | t">
+        @if (body().trim()) {
+          <app-markdown-view [src]="body()" />
+        } @else {
+          <p class="gid__none">{{ 'gremien.info.previewEmpty' | t }}</p>
+        }
+      </div>
+    }
+
+    <fieldset class="gid__links">
+      <legend class="gid__cap">{{ 'gremien.info.links' | t }}</legend>
+      @for (link of links(); track link.key; let i = $index, first = $first, last = $last) {
+        <div class="gid__row" role="group" [attr.aria-label]="('gremien.info.linkN' | t: { n: i + 1 })">
+          <div class="gid__fields">
+            <app-input
+              [name]="'label-' + link.key"
+              [label]="'gremien.info.label' | t"
+              [error]="error(errors()[i].label)"
+              [ngModel]="link.label"
+              (ngModelChange)="setLabel(link.key, $event)"
+            />
+            <app-input
+              type="url"
+              [name]="'url-' + link.key"
+              [label]="'gremien.info.url' | t"
+              [error]="error(errors()[i].url)"
+              [ngModel]="link.url"
+              (ngModelChange)="setUrl(link.key, $event)"
+            />
+          </div>
+          <div class="gid__rowTools">
+            <app-move-buttons
+              [upLabel]="'gremien.info.moveUp' | t: { label: link.label }"
+              [downLabel]="'gremien.info.moveDown' | t: { label: link.label }"
+              [upDisabled]="first"
+              [downDisabled]="last"
+              (move)="moveLink(i, $event)"
+            />
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [ariaLabel]="'gremien.info.removeLink' | t: { label: link.label }"
+              (click)="removeLink(link.key)"
+            ><app-icon name="trash" /></app-button>
+          </div>
+        </div>
+      }
+      <div class="gid__add">
+        <app-button variant="text" size="sm" [disabled]="full()" (click)="addLink()">
+          <app-icon name="plus" />
+          {{ 'gremien.info.addLink' | t }}
+        </app-button>
+      </div>
+    </fieldset>
+  </form>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [loading]="saving()" (click)="save()">
+    {{ 'action.save' | t }}
+  </app-button>
+</app-dialog>
