@@ -2,7 +2,7 @@
 id: "000946"
 title: A meeting shows one count of present members
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
