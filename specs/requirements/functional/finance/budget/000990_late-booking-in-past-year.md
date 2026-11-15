@@ -2,7 +2,7 @@
 id: "000990"
 title: A past fiscal year that is not closed takes a booking with a date in the year
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:
