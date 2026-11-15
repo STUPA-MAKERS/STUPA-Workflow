@@ -164,6 +164,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/meetings/{meeting_id}/join-code/rotate"): _MEETING_MANAGE,
     ("GET", "/api/meetings/{meeting_id}/protocol"): "ProtocolService.authorize_read_meeting",
     ("POST", "/api/meetings/{meeting_id}/protocol"): "ProtocolService.authorize_write_meeting",
+    ("GET", "/api/meetings/{meeting_id}/known-names"): "ProtocolService.authorize_write_meeting",
     ("POST", "/api/meetings/{meeting_id}/minute-taker-handover"): "HandoverOps.can_hand_over",
     ("DELETE", "/api/meetings/{meeting_id}/minute-taker-handover"): "HandoverOps.can_hand_over",
     ("POST", "/api/meetings/{meeting_id}/votes"): (
