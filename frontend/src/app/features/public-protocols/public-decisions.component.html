@@ -52,6 +52,10 @@
           [text]="semesterText()"
           [active]="semesterFilter() !== ''"
         />
+        <span class="pp__spacer"></span>
+        @if (!loading()) {
+          <span class="pp__count" aria-live="polite">{{ countText() }}</span>
+        }
       </div>
     </div>
 

@@ -148,10 +148,13 @@ describe('PublicDecisionsComponent', () => {
     expect(screen.getByRole('button', { name: 'Semester: Sommersemester 2026' })).toBeInTheDocument();
   });
 
-  it('takes the gremium from a link and counts an unknown one', async () => {
-    const { api } = await setup(makeApi(), { committee: 'g-x' });
-    expect(api.decisions).toHaveBeenCalledWith(expect.objectContaining({ gremium: ['g-x'] }));
-    expect(screen.getByRole('button', { name: 'Gremium: 1 Gremien' })).toBeInTheDocument();
+  /** A link names a Gremium; a value that is no id or no public Gremium is dropped, with no error. */
+  it('takes the gremium from a link and drops an unknown one', async () => {
+    const unknown = '11111111-1111-4111-8111-111111111111';
+    const { api } = await setup(makeApi(), { committee: [unknown, 'g-x'] });
+    expect(api.decisions).not.toHaveBeenCalledWith(expect.objectContaining({ gremium: [unknown, 'g-x'] }));
+    expect(api.decisions).toHaveBeenLastCalledWith(expect.objectContaining({ gremium: [] }));
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('loads the next page once while it runs', async () => {

@@ -52,6 +52,8 @@ interface SemesterGroup {
  * person. The search (the question), the Gremium chip and the Semester chip filter on
  * the server. The page is `noindex`.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Component({
   selector: 'app-public-decisions',
   standalone: true,
@@ -87,8 +89,9 @@ export class PublicDecisionsComponent {
       this.reload();
     },
   });
+  /** The Gremien of `?committee=`; a value that is no id is dropped, so it gives no error. */
   protected readonly gremiumFilter = signal<readonly string[]>(
-    this.route.snapshot.queryParamMap.getAll('committee'),
+    this.route.snapshot.queryParamMap.getAll('committee').filter((id) => UUID.test(id)),
   );
   protected readonly semesterFilter = signal('');
 
@@ -146,11 +149,33 @@ export class PublicDecisionsComponent {
   constructor() {
     useNoindex();
     this.api.gremien().subscribe({
-      next: (rows) => this.gremien.set(rows),
+      next: (rows) => {
+        this.gremien.set(rows);
+        this.dropUnknownGremien(rows);
+      },
       error: () => this.gremien.set([]),
     });
     this.reload();
   }
+
+  /** A Gremium of the filter that is not public gives no row: drop it and read again. */
+  private dropUnknownGremien(known: readonly PublicGremium[]): void {
+    const kept = this.gremiumFilter().filter((id) => known.some((g) => g.id === id));
+    if (kept.length !== this.gremiumFilter().length) this.onGremien(kept);
+  }
+
+  /** "12 Beschlüsse", or "3 Treffer" with a search text. */
+  protected readonly countText = computed(() => {
+    const one = this.total() === 1;
+    const key: TranslationKey = this.appliedQuery()
+      ? one
+        ? 'publicProtocols.list.hitsOne'
+        : 'publicProtocols.list.hits'
+      : one
+        ? 'publicDecisions.list.countOne'
+        : 'publicDecisions.list.count';
+    return this.i18n.translate(key, { n: this.total() });
+  });
 
   protected semesterName(key: string): string {
     return semesterLabel(key, (k, p) => this.i18n.translate(k, p));
@@ -178,6 +203,7 @@ export class PublicDecisionsComponent {
     if (this.loadingMore()) return;
     const seq = this.seq;
     this.loadingMore.set(true);
+    this.error.set(false);
     this.api.decisions({ ...this.filters(), offset: this.items().length }).subscribe({
       next: (page) => {
         if (seq !== this.seq) return;

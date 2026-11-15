@@ -4489,6 +4489,8 @@
   "publicDecisions.loading": "Beschlüsse werden geladen …",
   "publicDecisions.error": "Die Beschlüsse konnten nicht geladen werden. Versuche es später noch einmal.",
   "publicDecisions.more": "Weitere Beschlüsse laden",
+  "publicDecisions.list.count": "{n} Beschlüsse",
+  "publicDecisions.list.countOne": "1 Beschluss",
   "publicDecisions.empty.none": "Noch keine öffentlichen Beschlüsse",
   "publicDecisions.empty.noneBody": "Ein Beschluss erscheint hier, sobald das Protokoll seiner Sitzung öffentlich ist.",
   "publicDecisions.empty.filtered": "Keine Beschlüsse gefunden",

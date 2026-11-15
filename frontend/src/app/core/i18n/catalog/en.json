@@ -4489,6 +4489,8 @@
   "publicDecisions.loading": "Loading decisions …",
   "publicDecisions.error": "The decisions could not be loaded. Try again later.",
   "publicDecisions.more": "Load more decisions",
+  "publicDecisions.list.count": "{n} decisions",
+  "publicDecisions.list.countOne": "1 decision",
   "publicDecisions.empty.none": "No public decisions yet",
   "publicDecisions.empty.noneBody": "A decision appears here as soon as the minutes of its meeting are public.",
   "publicDecisions.empty.filtered": "No decisions found",
