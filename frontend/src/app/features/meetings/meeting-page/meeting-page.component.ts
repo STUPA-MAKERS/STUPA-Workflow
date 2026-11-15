@@ -70,9 +70,10 @@ type SessionAction = 'todos' | 'open' | 'agenda' | 'settings' | 'attendance' | '
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
  *
  * The header carries the title, the status, "Gremium · date · seit HH:MM", the session
- * menu and, on a wider screen, the close of a live meeting. "Sitzung eröffnen" is an item
- * of the session menu, disabled with its reason until a minute-taker is set and the open
- * window opens. Below the header the agenda pane, the sheet of the open item and the
+ * menu and, above the phone width, the main action: "Sitzung eröffnen" of a planned meeting
+ * or "Sitzung schließen" of a live one, at the same place (spec 000096). On a phone both are
+ * items of the session menu. The opening is disabled with its reason until a minute-taker is
+ * set and the open window opens; before the window the button reads "Möglich ab …". Below the header the agenda pane, the sheet of the open item and the
  * cards of its votes. A planned meeting opens on its first agenda item, so the text and
  * the votes can be prepared before the start. The dock at the foot steps through the
  * agenda and holds the attendance and the minute-taker (on a phone before the opening:
@@ -327,6 +328,13 @@ export class MeetingPageComponent {
     return this.i18n.translate('meetings.control.opensAt', { when });
   });
 
+  /** Why "Sitzung eröffnen" is disabled (no minute-taker, or "Möglich ab …"), else `null`. */
+  protected readonly openBlocked = computed<string | null>(() =>
+    this.meeting().protokollantId
+      ? this.opensAtText() || null
+      : this.i18n.translate('meetings.control.needProtokollant'),
+  );
+
   protected readonly mainAction = computed<'open' | 'close' | null>(() => {
     const m = this.meeting();
     if (m.status === 'planned' && m.canControl) return 'open';
@@ -336,8 +344,8 @@ export class MeetingPageComponent {
 
   /**
    * The session menu: settings, attendance and delete. Below the wide layout the beamer
-   * of a planned or live meeting goes in here too; on a phone the header keeps only the title, so the close moves in
-   * as well (the finalize is in the protocol bar). The opening is always here, first.
+   * of a planned or live meeting goes in here too; on a phone the header keeps only the title, so the opening (first)
+   * and the close move in as well (the finalize is in the protocol bar). Above the phone width both are header buttons.
    *
    * The beamer route and its stream need session.manage in the gremium.
    */
@@ -352,13 +360,11 @@ export class MeetingPageComponent {
       (m.status === 'planned' && m.canManage) ||
       (m.status === 'live' && (m.canManage || m.isProtokollant));
     const main: readonly RowMenuItem[] = [
-      ...when(this.mainAction() === 'open', {
+      ...when(this.phone() && this.mainAction() === 'open', {
         id: 'open',
         label: t('meetings.control.open'),
         icon: 'play',
-        disabledReason: m.protokollantId
-          ? this.opensAtText() || null
-          : t('meetings.control.needProtokollant'),
+        disabledReason: this.openBlocked(),
       }),
       // Below the wide layout the agenda is a sheet, and the menu opens it.
       ...when(!this.wide(), { id: 'agenda', label: t('meetings.agenda.title'), icon: 'list' }),
