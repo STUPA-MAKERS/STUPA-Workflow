@@ -24,7 +24,6 @@ from app.modules.livevote.events import (
 )
 from app.modules.livevote.schemas import MeetingVoteOpenBody
 from app.modules.livevote.service import BrokerPublisher, MeetingService
-from app.modules.livevote.service.votes import _Presence
 from app.modules.voting.schemas import (
     ElectionLotOut,
     ElectionResultOut,
@@ -246,8 +245,8 @@ def _election_row(**over: Any) -> Any:
 async def test_votes_for_reads_an_election() -> None:
     """Read an election in the meeting votes.
 
-    The fake session returns, in order: the votes, the ballots of the motion tally, the
-    ballots of the election and the present members.
+    The fake session returns, in order: the votes, the ballots of the motion tally and
+    the ballots of the election.
     """
     mid = uuid4()
     stored = ElectionResultOut(counts={"c1": 2, "c2": 1}, ballots=3, elected=["c1"])
@@ -259,7 +258,6 @@ async def test_votes_for_reads_an_election() -> None:
     sess = _QueueSession(
         executes=[
             res(row),
-            res((mid, 3)),
             res(),
             res(
                 (row.id, encode_election_choice(["c1"])),
@@ -286,14 +284,14 @@ async def test_votes_for_marks_a_missed_quorum_of_an_election() -> None:
         "quorum": {"type": "count", "value": 5},
     }
     row = _election_row(meeting_id=mid, result="rejected", config=config)
-    sess = _QueueSession(executes=[res(row), res((mid, 3)), res(), res()])
+    sess = _QueueSession(executes=[res(row), res(), res()])
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
     assert item.failed_reason == "quorum"
 
 
 async def test_election_tallies_without_elections() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc._election_tallies([], _Presence({}, {})) == {}
+    assert await svc._election_tallies([], {}) == {}
 
 
 async def test_ballots_of_gives_an_election_only_cast() -> None:

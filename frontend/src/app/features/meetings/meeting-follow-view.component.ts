@@ -47,6 +47,7 @@ import { TopSheetComponent } from './top-sheet/top-sheet.component';
 import { VoteCardComponent } from './vote-card/vote-card.component';
 import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
 import { MeetingHeadComponent } from './meeting-head/meeting-head.component';
+import { firstMeetingLink } from './meeting-kind.util';
 import { clock, shortTime, weekdayDate } from '@shared/date-format';
 
 /** The length of the protocol excerpt on a phone, in characters. */
@@ -241,6 +242,9 @@ export class MeetingFollowViewComponent {
 
   /** The member handed this meeting to a substitute. */
   protected readonly delegated = computed(() => !!this.delegationContext()?.myDelegation);
+
+  /** The first meeting of a Wiederholungssitzung (§ 000940). */
+  protected readonly firstLink = computed(() => firstMeetingLink(this.meeting(), this.i18n));
 
   /** "Studierendenparlament · Di., 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {

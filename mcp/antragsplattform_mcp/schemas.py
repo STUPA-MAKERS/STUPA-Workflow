@@ -245,6 +245,12 @@ class GremiumCreate(WireModel, frozen=True):
     delegationMaxPerDelegate: int = Field(default=2, ge=1, le=20)
     delegationInElections: bool = False
     quorumPercent: int | None = Field(default=None, ge=0, le=100)
+    termStartMonth: int | None = Field(
+        default=None,
+        ge=1,
+        le=12,
+        description="The month in which a term (Amtszeit) starts. Without it the setting counts.",
+    )
     repeatQuorumPercent: int | None = Field(
         default=None,
         ge=0,
@@ -275,6 +281,7 @@ class GremiumUpdate(WireModel, frozen=True):
     delegationMaxPerDelegate: int | None = Field(default=None, ge=1, le=20)
     delegationInElections: bool | None = None
     quorumPercent: int | None = None
+    termStartMonth: int | None = Field(default=None, ge=1, le=12)
     repeatQuorumPercent: int | None = None
     guestsMayVote: bool | None = None
     protocolsPublic: bool | None = Field(
@@ -580,6 +587,12 @@ class MeetingCreate(WireModel, frozen=True):
         default=None,
         description="The kind of the meeting. A new meeting is `ordinary`.",
     )
+    repeatOfId: str | None = Field(
+        default=None,
+        description="The first meeting of a `repeat` meeting: an earlier meeting of the same "
+        "Gremium. A `repeat` meeting needs it (422 `repeat_needs_first_meeting`, "
+        "`repeat_first_meeting_invalid`).",
+    )
     location: str | None = Field(default=None, description="The place, at most 200 characters.")
     form: Literal["presence", "hybrid", "video"] | None = Field(
         default=None, description="The form of the meeting. A new meeting is `presence`."
@@ -609,6 +622,12 @@ class MeetingPatch(WireModel, frozen=True):
         default=None,
         description="The kind of the meeting. It changes only while the meeting is planned "
         "(409 `meeting_not_planned`).",
+    )
+    repeatOfId: str | None = Field(
+        default=None,
+        description="The first meeting of a `repeat` meeting: an earlier meeting of the same "
+        "Gremium. A meeting that becomes `repeat` needs it (422 "
+        "`repeat_needs_first_meeting`, `repeat_first_meeting_invalid`).",
     )
     location: str | None = Field(default=None, description="The place, at most 200 characters.")
     form: Literal["presence", "hybrid", "video"] | None = Field(
@@ -693,8 +712,8 @@ class MeetingVoteOpenBody(WireModel, frozen=True):
     candidates: list[ElectionCandidateIn] = Field(
         default_factory=list, description="Election only: 1 to 50 candidates."
     )
-    # The server counts the eligible voters from the roster of the gremium.
-    quorumPercent: int | None = None
+    # The server counts the eligible voters from the roster of the gremium and takes the
+    # quorum from the settings of the gremium. A quorum on one vote gives 422.
     guestsVote: bool | None = Field(
         default=None,
         description="Public meeting: the admitted guests vote too (no quorum, majority of "

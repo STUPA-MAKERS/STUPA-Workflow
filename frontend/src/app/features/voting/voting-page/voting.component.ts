@@ -69,7 +69,9 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /**
  * The status chip: every vote, the open votes, the ended votes, the drafts. A cancelled
- * vote never shows in the list; it stays reachable from its application or meeting.
+ * vote does not show in the list; it stays reachable from its application or meeting. The
+ * one exception is the circular vote that an objection ended (§F/meetings/voting/000936):
+ * it has no application and no meeting, so the list shows it among the ended votes.
  */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
 
@@ -78,9 +80,9 @@ export type VoteKindFilter = '' | VoteKind;
 const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll', 'circular'];
 
 const STATUS_QUERY: Readonly<Record<VoteStatusFilter, readonly VoteStatus[]>> = {
-  '': ['open', 'closed'],
+  '': ['open', 'closed', 'cancelled'],
   open: ['open'],
-  ended: ['closed'],
+  ended: ['closed', 'cancelled'],
   draft: ['draft'],
 };
 
@@ -517,6 +519,7 @@ export class VotingComponent implements OnDestroy {
         gremiumId: this.gremiumId() || undefined,
         q: this.q() || undefined,
         kind: this.kindFilter() || undefined,
+        cancelledReason: 'objection',
         limit,
         offset,
       })

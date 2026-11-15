@@ -700,6 +700,7 @@ export class ApiClient {
       gremiumId: query.gremiumId || undefined,
       q: query.q || undefined,
       kind: query.kind || undefined,
+      cancelledReason: query.cancelledReason,
       limit: query.limit,
       offset: query.offset,
     });
@@ -1327,8 +1328,13 @@ export class ApiClient {
    * POST /protocols/{id}/draft-mail — send the PDF of a draft, with the watermark
    * "Entwurf", to the members of the Gremium (§ 000925). The state stays `draft`.
    */
-  sendProtocolDraft(protocolId: Uuid): Observable<{ readonly recipients: number }> {
-    return this.http.post<{ readonly recipients: number }>(`${this.base}/protocols/${protocolId}/draft-mail`, {});
+  sendProtocolDraft(
+    protocolId: Uuid,
+  ): Observable<{ readonly recipients: number; readonly draftSentAt?: string | null }> {
+    return this.http.post<{ readonly recipients: number; readonly draftSentAt?: string | null }>(
+      `${this.base}/protocols/${protocolId}/draft-mail`,
+      {},
+    );
   }
 
   /**

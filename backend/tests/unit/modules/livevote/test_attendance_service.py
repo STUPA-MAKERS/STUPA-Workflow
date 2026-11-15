@@ -1,7 +1,8 @@
 """Unit tests for AttendanceService.
 
-The close of a meeting freezes the attendance. The final protocol
-carries the lists. A later change makes the PDF and the system disagree.
+The close of a meeting freezes the own report, and the final protocol freezes the
+change of the lead: it carries the lists, and a later change makes the PDF and the
+system disagree.
 """
 
 from __future__ import annotations
@@ -39,11 +40,14 @@ async def test_set_self_conflict_when_closed() -> None:
     assert db.committed == 0
 
 
-async def test_set_for_conflict_when_closed() -> None:
+@pytest.mark.parametrize("state", ["rendering", "final"])
+async def test_set_for_conflict_when_the_protocol_is_final(state: str) -> None:
     meeting = _meeting("closed")
     db = fake_session(result(meeting))
-    with pytest.raises(ConflictError):
+    db.scalar_results = [state]
+    with pytest.raises(ConflictError) as ei:
         await AttendanceService(db).set_for(meeting.id, uuid4(), "absent", "sub-1")
+    assert ei.value.code == "protocol_final"
     assert db.committed == 0
 
 
@@ -288,11 +292,13 @@ async def test_reset_without_record_is_a_no_op(audit_calls: list[dict[str, Any]]
     assert audit_calls == []
 
 
-async def test_reset_conflict_when_closed() -> None:
+async def test_reset_conflict_when_the_protocol_is_final() -> None:
     meeting = _meeting("closed")
     db = fake_session(result(meeting))
-    with pytest.raises(ConflictError):
+    db.scalar_results = ["final"]
+    with pytest.raises(ConflictError) as ei:
         await AttendanceService(db).reset(meeting.id, uuid4(), "lead")
+    assert ei.value.code == "protocol_final"
 
 
 async def test_roster_note_only_for_self_and_lead() -> None:

@@ -90,6 +90,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/000892](requirements/functional/administration/admin/000892_pdf-footer-graphic.md) | Every PDF carries the footer graphic of the branding | approved |
 | [F/administration/admin/000906](requirements/functional/administration/admin/000906_gremium-defaults.md) | A new Gremium starts with the meeting defaults | approved |
 | [F/administration/admin/000917](requirements/functional/administration/admin/000917_meeting-periods.md) | The meeting settings hold the periods of the Geschäftsordnung | approved |
+| [F/administration/admin/000942](requirements/functional/administration/admin/000942_periods-fixed-at-start.md) | A changed period does not reach a started case | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -416,6 +417,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/delegations/000461](requirements/functional/meetings/delegations/000461_external-delegates.md) | External delegates need a Gremium switch | approved |
 | [F/meetings/delegations/000909](requirements/functional/meetings/delegations/000909_delegate-limit.md) | A delegate holds a limited number of delegations | approved |
 | [F/meetings/delegations/000910](requirements/functional/meetings/delegations/000910_no-delegation-in-election.md) | An election takes no delegation ballot | approved |
+| [F/meetings/delegations/000938](requirements/functional/meetings/delegations/000938_pool-substitute-votes-in-election.md) | A pool substitute votes in an election | approved |
 | [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | approved |
 | [F/meetings/meetings/000093](requirements/functional/meetings/meetings/000093_state-order.md) | Meeting states move only forward | approved |
 | [F/meetings/meetings/000094](requirements/functional/meetings/meetings/000094_close-with-open-vote.md) | A meeting with an open vote does not close | approved |
@@ -460,6 +462,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000921](requirements/functional/meetings/meetings/000921_absence-notice.md) | The lead gets a mail before a member reaches the absence limit | approved |
 | [F/meetings/meetings/000922](requirements/functional/meetings/meetings/000922_late-excuse.md) | A member can give an excuse after the meeting | approved |
 | [F/meetings/meetings/000923](requirements/functional/meetings/meetings/000923_attendance-export.md) | The attendance of a Gremium exports as XLSX | approved |
+| [F/meetings/meetings/000940](requirements/functional/meetings/meetings/000940_repeat-names-first-meeting.md) | A repeat meeting names its first meeting | approved |
+| [F/meetings/meetings/000941](requirements/functional/meetings/meetings/000941_absence-term-choice.md) | The absence count and the export offer each term | approved |
+| [F/meetings/meetings/000943](requirements/functional/meetings/meetings/000943_late-excuse-notice.md) | A late excuse sends a mail to the lead | approved |
+| [F/meetings/meetings/000946](requirements/functional/meetings/meetings/000946_one-present-count.md) | A meeting shows one count of present members | approved |
+| [F/meetings/meetings/000948](requirements/functional/meetings/meetings/000948_term-start-per-gremium.md) | Each Gremium has its own start month of the term | approved |
+| [F/meetings/meetings/000951](requirements/functional/meetings/meetings/000951_attendance-until-final.md) | The lead corrects the attendance until the protocol is final | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |
@@ -469,7 +477,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000354](requirements/functional/meetings/protocols/000354_built-from-tops.md) | The protocol is built from the TOP texts | approved |
 | [F/meetings/protocols/000355](requirements/functional/meetings/protocols/000355_public-variant.md) | A non-public TOP gives a second PDF | approved |
 | [F/meetings/protocols/000356](requirements/functional/meetings/protocols/000356_render-before-commit.md) | A failed render keeps the draft | approved |
-| [F/meetings/protocols/000357](requirements/functional/meetings/protocols/000357_roster-quorum.md) | The quorum uses the roster of the meeting | approved |
+| [F/meetings/protocols/000357](requirements/functional/meetings/protocols/000357_roster-quorum.md) | The quorum of a protocol uses the counts of the close | approved |
 | [F/meetings/protocols/000358](requirements/functional/meetings/protocols/000358_protocol-mail.md) | The protocol mail carries the PDF | approved |
 | [F/meetings/protocols/000359](requirements/functional/meetings/protocols/000359_cd-variant.md) | The CD variant selects the layout | approved |
 | [F/meetings/protocols/000360](requirements/functional/meetings/protocols/000360_text-is-data.md) | Protocol text is data, never code | approved |
@@ -494,9 +502,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000885](requirements/functional/meetings/protocols/000885_application-snapshot.md) | The Anlage holds the Antrag as the Sitzung treated it | approved |
 | [F/meetings/protocols/000886](requirements/functional/meetings/protocols/000886_application-public-redaction.md) | The public Anlage blacks out the personal data | approved |
 | [F/meetings/protocols/000908](requirements/functional/meetings/protocols/000908_protocol-header-place-form.md) | The protocol names the kind, the place and the form of the meeting | approved |
-| [F/meetings/protocols/000916](requirements/functional/meetings/protocols/000916_circular-in-protocol.md) | The next protocol lists the Umlaufverfahren | approved |
+| [F/meetings/protocols/000916](requirements/functional/meetings/protocols/000916_circular-in-protocol.md) | The next protocol lists the Umlaufverfahren | replaced |
 | [F/meetings/protocols/000924](requirements/functional/meetings/protocols/000924_protocol-approved.md) | A final protocol can be marked as approved | approved |
 | [F/meetings/protocols/000925](requirements/functional/meetings/protocols/000925_protocol-draft-mail.md) | The keeper sends the protocol draft to the members | approved |
+| [F/meetings/protocols/000934](requirements/functional/meetings/protocols/000934_circular-decisions-public.md) | A circular decision is public where the protocol is public | replaced |
+| [F/meetings/protocols/000937](requirements/functional/meetings/protocols/000937_draft-mail-limits.md) | The draft mail waits for the end of the meeting and asks before a repeat | approved |
+| [F/meetings/protocols/000950](requirements/functional/meetings/protocols/000950_protocol-draft-pdf.md) | The draft of a protocol reads as a PDF after the meeting | approved |
+| [F/meetings/protocols/000952](requirements/functional/meetings/protocols/000952_finalize-asks-first.md) | The finalize of a protocol asks first | approved |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |
@@ -524,6 +536,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/voting/000915](requirements/functional/meetings/voting/000915_circular-objection.md) | An objection ends an Umlaufverfahren | approved |
 | [F/meetings/voting/000932](requirements/functional/meetings/voting/000932_one-cast-for-all-ballots.md) | One cast counts for the own ballot and all represented ballots | approved |
 | [F/meetings/voting/000933](requirements/functional/meetings/voting/000933_turnout-counts-persons.md) | The turnout of a running vote counts persons | approved |
+| [F/meetings/voting/000935](requirements/functional/meetings/voting/000935_quorum-not-per-vote.md) | A vote takes its quorum from the Gremium | approved |
+| [F/meetings/voting/000936](requirements/functional/meetings/voting/000936_cancelled-circular-in-list.md) | The vote list shows a circular vote that an objection ended | approved |
+| [F/meetings/voting/000939](requirements/functional/meetings/voting/000939_member-count-at-open.md) | A vote without a meeting counts the members at its open | approved |
+| [F/meetings/voting/000944](requirements/functional/meetings/voting/000944_circular-mails.md) | A circular vote sends a mail at its open and before its end | approved |
+| [F/meetings/voting/000947](requirements/functional/meetings/voting/000947_objection-button.md) | The objection to a circular vote is a button | approved |
+| [F/meetings/voting/000949](requirements/functional/meetings/voting/000949_circular-in-decisions-only.md) | A circular decision shows in the list of decisions and in no protocol | approved |
 | [F/public/public-pages/000170](requirements/functional/public/public-pages/000170_no-public-meetings.md) | Meetings are never public | replaced |
 | [F/public/public-pages/000171](requirements/functional/public/public-pages/000171_public-protocols.md) | Only final protocols of public Gremien are public | approved |
 | [F/public/public-pages/000172](requirements/functional/public/public-pages/000172_public-protocol-content.md) | A public protocol has no names and no internal TOPs | approved |
@@ -533,6 +551,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/public/public-pages/000688](requirements/functional/public/public-pages/000688_blackout-bar-width.md) | A black bar has one fixed width and the text colour | approved |
 | [F/public/public-pages/000887](requirements/functional/public/public-pages/000887_blackout-bar-baseline.md) | A black bar in the PDF sits on the baseline of its line | approved |
 | [F/public/public-pages/000926](requirements/functional/public/public-pages/000926_public-decisions.md) | The decisions of a public Gremium are public | approved |
+| [F/public/public-pages/000945](requirements/functional/public/public-pages/000945_public-decisions-last-result.md) | The public decisions show the last result of a TOP | approved |
 | [NF/accessibility/conformance/000490](requirements/non-functional/accessibility/conformance/000490_wcag-22-aa.md) | Every view meets WCAG 2.2 level AA | approved |
 | [NF/accessibility/conformance/000491](requirements/non-functional/accessibility/conformance/000491_axe-every-route.md) | Every route passes an axe check in both themes | approved |
 | [NF/accessibility/conformance/000492](requirements/non-functional/accessibility/conformance/000492_template-lint.md) | The template lint has the accessibility rules | approved |

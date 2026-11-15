@@ -41,6 +41,7 @@ LinkTarget = Literal[
     "ticket",
     "todo",
     "poll",
+    "circular",
     "appointment",
 ]
 
@@ -53,6 +54,7 @@ _LABELS: dict[str, dict[str, str]] = {
     "ticket": {"de": "Ticket öffnen", "en": "Open the ticket"},
     "todo": {"de": "To-Do öffnen", "en": "Open the to-do"},
     "poll": {"de": "Umfrage öffnen", "en": "Open the poll"},
+    "circular": {"de": "Umlaufverfahren öffnen", "en": "Open the circular vote"},
     "appointment": {"de": "Termin öffnen", "en": "Open the appointment"},
 }
 
@@ -147,3 +149,8 @@ def appointment_link(settings: Settings, appointment_id: UUID | str) -> MailLink
 def vote_link(settings: Settings, vote_id: UUID | str) -> MailLink:
     """Return the link to a poll on the page "Abstimmungen" (``/voting/{id}``)."""
     return MailLink(f"{_base(settings)}/voting/{vote_id}", "poll")
+
+
+def circular_link(settings: Settings, vote_id: UUID | str) -> MailLink:
+    """Return the link to an Umlaufverfahren on the page "Abstimmungen"."""
+    return MailLink(f"{_base(settings)}/voting/{vote_id}", "circular")

@@ -48,13 +48,13 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.delegations.pool_seat import (
     claim_pool_seat,
-    pool_seat_counts,
     pool_seat_for,
     release_pool_seat_of,
 )
 from app.modules.delegations.service import Represented, counted_in, voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService, StagedFire
+from app.modules.meetings.present import NOBODY, Present, present_count
 from app.modules.meetings.protocol_models import ProtocolVoteRef
 from app.modules.voting import circular as circular_mod
 from app.modules.voting import election as election_mod
@@ -63,6 +63,7 @@ from app.modules.voting import tally as tally_mod
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.schemas import (
     BallotAccepted,
+    CancelReason,
     MyBallot,
     TallyOut,
     VoteClosed,
@@ -256,7 +257,7 @@ def _check_closable(vote: Vote, *, quorum_met: bool, now: datetime | None) -> No
     window_expired = now is not None and vote.closes_at is not None and now >= vote.closes_at
     if not quorum_met and not window_expired:
         raise ConflictError(
-            "quorum not met — the vote cannot be closed; collect more ballots or cancel the vote.",
+            "The quorum is not met. Cancel the vote, or close it when the quorum is met.",
             code="quorum_not_met",
         )
 
@@ -647,21 +648,14 @@ class VotingService:
         return tally_mod.tally(config.options, await self._choices(vote))
 
     async def _present_count(self, vote: Vote) -> int:
-        """Count the present meeting members, or 0 without a meeting."""
-        if vote.meeting_id is None:
-            return 0
-        from app.modules.meetings.models import MeetingAttendance
+        """Count the present members with a voting right, or 0 without a meeting."""
+        return (await self._presence(vote)).members
 
-        return (
-            await self.session.scalar(
-                select(func.count())
-                .select_from(MeetingAttendance)
-                .where(
-                    MeetingAttendance.meeting_id == vote.meeting_id,
-                    MeetingAttendance.status == "present",
-                )
-            )
-        ) or 0
+    async def _presence(self, vote: Vote) -> Present:
+        """Return the present count of the meeting of the vote (000946)."""
+        if vote.meeting_id is None:
+            return NOBODY
+        return await present_count(self.session, vote.meeting_id)
 
     async def _admitted_guest_count(self, vote: Vote) -> int:
         """Count the admitted guests of the meeting of the vote, or 0 without one."""
@@ -730,7 +724,8 @@ class VotingService:
         case only for a closed vote. Every vote is secret, so a running vote never
         shows an interim tally: only ``voted`` and ``present`` travel. ``voted`` of a
         running vote counts the persons who cast (``voters``), against the present
-        persons. After the close it counts the ballots.
+        persons. After the close it counts the ballots. A person who cast and then left
+        stays in the base, so ``present`` of a running vote is never below ``voted``.
 
         A vote with guests counts the admitted guests as present too: they are
         expected ballots. ``presentMembers`` and ``presentGuests`` give the attendance
@@ -745,11 +740,13 @@ class VotingService:
         counted = await self._counted(vote, config, counts, eligible)
         members, guests, present = await self._attendance(vote, config)
         revealed = vote.status == "closed"
+        running = vote.status == "open"
+        voted = await self.voters(vote.id) if running else counted.voted
         return TallyOut(
             counts=counted.counts if revealed else {},
             eligible=eligible,
-            voted=await self.voters(vote.id) if vote.status == "open" else counted.voted,
-            present=present,
+            voted=voted,
+            present=max(present, voted) if running else present,
             revealed=revealed,
             quorumMet=counted.quorum_met,
             leading=counted.leading if revealed else None,
@@ -798,9 +795,13 @@ class VotingService:
                     0,
                 )
             case (False, True):
-                members = await self._present_count(vote)
+                here = await self._presence(vote)
                 guests = await self._guest_attendance(vote, config)
-                return members, guests, members + guests if config.guests_vote else members
+                return (
+                    here.members,
+                    guests,
+                    here.total + guests if config.guests_vote else here.total,
+                )
             case _:
                 return None, None, 0
 
@@ -873,18 +874,19 @@ class VotingService:
         Only a meeting vote with ``quorumBasis = present`` has one: the persons with the
         attendance status ``present`` plus the pool substitutes on a seat. A member who
         gave a delegation is not present, so the ballot of a delegation does not count.
-        A closed vote takes the present members fixed at its close.
+        A closed vote takes the members and the seats fixed at its close.
         """
         if vote.meeting_id is None or config.quorum_basis != "present":
             return None
-        fixed: int | None = getattr(vote, "present_members", None)
-        members = (
-            fixed
-            if vote.status == "closed" and fixed is not None
-            else await self._present_count(vote)
+        closed = vote.status == "closed"
+        fixed: int | None = getattr(vote, "present_members", None) if closed else None
+        seats: int | None = getattr(vote, "present_seats", None) if closed else None
+        if fixed is not None and seats is not None:
+            return fixed + seats
+        presence = await self._presence(vote)
+        return (presence.members if fixed is None else fixed) + (
+            presence.seats if seats is None else seats
         )
-        seats = await pool_seat_counts(self.session, [vote.meeting_id])
-        return members + seats.get(vote.meeting_id, 0)
 
     async def _poll_outcome(self, vote: Vote) -> tally_mod.PollOutcome:
         """Tally a poll from its stored ballots."""
@@ -1219,7 +1221,9 @@ class VotingService:
         that would be fail-open. Without it a percent quorum stays fail-closed and
         never counts as met. A prepared meeting vote waits as a draft while the roster
         can change, so its caller counts the roster again and gives
-        ``eligible_count``, which replaces the count of the create.
+        ``eligible_count``, which replaces the count of the create. A vote without a
+        meeting counts the roster of its Gremium again here, so a draft does not keep
+        the count of the day it was made (§F/meetings/voting/000939).
 
         A meeting vote opens only in a ``live`` meeting. The method locks the meeting
         row before the vote row, as the meeting close does.
@@ -1255,8 +1259,7 @@ class VotingService:
         await circular_mod.CircularService(self).check_open(vote, now)
         await self._take_plan_step(vote, actor)
         config = self._config(vote)
-        if eligible_count is not None:
-            vote.eligible_count = eligible_count
+        vote.eligible_count = await self._opening_count(vote, eligible_count)
         vote.opens_at = now
         vote.status = "open"
         data: dict[str, object] = {
@@ -1279,6 +1282,30 @@ class VotingService:
         return self._to_out(
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
+
+    async def _opening_count(self, vote: Vote, given: int | None) -> int | None:
+        """Return the eligible count of an opening vote.
+
+        The caller of a meeting vote gives the count. A vote without a meeting counts
+        its roster now (000939) and keeps the stored count only with a free group key.
+        """
+        if given is not None or vote.meeting_id is not None:
+            return vote.eligible_count if given is None else given
+        counted = await self._roster_count(vote)
+        return vote.eligible_count if counted is None else counted
+
+    async def _roster_count(self, vote: Vote) -> int | None:
+        """Count the eligible members of the Gremium of ``vote`` now.
+
+        An old row with a free group key has no Gremium and gives None.
+        """
+        from app.modules.meetings.rules import MeetingRules
+
+        try:
+            gremium_id = UUID(vote.eligible_group)
+        except (ValueError, TypeError):
+            return None
+        return await MeetingRules(self.session).vote_eligible_count(gremium_id)
 
     async def cast(
         self,
@@ -1939,6 +1966,7 @@ class VotingService:
         gremium_id: UUID | None = None,
         q: str | None = None,
         kind: VoteKind | None = None,
+        cancelled_reason: CancelReason | None = None,
         limit: int = DEFAULT_LIMIT,
         offset: int = 0,
     ) -> Page[VoteListItem]:
@@ -1956,6 +1984,7 @@ class VotingService:
             gremium_id=gremium_id,
             q=q,
             kind=kind,
+            cancelled_reason=cancelled_reason,
             limit=limit,
             offset=offset,
         )
@@ -2395,9 +2424,11 @@ class VotingService:
         a meeting keeps its count.
         """
         if vote.meeting_id is not None:
-            members = await self._present_count(vote)
+            here = await self._presence(vote)
+            members = here.members
             guests = await self._guest_attendance(vote, config)
             vote.present_members = members
+            setattr(vote, "present_seats", here.seats)  # noqa: B010
             vote.present_guests = guests
             if config.guests_vote:
                 vote.eligible_count = members + guests

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -287,14 +287,48 @@ async def send_protocol_draft(
     """Send the PDF of a draft to the members of the Gremium.
 
     Each page of the PDF has the watermark "Entwurf". The send changes nothing on the
-    protocol: it stays a draft. The caller needs the write access to the protocol. A
-    protocol that is not a draft answers 409 ``protocol_not_draft``. The send writes
-    ``protocol_draft_mail`` with the number of recipients.
+    protocol but the time of the send (``draftSentAt``): it stays a draft. The caller
+    needs the write access to the protocol. A protocol that is not a draft answers 409
+    ``protocol_not_draft``, and a protocol of a live meeting 409 ``meeting_live``. The
+    send writes ``protocol_draft_mail`` with the number of recipients.
     """
     await service.authorize_write(protocol_id, principal)
-    sent = await DraftMailer(service).send(protocol_id, now=datetime.now(UTC), actor=principal.sub)
+    mailer, now = DraftMailer(service), datetime.now(UTC)
+    before = await mailer.last_sent(protocol_id)
+    sent = await mailer.send(protocol_id, now=now, actor=principal.sub)
     await service.session.commit()
-    return ProtocolDraftMailOut(recipients=sent)
+    return ProtocolDraftMailOut(recipients=sent, draftSentAt=now if sent else before)
+
+
+@router.get(
+    "/protocols/{protocol_id}/draft-pdf",
+    responses=_errors(400, 401, 403, 404, 409, 503),
+    response_class=Response,
+)
+async def get_protocol_draft_pdf(
+    protocol_id: UUID,
+    service: ServiceDep,
+    principal: PrincipalDep,
+    variant: Literal["internal", "public"] = "internal",
+) -> Response:
+    """Stream the PDF of a draft, with the watermark "Entwurf" on each page.
+
+    ``variant=public`` gives the redacted public variant. The render stores nothing
+    and changes nothing on the protocol. The read scope is the meeting view, like
+    the PDF of a final protocol. A protocol that is not a draft answers 409
+    ``protocol_not_draft``, and a protocol of a live meeting 409 ``meeting_live``
+    (§F/meetings/protocols/000950).
+    """
+    await service.authorize_read(protocol_id, principal)
+    data, name = await DraftMailer(service).preview(protocol_id, public=variant == "public")
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": content_disposition("inline", name),
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.put(

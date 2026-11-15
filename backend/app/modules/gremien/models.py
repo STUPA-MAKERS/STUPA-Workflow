@@ -26,6 +26,10 @@ DEFAULT_DELEGATION_MAX_PER_DELEGATE = 2
 MAX_DELEGATIONS_PER_DELEGATE = 20
 
 
+#: The start month of a term when no setting gives one: October.
+DEFAULT_TERM_START_MONTH = 10
+
+
 class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     """A gremium: the body that holds members, meetings and votes."""
 
@@ -67,6 +71,11 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     #: The quorum of a vote in a Wiederholungssitzung (meeting kind ``repeat``), in
     #: percent. NULL = such a vote uses ``quorum_percent``.
     repeat_quorum_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The month on whose first day a term (Amtszeit) of this Gremium starts, 1 to 12.
+    #: A new Gremium takes the value of the meeting settings (000948).
+    term_start_month: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_TERM_START_MONTH), default=DEFAULT_TERM_START_MONTH
+    )
     #: Admitted guests of a public meeting may vote. Off: guests only watch. A Gremium
     #: with a quorum never lets guests vote, whatever this switch says.
     guests_may_vote: Mapped[bool] = mapped_column(Boolean, server_default="false")

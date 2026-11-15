@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import AuditAction
@@ -21,6 +22,8 @@ from app.modules.meetings.protocol_models import Protocol
 from app.shared.errors import ConflictError, ValidationProblem
 
 PROTOCOL_NOT_FINAL = "protocol_not_final"
+#: The states of a meeting that can approve a protocol.
+SITTING = ("live", "closed")
 INVALID_APPROVAL_MEETING = "invalid_approval_meeting"
 
 
@@ -56,6 +59,26 @@ async def _audit(session: AsyncSession, protocol: Protocol, actor: str) -> None:
     )
 
 
+def _earlier(meeting: Meeting, own: Meeting | None) -> bool:
+    """Tell whether ``meeting`` has a date before the date of ``own``."""
+    if own is None or own.date is None or meeting.date is None:
+        return False
+    return meeting.date < own.date
+
+
+async def drop_approvals_by(session: AsyncSession, meeting_id: UUID) -> None:
+    """Remove the mark from each protocol that the meeting approved.
+
+    The delete of a meeting calls it: the foreign key only clears the meeting of the
+    mark, and a mark without its meeting would stay as approved.
+    """
+    await session.execute(
+        update(Protocol)
+        .where(Protocol.approved_meeting_id == meeting_id)
+        .values(approved_at=None, approved_meeting_id=None, approved_by=None)
+    )
+
+
 def _require_final(protocol: Protocol) -> None:
     if protocol.status != "final":
         raise ConflictError(
@@ -85,22 +108,29 @@ async def approve(
 ) -> None:
     """Mark a final protocol as approved by ``meeting_id``. The caller commits.
 
+    A meeting approves a protocol only when it sits: it is ``live`` or ``closed``, and
+    its date is not before the date of the meeting of the protocol.
+
     Raises:
         ConflictError: The protocol is not final (409 ``protocol_not_final``).
-        ValidationProblem: The meeting does not exist, belongs to another Gremium or
-            is the meeting of the protocol itself (422 ``invalid_approval_meeting``).
+        ValidationProblem: The meeting does not exist, belongs to another Gremium, is
+            the meeting of the protocol itself, is only planned or is an earlier
+            meeting (422 ``invalid_approval_meeting``).
     """
     _require_final(protocol)
     meeting = await session.get(Meeting, meeting_id)
+    own = await session.get(Meeting, protocol.meeting_id)
     if (
         meeting is None
         or meeting.gremium_id != protocol.gremium_id
         or meeting.id == protocol.meeting_id
+        or meeting.status not in SITTING
+        or _earlier(meeting, own)
     ):
         raise ValidationProblem(
-            "The approving meeting is another meeting of the same Gremium.",
+            "The approving meeting is a later meeting of the same Gremium that started.",
             code=INVALID_APPROVAL_MEETING,
-            errors=[{"field": "meetingId", "msg": "another meeting of the same gremium"}],
+            errors=[{"field": "meetingId", "msg": "a later, started meeting of the same gremium"}],
         )
     _write(protocol, at=now, meeting_id=meeting.id, by=actor)
     await session.flush()

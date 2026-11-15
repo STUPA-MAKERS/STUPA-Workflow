@@ -209,11 +209,11 @@ describe('MeetingPageComponent', () => {
     it('finalizes the draft of a closed meeting as a step of its own', async () => {
       const { on, fixture } = await setup({ meeting: meeting({ status: 'closed' }) });
       expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).toBeNull();
-      await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
       expect(on.finalize).toHaveBeenCalled();
       fixture.componentRef.setInput('protocol', protocol({ status: 'rendering', isLocked: true }));
       fixture.detectChanges();
-      expect(screen.queryByRole('button', { name: 'Finalisieren & versenden' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
     });
 
     it('offers no main action without the lead right', async () => {
@@ -395,10 +395,10 @@ describe('MeetingPageComponent', () => {
       fixture.componentRef.setInput('meeting', meeting({ status: 'closed' }));
       fixture.detectChanges();
       menu = await openMenu();
-      expect(within(menu).queryByRole('menuitem', { name: 'Finalisieren & versenden' })).toBeNull();
+      expect(within(menu).queryByRole('menuitem', { name: 'Finalisieren & senden' })).toBeNull();
       expect(within(menu).queryByRole('menuitem', { name: 'Beamer-Ansicht' })).toBeNull();
       await userEvent.keyboard('{Escape}');
-      await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
       expect(on.finalize).toHaveBeenCalled();
     });
 

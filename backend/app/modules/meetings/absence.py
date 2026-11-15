@@ -5,7 +5,8 @@ An unexcused absence is an attendance record with the status ``absent`` in a clo
 A meeting without a record of the member does not count: only the meeting lead sets
 ``absent``, so a person who joined the Gremium later has no absence in an older meeting.
 
-A term (Amtszeit) starts on the first day of ``termStartMonth`` and runs one year.
+A term (Amtszeit) starts on the first day of ``termStartMonth`` of the Gremium and runs
+one year (§F/meetings/meetings/000948).
 """
 
 from __future__ import annotations
@@ -19,7 +20,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.delegations.models import MeetingDelegation
-from app.modules.gremien.models import GremiumMembership, GremiumRole
+from app.modules.gremien.models import (
+    DEFAULT_TERM_START_MONTH,
+    Gremium,
+    GremiumMembership,
+    GremiumRole,
+)
 from app.modules.meetings.models import Meeting, MeetingAttendance, MeetingSettings
 from app.modules.meetings.periods import ORDINARY, term_end, term_start
 
@@ -75,6 +81,12 @@ async def unexcused_counts(
     return {pid: int(n) for pid, n in rows.all()}
 
 
+async def gremium_term_month(session: AsyncSession, gremium_id: UUID) -> int:
+    """Return the month in which a term of the Gremium starts."""
+    stored = await session.scalar(select(Gremium.term_start_month).where(Gremium.id == gremium_id))
+    return DEFAULT_TERM_START_MONTH if stored is None else int(stored)
+
+
 async def absence_notices(
     session: AsyncSession, meeting: Meeting, settings: MeetingSettings
 ) -> list[AbsenceNotice]:
@@ -86,7 +98,7 @@ async def absence_notices(
     """
     if meeting.status != "closed" or meeting.kind != ORDINARY or meeting.date is None:
         return []
-    first = term_start(meeting.date, settings.term_start_month)
+    first = term_start(meeting.date, await gremium_term_month(session, meeting.gremium_id))
     conditions = unexcused(meeting.gremium_id, first, term_end(first))
     here = await session.scalars(
         select(MeetingAttendance.principal_id)

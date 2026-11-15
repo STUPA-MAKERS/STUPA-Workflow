@@ -75,7 +75,7 @@ describe('election views', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Stimme abgeben: Anna' }));
     http.expectOne('/api/votes/e2/ballot').flush({ code: 'already_voted' }, { status: 409, statusText: 'Conflict' });
     const toasts = view.fixture.debugElement.injector.get(ToastService).toasts().map((t) => t.message);
-    expect(toasts).toContain('Du hast bereits abgestimmt.');
+    expect(toasts).toContain('Deine Stimme ist bereits abgegeben.');
   });
 
   it('the meeting card: the closed tie with the lot for the manager', async () => {

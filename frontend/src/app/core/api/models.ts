@@ -1503,6 +1503,8 @@ export interface VoteListQuery {
   readonly q?: string;
   /** Only the motions, the elections or the polls. */
   readonly kind?: VoteKind;
+  /** Of the cancelled votes, only those with this reason. */
+  readonly cancelledReason?: 'objection';
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -1671,10 +1673,17 @@ export interface MeetingOutWire {
   readonly admittedGuests?: number;
   /** The open join requests; the meeting lead only, else 0. */
   readonly pendingGuests?: number;
+  /** The present count fixed at the close (000946); `null` while the meeting is not closed. */
+  readonly presentCount?: number | null;
+  /** The members with a voting right, fixed at the close; `null` while not closed. */
+  readonly eligibleCount?: number | null;
+  /** The pool substitutes on a seat who are no present member with a voting right. */
+  readonly presentSeats?: number;
   /** Guests can get a ballot: the Gremium has the switch on and no quorum. */
   readonly guestsVoteAllowed?: boolean;
   /** The kind of the meeting. */
   readonly kind?: MeetingKind;
+  readonly repeatOfId?: Uuid | null;
   /** The place of the meeting, or `null`. */
   readonly location?: string | null;
   /** The form of the meeting. */
@@ -1706,6 +1715,8 @@ export interface ProtocolOutWire {
   readonly approvedMeetingId?: Uuid | null;
   readonly approvedMeetingTitle?: string | null;
   readonly approvedMeetingDate?: string | null;
+  /** The last send of the draft by mail, `null` without a send (§ 000937). */
+  readonly draftSentAt?: IsoDateTime | null;
 }
 
 /** Body for `POST /meetings` (`MeetingCreate`). */
@@ -1724,6 +1735,8 @@ export interface MeetingCreateBody {
   readonly publicJoin?: boolean;
   readonly guestsMode?: GuestsMode;
   readonly kind?: MeetingKind;
+  /** The first meeting of a `repeat` meeting (000940). The server needs it for this kind. */
+  readonly repeatOfId?: Uuid | null;
   readonly location?: string | null;
   readonly form?: MeetingForm;
 }
@@ -1755,6 +1768,8 @@ export interface MeetingPatchBody {
   readonly guestsMode?: GuestsMode;
   /** Only while the meeting is planned (409 `meeting_not_planned`). */
   readonly kind?: MeetingKind;
+  /** The first meeting of a `repeat` meeting (000940). The server needs it for this kind. */
+  readonly repeatOfId?: Uuid | null;
   readonly location?: string | null;
   readonly form?: MeetingForm;
   /** Confirms an early open (`status: 'live'` before `confirmUntil`). */
@@ -1889,10 +1904,18 @@ export interface Meeting {
   readonly admittedGuests: number;
   /** The open join requests (meeting lead only, else 0). */
   readonly pendingGuests: number;
+  /** The present count fixed at the close (000946); `null` while the meeting is not closed. */
+  readonly presentCount?: number | null;
+  /** The members with a voting right, fixed at the close; `null` while not closed. */
+  readonly eligibleCount?: number | null;
+  /** The pool substitutes on a seat who are no present member with a voting right. */
+  readonly presentSeats?: number;
   /** Guests can get a ballot: the Gremium has the switch on and no quorum. */
   readonly guestsVoteAllowed: boolean;
   /** The kind of the meeting. Only a planned meeting changes it. */
   readonly kind: MeetingKind;
+  /** The first meeting of a `repeat` meeting (000940), else `null`. */
+  readonly repeatOfId?: Uuid | null;
   /** The place of the meeting, or `null`. */
   readonly location: string | null;
   /** The form of the meeting. */
@@ -1941,6 +1964,8 @@ export interface Protocol {
   readonly approvedMeetingId?: Uuid | null;
   readonly approvedMeetingTitle?: string | null;
   readonly approvedMeetingDate?: string | null;
+  /** The last send of the draft by mail, `null` without a send (§ 000937). */
+  readonly draftSentAt?: IsoDateTime | null;
 }
 
 /**

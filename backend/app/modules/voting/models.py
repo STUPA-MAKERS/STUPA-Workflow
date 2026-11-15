@@ -103,6 +103,9 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     #: protocol and the result cards show them as counts, never as names.
     present_members: Mapped[int | None] = mapped_column(Integer, nullable=True)
     present_guests: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The pool substitutes on a seat at the close, so the quorum of a closed vote does
+    #: not follow a later change of the delegations. NULL as for the two counts above.
+    present_seats: Mapped[int | None] = mapped_column(Integer, nullable=True)
     #: Personnel elections. ``kind`` tells a motion (``config`` = VoteConfig) from
     #: an election (``config`` = ElectionConfig). An election never has an application
     #: and never fires a flow branch. A runoff points to its parent election

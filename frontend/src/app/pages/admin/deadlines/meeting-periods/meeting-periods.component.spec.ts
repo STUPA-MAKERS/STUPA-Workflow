@@ -1,3 +1,4 @@
+import { pickOption } from '../../../../../testing/select';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -56,9 +57,9 @@ describe('MeetingPeriodsSettingsComponent', () => {
     expect(field('Ladungsfrist andere Sitzungen').value).toBe('3');
     expect(field('Protokollentwurf nach').value).toBe('14');
     expect(field('Nachträgliche Entschuldigung bis').value).toBe('7');
-    expect(field('Umlaufbeschluss mindestens').value).toBe('3');
-    expect(field('Unentschuldigte Fehlzeiten bis zum Mandatsverlust').value).toBe('3');
-    expect(field('Beginn der Amtszeit (Monat)').value).toBe('10');
+    expect(field('Umlaufverfahren mindestens').value).toBe('3');
+    expect(field('Unentschuldigte Abwesenheiten bis zum Mandatsverlust').value).toBe('3');
+    expect(screen.getByRole('combobox', { name: 'Beginn der Amtszeit neuer Gremien' })).toHaveTextContent('Oktober');
     expect(c.dirty()).toBe(false);
     await userEvent.clear(field('Ladungsfrist ordentliche Sitzung'));
     await userEvent.type(field('Ladungsfrist ordentliche Sitzung'), '10');
@@ -71,16 +72,23 @@ describe('MeetingPeriodsSettingsComponent', () => {
 
   it('refuses a value outside the bounds of its field', async () => {
     const { api, c } = await setup();
-    await userEvent.clear(field('Beginn der Amtszeit (Monat)'));
-    await userEvent.type(field('Beginn der Amtszeit (Monat)'), '13');
-    expect(screen.getByText('Eine ganze Zahl von 1 bis 12.')).toBeInTheDocument();
+    await userEvent.clear(field('Ladungsfrist ordentliche Sitzung'));
+    await userEvent.type(field('Ladungsfrist ordentliche Sitzung'), '0');
+    expect(screen.getByText('Eine ganze Zahl von 1 bis 365.')).toBeInTheDocument();
     expect(c.valid()).toBe(false);
     c.save();
     expect(api.putMeetingPeriods).not.toHaveBeenCalled();
-    await userEvent.clear(field('Beginn der Amtszeit (Monat)'));
-    expect(screen.getByText('Eine ganze Zahl von 1 bis 12.')).toBeInTheDocument();
-    await userEvent.type(field('Beginn der Amtszeit (Monat)'), '4');
+    await userEvent.clear(field('Ladungsfrist ordentliche Sitzung'));
+    expect(screen.getByText('Eine ganze Zahl von 1 bis 365.')).toBeInTheDocument();
+    await userEvent.type(field('Ladungsfrist ordentliche Sitzung'), '4');
     expect(c.valid()).toBe(true);
+  });
+
+  it('takes the month of the term by its name', async () => {
+    const { api, c } = await setup();
+    await pickOption(screen.getByRole('combobox', { name: 'Beginn der Amtszeit neuer Gremien' }), 'April');
+    c.save();
+    expect(api.putMeetingPeriods).toHaveBeenCalledWith({ ...STORED, termStartMonth: 4 });
   });
 
   it('puts the stored values back on discard', async () => {

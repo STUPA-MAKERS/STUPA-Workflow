@@ -18,3 +18,12 @@
 .gdd__switch ::ng-deep .sw__label {
   font-weight: var(--fw-semibold);
 }
+
+.gdd__nested {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-inline-start: var(--space-1);
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--color-border);
+}

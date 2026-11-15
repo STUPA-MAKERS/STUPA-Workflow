@@ -68,8 +68,29 @@ async def test_internal_header_lists_the_excused_group() -> None:
     assert header.present == ["Anna"]
     assert header.excused == ["Cora", "Eva"]
     assert header.absent == ["dirk-sub"]
-    assert header.present_count == 1
+    assert header.present_count == 0
     assert header.datalines == []
+
+
+async def test_the_header_of_a_closed_meeting_shows_the_fixed_present_count() -> None:
+    """§F/meetings/meetings/000946: the protocol shows the count that the close fixed.
+
+    The list names one present person, and the count of the close is 3: two present
+    members with a voting right and one pool seat.
+    """
+    meeting = _meeting(status="closed", present_count=3)
+    header = await _service(_AttendanceSession(ROWS))._header_meta(meeting, public=True)
+    assert header.present_count == 3
+    assert header.datalines == ["Anwesend: 3", "Entschuldigt: 2", "Abwesend: 1"]
+
+
+async def test_the_quorum_of_a_closed_meeting_uses_the_fixed_member_count() -> None:
+    """§F/meetings/protocols/000357: a new render reads the member count of the close."""
+    service = _service(_AttendanceSession([]))
+    gremium = SimpleNamespace(id=GID, quorum_percent=None)
+    closed = _meeting(status="closed", eligible_count=4)
+    assert await service._quorate(gremium, closed, 3) is True
+    assert await service._quorate(gremium, closed, 2) is False
 
 
 async def test_public_header_counts_only() -> None:
@@ -78,8 +99,8 @@ async def test_public_header_counts_only() -> None:
     header = await _service(session)._header_meta(_meeting(), public=True)
     assert header.present == [] and header.excused == [] and header.absent == []
     assert header.keepers == [] and header.protokollant is None
-    assert header.present_count == 1
-    assert header.datalines == ["Anwesend: 1", "Entschuldigt: 2", "Abwesend: 1"]
+    assert header.present_count == 0
+    assert header.datalines == ["Anwesend: 0", "Entschuldigt: 2", "Abwesend: 1"]
 
 
 async def test_header_lists_every_keeper_period() -> None:

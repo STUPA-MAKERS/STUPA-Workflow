@@ -31,6 +31,8 @@ from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff", "no_majority"]
 #: ``circular`` is an Umlaufverfahren: a motion of a Gremium without a meeting.
 VoteKind = Literal["motion", "election", "poll", "circular"]
+#: The reason of a cancel that the row keeps. An objection ends a circular vote.
+CancelReason = Literal["objection"]
 
 
 class ElectionRunoffOut(FrozenCamelModel, frozen=True):
@@ -408,7 +410,7 @@ class VoteOut(FrozenCamelModel, frozen=True):
     closed_at: datetime | None = Field(default=None, alias="closedAt")
     #: Why the vote was cancelled, when the row keeps it: ``objection`` for an
     #: Umlaufverfahren that a member objected to.
-    cancel_reason: Literal["objection"] | None = Field(default=None, alias="cancelReason")
+    cancel_reason: CancelReason | None = Field(default=None, alias="cancelReason")
     tally: TallyOut
     #: A vote with guests: no quorum, only the majority of the cast ballots. A
     #: copy of ``config.guestsVote`` for the vote card.

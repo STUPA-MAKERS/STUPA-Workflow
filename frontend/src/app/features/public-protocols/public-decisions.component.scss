@@ -39,6 +39,14 @@
   gap: var(--space-2);
 }
 
+.pp__spacer {
+  flex: 1 1 auto;
+}
+.pp__count {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
 .pp__none {
   display: flex;
   flex-direction: column;
@@ -153,5 +161,9 @@
   .pp__side {
     width: 100%;
     justify-content: flex-end;
+  }
+  // A touch target is 44px high.
+  .pp__view {
+    min-height: 44px;
   }
 }

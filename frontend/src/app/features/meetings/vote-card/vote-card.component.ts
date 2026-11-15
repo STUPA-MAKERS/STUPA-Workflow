@@ -1,3 +1,4 @@
+import { castRefusalText } from '../../voting/ballot/ballot-refusal';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -157,9 +158,10 @@ export class VoteCardComponent {
   protected readonly notCast: MyBallot = { cast: false, choice: null };
 
   protected onBallotFailed(failure: BallotFailure): void {
-    const detail = failure.alreadyVoted ? '' : problemDetail(failure.error);
+    const own = castRefusalText(failure);
+    const detail = failure.alreadyVoted || own ? '' : problemDetail(failure.error);
     const base = this.i18n.translate(
-      failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'meetings.toast.actionFailed',
+      own ?? (failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'meetings.toast.actionFailed'),
     );
     this.toast.error(detail ? `${base}: ${detail}` : base);
   }

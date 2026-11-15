@@ -26,11 +26,13 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.guests import GuestEvents, GuestService
-from app.modules.livevote.open_window import check_open
+from app.modules.livevote.open_window import check_open, load_meeting_settings
+from app.modules.livevote.repeat import first_meeting_id
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service.handover import HandoverOps
 from app.modules.meetings.agenda_service import AgendaService
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.present import fix_counts, present_count
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteOut
 from app.shared.errors import (
@@ -56,6 +58,7 @@ _AUDITED_FIELDS: tuple[tuple[str, str], ...] = (
     ("end_time", "endTime"),
     ("protokollant_id", "protokollantId"),
     ("kind", "kind"),
+    ("repeat_of_id", "repeatOfId"),
     ("location", "location"),
     ("form", "form"),
 )
@@ -121,6 +124,14 @@ class LifecycleOps(HandoverOps):
             end_time=payload.end_time,
             status="planned",
             kind=payload.kind,
+            repeat_of_id=await first_meeting_id(
+                self.session,
+                kind=payload.kind,
+                gremium_id=payload.gremium_id,
+                first_id=payload.repeat_of_id,
+                day=payload.date,
+            ),
+            late_excuse_days=(await load_meeting_settings(self.session)).late_excuse_days,
             location=payload.location or None,
             form=payload.form,
             created_by=principal.sub,
@@ -238,6 +249,7 @@ class LifecycleOps(HandoverOps):
             or "end_time" in payload.model_fields_set
             or "protokollant_id" in payload.model_fields_set
             or "kind" in payload.model_fields_set
+            or "repeat_of_id" in payload.model_fields_set
             or "location" in payload.model_fields_set
             or "form" in payload.model_fields_set
             or wants_public
@@ -336,6 +348,8 @@ class LifecycleOps(HandoverOps):
         if payload.title is not None:
             meeting.title = payload.title
         _apply_kind_place_form(meeting, payload)
+        if {"kind", "repeat_of_id"} & payload.model_fields_set:
+            await self._apply_first_meeting(meeting, payload)
         if "date" in payload.model_fields_set:
             meeting.date = payload.date
         if "start_time" in payload.model_fields_set:
@@ -469,6 +483,22 @@ class LifecycleOps(HandoverOps):
         )
         return False
 
+    async def _apply_first_meeting(self, meeting: Meeting, payload: MeetingPatch) -> None:
+        """Store the first meeting of a repeat meeting, or clear it for another kind.
+
+        The kind of the patch is already on the meeting. A patch without `repeatOfId`
+        keeps the stored first meeting (spec 000940).
+        """
+        named = "repeat_of_id" in payload.model_fields_set
+        meeting.repeat_of_id = await first_meeting_id(
+            self.session,
+            kind=meeting.kind,
+            gremium_id=meeting.gremium_id,
+            first_id=payload.repeat_of_id if named else meeting.repeat_of_id,
+            day=payload.date if "date" in payload.model_fields_set else meeting.date,
+            meeting_id=meeting.id,
+        )
+
     async def _close(
         self, meeting: Meeting, actor: str, now: datetime
     ) -> tuple[list[Vote], GuestEvents]:
@@ -482,6 +512,11 @@ class LifecycleOps(HandoverOps):
         """
         await self.close_periods(meeting, now)
         meeting.closed_at = now
+        fix_counts(
+            meeting,
+            await present_count(self.session, meeting.id),
+            await self.vote_eligible_count(meeting.gremium_id),
+        )
         from app.modules.voting.service import VotingService
 
         cancelled = await VotingService(self.session).cancel_drafts_for_meeting(
@@ -765,7 +800,13 @@ class LifecycleOps(HandoverOps):
 
         The session flushes at once, because a Gremium delete that follows must not cascade
         over a meeting row that the session still has to delete.
+
+        A protocol that this meeting approved loses its mark (§F/meetings/protocols/000924):
+        without the meeting the mark names nothing. The import is local, because
+        ``protocol`` depends on ``livevote``.
         """
+        from app.modules.protocol.approval import drop_approvals_by
+
         data: dict[str, Any] = {
             "title": meeting.title,
             "gremiumId": str(meeting.gremium_id),
@@ -782,5 +823,6 @@ class LifecycleOps(HandoverOps):
             target_id=str(meeting.id),
             data=data,
         )
+        await drop_approvals_by(self.session, meeting.id)
         await self.session.delete(meeting)
         await self.session.flush()

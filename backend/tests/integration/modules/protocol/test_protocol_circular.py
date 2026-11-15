@@ -1,7 +1,7 @@
-"""The protocol of the next meeting lists the Umlaufverfahren (spec 000916).
+"""A circular decision shows in the list of decisions and in no protocol (spec 000949).
 
-Real Postgres: the protocol assembly reads the closed circular votes of the Gremium
-that closed after the start of the meeting before and not after its own start.
+Real Postgres: the protocol assembly holds no circular vote, and the list of public
+decisions reads the closed circular votes of the gremien with public protocols.
 """
 
 from __future__ import annotations
@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.meetings.protocol_models import Protocol
+from app.modules.protocol.public import PublicFilter, PublicProtocolService
+from app.modules.protocol.public_decisions import list_public_decisions
 from app.modules.protocol.service import ProtocolService
 from app.modules.voting.circular import circular_config
 from app.modules.voting.models import SecretBallot, Vote
@@ -24,7 +26,6 @@ from app.modules.voting.models import SecretBallot, Vote
 pytestmark = pytest.mark.integration
 
 T0 = datetime(2026, 10, 1, 17, 0, tzinfo=UTC)
-LEAD = "Beschlüsse im Umlaufverfahren seit der letzten Sitzung"
 
 
 @pytest.fixture
@@ -94,56 +95,59 @@ async def _protocol(session: AsyncSession, meeting: Meeting) -> Protocol:
     return protocol
 
 
-async def test_protocol_lists_the_circular_votes_since_the_meeting_before(
-    session: AsyncSession,
-) -> None:
+async def test_a_protocol_lists_no_circular_vote(session: AsyncSession) -> None:
+    """§F/meetings/voting/000949: no variant of a protocol holds a circular vote."""
     gremium = await _gremium(session)
-    other = await _gremium(session)
     await _meeting(session, gremium, "Sitzung 1", T0)
     meeting = await _meeting(session, gremium, "Sitzung 2", T0 + timedelta(days=14))
     session.add(MeetingAgendaItem(meeting_id=meeting.id, position=1, title="Berichte"))
-    await _circular(session, gremium, "Alter Beschluss", T0 - timedelta(days=2))
     await _circular(session, gremium, "Lastenanhänger beschaffen", T0 + timedelta(days=5), yes=3)
-    await _circular(
-        session, gremium, "Gutachten beauftragen", T0 + timedelta(days=6), result="rejected"
-    )
-    await _circular(session, gremium, "Später Beschluss", T0 + timedelta(days=15))
-    await _circular(
-        session, gremium, "Mit Widerspruch", T0 + timedelta(days=4), status="cancelled", result=None
-    )
-    await _circular(session, other, "Fremdes Gremium", T0 + timedelta(days=5))
     protocol = await _protocol(session, meeting)
 
     svc = ProtocolService(session)
     for public in (False, True):
         document = await svc._build_document(protocol, public=public)
-        assert LEAD in document
-        assert "**Lastenanhänger beschaffen**" in document
-        assert "> yes: 3, no: 0, abstain: 0" in document
-        assert "Umlaufverfahren · beendet am 06.10.2026 · angenommen" in document
-        assert "**Gutachten beauftragen**" in document
-        assert "Umlaufverfahren · beendet am 07.10.2026 · abgelehnt" in document
-        assert document.index("Lastenanhänger") < document.index("Gutachten")
-        assert document.index(LEAD) < document.index("# Berichte")
-        for absent in ("Alter Beschluss", "Später Beschluss", "Mit Widerspruch", "Fremdes"):
-            assert absent not in document
+        assert "# Berichte" in document
+        assert "Lastenanhänger" not in document
+        assert "Umlaufverfahren" not in document
 
 
-async def test_first_protocol_of_a_planned_meeting_lists_every_closed_one(
+async def test_the_public_decisions_hold_the_circular_votes_of_a_public_gremium(
     session: AsyncSession,
 ) -> None:
-    gremium = await _gremium(session)
-    meeting = await _meeting(session, gremium, "Erste Sitzung", None)
-    await _circular(session, gremium, "Früher Beschluss", T0)
-    protocol = await _protocol(session, meeting)
-    document = await ProtocolService(session)._build_document(protocol)
-    assert LEAD in document
-    assert "**Früher Beschluss**" in document
+    """§F/meetings/voting/000949: a closed circular vote of a public Gremium is public.
 
-
-async def test_protocol_without_a_circular_vote_has_no_lead(session: AsyncSession) -> None:
+    The vote of a Gremium without public protocols and the vote that an objection
+    cancelled stay out. The newest close comes first.
+    """
     gremium = await _gremium(session)
-    meeting = await _meeting(session, gremium, "Sitzung", T0)
-    protocol = await _protocol(session, meeting)
-    document = await ProtocolService(session)._build_document(protocol)
-    assert LEAD not in document
+    gremium.protocols_public = True
+    internal = await _gremium(session)
+    await _circular(session, gremium, "Lastenanhänger beschaffen", T0 + timedelta(days=5), yes=3)
+    await _circular(
+        session, gremium, "Gutachten beauftragen", T0 + timedelta(days=6), result="rejected"
+    )
+    await _circular(
+        session, gremium, "Mit Widerspruch", T0 + timedelta(days=4), status="cancelled", result=None
+    )
+    await _circular(session, internal, "Internes Gremium", T0 + timedelta(days=5))
+    await session.commit()
+
+    service = PublicProtocolService(session)
+    page = await list_public_decisions(service, PublicFilter(), limit=20, offset=0)
+    assert [d.question for d in page.items] == [
+        "Gutachten beauftragen",
+        "Lastenanhänger beschaffen",
+    ]
+    rejected, passed = page.items
+    assert (rejected.kind, rejected.result, rejected.date.isoformat()) == (
+        "circular",
+        "rejected",
+        "2026-10-07",
+    )
+    assert passed.counts == {"yes": 3, "no": 0, "abstain": 0}
+    assert (passed.protocol_id, passed.meeting_title) == (None, None)
+    other = await list_public_decisions(
+        service, PublicFilter(gremium_ids=(internal.id,)), limit=20, offset=0
+    )
+    assert other.items == []

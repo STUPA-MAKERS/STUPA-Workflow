@@ -11,6 +11,15 @@ import {
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { type DockPanel, SessionDockComponent } from './session-dock.component';
 
+/**
+ * Spec 000946: three members with a voting right, one of them present, and one present
+ * member without a voting right. The pool seat of the meeting adds one person.
+ */
+const COUNTED: Attendance[] = [
+  ...ATTENDANCE.map((a) => ({ ...a, canVote: true })),
+  { principalId: 'pr-9', displayName: 'Rita Rat', email: null, status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false, canVote: false },
+];
+
 const OUTPUTS = ['step', 'jumpNow', 'setProtokollant', 'pickHandover', 'cancelHandover'] as const;
 
 interface Inputs {
@@ -99,16 +108,25 @@ describe('SessionDockComponent', () => {
 
     /** The sheet belongs to the page; the dock opens no popover for it. */
     it('counts the present members and opens the attendance sheet of the page', async () => {
-      const { fixture } = await setup();
+      const { fixture } = await setup({ meeting: meeting({ presentSeats: 1 }), attendance: COUNTED });
       const chip = screen.getByTitle('Anwesenheit');
-      expect(chip).toHaveTextContent('1 von 3');
-      expect(chip).toHaveAccessibleName('Anwesend 1 von 3');
+      expect(chip).toHaveTextContent('2 von 3');
+      expect(chip).toHaveAccessibleName('Anwesend 2 von 3');
       await userEvent.click(chip);
       expect(fixture.componentInstance.panel()).toBe('attendance');
       expect(chip).toHaveAttribute('aria-expanded', 'true');
       expect(screen.queryByRole('dialog')).toBeNull();
       await userEvent.click(chip);
       expect(fixture.componentInstance.panel()).toBe('none');
+    });
+
+    /** Spec 000946: a closed meeting shows the count that its close fixed. */
+    it('shows the present count that the close fixed', async () => {
+      await setup({
+        meeting: meeting({ status: 'closed', presentCount: 7, eligibleCount: 9 }),
+        attendance: COUNTED,
+      });
+      expect(screen.getByTitle('Anwesenheit')).toHaveAccessibleName('Anwesend 7 von 9');
     });
 
     it('closes the minute-taker menu on the backdrop, on Escape and on a second click', async () => {

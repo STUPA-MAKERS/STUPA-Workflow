@@ -39,10 +39,11 @@ from app.modules.meetings.publisher import MeetingPublisher, get_meeting_publish
 from app.modules.voting.circular import CircularService
 from app.modules.voting.election import ElectionService
 from app.modules.voting.poll import PollService
-from app.modules.voting.poll_mails import notify_poll_started
+from app.modules.voting.poll_mails import MAIL_KINDS, notify_poll_started
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,
+    CancelReason,
     CircularCreate,
     CircularRulesOut,
     GremiumVoteCreate,
@@ -92,12 +93,13 @@ ReaderDep = Annotated[Principal, Depends(require_principal())]
 def mail_poll_start(
     vote: VoteOut, background: BackgroundTasks, request: Request, settings: SettingsDep
 ) -> None:
-    """Send ``poll_started`` after the open of a poll of a Gremium (background task).
+    """Send the start mail after the open of a poll or an Umlaufverfahren of a Gremium.
 
-    A meeting poll runs in the room and sends no mail; a motion and an election send
-    none either.
+    It runs as a background task: ``poll_started`` for a poll, ``circular_open`` for an
+    Umlaufverfahren. A meeting poll runs in the room and sends no mail; a motion and an
+    election send none either.
     """
-    if vote.kind != "poll" or vote.meeting_id is not None or vote.status != "open":
+    if vote.kind not in MAIL_KINDS or vote.meeting_id is not None or vote.status != "open":
         return
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(notify_poll_started, settings, vote.id, pool)
@@ -120,17 +122,21 @@ async def create_poll(
 
     ``kind: poll`` or ``kind: circular``; a body without ``kind`` is a poll. An
     Umlaufverfahren is a motion with the majority of the members; ``closesAt`` lies at
-    least ``circularMinDays`` days ahead (422 ``circular_window_too_short``), and it
-    sends no mail. The rest describes the poll. The caller needs the gremium permission
+    least ``circularMinDays`` days ahead (422 ``circular_window_too_short``). The rest
+    describes the poll. The caller needs the gremium permission
     ``vote.manage`` in ``eligibleGroup`` (or the admin role), else 403. ``closesAt`` lies
     at least one hour ahead (422 ``closes_at_too_soon``); the deadline cron closes the poll then.
     Without ``draft`` the poll opens at once, and the eligible members (``vote.cast``)
-    get the mail ``poll_started``.
+    get the mail ``poll_started``. An Umlaufverfahren that opens sends ``circular_open``
+    to them, and ``circular_reminder`` goes one day before its end to each member
+    without a ballot.
     """
     now = datetime.now(UTC)
-    if isinstance(payload, CircularCreate):
-        return await CircularService(service).create(payload, principal, now=now)
-    vote = await PollService(service).create(payload, principal, now=now)
+    vote = (
+        await CircularService(service).create(payload, principal, now=now)
+        if isinstance(payload, CircularCreate)
+        else await PollService(service).create(payload, principal, now=now)
+    )
     mail_poll_start(vote, background, request, settings)
     return vote
 
@@ -378,6 +384,7 @@ async def list_votes(
     gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     kind: Annotated[VoteKind | None, Query()] = None,
+    cancelled_reason: Annotated[CancelReason | None, Query(alias="cancelledReason")] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[VoteListItem]:
@@ -388,7 +395,8 @@ async def list_votes(
     ``application.read``, an eligible voter or a manager of the vote. ``status`` repeats
     (``?status=open&status=closed``). Without it the list leaves out the drafts.
     ``gremiumId`` keeps the votes of one gremium, and ``q`` searches the question and
-    the meeting title. ``kind`` keeps the motions, the elections or the polls. Each row
+    the meeting title. ``kind`` keeps the motions, the elections or the polls.
+    ``cancelledReason`` keeps of the cancelled votes only those with this reason. Each row
     carries ``canCast`` and the own ballot (``myBallot``; a secret vote gives only
     ``cast``) and no tally.
     """
@@ -398,6 +406,7 @@ async def list_votes(
         gremium_id=gremium_id,
         q=q,
         kind=kind,
+        cancelled_reason=cancelled_reason,
         limit=limit,
         offset=offset,
     )

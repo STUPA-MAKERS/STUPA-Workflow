@@ -187,6 +187,7 @@ markers = [
     "integration: braucht testcontainers (PG/Redis/MinIO) — Docker erforderlich",
     "e2e: End-to-End gegen ephemeren Compose-Stack",
     "real_rules: the account-merge unit test runs the real erasure and privilege checks",
+    "real_present: the unit test reads the present count of a meeting through its own fake",
 ]
 
 [tool.coverage.run]
