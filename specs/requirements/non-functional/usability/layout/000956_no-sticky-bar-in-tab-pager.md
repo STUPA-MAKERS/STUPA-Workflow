@@ -2,7 +2,7 @@
 id: "000956"
 title: A search bar in a paged tab does not stick
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
