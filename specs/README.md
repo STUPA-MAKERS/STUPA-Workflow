@@ -498,7 +498,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000924](requirements/functional/meetings/protocols/000924_protocol-approved.md) | A final protocol can be marked as approved | approved |
 | [F/meetings/protocols/000925](requirements/functional/meetings/protocols/000925_protocol-draft-mail.md) | The keeper sends the protocol draft to the members | approved |
 | [F/meetings/protocols/000934](requirements/functional/meetings/protocols/000934_circular-decisions-public.md) | A circular decision is public where the protocol is public | approved |
-| [F/meetings/protocols/000937](requirements/functional/meetings/protocols/000937_draft-mail-limits.md) | The draft mail waits for the end of the meeting and asks before a repeat | draft |
+| [F/meetings/protocols/000937](requirements/functional/meetings/protocols/000937_draft-mail-limits.md) | The draft mail waits for the end of the meeting and asks before a repeat | approved |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |

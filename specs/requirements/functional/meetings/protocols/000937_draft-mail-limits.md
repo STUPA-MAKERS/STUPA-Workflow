@@ -2,7 +2,7 @@
 id: "000937"
 title: The draft mail waits for the end of the meeting and asks before a repeat
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
