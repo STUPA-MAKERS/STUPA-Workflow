@@ -244,7 +244,8 @@ export class PublicDecisionsComponent {
   /** "Studierendenparlament · Di, 29.09.2026 · 34. Sitzung"; an election has no meeting title. */
   protected meta(d: PublicDecisionRow): readonly string[] {
     const when = weekdayDate(d.date, this.i18n.formatLocale());
-    return [d.gremium.name, when, ...(d.meetingTitle ? [d.meetingTitle] : [])];
+    const where = d.kind === 'circular' ? this.i18n.translate('publicDecisions.circular') : d.meetingTitle;
+    return [d.gremium.name, when, ...(where ? [where] : [])];
   }
 
   protected question(d: PublicDecisionRow): string {

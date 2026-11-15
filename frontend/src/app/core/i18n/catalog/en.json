@@ -3302,6 +3302,8 @@
   "publicProtocols.detail.meetingOn": "Meeting on {date}",
   "publicProtocols.detail.finalizedOn": "finalized on {date}",
   "publicProtocols.detail.agenda": "Agenda and decisions",
+  "publicProtocols.detail.circular": "Decisions by circular vote",
+  "publicProtocols.decision.circularEnded": "Circular vote · ended on {date}",
   "publicProtocols.detail.top": "Item {n}:",
   "publicProtocols.detail.noText": "These minutes have no public text. The wording is in the PDF.",
   "publicProtocols.detail.noTopText": "No text and no decision.",
@@ -4484,6 +4486,7 @@
   "publicDecisions.empty.filteredBody": "No public decision matches your search and filters.",
   "publicDecisions.noQuestion": "Decision without a question",
   "publicDecisions.election": "Election",
+  "publicDecisions.circular": "Circular vote",
   "publicDecisions.protocol": "Open minutes",
   "publicDecisions.link": "Decisions"
 }

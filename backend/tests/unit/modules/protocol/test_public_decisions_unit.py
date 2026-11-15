@@ -115,6 +115,36 @@ async def test_list_holds_the_public_decisions_only() -> None:
     assert "Intern" not in dumped
 
 
+async def test_list_holds_the_circular_votes_of_a_public_protocol() -> None:
+    """§F/meetings/protocols/000934: a circular decision is public with its protocol."""
+    snapshot = _snapshot()
+    snapshot.circular = [
+        PublicDecision(
+            kind="circular",
+            question="Lastenanhänger beschaffen",
+            counts={"yes": 5, "no": 1},
+            result="passed",
+            closedOn=_date(2026, 10, 20),
+        ),
+        PublicDecision(kind="circular", question="Ohne Tag", result="rejected"),
+    ]
+    protocol, meeting, gremium = _row()
+    protocol.public_content = snapshot.model_dump(mode="json", by_alias=True)
+    page = await list_public_decisions(
+        _service([(protocol, meeting, gremium)]), PublicFilter(), limit=20, offset=0
+    )
+    assert page.total == 4
+    first, undated = page.items[:2]
+    assert first.kind == "circular"
+    assert first.question == "Lastenanhänger beschaffen"
+    assert first.date == _date(2026, 10, 20)
+    assert first.meeting_title is None
+    assert first.result == "passed"
+    assert first.counts == {"yes": 5, "no": 1}
+    assert undated.date == _date(2026, 11, 3)
+    assert "Lastenanhänger" in snapshot.search_text()
+
+
 async def test_list_searches_the_question_and_cuts_the_page() -> None:
     svc = _service([_row(), _row()])
     hits = await list_public_decisions(svc, PublicFilter(q="SOMMERFEST"), limit=20, offset=0)

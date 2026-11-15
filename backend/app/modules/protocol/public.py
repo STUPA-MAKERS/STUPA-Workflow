@@ -73,7 +73,10 @@ class PublicDecision(FrozenCamelModel, frozen=True):
     conditions: list[str] = Field(default_factory=list)
     #: Personnel elections. The public version names the elected candidates
     #: only; the other candidates appear as a count, and no vote count travels.
-    kind: Literal["motion", "election"] = "motion"
+    #: ``circular`` is a vote of an Umlaufverfahren that the protocol lists. It belongs to
+    #: no TOP and carries the day of its close.
+    kind: Literal["motion", "election", "circular"] = "motion"
+    closed_on: _date | None = Field(default=None, alias="closedOn")
     seats: int | None = None
     round: int = 1
     elected: list[str] = Field(default_factory=list)
@@ -151,6 +154,9 @@ class PublicSnapshot(BaseModel):
 
     version: int = SNAPSHOT_VERSION
     tops: list[PublicTop] = Field(default_factory=list)
+    #: The circular votes that the protocol lists (§F/meetings/protocols/000934). A
+    #: snapshot from before this field has none.
+    circular: list[PublicDecision] = Field(default_factory=list)
     #: The free text of a meeting without agenda items. None when TOPs exist.
     markdown: str | None = None
     attendance: PublicAttendance = Field(default_factory=PublicAttendance)
@@ -164,7 +170,8 @@ class PublicSnapshot(BaseModel):
             for part in (top.title, top.markdown, *(d.question for d in top.decisions))
             if part
         )
-        return "\n".join([*parts, *([self.markdown] if self.markdown else [])])
+        circular = (d.question for d in self.circular if d.question)
+        return "\n".join([*circular, *parts, *([self.markdown] if self.markdown else [])])
 
 
 def apply_public_snapshot(protocol: Protocol, snapshot: PublicSnapshot, pdf: bytes | None) -> None:
@@ -265,6 +272,8 @@ class PublicProtocolDetail(FrozenCamelModel, frozen=True):
     #: The page puts it on the text as `lang` when it is not the UI language (spec 000523).
     lang: str = "de"
     tops: list[PublicTopOut]
+    #: The circular votes that the protocol lists, in the order of their close.
+    circular: list[PublicDecision] = Field(default_factory=list)
     markdown: str | None = None
     attendance: PublicAttendance
     has_pdf: bool = Field(alias="hasPdf")
@@ -508,6 +517,7 @@ class PublicProtocolService:
                 )
                 for t in snap.tops
             ],
+            circular=snap.circular,
             markdown=snap.markdown,
             attendance=snap.attendance,
             hasPdf=self._has_pdf(protocol),

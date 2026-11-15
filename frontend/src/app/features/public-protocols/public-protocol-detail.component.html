@@ -51,6 +51,14 @@
 
     <div class="pd__cols">
       <div class="pd__main">
+        @if (p.circular?.length) {
+          <h2 class="pd__h2">{{ 'publicProtocols.detail.circular' | t }}</h2>
+          <div class="pd__circular">
+            @for (d of p.circular; track $index) {
+              <ng-container *ngTemplateOutlet="decisionBox; context: { $implicit: d }" />
+            }
+          </div>
+        }
         <h2 class="pd__h2">{{ 'publicProtocols.detail.agenda' | t }}</h2>
         @if (p.tops.length === 0) {
           <div class="pd__free">
@@ -185,6 +193,9 @@
           }
         </div>
         <p class="pd__rule">{{ ruleLine(d) }}</p>
+        @if (d.kind === 'circular' && d.closedOn) {
+          <p class="pd__rule">{{ 'publicProtocols.decision.circularEnded' | t: { date: day(d.closedOn) } }}</p>
+        }
         @if (d.conditions?.length) {
           <div class="pd__conds">
             <span class="cap">{{ 'decision.conditions' | t }}</span>

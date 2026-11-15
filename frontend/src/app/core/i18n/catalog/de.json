@@ -3302,6 +3302,8 @@
   "publicProtocols.detail.meetingOn": "Sitzung vom {date}",
   "publicProtocols.detail.finalizedOn": "finalisiert am {date}",
   "publicProtocols.detail.agenda": "Tagesordnung und Beschlüsse",
+  "publicProtocols.detail.circular": "Beschlüsse im Umlaufverfahren",
+  "publicProtocols.decision.circularEnded": "Umlaufverfahren · beendet am {date}",
   "publicProtocols.detail.top": "TOP {n}:",
   "publicProtocols.detail.noText": "Zu diesem Protokoll gibt es keinen öffentlichen Text. Der Wortlaut steht im PDF.",
   "publicProtocols.detail.noTopText": "Ohne Text und ohne Beschluss.",
@@ -4484,6 +4486,7 @@
   "publicDecisions.empty.filteredBody": "Zu deiner Suche und den Filtern gibt es keinen öffentlichen Beschluss.",
   "publicDecisions.noQuestion": "Beschluss ohne Frage",
   "publicDecisions.election": "Wahl",
+  "publicDecisions.circular": "Umlaufverfahren",
   "publicDecisions.protocol": "Zum Protokoll",
   "publicDecisions.link": "Beschlüsse"
 }

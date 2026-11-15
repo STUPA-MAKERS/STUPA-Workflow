@@ -87,7 +87,12 @@ from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient, TypstError
 from app.modules.protocol import approval
 from app.modules.protocol.approval import approval_fields
-from app.modules.protocol.circular import circular_block
+from app.modules.protocol.circular import (
+    build_circular_block,
+    circular_decision,
+    circular_snippet,
+    circular_views,
+)
 from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.markdown import (
     ElectionLine,
@@ -937,10 +942,12 @@ class ProtocolService:
         free_text = (
             black_out(protocol.markdown) if public and protocol.markdown else protocol.markdown
         )
-        circular = await circular_block(
-            self.session, meeting, VotingService(self.session), self._tz()
+        circular_votes = await circular_views(self.session, meeting, VotingService(self.session))
+        circular = build_circular_block(
+            [circular_snippet(view, self._tz()) for view in circular_votes]
         )
         if snapshot is not None:
+            snapshot.circular = [circular_decision(view, self._tz()) for view in circular_votes]
             snapshot.attendance = PublicAttendance(
                 present=header.present_count,
                 excused=header.excused_count,

@@ -89,6 +89,19 @@ describe('PublicDecisionsComponent', () => {
     expect(within(card).queryByText('Angenommen')).toBeNull();
   });
 
+  it('names a circular vote in place of a meeting (§F/meetings/protocols/000934)', async () => {
+    const circular = decisionRowFixture({
+      kind: 'circular',
+      question: 'Lastenanhänger beschaffen',
+      meetingTitle: null,
+      date: '2026-10-20',
+    });
+    await setup(makeApi({ decisions: jest.fn(() => of(page([circular]))) }));
+    expect(screen.getByText('Lastenanhänger beschaffen')).toBeInTheDocument();
+    expect(screen.getByText('Umlaufverfahren')).toBeInTheDocument();
+    expect(screen.getByText('Angenommen')).toBeInTheDocument();
+  });
+
   it('words a rejected motion, another option and a missing question', async () => {
     const rows = [
       decisionRowFixture({ result: 'rejected', counts: { ja: 1, vertagen: 2 } }),

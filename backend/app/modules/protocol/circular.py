@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.meetings.models import Meeting
 from app.modules.protocol.markdown import build_vote_snippet
+from app.modules.protocol.public import PublicDecision
 from app.modules.voting.circular import CIRCULAR
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteOut
@@ -68,16 +69,16 @@ async def _previous_start(
     return (await session.execute(query)).scalar_one_or_none()
 
 
-async def circular_block(
-    session: AsyncSession, meeting: Meeting | None, voting: VotingService, tz: ZoneInfo
-) -> str:
-    """Build the block of the circular votes that the protocol of ``meeting`` lists.
+async def circular_views(
+    session: AsyncSession, meeting: Meeting | None, voting: VotingService
+) -> list[VoteOut]:
+    """Read the closed circular votes that the protocol of ``meeting`` lists.
 
     A protocol without a meeting row, or a meeting without a Gremium, lists none.
     """
     gremium_id: UUID | None = getattr(meeting, "gremium_id", None)
     if meeting is None or gremium_id is None:
-        return ""
+        return []
     until: datetime | None = getattr(meeting, "started_at", None)
     after = await _previous_start(session, meeting.id, gremium_id, until)
     ids = (
@@ -97,5 +98,29 @@ async def circular_block(
         .scalars()
         .all()
     )
-    views = [await voting.get(vote_id) for vote_id in ids]
+    return [await voting.get(vote_id) for vote_id in ids]
+
+
+def circular_decision(view: VoteOut, tz: ZoneInfo) -> PublicDecision:
+    """Build the public form of one circular vote: question, day, result and sums.
+
+    The public form holds no name (§F/meetings/protocols/000934).
+    """
+    closed_at: datetime | None = getattr(view, "closed_at", None)
+    return PublicDecision(
+        kind="circular",
+        question=view.question,
+        counts=dict(view.tally.counts),
+        result=view.result,
+        majorityRule=getattr(view, "majority_rule", "members_majority"),
+        secret=bool(getattr(view, "secret", True)),
+        closedOn=closed_at.astimezone(tz).date() if closed_at else None,
+    )
+
+
+async def circular_block(
+    session: AsyncSession, meeting: Meeting | None, voting: VotingService, tz: ZoneInfo
+) -> str:
+    """Build the block of the circular votes that the protocol of ``meeting`` lists."""
+    views = await circular_views(session, meeting, voting)
     return build_circular_block([circular_snippet(view, tz) for view in views])

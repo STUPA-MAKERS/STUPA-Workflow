@@ -15,6 +15,7 @@ from app.modules.protocol.circular import (
     CIRCULAR_LEAD,
     build_circular_block,
     circular_block,
+    circular_decision,
     circular_note,
     circular_snippet,
 )
@@ -62,6 +63,18 @@ def test_snippet_holds_the_question_the_counts_and_the_result() -> None:
         "> Umlaufverfahren · beendet am 10.11.2026 · angenommen",
     ]
     assert "**Umlaufverfahren**" in circular_snippet(_view(question=None), TZ)
+
+
+def test_public_form_of_a_circular_vote_has_no_name() -> None:
+    """§F/meetings/protocols/000934: question, day, result and sums."""
+    decision = circular_decision(_view(), TZ)
+    assert decision.kind == "circular"
+    assert decision.question == "Soll der AStA einen Lastenanhänger beschaffen?"
+    assert decision.counts == {"yes": 5, "no": 1, "abstain": 0}
+    assert decision.result == "passed"
+    assert decision.closed_on is not None
+    assert decision.closed_on.isoformat() == "2026-11-10"
+    assert circular_decision(_view(closedAt=None), TZ).closed_on is None
 
 
 def test_block_has_the_lead_only_with_a_vote() -> None:

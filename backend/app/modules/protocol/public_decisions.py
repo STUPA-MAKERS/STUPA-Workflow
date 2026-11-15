@@ -35,13 +35,16 @@ from app.shared.schemas import FrozenCamelModel
 
 
 class PublicDecisionOut(FrozenCamelModel, frozen=True):
-    """One public decision. An election has no meeting title, result or sums."""
+    """One public decision. An election has no meeting title, result or sums.
+
+    A circular vote has no meeting title, and its date is the day of its close.
+    """
 
     protocol_id: UUID = Field(alias="protocolId")
     gremium: PublicGremiumRef
     date: _date
     semester: str
-    kind: Literal["motion", "election"] = "motion"
+    kind: Literal["motion", "election", "circular"] = "motion"
     question: str | None = None
     meeting_title: str | None = Field(default=None, alias="meetingTitle")
     result: VoteResult | None = None
@@ -60,7 +63,8 @@ class PublicDecisionPage(FrozenCamelModel, frozen=True):
 def _decision_out(
     decision: PublicDecision, protocol: Protocol, meeting: Meeting, gremium: Gremium
 ) -> PublicDecisionOut:
-    day = meeting_day(meeting)
+    circular = decision.kind == "circular"
+    day = decision.closed_on if circular and decision.closed_on else meeting_day(meeting)
     election = decision.kind == "election"
     return PublicDecisionOut(
         protocolId=protocol.id,
@@ -69,7 +73,7 @@ def _decision_out(
         semester=semester_of(day),
         kind=decision.kind,
         question=decision.question,
-        meetingTitle=None if election else meeting.title,
+        meetingTitle=None if election or circular else meeting.title,
         result=None if election else decision.result,
         counts={} if election else dict(decision.counts),
     )
@@ -103,16 +107,23 @@ def decisions_of(
 ) -> list[PublicDecisionOut]:
     """Return the public decisions of one visible protocol, in the agenda order.
 
+    The circular votes that the protocol lists come first, as they do in its text
+    (§F/meetings/protocols/000934).
+
     `q` keeps the decisions whose question holds the text. The search of the protocol
     rows also finds a protocol by its title or its TOP text, so the list filters again.
     """
     needle = q.casefold() if q else None
     snapshot = PublicSnapshot.model_validate(protocol.public_content or {})
-    return [
-        _decision_out(decision, protocol, meeting, gremium)
+    of_tops = [
+        decision
         for top in snapshot.tops
         if not top.non_public
         for decision in last_results(top.decisions)
+    ]
+    return [
+        _decision_out(decision, protocol, meeting, gremium)
+        for decision in (*snapshot.circular, *of_tops)
         if _matches(decision, needle)
     ]
 
