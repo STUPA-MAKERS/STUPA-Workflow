@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.meetings import present as present_mod
 from app.modules.meetings.present import Present
+from app.modules.notifications import brand as brand_mod
+from app.modules.site_config.branding import Branding
 
 
 @dataclass(slots=True)
@@ -35,4 +37,29 @@ def presence(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) ->
         return {} if holder.here is None else dict.fromkeys(meeting_ids, holder.here)
 
     monkeypatch.setattr(present_mod, "present_counts", _counts)
+    return holder
+
+
+@dataclass(slots=True)
+class MailBranding:
+    """The active branding that the mails of one test read."""
+
+    active: Branding
+
+
+@pytest.fixture(autouse=True)
+def mail_branding(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> MailBranding:
+    """Stub the branding read of the mails, so a session fake needs no row for it.
+
+    A test sets `mail_branding.active` to give its mails this branding. A test of the read
+    itself carries the marker `real_branding` and reads through its own fake.
+    """
+    holder = MailBranding(active=Branding())
+    if request.node.get_closest_marker("real_branding") is not None:
+        return holder
+
+    async def _active(_session: AsyncSession) -> Branding:
+        return holder.active
+
+    monkeypatch.setattr(brand_mod, "active_branding", _active)
     return holder

@@ -2,10 +2,16 @@
 id: "001004"
 title: A mail has light and dark colours
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+tests:
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_both_colour_sets_keep_the_contrast"
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_the_dark_set_applies_only_on_request_of_the_client"
+implementation:
+  - backend/app/modules/notifications/colours.py
+  - backend/app/modules/notifications/layout.py
+  - backend/app/modules/notifications/texts/comments.py
 scope:
   - backend/app/modules/notifications
   - backend/app/modules/protocol

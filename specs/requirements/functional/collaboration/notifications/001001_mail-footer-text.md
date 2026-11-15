@@ -2,10 +2,17 @@
 id: "001001"
 title: The footer of a mail shows the E-Mail-Fußzeile
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+tests:
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_the_footer_shows_the_footer_text_in_the_language_of_the_mail"
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_the_plain_text_ends_with_the_footer_text"
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_a_mail_without_a_footer_text_has_no_such_line"
+implementation:
+  - backend/app/modules/notifications/brand.py
+  - backend/app/modules/notifications/layout.py
+  - backend/app/modules/notifications/compose.py
 scope:
   - backend/app/modules/notifications
   - backend/app/modules/protocol

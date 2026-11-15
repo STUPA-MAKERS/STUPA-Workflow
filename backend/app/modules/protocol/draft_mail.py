@@ -27,12 +27,8 @@ from app.modules.audit.service import record as audit_record
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
-from app.modules.notifications.layout import (
-    append_link_text,
-    reason_text,
-    render_layout,
-    text_to_html,
-)
+from app.modules.notifications.brand import load_mail_brand
+from app.modules.notifications.compose import branded_mail
 from app.modules.notifications.links import protocol_link
 from app.modules.notifications.mail import (
     MailAttachment,
@@ -179,23 +175,18 @@ class DraftMailer:
             if meeting is not None
             else "Protokoll.pdf"
         )
-        return MailMessage(
+        return branded_mail(
+            brand=await load_mail_brand(svc.session, settings),
+            settings=settings,
             to=tuple(recipients),
             subject=subject,
-            text=append_link_text(body, link.url, link.label("de")),
-            html=render_layout(
-                content_html=text_to_html(body),
-                title=subject,
-                site_name=settings.mail_from_name,
-                base_url=settings.public_base_url,
-                reason=reason_text("protocol", "de"),
-                lang="de",
-                action_url=link.url,
-                action_label=link.label("de"),
-            ),
+            text=body,
+            reason="protocol",
+            lang="de",
             idempotency_key=compute_idempotency_key(
                 "protocol_draft", str(protocol.id), now.isoformat()
             ),
+            link=link,
             attachments=(
                 MailAttachment(filename=f"Entwurf {name}", mime="application/pdf", content=pdf),
             ),

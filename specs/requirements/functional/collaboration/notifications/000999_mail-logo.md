@@ -2,10 +2,20 @@
 id: "000999"
 title: The head of a mail shows the logo of the branding
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+tests:
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_the_head_shows_the_wordmark_as_an_inline_png"
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_the_head_shows_the_imagemark_beside_the_name"
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_a_url_logo_and_a_broken_logo_count_as_no_logo"
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_the_html_loads_no_remote_resource"
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_the_logo_is_a_related_part_of_the_html"
+implementation:
+  - backend/app/modules/notifications/brand.py
+  - backend/app/modules/notifications/compose.py
+  - backend/app/modules/notifications/layout.py
+  - backend/app/modules/notifications/mail.py
 scope:
   - backend/app/modules/notifications
   - backend/app/modules/protocol

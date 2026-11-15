@@ -2,10 +2,14 @@
 id: "001002"
 title: The footer of a mail shows the copyright line
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+tests:
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_the_copyright_line_is_the_last_line_of_the_footer"
+implementation:
+  - backend/app/modules/notifications/brand.py
+  - backend/app/modules/notifications/layout.py
 scope:
   - backend/app/modules/notifications
   - backend/app/modules/protocol

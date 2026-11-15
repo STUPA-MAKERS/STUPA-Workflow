@@ -2,10 +2,16 @@
 id: "001000"
 title: The button and the links of a mail use the accent colour
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+tests:
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_the_accent_of_the_branding_colours_button_and_links"
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_without_an_accent_the_mail_uses_the_built_in_one"
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_every_accent_keeps_the_contrast"
+implementation:
+  - backend/app/modules/notifications/colours.py
+  - backend/app/modules/notifications/layout.py
 scope:
   - backend/app/modules/notifications
   - backend/app/modules/protocol

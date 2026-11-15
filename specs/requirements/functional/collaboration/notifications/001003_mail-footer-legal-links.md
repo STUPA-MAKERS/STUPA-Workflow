@@ -2,10 +2,14 @@
 id: "001003"
 title: The footer of a mail shows the legal links
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+tests:
+  - "backend/tests/unit/modules/notifications/test_mail_branding.py:test_the_footer_shows_the_legal_links_in_one_line"
+implementation:
+  - backend/app/modules/notifications/brand.py
+  - backend/app/modules/notifications/layout.py
 scope:
   - backend/app/modules/notifications
   - backend/app/modules/protocol
