@@ -26,7 +26,7 @@ from app.modules.protocol.public import (
     PublicSnapshot,
     PublicTop,
 )
-from app.modules.protocol.public_decisions import list_public_decisions
+from app.modules.protocol.public_decisions import last_results, list_public_decisions
 from app.modules.protocol.public_router import get_public_protocol_service
 from app.settings import get_settings
 from app.shared import antiabuse
@@ -123,6 +123,18 @@ async def test_list_searches_the_question_and_cuts_the_page() -> None:
     assert page.total == 4
     assert [d.question for d in page.items] == ["Wahl Vorsitz"]
     assert (page.limit, page.offset) == (1, 3)
+
+
+def test_a_repeated_vote_shows_its_last_result_only() -> None:
+    """§F/public/public-pages/000945: one question on one TOP gives one row."""
+    first = PublicDecision(question="Zuschuss", counts={"ja": 2, "nein": 3}, result="rejected")
+    again = PublicDecision(question="Zuschuss", counts={"ja": 4, "nein": 1}, result="passed")
+    other = PublicDecision(question="Vertagung", counts={"ja": 5}, result="passed")
+    round_one = PublicDecision(question="Wahl Vorsitz", kind="election", round=1)
+    round_two = PublicDecision(question="Wahl Vorsitz", kind="election", round=2)
+    unnamed = PublicDecision(counts={"ja": 1}, result="passed")
+    kept = last_results([first, round_one, other, again, unnamed, round_two, unnamed])
+    assert kept == [other, again, unnamed, round_two, unnamed]
 
 
 async def test_list_without_a_public_protocol_is_empty() -> None:

@@ -5,6 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/unit/modules/protocol/test_public_decisions_unit.py:test_a_repeated_vote_shows_its_last_result_only"
 implementation:
   - backend/app/modules/protocol/public_decisions.py
 scope:

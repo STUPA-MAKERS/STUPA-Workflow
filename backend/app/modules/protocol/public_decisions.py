@@ -5,11 +5,13 @@ public version (`protocol.public_content`) of each visible protocol, so it holds
 closed votes that are no poll, of a TOP that is not internal, of a protocol that is
 public (`visible_clause`). It never holds a name: a motion gives its question, its
 date, the title of its meeting, its result and the sums of the votes; an election
-gives its question and its date only, so the elected persons stay out.
+gives its question and its date only, so the elected persons stay out. A TOP with more
+than one vote on the same question gives only the last one (spec 000945).
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date as _date
 from typing import Literal
 from uuid import UUID
@@ -77,6 +79,25 @@ def _matches(decision: PublicDecision, needle: str | None) -> bool:
     return needle is None or needle in (decision.question or "").casefold()
 
 
+def last_results(decisions: Sequence[PublicDecision]) -> list[PublicDecision]:
+    """Keep of the votes of one TOP with the same question only the last one.
+
+    A repeated vote and the rounds of an election have the same question
+    (§F/public/public-pages/000945). The decisions stand in the order of their close, so
+    the last one of a question is its result. A vote without a question always stays.
+    """
+    last = {
+        (decision.kind, decision.question): index
+        for index, decision in enumerate(decisions)
+        if decision.question
+    }
+    return [
+        decision
+        for index, decision in enumerate(decisions)
+        if not decision.question or last[(decision.kind, decision.question)] == index
+    ]
+
+
 def decisions_of(
     protocol: Protocol, meeting: Meeting, gremium: Gremium, *, q: str | None = None
 ) -> list[PublicDecisionOut]:
@@ -91,7 +112,7 @@ def decisions_of(
         _decision_out(decision, protocol, meeting, gremium)
         for top in snapshot.tops
         if not top.non_public
-        for decision in top.decisions
+        for decision in last_results(top.decisions)
         if _matches(decision, needle)
     ]
 
