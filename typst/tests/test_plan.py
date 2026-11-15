@@ -130,17 +130,17 @@ def test_the_plan_renders_landscape_with_its_mark_on_each_page(tmp_path: Path) -
     assert "Summe Ausgaben" in texts[-1]
 
 
-def _word_tops(path: Path) -> dict[str, float]:
-    """Return the top of the first word of each text on page 1, in pt from the page top."""
+def _word_tops(path: Path) -> dict[str, list[float]]:
+    """Return the tops of each word on page 1, in pt from the page top, in reading order."""
     out = subprocess.run(
         ["pdftotext", "-f", "1", "-l", "1", "-bbox", str(path), "-"],
         capture_output=True,
         text=True,
         check=True,
     ).stdout
-    tops: dict[str, float] = {}
+    tops: dict[str, list[float]] = {}
     for top, word in re.findall(r'yMin="([\d.]+)"[^>]*>([^<]+)</word>', out):
-        tops.setdefault(word, float(top))
+        tops.setdefault(word, []).append(float(top))
     return tops
 
 
@@ -155,5 +155,7 @@ def test_the_head_line_sits_tight_between_the_title_and_the_table(tmp_path: Path
     path = tmp_path / "plan.pdf"
     path.write_bytes(asyncio.run(default_compiler().compile(doc, {})))
     tops = _word_tops(path)
-    assert tops["Haushalt"] - tops["Plantitel"] <= 26
-    assert tops["Schlüssel"] - tops["Haushalt"] <= 20
+    head = tops["Haushalt"][0]
+    title = max(top for top in tops["Plantitel"] if top < head)
+    assert head - title <= 26
+    assert tops["Schlüssel"][0] - head <= 20
