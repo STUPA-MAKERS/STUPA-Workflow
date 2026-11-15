@@ -29,7 +29,8 @@ interface BarState {
  *   and for a holder of `canFinalize` the switch between the two (the protocol is held
  *   back from the public protocol page, or published again).
  * - Draft, with write access: "Entwurf senden" sends the PDF with the watermark "Entwurf"
- *   to the members, after a confirmation. The protocol stays a draft (§ 000925).
+ *   to the members, after a confirmation. The protocol stays a draft (§ 000925). A
+ *   second send names the date of the last one in the confirmation (§ 000937).
  * - Final, for a holder of `canFinalize`: "Als genehmigt markieren" asks for the meeting
  *   that approved the protocol. With the mark the bar names that meeting and offers
  *   "Genehmigung entfernen" (§ 000924).
@@ -74,6 +75,15 @@ export class ProtocolBarComponent {
   protected readonly approvalSaving = computed(() => this.session?.approvalSaving() ?? false);
   /** The confirmation of "Entwurf senden" is open. */
   protected readonly confirmDraft = signal(false);
+  /** The confirmation text: a second send names the date of the last one (§ 000937). */
+  protected readonly draftBody = computed(() => {
+    const last = this.protocol().draftSentAt;
+    return last
+      ? this.i18n.translate('meetings.draftMail.again', {
+          date: longDate(last, this.i18n.formatLocale()),
+        })
+      : this.i18n.translate('meetings.draftMail.body');
+  });
   /** The dialog "Als genehmigt markieren" is open. */
   protected readonly approvalOpen = signal(false);
 

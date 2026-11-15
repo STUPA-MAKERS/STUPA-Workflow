@@ -364,6 +364,7 @@ class ProtocolService:
             sentAt=protocol.sent_at,
             publicWithheld=bool(getattr(protocol, "public_withheld", False)),
             gremiumProtocolsPublic=bool(getattr(gremium, "protocols_public", False)),
+            draftSentAt=getattr(protocol, "draft_sent_at", None),
             **await approval_fields(self.session, protocol),
         )
 

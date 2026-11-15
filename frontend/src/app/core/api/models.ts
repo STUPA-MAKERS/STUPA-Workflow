@@ -1715,6 +1715,8 @@ export interface ProtocolOutWire {
   readonly approvedMeetingId?: Uuid | null;
   readonly approvedMeetingTitle?: string | null;
   readonly approvedMeetingDate?: string | null;
+  /** The last send of the draft by mail, `null` without a send (§ 000937). */
+  readonly draftSentAt?: IsoDateTime | null;
 }
 
 /** Body for `POST /meetings` (`MeetingCreate`). */
@@ -1962,6 +1964,8 @@ export interface Protocol {
   readonly approvedMeetingId?: Uuid | null;
   readonly approvedMeetingTitle?: string | null;
   readonly approvedMeetingDate?: string | null;
+  /** The last send of the draft by mail, `null` without a send (§ 000937). */
+  readonly draftSentAt?: IsoDateTime | null;
 }
 
 /**

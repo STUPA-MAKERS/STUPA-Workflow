@@ -79,6 +79,8 @@ class ProtocolOut(FrozenCamelModel, frozen=True):
     approved_meeting_id: UUID | None = Field(default=None, alias="approvedMeetingId")
     approved_meeting_title: str | None = Field(default=None, alias="approvedMeetingTitle")
     approved_meeting_date: date | None = Field(default=None, alias="approvedMeetingDate")
+    #: The last send of the draft by mail (§F/meetings/protocols/000937), else null.
+    draft_sent_at: datetime | None = Field(default=None, alias="draftSentAt")
 
 
 class ProtocolApprovalBody(FrozenCamelModel, frozen=True):
@@ -91,3 +93,5 @@ class ProtocolDraftMailOut(FrozenCamelModel, frozen=True):
     """`POST /protocols/{id}/draft-mail`: the number of addresses the draft went to."""
 
     recipients: int
+    #: The stored time of the last send; null when no address got the draft yet.
+    draft_sent_at: datetime | None = Field(default=None, alias="draftSentAt")

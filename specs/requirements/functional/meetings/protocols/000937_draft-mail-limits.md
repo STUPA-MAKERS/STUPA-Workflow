@@ -5,9 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/integration/modules/protocol/test_protocol_draft_and_approval.py:test_draft_mail_of_a_live_meeting_is_refused"
+  - "backend/tests/integration/modules/protocol/test_protocol_draft_and_approval.py:test_draft_mail_goes_to_the_members_and_keeps_the_draft"
+  - "frontend/src/app/features/meetings/protocol-bar/protocol-bar.component.spec.ts:draftSentAt"
 implementation:
   - backend/app/modules/protocol/draft_mail.py
-  - frontend/src/app/features/meetings
+  - backend/app/modules/meetings/protocol_models.py
+  - frontend/src/app/features/meetings/protocol-bar/protocol-bar.component.ts
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings

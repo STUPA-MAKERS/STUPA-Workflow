@@ -1356,6 +1356,7 @@
   "meetings.protocolBar.approvedIn": "Genehmigt in: {meeting}",
   "meetings.draftMail.title": "Entwurf senden?",
   "meetings.draftMail.body": "Die Mitglieder des Gremiums erhalten das Protokoll als PDF mit dem Wasserzeichen „Entwurf“. Das Protokoll bleibt ein Entwurf.",
+  "meetings.draftMail.again": "Der Entwurf ging zuletzt am {date} an die Mitglieder des Gremiums. Sie erhalten ihn jetzt noch einmal.",
   "meetings.draftMail.confirm": "Senden",
   "meetings.approval.title": "Als genehmigt markieren",
   "meetings.approval.meeting": "Genehmigt in der Sitzung",

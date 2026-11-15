@@ -593,8 +593,11 @@ async def send_protocol_draft(protocol_id: str) -> dict:
 
     Each page of the PDF has the watermark "Entwurf". The protocol stays a draft.
     Requires the write access to the protocol. A protocol that is not a draft gives
-    409 `protocol_not_draft`. Returns `{recipients}`, the number of addresses. The
-    send goes into the audit log (`protocol_draft_mail`).
+    409 `protocol_not_draft`, and a protocol of a live meeting 409 `meeting_live`.
+    Returns `{recipients, draftSentAt}`: the number of addresses and the time of the
+    last send. `draftSentAt` of the protocol is set when a draft already went out: ask
+    the user before you send it again. The send goes into the audit log
+    (`protocol_draft_mail`).
     """
     return await api().post(f"/protocols/{protocol_id}/draft-mail")
 

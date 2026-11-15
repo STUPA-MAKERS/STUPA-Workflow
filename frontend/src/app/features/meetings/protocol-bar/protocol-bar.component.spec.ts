@@ -104,6 +104,17 @@ describe('ProtocolBarComponent', () => {
       expect(screen.queryByRole('dialog', { name: 'Entwurf senden?' })).toBeNull();
     });
 
+    /** §F/meetings/protocols/000937 */
+    it('names the date of the last send in the confirmation of a second send', async () => {
+      const { session } = await withSession(closed(), protocol({ draftSentAt: '2026-11-03T18:30:00Z' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Entwurf senden' }));
+      const confirm = screen.getByRole('dialog', { name: 'Entwurf senden?' });
+      expect(confirm).toHaveTextContent('Der Entwurf ging zuletzt am 3. November 2026 an die Mitglieder des Gremiums.');
+      expect(confirm).not.toHaveTextContent('Wasserzeichen');
+      await userEvent.click(within(confirm).getByRole('button', { name: 'Senden' }));
+      expect(session.sendProtocolDraft).toHaveBeenCalledTimes(1);
+    });
+
     it('keeps the draft on "Abbrechen", and offers no send to a reader or for a live meeting', async () => {
       const { session, fixture } = await withSession(closed(), protocol());
       await userEvent.click(screen.getByRole('button', { name: 'Entwurf senden' }));

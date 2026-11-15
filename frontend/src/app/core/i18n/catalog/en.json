@@ -1356,6 +1356,7 @@
   "meetings.protocolBar.approvedIn": "Approved in: {meeting}",
   "meetings.draftMail.title": "Send the draft?",
   "meetings.draftMail.body": "The members of the committee get the protocol as a PDF with the watermark \"Entwurf\". The protocol stays a draft.",
+  "meetings.draftMail.again": "The draft last went to the members of the committee on {date}. They now get it once more.",
   "meetings.draftMail.confirm": "Send",
   "meetings.approval.title": "Mark as approved",
   "meetings.approval.meeting": "Approved in the meeting",

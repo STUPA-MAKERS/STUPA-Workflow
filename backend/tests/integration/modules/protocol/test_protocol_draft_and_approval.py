@@ -136,6 +136,7 @@ async def test_draft_mail_goes_to_the_members_and_keeps_the_draft(
         assert protocol is not None
         assert protocol.status == "draft"
         assert (protocol.pdf_storage_key, protocol.sent_at) == (None, None)
+        assert protocol.draft_sent_at == now
     entries = [
         e
         for e in await audit_actions(maker, target_id=s.protocol_id)
@@ -161,6 +162,7 @@ async def test_draft_mail_without_a_reader_sends_nothing_and_needs_a_draft(
         )
         mailer = DraftMailer(service)
         assert await mailer.send(s.protocol_id, now=now, actor=ADMIN_SUB) == 0
+        assert await mailer.last_sent(s.protocol_id) is None
         with pytest.raises(ConflictError):
             await mailer.send(final.protocol_id, now=now, actor=ADMIN_SUB)
         with pytest.raises(ServiceUnavailableError):
@@ -189,6 +191,21 @@ async def test_draft_mail_route_answers_503_without_a_render_service(
     assert not_draft.json()["code"] == "protocol_not_draft"
     assert missing.status_code == 404, missing.text
     assert state.json()["status"] == "draft"
+    assert state.json()["draftSentAt"] is None
+
+
+async def test_draft_mail_of_a_live_meeting_is_refused(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """§F/meetings/protocols/000937: the draft of a live meeting is not complete."""
+    s = await seed(maker, status="live", items=0, protocol="draft")
+    with TestClient(api) as client:
+        resp = client.post(f"/api/protocols/{s.protocol_id}/draft-mail")
+    assert resp.status_code == 409, resp.text
+    assert resp.json()["code"] == "meeting_live"
+    async with maker() as session:
+        protocol = await session.get(Protocol, s.protocol_id)
+        assert protocol is not None and protocol.draft_sent_at is None
 
 
 async def test_approval_needs_a_final_protocol_and_another_meeting_of_the_gremium(

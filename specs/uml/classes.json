@@ -5332,6 +5332,12 @@
           "type": "TEXT"
         },
         {
+          "name": "draft_sent_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,

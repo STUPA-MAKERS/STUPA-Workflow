@@ -68,7 +68,7 @@
 <app-confirm-dialog
   [open]="confirmDraft()"
   [title]="'meetings.draftMail.title' | t"
-  [body]="'meetings.draftMail.body' | t"
+  [body]="draftBody()"
   [confirmLabel]="'meetings.draftMail.confirm' | t"
   (confirm)="sendDraft()"
   (cancel)="confirmDraft.set(false)"

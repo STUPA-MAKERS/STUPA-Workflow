@@ -572,8 +572,9 @@ export class MeetingSessionService implements OnDestroy {
     if (!proto || this.draftSending()) return;
     this.draftSending.set(true);
     this.api.sendProtocolDraft(proto.id).subscribe({
-      next: ({ recipients }) => {
+      next: ({ recipients, draftSentAt }) => {
         this.draftSending.set(false);
+        if (draftSentAt) this.protocol.update((p) => (p?.id === proto.id ? { ...p, draftSentAt } : p));
         this.toast.success(this.i18n.translate('meetings.toast.draftSent', { n: recipients }));
       },
       error: (err: unknown) => {

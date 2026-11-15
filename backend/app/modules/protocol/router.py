@@ -287,14 +287,17 @@ async def send_protocol_draft(
     """Send the PDF of a draft to the members of the Gremium.
 
     Each page of the PDF has the watermark "Entwurf". The send changes nothing on the
-    protocol: it stays a draft. The caller needs the write access to the protocol. A
-    protocol that is not a draft answers 409 ``protocol_not_draft``. The send writes
-    ``protocol_draft_mail`` with the number of recipients.
+    protocol but the time of the send (``draftSentAt``): it stays a draft. The caller
+    needs the write access to the protocol. A protocol that is not a draft answers 409
+    ``protocol_not_draft``, and a protocol of a live meeting 409 ``meeting_live``. The
+    send writes ``protocol_draft_mail`` with the number of recipients.
     """
     await service.authorize_write(protocol_id, principal)
-    sent = await DraftMailer(service).send(protocol_id, now=datetime.now(UTC), actor=principal.sub)
+    mailer, now = DraftMailer(service), datetime.now(UTC)
+    before = await mailer.last_sent(protocol_id)
+    sent = await mailer.send(protocol_id, now=now, actor=principal.sub)
     await service.session.commit()
-    return ProtocolDraftMailOut(recipients=sent)
+    return ProtocolDraftMailOut(recipients=sent, draftSentAt=now if sent else before)
 
 
 @router.put(

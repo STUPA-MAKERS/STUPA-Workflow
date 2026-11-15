@@ -376,6 +376,7 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
     approvedMeetingId: wire.approvedMeetingId ?? null,
     approvedMeetingTitle: wire.approvedMeetingTitle ?? null,
     approvedMeetingDate: wire.approvedMeetingDate ?? null,
+    draftSentAt: wire.draftSentAt ?? null,
   };
 }
 
