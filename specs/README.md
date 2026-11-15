@@ -1,7 +1,9 @@
 # Specs
 
-The binding rules of STUPA-Workflow. One file holds one rule. The rules for specs are in
-[style/specs/](style/specs/). Copy [TEMPLATE.md](TEMPLATE.md) to start a new rule.
+The binding rules of STUPA-Workflow. One file holds one rule. A protocol spec in `protocols/`
+holds one whole data exchange format. The rules for specs are in [style/specs/](style/specs/).
+Copy [TEMPLATE.md](TEMPLATE.md) to start a new rule, and
+[TEMPLATE-protocol.md](TEMPLATE-protocol.md) to start a new protocol spec.
 
 ## Tree
 
@@ -11,7 +13,7 @@ specs/
     backend/   database, functional, python
     frontend/  angular, functional
     shared/    agents, api, functional, git, testing, tooling, writing
-    specs/     content, format, structure, uml
+    specs/     content, format, protocols, structure, uml
   requirements/
     functional/
       administration/  accounts, admin, audit, backups, files, privacy, translations
@@ -28,6 +30,8 @@ specs/
       privacy/        personal-data
       security/       access, files, integrity, network
       usability/      controls, layout
+  protocols/
+    integrations/  webhooks
 ```
 
 The second level is the area, the third level is the topic. A topic folder holds the rule
@@ -750,6 +754,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/000677](requirements/non-functional/usability/layout/000677_public-page-title-size.md) | A public page has a title of 28 px | approved |
 | [NF/usability/layout/000743](requirements/non-functional/usability/layout/000743_week-day-lines-on-pull.md) | The day lines of the week grid stay when the hours are pulled | approved |
 | [NF/usability/layout/000745](requirements/non-functional/usability/layout/000745_week-blocks-overlap.md) | A later entry lies on an earlier one in the week view | approved |
+| [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | draft |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
 | [S/backend/database/000070](style/backend/database/000070_idempotent-tables.md) | A migration that adds a table is idempotent | approved |
@@ -868,18 +873,24 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/specs/content/000021](style/specs/content/000021_current-rule.md) | A spec states the current rule | approved |
 | [S/specs/content/000022](style/specs/content/000022_ste.md) | A spec is written in ASD-STE100 | approved |
 | [S/specs/content/000023](style/specs/content/000023_product-terms.md) | Product terms stay as the UI shows them | approved |
-| [S/specs/format/000001](style/specs/format/000001_copy-the-template.md) | A new spec starts as a copy of the template | approved |
-| [S/specs/format/000002](style/specs/format/000002_front-matter.md) | A spec starts with a YAML front matter | approved |
+| [S/specs/format/000001](style/specs/format/000001_copy-the-template.md) | A new spec starts as a copy of the template | draft |
+| [S/specs/format/000002](style/specs/format/000002_front-matter.md) | A spec starts with a YAML front matter | draft |
 | [S/specs/format/000003](style/specs/format/000003_status.md) | The status shows the approval | approved |
-| [S/specs/format/000004](style/specs/format/000004_one-rule-per-file.md) | One file holds one rule | approved |
-| [S/specs/format/000005](style/specs/format/000005_rule-id.md) | The rule ID has kind, path and number | approved |
+| [S/specs/format/000004](style/specs/format/000004_one-rule-per-file.md) | One file holds one rule | draft |
+| [S/specs/format/000005](style/specs/format/000005_rule-id.md) | The rule ID has kind, path and number | draft |
 | [S/specs/format/000006](style/specs/format/000006_unique-number.md) | The number is the identity of a rule | approved |
 | [S/specs/format/000007](style/specs/format/000007_moved-rule.md) | A moved rule keeps its number | approved |
 | [S/specs/format/000008](style/specs/format/000008_labels.md) | Labels in a rule are fixed | approved |
 | [S/specs/format/000032](style/specs/format/000032_section-sign-reference.md) | Code refers to a rule with the § sign | approved |
 | [S/specs/format/000033](style/specs/format/000033_file-name.md) | The file name is number and name | approved |
+| [S/specs/protocols/000957](style/specs/protocols/000957_whole-format.md) | A protocol spec describes one whole format | draft |
+| [S/specs/protocols/000958](style/specs/protocols/000958_schema-file.md) | A JSON format has a JSON Schema file beside its spec | draft |
+| [S/specs/protocols/000959](style/specs/protocols/000959_checked-example.md) | The example of a JSON format matches its schema | draft |
+| [S/specs/protocols/000960](style/specs/protocols/000960_breaking-change.md) | A breaking change of a format is a new protocol spec | draft |
+| [S/specs/protocols/000961](style/specs/protocols/000961_code-against-schema.md) | A test checks the output of the code against the schema | draft |
+| [S/specs/protocols/000962](style/specs/protocols/000962_protocols-key.md) | A rule names the formats that it uses | draft |
 | [S/specs/structure/000009](style/specs/structure/000009_precedence.md) | A spec wins over other guidance | approved |
-| [S/specs/structure/000010](style/specs/structure/000010_tree.md) | The tree sorts by kind, then by area and topic | approved |
+| [S/specs/structure/000010](style/specs/structure/000010_tree.md) | The tree sorts by kind, then by area and topic | draft |
 | [S/specs/structure/000011](style/specs/structure/000011_folder-names.md) | Folder names are lower case kebab case | approved |
 | [S/specs/structure/000012](style/specs/structure/000012_one-place.md) | A rule is written in one place | approved |
 | [S/specs/structure/000013](style/specs/structure/000013_index.md) | The index lists every rule | approved |
