@@ -1,6 +1,8 @@
 // Shared layout of the form dialogs. Emulated encapsulation scopes styles per component, so each
 // dialog component includes these mixins in its own stylesheet.
 
+@use 'breakpoints' as bp;
+
 @mixin host {
   :host {
     display: contents;
@@ -25,4 +27,25 @@
   font-size: 0.8125rem;
   line-height: 1.1875rem;
   color: var(--color-text-muted);
+}
+
+// "Wann und Wo" of a meeting dialog: the date with the two times in one row, the place with
+// the form in the next one. On the phone each field has a row of its own.
+@mixin when-where($when, $where) {
+  #{$when} {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+  #{$where} {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+  @include bp.phone {
+    #{$where},
+    #{$when} {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
 }

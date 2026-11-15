@@ -43,6 +43,12 @@ export const MAX_DELEGATION_LEAD_MINUTES = 60 * 24 * 30;
 export const MAX_DELEGATIONS_PER_DELEGATE = 20;
 export const DEFAULT_DELEGATIONS_PER_DELEGATE = 2;
 
+/** The lead time of a delegation: empty or invalid gives 0, else whole minutes from 0 to 30 days. */
+export function delegationLeadOf(value: number | string | null): number {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.min(MAX_DELEGATION_LEAD_MINUTES, Math.max(0, n)) : 0;
+}
+
 /** The most delegations per person: empty or invalid gives the default, else 1 to 20. */
 export function delegationMaxOf(value: number | string | null): number {
   const n = Math.round(Number(value));
@@ -317,13 +323,8 @@ export class GremiumDialogComponent {
     this.form.update((f) => ({ ...f, [key]: value }));
   }
 
-  /** Lead time: empty or invalid gives 0, else whole minutes from 0 to 30 days. */
   protected patchLead(value: number | string | null): void {
-    const n = Math.round(Number(value));
-    this.patch(
-      'delegationLeadMinutes',
-      Number.isFinite(n) ? Math.min(MAX_DELEGATION_LEAD_MINUTES, Math.max(0, n)) : 0,
-    );
+    this.patch('delegationLeadMinutes', delegationLeadOf(value));
   }
 
   protected patchMax(value: number | string | null): void {
