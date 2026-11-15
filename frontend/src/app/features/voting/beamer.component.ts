@@ -10,7 +10,8 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink, type UrlTree } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
-import type { AgendaItem, JoinLink, Meeting, Vote, VoteResult } from '@core/api/models';
+import type { AgendaItem, Attendance, JoinLink, Meeting, Vote, VoteResult } from '@core/api/models';
+import { presentCount } from '@shared/present-count.util';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { BrandingService } from '@core/branding/branding.service';
@@ -86,7 +87,8 @@ export class BeamerComponent implements OnDestroy {
   private meetingStateSeen = false;
   /** The join link of a public meeting and the present members. */
   private readonly link = signal<JoinLink | null>(null);
-  private readonly presentMembers = signal(0);
+  private readonly attendance = signal<readonly Attendance[]>([]);
+  private readonly presentMembers = computed(() => presentCount(this.meeting(), this.attendance()));
 
   /** The public participation: the stream first, then the meeting read. */
   private readonly publicJoin = computed(() => {
@@ -295,7 +297,7 @@ export class BeamerComponent implements OnDestroy {
       error: () => {},
     });
     this.api.listAttendance(id, { quiet: true }).subscribe({
-      next: (rows) => this.presentMembers.set(rows.filter((a) => a.status === 'present').length),
+      next: (rows) => this.attendance.set(rows),
       error: () => {},
     });
   }

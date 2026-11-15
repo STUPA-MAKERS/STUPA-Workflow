@@ -29,6 +29,11 @@ def fake_api(monkeypatch: pytest.MonkeyPatch) -> _FakeApi:
     return fake
 
 
+def test_next_round(fake_api: _FakeApi) -> None:
+    asyncio.run(meetings.vote_next_round("v1"))
+    assert fake_api.calls == [("POST", "/votes/v1/next-round", None)]
+
+
 def test_draw_lot(fake_api: _FakeApi) -> None:
     asyncio.run(meetings.vote_draw_lot("v1"))
     assert fake_api.calls == [("POST", "/votes/v1/draw-lot", None)]

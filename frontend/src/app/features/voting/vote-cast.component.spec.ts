@@ -286,7 +286,7 @@ describe('VoteCastComponent', () => {
     const { toast, getVote } = await setup({ castError: conflict('already_voted') });
     getVote.mockClear();
     await castOwn();
-    expect(toast.error).toHaveBeenCalledWith('Du hast bereits abgestimmt.');
+    expect(toast.error).toHaveBeenCalledWith('Deine Stimme ist bereits abgegeben.');
     expect(screen.getByText('Danke! Deine Stimme ist abgegeben.')).toBeInTheDocument();
     expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
   });
@@ -1113,13 +1113,14 @@ describe('VoteCastComponent', () => {
       expect(open.fixture.componentInstance.pollAction()).toBeNull();
     });
 
-    it('an eligible member objects after a confirmation', async () => {
+    it('an eligible member objects with a button and a confirmation (§F/meetings/voting/000947)', async () => {
       const { api, toast, page, fixture } = await withApi(circular());
       const cmp = fixture.componentInstance;
       expect(cmp.canObject()).toBe(true);
-      await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Widersprechen' }));
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Widersprechen' }));
       expect(cmp.confirmObject()).toBe(true);
+      expect(screen.getByText(/beendet die Abstimmung für alle Mitglieder/)).toBeInTheDocument();
       expect(api['objectToCircular']).not.toHaveBeenCalled();
       cmp.doObject();
       expect(api['objectToCircular']).toHaveBeenCalledWith('v1');

@@ -68,7 +68,8 @@ export function attendance(over: Partial<GremiumAttendance> = {}): GremiumAttend
   return {
     fromMonth: '2026-09',
     toMonth: '2026-10',
-    termStart: '2025-10-01',
+    termStart: '2026-10-01',
+    terms: ['2026-10-01', '2025-10-01'],
     absenceLimit: 3,
     months: [
       { month: '2026-09', meetings: 2 },

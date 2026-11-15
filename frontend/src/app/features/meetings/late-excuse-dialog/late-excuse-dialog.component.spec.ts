@@ -12,7 +12,7 @@ async function setup(meetingId: string | null = 'm-1') {
   const closed = jest.fn();
   const excused = jest.fn();
   const view = await render(LateExcuseDialogComponent, {
-    inputs: { meetingId, meetingTitle: '35. Sitzung' },
+    inputs: { meetingId },
     on: { closed, excused },
     providers: [provideHttpClient(), provideHttpClientTesting()],
   });
@@ -37,7 +37,7 @@ describe('LateExcuseDialogComponent', () => {
   it('needs a reason, sends it and hands the new roster on', async () => {
     const { http, excused, toasts, container } = await setup();
     const dialog = screen.getByRole('dialog', { name: 'Nachträglich entschuldigen' });
-    expect(dialog).toHaveAccessibleDescription('35. Sitzung');
+    expect(dialog).not.toHaveAccessibleDescription();
     const submit = screen.getByRole('button', { name: 'Entschuldigen' });
     expect(submit).toBeDisabled();
     expect(await runAxe(container)).toHaveNoViolations();
@@ -55,7 +55,8 @@ describe('LateExcuseDialogComponent', () => {
     const { http, cmp, fixture } = await setup();
     cmp.note.set('x'.repeat(LATE_EXCUSE_NOTE_MAX + 1));
     fixture.detectChanges();
-    expect(screen.getByText(`Höchstens ${LATE_EXCUSE_NOTE_MAX} Zeichen.`)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Grund/)).toHaveAttribute('maxlength', String(LATE_EXCUSE_NOTE_MAX));
+    expect(screen.getByRole('button', { name: 'Entschuldigen' })).toBeDisabled();
     cmp.save();
     http.expectNone(URL);
     cmp.note.set('Krank');
@@ -69,13 +70,14 @@ describe('LateExcuseDialogComponent', () => {
     ['not_absent', 'Nur eine Abwesenheit kann nachträglich entschuldigt werden.'],
     ['other', 'Aktion fehlgeschlagen.'],
   ])('names the cause of a refusal (%s)', async (code, text) => {
-    const { http, cmp, excused, toasts } = await setup();
+    const { http, cmp, excused, closed, toasts } = await setup();
     cmp.note.set('Krank');
     cmp.save();
     http.expectOne(URL).flush({ code }, { status: 409, statusText: 'Conflict' });
     expect(toasts()).toContain(text);
     expect(excused).not.toHaveBeenCalled();
     expect(cmp.saving()).toBe(false);
+    expect(closed).toHaveBeenCalledTimes(code === 'other' ? 0 : 1);
   });
 
   it('closes on "Abbrechen" and starts empty on the next opening', async () => {

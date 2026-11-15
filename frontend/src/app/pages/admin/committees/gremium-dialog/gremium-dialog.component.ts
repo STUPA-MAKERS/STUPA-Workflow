@@ -1,3 +1,4 @@
+import { monthOptions } from '@shared/month-options';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -42,6 +43,12 @@ export const MAX_DELEGATION_LEAD_MINUTES = 60 * 24 * 30;
 export const MAX_DELEGATIONS_PER_DELEGATE = 20;
 export const DEFAULT_DELEGATIONS_PER_DELEGATE = 2;
 
+/** The lead time of a delegation: empty or invalid gives 0, else whole minutes from 0 to 30 days. */
+export function delegationLeadOf(value: number | string | null): number {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.min(MAX_DELEGATION_LEAD_MINUTES, Math.max(0, n)) : 0;
+}
+
 /** The most delegations per person: empty or invalid gives the default, else 1 to 20. */
 export function delegationMaxOf(value: number | string | null): number {
   const n = Math.round(Number(value));
@@ -73,6 +80,8 @@ export interface GremiumForm {
   readonly repeatQuorumPercent: number | null;
   /** Guests of a public meeting can get a ballot. Counts only without a quorum. */
   readonly guestsMayVote: boolean;
+  /** The month in which a term starts. `null`: a new Gremium takes the setting (§ 000948). */
+  readonly termStartMonth: number | null;
   /** Extra protocol recipients, one address per line. */
   readonly mailRecipients: string;
   /** The final protocols show on the public protocol page. */
@@ -93,6 +102,7 @@ export function emptyGremiumForm(): GremiumForm {
     quorumMinPresent: null,
     repeatQuorumPercent: null,
     guestsMayVote: false,
+    termStartMonth: null,
     mailRecipients: '',
     protocolsPublic: false,
   };
@@ -220,6 +230,8 @@ export class GremiumDialogComponent {
   protected readonly langOptions = computed<SelectOption[]>(() =>
     this.i18n.locales().map((code) => ({ value: code, label: this.i18n.languageName(code) })),
   );
+  /** The twelve months by name, for the start of the term. */
+  protected readonly monthOptions = computed(() => monthOptions(this.i18n.formatLocale()));
   protected readonly canSave = computed(() => !!this.form().name.trim() && !this.saving());
 
   constructor() {
@@ -258,6 +270,7 @@ export class GremiumDialogComponent {
       quorumMinPresent: g.quorumMinPresent ?? null,
       repeatQuorumPercent: g.repeatQuorumPercent ?? null,
       guestsMayVote: g.guestsMayVote ?? false,
+      termStartMonth: g.termStartMonth ?? null,
       mailRecipients: '',
       protocolsPublic: g.protocolsPublic ?? false,
     });
@@ -310,13 +323,8 @@ export class GremiumDialogComponent {
     this.form.update((f) => ({ ...f, [key]: value }));
   }
 
-  /** Lead time: empty or invalid gives 0, else whole minutes from 0 to 30 days. */
   protected patchLead(value: number | string | null): void {
-    const n = Math.round(Number(value));
-    this.patch(
-      'delegationLeadMinutes',
-      Number.isFinite(n) ? Math.min(MAX_DELEGATION_LEAD_MINUTES, Math.max(0, n)) : 0,
-    );
+    this.patch('delegationLeadMinutes', delegationLeadOf(value));
   }
 
   protected patchMax(value: number | string | null): void {
@@ -390,6 +398,11 @@ export class GremiumDialogComponent {
     this.save();
   }
 
+  protected patchTermStart(value: string): void {
+    const month = Number(value);
+    if (Number.isInteger(month) && month >= 1 && month <= 12) this.patch('termStartMonth', month);
+  }
+
   /**
    * The recipients are not saved when their stored list failed to load, because the PUT would
    * replace it with the empty field.
@@ -411,6 +424,7 @@ export class GremiumDialogComponent {
       quorumMinPresent: f.quorumMinPresent,
       repeatQuorumPercent: f.repeatQuorumPercent,
       guestsMayVote: f.guestsMayVote,
+      ...(f.termStartMonth === null ? {} : { termStartMonth: f.termStartMonth }),
       protocolsPublic: f.protocolsPublic,
     } satisfies GremiumUpdateBody;
     const isNew = this.isNew();

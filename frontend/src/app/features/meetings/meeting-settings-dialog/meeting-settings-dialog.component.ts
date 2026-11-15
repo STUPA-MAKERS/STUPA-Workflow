@@ -37,7 +37,14 @@ import {
 } from '@stupa-makers/ui-kit';
 import { problemCode, problemDetail } from '@core/api/problem';
 import { MeetingGuestsService } from '../meeting-guests.service';
-import { lateInviteDays, MEETING_LOCATION_MAX, meetingFormOptions, meetingKindOptions } from '../meeting-kind.util';
+import {
+  firstMeetingOptions,
+  lateInviteDays,
+  locationError,
+  locationTooLong,
+  meetingFormOptions,
+  meetingKindOptions,
+} from '../meeting-kind.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
 import { personLabel } from '@shared/person-label.util';
 
@@ -47,7 +54,7 @@ export const MEETING_TITLE_MAX = 200;
 /**
  * "Sitzung bearbeiten": the title, the kind, the minute-taker, the date, the start, the
  * end, the place and the form of a meeting. The kind changes only while the meeting is
- * planned (§ 000903).
+ * planned (§ 000903). A Wiederholungssitzung names its first meeting (§ 000940).
  *
  * The dialog opens from a list row, from the detail sheet, from the calendar and from
  * the meeting page. The title can change while the meeting is planned or live. A
@@ -102,26 +109,43 @@ export class MeetingSettingsDialogComponent {
   readonly publicJoin = signal(false);
   readonly guestsMode = signal<GuestsMode>('watch');
   readonly kind = signal<MeetingKind>('ordinary');
+  /** The first meeting of a Wiederholungssitzung (§ 000940). */
+  readonly repeatOf = signal('');
+  /** The meetings of the Gremium, read for a planned meeting. */
+  readonly meetings = signal<Meeting[]>([]);
+  readonly repeatOfOptions = computed(() =>
+    firstMeetingOptions(
+      this.meetings(),
+      this.i18n.formatLocale(),
+      this.date(),
+      this.meeting()?.id ?? null,
+    ),
+  );
+  /** A planned Wiederholungssitzung names a first meeting that the list still holds. */
+  readonly repeatOfMissing = computed(
+    () =>
+      !this.kindLocked() &&
+      this.kind() === 'repeat' &&
+      !this.repeatOfOptions().some((o) => o.value === this.repeatOf()),
+  );
   readonly location = signal('');
   readonly form = signal<MeetingForm>('presence');
   readonly kindOptions = computed(() => meetingKindOptions(this.i18n));
   readonly formOptions = computed(() => meetingFormOptions(this.i18n));
   /** The place is too long for the server. */
-  readonly locationTooLong = computed(() => this.location().trim().length > MEETING_LOCATION_MAX);
-  readonly locationError = computed(() =>
-    this.locationTooLong()
-      ? this.i18n.translate('meetings.location.tooLong', { max: MEETING_LOCATION_MAX })
-      : '',
-  );
+  readonly locationTooLong = computed(() => locationTooLong(this.location()));
+  readonly locationError = computed(() => locationError(this.i18n, this.location()));
   /** The invitation periods of the Gremium, read for a planned meeting. */
   readonly defaults = signal<MeetingDefaults | null>(null);
   /**
    * The invitation period that a new date misses, else `null`. Only a planned meeting
-   * with a changed date warns, and the warning never blocks the save (§ 000918).
+   * with a changed date or a changed kind warns, because the kind sets the period, and
+   * the warning never blocks the save (§ 000918).
    */
   readonly lateInvite = computed(() => {
     const m = this.meeting();
-    if (m?.status !== 'planned' || this.date().trim() === m.date) return null;
+    if (m?.status !== 'planned') return null;
+    if (this.date().trim() === m.date && this.kind() === m.kind) return null;
     return lateInviteDays(this.date(), this.kind(), this.defaults());
   });
   /** The kind is fixed from the start of the meeting on. */
@@ -131,9 +155,14 @@ export class MeetingSettingsDialogComponent {
   /** The confirmation before the public participation goes off in a live meeting. */
   readonly confirmOff = signal(false);
 
-  /** A closed meeting locks every setting. */
-  readonly locked = computed(() => this.meeting()?.status === 'closed');
-  readonly keeperLocked = computed(() => this.locked() || this.protocolFinal());
+  /** The meeting is closed: its minute-taker, its kind and its guest settings stay. */
+  readonly closedMeeting = computed(() => this.meeting()?.status === 'closed');
+  /**
+   * A closed meeting with a final protocol locks every setting. Until then the title, the
+   * date, the times, the place and the form stay open (§ 000982).
+   */
+  readonly locked = computed(() => this.closedMeeting() && this.protocolFinal());
+  readonly keeperLocked = computed(() => this.closedMeeting() || this.protocolFinal());
 
   /** Members with `protocol.write`, and the current minute-taker. */
   readonly keeperOptions = computed<SelectFieldOption[]>(() => {
@@ -151,7 +180,7 @@ export class MeetingSettingsDialogComponent {
   });
 
   /** Only the meeting lead (`canManage`) changes the public participation. */
-  readonly publicLocked = computed(() => this.locked() || !this.meeting()?.canManage);
+  readonly publicLocked = computed(() => this.closedMeeting() || !this.meeting()?.canManage);
   /** The counts that the confirmation names: open requests and admitted guests. */
   readonly offCounts = computed(() => ({
     pending: this.meeting()?.pendingGuests ?? 0,
@@ -171,6 +200,7 @@ export class MeetingSettingsDialogComponent {
       !!this.title().trim() &&
       !this.titleTooLong() &&
       !this.locationTooLong() &&
+      !this.repeatOfMissing() &&
       !!this.date().trim() &&
       !!this.time().trim(),
   );
@@ -192,6 +222,8 @@ export class MeetingSettingsDialogComponent {
     this.publicJoin.set(m.publicJoin);
     this.guestsMode.set(m.guestsVoteAllowed ? m.guestsMode : 'watch');
     this.kind.set(m.kind);
+    this.repeatOf.set(m.repeatOfId ?? '');
+    this.meetings.set([]);
     this.location.set(m.location ?? '');
     this.form.set(m.form);
     this.link.set(null);
@@ -199,7 +231,10 @@ export class MeetingSettingsDialogComponent {
     this.confirmOff.set(false);
     if (m.publicJoin && m.canManage) this.loadLink(m);
     this.defaults.set(null);
-    if (m.status === 'planned' && m.gremiumId) this.loadDefaults(m.id, m.gremiumId);
+    if (m.status === 'planned' && m.gremiumId) {
+      this.loadDefaults(m.id, m.gremiumId);
+      this.loadMeetings(m.id, m.gremiumId);
+    }
     this.roster.set([]);
     this.api.listAttendance(m.id, { quiet: true }).subscribe({
       next: (rows) => {
@@ -214,6 +249,15 @@ export class MeetingSettingsDialogComponent {
     this.api.meetingDefaults(gremiumId).subscribe({
       next: (d) => {
         if (this.meeting()?.id === meetingId) this.defaults.set(d);
+      },
+      error: () => {},
+    });
+  }
+
+  private loadMeetings(meetingId: string, gremiumId: string): void {
+    this.api.listMeetings(gremiumId).subscribe({
+      next: (rows) => {
+        if (this.meeting()?.id === meetingId) this.meetings.set(rows);
       },
       error: () => {},
     });
@@ -294,6 +338,10 @@ export class MeetingSettingsDialogComponent {
       this.toast.error(this.titleError() || this.i18n.translate('meetings.toast.titleRequired'));
       return;
     }
+    if (this.repeatOfMissing()) {
+      this.toast.error(this.i18n.translate('meetings.repeatOf.required'));
+      return;
+    }
     if (!this.valid()) {
       this.toast.error(this.i18n.translate('meetings.toast.dateTimeRequired'));
       return;
@@ -326,7 +374,15 @@ export class MeetingSettingsDialogComponent {
             this.toast.error(this.i18n.translate('meetings.toast.needsProtocolWrite'));
             return;
           }
+          if (problemCode(err) === 'protocol_final') {
+            this.toast.error(this.i18n.translate('meetings.settings.closedHint'));
+            return;
+          }
           const code = problemCode(err);
+          if (code === 'repeat_first_meeting_invalid' || code === 'repeat_needs_first_meeting') {
+            this.toast.error(this.i18n.translate('meetings.repeatOf.invalid'));
+            return;
+          }
           if (code === 'guests_vote_off' || code === 'guests_vote_needs_no_quorum') {
             this.toast.error(this.i18n.translate('guests.toast.voteOff'));
             return;
@@ -342,11 +398,20 @@ export class MeetingSettingsDialogComponent {
       });
   }
 
-  /** The changed kind, place and form of the PATCH. A started meeting keeps its kind. */
-  private placeChanges(m: Meeting): Pick<MeetingPatchBody, 'kind' | 'location' | 'form'> {
+  /**
+   * The changed kind, first meeting, place and form of the PATCH. A started meeting
+   * keeps its kind and its first meeting.
+   */
+  private placeChanges(
+    m: Meeting,
+  ): Pick<MeetingPatchBody, 'kind' | 'repeatOfId' | 'location' | 'form'> {
     const location = this.location().trim() || null;
+    const first = this.kind() === 'repeat' ? this.repeatOf() : null;
     return {
       ...(!this.kindLocked() && this.kind() !== m.kind ? { kind: this.kind() } : {}),
+      ...(!this.kindLocked() && first && first !== (m.repeatOfId ?? null)
+        ? { repeatOfId: first }
+        : {}),
       ...(location !== (m.location ?? null) ? { location } : {}),
       ...(this.form() !== m.form ? { form: this.form() } : {}),
     };

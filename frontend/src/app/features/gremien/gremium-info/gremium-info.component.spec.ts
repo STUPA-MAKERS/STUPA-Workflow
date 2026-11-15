@@ -29,7 +29,7 @@ async function setup(info: GremiumInfo | null | undefined) {
 describe('GremiumInfoComponent', () => {
   afterEach(() => localStorage.clear());
 
-  it('shows the text, the links in their order and the last change (§ 000950)', async () => {
+  it('shows the text, the links in their order and the last change (§ 001010)', async () => {
     const { container } = await setup(FILLED);
     expect(screen.getByRole('heading', { name: 'Willkommen' })).toBeTruthy();
     const links = screen.getAllByRole('link');
@@ -45,7 +45,7 @@ describe('GremiumInfoComponent', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
-  it('renders a script in the text as text (§ 000953)', async () => {
+  it('renders a script in the text as text (§ 001013)', async () => {
     const { container } = await setup(FILLED);
     expect(container.querySelector('script')).toBeNull();
     expect(container.textContent).toContain('<script>alert(1)</script>');
@@ -56,7 +56,7 @@ describe('GremiumInfoComponent', () => {
     expect(screen.getByText(/^Zuletzt geändert am/)).toBeTruthy();
   });
 
-  it('gives an editor the edit action, and the empty state when empty (§ 000955)', async () => {
+  it('gives an editor the edit action, and the empty state when empty (§ 001015)', async () => {
     const { cmp, rerender } = await setup(gremiumInfo({ canEdit: true }));
     expect(screen.getByText('Noch keine Info')).toBeTruthy();
     screen.getByRole('button', { name: /Info bearbeiten/ }).click();

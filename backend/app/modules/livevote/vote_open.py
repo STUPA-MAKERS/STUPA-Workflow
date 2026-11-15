@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.principal import Principal
@@ -87,7 +88,27 @@ async def draft_open_checks(
             if source is not None:
                 await reopen_application(service.session, source, actor=actor)
         await assert_application_votable(service, meeting, vote.application_id)
+    await _refresh_quorum(service, meeting, vote_id, guests_vote=vote.guests_vote)
     return await eligible_count(service, meeting, guests_vote=vote.guests_vote)
+
+
+async def _refresh_quorum(
+    service: MeetingService, meeting: MeetingOut, vote_id: UUID, *, guests_vote: bool
+) -> None:
+    """Write the quorum of the Gremium of today into an opening draft.
+
+    A draft can wait while the meeting changes its kind or the Gremium its quorum.
+    The open of the vote commits the change.
+    """
+    row = await service.session.get(Vote, vote_id)
+    if row is None or not isinstance(row.config, dict):
+        return
+    rules = await quorum_rules(service, meeting, guests_vote=guests_vote, poll=row.kind == "poll")
+    kept = {k: v for k, v in row.config.items() if k not in QUORUM_KEYS}
+    await service.session.execute(
+        update(Vote).where(Vote.id == vote_id).values(config={**kept, **rules})
+    )
+    await service.session.refresh(row)
 
 
 def assert_vote_window(meeting: MeetingOut, *, draft: bool) -> None:
@@ -150,3 +171,45 @@ async def eligible_count(service: MeetingService, meeting: MeetingOut, *, guests
     if guests_vote:
         return await service.present_member_count(meeting.id) + meeting.admitted_guests
     return await service.vote_eligible_count(meeting.gremium_id)
+
+
+QUORUM_KEYS = ("quorum", "quorumBasis", "quorumMinPresent")
+
+
+async def quorum_rules(
+    service: MeetingService, meeting: MeetingOut, *, guests_vote: bool, poll: bool
+) -> dict[str, object]:
+    """Return the quorum keys of a vote of this meeting, from its Gremium now.
+
+    A poll has no quorum. A vote with guests has no percent and no least number, and
+    counts the present persons as each other meeting vote. The create of a vote and
+    the open of a prepared draft both read these keys, so a draft does not keep the
+    quorum of a meeting that changed its kind after the draft (000902).
+    """
+    if poll:
+        return {}
+    if guests_vote:
+        return {"quorumBasis": "present"}
+    percent = await _default_quorum_percent(service, meeting)
+    min_present = await service.gremium_quorum_min_present(meeting.gremium_id)
+    return {
+        **({} if percent is None else {"quorum": {"type": "percent", "value": percent}}),
+        "quorumBasis": "present",
+        **({} if min_present is None else {"quorumMinPresent": min_present}),
+    }
+
+
+async def _default_quorum_percent(service: MeetingService, meeting: MeetingOut) -> int | None:
+    """Return the quorum that a vote of this meeting starts with.
+
+    A Wiederholungssitzung (kind ``repeat``) uses the repeat quorum of its Gremium.
+    Without that value, and in every other meeting, the quorum of the Gremium applies.
+    """
+    repeat = (
+        await service.gremium_repeat_quorum_percent(meeting.gremium_id)
+        if meeting.kind == "repeat"
+        else None
+    )
+    return (
+        repeat if repeat is not None else await service.gremium_quorum_percent(meeting.gremium_id)
+    )

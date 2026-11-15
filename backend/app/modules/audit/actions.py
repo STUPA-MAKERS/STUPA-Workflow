@@ -105,6 +105,8 @@ class AuditAction(StrEnum):
         PROTOCOL_APPROVAL: A final protocol marked as approved, or the mark removed.
             ``data`` carries the meeting, the gremium and the approving meeting
             (``approvedMeetingId``, null for a removed mark).
+        PROTOCOL_REOPEN: A final protocol set back to draft before its approval
+            (spec 000983). ``data`` carries the meeting and the Gremium.
         PROTOKOLLANT_HANDOVER: Handover of the minutes in a live meeting. ``data``
             carries the ``mode`` (``now``, ``next_item``, ``activate`` when an agenda
             move starts the planned period, ``cancel`` when the planned handover goes
@@ -206,6 +208,7 @@ class AuditAction(StrEnum):
     PROTOCOL_PUBLICATION = "protocol_publication"
     PROTOCOL_DRAFT_MAIL = "protocol_draft_mail"
     PROTOCOL_APPROVAL = "protocol_approval"
+    PROTOCOL_REOPEN = "protocol_reopen"
     PROTOKOLLANT_HANDOVER = "protokollant_handover"
     VOTE_DELETE = "vote_delete"
     VOTE_OPEN = "vote_open"

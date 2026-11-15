@@ -11,25 +11,39 @@
   border-radius: var(--radius-xl);
   background: var(--color-surface-1);
 }
+.vc__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+/* The ⋮ sits centred on the first line of the question, and its dots stand on the right
+   edge of the counts: the button reaches past the edge by the space beside the dots, which
+   are about 4px wide. */
+.vc__menu {
+  flex: none;
+  margin-block: calc((var(--fs-h3) * 1.4 - var(--control-height)) / 2);
+  margin-inline-end: calc((4px - var(--control-height)) / 2);
+}
+.vc__lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: -8px;
+}
 .vc__status {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-.vc__cap {
-  font-size: var(--fs-cap);
-  line-height: 1rem;
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  gap: var(--space-2);
+  margin: 0;
 }
 .vc__result {
   font-weight: var(--fw-semibold);
 }
 .vc__q {
-  margin: -6px 0 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
   font-size: var(--fs-h3);
   line-height: 1.4;
   font-weight: var(--fw-semibold);

@@ -17,6 +17,10 @@
  * destination renders as its alt text, so no external image loads (tracking pixels).
  * A link to the canonical path of an embedded PDF (`/api/media/documents/<uuid>`) renders
  * as a file badge button with `documents`, else as its plain name.
+ *
+ * Blackout (000685-000690, 000965-000967): `%%Name%%` is a marked segment and `%%%%` its
+ * bar. Two lines that hold only `%%` fence a block, which renders its own blocks in one box
+ * with the mark. The empty block is the bar of a block: one bar of the full width.
  */
 
 import { linkify } from './linkify';
@@ -39,13 +43,23 @@ export interface MarkdownOptions {
    * session. `null` renders the alt text instead of an image (anonymous contexts).
    */
   readonly imageSrc?: ((id: string) => string) | null;
-  /** The tooltip of a marked segment (`%%Name%%`) and the text of a black bar (`%%%%`). */
-  readonly blackout?: { readonly mark: string; readonly bar: string };
+  /**
+   * The tooltip of a marked segment or block, the text of a black bar (`%%%%`) and the text
+   * of the bar of a block (the empty block).
+   */
+  readonly blackout?: BlackoutTexts;
   /**
    * The embedded PDFs (`[name](/api/media/documents/<uuid>)`). With it, a reference renders
    * as a file badge button with `data-doc="<uuid>"`; without it, as its plain name.
    */
   readonly documents?: DocumentBadges | null;
+}
+
+/** The texts of the blackout marks. `block` falls back to `bar`. */
+export interface BlackoutTexts {
+  readonly mark: string;
+  readonly bar: string;
+  readonly block?: string;
 }
 
 /** The texts and page counts of the PDF badges. */
@@ -195,7 +209,7 @@ type Inline = (text: string) => string;
  */
 function inlineRenderer(
   imageSrc: ((id: string) => string) | null,
-  blackout: { readonly mark: string; readonly bar: string },
+  blackout: BlackoutTexts,
   documents: DocumentBadges | null = null,
 ): Inline {
   return (text: string): string => {
@@ -347,13 +361,14 @@ function renderItem(text: string, inline: Inline): string {
  */
 export function markdownToSafeHtml(src: string, opts: MarkdownOptions = {}): string {
   const offset = opts.headingOffset ?? 3;
+  const blackout = opts.blackout ?? { mark: '', bar: '' };
   const inline = inlineRenderer(
     opts.imageSrc === undefined ? defaultImageSrc : opts.imageSrc,
-    opts.blackout ?? { mark: '', bar: '' },
+    blackout,
     opts.documents ?? null,
   );
   const clean = src.replace(/\r\n?/g, '\n').replace(CONTROL_RE, '');
-  return linkify(renderBlocks(escapeHtml(clean).split('\n'), offset, inline));
+  return linkify(renderBlocks(escapeHtml(clean).split('\n'), { offset, inline, blackout }));
 }
 
 /** An open list: its tag and the source text of its items. */
@@ -372,13 +387,16 @@ interface BlockState {
   readonly list: OpenList | null;
   readonly quote: readonly string[];
   readonly fence: readonly string[] | null;
+  /** The lines of an open blackout block, else `null`. */
+  readonly blackout: readonly string[] | null;
   readonly skip: number;
 }
 
-/** The settings of one render: the heading offset and the inline renderer. */
+/** The settings of one render: the heading offset, the inline renderer, the blackout texts. */
 interface BlockContext {
   readonly offset: number;
   readonly inline: Inline;
+  readonly blackout: BlackoutTexts;
 }
 
 /** The state with `html` added to the finished blocks. */
@@ -401,7 +419,7 @@ function flushList(s: BlockState, ctx: BlockContext): BlockState {
 
 /** Closes the open quote. A blockquote renders its lines again. */
 function flushQuote(s: BlockState, ctx: BlockContext): BlockState {
-  const blocks = (inner: readonly string[]): string => renderBlocks(inner, ctx.offset, ctx.inline);
+  const blocks = (inner: readonly string[]): string => renderBlocks(inner, ctx);
   return s.quote.length ? { ...emit(s, renderQuote(s.quote, ctx.inline, blocks)), quote: [] } : s;
 }
 
@@ -416,6 +434,23 @@ function pushItem(s: BlockState, ctx: BlockContext, tag: 'ul' | 'ol', text: stri
   const items = open.list?.tag === tag ? open.list.items : [];
   const base = open.list?.tag === tag ? open : flushList(open, ctx);
   return { ...base, list: { tag, items: [...items, text] } };
+}
+
+/** A fence line of a blackout block: only `%%`. */
+const BLOCK_FENCE_RE = /^[ \t]*%%[ \t]*$/;
+
+/**
+ * The state after a line inside a blackout block: the closing fence line renders the block.
+ * The empty block is the bar of a block (000967), any other block its own blocks in one box
+ * with the mark (000689).
+ */
+function blackoutStep(s: BlockState, ctx: BlockContext, inner: readonly string[], line: string): BlockState {
+  if (!BLOCK_FENCE_RE.test(line)) return { ...s, blackout: [...inner, line] };
+  const { mark, bar, block } = ctx.blackout;
+  const html = inner.some((l) => l.trim())
+    ? `<div class="md-blackout-block" title="${escapeHtml(mark)}">${renderBlocks(inner, ctx)}</div>`
+    : `<div class="md-bar-block" role="img" aria-label="${escapeHtml(block ?? bar)}"></div>`;
+  return { ...emit(s, html), blackout: null };
 }
 
 /** The code block of a fence. */
@@ -457,6 +492,7 @@ function lineStep(
 ): BlockState {
   const t = lines[i].trim();
   if (/^```/.test(t)) return { ...flushAll(s, ctx), fence: [] };
+  if (BLOCK_FENCE_RE.test(t)) return { ...flushAll(s, ctx), blackout: [] };
   if (!t) return flushAll(s, ctx);
   const h = /^(#{1,6})\s+(.*)$/.exec(t);
   if (h) {
@@ -480,25 +516,33 @@ function lineStep(
 }
 
 /** The blocks of lines that are escaped already. A blockquote renders its lines again. */
-function renderBlocks(lines: readonly string[], offset: number, inline: Inline): string {
-  const ctx: BlockContext = { offset, inline };
-  const start: BlockState = { out: [], para: [], list: null, quote: [], fence: null, skip: 0 };
+function renderBlocks(lines: readonly string[], ctx: BlockContext): string {
+  const start: BlockState = { out: [], para: [], list: null, quote: [], fence: null, blackout: null, skip: 0 };
   const step = (s: BlockState, line: string, i: number): BlockState => {
     if (s.skip > 0) return { ...s, skip: s.skip - 1 };
-    return s.fence ? fenceStep(s, s.fence, line) : lineStep(s, ctx, lines, i);
+    if (s.fence) return fenceStep(s, s.fence, line);
+    return s.blackout ? blackoutStep(s, ctx, s.blackout, line) : lineStep(s, ctx, lines, i);
   };
   const end = lines.reduce(step, start);
   const closed = end.fence ? { ...emit(end, fenceHtml(end.fence)), fence: null } : end;
-  return flushAll(closed, ctx).out.join('\n');
+  // An open block marks nothing (000686): its fence line and its lines render as text.
+  const unblocked = closed.blackout
+    ? { ...emit(closed, `<p>%%</p>${renderBlocks(closed.blackout, ctx)}`), blackout: null }
+    : closed;
+  return flushAll(unblocked, ctx).out.join('\n');
 }
 
 /** A closed blackout marker, `%%Name%%` or the bar `%%%%`, that no backslash escapes. */
 const BLACKOUT_RE = /(?<!\\)%%[^%\n]*%%/g;
 
+/** A closed blackout block: a fence line, the content, the next fence line. */
+const BLACKOUT_BLOCK_RE = /^[ \t]*%%[ \t]*\r?\n[\s\S]*?^[ \t]*%%[ \t]*\r?$/gm;
+
 /**
- * True if the text has a `%%` without its closing pair (000686). It blacks out nothing, so
- * the server refuses the finalize. The rule matches `app/shared/blackout.py`.
+ * True if the text has a `%%` without its closing pair, or a fence line without its closing
+ * fence line (000686). It blacks out nothing, so the server refuses the finalize. The rule
+ * matches `app/shared/blackout.py`.
  */
 export function hasOpenBlackout(text: string): boolean {
-  return /(?<!\\)%%/.test(text.replace(BLACKOUT_RE, ''));
+  return /(?<!\\)%%/.test(text.replace(BLACKOUT_BLOCK_RE, '').replace(BLACKOUT_RE, ''));
 }

@@ -291,6 +291,24 @@ describe('GremiumDialogComponent', () => {
   });
 
   /** §F/meetings/voting/000902, §F/meetings/meetings/000904 */
+  /** § 000948: a stored Gremium has its own start month; a new one takes the setting. */
+  it('saves the start month of the term of a stored Gremium', async () => {
+    const stored = await setup({ ...STUPA, termStartMonth: 4 });
+    expect(screen.getByText('Beginn der Amtszeit')).toBeTruthy();
+    stored.fixture.componentInstance['patchTermStart']('13');
+    stored.fixture.componentInstance['patchTermStart']('7');
+    await userEvent.click(save());
+    expect(stored.api.updateGremium).toHaveBeenCalledWith('g-1', expect.objectContaining({ termStartMonth: 7 }));
+  });
+
+  it('shows no start month for a new Gremium and sends none', async () => {
+    const fresh = await setup(null);
+    expect(screen.queryByText('Beginn der Amtszeit')).toBeNull();
+    await userEvent.type(screen.getByRole('textbox', { name: /Name/ }), 'Neu');
+    await userEvent.click(save());
+    expect(fresh.api.createGremium.mock.calls[0][0]).not.toHaveProperty('termStartMonth');
+  });
+
   it('saves the repeat quorum and the guest ballot; a quorum locks the guest switch', async () => {
     const { api } = await setup({ ...STUPA, quorumPercent: null, repeatQuorumPercent: 30 });
     const repeat = screen.getByRole('spinbutton', { name: 'Quorum der Wiederholungssitzung (%)' });

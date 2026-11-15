@@ -205,7 +205,7 @@
     [attr.aria-expanded]="panel() === 'attendance'"
     aria-haspopup="dialog"
     [title]="'meetings.attendance.title' | t"
-    [attr.aria-label]="guestChip() ? ('guests.dock.present' | t: { n: presentCount(), g: guestChip()!.admitted }) : ('meetings.dock.present' | t: { n: presentCount(), m: attendance().length })"
+    [attr.aria-label]="guestChip() ? ('guests.dock.present' | t: { n: presentCount(), g: guestChip()!.admitted }) : ('meetings.dock.present' | t: { n: presentCount(), m: eligibleCount() })"
     (click)="togglePanel('attendance')"
   >
     <app-icon name="users" [size]="18" />
@@ -215,7 +215,7 @@
         <span class="sd__badge num" [attr.aria-label]="'guests.dock.pending' | t: { n: g.pending }">{{ g.pending }}</span>
       }
     } @else {
-      <span>{{ tight() ? presentCount() + '/' + attendance().length : ('meetings.dock.presentShort' | t: { n: presentCount(), m: attendance().length }) }}</span>
+      <span>{{ tight() ? presentCount() + '/' + eligibleCount() : ('meetings.dock.presentShort' | t: { n: presentCount(), m: eligibleCount() }) }}</span>
     }
   </button>
 </ng-template>

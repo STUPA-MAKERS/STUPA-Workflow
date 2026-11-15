@@ -59,8 +59,10 @@ def test_new_mentions_are_the_added_ids() -> None:
 def test_the_mention_kind_and_both_mails_are_registered() -> None:
     assert "mention" in NOTIFICATION_KINDS
     assert "mention" in _REASONS
-    assert reason_text("mention", "de") == "Sie erhalten diese E-Mail, weil Sie erwähnt wurden."
-    assert reason_text("mention", "en") == (
+    assert reason_text("mention", "de", "P") == (
+        "Sie erhalten diese E-Mail, weil Sie erwähnt wurden."
+    )
+    assert reason_text("mention", "en", "P") == (
         "You are receiving this email because you were mentioned."
     )
     for key in ("comment_mentioned", "ticket_mentioned"):

@@ -24,8 +24,9 @@ from sqlalchemy import ColumnElement, delete, func, insert, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.principal import Principal
-from app.modules.calendar.external_feed import BERLIN, FeedEntry, FeedError, parse_feed
+from app.modules.calendar.external_feed import BERLIN, FeedEntry
 from app.modules.calendar.external_fetch import FeedFetcher, FetchError
+from app.modules.calendar.external_read import FeedReader, Read, read_feed
 from app.modules.calendar.models import ExternalCalendar, ExternalEntry
 from app.modules.calendar.schemas import (
     EntryOut,
@@ -227,11 +228,19 @@ class ExternalCalendarService:
             ).all()
         )
 
-    async def refresh(self, calendar_id: UUID, fetcher: FeedFetcher, now: datetime) -> bool:
+    async def refresh(
+        self,
+        calendar_id: UUID,
+        fetcher: FeedFetcher,
+        now: datetime,
+        reader: FeedReader = read_feed,
+    ) -> bool:
         """Fetch one calendar and store the result. Return whether the fetch was good.
 
         The row is locked, so two workers never fetch the same calendar at once. A
-        calendar that is gone, or that another run already moved on, gives False.
+        calendar that is gone, or that another run already moved on, gives False. The
+        reader turns the bytes into entries in a process of its own with a time limit
+        (§F/meetings/calendar/000974).
         """
         row = await self.session.scalar(
             select(ExternalCalendar)
@@ -241,7 +250,9 @@ class ExternalCalendarService:
         if row is None:
             return False
         fetched = await fetcher.fetch(row.url)
-        entries, error = _read(fetched.data, fetched.error, now.astimezone(BERLIN).date())
+        entries, error = await _read(
+            fetched.data, fetched.error, now.astimezone(BERLIN).date(), reader
+        )
         if entries is not None:
             await self.session.execute(
                 delete(ExternalEntry).where(ExternalEntry.calendar_id == calendar_id)
@@ -339,13 +350,10 @@ class ExternalCalendarService:
         )
 
 
-def _read(
-    data: bytes | None, error: FetchError | None, today: date
-) -> tuple[tuple[FeedEntry, ...] | None, FetchError | None]:
+async def _read(
+    data: bytes | None, error: FetchError | None, today: date, reader: FeedReader
+) -> Read:
     """Turn the result of a fetch into the entries, or into the cause of the failure."""
     if data is None:
         return None, error or "unreachable"
-    try:
-        return parse_feed(data, today), None
-    except FeedError:
-        return None, "format"
+    return await reader(data, today)

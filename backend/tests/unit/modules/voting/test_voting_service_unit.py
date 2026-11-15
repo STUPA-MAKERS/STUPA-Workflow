@@ -18,10 +18,12 @@ import pytest
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.flow.schemas import TransitionOut, TransitionResult
-from app.modules.voting import service as voting_service
+from app.modules.meetings.present import Present
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteCreate, VoteCreateInternal
 from app.modules.voting.service import VotingService
+from app.modules.voting.service import cast as voting_cast
+from app.modules.voting.service import close as voting_close
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import (
     ConflictError,
@@ -30,6 +32,7 @@ from app.shared.errors import (
     ValidationProblem,
 )
 from tests._support.flow_fakes import fake_session, result
+from tests.unit.conftest import Presence
 
 NOW = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
 OPTIONS = ["yes", "no", "abstain"]
@@ -159,13 +162,18 @@ async def test_create_internal_unknown_application_404() -> None:
         await VotingService(db).create_internal(uuid4(), payload)
 
 
-async def test_open_sets_window_keeps_roster_eligible() -> None:
-    """The open sets the window and keeps the eligible count of the roster.
+async def test_open_sets_window_and_counts_the_roster(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The open sets the window and counts the roster of the Gremium again.
 
-    The roster sets eligible_count at create time and never counts logged-in users, so
-    the open reads only the vote and recounts nothing. The open writes a vote_open audit
-    entry with id references only.
+    §F/meetings/voting/000939: a vote without a meeting takes the roster count of its
+    open, not the count of its draft. The count never comes from the logged-in users.
+    The open writes a vote_open audit entry with id references only.
     """
+
+    async def _count(self: VotingService, vote: Any) -> int | None:
+        return 23
+
+    monkeypatch.setattr(VotingService, "_roster_count", _count)
     vote = _vote(status="draft", eligible_count=20)
     db = fake_session(result(vote))
     out = await VotingService(db).open(vote.id, now=NOW, actor="mgr")
@@ -173,12 +181,26 @@ async def test_open_sets_window_keeps_roster_eligible() -> None:
     assert out.opens_at == NOW
     assert out.opened_at == NOW
     assert out.closed_at is None
-    assert out.tally.eligible == 20
+    assert out.tally.eligible == 23
     entries = [a for a in db.added if type(a).__name__ == "AuditEntry"]
     assert [e.action for e in entries] == ["vote_open"]
     assert entries[0].actor == "mgr"
     assert entries[0].data["applicationId"] == str(vote.application_id)
     assert entries[0].data["meetingId"] is None
+
+
+async def test_open_with_a_free_group_key_keeps_the_count() -> None:
+    """An old vote with a free group key has no Gremium to count."""
+    vote = _vote(status="draft", eligible_count=20, eligible_group="legacy-key")
+    db = fake_session(result(vote))
+    assert await VotingService(db)._roster_count(vote) is None  # type: ignore[arg-type]
+    out = await VotingService(db).open(vote.id, now=NOW, actor="mgr")
+    assert out.tally.eligible == 20
+
+
+async def test_roster_count_reads_the_members_of_the_gremium() -> None:
+    db = fake_session(result())
+    assert await VotingService(db)._roster_count(_vote()) == 0  # type: ignore[arg-type]
 
 
 async def test_open_non_draft_409() -> None:
@@ -454,7 +476,7 @@ async def test_cast_pool_seat_claims_and_runs_under_the_member(
         claims.append((sub, meeting_id))
         return "absent-member"
 
-    monkeypatch.setattr(voting_service, "claim_pool_seat", _claim)
+    monkeypatch.setattr(voting_cast, "claim_pool_seat", _claim)
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(
@@ -482,7 +504,7 @@ async def test_cast_own_ballot_frees_a_pool_seat(
         released.append((meeting_id, sub))
         return True
 
-    monkeypatch.setattr(voting_service, "release_pool_seat_of", _release)
+    monkeypatch.setattr(voting_cast, "release_pool_seat_of", _release)
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result(), result(SimpleNamespace(inserted=True)))
@@ -635,7 +657,7 @@ def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     _FakeFlow.notes = []
     _FakeFlow.vote_ids = []
     _FakeFlow.after = []
-    monkeypatch.setattr(voting_service, "FlowService", _FakeFlow)
+    monkeypatch.setattr(voting_close, "FlowService", _FakeFlow)
     return _FakeFlow
 
 
@@ -1333,6 +1355,7 @@ async def test_delete_locked_votes_without_votes_writes_nothing() -> None:
 
 async def test_get_meeting_open_stays_hidden_when_all_present_voted(
     monkeypatch: pytest.MonkeyPatch,
+    presence: Presence,
 ) -> None:
     """An open meeting vote hides the tally even when every present member voted.
 
@@ -1340,7 +1363,8 @@ async def test_get_meeting_open_stays_hidden_when_all_present_voted(
     """
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [2, 1]
+    presence.here = Present(members=2)
+    db.scalar_results = [1]
     monkeypatch.setattr(VotingService, "voters", _persons(2))
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False

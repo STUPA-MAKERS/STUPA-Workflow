@@ -10,16 +10,27 @@
   [statusKind]="status().kind"
   [statusText]="status().key | t"
   [sub]="subLine() || null"
+  [link]="firstLink()"
   (back)="back.emit()"
 >
   @if (phone()) {
     <app-join-qr [meeting]="m" [button]="false" [(open)]="qrOpen" />
   }
 
-  @if (!phone() && mainAction() === 'close') {
-    <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
-      {{ 'meetings.control.closeSession' | t }}
-    </app-button>
+  @if (!phone()) {
+    @switch (mainAction()) {
+      @case ('open') {
+        <app-button variant="fill" [disabled]="!!openBlocked()" [title]="openBlocked() || ('meetings.control.open' | t)" (click)="startSession.emit()">
+          <app-icon name="play" />
+          {{ opensAtText() || ('meetings.control.open' | t) }}
+        </app-button>
+      }
+      @case ('close') {
+        <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
+          {{ 'meetings.control.closeSession' | t }}
+        </app-button>
+      }
+    }
   }
 
   <app-row-menu [sections]="menu()" [label]="'meetings.page.menu' | t" (selected)="onMenu($event)" />
@@ -56,7 +67,7 @@
       [saveState]="saveState()"
       [revision]="revision()"
       [finalizing]="finalizing()"
-      [canRename]="canAddTop()"
+      [canRename]="canRenameTop()"
       [renamingTopId]="renamingTopId()"
       [(renameDraft)]="renameDraft"
       (bodyChange)="bodyChange.emit($event)"
@@ -112,6 +123,7 @@
   [open]="panel() === 'attendance'"
   (openChange)="$event || panel.set('none')"
   [meeting]="m"
+  [protocolLocked]="locked()"
   [attendance]="attendance()"
   [saving]="savingAttendance()"
   [viewers]="viewers()"
@@ -165,6 +177,7 @@
       [otherOpen]="anyOpenVote()"
       [repeated]="repeatedIds().has(vote.id)"
       [canRepeat]="repeatableIds().has(vote.id)"
+      [continued]="continuedIds().has(vote.id)"
       (edit)="voteSource.emit({ mode: 'edit', vote: $event })"
       (repeat)="voteSource.emit({ mode: 'repeat', vote: $event })"
       (close)="voteClose.emit($event)"

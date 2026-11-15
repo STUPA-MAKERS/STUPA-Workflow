@@ -60,34 +60,25 @@ from app.modules.files.pdf_branding import (
     footer_render_config,
 )
 from app.modules.files.storage import ObjectStorage, StorageError
-from app.modules.gremien.models import Gremium
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.service import MeetingService
 from app.modules.media.models import MarkdownDocument
 from app.modules.media.service import MediaService
 from app.modules.meetings.agenda_service import agenda_order, title_of
 from app.modules.meetings.keepers import agenda_positions, keeper_periods, principal_names
 from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.meetings.present import VOTE_PERMISSION, meeting_present
 from app.modules.meetings.protocol_models import Protocol, ProtocolVoteRef
-from app.modules.meetings.roster import meeting_roster_filter, roster_filter
-from app.modules.notifications.layout import (
-    append_link_text,
-    reason_text,
-    render_layout,
-    text_to_html,
-)
+from app.modules.notifications.brand import load_mail_brand
+from app.modules.notifications.compose import branded_mail
 from app.modules.notifications.links import protocol_link, public_protocol_url
-from app.modules.notifications.mail import (
-    MailAttachment,
-    MailMessage,
-    compute_idempotency_key,
-)
+from app.modules.notifications.mail import MailAttachment, compute_idempotency_key
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient, TypstError
 from app.modules.protocol import approval
 from app.modules.protocol.approval import approval_fields
-from app.modules.protocol.circular import circular_block
 from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.markdown import (
     ElectionLine,
@@ -176,8 +167,9 @@ BackfillOutcome = Literal["done", "transient", "failed"]
 class HeaderMeta:
     """The person-related header data of one protocol variant.
 
-    `present_count` holds the true number of attendees and feeds the quorum, also
-    in the public variant that leaves the names out.
+    `present_count` holds the one present count of the meeting
+    (§F/meetings/meetings/000946) and feeds the quorum, also in the public variant
+    that leaves the names out.
     """
 
     protokollant: str | None = None
@@ -364,6 +356,7 @@ class ProtocolService:
             sentAt=protocol.sent_at,
             publicWithheld=bool(getattr(protocol, "public_withheld", False)),
             gremiumProtocolsPublic=bool(getattr(gremium, "protocols_public", False)),
+            draftSentAt=getattr(protocol, "draft_sent_at", None),
             **await approval_fields(self.session, protocol),
         )
 
@@ -480,12 +473,20 @@ class ProtocolService:
         The `protocol_vote_ref` rows cascade on the foreign key. The audit log
         records the removal, because the draft text itself is not recoverable.
 
+        A draft that was final once (spec 000983) went out by mail, so it stays a
+        record and answers 409 too.
+
         Raises:
             NotFoundError: No protocol has this id (404).
-            ConflictError: The protocol is final or under render (409).
+            ConflictError: The protocol is final, under render, or was final once (409).
         """
         protocol = await self._get(protocol_id)
         self._ensure_draft(protocol)
+        if getattr(protocol, "sent_at", None) is not None:
+            raise ConflictError(
+                "The protocol went out once and is a record. It cannot be deleted.",
+                code="protocol_finalized",
+            )
         await audit_record(
             self.session,
             actor=actor,
@@ -682,6 +683,20 @@ class ProtocolService:
             await approval.approve(self.session, protocol, meeting_id, now=now, actor=actor)
         return await self._to_out(protocol)
 
+    async def reopen(self, protocol_id: UUID, *, actor: str) -> ProtocolOut:
+        """Set a final protocol back to draft (spec 000983). The caller commits.
+
+        The protocol leaves the public pages, because they show a final protocol only.
+        The next finalization renders and sends again.
+
+        Raises:
+            ConflictError: The protocol is not final (409 ``protocol_not_final``), or it
+                has an approval mark (409 ``protocol_approved``).
+        """
+        protocol = await self._get(protocol_id, for_update=True)
+        await approval.reopen(self.session, protocol, actor=actor)
+        return await self._to_out(protocol)
+
     async def revert_to_draft(self, protocol_id: UUID) -> None:
         """Roll a protocol back from `rendering` to `draft`.
 
@@ -733,7 +748,7 @@ class ProtocolService:
         await self.session.flush()
         await self.session.commit()
         await self._store(uploads)
-        await self._send(protocol, mail_pdf)
+        await self._send(protocol, mail_pdf, at=now)
         return await self._to_out(protocol)
 
     async def _render_both(
@@ -916,8 +931,8 @@ class ProtocolService:
         snippets. If not, it falls back to the free text in `protocol.markdown`, which
         is then the whole public body too.
 
-        The circular votes of the Gremium since the meeting before stand in front of
-        the first TOP, in both variants (`protocol.circular`, spec 000916).
+        The document holds no circular vote of the Gremium: such a decision shows in the
+        list of decisions only (§F/meetings/voting/000949).
 
         `public=True` redacts a non-public item and the header metadata. The mailed
         variant must not carry the names of the attendees, of the excused members, of
@@ -936,9 +951,6 @@ class ProtocolService:
         header = await self._header_meta(meeting, public=public)
         free_text = (
             black_out(protocol.markdown) if public and protocol.markdown else protocol.markdown
-        )
-        circular = await circular_block(
-            self.session, meeting, VotingService(self.session), self._tz()
         )
         if snapshot is not None:
             snapshot.attendance = PublicAttendance(
@@ -975,7 +987,7 @@ class ProtocolService:
                 absent=header.absent,
                 datalines=header.datalines,
                 quorate=await self._quorate(gremium, meeting, header.present_count),
-                markdown="\n\n".join(part for part in (circular, assembled or free_text) if part),
+                markdown=assembled or free_text,
             )
         )
 
@@ -1030,15 +1042,28 @@ class ProtocolService:
             for p in periods
         ]
 
+    async def _voting_members(self, gremium_id: UUID) -> int:
+        """Count the members of the Gremium whose role holds `vote.cast`."""
+        return (
+            await self.session.scalar(
+                select(func.count(GremiumMembership.principal_id.distinct()))
+                .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
+                .where(
+                    GremiumMembership.gremium_id == gremium_id,
+                    GremiumRole.permissions.contains([VOTE_PERMISSION]),
+                )
+            )
+        ) or 0
+
     async def _quorate(
         self, gremium: object | None, meeting: Meeting | None, present_count: int
     ) -> bool | None:
-        """Compute the quorum from the attendees and the members of the meeting.
+        """Compute the quorum from the present count and the members with a voting right.
 
-        The members are the roster of the meeting: the members of the Gremium,
-        plus each principal with an attendance record (see
-        `app.modules.meetings.roster`). Without a meeting the members of the
-        Gremium count. The threshold is `gremium.quorum_percent` when
+        A closed meeting gives the member count that its close fixed, so a new render
+        gives the same quorum (§F/meetings/protocols/000357). A meeting that is not
+        closed, and a meeting without a fixed count, counts the members of the Gremium
+        whose role holds `vote.cast` now. The threshold is `gremium.quorum_percent` when
         that value is set. If not, the threshold is more than half of the members.
 
         Returns:
@@ -1048,14 +1073,12 @@ class ProtocolService:
         gremium_id = getattr(gremium, "id", None)
         if gremium_id is None:
             return None
-        where = (
-            meeting_roster_filter(meeting)
-            if meeting is not None and getattr(meeting, "gremium_id", None) == gremium_id
-            else roster_filter(gremium_id)
-        )
+        fixed: int | None = getattr(meeting, "eligible_count", None)
         members = (
-            await self.session.scalar(select(func.count()).select_from(PrincipalRow).where(where))
-        ) or 0
+            fixed
+            if fixed is not None and getattr(meeting, "status", None) == "closed"
+            else await self._voting_members(gremium_id)
+        )
         percent = getattr(gremium, "quorum_percent", None)
         quorate = (
             present_count * 100 >= percent * members
@@ -1091,7 +1114,7 @@ class ProtocolService:
         present = [name or sub for status, name, sub in rows if status == "present"]
         excused = [name or sub for status, name, sub in rows if status == "excused"]
         absent = [name or sub for status, name, sub in rows if status == "absent"]
-        present_count = len(present)
+        present_count = await meeting_present(self.session, meeting)
         from app.modules.livevote.guests import GuestService
 
         guests = await GuestService(self.session).attended_count(meeting.id)
@@ -1518,8 +1541,11 @@ class ProtocolService:
         except StorageError as exc:
             raise ServiceUnavailableError("Protocol rendering temporarily unavailable.") from exc
 
-    async def _send(self, protocol: Protocol, pdf: bytes | None) -> None:
+    async def _send(self, protocol: Protocol, pdf: bytes | None, *, at: datetime) -> None:
         """Mail the protocol to MAIL_LIST(gremium) under an idempotency key.
+
+        The key holds the time of the finalization, so a protocol that went back to
+        draft sends again on its next finalization (spec 000983).
 
         The mail carries the PDF as an attachment. The subject and the body name the
         Gremium and the meeting. The HTML version uses the branded mail layout.
@@ -1578,7 +1604,6 @@ class ProtocolService:
             else "Das Sitzungsprotokoll wurde finalisiert."
         )
         body = intro + ("\n\n" + "\n".join(lines) if lines else "") + "\n"
-        text = append_link_text(body, link.url, link.label("de"))
         filename = (
             protocol_pdf_filename(meeting.title, meeting_day(meeting))
             if meeting is not None
@@ -1589,23 +1614,19 @@ class ProtocolService:
             if pdf is not None
             else ()
         )
-        html = render_layout(
-            content_html=text_to_html(body),
-            title=subject,
-            site_name=settings.mail_from_name,
-            base_url=settings.public_base_url,
-            reason=reason_text("protocol", "de"),
-            lang="de",
-            action_url=link.url,
-            action_label=link.label("de"),
-        )
         await self.mail_queue.enqueue(
-            MailMessage(
+            branded_mail(
+                brand=await load_mail_brand(self.session, settings),
+                settings=settings,
                 to=tuple(recipients),
                 subject=subject,
-                text=text,
-                html=html,
-                idempotency_key=compute_idempotency_key("protocol_finalized", str(protocol.id)),
+                text=body,
+                reason="protocol",
+                lang="de",
+                idempotency_key=compute_idempotency_key(
+                    "protocol_finalized", str(protocol.id), at.isoformat()
+                ),
+                link=link,
                 attachments=attachments,
             )
         )
@@ -1789,6 +1810,7 @@ def election_snippet_of(
     lines = sorted(listed, key=lambda line: -line.votes) if by_votes else listed
     lot = result.lot if result is not None else None
     runoff = result.runoff if result is not None else None
+    place_lot = result.next_round_lot if result is not None else None
     return ElectionSnippet(
         question=(question or "Wahlgang").strip() or "Wahlgang",
         seats=election.seats,
@@ -1798,6 +1820,9 @@ def election_snippet_of(
         yes=result.yes if result is not None else None,
         no=result.no if result is not None else None,
         by_lot=lot is not None and lot.drawn is not None,
+        next_round_lot_names=[names.get(cid, cid) for cid in (place_lot.drawn or ())]
+        if place_lot is not None
+        else [],
         lot_pending=lot is not None and lot.drawn is None,
         runoff_names=[names.get(cid, cid) for cid in runoff.candidate_ids] if runoff else [],
         runoff_seats=runoff.seats if runoff else 0,

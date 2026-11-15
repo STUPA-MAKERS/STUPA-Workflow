@@ -1,6 +1,10 @@
-"""Poll mails: ``poll_started`` and ``poll_reminder``.
+"""Poll mails: ``poll_started`` and ``poll_reminder``; the mails of an Umlaufverfahren.
 
 Only a poll of a Gremium (no meeting) sends mail. A meeting poll runs in the room.
+An Umlaufverfahren (``kind = 'circular'``) sends ``circular_open`` and
+``circular_reminder`` by the same rules (§F/meetings/voting/000944). These two are in
+no notification kind, so a member cannot switch them off: a ballot that is not cast
+counts as a no.
 
 * ``poll_started`` goes to every eligible member (an active member with the gremium
   permission ``vote.cast``) when the poll opens. The router sends it after the commit
@@ -29,11 +33,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db import get_sessionmaker
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.notifications.links import vote_link
+from app.modules.notifications.links import MailLink, circular_link, vote_link
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
 from app.modules.notifications.texts.polls import (
+    CIRCULAR_OPEN_BODY,
+    CIRCULAR_OPEN_KEY,
+    CIRCULAR_OPEN_SUBJECT,
+    CIRCULAR_REMINDER_BODY,
+    CIRCULAR_REMINDER_KEY,
+    CIRCULAR_REMINDER_SUBJECT,
     POLL_REMINDER_BODY,
     POLL_REMINDER_KEY,
     POLL_REMINDER_SUBJECT,
@@ -45,6 +55,28 @@ from app.modules.voting.models import Vote, VotedMarker
 from app.settings import Settings
 
 logger = logging.getLogger("app.notifications")
+
+#: The kinds of a vote that send mail, each with the builtin of its start mail and of
+#: its reminder: the key, the subject and the body.
+_Texts = tuple[str, dict[str, str], dict[str, str]]
+_MAILS: dict[str, tuple[_Texts, _Texts]] = {
+    "poll": (
+        (POLL_STARTED_KEY, POLL_STARTED_SUBJECT, POLL_STARTED_BODY),
+        (POLL_REMINDER_KEY, POLL_REMINDER_SUBJECT, POLL_REMINDER_BODY),
+    ),
+    "circular": (
+        (CIRCULAR_OPEN_KEY, CIRCULAR_OPEN_SUBJECT, CIRCULAR_OPEN_BODY),
+        (CIRCULAR_REMINDER_KEY, CIRCULAR_REMINDER_SUBJECT, CIRCULAR_REMINDER_BODY),
+    ),
+}
+#: The kinds of a vote of a Gremium that send a start mail and a reminder.
+MAIL_KINDS: tuple[str, ...] = tuple(_MAILS)
+
+
+def _link(settings: Settings, vote: Vote) -> MailLink:
+    """Return the link of the mail: the poll or the Umlaufverfahren."""
+    make = circular_link if vote.kind == "circular" else vote_link
+    return make(settings, vote.id)
 
 
 def _maker(
@@ -106,7 +138,10 @@ async def send_poll_mail(
     vote: Vote,
     reminder: bool,
 ) -> bool:
-    """Send ``poll_started`` (every eligible member) or ``poll_reminder`` (no answer yet).
+    """Send the start mail (every eligible member) or the reminder (no answer yet).
+
+    A poll sends ``poll_started`` and ``poll_reminder``, an Umlaufverfahren
+    ``circular_open`` and ``circular_reminder``.
 
     Each member gets an own mail with an own idempotency key (kind, vote, member),
     because a shared To: line would show every member who has not answered yet, which
@@ -115,7 +150,7 @@ async def send_poll_mail(
     Returns:
         True when at least one mail was enqueued.
     """
-    if vote.meeting_id is not None or vote.kind != "poll":
+    if vote.meeting_id is not None or vote.kind not in _MAILS:
         return False
     gremium_id = UUID(vote.eligible_group)
     eligible = await eligible_members(session, gremium_id)
@@ -124,7 +159,7 @@ async def send_poll_mail(
     if not members:
         return False
     gremium_name = await session.scalar(select(Gremium.name).where(Gremium.id == gremium_id))
-    key = POLL_REMINDER_KEY if reminder else POLL_STARTED_KEY
+    key, subject, body = _MAILS[vote.kind][1 if reminder else 0]
     context: dict[str, object] = {
         "question": vote.question or "",
         "gremiumName": gremium_name or "",
@@ -137,11 +172,11 @@ async def send_poll_mail(
             [email],
             kind=key,
             template_key=key,
-            builtin_subject=POLL_REMINDER_SUBJECT if reminder else POLL_STARTED_SUBJECT,
-            builtin_body=POLL_REMINDER_BODY if reminder else POLL_STARTED_BODY,
+            builtin_subject=subject,
+            builtin_body=body,
             context=context,
             idempotency_parts=(key, str(vote.id), sub),
-            link=vote_link(settings, vote.id),
+            link=_link(settings, vote),
         )
 
     sent = [await send_to(sub, email) for sub, email in members]
@@ -155,7 +190,7 @@ async def notify_poll_started(
     *,
     sessionmaker: async_sessionmaker[AsyncSession] | None = None,
 ) -> bool:
-    """Send ``poll_started`` after the open of a poll of a Gremium (best effort).
+    """Send the start mail after the open of a poll or an Umlaufverfahren (best effort).
 
     Returns:
         True when a mail was enqueued.

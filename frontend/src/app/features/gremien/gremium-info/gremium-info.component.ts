@@ -16,7 +16,7 @@ import { GremiumInfoDialogComponent } from '../gremium-info-dialog/gremium-info-
 import { infoEmpty, infoUrlShown } from '../gremien.util';
 
 /**
- * The sub-tab "Info" of a gremium (specs 000950-000955): the Markdown text and the
+ * The sub-tab "Info" of a gremium (specs 001010-001015): the Markdown text and the
  * labelled links (wikis, chat groups), for everyone who sees the gremium.
  *
  * A holder of `info.write` gets "Info bearbeiten", which opens the editor. An empty Info

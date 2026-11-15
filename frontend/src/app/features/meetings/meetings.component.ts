@@ -31,7 +31,6 @@ import {
 import type { TranslationKey } from '@core/i18n/translations';
 import { AgendaItemDialogComponent } from './agenda-item-dialog/agenda-item-dialog.component';
 import { CloseMeetingDialogComponent } from './close-meeting-dialog/close-meeting-dialog.component';
-import { EarlyOpenDialogComponent } from './early-open-dialog/early-open-dialog.component';
 import { FinalizeProtocolDialogComponent } from './finalize-protocol-dialog/finalize-protocol-dialog.component';
 import { DeleteMeetingDialogComponent } from './delete-meeting-dialog/delete-meeting-dialog.component';
 import { HandoverDialogComponent } from './handover-dialog/handover-dialog.component';
@@ -95,7 +94,6 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
     MeetingSettingsDialogComponent,
     DeleteMeetingDialogComponent,
     CloseMeetingDialogComponent,
-    EarlyOpenDialogComponent,
     FinalizeProtocolDialogComponent,
     VoteOpenDialogComponent,
     AgendaItemDialogComponent,
@@ -126,7 +124,6 @@ export class MeetingsComponent {
   readonly viewers = this.session.viewers;
   readonly savingAttendance = this.session.savingAttendance;
   readonly finalizing = this.session.finalizing;
-  readonly earlyOpenAsk = this.session.earlyOpenAsk;
   /** The member whose "present" the server refused (409 `delegation_active`). */
   readonly attendanceConflict = this.session.attendanceConflict;
   readonly casting = this.session.casting;
@@ -239,9 +236,9 @@ export class MeetingsComponent {
     this.dialogs.cancelHandover(m);
   }
 
-  /** "Sitzung eröffnen". An early open asks first (`EarlyOpenDialogComponent`). */
-  startMeeting(confirmEarly = false): void {
-    this.session.startMeeting(confirmEarly);
+  /** "Sitzung eröffnen". */
+  startMeeting(): void {
+    this.session.startMeeting();
   }
 
   /** "Sitzung schließen": save the open text first, then ask. */
@@ -288,24 +285,21 @@ export class MeetingsComponent {
     return this.myChoices()[voteId] ?? null;
   }
 
-  /** "Protokoll finalisieren?": open for the protocol of a public gremium. */
+  /** "Protokoll finalisieren?" is open. */
   readonly finalizeDialogOpen = signal(false);
 
   /**
-   * Finalize the protocol. A gremium that publishes its protocols asks first: the
-   * dialog reminds of the public page and can hold this protocol back.
+   * Finalize the protocol. The page asks first, because a final protocol does not change
+   * and the mail goes out at once (§ 000952). For a gremium that publishes its protocols
+   * the dialog also reminds of the public page and can hold this protocol back.
    */
   finalize(): void {
-    if (this.protocol()?.gremiumProtocolsPublic) {
-      this.finalizeDialogOpen.set(true);
-      return;
-    }
-    this.session.finalize();
+    this.finalizeDialogOpen.set(true);
   }
 
   confirmFinalize(opts: { publicWithheld: boolean }): void {
     this.finalizeDialogOpen.set(false);
-    this.session.finalize(opts);
+    this.session.finalize(this.protocol()?.gremiumProtocolsPublic ? opts : undefined);
   }
 
   setAttendance(member: Attendance, status: AttendanceStatus, note?: string | null): void {

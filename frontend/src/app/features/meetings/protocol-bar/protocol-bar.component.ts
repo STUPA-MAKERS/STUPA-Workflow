@@ -29,10 +29,14 @@ interface BarState {
  *   and for a holder of `canFinalize` the switch between the two (the protocol is held
  *   back from the public protocol page, or published again).
  * - Draft, with write access: "Entwurf senden" sends the PDF with the watermark "Entwurf"
- *   to the members, after a confirmation. The protocol stays a draft (§ 000925).
+ *   to the members, after a confirmation. The protocol stays a draft (§ 000925). A
+ *   second send names the date of the last one in the confirmation (§ 000937).
+ * - Draft: "PDF intern" and "PDF öffentlich" open the draft as a PDF
+ *   with the watermark "Entwurf". The server renders it for this read and stores
+ *   nothing (§ 000950).
  * - Final, for a holder of `canFinalize`: "Als genehmigt markieren" asks for the meeting
  *   that approved the protocol. With the mark the bar names that meeting and offers
- *   "Genehmigung entfernen" (§ 000924).
+ *   "Genehmigung entfernen", which asks before it removes the mark (§ 000924).
  *
  * The finalize is a step of its own after the close; a live meeting has no bar.
  */
@@ -74,8 +78,19 @@ export class ProtocolBarComponent {
   protected readonly approvalSaving = computed(() => this.session?.approvalSaving() ?? false);
   /** The confirmation of "Entwurf senden" is open. */
   protected readonly confirmDraft = signal(false);
+  /** The confirmation text: a second send names the date of the last one (§ 000937). */
+  protected readonly draftBody = computed(() => {
+    const last = this.protocol().draftSentAt;
+    return last
+      ? this.i18n.translate('meetings.draftMail.again', {
+          date: longDate(last, this.i18n.formatLocale()),
+        })
+      : this.i18n.translate('meetings.draftMail.body');
+  });
   /** The dialog "Als genehmigt markieren" is open. */
   protected readonly approvalOpen = signal(false);
+  /** The confirmation of "Genehmigung entfernen" is open. */
+  protected readonly confirmUnapprove = signal(false);
 
   /** "Entwurf senden": a closed meeting, a draft and write access. */
   protected readonly canSendDraft = computed(() => {
@@ -83,10 +98,24 @@ export class ProtocolBarComponent {
     return m.status === 'closed' && !!m.canWrite && this.protocol().status === 'draft' && this.session !== null;
   });
 
+  /** The two PDF links of a draft of a closed meeting (§ 000950). */
+  protected readonly draftPdf = computed(() => {
+    const p = this.protocol();
+    if (p.status !== 'draft' || this.meeting().status !== 'closed') return null;
+    const base = `/api/protocols/${p.id}/draft-pdf`;
+    return { internal: base, public: `${base}?variant=public` };
+  });
+
   /** The mark and its removal: a final protocol and the right to finalize. */
   protected readonly canApprove = computed(
     () => this.protocol().isFinal && !!this.meeting().canFinalize && this.session !== null,
   );
+
+  /** "Zurück in Entwurf": a final protocol without the mark and the right to finalize (§ 000983). */
+  protected readonly canReopen = computed(() => this.canApprove() && !this.protocol().approvedAt);
+  protected readonly reopenSaving = computed(() => this.session?.reopenSaving() ?? false);
+  /** The confirmation of "Zurück in Entwurf" is open. */
+  protected readonly confirmReopen = signal(false);
 
   /** "Genehmigt in der Sitzung … am …", or '' without the mark. */
   protected readonly approvedText = computed(() => {
@@ -109,6 +138,16 @@ export class ProtocolBarComponent {
   protected sendDraft(): void {
     this.confirmDraft.set(false);
     this.session?.sendProtocolDraft();
+  }
+
+  protected unapprove(): void {
+    this.confirmUnapprove.set(false);
+    this.approve(null);
+  }
+
+  protected reopen(): void {
+    this.confirmReopen.set(false);
+    this.session?.reopenProtocol();
   }
 
   protected approve(meetingId: Uuid | null): void {
@@ -137,7 +176,12 @@ export class ProtocolBarComponent {
         text: 'meetings.protocolBar.rendering',
       };
     }
-    return { icon: 'edit', tone: 'muted', label: 'meetings.protocol.draft', text: 'meetings.protocolBar.draft' };
+    return {
+      icon: 'edit',
+      tone: 'muted',
+      label: 'meetings.protocol.draft',
+      text: p.sentAt ? 'meetings.protocolBar.draftAgain' : 'meetings.protocolBar.draft',
+    };
   });
 
   /** Finalize: a closed meeting, a draft and the right. */

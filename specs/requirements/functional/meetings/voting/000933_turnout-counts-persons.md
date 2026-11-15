@@ -9,7 +9,7 @@ tests:
   - "backend/tests/integration/modules/delegations/test_delegate_limit_live.py:test_one_cast_writes_the_own_and_each_represented_ballot"
   - "backend/tests/integration/modules/delegations/test_delegate_limit_live.py:test_an_external_delegate_casts_for_every_represented_member"
 implementation:
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
   - backend/app/modules/voting/models.py
   - backend/app/modules/livevote/service/votes.py
 scope:

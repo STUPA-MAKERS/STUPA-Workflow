@@ -454,7 +454,7 @@ async def test_send_magic_link_builtin_fallback_in_english() -> None:
     await _service(session, queue).send_magic_link(
         email="a@x.de", link="https://l/#t=3", lang="en"
     )
-    assert queue.messages[0].subject == "Your access link for the application platform"
+    assert queue.messages[0].subject == "Your access link for Antragsplattform"
     assert "use this link to access your application" in queue.messages[0].text
 
 

@@ -35,7 +35,7 @@
     @if (circular()) {
       <p class="npd__rule" role="note">
         <app-icon name="info" [size]="16" />
-        <span>{{ 'circular.new.rule' | t: { n: minDays() } }}</span>
+        <span>{{ (minDays() === 1 ? 'circular.new.rule1' : 'circular.new.rule') | t: { n: minDays() } }}</span>
       </p>
     } @else {
       <app-poll-editor idPrefix="npd" [(draft)]="draft" />

@@ -92,13 +92,12 @@ describe('AttendanceDetailComponent', () => {
     const view = await setup({ api: gremienApiMock({ memberAttendance: jest.fn(() => of(late)) }) });
     restore = view.restore;
     await view.openWith(ONE);
-    const buttons = screen.getAllByRole('button', { name: 'Entschuldigen' });
+    const buttons = screen.getAllByRole('button', { name: 'Nachträglich entschuldigen' });
     expect(buttons).toHaveLength(1);
     await userEvent.click(buttons[0]);
     view.fixture.detectChanges();
     expect(screen.queryByRole('dialog', { name: 'Finn Schulze · September 2026' })).toBeNull();
     const dialog = screen.getByRole('dialog', { name: 'Nachträglich entschuldigen' });
-    expect(dialog).toHaveAccessibleDescription('32. Sitzung');
     await userEvent.type(within(dialog).getByLabelText(/Grund/), 'Krank');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Entschuldigen' }));
     view.fixture.detectChanges();

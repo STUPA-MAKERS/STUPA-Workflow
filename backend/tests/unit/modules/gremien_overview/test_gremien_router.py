@@ -94,6 +94,7 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> _Calls:
             from_month="2026-05",
             to_month="2026-10",
             term_start=date(2025, 10, 1),
+            terms=[date(2025, 10, 1)],
             absence_limit=3,
             months=[],
             rows=[],
@@ -168,7 +169,18 @@ def test_attendance_passes_the_range(calls: _Calls) -> None:
     )
     assert resp.status_code == 200
     assert resp.json()["fromMonth"] == "2026-05"
-    assert calls.seen[0][2] == {"from_month": "2026-01", "to_month": "2026-06"}
+    assert calls.seen[0][2] == {"from_month": "2026-01", "to_month": "2026-06", "term": None}
+
+
+def test_attendance_passes_the_term(calls: _Calls) -> None:
+    """§F/meetings/meetings/000941: the term is a day, inside the calendar."""
+    client = _client(Principal(sub="u1"))
+    resp = client.get(f"/api/committees/{GID}/attendance?term=2024-10-01")
+    assert resp.status_code == 200
+    assert resp.json()["terms"] == ["2025-10-01"]
+    assert calls.seen[0][2] == {"from_month": None, "to_month": None, "term": date(2024, 10, 1)}
+    late = client.get(f"/api/committees/{GID}/attendance?term=2100-01-01")
+    assert late.status_code == 422 and late.json()["code"] == "invalid_date_range"
 
 
 @pytest.mark.parametrize("query", ["from=2026-13", "to=26-01", "from=2026-1"])

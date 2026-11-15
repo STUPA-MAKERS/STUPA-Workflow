@@ -34,6 +34,9 @@ async function setup(over: {
   canManage?: boolean;
   election?: ElectionConfig;
   counts?: Record<string, number>;
+  round?: number;
+  canNextRound?: boolean;
+  inCard?: boolean;
 }) {
   const changed = jest.fn();
   const view = await render(ElectionResultComponent, {
@@ -44,6 +47,9 @@ async function setup(over: {
       counts: over.counts ?? {},
       voteId: 'e1',
       canManage: over.canManage ?? true,
+      round: over.round ?? 1,
+      canNextRound: over.canNextRound ?? false,
+      inCard: over.inCard ?? false,
     },
     on: { changed },
     providers: [provideHttpClient(), provideHttpClientTesting()],
@@ -137,6 +143,28 @@ describe('ElectionResultComponent', () => {
     http.expectOne({ method: 'POST', url: '/api/votes/e1/draw-lot' }).flush({ id: 'e1' });
     expect(changed).toHaveBeenCalledWith({ id: 'e1' });
     expect(toasts()).toContain('Das Los ist gezogen.');
+  });
+
+  /** The meeting card states the result itself (§ 001006). */
+  it('leaves the result heading and the lot banner to the meeting card', async () => {
+    const tie: ElectionResult = {
+      counts: { c1: 2, c2: 2, c3: 0, c4: 0 },
+      abstentions: 0,
+      ballots: 4,
+      elected: [],
+      lot: { among: ['c1', 'c2'], seats: 1, drawn: null },
+    };
+    const { container } = await setup({
+      result: 'tie',
+      electionResult: tie,
+      election: { ...ELECTION, seats: 1 },
+      inCard: true,
+    });
+    expect(screen.queryByText('Gleichstand: das Los steht aus')).toBeNull();
+    expect(screen.queryByText(/Das Los entscheidet/)).toBeNull();
+    expect(container.querySelector('.er__banner')).toBeNull();
+    expect(screen.getAllByText('Gleichstand')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Los ziehen' })).toBeInTheDocument();
   });
 
   it('tells a member that the lead draws the lot, and shows a drawn lot', async () => {
@@ -241,5 +269,52 @@ describe('ElectionResultComponent', () => {
     });
     expect(screen.getByLabelText('Ja: 0 Stimmen, 0 %')).toBeInTheDocument();
     expect(screen.getByLabelText('Nein: 0 Stimmen, 0 %')).toBeInTheDocument();
+  });
+
+  /** § 000971: the Wahlgänge of an election by the majority of the members. */
+  describe('nextRound', () => {
+    const MEMBERS: ElectionConfig = { ...ELECTION, seats: 1, majorityRule: 'members_majority' };
+    const MISSED: ElectionResult = {
+      counts: { c1: 3, c2: 2, c3: 2, c4: 0 },
+      abstentions: 0,
+      ballots: 7,
+      elected: [],
+    };
+
+    it('offers the second Wahlgang and creates its draft', async () => {
+      const { http, changed, toasts } = await setup({
+        election: MEMBERS,
+        result: 'no_majority',
+        electionResult: MISSED,
+        canNextRound: true,
+      });
+      await userEvent.click(screen.getByRole('button', { name: 'Zweiter Wahlgang' }));
+      const req = http.expectOne('/api/votes/e1/next-round');
+      expect(req.request.method).toBe('POST');
+      req.flush({ id: 'e2', round: 2 });
+      expect(changed).toHaveBeenCalledWith({ id: 'e2', round: 2 });
+      expect(toasts()).toContain('Der nächste Wahlgang ist vorbereitet.');
+    });
+
+    it('offers the third Wahlgang after the second, and names the lot for a place', async () => {
+      await setup({
+        election: MEMBERS,
+        result: 'no_majority',
+        electionResult: { ...MISSED, nextRoundLot: { among: ['c2', 'c3'], seats: 1, drawn: ['c3'] } },
+        canNextRound: true,
+        round: 2,
+      });
+      expect(screen.getByRole('button', { name: 'Dritter Wahlgang' })).toBeInTheDocument();
+      expect(screen.getByText('Das Los bestimmt für den dritten Wahlgang: Cem')).toBeInTheDocument();
+    });
+
+    it.each([
+      ['after the third', { round: 3, canNextRound: true, result: 'no_majority' }],
+      ['with a next one', { round: 1, canNextRound: false, result: 'no_majority' }],
+      ['for another result', { round: 1, canNextRound: true, result: 'rejected' }],
+    ])('offers no Wahlgang %s', async (_name, over) => {
+      await setup({ election: MEMBERS, electionResult: MISSED, ...over });
+      expect(screen.queryByRole('button', { name: /Wahlgang/ })).toBeNull();
+    });
   });
 });

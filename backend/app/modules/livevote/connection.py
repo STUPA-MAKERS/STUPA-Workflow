@@ -290,8 +290,9 @@ class LiveVoteConnection:
                     now=datetime.now(UTC),
                     as_delegation=msg.as_delegation,
                 )
-            except ForbiddenError:
-                await self._send_error("not_eligible")
+            except ForbiddenError as exc:
+                known = exc.code == "delegation_not_in_election"
+                await self._send_error(exc.code if known and exc.code else "not_eligible")
                 return None
             except AppError as exc:
                 await self._send_error(exc.code or "error")

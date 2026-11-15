@@ -290,13 +290,13 @@ export function fileSlug(name: string): string {
   return slug || 'gremium';
 }
 
-/** The schemes that an Info link may use (spec 000952); the server refuses every other. */
+/** The schemes that an Info link may use (spec 001012); the server refuses every other. */
 const INFO_SCHEMES = ['https://', 'http://', 'mailto:'] as const;
-/** The most links of one Info (spec 000952). */
+/** The most links of one Info (spec 001012). */
 export const INFO_MAX_LINKS = 30;
-/** The longest label of an Info link (spec 000952). */
+/** The longest label of an Info link (spec 001012). */
 export const INFO_MAX_LABEL = 80;
-/** The longest Info text (spec 000953). */
+/** The longest Info text (spec 001013). */
 export const INFO_MAX_TEXT = 20_000;
 
 /** The URL starts with `https://`, `http://` or `mailto:` and has more after it. */
@@ -312,7 +312,7 @@ export function infoEmpty(info: GremiumInfo): boolean {
 
 /**
  * The tab "Info" shows while the Info loads, after a load error, to an editor and when
- * the Info has content. A reader never sees an empty tab (spec 000955).
+ * the Info has content. A reader never sees an empty tab (spec 001015).
  */
 export function infoTabShown(info: GremiumInfo | null | undefined): boolean {
   return info === undefined || info === null || info.canEdit || !infoEmpty(info);

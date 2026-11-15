@@ -174,7 +174,7 @@ describe('rangeDays', () => {
     expect(rangeDays({ from: '2024-02', to: '2024-02' })).toEqual({ from: '2024-02-01', to: '2024-02-29' });
   });
 
-  it('checks the Info links and when the tab shows (§ 000952, § 000955)', () => {
+  it('checks the Info links and when the tab shows (§ 001012, § 001015)', () => {
     expect(infoUrlValid('https://wiki.example.org')).toBe(true);
     expect(infoUrlValid(' MAILTO:a@b.de ')).toBe(true);
     expect(infoUrlValid('https://')).toBe(false);

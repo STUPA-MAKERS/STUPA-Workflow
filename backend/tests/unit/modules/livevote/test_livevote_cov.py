@@ -58,11 +58,11 @@ from app.modules.livevote.service.paging import (
     _encode_cursor,
     _encode_offset,
 )
-from app.modules.livevote.service.votes import _Presence
 from app.modules.meetings import rules as permissions_mod
 from app.modules.meetings.agenda_service import AgendaService, title_of
 from app.modules.meetings.attendance_service import AttendanceService
 from app.modules.meetings.models import Meeting
+from app.modules.meetings.present import Present
 from app.shared.errors import (
     BadRequestError,
     ConflictError,
@@ -70,6 +70,7 @@ from app.shared.errors import (
     NotFoundError,
     ValidationProblem,
 )
+from tests.unit.conftest import Presence
 
 
 class _Scalars:
@@ -180,14 +181,25 @@ def audit_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     """
     import app.modules.meetings.agenda_service as agenda_mod
     import app.modules.meetings.attendance_service as attendance_mod
-    import app.modules.voting.service as voting_service_mod
+    import app.modules.voting.service.cast as voting_cast_mod
+    import app.modules.voting.service.close as voting_close_mod
+    import app.modules.voting.service.create as voting_create_mod
+    import app.modules.voting.service.delete as voting_delete_mod
 
     calls: list[dict[str, Any]] = []
 
     async def _record(_session: Any, **kw: Any) -> None:
         calls.append(kw)
 
-    for mod in (agenda_mod, attendance_mod, lifecycle_mod, voting_service_mod):
+    for mod in (
+        agenda_mod,
+        attendance_mod,
+        lifecycle_mod,
+        voting_cast_mod,
+        voting_close_mod,
+        voting_create_mod,
+        voting_delete_mod,
+    ):
         monkeypatch.setattr(mod, "audit_record", _record)
     return calls
 
@@ -609,30 +621,30 @@ async def test_votes_for_empty() -> None:
     assert await svc._votes_for([]) == {}
 
 
-async def test_present_by_meeting_empty() -> None:
+async def test_present_seats_of_no_meeting_reads_nothing() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc._present_by_meeting([]) == {}
+    assert await svc._present_seats([]) == {}
 
 
 async def test_vote_tallies_empty() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc._vote_tallies([], _Presence({}, {})) == {}
+    assert await svc._vote_tallies([], {}) == {}
 
 
-async def test_votes_for_closed_revealed() -> None:
+async def test_votes_for_closed_revealed(presence: Presence) -> None:
     """Reveal a closed vote.
 
     The execute order: `_votes_for` selects the votes with `scalars().all()`.
     `_vote_tallies` then reads the secret ballots with one `execute().all()`.
-    `_present_by_meeting` comes last. The fake session returns, in order: the votes, the
-    secret ballots and the present count.
+    The fake session returns, in order: the votes and the secret ballots. The fixture
+    `presence` gives the present count (§F/meetings/meetings/000946).
     """
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="closed", result="passed", eligible=2)
+    presence.here = Present(members=2)
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((mid, 2)),
             res((vrow.id, "yes"), (vrow.id, "no")),
         ]
     )
@@ -674,7 +686,6 @@ async def test_votes_for_open_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((mid, 3)),
             res((vrow.id, "yes")),
         ]
     )
@@ -688,7 +699,9 @@ async def test_votes_for_open_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
     assert item.voted == 1
 
 
-async def test_votes_for_open_all_voted_stays_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_votes_for_open_all_voted_stays_hidden(
+    monkeypatch: pytest.MonkeyPatch, presence: Presence
+) -> None:
     """Keep the tally of an open vote hidden even when every present member voted.
 
     The fake session returns, in order: the votes, two secret ballots and two present
@@ -696,10 +709,10 @@ async def test_votes_for_open_all_voted_stays_hidden(monkeypatch: pytest.MonkeyP
     """
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="open", eligible=2)
+    presence.here = Present(members=2)
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((mid, 2)),
             res((vrow.id, "yes"), (vrow.id, "yes")),
         ]
     )
@@ -718,7 +731,7 @@ async def test_votes_for_skips_unbound_vote() -> None:
     """Skip a vote without a meeting.
 
     The vote with `meeting_id` None hits the `continue` branch of `_votes_for`. The call
-    passes the id on to `_present_by_meeting`, but the loop skips the vote.
+    passes the id on to the read of the present count, but the loop skips the vote.
     """
     vrow = _vote_row(meeting_id=None)
     sess = _QueueSession(
@@ -750,7 +763,6 @@ async def test_votes_for_config_not_dict() -> None:
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((mid, 0)),
             res(),
         ]
     )
@@ -768,7 +780,7 @@ async def test_vote_tallies_failed_reason_set() -> None:
     vrow = _vote_row(meeting_id=mid, status="closed", result="rejected", eligible=10)
     sess = _QueueSession(executes=[res((vrow.id, "no"), (vrow.id, "no"))])
     svc = MeetingService(sess)  # type: ignore[arg-type]
-    out = await svc._vote_tallies([vrow], _Presence({}, {}))
+    out = await svc._vote_tallies([vrow], {})
     counts, _leading, reason = out[vrow.id]
     assert counts == {"yes": 0, "no": 2}
     assert reason in ("quorum", "majority")
@@ -1227,13 +1239,27 @@ async def test_patch_closed_reopen_conflict() -> None:
         await svc.patch(m.id, MeetingPatch(status="live"), _admin())
 
 
-async def test_patch_closed_settings_frozen() -> None:
+@pytest.mark.parametrize("state", ["rendering", "final"])
+async def test_patch_closed_settings_frozen(state: str) -> None:
+    """§F/meetings/meetings/000982: a final protocol closes the head data."""
+    m = _meeting(status="closed")
+    from app.modules.livevote.schemas import MeetingPatch
+
+    svc = MeetingService(_QueueSession(executes=[res(m)], scalar_q=[state]))  # type: ignore[arg-type]
+    with pytest.raises(ConflictError) as ei:
+        await svc.patch(m.id, MeetingPatch(date=date(2026, 7, 1)), _admin())
+    assert ei.value.code == "protocol_final"
+
+
+async def test_patch_closed_keeps_its_kind() -> None:
+    """§F/meetings/meetings/000982: the kind closes with the meeting."""
     m = _meeting(status="closed")
     from app.modules.livevote.schemas import MeetingPatch
 
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
-    with pytest.raises(ConflictError):
-        await svc.patch(m.id, MeetingPatch(date=date(2026, 7, 1)), _admin())
+    with pytest.raises(ConflictError) as ei:
+        await svc.patch(m.id, MeetingPatch(kind="extraordinary"), _admin())
+    assert ei.value.code == "meeting_closed"
 
 
 async def test_patch_end_before_start_bad_request() -> None:
@@ -1874,18 +1900,18 @@ async def test_set_body_after_close_with_locked_protocol_conflicts(
     kwargs: dict[str, Any] = {"body": "x"} if field == "body" else {"non_public": True}
     with pytest.raises(ConflictError) as ei:
         await AgendaService(sess).set_body(m.id, item.id, **kwargs)  # type: ignore[arg-type]
-    assert ei.value.code == "protocol_locked"
+    assert ei.value.code == "protocol_final"
     assert item.body == "old"
 
 
-async def test_rename_after_close_conflicts() -> None:
-    """A rename is a change of the agenda and stops with the close."""
+async def test_rename_after_close_follows_the_protocol() -> None:
+    """§F/meetings/meetings/000982: a rename is open until the protocol is final."""
     m = _meeting(status="closed")
     item = _agenda_item(application_id=None, title="old")
-    sess = _QueueSession(executes=[res(m), res(item)])
+    sess = _QueueSession(executes=[res(m), res(item)], scalar_q=["final"])
     with pytest.raises(ConflictError) as ei:
         await AgendaService(sess).set_body(m.id, item.id, title="new")  # type: ignore[arg-type]
-    assert ei.value.code == "meeting_closed"
+    assert ei.value.code == "protocol_final"
     assert item.title == "old"
 
 
@@ -3097,11 +3123,10 @@ async def test_can_run_votes_is_the_protokollant_with_vote_manage(
 def test_open_vote_application_top_with_quorum_and_eligible(
     app: FastAPI, client: TestClient, fakes
 ) -> None:
-    """Open a vote on an application item with a quorum and the server roster.
+    """Open a vote on an application item with the server roster.
 
-    The item has an explicit `quorum_percent`. The router must ignore a client
-    `eligibleCount`, because the quorum denominator always comes from the real roster. The
-    fake `vote_eligible_count` returns 7, and the body tries 9.
+    The router must ignore a client `eligibleCount`, because the quorum denominator always
+    comes from the real roster. The fake `vote_eligible_count` returns 7, and the body tries 9.
     """
     from types import SimpleNamespace
 
@@ -3112,12 +3137,25 @@ def test_open_vote_application_top_with_quorum_and_eligible(
         f"/api/meetings/{uuid4()}/votes",
         json={
             "agendaItemId": str(uuid4()),
-            "quorumPercent": 50,
             "eligibleCount": 9,
         },
     )
     assert r.status_code == 200
     assert fakes["voting"].last_payload.eligible_count == 7
+
+
+def test_open_vote_refuses_a_quorum_on_one_vote_422(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    """§F/meetings/voting/000935: the body of a vote takes no quorum in percent."""
+    fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
+    _login(app)
+    r = client.post(
+        f"/api/meetings/{uuid4()}/votes",
+        json={"agendaItemId": str(uuid4()), "quorumPercent": 0},
+    )
+    assert r.status_code == 422
+    assert r.headers["content-type"] == "application/problem+json"
 
 
 def test_open_vote_application_already_has_vote_conflict(
@@ -3755,8 +3793,8 @@ async def test_assert_can_read_forbidden(monkeypatch: pytest.MonkeyPatch) -> Non
 async def test_get_with_votes_and_protocol() -> None:
     """Read a meeting with its votes and its protocol.
 
-    The fake session returns, in order: the meeting, the votes, the secret ballots, the
-    present count, no admitted guests, no voting delegations of the caller, no own voted
+    The fake session returns, in order: the meeting, the votes, the secret ballots,
+    no admitted guests, no voting delegations of the caller, no own voted
     markers and the protocol id.
     """
     mid = uuid4()
@@ -3768,7 +3806,6 @@ async def test_get_with_votes_and_protocol() -> None:
             res(m),
             res(vrow),
             res((vrow.id, "yes")),
-            res((mid, 1)),
             res(),
             res(),
             res(),
@@ -4067,7 +4104,7 @@ async def test_set_done_after_close_with_locked_protocol_conflicts(
     sess = _QueueSession(executes=[res(m), res(item)], scalar_q=[protocol_status])
     with pytest.raises(ConflictError) as ei:
         await AgendaService(sess).set_done(m.id, item.id, done=True, actor="mgr")  # type: ignore[arg-type]
-    assert ei.value.code == "protocol_locked"
+    assert ei.value.code == "protocol_final"
     assert item.done_at is None
 
 

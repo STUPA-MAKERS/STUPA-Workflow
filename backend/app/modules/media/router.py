@@ -12,11 +12,10 @@ magic-link applicant. The id is a random uuid4, so it is unguessable on top of t
 session check. The image of a protocol that an applicant cannot read is therefore
 reachable only with its id.
 
-``GET /api/media/documents/{id}`` streams one embedded PDF the same way, as a
-download or with ``?inline=true`` as the framable preview of the file viewer, and
-``GET /api/media/documents/{id}/info`` answers its name and page count. The upload
-of a PDF is ``POST /api/meetings/{id}/documents`` in `protocol.documents_router`,
-because only a person who can write the protocol may upload one (spec 000862).
+The routes of an embedded PDF (`/api/media/documents/{id}`, its info route and the
+upload ``POST /api/meetings/{id}/documents``) are in `protocol.documents_router`,
+because they check a right on the Sitzung (spec 000862, §NF/security/files/000979).
+This module only builds their answer (`document_response`).
 
 The route of the images of a public protocol is in `protocol.public_images_router`,
 because it reads the protocol, and `media` imports no higher module
@@ -37,7 +36,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
@@ -45,7 +44,7 @@ from app.modules.auth.oauth import SCOPES
 from app.modules.auth.principal import Applicant, Principal
 from app.modules.files.body import read_capped
 from app.modules.files.storage import ObjectStorage
-from app.modules.media.schemas import MarkdownDocumentOut, MarkdownImageOut
+from app.modules.media.schemas import MarkdownImageOut
 from app.modules.media.service import DocumentStream, ImageStream, MediaService
 from app.shared.antiabuse import (
     enforce_media_body_cap,
@@ -179,42 +178,3 @@ async def get_image(
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
     return image_response(await service.open(image_id), _PRIVATE_CACHE)
-
-
-@router.get(
-    "/media/documents/{document_id}",
-    response_class=StreamingResponse,
-    responses=_errors(401, 404, 503),
-)
-async def get_document(
-    document_id: UUID,
-    service: ServiceDep,
-    principal: Annotated[Principal | None, Depends(get_current_principal)],
-    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
-    inline: Annotated[bool, Query()] = False,
-) -> StreamingResponse:
-    """Stream one embedded PDF to a principal or a magic-link applicant.
-
-    ``?inline=true`` answers the framable preview of the file viewer, else a download.
-    """
-    if principal is None and applicant is None:
-        raise UnauthorizedError("Authentication required.")
-    document = await service.open_document(document_id)
-    return document_response(document, inline=inline, cache_control=_PRIVATE_CACHE)
-
-
-@router.get(
-    "/media/documents/{document_id}/info",
-    response_model=MarkdownDocumentOut,
-    responses=_errors(401, 404),
-)
-async def get_document_info(
-    document_id: UUID,
-    service: ServiceDep,
-    principal: Annotated[Principal | None, Depends(get_current_principal)],
-    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
-) -> MarkdownDocumentOut:
-    """Return the file name, size and page count of one embedded PDF for its badge."""
-    if principal is None and applicant is None:
-        raise UnauthorizedError("Authentication required.")
-    return await service.document_info(document_id)

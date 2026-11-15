@@ -125,12 +125,13 @@ export interface PublicProtocolQuery {
  * question and its date only: no meeting title, no result and no counts.
  */
 export interface PublicDecisionRow {
-  readonly protocolId: string;
+  /** The protocol that records the decision; a circular vote has none (`null`). */
+  readonly protocolId: string | null;
   readonly gremium: PublicGremiumRef;
   /** The meeting date, `YYYY-MM-DD`. */
   readonly date: string;
   readonly semester: string;
-  readonly kind: 'motion' | 'election';
+  readonly kind: 'motion' | 'election' | 'circular';
   readonly question: string | null;
   readonly meetingTitle: string | null;
   readonly result: PublicVoteResult | null;

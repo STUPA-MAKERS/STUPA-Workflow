@@ -31,6 +31,8 @@ from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff", "no_majority"]
 #: ``circular`` is an Umlaufverfahren: a motion of a Gremium without a meeting.
 VoteKind = Literal["motion", "election", "poll", "circular"]
+#: The reason of a cancel that the row keeps. An objection ends a circular vote.
+CancelReason = Literal["objection"]
 
 
 class ElectionRunoffOut(FrozenCamelModel, frozen=True):
@@ -60,6 +62,11 @@ class ElectionLotOut(FrozenCamelModel, frozen=True):
     by_name: str | None = Field(default=None, alias="byName")
 
 
+def _without_sub(lot: ElectionLotOut | None) -> ElectionLotOut | None:
+    """Return the lot without the ``sub`` of the lead who drew it."""
+    return lot if lot is None or lot.by is None else lot.model_copy(update={"by": None})
+
+
 class ElectionResultOut(FrozenCamelModel, frozen=True):
     """The stored result of a closed election (``vote.election_result``)."""
 
@@ -72,6 +79,9 @@ class ElectionResultOut(FrozenCamelModel, frozen=True):
     elected: Sequence[str] = Field(default_factory=tuple)
     runoff: ElectionRunoffOut | None = None
     lot: ElectionLotOut | None = None
+    #: The lot for a place in the third Wahlgang, after a tie for the second place
+    #: of the second Wahlgang (§F/meetings/voting/000971). It elects nobody.
+    next_round_lot: ElectionLotOut | None = Field(default=None, alias="nextRoundLot")
 
     def public(self) -> ElectionResultOut:
         """Return the result without the ``sub`` of the lead who drew the lot.
@@ -79,10 +89,16 @@ class ElectionResultOut(FrozenCamelModel, frozen=True):
         The WebSocket channel of a meeting reaches the beamer and the guests, so it
         carries this form. ``byName`` stays for the lot note.
         """
+        lots = (self.lot, self.next_round_lot)
         return (
             self
-            if self.lot is None or self.lot.by is None
-            else self.model_copy(update={"lot": self.lot.model_copy(update={"by": None})})
+            if all(lot is None or lot.by is None for lot in lots)
+            else self.model_copy(
+                update={
+                    "lot": _without_sub(self.lot),
+                    "next_round_lot": _without_sub(self.next_round_lot),
+                }
+            )
         )
 
 
@@ -408,7 +424,7 @@ class VoteOut(FrozenCamelModel, frozen=True):
     closed_at: datetime | None = Field(default=None, alias="closedAt")
     #: Why the vote was cancelled, when the row keeps it: ``objection`` for an
     #: Umlaufverfahren that a member objected to.
-    cancel_reason: Literal["objection"] | None = Field(default=None, alias="cancelReason")
+    cancel_reason: CancelReason | None = Field(default=None, alias="cancelReason")
     tally: TallyOut
     #: A vote with guests: no quorum, only the majority of the cast ballots. A
     #: copy of ``config.guestsVote`` for the vote card.

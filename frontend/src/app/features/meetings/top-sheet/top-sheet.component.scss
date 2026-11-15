@@ -19,6 +19,11 @@
   background: var(--color-surface-1);
   overflow: hidden;
 }
+/* The band of the protocol is the top of the pane: an edge of the band follows the round
+   corners of the pane, or the pane cuts it. */
+app-protocol-bar {
+  --pb-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+}
 
 .ts__head {
   display: flex;
@@ -207,6 +212,12 @@
     box-shadow: none;
     outline: none;
   }
+  /* A note inside the yellow pane: its own surface would be as dark as its text, so it
+     shows the edge of the field instead. */
+  .ts__public {
+    --note-surface: transparent;
+    box-shadow: inset 0 0 0 2px var(--field-text);
+  }
 }
 .ts__editor ::ng-deep .mde__host {
   min-height: 100%;
@@ -288,6 +299,9 @@
   // The protocol is the page there, not a card on it: no surface, no clip, and the format
   // bar sticks below the bar of the page (`--ld-bar-height`) while the text scrolls, as
   // frosted glass like that bar.
+  app-protocol-bar {
+    --pb-radius: 0;
+  }
   .ts {
     border-radius: 0;
     background: transparent;

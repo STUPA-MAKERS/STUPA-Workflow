@@ -1,4 +1,10 @@
-import type { MarkdownFormat } from '@stupa-makers/ui-kit/markdown-editor';
+import {
+  type KnownName,
+  MASK,
+  type MarkdownFormat,
+  type NameMatch,
+  matchKnownName,
+} from '@stupa-makers/ui-kit/markdown-editor';
 
 /** A text with a selection, as a textarea holds it. */
 export interface RawText {
@@ -17,8 +23,17 @@ const PREFIXES: Partial<Record<MarkdownFormat, string>> = { heading: '## ', bull
  * already has them. An empty selection gets an empty pair with the cursor between the
  * marks. A heading and a list put their prefix before each selected line, or remove it
  * when every line already has it.
+ *
+ * Blackout (000690): a selection in one line gets the marker `%%…%%`. A selection over more
+ * than one line, a caret in an empty line, and a caret in a block switch a block: the fence
+ * lines `%%` go around the selected lines, or the fence lines of the block go away.
  */
 export function applyRawFormat(raw: RawText, format: MarkdownFormat): RawText {
+  if (format === 'blackout' && !hasInlineMark(raw)) {
+    const block = enclosingBlock(raw);
+    if (block) return removeBlock(raw, block);
+    if (wantsBlock(raw)) return addBlock(raw);
+  }
   const mark = MARKS[format];
   if (mark) return toggleMark(raw, mark);
   return togglePrefix(raw, PREFIXES[format] ?? '');
@@ -45,6 +60,87 @@ function toggleMark({ text, start, end }: RawText, mark: string): RawText {
     start: start + n,
     end: end + n,
   };
+}
+
+/** A fence line of a blackout block: only `%%`. */
+const FENCE_RE = /^[ \t]*%%[ \t]*$/;
+
+/** The offsets of the start of each line, and the lines. */
+function linesOf(text: string): { readonly lines: readonly string[]; readonly starts: readonly number[] } {
+  const lines = text.split('\n');
+  const starts = lines.reduce<readonly number[]>(
+    (acc, _l, i) => (i === 0 ? [0] : [...acc, acc[i - 1] + lines[i - 1].length + 1]),
+    [],
+  );
+  return { lines, starts };
+}
+
+/** The line index of an offset. */
+function lineAt(starts: readonly number[], at: number): number {
+  const after = starts.findIndex((s) => s > at);
+  return (after < 0 ? starts.length : after) - 1;
+}
+
+/** True if the selection in one line has the marker `%%…%%` around it. */
+function hasInlineMark({ text, start, end }: RawText): boolean {
+  return (
+    !text.slice(start, end).includes('\n') &&
+    text.slice(start - 2, start) === '%%' &&
+    text.slice(end, end + 2) === '%%'
+  );
+}
+
+/** True if the selection spans more than one line, or the caret is in an empty line. */
+function wantsBlock({ text, start, end }: RawText): boolean {
+  if (text.slice(start, end).includes('\n')) return true;
+  const { lines, starts } = linesOf(text);
+  return start === end && !lines[lineAt(starts, start)].trim();
+}
+
+/**
+ * The fence lines of the block that holds the selection, else `null`. Fence lines pair up
+ * from the top, outside code, as the renderers read them.
+ */
+function enclosingBlock({ text, start, end }: RawText): { readonly open: number; readonly close: number } | null {
+  const { lines, starts } = linesOf(text);
+  const first = lineAt(starts, start);
+  const last = lineAt(starts, end);
+  const pairs = lines.reduce<{ readonly code: boolean; readonly open: number | null; readonly found: readonly [number, number][] }>(
+    (acc, line, i) => {
+      if (/^\s*(```|~~~)/.test(line)) return { ...acc, code: !acc.code };
+      if (acc.code || !FENCE_RE.test(line)) return acc;
+      return acc.open === null ? { ...acc, open: i } : { ...acc, open: null, found: [...acc.found, [acc.open, i]] };
+    },
+    { code: false, open: null, found: [] },
+  ).found;
+  const hit = pairs.find(([o, c]) => o <= first && last <= c);
+  return hit ? { open: hit[0], close: hit[1] } : null;
+}
+
+/** Remove the two fence lines of a block, and keep the selection on the same text. */
+function removeBlock({ text, start, end }: RawText, block: { readonly open: number; readonly close: number }): RawText {
+  const { lines, starts } = linesOf(text);
+  const openAt = starts[block.open];
+  const openLen = lines[block.open].length + 1;
+  const closeAt = starts[block.close];
+  const closeLen = lines[block.close].length + 1;
+  const kept = lines.filter((_l, i) => i !== block.open && i !== block.close).join('\n');
+  const shift = (at: number): number => {
+    if (at <= openAt) return at;
+    if (at < openAt + openLen) return openAt;
+    if (at <= closeAt) return at - openLen;
+    return Math.max(closeAt - openLen, at - openLen - closeLen);
+  };
+  return { text: kept, start: shift(start), end: Math.min(kept.length, shift(end)) };
+}
+
+/** Put the fence lines `%%` around the lines of the selection. */
+function addBlock({ text, start, end }: RawText): RawText {
+  const from = text.lastIndexOf('\n', start - 1) + 1;
+  const nl = text.indexOf('\n', end > start && text[end - 1] === '\n' ? end - 1 : end);
+  const to = nl < 0 ? text.length : nl;
+  const block = `%%\n${text.slice(from, to)}\n%%`;
+  return { text: text.slice(0, from) + block + text.slice(to), start: start + 3, end: end + 3 };
 }
 
 function starsBefore(text: string, at: number): number {
@@ -130,4 +226,37 @@ export function insertRawInline({ text, start, end }: RawText, reference: string
   const insert = `${lead}${reference}${trail}`;
   const caret = start + insert.length;
   return { text: before + insert + after, start: caret, end: caret };
+}
+
+/** A closed blackout marker or a closed code span in one line. */
+const CLOSED_RE = /(?<!\\)%%[^%\n]*%%|`[^`\n]*`/g;
+
+/**
+ * The line up to the caret with each marker, each code span and everything after an
+ * open marker or an open code span as `MASK`, so the offsets stay the same.
+ */
+function maskedLine(line: string): string {
+  const closed = line.replace(CLOSED_RE, (m) => MASK.repeat(m.length));
+  const open = closed.search(/(?<!\\)%%|`/);
+  return open < 0 ? closed : closed.slice(0, open) + MASK.repeat(closed.length - open);
+}
+
+/** True if the line of the offset is in a code block. */
+function inCodeBlock(text: string, at: number): boolean {
+  const before = text.slice(0, text.lastIndexOf('\n', at - 1) + 1).split('\n');
+  return before.filter((l) => /^\s*(```|~~~)/.test(l)).length % 2 === 1;
+}
+
+/**
+ * The range of the Markdown source that gets the blackout marker `%%…%%` after the
+ * character just typed before the caret (000969), or `null`. A name in a blackout block,
+ * in code or in a marker gets none.
+ */
+export function rawKnownName(raw: RawText, names: readonly KnownName[]): NameMatch | null {
+  const { text, start, end } = raw;
+  if (start !== end || start === 0 || names.length === 0) return null;
+  if (enclosingBlock(raw) || inCodeBlock(text, start)) return null;
+  const from = text.lastIndexOf('\n', start - 1) + 1;
+  const match = matchKnownName(maskedLine(text.slice(from, start)), names);
+  return match ? { from: from + match.from, to: from + match.to } : null;
 }

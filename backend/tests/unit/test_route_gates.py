@@ -168,6 +168,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/meetings/{meeting_id}/join-code/rotate"): _MEETING_MANAGE,
     ("GET", "/api/meetings/{meeting_id}/protocol"): "ProtocolService.authorize_read_meeting",
     ("POST", "/api/meetings/{meeting_id}/protocol"): "ProtocolService.authorize_write_meeting",
+    ("GET", "/api/meetings/{meeting_id}/known-names"): "ProtocolService.authorize_write_meeting",
     ("POST", "/api/meetings/{meeting_id}/minute-taker-handover"): "HandoverOps.can_hand_over",
     ("DELETE", "/api/meetings/{meeting_id}/minute-taker-handover"): "HandoverOps.can_hand_over",
     ("POST", "/api/meetings/{meeting_id}/votes"): (
@@ -194,8 +195,10 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("DELETE", "/api/protocols/{protocol_id}"): _PROTOCOL_WRITE,
     ("POST", "/api/protocols/{protocol_id}/finalize"): "ProtocolService.authorize_finalize",
     ("POST", "/api/protocols/{protocol_id}/draft-mail"): "ProtocolService.authorize_write",
+    ("GET", "/api/protocols/{protocol_id}/draft-pdf"): _PROTOCOL_READ,
     ("PUT", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
     ("DELETE", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
+    ("POST", "/api/protocols/{protocol_id}/reopen"): "ProtocolService.authorize_finalize",
     ("GET", "/api/protocols/{protocol_id}/pdf"): _PROTOCOL_READ,
     ("GET", "/api/protocols/{protocol_id}/pdf/public"): _PROTOCOL_READ,
     ("POST", "/api/protocols/{protocol_id}/votes"): _PROTOCOL_WRITE,
@@ -264,6 +267,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/votes/{vote_id}/cancel"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/close"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/draw-lot"): _MANAGE_VOTE,
+    ("POST", "/api/votes/{vote_id}/next-round"): _MANAGE_VOTE,
     ("POST", "/api/votes/{vote_id}/objection"): (
         "CircularService.object (VotingService.can_cast_own: roster of the vote)"
     ),

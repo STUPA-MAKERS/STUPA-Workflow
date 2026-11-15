@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-14
 implementation:
   - backend/app/modules/delegations/service.py
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
 scope:
   - backend/app/modules/delegations
   - backend/app/modules/voting

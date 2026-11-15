@@ -36,7 +36,7 @@ async function setup(api = gremienApiMock()) {
 describe('gremium info drafts', () => {
   const row = (label: string, url: string) => ({ key: 1, label, url });
 
-  it('drops blank rows and trims (§ 000952)', () => {
+  it('drops blank rows and trims (§ 001012)', () => {
     expect(linkBlank(row(' ', ''))).toBe(true);
     expect(draftLinks([row(' Wiki ', ' https://w.de '), row('', '')])).toEqual([
       { label: 'Wiki', url: 'https://w.de' },
@@ -81,7 +81,7 @@ describe('GremiumInfoDialogComponent', () => {
     expect(cmp.full()).toBe(true);
   });
 
-  it('saves text and links with the version read (§ 000954)', async () => {
+  it('saves text and links with the version read (§ 001014)', async () => {
     const { cmp, api, toast } = await setup();
     const saved = jest.fn();
     const closed = jest.fn();

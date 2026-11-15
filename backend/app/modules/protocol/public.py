@@ -24,11 +24,12 @@ import logging
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date as _date
-from typing import Any, Literal
+from datetime import datetime
+from typing import Any, Literal, NamedTuple
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import ColumnElement, Date, Select, and_, cast, func, or_, select
+from sqlalchemy import ColumnElement, Date, Select, Text, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.storage import ObjectStorage, StorageError
@@ -37,6 +38,10 @@ from app.modules.media.refs import document_ids_in, image_ids_in
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.filename import protocol_pdf_filename
+from app.modules.voting.circular import CIRCULAR
+from app.modules.voting.models import Vote
+from app.modules.voting.schemas import VoteOut
+from app.modules.voting.service import VotingService
 from app.shared.config_schemas import ElectionConfig, MajorityRule
 from app.shared.errors import NotFoundError, ServiceUnavailableError
 from app.shared.schemas import FrozenCamelModel
@@ -324,6 +329,15 @@ class PublicFilter:
     q: str | None = None
 
 
+class CircularRow(NamedTuple):
+    """One closed circular vote of a public Gremium, without its result and sums."""
+
+    vote_id: UUID
+    question: str | None
+    closed_at: datetime | None
+    gremium: Gremium
+
+
 @dataclass(frozen=True, slots=True)
 class PublicProtocolService:
     """The reads of the public protocols page. No write and no auth here.
@@ -452,6 +466,35 @@ class PublicProtocolService:
             meeting_day_expr().desc(), Meeting.created_at.desc(), Protocol.id
         )
         return [(p, m, g) for p, m, g in (await self.session.execute(stmt)).all()]
+
+    async def circular_rows(self, flt: PublicFilter) -> list[CircularRow]:
+        """Read the closed circular votes of the public gremien, newest close first.
+
+        A circular vote stands in no protocol, so its row is the source
+        (§F/meetings/voting/000949). A row holds no result and no sums: the caller
+        cuts the page first and reads `circular_view` only for the votes of the page.
+        Only the gremium filter applies here: the caller filters by the day of the
+        close and by the question.
+        """
+        stmt = (
+            select(Vote.id, Vote.question, Vote.closed_at, Gremium)
+            .join(Gremium, Vote.eligible_group == cast(Gremium.id, Text))
+            .where(
+                Vote.kind == CIRCULAR,
+                Vote.status == "closed",
+                Gremium.protocols_public.is_(True),
+                *([Gremium.id.in_(flt.gremium_ids)] if flt.gremium_ids else []),
+            )
+            .order_by(Vote.closed_at.desc(), Vote.id)
+        )
+        return [
+            CircularRow(vote_id, question, closed_at, gremium)
+            for vote_id, question, closed_at, gremium in (await self.session.execute(stmt)).all()
+        ]
+
+    async def circular_view(self, vote_id: UUID) -> VoteOut:
+        """Read one closed circular vote with its result and the sums of its votes."""
+        return await VotingService(self.session).get(vote_id)
 
     async def list_semesters(self, flt: PublicFilter) -> list[PublicSemesterOut]:
         """Count the visible protocols per semester, newest semester first.

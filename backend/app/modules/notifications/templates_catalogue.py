@@ -209,6 +209,21 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         },
     ),
     MailTemplateSpec(
+        "late_excuse",
+        "meeting",
+        meetings.BUILTIN_LATE_EXCUSE_SUBJECT,
+        meetings.BUILTIN_LATE_EXCUSE_BODY,
+        {
+            "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
+            "memberName": "Name des Mitglieds",
+            "reason": "Grund der Entschuldigung",
+            "meetingTitle": "Titel der Sitzung",
+            "meetingDate": "Datum",
+            "gremiumName": "Gremium",
+            "meetingId": "ID der Sitzung",
+        },
+    ),
+    MailTemplateSpec(
         "delegation_granted",
         "delegation",
         meetings.BUILTIN_DELEGATION_GRANTED_SUBJECT,
@@ -335,6 +350,20 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         polls.POLL_REMINDER_SUBJECT,
         polls.POLL_REMINDER_BODY,
         polls.POLL_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        polls.CIRCULAR_OPEN_KEY,
+        polls.CIRCULAR_OPEN_KEY,
+        polls.CIRCULAR_OPEN_SUBJECT,
+        polls.CIRCULAR_OPEN_BODY,
+        polls.CIRCULAR_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        polls.CIRCULAR_REMINDER_KEY,
+        polls.CIRCULAR_REMINDER_KEY,
+        polls.CIRCULAR_REMINDER_SUBJECT,
+        polls.CIRCULAR_REMINDER_BODY,
+        polls.CIRCULAR_PLACEHOLDERS,
     ),
     MailTemplateSpec(
         todos.TODO_ASSIGNED_KEY,

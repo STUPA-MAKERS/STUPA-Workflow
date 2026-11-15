@@ -66,9 +66,9 @@ export type GremiumTab = (typeof GREMIUM_TABS)[number];
  * opens the live or the next meeting.
  *
  * The sub-tabs follow, kept in `?tab=` so a link opens one of them: Info (first, spec
- * 000950), Sitzungen, Mitglieder, Anwesenheit, Beschlüsse, To-Dos. A tab loads its data
+ * 001010), Sitzungen, Mitglieder, Anwesenheit, Beschlüsse, To-Dos. A tab loads its data
  * when it opens first and keeps it while the gremium stays open; only the Info loads with
- * the gremium, because an empty Info hides its tab from a reader (spec 000955).
+ * the gremium, because an empty Info hides its tab from a reader (spec 001015).
  *
  * On a phone the header holds the title and one action; the rest moves into the ⋮ menu.
  */

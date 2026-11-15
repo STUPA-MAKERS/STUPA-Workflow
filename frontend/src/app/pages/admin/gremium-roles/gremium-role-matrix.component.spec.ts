@@ -97,7 +97,7 @@ const row = (name: string) =>
 describe('GremiumRoleMatrixComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('shows one column per right of the catalogue, "Protokoll freigeben" included', async () => {
+  it('shows one column per right of the catalogue, "Protokoll finalisieren & senden" included', async () => {
     await setup();
     const heads = screen
       .getAllByRole('columnheader')
@@ -108,7 +108,7 @@ describe('GremiumRoleMatrixComponent', () => {
       'Abstimmungen führen',
       'Abstimmen',
       'Protokoll führen',
-      'Protokoll freigeben',
+      'Protokoll finalisieren & senden',
       'Info bearbeiten',
       'Aktionen',
     ]);
@@ -134,13 +134,13 @@ describe('GremiumRoleMatrixComponent', () => {
   it('saves a box at once and puts it back when the save fails', async () => {
     const api = makeApi();
     const { toast } = await setup({ api });
-    const box = screen.getByRole('checkbox', { name: 'Protokoll freigeben: Protokoll' });
+    const box = screen.getByRole('checkbox', { name: 'Protokoll finalisieren & senden: Protokoll' });
     expect(box).not.toBeChecked();
     await userEvent.click(box);
     expect(api.updateGremiumRole).toHaveBeenCalledWith('gr-p', {
       permissions: ['vote.cast', 'protocol.write', 'protocol.finalize'],
     });
-    expect(screen.getByRole('checkbox', { name: 'Protokoll freigeben: Protokoll' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Protokoll finalisieren & senden: Protokoll' })).toBeChecked();
 
     api.updateGremiumRole.mockReturnValueOnce(throwError(() => ({ status: 500 })));
     await userEvent.click(screen.getByRole('checkbox', { name: 'Abstimmen: Protokoll' }));

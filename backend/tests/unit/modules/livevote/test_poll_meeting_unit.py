@@ -54,7 +54,7 @@ def test_open_poll_builds_the_poll_config(setup: Any) -> None:  # noqa: F811
     meetings._meeting_out = _meeting(True, "vote")
     agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
     resp = client.post(
-        f"/api/meetings/{uuid4()}/votes", json=_poll_body(secret=True, quorumPercent=50)
+        f"/api/meetings/{uuid4()}/votes", json=_poll_body(secret=True)
     )
     assert resp.status_code == 200, resp.text
     config = voting.last_payload.config
@@ -130,8 +130,8 @@ def _poll_row(**over: Any) -> Any:
 async def test_votes_for_reads_a_closed_poll() -> None:
     """Read a closed poll in the meeting votes.
 
-    The fake session returns, in order: the votes, the ballots of the motion tally, the
-    poll ballots and the present members.
+    The fake session returns, in order: the votes, the ballots of the motion tally and
+    the poll ballots.
     """
     mid = uuid4()
     stored = PollResultOut(counts={"o1": 2, "o2": 1}, ballots=3, order=["o1", "o2"], top=["o1"])
@@ -141,7 +141,6 @@ async def test_votes_for_reads_a_closed_poll() -> None:
     sess = _QueueSession(
         executes=[
             res(row),
-            res((mid, 3)),
             res(),
             res((row.id, '["o1"]'), (row.id, '["o1","o2"]'), (row.id, '["o1"]')),
         ]
@@ -159,7 +158,7 @@ async def test_votes_for_reads_a_closed_poll() -> None:
 async def test_votes_for_hides_the_count_of_a_running_poll(monkeypatch: pytest.MonkeyPatch) -> None:
     mid = uuid4()
     row = _poll_row(meeting_id=mid, status="open", result=None)
-    sess = _QueueSession(executes=[res(row), res((mid, 3)), res(), res((row.id, '["o1"]'))])
+    sess = _QueueSession(executes=[res(row), res(), res((row.id, '["o1"]'))])
     monkeypatch.setattr(MeetingService, "_voters_by_vote", _persons_by_vote(1))
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
     assert item.voted == 1

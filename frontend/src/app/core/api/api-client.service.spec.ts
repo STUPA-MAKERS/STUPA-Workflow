@@ -447,7 +447,14 @@ describe('ApiClient', () => {
 
   it('GETs the vote list from /votes with repeated status and the filters', (done) => {
     api
-      .listVotes({ status: ['closed', 'cancelled'], gremiumId: 'g1', q: 'Haus', limit: 30, offset: 60 })
+      .listVotes({
+        status: ['closed', 'cancelled'],
+        gremiumId: 'g1',
+        q: 'Haus',
+        cancelledReason: 'objection',
+        limit: 30,
+        offset: 60,
+      })
       .subscribe((page) => {
         expect(page.total).toBe(0);
         done();
@@ -457,6 +464,7 @@ describe('ApiClient', () => {
     expect(req.request.params.getAll('status')).toEqual(['closed', 'cancelled']);
     expect(req.request.params.get('gremiumId')).toBe('g1');
     expect(req.request.params.get('q')).toBe('Haus');
+    expect(req.request.params.get('cancelledReason')).toBe('objection');
     expect(req.request.params.get('limit')).toBe('30');
     expect(req.request.params.get('offset')).toBe('60');
     req.flush({ items: [], total: 0, limit: 30, offset: 60 });
@@ -931,6 +939,13 @@ describe('ApiClient', () => {
     api.setProtocolApproval('p-1', null).subscribe((v) => (approved = v));
     http.expectOne({ method: 'DELETE', url: '/api/protocols/p-1/approval' }).flush(wire);
     expect(approved).toMatchObject({ approvedAt: null, approvedMeetingId: null, approvedMeetingTitle: null, approvedMeetingDate: null });
+  });
+
+  it('POSTs the reopen of a final protocol', () => {
+    let draft: unknown;
+    api.reopenProtocol('p-1').subscribe((v) => (draft = v));
+    http.expectOne({ method: 'POST', url: '/api/protocols/p-1/reopen' }).flush({ id: 'p-1', meetingId: 'm-1', markdown: '', status: 'draft' });
+    expect(draft).toMatchObject({ id: 'p-1', status: 'draft', isFinal: false });
   });
 
   it('PUTs the reason of an excuse only when given', () => {

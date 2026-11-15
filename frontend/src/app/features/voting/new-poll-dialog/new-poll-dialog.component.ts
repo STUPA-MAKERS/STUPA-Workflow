@@ -1,3 +1,4 @@
+import { pollRefusalMessage } from '../poll-refusal';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -12,7 +13,6 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ApiClient } from '@core/api/api-client.service';
 import type { Vote } from '@core/api/models';
-import { problemDetail } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -210,9 +210,7 @@ export class NewPollDialogComponent {
         },
         error: (err: unknown) => {
           this.submitting.set(false);
-          const detail = problemDetail(err);
-          const base = this.i18n.translate('meetings.toast.actionFailed');
-          this.toast.error(detail ? `${base}: ${detail}` : base);
+          this.toast.error(pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)));
         },
       });
   }

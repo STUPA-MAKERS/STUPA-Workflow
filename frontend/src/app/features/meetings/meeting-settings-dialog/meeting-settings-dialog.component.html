@@ -8,6 +8,8 @@
   <form class="msd" (submit)="$event.preventDefault(); save()">
     @if (locked()) {
       <app-note icon="lock">{{ 'meetings.settings.closedHint' | t }}</app-note>
+    } @else if (closedMeeting()) {
+      <app-note icon="lock">{{ 'meetings.settings.closedOpenHint' | t }}</app-note>
     } @else if (keeperLocked()) {
       <app-note icon="lock">{{ 'meetings.protokollant.lockedHint' | t }}</app-note>
     }
@@ -30,6 +32,18 @@
       [ngModel]="kind()"
       (ngModelChange)="kind.set($event)"
     />
+    @if (kind() === 'repeat' && !kindLocked()) {
+      <app-select
+        name="repeatOf"
+        [id]="'msd-repeat-of'"
+        [label]="'meetings.repeatOf.label' | t"
+        [placeholder]="'meetings.repeatOf.placeholder' | t"
+        [options]="repeatOfOptions()"
+        [required]="true"
+        [ngModel]="repeatOf()"
+        (ngModelChange)="repeatOf.set($event)"
+      />
+    }
     <app-select
       name="keeper"
       [id]="'msd-keeper'"
@@ -68,7 +82,7 @@
       />
     </div>
     @if (lateInvite(); as days) {
-      <app-note icon="alert" kind="warn" role="status">{{ 'meetings.lateInvite' | t: { n: days } }}</app-note>
+      <app-note icon="alert" kind="warn" role="status">{{ (days === 1 ? 'meetings.lateInvite1' : 'meetings.lateInvite') | t: { n: days } }}</app-note>
     }
     <div class="msd__where">
       <app-input

@@ -242,6 +242,8 @@ export interface Gremium {
   readonly repeatQuorumPercent?: number | null;
   /** Guests of a public meeting can get a ballot. Only without a quorum. */
   readonly guestsMayVote?: boolean;
+  /** The month (1 to 12) on whose first day a term of the gremium starts (§ 000948). */
+  readonly termStartMonth?: number;
   /** Number of members. Only the admin list (`GET /admin/committees`) gives it. */
   readonly memberCount?: number;
   /** Number of gremium roles, the forced roles included. Admin list only. */
@@ -276,6 +278,8 @@ export interface GremiumCreateBody {
   readonly repeatQuorumPercent?: number | null;
   /** Guests of a public meeting can get a ballot. Only without a quorum. */
   readonly guestsMayVote?: boolean;
+  /** Without a value the gremium takes the month of the meeting periods. */
+  readonly termStartMonth?: number;
   readonly protocolsPublic?: boolean;
 }
 
@@ -297,6 +301,7 @@ export interface GremiumUpdateBody {
   readonly repeatQuorumPercent?: number | null;
   /** Guests of a public meeting can get a ballot. Only without a quorum. */
   readonly guestsMayVote?: boolean;
+  readonly termStartMonth?: number;
   readonly protocolsPublic?: boolean;
 }
 
@@ -1115,13 +1120,11 @@ export const MAX_LINK_TTL_DAYS = 3650;
 
 /**
  * The open window of meetings (P admin.deadlines): `GET/PUT /admin/meeting-settings`.
- * Both values are minutes before the planned start of a meeting.
+ * The value is minutes before the planned start of a meeting.
  */
 export interface MeetingSettings {
   /** The earliest open (0 to 10080). */
   readonly openLeadMinutes: number;
-  /** Before this point the open needs an extra confirmation (0 to `openLeadMinutes`). */
-  readonly confirmLeadMinutes: number;
 }
 
 /**
@@ -1162,7 +1165,6 @@ export interface MeetingPeriods {
   /** Days between the invitation and a meeting of every other kind. */
   readonly inviteDaysExtraordinary: number;
   /** Days after a meeting until the draft of the protocol is due. */
-  readonly protocolDraftDays: number;
   /** Days after the close of a meeting in which a member can still give an excuse. */
   readonly lateExcuseDays: number;
   /** The number of unexcused absences in one term that ends a Mandat. */
@@ -1177,12 +1179,11 @@ export type MeetingPeriodKey = keyof MeetingPeriods;
 
 /** The lowest and the highest value of each {@link MeetingPeriods} field. */
 export const MEETING_PERIOD_BOUNDS: Readonly<Record<MeetingPeriodKey, readonly [number, number]>> = {
-  inviteDaysOrdinary: [0, 365],
-  inviteDaysExtraordinary: [0, 365],
-  protocolDraftDays: [0, 365],
-  lateExcuseDays: [0, 365],
+  inviteDaysOrdinary: [1, 365],
+  inviteDaysExtraordinary: [1, 365],
+  lateExcuseDays: [1, 365],
   absenceLimit: [1, 50],
-  circularMinDays: [0, 365],
+  circularMinDays: [1, 365],
   termStartMonth: [1, 12],
 };
 

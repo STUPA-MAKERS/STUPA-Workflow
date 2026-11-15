@@ -24,6 +24,7 @@ import { ButtonComponent, FocusDialogDirective, IconComponent, MEDIA, mediaQuery
 import { KeeperMenuComponent } from '../keeper-menu/keeper-menu.component';
 import { keeperNames } from '../keepers.util';
 import { MeetingGuestsService } from '../meeting-guests.service';
+import { eligibleCount, presentCount } from '@shared/present-count.util';
 import { clock } from '@shared/date-format';
 
 /**
@@ -220,8 +221,9 @@ export class SessionDockComponent {
     return { admitted: counts.admitted, pending: m.status === 'closed' ? 0 : counts.pending };
   });
 
-  protected readonly presentCount = computed(
-    () => this.attendance().filter((a) => a.status === 'present').length,
+  protected readonly presentCount = computed(() => presentCount(this.meeting(), this.attendance()));
+  protected readonly eligibleCount = computed(() =>
+    eligibleCount(this.meeting(), this.attendance()),
   );
   protected readonly hasPrev = computed(() => this.topIndex() > 0);
   protected readonly hasNext = computed(

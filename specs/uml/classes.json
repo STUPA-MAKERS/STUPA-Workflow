@@ -526,6 +526,13 @@
       "to": "Application"
     },
     {
+      "column": "meeting_id",
+      "from": "MarkdownDocument",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Meeting"
+    },
+    {
       "column": "active_application_id",
       "from": "Meeting",
       "multiplicity": "*",
@@ -538,6 +545,13 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Gremium"
+    },
+    {
+      "column": "repeat_of_id",
+      "from": "Meeting",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Meeting"
     },
     {
       "column": "current_agenda_item_id",
@@ -3667,6 +3681,12 @@
           "type": "INTEGER"
         },
         {
+          "name": "term_start_month",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "guests_may_vote",
           "nullable": false,
           "primaryKey": false,
@@ -4250,6 +4270,12 @@
           "type": "INTEGER"
         },
         {
+          "name": "meeting_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
           "name": "created_at",
           "nullable": false,
           "primaryKey": false,
@@ -4448,6 +4474,30 @@
           "nullable": true,
           "primaryKey": false,
           "type": "TEXT"
+        },
+        {
+          "name": "repeat_of_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "late_excuse_days",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "present_count",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "eligible_count",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
         },
         {
           "name": "id",
@@ -4787,12 +4837,6 @@
           "type": "INTEGER"
         },
         {
-          "name": "confirm_lead_minutes",
-          "nullable": false,
-          "primaryKey": false,
-          "type": "INTEGER"
-        },
-        {
           "name": "default_quorum_percent",
           "nullable": true,
           "primaryKey": false,
@@ -4830,12 +4874,6 @@
         },
         {
           "name": "invite_days_extraordinary",
-          "nullable": false,
-          "primaryKey": false,
-          "type": "INTEGER"
-        },
-        {
-          "name": "protocol_draft_days",
           "nullable": false,
           "primaryKey": false,
           "type": "INTEGER"
@@ -5364,6 +5402,12 @@
           "nullable": true,
           "primaryKey": false,
           "type": "TEXT"
+        },
+        {
+          "name": "draft_sent_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
         },
         {
           "name": "id",
@@ -7048,6 +7092,12 @@
         },
         {
           "name": "present_guests",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "present_seats",
           "nullable": true,
           "primaryKey": false,
           "type": "INTEGER"

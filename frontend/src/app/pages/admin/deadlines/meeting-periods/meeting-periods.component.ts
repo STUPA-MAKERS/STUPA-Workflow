@@ -1,3 +1,4 @@
+import { monthOptions } from '@shared/month-options';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
@@ -6,7 +7,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
-import { InputComponent, SectionComponent } from '@stupa-makers/ui-kit';
+import { InputComponent, SectionComponent, SelectFieldComponent } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import { MEETING_PERIOD_BOUNDS, type MeetingPeriodKey, type MeetingPeriods } from '../../admin.models';
 
@@ -26,7 +27,6 @@ const DAYS: TranslationKey = 'admin.meetingPeriods.days';
 const FIELDS: readonly Field[] = [
   { key: 'inviteDaysOrdinary', label: 'admin.meetingPeriods.inviteDaysOrdinary', unit: DAYS },
   { key: 'inviteDaysExtraordinary', label: 'admin.meetingPeriods.inviteDaysExtraordinary', unit: DAYS },
-  { key: 'protocolDraftDays', label: 'admin.meetingPeriods.protocolDraftDays', unit: DAYS },
   { key: 'lateExcuseDays', label: 'admin.meetingPeriods.lateExcuseDays', unit: DAYS },
   { key: 'circularMinDays', label: 'admin.meetingPeriods.circularMinDays', unit: DAYS },
   { key: 'absenceLimit', label: 'admin.meetingPeriods.absenceLimit', unit: null },
@@ -66,7 +66,7 @@ const EMPTY: Draft = Object.fromEntries(KEYS.map((k) => [k, ''])) as Draft;
   selector: 'app-meeting-periods-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SectionComponent, FormsModule, TranslatePipe, InputComponent, LoadStateComponent],
+  imports: [SectionComponent, FormsModule, TranslatePipe, InputComponent, SelectFieldComponent, LoadStateComponent],
   templateUrl: './meeting-periods.component.html',
   styleUrl: '../guest-settings/guest-settings.component.scss',
 })
@@ -76,6 +76,8 @@ export class MeetingPeriodsSettingsComponent {
   private readonly i18n = inject(I18nService);
 
   protected readonly fields = FIELDS;
+  /** The twelve months by name, for the start of the term. */
+  protected readonly months = computed(() => monthOptions(this.i18n.formatLocale()));
 
   protected readonly form: SettingsForm<MeetingPeriods, Draft> = settingsForm<MeetingPeriods, Draft, MeetingPeriods>({
     allowed: () => this.auth.can('admin.deadlines'),

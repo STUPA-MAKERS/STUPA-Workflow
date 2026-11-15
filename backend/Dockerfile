@@ -1,6 +1,6 @@
 # Backend image. The api and worker services share it. The compose file overrides the
 # command for the worker.
-FROM python:3.13-slim AS base
+FROM python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
@@ -13,18 +13,21 @@ WORKDIR /app
 #   MUST match the server major (compose runs postgres:16-alpine). A pg_dump older than
 #   the server refuses to run, so the pin is not cosmetic. The Debian package comes from
 #   the PostgreSQL APT repository, because trixie ships a different major.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libmagic1 ca-certificates curl gnupg \
-    && install -d /usr/share/postgresql-common/pgdg \
-    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-        -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+#
+# The signing key of that repository is the file docker/apt.postgresql.org.asc
+# (fingerprint B97B 0AFC AA1A 47F0 44F2 44A0 7FCC 7D46 ACCC 4CF8). The build does not
+# fetch it, because one failed request to postgresql.org then holds a release back, and
+# a fetched key is trusted only through TLS. apt repeats a failed download five times
+# (§NF/compatibility/deploy/000978).
+COPY docker/apt.postgresql.org.asc /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends libmagic1 ca-certificates \
     && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
 https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" \
         > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends postgresql-client-16 \
-    && apt-get purge -y curl gnupg \
-    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install the dependencies in their own layer before the source code. A code change then

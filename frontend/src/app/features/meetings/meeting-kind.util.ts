@@ -1,6 +1,12 @@
-import { MEETING_FORMS, MEETING_KINDS, type MeetingDefaults, type MeetingKind } from '@core/api/models';
+import {
+  MEETING_FORMS,
+  MEETING_KINDS,
+  type Meeting,
+  type MeetingDefaults,
+  type MeetingKind,
+} from '@core/api/models';
 import type { I18nService } from '@core/i18n/i18n.service';
-import { daysUntil } from '@shared/date-format';
+import { dayMonthYear, daysUntil } from '@shared/date-format';
 import type { SelectOption } from '@stupa-makers/ui-kit';
 
 /** The longest place of a meeting that the server accepts. */
@@ -9,6 +15,18 @@ export const MEETING_LOCATION_MAX = 200;
 /** The kinds of a meeting for a select (§ 000903). */
 export function meetingKindOptions(i18n: I18nService) {
   return MEETING_KINDS.map((value): SelectOption => ({ value, label: i18n.translate(`meetings.kind.${value}`) }));
+}
+
+/** The place of a meeting is too long for the server. */
+export function locationTooLong(location: string): boolean {
+  return location.trim().length > MEETING_LOCATION_MAX;
+}
+
+/** The error text under the place of a meeting, or `''`. The two meeting dialogs show it. */
+export function locationError(i18n: I18nService, location: string): string {
+  return locationTooLong(location)
+    ? i18n.translate('meetings.location.tooLong', { max: MEETING_LOCATION_MAX })
+    : '';
 }
 
 /** The forms of a meeting for a select (§ 000907). */
@@ -32,4 +50,35 @@ export function lateInviteDays(
   const left = daysUntil(date.trim(), today);
   const period = kind === 'ordinary' ? defaults.inviteDaysOrdinary : defaults.inviteDaysExtraordinary;
   return left !== null && left < period ? period : null;
+}
+
+/**
+ * The meetings that a repeat meeting can name as its first meeting (§ 000940).
+ *
+ * These are the other meetings of the same Gremium that are not after `day`. A meeting
+ * without a date stays in the list, because the server decides nothing from a missing date.
+ */
+export function firstMeetingOptions(
+  meetings: readonly Pick<Meeting, 'id' | 'title' | 'date'>[],
+  locale: string,
+  day: string,
+  selfId: string | null = null,
+): readonly SelectOption[] {
+  const limit = day.trim();
+  return meetings
+    .filter((m) => m.id !== selfId && (!limit || !m.date || m.date <= limit))
+    .map((m) => ({
+      value: m.id,
+      label: m.date ? `${m.title} · ${dayMonthYear(m.date, locale)}` : m.title,
+    }));
+}
+
+/** The link from a Wiederholungssitzung to its first meeting, else `null` (§ 000940). */
+export function firstMeetingLink(
+  meeting: Pick<Meeting, 'repeatOfId'>,
+  i18n: I18nService,
+): { readonly label: string; readonly to: string } | null {
+  return meeting.repeatOfId
+    ? { label: i18n.translate('meetings.repeatOf.label'), to: `/meetings/${meeting.repeatOfId}` }
+    : null;
 }

@@ -85,6 +85,15 @@
           [ngModel]="form().repeatQuorumPercent"
           (ngModelChange)="patchQuorum($event, 'repeatQuorumPercent')"
         />
+        @if (form().termStartMonth !== null) {
+          <app-select
+            [label]="'admin.gremien.termStartMonth' | t"
+            [options]="monthOptions()"
+            [ngModel]="'' + form().termStartMonth"
+            (ngModelChange)="patchTermStart($event)"
+            name="termStartMonth"
+          />
+        }
       </div>
 
       <div class="gd__col">

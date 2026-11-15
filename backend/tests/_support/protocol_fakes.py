@@ -46,7 +46,6 @@ class FakeSession:
         self._results = list(results)
         self.scalar_results: list[Any] = []
         self.keeper_rows: list[Any] = []
-        self.circular_ids: list[Any] = []
         self.added: list[Any] = []
         self.deleted: list[Any] = []
         self.flushed = 0
@@ -59,17 +58,12 @@ class FakeSession:
         the queue. It gets an empty result, so that it does not take the result of
         another query. The header also reads the keeper periods. That query returns
         ``keeper_rows``, which a test sets when it needs them, and never takes a result
-        of the queue. The circular votes of the Gremium (``circular_ids``) and the start
-        of the meeting before have no entry in the queue either.
+        of the queue.
         """
         if "meeting_attendance" in str(_stmt).lower():
             return FakeResult()
         if "protocol_keeper_period" in str(_stmt).lower():
             return FakeResult(self.keeper_rows)
-        if "vote.kind =" in str(_stmt).lower():
-            return FakeResult(self.circular_ids)
-        if str(_stmt).lower().lstrip().startswith("select meeting.started_at"):
-            return FakeResult()
         return self._results.pop(0) if self._results else FakeResult()
 
     async def scalars(self, _stmt: Any) -> FakeResult:

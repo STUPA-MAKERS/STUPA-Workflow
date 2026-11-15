@@ -20,6 +20,7 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.documents.service import ApplicationPdfService
 from app.modules.files.storage import ObjectStorage
 from app.modules.pdf.typst_client import build_typst_client
+from app.shared.antiabuse import rate_limit_pdf_render
 from app.shared.errors import ProblemDetail
 from app.shared.filenames import content_disposition, title_token
 
@@ -55,9 +56,10 @@ def get_pdf_service(
 @router.get(
     "/applications/{application_id}/pdf",
     response_class=Response,
+    dependencies=[Depends(rate_limit_pdf_render)],
     responses={
         200: {"content": {"application/pdf": {}}, "description": "The Antrag as PDF."},
-        **dict.fromkeys((400, 401, 403, 404, 503), _PROBLEM),
+        **dict.fromkeys((400, 401, 403, 404, 429, 503), _PROBLEM),
     },
 )
 async def get_application_pdf(

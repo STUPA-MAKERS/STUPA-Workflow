@@ -426,6 +426,7 @@ async def test_main_on_startup_calls_all_inits(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(wmain, "deadlines_on_startup", await _mk("deadlines"))
     monkeypatch.setattr(wmain, "backup_on_startup", await _mk("backup"))
     monkeypatch.setattr(wmain, "cd_builtin_on_startup", await _mk("cd_builtin"))
+    monkeypatch.setattr(wmain, "watchdog_on_startup", await _mk("watchdog"))
     sentinel = object()
     built: list[tuple[Any, ...]] = []
 
@@ -436,7 +437,16 @@ async def test_main_on_startup_calls_all_inits(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(wmain, "build_worker_dispatcher", _build)
     ctx: dict[str, Any] = {"redis": "pool", "settings": "cfg"}
     await wmain._on_startup(ctx)
-    assert called == ["mail", "scan", "protocol", "webhook", "deadlines", "backup", "cd_builtin"]
+    assert called == [
+        "mail",
+        "scan",
+        "protocol",
+        "webhook",
+        "deadlines",
+        "backup",
+        "cd_builtin",
+        "watchdog",
+    ]
     assert ctx["flow_dispatcher"] is sentinel
     assert built and built[0][0] == "pool" and built[0][2] == "cfg"
 

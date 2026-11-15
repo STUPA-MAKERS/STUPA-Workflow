@@ -15,18 +15,6 @@
               [suffix]="'admin.meetingWindow.unit' | t"
             />
           </div>
-
-          <div class="gs__field">
-            <app-input
-              type="number"
-              [label]="'admin.meetingWindow.confirmLead' | t"
-              [error]="confirmError()"
-              name="confirmLeadMinutes"
-              [ngModel]="draft().confirm"
-              (ngModelChange)="patch({ confirm: $event })"
-              [suffix]="'admin.meetingWindow.unit' | t"
-            />
-          </div>
         </form>
       </ng-template>
     </app-load-state>

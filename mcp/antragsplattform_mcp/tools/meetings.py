@@ -59,6 +59,21 @@ async def vote_draw_lot(vote_id: str) -> dict:
 
 
 @group.tool
+async def vote_next_round(vote_id: str) -> dict:
+    """Create the next Wahlgang of an election without the majority of the members.
+
+    Only a closed election with `majorityRule: "members_majority"` and the result
+    `no_majority` takes the call, after its first or its second Wahlgang. The answer is
+    the draft of the next Wahlgang on the same agenda item; the protokollant opens it.
+    The third Wahlgang takes the simple majority and has the two candidates with the
+    most votes; the server draws the lot for a tied place. 409 `no_next_round`,
+    `next_round_exists`, `not_an_election` or `meeting_closed`. Requires the gremium
+    permission `vote.manage` or `session.manage` in the gremium of the vote (or admin).
+    """
+    return await api().post(f"/votes/{vote_id}/next-round")
+
+
+@group.tool
 async def create_application_vote(application_id: str, vote: S.VoteCreate) -> dict:
     """Create a vote bound to an application.
 
@@ -157,10 +172,8 @@ async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     (close or cancel it first), and it cancels the draft votes. A closed meeting
     keeps its title, date, time and minute-taker.
 
-    The start has an open window (`opensAt`, `confirmUntil` on the meeting): before
-    `opensAt` it gives 409 `meeting_too_early`, and before `confirmUntil` it needs
-    `confirmEarly: true` (else 409 `early_open_unconfirmed`). Ask the user before you
-    confirm an early open.
+    The start has an open window (`opensAt` on the meeting): before `opensAt` it gives
+    409 `meeting_too_early`.
 
     A new minute-taker needs protocol.write in the gremium (422
     `protokollant_needs_protocol_write`). While the meeting is live, a new
@@ -331,7 +344,7 @@ async def update_agenda_item(
     or protocol.write in its gremium, the assigned minute-taker, or admin.
 
     The `body` needs a live meeting, or a closed meeting whose protocol is still a
-    draft (409 `meeting_not_started` or `protocol_locked` otherwise). The `title`
+    draft (409 `meeting_not_started` or `protocol_final` otherwise). The `title`
     needs a planned or live meeting (409 `meeting_closed` otherwise).
     """
     return await api().patch(
@@ -593,8 +606,11 @@ async def send_protocol_draft(protocol_id: str) -> dict:
 
     Each page of the PDF has the watermark "Entwurf". The protocol stays a draft.
     Requires the write access to the protocol. A protocol that is not a draft gives
-    409 `protocol_not_draft`. Returns `{recipients}`, the number of addresses. The
-    send goes into the audit log (`protocol_draft_mail`).
+    409 `protocol_not_draft`, and a protocol of a live meeting 409 `meeting_live`.
+    Returns `{recipients, draftSentAt}`: the number of addresses and the time of the
+    last send. `draftSentAt` of the protocol is set when a draft already went out: ask
+    the user before you send it again. The send goes into the audit log
+    (`protocol_draft_mail`).
     """
     return await api().post(f"/protocols/{protocol_id}/draft-mail")
 
@@ -613,6 +629,20 @@ async def set_protocol_approval(protocol_id: str, approved_in_meeting_id: str | 
     if approved_in_meeting_id is None:
         return await api().delete(path)
     return await api().put(path, json={"meetingId": approved_in_meeting_id})
+
+
+@group.tool
+async def reopen_protocol(protocol_id: str) -> dict:
+    """Set a final protocol back to draft, so that it can be corrected.
+
+    Requires the gremium permission protocol.finalize. A protocol that is not final
+    gives 409 `protocol_not_final`, and one with an approval mark 409
+    `protocol_approved`: remove the mark first. The public pages no longer show the
+    protocol until it is final again, and the next finalize sends the PDF to the mailing
+    list again, so ask the user before you call this. The change goes into the audit log
+    (`protocol_reopen`).
+    """
+    return await api().post(f"/protocols/{protocol_id}/reopen")
 
 
 @group.tool

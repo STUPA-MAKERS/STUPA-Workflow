@@ -482,7 +482,7 @@ describe('BrandingEditorComponent', () => {
     expect(c.draft().logos.wordmark.mime).toBe('image/png');
   });
 
-  it('shows the default, uploads, resets and empties the PDF branding (specs 000891, 000892)', async () => {
+  it('shows the default, uploads, resets and empties the PDF branding (specs 000891, 000892, 001005)', async () => {
     const builtin = { builtin: true, fileName: null, mime: null, size: null };
     const upload = { builtin: false, fileName: 'logo.svg', mime: 'image/svg+xml', size: 3 };
     const api = {
@@ -497,6 +497,9 @@ describe('BrandingEditorComponent', () => {
     expect(screen.getByText('PDF-Logo')).toBeInTheDocument();
     expect(screen.getByText('PDF-Footer-Grafik')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Standard wiederherstellen: PDF-Logo' })).toBeNull();
+    const paper = (): (string | null)[] =>
+      Array.from(container.querySelectorAll<HTMLImageElement>('.br__thumb--paper img')).map((i) => i.getAttribute('src'));
+    expect(paper()).toEqual(['assets/logos/pdf-stupa.svg', 'assets/logos/pdf-skyline.svg']);
     const input = container.querySelectorAll<HTMLInputElement>('input[type="file"]')[3];
     expect(input.accept).toBe('image/png,image/jpeg,image/webp,image/svg+xml,application/pdf');
     await userEvent.upload(input, new File(['x'], 'logo.ico', { type: 'image/x-icon' }), { applyAccept: false });
@@ -507,12 +510,14 @@ describe('BrandingEditorComponent', () => {
     expect(api.uploadPdfAsset).toHaveBeenCalledWith('logo', expect.any(File));
     expect(screen.getByText(/logo\.svg/)).toBeInTheDocument();
     expect(container.querySelector('.br__logos img[src^="data:image/svg"]')).toBeNull();
+    expect(paper()).toEqual(['assets/logos/pdf-skyline.svg']);
     await userEvent.click(screen.getByRole('button', { name: 'Standard wiederherstellen: PDF-Logo' }));
     expect(api.resetPdfAsset).toHaveBeenCalledWith('logo');
     await userEvent.click(screen.getByRole('button', { name: 'Entfernen: PDF-Footer-Grafik' }));
     fixture.detectChanges();
     expect(api.deletePdfAsset).toHaveBeenCalledWith('footer');
     expect(screen.getByText('Keine Grafik')).toBeInTheDocument();
+    expect(paper()).toEqual(['assets/logos/pdf-stupa.svg']);
     expect(screen.getByRole('button', { name: 'Auswählen: PDF-Footer-Grafik' })).toBeInTheDocument();
   });
 

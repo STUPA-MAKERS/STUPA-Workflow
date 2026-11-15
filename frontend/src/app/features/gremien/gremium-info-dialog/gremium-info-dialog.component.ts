@@ -53,7 +53,7 @@ export function linkBlank(link: InfoLinkDraft): boolean {
   return link.label.trim() === '' && link.url.trim() === '';
 }
 
-/** The errors of one row of the link editor (spec 000952). */
+/** The errors of one row of the link editor (spec 001012). */
 export function linkErrors(link: InfoLinkDraft): InfoLinkErrors {
   const blank = linkBlank(link);
   const label = link.label.trim();
@@ -76,7 +76,7 @@ export function draftLinks(drafts: readonly InfoLinkDraft[]): readonly GremiumIn
 }
 
 /**
- * The editor of the Info tab (specs 000951-000954): the Markdown text with "Schreiben"
+ * The editor of the Info tab (specs 001011-001014): the Markdown text with "Schreiben"
  * and "Vorschau", and the labelled links in their order with up, down and remove.
  *
  * Text and links save together with the version that the tab read. A stale version gives

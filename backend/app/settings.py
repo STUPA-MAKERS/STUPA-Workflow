@@ -190,6 +190,8 @@ class Settings(BaseSettings):
         `rl_media_images_per_hour` counts per principal and is higher than the
         attachment limit, because a protocol can hold many pasted screenshots.
         `rl_media_documents_per_hour` counts the embedded PDFs per principal.
+        `rl_pdf_render_per_hour` counts the PDFs that a route renders in the request,
+        per session. `rl_observers_per_hour` counts the adds of observers per Antrag.
         `rl_default_write_per_hour` keys on the IP and catches an endpoint without
         its own limit (defense in depth). `rl_default_write_session_per_hour` keys
         on a signed principal session instead, because a campus NAT puts all users
@@ -413,6 +415,8 @@ class Settings(BaseSettings):
     rl_attachments_per_hour: int = 30
     rl_media_images_per_hour: int = 120
     rl_media_documents_per_hour: int = 60
+    rl_pdf_render_per_hour: int = 60
+    rl_observers_per_hour: int = 10
     rl_default_write_per_hour: int = 100
     rl_default_write_session_per_hour: int = 3000
     rl_avatar_per_hour: int = 1200

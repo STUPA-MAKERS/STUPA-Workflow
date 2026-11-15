@@ -28,6 +28,10 @@ builder (`backend/app/modules/protocol/markdown.py`):
 * Blackout marks: the empty marker `%%%%` is a black bar of one fixed width.
   The backend puts it in place of each marked name of the public variant. A
   `%%Name%%` of the internal variant prints the name as plain text.
+* Blackout blocks: two lines that hold only `%%` fence a block. The converter
+  drops the fence lines and keeps the content, so the internal variant prints
+  it as normal Markdown. The empty block (one fence line right after the other)
+  is the bar of the public variant: one black bar of the full text width.
 * TeX math: `$...$` in a line, and a paragraph that is one `$$...$$` block.
   The formula body goes to the template as a string. The vendored mitex
   package converts it inside math mode.
@@ -62,7 +66,14 @@ if TYPE_CHECKING:
 
     from .frontmatter import Meta
 
-__all__ = ["ConversionError", "Node", "convert_body", "image_assets", "strip_antrag_fences"]
+__all__ = [
+    "ConversionError",
+    "Node",
+    "convert_body",
+    "image_assets",
+    "strip_antrag_fences",
+    "strip_blackout_blocks",
+]
 
 type Node = dict[str, object]
 
@@ -406,6 +417,13 @@ _ANTRAG_OPEN_RE: Final[re.Pattern[str]] = re.compile(r"^\s*:::\s*antrag\b[^\n]*$
 _FENCE_CLOSE_RE: Final[re.Pattern[str]] = re.compile(r"^\s*:::\s*$")
 _CODE_FENCE_RE: Final[re.Pattern[str]] = re.compile(r"^\s*(```|~~~)")
 
+# A fence line of a blackout block: only `%%`.
+_BLOCK_FENCE_RE: Final[re.Pattern[str]] = re.compile(r"^[ \t]*%%[ \t]*\r?$")
+
+# The paragraph that stands for the bar of an empty blackout block. The private-use
+# characters keep it apart from any text a keeper types.
+_BLOCK_BAR_TEXT: Final = "\ue000blackout-block\ue000"
+
 
 def _text(value: str) -> Node:
     return {"t": "text", "v": value}
@@ -576,6 +594,41 @@ def strip_antrag_fences(markdown: str) -> str:
     scans = itertools.accumulate(lines, _fence_line, initial=_FenceScan())
     kept = zip(lines, itertools.islice(scans, 1, None), strict=True)
     return "\n".join(line for line, scan in kept if scan.keep)
+
+
+@dataclass(frozen=True, slots=True)
+class _BlockScan:
+    """The blackout block state after one line, and the lines that replace it."""
+
+    in_code: bool = False
+    # The line number of the open fence line, else None.
+    open_at: int | None = None
+    out: tuple[str, ...] = ()
+
+
+def _block_line(scan: _BlockScan, numbered: tuple[int, str]) -> _BlockScan:
+    """Advance the block state over one line."""
+    index, line = numbered
+    match line:
+        case _ if _CODE_FENCE_RE.match(line):
+            return replace(scan, in_code=not scan.in_code, out=(line,))
+        case _ if not scan.in_code and _BLOCK_FENCE_RE.match(line) and scan.open_at is None:
+            return replace(scan, open_at=index, out=("",))
+        case _ if not scan.in_code and _BLOCK_FENCE_RE.match(line):
+            empty = scan.open_at == index - 1
+            return replace(scan, open_at=None, out=(_BLOCK_BAR_TEXT, "") if empty else ("",))
+        case _:
+            return replace(scan, out=(line,))
+
+
+def strip_blackout_blocks(markdown: str) -> str:
+    """Drop the fence lines of each blackout block, outside code.
+
+    A fence line becomes an empty line, so the content of a block stands apart
+    from the text around it. The empty block becomes the paragraph of the bar.
+    """
+    scans = itertools.accumulate(enumerate(markdown.split("\n")), _block_line, initial=_BlockScan())
+    return "\n".join(line for scan in itertools.islice(scans, 1, None) for line in scan.out)
 
 
 # -- the converter ----------------------------------------------------------
@@ -781,6 +834,9 @@ class _Converter:
         display = self._display_math(node)
         if display is not None:
             return display
+        if _plain(node).strip() == _BLOCK_BAR_TEXT:
+            # The empty blackout block of the public variant (000967).
+            return {"t": "par", "c": [{"t": "blockbar"}]}
         content = _trim(self.inlines(node))
         if len(content) == 1 and content[0].get("t") == "image" and "asset" in content[0]:
             # A paragraph of one image is a block image, centered and scaled.
@@ -1094,7 +1150,7 @@ def convert_body(markdown: str, meta: Meta, assets: Collection[str] = ()) -> lis
     Raises:
         ConversionError: The Markdown nests too deep.
     """
-    tree = _PARSER.parse(strip_antrag_fences(markdown))
+    tree = _PARSER.parse(strip_blackout_blocks(strip_antrag_fences(markdown)))
     documents = frozenset(
         match.group(1) for name in assets if (match := DOCUMENT_ASSET_RE.fullmatch(name))
     )

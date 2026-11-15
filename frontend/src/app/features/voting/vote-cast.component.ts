@@ -1,3 +1,5 @@
+import { pollRefusalMessage } from './poll-refusal';
+import { castRefusalText } from './ballot/ballot-refusal';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -239,7 +241,10 @@ export class VoteCastComponent implements OnDestroy {
     if (vote.status === 'draft') return 'start';
     return vote.status === 'open' && !circular ? 'close' : null;
   });
-  /** An eligible member can object to an open Umlaufverfahren; this cancels it. */
+  /**
+   * An eligible member can object to an open Umlaufverfahren; this cancels it. The action
+   * is a button, not a menu item (§F/meetings/voting/000947).
+   */
   readonly canObject = computed(() => {
     const vote = this.loaded();
     return vote?.kind === 'circular' && vote.status === 'open' && vote.canCast === true;
@@ -258,13 +263,9 @@ export class VoteCastComponent implements OnDestroy {
     const planItems: readonly RowMenuItem[] = this.planReadable()
       ? [{ id: 'plan', label: this.i18n.translate('voting.plan.open'), icon: 'link' }]
       : [];
-    const objectItems: readonly RowMenuItem[] = this.canObject()
-      ? [{ id: 'object', label: this.i18n.translate('circular.object.action'), icon: 'x' }]
-      : [];
     const pollItems: readonly RowMenuItem[] = [
       ...planItems,
       ...(action ? [this.pollMenuItem(action)] : []),
-      ...objectItems,
     ];
     const deleteItems: readonly RowMenuItem[] = this.canDelete()
       ? [
@@ -350,9 +351,6 @@ export class VoteCastComponent implements OnDestroy {
       case 'close':
         this.runPoll(id);
         return;
-      case 'object':
-        this.confirmObject.set(true);
-        return;
       case 'plan':
         void this.router.navigate(['/budget/plan'], { queryParams: { planVersion: this.loaded()?.planVersionId } });
         return;
@@ -397,9 +395,7 @@ export class VoteCastComponent implements OnDestroy {
       },
       error: (err: unknown) => {
         this.pollBusy.set(false);
-        const detail = problemDetail(err);
-        const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.error(detail ? `${base}: ${detail}` : base);
+        this.toast.error(pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)));
         this.reload();
       },
     });
@@ -451,7 +447,7 @@ export class VoteCastComponent implements OnDestroy {
     if (error.status === 403) {
       if (failure.asDelegation) this.proxyRefused.set(true);
       else this.notEligible.set(true);
-      this.toast.error(this.i18n.translate('voting.cast.notEligible'));
+      this.toast.error(this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'));
       this.reload();
       const id = this.loaded()?.id;
       if (id) this.loadDelegation(id);
@@ -460,7 +456,8 @@ export class VoteCastComponent implements OnDestroy {
     if (error.status === 409) {
       this.toast.error(
         this.i18n.translate(
-          failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict',
+          castRefusalText(failure) ??
+            (failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict'),
         ),
       );
       this.reload();

@@ -33,6 +33,7 @@ from app.modules.applications.observers import (
 from app.modules.applications.schemas import ObserverCreate, ObserverEnd, ObserverOut
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.settings import Settings
+from app.shared.antiabuse import RateLimiterDep, enforce_observer_add_limit
 from app.shared.errors import ForbiddenError
 
 logger = logging.getLogger("app.notifications")
@@ -40,7 +41,7 @@ logger = logging.getLogger("app.notifications")
 router = APIRouter(tags=["applications"])
 
 _ERRORS: dict[int | str, dict[str, object]] = {
-    code: {"description": "problem+json"} for code in (401, 403, 404, 409, 422)
+    code: {"description": "problem+json"} for code in (401, 403, 404, 409, 422, 429)
 }
 
 
@@ -62,6 +63,17 @@ async def require_observer_manager(
 
 
 ManagerDep = Annotated[Access, Depends(require_observer_manager)]
+
+
+async def limit_observer_add(
+    access: ManagerDep, limiter: RateLimiterDep, settings: SettingsDep
+) -> None:
+    """Count one add against the limit of the Antrag (§NF/security/access/000977).
+
+    The dependency takes the access of the manager first, so a caller without the right
+    gets 403 and uses up nothing.
+    """
+    await enforce_observer_add_limit(limiter, settings, access.application_id)
 
 
 async def _deliver_added_mail(
@@ -105,6 +117,7 @@ async def get_observers(db: DbSession, access: ManagerDep) -> list[ObserverOut]:
     "/applications/{application_id}/observers",
     response_model=ObserverOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limit_observer_add)],
     responses=_ERRORS,
 )
 async def post_observer(
@@ -118,7 +131,8 @@ async def post_observer(
 ) -> ObserverOut:
     """Add an observer by e-mail address and send it one mail after the commit.
 
-    An application has at most five observers (422 ``observer_limit``). The applicant
+    An application has at most five observers (422 ``observer_limit``) and takes ten adds
+    in an hour (429). The applicant
     address is refused (422 ``observer_is_applicant``), an address that observes
     already answers 409 ``observer_exists``. The answer is the same for an address with
     and without an account.

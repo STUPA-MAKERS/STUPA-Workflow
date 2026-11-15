@@ -2387,7 +2387,7 @@ async def test_the_close_of_a_step_vote_locks_the_plan_before_the_audit_entry(
     takes the same order and the two never wait for each other.
     Rule: §F/finance/budget/000842.
     """
-    import app.modules.voting.service as voting
+    import app.modules.voting.service.close as voting
 
     t = await _tree(session)
     gremium = await _gremium(session)

@@ -53,3 +53,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.mh__link {
+  flex: none;
+  align-self: flex-start;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-primary);
+}

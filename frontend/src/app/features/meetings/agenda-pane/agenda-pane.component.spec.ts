@@ -275,15 +275,19 @@ describe('AgendaPaneComponent', () => {
       expect(on.remove).not.toHaveBeenCalled();
     });
 
-    it('keeps only the NÖ switch once the meeting is closed', async () => {
-      const { container, fixture } = await setup({ meeting: meeting({ status: 'closed' }) });
+    /** § 000982 (canEditTop) */
+    it('keeps the rename and the NÖ switch once the meeting is closed', async () => {
+      const { container, fixture, on } = await setup({ meeting: meeting({ status: 'closed' }) });
       expect(screen.queryByRole('button', { name: 'TOP hinzufügen' })).toBeNull();
       expect(container.querySelector('.ap__grip')).toBeNull();
       expect(draggable(fixture)).toEqual([false, false, false]);
       expect(fixture.debugElement.query(By.directive(CdkDropList)).injector.get(CdkDropList).disabled).toBe(true);
       const menu = await openMenu(0);
       expect(within(menu).getAllByRole('menuitemcheckbox')).toHaveLength(1);
-      expect(within(menu).queryByRole('menuitem')).toBeNull();
+      const items = within(menu).getAllByRole('menuitem');
+      expect(items.map((i) => i.textContent?.trim())).toEqual(['TOP umbenennen']);
+      await userEvent.click(items[0]);
+      expect(on.startRename).toHaveBeenCalledWith(AGENDA[0]);
     });
 
     it('has no menu once the protocol is locked or without write access', async () => {

@@ -15,11 +15,18 @@ from app.modules.applications.decision import DecisionIn
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
-from app.modules.delegations.pool_seat import pool_seat_counts
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.schemas import MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
-from app.modules.meetings.models import MeetingAttendance, MeetingGuest
+from app.modules.meetings import present as present_mod
+from app.modules.meetings.models import MeetingGuest
+from app.modules.meetings.present import (
+    NOBODY,
+    Present,
+    fixed_present,
+    present_count,
+    quorum_present,
+)
 from app.modules.voting.election import election_config, election_fields, is_election
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.poll import is_poll, poll_config, poll_fields, result_of
@@ -42,7 +49,7 @@ class _VoteReads:
     tallies: Mapping[UUID, _Tally]
     elections: Mapping[UUID, ElectionOutcome]
     polls: Mapping[UUID, PollOutcome]
-    present_by_meeting: Mapping[UUID, int]
+    presence: Mapping[UUID, Present]
     guests_by_meeting: Mapping[UUID, int]
     late_guests: Mapping[UUID, int]
     voters: Mapping[UUID, int]
@@ -82,26 +89,24 @@ def _meeting_vote_out(vote: Vote, meeting_id: UUID, reads: _VoteReads) -> Meetin
         vote, reads.tallies.get(vote.id, _NO_TALLY), reads.elections.get(vote.id), poll
     )
     settled = vote.status in ("closed", "cancelled")
-    members: int | None = (
-        getattr(vote, "present_members", None)
-        if settled
-        else reads.present_by_meeting.get(meeting_id, 0)
-    )
+    here = reads.presence.get(meeting_id, NOBODY)
+    members: int | None = getattr(vote, "present_members", None) if settled else here.members
     stored_guests: int | None = (
         getattr(vote, "present_guests", None)
         if settled
         else reads.guests_by_meeting.get(meeting_id, 0)
     )
-    present_members = reads.present_by_meeting.get(meeting_id, 0)
     with_guests = config.guests_vote and not settled
     late = reads.late_guests.get(vote.id, 0)
     guests = (stored_guests or 0) + late if with_guests else stored_guests
     present = (
-        present_members + reads.guests_by_meeting.get(meeting_id, 0) + late
+        here.total + reads.guests_by_meeting.get(meeting_id, 0) + late
         if with_guests
-        else present_members
+        else here.total
     )
     revealed = vote.status == "closed"
+    running = vote.status == "open"
+    voted_now = reads.voters.get(vote.id, 0) if running else voted
     return MeetingVoteOut(
         id=vote.id,
         applicationId=vote.application_id,
@@ -112,8 +117,8 @@ def _meeting_vote_out(vote: Vote, meeting_id: UUID, reads: _VoteReads) -> Meetin
         result=vote.result,
         counts=counts if revealed else {},
         leading=leading if revealed else None,
-        voted=reads.voters.get(vote.id, 0) if vote.status == "open" else voted,
-        present=present,
+        voted=voted_now,
+        present=max(present, voted_now) if running else present,
         revealed=revealed,
         failedReason=reason,
         majorityRule=config.majority_rule,
@@ -134,36 +139,22 @@ def _meeting_vote_out(vote: Vote, meeting_id: UUID, reads: _VoteReads) -> Meetin
     )
 
 
-@dataclass(frozen=True, slots=True)
-class _Presence:
-    """The present members and the taken pool seats of the meetings of one read."""
-
-    members: Mapping[UUID, int]
-    seats: Mapping[UUID, int]
-
-
 def _counts_present(vote: Vote) -> bool:
     """Tell if the quorum of a meeting vote counts the present members."""
     stored = vote.config if isinstance(vote.config, dict) else {}
     return vote.meeting_id is not None and stored.get("quorumBasis") == "present"
 
 
-def _quorum_present(vote: Vote, presence: _Presence) -> int | None:
+def _quorum_present(vote: Vote, presence: Mapping[UUID, Present]) -> int | None:
     """Return the present count for the quorum of a meeting vote, or None.
 
     Only a vote with ``quorumBasis = present`` has one: the present members plus the
-    pool substitutes on a seat. A closed vote takes the members fixed at its close, a
-    running vote the present members of its meeting now.
+    pool substitutes on a seat. A closed vote takes the members and the seats fixed at
+    its close, a running vote the present count of its meeting now.
     """
     if vote.meeting_id is None or not _counts_present(vote):
         return None
-    fixed: int | None = getattr(vote, "present_members", None)
-    members = (
-        fixed
-        if vote.status == "closed" and fixed is not None
-        else presence.members.get(vote.meeting_id, 0)
-    )
-    return members + presence.seats.get(vote.meeting_id, 0)
+    return quorum_present(fixed_present(vote), presence.get(vote.meeting_id, NOBODY))
 
 
 def _reload_tally(vote: Vote, choices: list[str | None], present: int | None) -> _Tally:
@@ -216,14 +207,7 @@ class VoteReadOps(MeetingServiceBase):
             .scalars()
             .all()
         )
-        present_by_meeting = await self._present_by_meeting(meeting_ids)
-        seat_meetings = sorted(
-            {v.meeting_id for v in rows if v.meeting_id is not None and _counts_present(v)},
-            key=str,
-        )
-        presence = _Presence(
-            present_by_meeting, await pool_seat_counts(self.session, seat_meetings)
-        )
+        presence = await present_mod.present_counts(self.session, meeting_ids)
         tallies = await self._vote_tallies(rows, presence)
         elections = await self._election_tallies([v for v in rows if is_election(v)], presence)
         polls = await self._poll_tallies([v for v in rows if is_poll(v)])
@@ -244,7 +228,7 @@ class VoteReadOps(MeetingServiceBase):
             tallies=tallies,
             elections=elections,
             polls=polls,
-            present_by_meeting=present_by_meeting,
+            presence=presence,
             guests_by_meeting=guests_by_meeting,
             late_guests=late_guests,
             voters=await self._voters_by_vote([v.id for v in rows if v.status == "open"]),
@@ -281,7 +265,7 @@ class VoteReadOps(MeetingServiceBase):
         return {v.id: tally_poll(choices.get(v.id, []), poll_config(v)) for v in votes}
 
     async def _election_tallies(
-        self, votes: Sequence[Vote], presence: _Presence
+        self, votes: Sequence[Vote], presence: Mapping[UUID, Present]
     ) -> dict[UUID, ElectionOutcome]:
         """Tally the elections of the reload path in one query."""
         if not votes:
@@ -410,22 +394,6 @@ class VoteReadOps(MeetingServiceBase):
         ).all()
         return dict(rows)
 
-    async def _present_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
-        """Return `{meeting_id: number of present members}`."""
-        if not meeting_ids:
-            return {}
-        rows = (
-            await self.session.execute(
-                select(MeetingAttendance.meeting_id, func.count())
-                .where(
-                    MeetingAttendance.meeting_id.in_(meeting_ids),
-                    MeetingAttendance.status == "present",
-                )
-                .group_by(MeetingAttendance.meeting_id)
-            )
-        ).all()
-        return dict(rows)
-
     async def _departed_guest_voters(self, vote_ids: list[UUID]) -> dict[UUID, int]:
         """Count per vote the guests with a ballot who are no longer admitted."""
         from app.modules.voting.service import GUEST_VOTER_PREFIX
@@ -468,7 +436,9 @@ class VoteReadOps(MeetingServiceBase):
         ).all()
         return dict(rows)
 
-    async def _vote_tallies(self, votes: Sequence[Vote], presence: _Presence) -> dict[UUID, _Tally]:
+    async def _vote_tallies(
+        self, votes: Sequence[Vote], presence: Mapping[UUID, Present]
+    ) -> dict[UUID, _Tally]:
         """Build `{vote_id: (counts, leading, failedReason)}` from the ballots.
 
         This is the reload path. The method loads the ballots from `secret_ballot` in
@@ -557,4 +527,4 @@ class VoteReadOps(MeetingServiceBase):
 
     async def present_member_count(self, meeting_id: UUID) -> int:
         """Return the present members of the meeting (the base of a guest vote)."""
-        return (await self._present_by_meeting([meeting_id])).get(meeting_id, 0)
+        return (await present_count(self.session, meeting_id)).members

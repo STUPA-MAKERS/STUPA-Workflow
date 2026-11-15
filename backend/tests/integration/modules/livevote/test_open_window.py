@@ -1,13 +1,12 @@
 """The open window of a meeting on a real Postgres.
 
-* ``GET/PUT /admin/meeting-settings`` reads the seeded defaults (60 and 10 minutes),
-  replaces them, refuses a confirmation point before the earliest open (422) and
-  writes a ``config_change`` entry.
+* ``GET/PUT /admin/meeting-settings`` reads the seeded default (60 minutes), replaces
+  it, refuses a body with a second value (422) and writes a ``config_change`` entry.
 * ``GET/PUT /admin/gremium-defaults`` reads the defaults of a new Gremium and replaces
   them. A Gremium that exists keeps its values (§F/administration/admin/000906).
 * ``PATCH /meetings/{id}`` with ``status: live`` gives 409 ``meeting_too_early``
-  before the window and 409 ``early_open_unconfirmed`` in the early part without
-  ``confirmEarly``. The planned meeting carries ``opensAt`` and ``confirmUntil``.
+  before the window. In the window the open needs nothing more
+  (§F/meetings/meetings/000092). The planned meeting carries ``opensAt``.
 """
 
 from __future__ import annotations
@@ -50,24 +49,17 @@ async def test_settings_defaults_update_and_audit(
         got = client.get("/api/admin/meeting-settings")
         assert got.status_code == 200, got.text
         assert got.json()["openLeadMinutes"] == 60
-        assert got.json()["confirmLeadMinutes"] == 10
+        assert "confirmLeadMinutes" not in got.json()
         bad = client.put(
-            "/api/admin/meeting-settings",
-            json={"openLeadMinutes": 10, "confirmLeadMinutes": 20},
-        )
-        assert bad.status_code == 422, bad.text
-        put = client.put(
             "/api/admin/meeting-settings",
             json={"openLeadMinutes": 120, "confirmLeadMinutes": 30},
         )
+        assert bad.status_code == 422, bad.text
+        put = client.put("/api/admin/meeting-settings", json={"openLeadMinutes": 120})
         assert put.status_code == 200, put.text
         assert put.json()["openLeadMinutes"] == 120
-        assert put.json()["confirmLeadMinutes"] == 30
     [entry] = [e for e in await audit_actions(maker) if e.target_type == "meeting_settings"]
-    assert entry.data == {
-        "openLeadMinutes": {"from": 60, "to": 120},
-        "confirmLeadMinutes": {"from": 10, "to": 30},
-    }
+    assert entry.data == {"openLeadMinutes": {"from": 60, "to": 120}}
 
 
 async def test_gremium_defaults_leave_an_old_gremium(
@@ -131,21 +123,19 @@ async def test_open_before_the_window_conflicts(
     with TestClient(api) as client:
         meeting = client.get(url).json()
         assert meeting["opensAt"] is not None
-        assert meeting["confirmUntil"] is not None
-        early = client.patch(url, json={"status": "live", "confirmEarly": True})
+        assert "confirmUntil" not in meeting
+        early = client.patch(url, json={"status": "live"})
         assert early.status_code == 409, early.text
         assert early.json()["code"] == "meeting_too_early"
 
 
-async def test_early_open_needs_the_confirmation(
+async def test_open_in_the_window_needs_no_confirmation(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """§F/meetings/meetings/000092: in the window the open needs nothing more."""
     url = await _starts_in(maker, 30)
     with TestClient(api) as client:
-        refused = client.patch(url, json={"status": "live"})
-        assert refused.status_code == 409, refused.text
-        assert refused.json()["code"] == "early_open_unconfirmed"
-        started = client.patch(url, json={"status": "live", "confirmEarly": True})
+        started = client.patch(url, json={"status": "live"})
         assert started.status_code == 200, started.text
         assert started.json()["status"] == "live"
         assert started.json()["opensAt"] is None

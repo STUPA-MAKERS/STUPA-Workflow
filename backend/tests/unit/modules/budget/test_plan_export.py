@@ -227,6 +227,25 @@ def test_the_pdf_request_holds_the_table_as_text() -> None:
     assert plan_export.pdf_source(export) == '---\ntitle: "Haushaltsplan VS-Mittel 2026"\n---\n'
 
 
+def test_the_pdf_shows_the_amounts_of_a_line_with_lines_below_in_brackets() -> None:
+    """Rule: §F/finance/budget/000968. A line without a line below keeps its plain amounts."""
+    export = _export()
+    expense = export.groups[1]
+    assert [(r.key, r.leaf) for r in expense.rows] == [("VS-8", False), ("VS-8-9", True)]
+    assert expense.rows[0].amount == D("60")
+    rows = plan_export.sheet_rows(export)
+    assert (rows[4].leaf, rows[5].leaf, rows[6].leaf) == (False, True, True)
+    assert rows[4].cells[2] == D("60")
+    plan = plan_export.pdf_config(export)["plan"]
+    assert isinstance(plan, dict)
+    assert plan["rows"][4]["cells"] == [
+        "VS-8", "Zuschüsse", "(60,00)", "(50,00)", "(0,00)", "übertragbar, deckungsfähig", "", "",
+    ]
+    assert plan["rows"][5]["cells"][2] == "60,00"
+    assert plan["rows"][6]["cells"][2] == "60,00"
+    assert plan["rows"][1]["cells"][2] == "100,00"
+
+
 def test_the_workbook_holds_the_head_and_the_amounts_as_numbers() -> None:
     """Rule: §F/finance/budget/000875. A text that starts a formula is made safe."""
     export = _export()

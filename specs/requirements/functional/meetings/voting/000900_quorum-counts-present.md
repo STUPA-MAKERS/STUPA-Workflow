@@ -10,7 +10,7 @@ tests:
   - "backend/tests/integration/modules/livevote/test_quorum_present.py:test_close_meets_the_quorum_by_present_members"
 implementation:
   - backend/app/modules/voting/tally.py
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
   - backend/app/modules/livevote/service/votes.py
   - backend/app/modules/delegations/pool_seat.py
 scope:

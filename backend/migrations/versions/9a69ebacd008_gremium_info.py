@@ -13,7 +13,7 @@ Idempotent. A fresh database already gets the table from the ``create_all`` base
 The downgrade drops the table and removes ``info.write`` from every gremium role.
 
 Revision ID: 9a69ebacd008
-Revises: b6e21d07c9a4
+Revises: 5d1e8a3c9b72
 Create Date: 2026-11-15 14:00:00
 """
 
@@ -24,7 +24,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "9a69ebacd008"
-down_revision: str | None = "b6e21d07c9a4"
+down_revision: str | None = "5d1e8a3c9b72"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

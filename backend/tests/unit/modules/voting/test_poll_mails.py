@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.modules.notifications.kinds import NOTIFICATION_KINDS
 from app.modules.notifications.links import vote_link
 from app.modules.voting import poll_mails as polls
 from app.modules.voting.models import Vote
@@ -123,6 +124,37 @@ async def test_reminder_skips_the_members_who_answered(mails: type[_Mails]) -> N
     assert call["kind"] == "poll_reminder"
     assert call["context"]["question"] == ""
     assert call["context"]["gremiumName"] == ""
+
+
+@pytest.mark.parametrize(
+    ("reminder", "key", "answered"),
+    [(False, "circular_open", []), (True, "circular_reminder", [["a"]])],
+)
+async def test_a_circular_vote_sends_its_own_mails(
+    mails: type[_Mails], reminder: bool, key: str, answered: list[list[str]]
+) -> None:
+    """§F/meetings/voting/000944: the open mail to each voter, the reminder to the rest."""
+    vote = _poll(kind="circular", question="Satzung ändern?")
+    session = ScriptedSession(execute=[_members()], scalars=answered, scalar=["StuPa"])
+    sent = await polls.send_poll_mail(
+        session,  # type: ignore[arg-type]
+        queue=None,
+        settings=SETTINGS,
+        vote=vote,
+        reminder=reminder,
+    )
+    assert sent is True
+    expected = ["b@example.org"] if reminder else ["a@example.org", "b@example.org"]
+    assert [c["recipients"] for c in mails.calls] == [[r] for r in expected]
+    call = mails.calls[-1]
+    assert (call["kind"], call["template_key"]) == (key, key)
+    assert key not in NOTIFICATION_KINDS
+    assert call["idempotency_parts"] == (key, str(vote.id), "b")
+    assert call["link"].target == "circular"
+    assert call["link"].url.endswith(f"/voting/{vote.id}")
+    assert call["context"]["closesAt"] == "30.10.2026, 12:00"
+    assert "Satzung" not in str(call["builtin_subject"])
+    assert "Nein" in call["builtin_body"]["de"]
 
 
 async def test_reminder_without_anybody_left_sends_nothing(mails: type[_Mails]) -> None:

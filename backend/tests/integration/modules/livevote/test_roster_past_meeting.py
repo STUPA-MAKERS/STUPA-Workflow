@@ -3,7 +3,7 @@
 A closed meeting keeps the people who attended it. The roster holds the members of
 the Gremium, plus each principal with an attendance record for the meeting, also
 after the OIDC sync removed the membership. A principal without a membership and
-without a record is not on the roster. The protocol quorum counts the same roster.
+without a record is not on the roster.
 """
 
 from __future__ import annotations
@@ -142,13 +142,14 @@ async def test_live_meeting_roster_holds_current_members_and_records(
     assert str(outsider) not in got
 
 
-async def test_protocol_quorum_counts_the_meeting_roster(
+async def test_protocol_quorum_reads_the_member_count_of_the_close(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """The quorum of a closed meeting counts its roster, not only the members.
+    """§F/meetings/protocols/000357: the quorum uses the member count that the close fixed.
 
-    The roster has 4 entries and 2 are present, so a 50 % quorum holds and 1
-    present does not. Without a meeting the 3 members count (Anna, Carla, Fritz).
+    A meeting without a fixed count counts the 3 members with a voting right of now
+    (Anna, Carla, Fritz), so a 50 % quorum holds with 2 present and not with 1. The
+    fixed count of 6 then needs 3 present.
     """
     gremium_id, meeting_id, _ = await _closed_meeting(maker)
     async with maker() as session:
@@ -159,5 +160,6 @@ async def test_protocol_quorum_counts_the_meeting_roster(
         svc = ProtocolService(session)
         assert await svc._quorate(gremium, meeting, 2) is True
         assert await svc._quorate(gremium, meeting, 1) is False
-        assert await svc._quorate(gremium, None, 2) is True
-        assert await svc._quorate(gremium, None, 1) is False
+        meeting.eligible_count = 6
+        assert await svc._quorate(gremium, meeting, 3) is True
+        assert await svc._quorate(gremium, meeting, 2) is False

@@ -190,6 +190,29 @@
   border-radius: 2px;
   background: var(--color-text);
 }
+// A block that the public protocol blacks out (000689, 000965): its blocks in one box with
+// the dashed edge of a segment.
+.mdv .md-blackout-block {
+  outline: 1.5px dashed var(--color-text-muted);
+  outline-offset: 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  padding: 4px 8px;
+  margin: 0.5em 0;
+  > :first-child {
+    margin-top: 0;
+  }
+  > :last-child {
+    margin-bottom: 0;
+  }
+}
+// The bar of a block (000967): the full width and the height of the bar of a segment.
+.mdv .md-bar-block {
+  height: 1em;
+  margin: 0.5em 0;
+  border-radius: 2px;
+  background: var(--color-text);
+}
 
 /* A time note of a protocol: one grey, centered line with its time, as in the PDF. */
 .mdv .mdv__time-note {

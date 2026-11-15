@@ -37,6 +37,7 @@ from app.modules.livevote.schemas import (
 )
 from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.livevote.service.lifecycle import LifecycleOps
+from app.modules.meetings.present import Present
 from app.modules.protocol.markdown import build_vote_snippet, guest_vote_note
 from app.modules.protocol.service import _guest_note
 from app.modules.voting.schemas import TallyOut, VoteOut
@@ -46,6 +47,7 @@ from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, RateLimitedError
 from app.shared.ratelimit import InMemoryRateLimiter
 from tests._support.flow_fakes import FakeSession, result
+from tests.unit.conftest import Presence
 from tests.unit.modules.livevote.test_livevote_cov import (
     _FakeAgendaService,
     _FakeAttendanceService,
@@ -346,7 +348,7 @@ async def test_guest_vote_open_query() -> None:
     assert await MeetingService(FakeSession())._guest_vote_open(uuid4()) is False  # type: ignore[arg-type]
 
 
-async def test_meeting_reads_for_guests() -> None:
+async def test_meeting_reads_for_guests(presence: Presence) -> None:
     session = FakeSession([result((uuid4(), "admitted", 2), (uuid4(), "pending", 1))])
     svc = MeetingService(session)  # type: ignore[arg-type]
     counts = await svc._guest_counts([uuid4()])
@@ -354,7 +356,7 @@ async def test_meeting_reads_for_guests() -> None:
     assert await svc._guest_counts([]) == {}
     assert await svc.admitted_guests_by_meeting([]) == {}
     mid = uuid4()
-    session = FakeSession([result((mid, 3))])
+    presence.here = Present(members=3)
     assert await MeetingService(session).present_member_count(mid) == 3  # type: ignore[arg-type]
     session = FakeSession([result(SimpleNamespace(gremium_id=mid))])
     assert await MeetingService(session).meeting_gremium_id(uuid4()) == mid  # type: ignore[arg-type]
@@ -532,7 +534,7 @@ async def test_a_stale_vote_mode_becomes_watch_at_the_switch_on() -> None:
     assert m.public_join is True and m.guests_mode == "watch"
 
 
-async def test_votes_for_counts_guests_of_a_guest_vote() -> None:
+async def test_votes_for_counts_guests_of_a_guest_vote(presence: Presence) -> None:
     from app.modules.voting.models import Vote
 
     mid = uuid4()
@@ -549,7 +551,8 @@ async def test_votes_for_counts_guests_of_a_guest_vote() -> None:
         status="open",
         eligible_count=3,
     )
-    session = FakeSession([result(vote), result((mid, 2)), result(), result((mid, 1))])
+    presence.here = Present(members=2)
+    session = FakeSession([result(vote), result(), result((mid, 1))])
     out = await MeetingService(session)._votes_for([mid])  # type: ignore[arg-type]
     [item] = out[mid]
     assert item.guests_vote is True and item.present == 3

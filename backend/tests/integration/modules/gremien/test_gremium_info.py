@@ -1,4 +1,4 @@
-"""The Info tab of a Gremium against a real Postgres (specs 000950-000954).
+"""The Info tab of a Gremium against a real Postgres (specs 001010-001014).
 
 The read follows the gate of the tab "Gremien" (member, ``gremium.view_all``, admin,
 else 404). The save needs ``info.write`` from the own gremium role: no admin bypass, and
@@ -132,7 +132,7 @@ def _body(version: int, **extra: object) -> dict[str, object]:
 async def test_empty_info_reads_for_member_and_view_all(
     maker: async_sessionmaker[AsyncSession], app_for: FastAPI
 ) -> None:
-    """§ 000950: an unsaved Info is empty with version 0; a member cannot edit it."""
+    """§ 001010: an unsaved Info is empty with version 0; a member cannot edit it."""
     w = await _world(maker)
     out = _client(app_for, w.member).get(f"/api/committees/{w.gremium_id}/info").json()
     assert out == {
@@ -151,7 +151,7 @@ async def test_empty_info_reads_for_member_and_view_all(
 
 
 async def test_stranger_gets_404(maker: async_sessionmaker[AsyncSession], app_for: FastAPI) -> None:
-    """§ 000950: a principal who does not see the Gremium gets 404 for read and save."""
+    """§ 001010: a principal who does not see the Gremium gets 404 for read and save."""
     w = await _world(maker)
     client = _client(app_for, Principal(sub="stranger-info"))
     for resp in (
@@ -165,7 +165,7 @@ async def test_stranger_gets_404(maker: async_sessionmaker[AsyncSession], app_fo
 async def test_manager_saves_and_member_reads(
     maker: async_sessionmaker[AsyncSession], app_for: FastAPI
 ) -> None:
-    """§ 000951, § 000952, § 000954: a save keeps the order, bumps the version, writes the audit."""
+    """§ 001011, § 001012, § 001014: a save keeps the order, bumps the version, writes the audit."""
     w = await _world(maker)
     resp = _client(app_for, w.manager).put(f"/api/committees/{w.gremium_id}/info", json=_body(0))
     assert resp.status_code == 200, resp.text
@@ -208,7 +208,7 @@ async def test_manager_saves_and_member_reads(
 async def test_stale_version_conflicts(
     maker: async_sessionmaker[AsyncSession], app_for: FastAPI
 ) -> None:
-    """§ 000954: a save against an older version gives 409 and changes nothing."""
+    """§ 001014: a save against an older version gives 409 and changes nothing."""
     w = await _world(maker)
     client = _client(app_for, w.manager)
     assert client.put(f"/api/committees/{w.gremium_id}/info", json=_body(0)).status_code == 200
@@ -222,7 +222,7 @@ async def test_stale_version_conflicts(
 async def test_only_info_write_saves(
     maker: async_sessionmaker[AsyncSession], app_for: FastAPI
 ) -> None:
-    """§ 000951: a member, an admin without membership and a token without the scope get 403."""
+    """§ 001011: a member, an admin without membership and a token without the scope get 403."""
     w = await _world(maker)
     admin = Principal(sub="admin-info", roles=["admin"])
     capped = Principal(
@@ -255,7 +255,7 @@ async def test_only_info_write_saves(
 async def test_invalid_links_give_422(
     maker: async_sessionmaker[AsyncSession], app_for: FastAPI, links: list[dict[str, str]]
 ) -> None:
-    """§ 000952: an unknown scheme, an empty or long label and more than 30 links give 422."""
+    """§ 001012: an unknown scheme, an empty or long label and more than 30 links give 422."""
     w = await _world(maker)
     resp = _client(app_for, w.manager).put(
         f"/api/committees/{w.gremium_id}/info", json=_body(0, links=links)
@@ -267,7 +267,7 @@ async def test_invalid_links_give_422(
 async def test_long_text_gives_422(
     maker: async_sessionmaker[AsyncSession], app_for: FastAPI
 ) -> None:
-    """§ 000953: a text over 20 000 characters gives 422."""
+    """§ 001013: a text over 20 000 characters gives 422."""
     w = await _world(maker)
     resp = _client(app_for, w.manager).put(
         f"/api/committees/{w.gremium_id}/info", json=_body(0, bodyMd="x" * 20_001)
@@ -278,7 +278,7 @@ async def test_long_text_gives_422(
 async def test_deleted_editor_leaves_no_name(
     maker: async_sessionmaker[AsyncSession], app_for: FastAPI
 ) -> None:
-    """§ 000954: the last editor's name goes when the account goes (``SET NULL``)."""
+    """§ 001014: the last editor's name goes when the account goes (``SET NULL``)."""
     w = await _world(maker)
     _client(app_for, w.manager).put(f"/api/committees/{w.gremium_id}/info", json=_body(0))
     async with maker() as s:

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from datetime import date as _date
 from typing import cast
 
@@ -106,9 +106,7 @@ async def test_draft_mail_goes_to_the_members_and_keeps_the_draft(
     people = await _members(maker, s.gremium_id, ("anna", "ben"))
     async with maker() as session:
         session.add(
-            NotificationPreference(
-                principal_id=people["ben"].id, kind="protocol", enabled=False
-            )
+            NotificationPreference(principal_id=people["ben"].id, kind="protocol", enabled=False)
         )
         await session.commit()
     typst, queue = _Typst(), _Queue()
@@ -136,6 +134,7 @@ async def test_draft_mail_goes_to_the_members_and_keeps_the_draft(
         assert protocol is not None
         assert protocol.status == "draft"
         assert (protocol.pdf_storage_key, protocol.sent_at) == (None, None)
+        assert protocol.draft_sent_at == now
     entries = [
         e
         for e in await audit_actions(maker, target_id=s.protocol_id)
@@ -161,6 +160,7 @@ async def test_draft_mail_without_a_reader_sends_nothing_and_needs_a_draft(
         )
         mailer = DraftMailer(service)
         assert await mailer.send(s.protocol_id, now=now, actor=ADMIN_SUB) == 0
+        assert await mailer.last_sent(s.protocol_id) is None
         with pytest.raises(ConflictError):
             await mailer.send(final.protocol_id, now=now, actor=ADMIN_SUB)
         with pytest.raises(ServiceUnavailableError):
@@ -189,6 +189,81 @@ async def test_draft_mail_route_answers_503_without_a_render_service(
     assert not_draft.json()["code"] == "protocol_not_draft"
     assert missing.status_code == 404, missing.text
     assert state.json()["status"] == "draft"
+    assert state.json()["draftSentAt"] is None
+
+
+async def test_draft_mail_of_a_live_meeting_is_refused(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """§F/meetings/protocols/000937: the draft of a live meeting is not complete."""
+    s = await seed(maker, status="live", items=0, protocol="draft")
+    with TestClient(api) as client:
+        resp = client.post(f"/api/protocols/{s.protocol_id}/draft-mail")
+    assert resp.status_code == 409, resp.text
+    assert resp.json()["code"] == "meeting_live"
+    async with maker() as session:
+        protocol = await session.get(Protocol, s.protocol_id)
+        assert protocol is not None and protocol.draft_sent_at is None
+
+
+async def test_draft_pdf_gives_both_variants_and_stores_nothing(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """§F/meetings/protocols/000950: the draft of a closed meeting reads as a PDF."""
+    s = await seed(maker, status="closed", items=1, protocol="draft")
+    final = await seed(maker, status="closed", items=0, protocol="final")
+    live = await seed(maker, status="live", items=0, protocol="draft")
+    assert s.protocol_id is not None and final.protocol_id is not None
+    assert live.protocol_id is not None
+    typst = _Typst()
+    async with maker() as session:
+        mailer = DraftMailer(
+            ProtocolService(
+                session,
+                storage=cast("ObjectStorage", _Storage()),
+                typst=cast("TypstClient", typst),
+            )
+        )
+        internal, name = await mailer.preview(s.protocol_id, public=False)
+        public, public_name = await mailer.preview(s.protocol_id, public=True)
+        with pytest.raises(ConflictError):
+            await mailer.preview(final.protocol_id, public=False)
+        with pytest.raises(ConflictError):
+            await mailer.preview(live.protocol_id, public=False)
+    assert (internal, public) == (b"%PDF-draft", b"%PDF-draft")
+    assert [c["watermark"] for c in typst.configs] == [WATERMARK, WATERMARK]
+    assert name.startswith("Entwurf_Protokoll_") and "oeffentlich" not in name
+    assert public_name.endswith("_oeffentlich.pdf")
+    async with maker() as session:
+        protocol = await session.get(Protocol, s.protocol_id)
+        assert protocol is not None
+        assert (protocol.status, protocol.draft_sent_at) == ("draft", None)
+        assert (protocol.pdf_storage_key, protocol.public_pdf_storage_key) == (None, None)
+    assert [
+        e.action
+        for e in await audit_actions(maker, target_id=s.protocol_id)
+        if e.action == "protocol_draft_mail"
+    ] == []
+
+
+async def test_draft_pdf_route_needs_a_draft_and_a_render_service(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    s = await seed(maker, status="closed", items=0, protocol="draft")
+    final = await seed(maker, status="closed", items=0, protocol="final")
+    live = await seed(maker, status="live", items=0, protocol="draft")
+    with TestClient(api) as client:
+        resp = client.get(f"/api/protocols/{s.protocol_id}/draft-pdf?variant=public")
+        running = client.get(f"/api/protocols/{live.protocol_id}/draft-pdf")
+        not_draft = client.get(f"/api/protocols/{final.protocol_id}/draft-pdf")
+        missing = client.get(f"/api/protocols/{uuid.uuid4()}/draft-pdf")
+        bad = client.get(f"/api/protocols/{s.protocol_id}/draft-pdf?variant=other")
+    assert resp.status_code == 503, resp.text
+    assert (running.status_code, running.json()["code"]) == (409, "meeting_live")
+    assert not_draft.status_code == 409, not_draft.text
+    assert not_draft.json()["code"] == "protocol_not_draft"
+    assert missing.status_code == 404, missing.text
+    assert bad.status_code == 422, bad.text
 
 
 async def test_approval_needs_a_final_protocol_and_another_meeting_of_the_gremium(
@@ -201,10 +276,25 @@ async def test_approval_needs_a_final_protocol_and_another_meeting_of_the_gremiu
         nxt = Meeting(
             gremium_id=s.gremium_id, title="Folgesitzung", date=_date(2026, 7, 4), status="closed"
         )
-        session.add(nxt)
+        own = await session.get(Meeting, s.meeting_id)
+        assert own is not None and own.date is not None
+        before = Meeting(
+            gremium_id=s.gremium_id,
+            title="Vorher",
+            date=own.date - timedelta(days=7),
+            status="closed",
+        )
+        planned = Meeting(
+            gremium_id=s.gremium_id, title="Geplant", date=_date(2026, 8, 1), status="planned"
+        )
+        session.add_all([nxt, before, planned])
         await session.commit()
     url = f"/api/protocols/{s.protocol_id}/approval"
     with TestClient(api) as client:
+        for wrong in (before, planned):
+            refused = client.put(url, json={"meetingId": str(wrong.id)})
+            assert refused.status_code == 422, refused.text
+            assert refused.json()["code"] == "invalid_approval_meeting"
         on_draft = client.put(
             f"/api/protocols/{draft.protocol_id}/approval", json={"meetingId": str(nxt.id)}
         )
@@ -243,3 +333,60 @@ async def test_approval_needs_a_final_protocol_and_another_meeting_of_the_gremiu
         if e.action == "protocol_approval"
     ]
     assert marks == [str(nxt.id), None]
+
+
+async def test_the_delete_of_the_approving_meeting_removes_the_mark(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """§F/meetings/protocols/000924: a mark names its meeting, so it goes with it."""
+    s = await seed(maker, status="closed", items=0, protocol="final")
+    async with maker() as session:
+        nxt = Meeting(
+            gremium_id=s.gremium_id, title="Folgesitzung", date=_date(2027, 1, 9), status="closed"
+        )
+        session.add(nxt)
+        await session.commit()
+    url = f"/api/protocols/{s.protocol_id}/approval"
+    with TestClient(api) as client:
+        assert client.put(url, json={"meetingId": str(nxt.id)}).status_code == 200
+        assert client.delete(f"/api/meetings/{nxt.id}").status_code in (200, 204)
+        read = client.get(f"/api/meetings/{s.meeting_id}/protocol")
+    assert read.json()["approvedAt"] is None
+    assert read.json()["approvedMeetingId"] is None
+
+
+async def test_a_final_protocol_goes_back_to_draft_until_it_is_approved(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """§F/meetings/protocols/000983: back to draft without a mark, 409 with one."""
+    s = await seed(maker, status="closed", items=0, protocol="final")
+    marked = await seed(maker, status="closed", items=0, protocol="final")
+    async with maker() as session:
+        nxt = Meeting(
+            gremium_id=marked.gremium_id,
+            title="Folgesitzung",
+            date=_date(2026, 7, 4),
+            status="closed",
+        )
+        session.add(nxt)
+        sent = await session.get(Protocol, s.protocol_id)
+        assert sent is not None
+        sent.sent_at = datetime(2026, 6, 21, 9, 0, tzinfo=UTC)
+        await session.commit()
+    with TestClient(api) as client:
+        client.put(f"/api/protocols/{marked.protocol_id}/approval", json={"meetingId": str(nxt.id)})
+        approved = client.post(f"/api/protocols/{marked.protocol_id}/reopen")
+        reopened = client.post(f"/api/protocols/{s.protocol_id}/reopen")
+        again = client.post(f"/api/protocols/{s.protocol_id}/reopen")
+        text = client.patch(f"/api/meetings/{s.meeting_id}", json={"title": "Korrigierter Titel"})
+        gone = client.delete(f"/api/protocols/{s.protocol_id}")
+        missing = client.post(f"/api/protocols/{uuid.uuid4()}/reopen")
+    assert (approved.status_code, approved.json()["code"]) == (409, "protocol_approved")
+    assert reopened.status_code == 200, reopened.text
+    assert reopened.json()["status"] == "draft"
+    assert (again.status_code, again.json()["code"]) == (409, "protocol_not_final")
+    assert text.status_code == 200, text.text
+    assert (gone.status_code, gone.json()["code"]) == (409, "protocol_finalized")
+    assert missing.status_code == 404, missing.text
+    actions = [e.action for e in await audit_actions(maker, target_id=s.protocol_id)]
+    assert actions == ["protocol_reopen"]

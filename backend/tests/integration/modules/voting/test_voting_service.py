@@ -233,16 +233,19 @@ async def test_percent_quorum_denominator_is_roster_not_voters(
 ) -> None:
     """The percent quorum divides by the roster, not by the voters.
 
-    The roster holds 20 eligible voters, for example the size of the Gremium,
-    independent of who logs in or votes. No principal row exists for these voters. 5
-    votes give 5/20 = 25%, below 50%, so the quorum is missed. A denominator of the
-    voters alone would give 5/5 = 100% and fail open. A missed quorum blocks the close
-    with 409 instead of a silent rejected. The way out is to collect more votes or to
-    cancel the vote.
+    The Gremium holds 20 members with a voting right, independent of who logs in or
+    votes. The open counts them again (§F/meetings/voting/000939), so the count of the
+    create does not matter. 5 votes give 5/20 = 25%, below 50%, so the quorum is missed.
+    A denominator of the voters alone would give 5/5 = 100% and fail open. A missed
+    quorum blocks the close with 409 instead of a silent rejected. The way out is
+    to collect more votes or to cancel the vote.
     """
     app, _ = await _seed(session)
+    assert app.gremium_id is not None
+    for _n in range(20):
+        await _add_member(session, app.gremium_id, ["vote.cast"])
     vote = await _make_vote(
-        session, app, eligible_count=20, quorum={"type": "percent", "value": 50}
+        session, app, eligible_count=3, quorum={"type": "percent", "value": 50}
     )
     svc = VotingService(session)
     await svc.open(vote.id, now=NOW)

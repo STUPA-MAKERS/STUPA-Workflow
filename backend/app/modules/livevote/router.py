@@ -437,9 +437,8 @@ async def patch_meeting(
     The status runs only planned, live, closed (409 ``invalid_status_transition``
     otherwise). The close answers 409 ``open_vote`` while a vote of the meeting is
     open, and it cancels the draft votes of the meeting. The start has an open window
-    (``opensAt``/``confirmUntil`` of the meeting): before ``opensAt`` it answers 409
-    ``meeting_too_early``, and before ``confirmUntil`` it needs ``confirmEarly``, else
-    409 ``early_open_unconfirmed``.
+    (``opensAt`` of the meeting): before ``opensAt`` it answers 409
+    ``meeting_too_early``.
 
     The close of an ordinary meeting sends the mail ``absence_limit`` to the persons
     with ``session.manage`` for each member whose unexcused absences of the term reach
@@ -570,6 +569,10 @@ async def excuse_own_absence(
     attendance: AttendanceDep,
     service: ServiceDep,
     principal: ReaderDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: MeetingMailerDep,
 ) -> list[AttendanceOut]:
     """Change the own ``absent`` of a closed meeting to ``excused``.
 
@@ -577,6 +580,8 @@ async def excuse_own_absence(
     the close (409 ``late_excuse_expired``). A meeting that is not closed answers 409
     ``meeting_not_closed``, a caller without an ``absent`` record 409 ``not_absent``.
     The change writes ``attendance_set`` with ``late: true``, never with the reason.
+    The excuse applies at once. The mail ``late_excuse`` tells the persons with
+    ``session.manage`` in the Gremium of it, with the reason.
     """
     await service.assert_can_read(meeting_id, principal)
     can_write = await service.can_write_meeting(meeting_id, principal)
@@ -584,6 +589,8 @@ async def excuse_own_absence(
         meeting_id, principal.sub, payload.note, now=datetime.now(UTC), can_write=can_write
     )
     await attendance.session.commit()
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(mailer.late_excuse, settings, meeting_id, principal.sub, pool)
     return roster
 
 
@@ -1126,7 +1133,7 @@ async def set_agenda_done(
 
     The gate is the gate of the item text: ``canWrite``, and in a live meeting with a
     protokollant only the protokollant (403 ``not_protokollant``). A closed meeting
-    whose protocol is no longer a draft answers 409 ``protocol_locked``. Writes
+    whose protocol is no longer a draft answers 409 ``protocol_final``. Writes
     ``agenda_item_done`` or ``agenda_item_reopened`` and sends ``agenda_changed``.
     """
     meeting = await service.get(meeting_id, principal)

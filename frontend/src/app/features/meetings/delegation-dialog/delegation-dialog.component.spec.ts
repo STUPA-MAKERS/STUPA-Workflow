@@ -186,6 +186,18 @@ describe('DelegationDialogComponent', () => {
     expect(toast.error).toHaveBeenLastCalledWith('Vertretung konnte nicht eingerichtet werden.');
   });
 
+  it('says in the language of the page that the person holds the most delegations', async () => {
+    const { dialog, http } = await setup();
+    await userEvent.click(within(dialog()).getByRole('radio', { name: /Mara Keller/ }));
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Vertretung einrichten' }));
+    http
+      .expectOne(`${BASE}/delegations`)
+      .flush({ code: 'delegate_limit', detail: 'Recipient already holds' }, { status: 409, statusText: 'Conflict' });
+    expect(toast.error).toHaveBeenCalledWith(
+      'Diese Person vertritt in dieser Sitzung schon die Höchstzahl an Mitgliedern.',
+    );
+  });
+
   it('closes on cancel and starts empty on the next opening', async () => {
     const { dialog, closed, fixture } = await setup();
     await userEvent.click(within(dialog()).getByRole('radio', { name: /Mara Keller/ }));
