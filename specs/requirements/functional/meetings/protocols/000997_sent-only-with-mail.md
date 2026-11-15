@@ -2,7 +2,7 @@
 id: "000997"
 title: A protocol counts as sent only when its mail went out
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:

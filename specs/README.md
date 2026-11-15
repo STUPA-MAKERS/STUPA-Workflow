@@ -516,7 +516,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000966](requirements/functional/meetings/protocols/000966_blackout-block-attachments.md) | An attachment in a blackout block stays out of the public protocol | approved |
 | [F/meetings/protocols/000969](requirements/functional/meetings/protocols/000969_blackout-known-names.md) | The editor blacks out a known name after it is typed | approved |
 | [F/meetings/protocols/000970](requirements/functional/meetings/protocols/000970_known-names.md) | The known names are the persons of the platform | approved |
-| [F/meetings/protocols/000997](requirements/functional/meetings/protocols/000997_sent-only-with-mail.md) | A protocol counts as sent only when its mail went out | draft |
+| [F/meetings/protocols/000997](requirements/functional/meetings/protocols/000997_sent-only-with-mail.md) | A protocol counts as sent only when its mail went out | approved |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |
@@ -553,8 +553,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/voting/000971](requirements/functional/meetings/voting/000971_election-three-rounds.md) | An election by the majority of the members has up to three Wahlgänge | approved |
 | [F/meetings/voting/000993](requirements/functional/meetings/voting/000993_repeat-vote-way-back.md) | A repeated application vote moves the application in one step and has a way back | approved |
 | [F/meetings/voting/000994](requirements/functional/meetings/voting/000994_one-open-vote.md) | A meeting has one open vote at a time | approved |
-| [F/meetings/voting/000995](requirements/functional/meetings/voting/000995_cancelled-vote-frees-item.md) | A cancelled vote does not block the vote of an application item | draft |
-| [F/meetings/voting/000996](requirements/functional/meetings/voting/000996_round-and-repeat-lock.md) | The next Wahlgang and the repeat of an election lock each other | draft |
+| [F/meetings/voting/000995](requirements/functional/meetings/voting/000995_cancelled-vote-frees-item.md) | A cancelled vote does not block the vote of an application item | approved |
+| [F/meetings/voting/000996](requirements/functional/meetings/voting/000996_round-and-repeat-lock.md) | The next Wahlgang and the repeat of an election lock each other | approved |
 | [F/public/public-pages/000170](requirements/functional/public/public-pages/000170_no-public-meetings.md) | Meetings are never public | replaced |
 | [F/public/public-pages/000171](requirements/functional/public/public-pages/000171_public-protocols.md) | Only final protocols of public Gremien are public | approved |
 | [F/public/public-pages/000172](requirements/functional/public/public-pages/000172_public-protocol-content.md) | A public protocol has no names and no internal TOPs | approved |

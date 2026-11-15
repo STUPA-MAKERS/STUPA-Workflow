@@ -2,7 +2,7 @@
 id: "000996"
 title: The next Wahlgang and the repeat of an election lock each other
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:

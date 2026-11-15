@@ -2,7 +2,7 @@
 id: "000995"
 title: A cancelled vote does not block the vote of an application item
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:
