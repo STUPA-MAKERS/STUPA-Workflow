@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.webhook_actions import WebhookActionDispatcher
@@ -15,15 +16,12 @@ from tests._support.protocols import assert_matches_schema
 from tests._support.webhooks_fakes import FakeSession, FakeWebhookQueue
 
 
-class _SessionCM:
-    def __init__(self, session: FakeSession) -> None:
-        self.session = session
+def _maker(session: FakeSession) -> Callable[[], AbstractAsyncContextManager[FakeSession]]:
+    @asynccontextmanager
+    async def open_session() -> AsyncIterator[FakeSession]:
+        yield session
 
-    async def __aenter__(self) -> FakeSession:
-        return self.session
-
-    async def __aexit__(self, *_a: Any) -> bool:
-        return False
+    return open_session
 
 
 async def test_transition_delivery_matches_schema() -> None:
@@ -42,7 +40,7 @@ async def test_transition_delivery_matches_schema() -> None:
         params={"webhookId": str(hook.id)},
     )
     dispatcher = WebhookActionDispatcher(
-        lambda: _SessionCM(session),  # type: ignore[arg-type]
+        _maker(session),  # type: ignore[arg-type]
         queue,
         load_settings(),
     )
