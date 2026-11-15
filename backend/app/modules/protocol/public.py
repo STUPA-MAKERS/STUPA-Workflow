@@ -24,7 +24,8 @@ import logging
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date as _date
-from typing import Any, Literal
+from datetime import datetime
+from typing import Any, Literal, NamedTuple
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -328,6 +329,15 @@ class PublicFilter:
     q: str | None = None
 
 
+class CircularRow(NamedTuple):
+    """One closed circular vote of a public Gremium, without its result and sums."""
+
+    vote_id: UUID
+    question: str | None
+    closed_at: datetime | None
+    gremium: Gremium
+
+
 @dataclass(frozen=True, slots=True)
 class PublicProtocolService:
     """The reads of the public protocols page. No write and no auth here.
@@ -457,15 +467,17 @@ class PublicProtocolService:
         )
         return [(p, m, g) for p, m, g in (await self.session.execute(stmt)).all()]
 
-    async def circular_votes(self, flt: PublicFilter) -> list[tuple[VoteOut, Gremium]]:
+    async def circular_rows(self, flt: PublicFilter) -> list[CircularRow]:
         """Read the closed circular votes of the public gremien, newest close first.
 
         A circular vote stands in no protocol, so its row is the source
-        (§F/meetings/voting/000949). Only the gremium filter applies here: the caller
-        filters by the day of the close and by the question.
+        (§F/meetings/voting/000949). A row holds no result and no sums: the caller
+        cuts the page first and reads `circular_view` only for the votes of the page.
+        Only the gremium filter applies here: the caller filters by the day of the
+        close and by the question.
         """
         stmt = (
-            select(Vote.id, Gremium)
+            select(Vote.id, Vote.question, Vote.closed_at, Gremium)
             .join(Gremium, Vote.eligible_group == cast(Gremium.id, Text))
             .where(
                 Vote.kind == CIRCULAR,
@@ -475,11 +487,14 @@ class PublicProtocolService:
             )
             .order_by(Vote.closed_at.desc(), Vote.id)
         )
-        voting = VotingService(self.session)
         return [
-            (await voting.get(vote_id), gremium)
-            for vote_id, gremium in (await self.session.execute(stmt)).all()
+            CircularRow(vote_id, question, closed_at, gremium)
+            for vote_id, question, closed_at, gremium in (await self.session.execute(stmt)).all()
         ]
+
+    async def circular_view(self, vote_id: UUID) -> VoteOut:
+        """Read one closed circular vote with its result and the sums of its votes."""
+        return await VotingService(self.session).get(vote_id)
 
     async def list_semesters(self, flt: PublicFilter) -> list[PublicSemesterOut]:
         """Count the visible protocols per semester, newest semester first.

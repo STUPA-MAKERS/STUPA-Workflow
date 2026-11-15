@@ -10,7 +10,8 @@ than one vote on the same question gives only the last one (spec 000945).
 
 A circular vote stands in no protocol. The list reads each closed circular vote of a
 Gremium with `protocols_public` from its row, from the close of the vote on
-(§F/meetings/voting/000949). A vote that an objection cancelled is not closed, so it
+(§F/meetings/voting/000949). Its result and its sums are read only for a vote of the
+returned page. A vote that an objection cancelled is not closed, so it
 stays out.
 """
 
@@ -28,6 +29,7 @@ from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.public import (
+    CircularRow,
     PublicDecision,
     PublicFilter,
     PublicGremiumRef,
@@ -37,7 +39,6 @@ from app.modules.protocol.public import (
     meeting_day,
     semester_of,
 )
-from app.modules.voting.schemas import VoteOut
 from app.settings import get_settings
 from app.shared.schemas import FrozenCamelModel
 
@@ -142,32 +143,52 @@ def _in_filter(day: _date, question: str | None, flt: PublicFilter) -> bool:
     )
 
 
-def circular_out(view: VoteOut, gremium: Gremium, tz: ZoneInfo) -> PublicDecisionOut | None:
+def circular_out(row: CircularRow, tz: ZoneInfo) -> PublicDecisionOut | None:
     """Build the public form of one closed circular vote: no name, no meeting.
+
+    The result and the sums are not in it yet: `with_tally` adds them for a vote of
+    the page.
 
     Returns:
         The decision, or `None` for a vote without the time of its close.
     """
-    if view.closed_at is None:
+    if row.closed_at is None:
         return None
-    day = view.closed_at.astimezone(tz).date()
+    day = row.closed_at.astimezone(tz).date()
+    gremium = row.gremium
     return PublicDecisionOut(
         gremium=PublicGremiumRef(id=gremium.id, name=gremium.name, slug=gremium.slug),
         date=day,
         semester=semester_of(day),
         kind="circular",
-        question=view.question,
-        result=view.result,
-        counts=dict(view.tally.counts),
+        question=row.question,
     )
 
 
 def circular_decisions(
-    views: Sequence[tuple[VoteOut, Gremium]], flt: PublicFilter, tz: ZoneInfo
-) -> list[PublicDecisionOut]:
-    """Build the circular decisions that pass the semester, year and text filters."""
-    outs = [circular_out(view, gremium, tz) for view, gremium in views]
-    return [out for out in outs if out is not None and _in_filter(out.date, out.question, flt)]
+    rows: Sequence[CircularRow], flt: PublicFilter, tz: ZoneInfo
+) -> list[tuple[PublicDecisionOut, UUID]]:
+    """Build the circular decisions that pass the semester, year and text filters.
+
+    Returns:
+        Each decision with the id of its vote.
+    """
+    outs = [(circular_out(row, tz), row.vote_id) for row in rows]
+    return [
+        (out, vote_id)
+        for out, vote_id in outs
+        if out is not None and _in_filter(out.date, out.question, flt)
+    ]
+
+
+async def with_tally(
+    service: PublicProtocolService, out: PublicDecisionOut, vote_id: UUID | None
+) -> PublicDecisionOut:
+    """Add the result and the sums to a circular decision. Another decision has them."""
+    if vote_id is None:
+        return out
+    view = await service.circular_view(vote_id)
+    return out.model_copy(update={"result": view.result, "counts": dict(view.tally.counts)})
 
 
 async def list_public_decisions(
@@ -178,18 +199,20 @@ async def list_public_decisions(
     The page is cut after the read of the visible protocols, because a decision of a
     meeting is a part of the stored public version and has no row of its own. The
     circular decisions join the list by their day; the sort is stable, so the decisions
-    of one protocol keep the agenda order.
+    of one protocol keep the agenda order. Only the circular votes of the page are
+    counted, because the count of a vote costs queries of its own.
     """
     rows = await service.visible_rows(flt)
-    of_meetings = [
-        out
+    of_meetings: list[tuple[PublicDecisionOut, UUID | None]] = [
+        (out, None)
         for protocol, meeting, gremium in rows
         for out in decisions_of(protocol, meeting, gremium, q=flt.q)
     ]
     circular = circular_decisions(
-        await service.circular_votes(flt), flt, ZoneInfo(get_settings().local_timezone)
+        await service.circular_rows(flt), flt, ZoneInfo(get_settings().local_timezone)
     )
-    found = sorted([*of_meetings, *circular], key=lambda out: out.date, reverse=True)
-    return PublicDecisionPage(
-        items=found[offset : offset + limit], total=len(found), limit=limit, offset=offset
-    )
+    found = sorted([*of_meetings, *circular], key=lambda entry: entry[0].date, reverse=True)
+    items = [
+        await with_tally(service, out, vote_id) for out, vote_id in found[offset : offset + limit]
+    ]
+    return PublicDecisionPage(items=items, total=len(found), limit=limit, offset=offset)
