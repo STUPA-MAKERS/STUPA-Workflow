@@ -79,8 +79,8 @@
 }
 
 @if (nextRound(); as label) {
-  <div class="er__actions">
-    <app-button variant="fill" [loading]="busy() === 'next'" (click)="startNextRound()">
+  <div class="er__next">
+    <app-button variant="fill" [block]="true" [loading]="busy() === 'next'" (click)="startNextRound()">
       <app-icon name="repeat" />
       {{ label | t }}
     </app-button>
