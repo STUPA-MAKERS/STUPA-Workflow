@@ -20,7 +20,7 @@
     }
     @if (i.links.length) {
       <app-section class="gi__sec" [heading]="'gremien.info.links' | t">
-        <ul class="gi__links">
+        <ul class="rowgroup gi__links">
           @for (link of i.links; track $index) {
             <li>
               <a class="gi__link" [href]="link.url" target="_blank" rel="noopener">
