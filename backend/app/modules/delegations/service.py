@@ -35,7 +35,8 @@ The server enforces these invariants:
   does not count. The delegator cannot vote in that meeting. See
   `voting_delegation_check`. The audit log records every use.
 * Elections. An election takes the ballot of a delegation only with the gremium
-  switch `delegation_in_elections` (`counted_in`). A pool seat always counts.
+  switch `delegation_in_elections` (`counted_in`). A substitution from the pool always
+  counts, also one that the lead entered.
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, or_, select
+from sqlalchemy import ColumnElement, and_, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -166,7 +167,9 @@ class Represented:
 
     sub: str
     principal_id: UUID
-    #: True for a seat that a pool substitute claimed for itself.
+    #: True for a substitution from the pool: a seat that the substitute claimed or
+    #: that the lead entered. It is no transfer of the voting right
+    #: (§F/meetings/delegations/000938).
     pool: bool
 
 
@@ -183,8 +186,9 @@ def counted_in(
 ) -> tuple[Represented, ...]:
     """Return the represented members that a cast in `vote` writes a ballot for.
 
-    A pool seat is a substitution, not a transfer of the voting right, so it counts
-    in every vote. A delegation counts where `takes_delegations` says so.
+    A substitution from the pool is no transfer of the voting right, so it counts in
+    every vote, for a seat that the substitute claimed and for an entry of the lead
+    (§F/meetings/delegations/000938). A delegation counts where `takes_delegations` says so.
     """
     if takes_delegations(vote, in_elections=in_elections):
         return incoming
@@ -229,12 +233,18 @@ async def voting_delegation_check(
     delegator = aliased(PrincipalRow)
     delegate = aliased(PrincipalRow)
     is_delegator = MeetingDelegation.delegator_principal_id == pid_subq
+    # For an own row: the substitute claimed the seat itself, so the member is not
+    # blocked. For a received row: any substitution from the pool.
+    substitution = or_(
+        pool_seat_clause(delegate),
+        and_(not_(is_delegator), MeetingDelegation.via_pool.is_(True)),
+    )
     rows = (
         await session.execute(
             select(
                 is_delegator,
                 MeetingDelegation.delegate_voting,
-                pool_seat_clause(delegate),
+                substitution,
                 delegator.sub,
                 delegator.id,
             )
@@ -1065,7 +1075,8 @@ class DelegationService:
         incoming = [
             d.delegator_principal_id
             for d, seat in rows
-            if d.delegator_principal_id != me.id and (transfers or seat)
+            if d.delegator_principal_id != me.id
+            and (transfers or seat or bool(getattr(d, "via_pool", False)))
         ]
         outgoing = [
             d.delegate_principal_id

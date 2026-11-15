@@ -5,8 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/integration/modules/delegations/test_delegate_limit_live.py:test_a_pool_substitute_of_the_lead_votes_in_an_election"
 implementation:
-  - backend/app/modules/voting/service.py
   - backend/app/modules/delegations/service.py
 scope:
   - backend/app/modules/voting

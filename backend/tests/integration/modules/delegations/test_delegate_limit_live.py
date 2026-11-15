@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.deps import get_current_principal
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.models import Gremium
 from app.modules.voting.models import Vote, VotedMarker
 from app.shared.config_schemas import VoteConfig
@@ -233,3 +234,29 @@ async def test_an_election_takes_no_delegation_ballot(
     assert both.status_code == 200, both.text
     assert both.json()["ballots"] == 2
     assert await _voters(maker, allowed) == {w.subs["Dora"], w.subs["Anna"]}
+
+
+async def test_a_pool_substitute_of_the_lead_votes_in_an_election(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """§F/meetings/delegations/000938: a substitution from the pool is no transfer."""
+    w = await _world(maker)
+    with TestClient(api) as client:
+        assert _delegate(client, api, w, "Anna", "Dora").status_code == 201
+        async with maker() as session:
+            await session.execute(
+                update(MeetingDelegation)
+                .where(MeetingDelegation.meeting_id == w.meeting_id)
+                .values(via_pool=True, created_by="lead")
+            )
+            await session.commit()
+        await set_status(maker, w.meeting_id, "live")
+        election = await _vote(maker, w, election=True)
+        _as_member(api, w, "Dora")
+        status = client.get(f"/api/delegations/votes/{election}/status").json()
+        cast = _cast(client, election, ["c1"])
+    assert status["exercising"] is True
+    assert cast.status_code == 200, cast.text
+    assert cast.json()["ballots"] == 2
+    assert await _voters(maker, election) == {w.subs["Dora"], w.subs["Anna"]}
+
