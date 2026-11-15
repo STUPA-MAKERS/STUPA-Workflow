@@ -2,7 +2,7 @@
 id: "000944"
 title: A circular vote sends a mail at its open and before its end
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
