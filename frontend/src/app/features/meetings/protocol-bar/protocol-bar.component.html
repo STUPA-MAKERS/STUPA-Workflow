@@ -49,6 +49,16 @@
         {{ (publication() === 'withheld' ? 'meetings.protocolBar.publish' : 'meetings.protocolBar.withhold') | t }}
       </app-button>
     }
+    @if (draftPdf(); as draft) {
+      <a class="pb__pdf" [href]="draft.internal" target="_blank" rel="noopener">
+        <app-icon name="download" [size]="15" />
+        {{ 'meetings.protocolBar.pdfInternal' | t }}
+      </a>
+      <a class="pb__pdf" [href]="draft.public" target="_blank" rel="noopener">
+        <app-icon name="download" [size]="15" />
+        {{ 'meetings.protocolBar.pdfPublic' | t }}
+      </a>
+    }
     @if (p.isFinal) {
       @if (p.pdfUrl) {
         <a class="pb__pdf" [href]="p.pdfUrl" target="_blank" rel="noopener">

@@ -31,6 +31,9 @@ interface BarState {
  * - Draft, with write access: "Entwurf senden" sends the PDF with the watermark "Entwurf"
  *   to the members, after a confirmation. The protocol stays a draft (§ 000925). A
  *   second send names the date of the last one in the confirmation (§ 000937).
+ * - Draft: "PDF intern" and "PDF öffentlich" open the draft as a PDF
+ *   with the watermark "Entwurf". The server renders it for this read and stores
+ *   nothing (§ 000950).
  * - Final, for a holder of `canFinalize`: "Als genehmigt markieren" asks for the meeting
  *   that approved the protocol. With the mark the bar names that meeting and offers
  *   "Genehmigung entfernen", which asks before it removes the mark (§ 000924).
@@ -93,6 +96,14 @@ export class ProtocolBarComponent {
   protected readonly canSendDraft = computed(() => {
     const m = this.meeting();
     return m.status === 'closed' && !!m.canWrite && this.protocol().status === 'draft' && this.session !== null;
+  });
+
+  /** The two PDF links of a draft of a closed meeting (§ 000950). */
+  protected readonly draftPdf = computed(() => {
+    const p = this.protocol();
+    if (p.status !== 'draft' || this.meeting().status !== 'closed') return null;
+    const base = `/api/protocols/${p.id}/draft-pdf`;
+    return { internal: base, public: `${base}?variant=public` };
   });
 
   /** The mark and its removal: a final protocol and the right to finalize. */

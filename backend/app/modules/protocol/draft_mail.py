@@ -8,6 +8,10 @@ blackout mark.
 
 A live meeting refuses the send, because its draft is not complete, and the stored time
 lets the client ask before a second send (§F/meetings/protocols/000937).
+
+A reader of the meeting also reads the draft as a PDF without a mail (`preview`,
+§F/meetings/protocols/000950): the internal variant or the public one, each with the
+watermark, and only after the meeting. This read stores nothing and writes no audit entry.
 """
 
 from __future__ import annotations
@@ -105,6 +109,35 @@ class DraftMailer:
             },
         )
         return len(recipients)
+
+    async def preview(self, protocol_id: UUID, *, public: bool) -> tuple[bytes, str]:
+        """Render the draft with the watermark. Return the PDF and its download name.
+
+        `public` picks the redacted variant. Nothing is stored and nothing is sent.
+
+        Raises:
+            ConflictError: The protocol is not a draft (409 ``protocol_not_draft``), or
+                its meeting is live (409 ``meeting_live``).
+            ServiceUnavailableError: No render service or no storage is configured (503).
+            BadRequestError: typst refused the document (400 ``render_failed``).
+        """
+        svc = self.service
+        protocol = await svc._get(protocol_id)
+        if protocol.status != "draft":
+            raise ConflictError("Only a draft has a draft PDF.", code=PROTOCOL_NOT_DRAFT)
+        meeting = await svc.session.get(Meeting, protocol.meeting_id)
+        if meeting is not None and meeting.status == "live":
+            raise ConflictError("A live meeting has no draft PDF.", code=MEETING_LIVE)
+        markdown = await svc._build_document(protocol, public=public)
+        pdf = await svc._render_pdf(protocol, markdown, public=public, watermark=WATERMARK)
+        if pdf is None:
+            raise ServiceUnavailableError("The draft cannot be rendered now.")
+        name = (
+            protocol_pdf_filename(meeting.title, meeting_day(meeting), public=public)
+            if meeting is not None
+            else "Protokoll.pdf"
+        )
+        return pdf, f"Entwurf_{name}"
 
     async def last_sent(self, protocol_id: UUID) -> datetime | None:
         """Return the time of the last send before this request, or None.

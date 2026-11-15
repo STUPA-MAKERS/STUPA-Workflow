@@ -208,6 +208,66 @@ async def test_draft_mail_of_a_live_meeting_is_refused(
         assert protocol is not None and protocol.draft_sent_at is None
 
 
+async def test_draft_pdf_gives_both_variants_and_stores_nothing(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """§F/meetings/protocols/000950: the draft of a closed meeting reads as a PDF."""
+    s = await seed(maker, status="closed", items=1, protocol="draft")
+    final = await seed(maker, status="closed", items=0, protocol="final")
+    live = await seed(maker, status="live", items=0, protocol="draft")
+    assert s.protocol_id is not None and final.protocol_id is not None
+    assert live.protocol_id is not None
+    typst = _Typst()
+    async with maker() as session:
+        mailer = DraftMailer(
+            ProtocolService(
+                session,
+                storage=cast("ObjectStorage", _Storage()),
+                typst=cast("TypstClient", typst),
+            )
+        )
+        internal, name = await mailer.preview(s.protocol_id, public=False)
+        public, public_name = await mailer.preview(s.protocol_id, public=True)
+        with pytest.raises(ConflictError):
+            await mailer.preview(final.protocol_id, public=False)
+        with pytest.raises(ConflictError):
+            await mailer.preview(live.protocol_id, public=False)
+    assert (internal, public) == (b"%PDF-draft", b"%PDF-draft")
+    assert [c["watermark"] for c in typst.configs] == [WATERMARK, WATERMARK]
+    assert name.startswith("Entwurf_Protokoll_") and "oeffentlich" not in name
+    assert public_name.endswith("_oeffentlich.pdf")
+    async with maker() as session:
+        protocol = await session.get(Protocol, s.protocol_id)
+        assert protocol is not None
+        assert (protocol.status, protocol.draft_sent_at) == ("draft", None)
+        assert (protocol.pdf_storage_key, protocol.public_pdf_storage_key) == (None, None)
+    assert [
+        e.action
+        for e in await audit_actions(maker, target_id=s.protocol_id)
+        if e.action == "protocol_draft_mail"
+    ] == []
+
+
+async def test_draft_pdf_route_needs_a_draft_and_a_render_service(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    s = await seed(maker, status="closed", items=0, protocol="draft")
+    final = await seed(maker, status="closed", items=0, protocol="final")
+    live = await seed(maker, status="live", items=0, protocol="draft")
+    with TestClient(api) as client:
+        resp = client.get(f"/api/protocols/{s.protocol_id}/draft-pdf?variant=public")
+        running = client.get(f"/api/protocols/{live.protocol_id}/draft-pdf")
+        not_draft = client.get(f"/api/protocols/{final.protocol_id}/draft-pdf")
+        missing = client.get(f"/api/protocols/{uuid.uuid4()}/draft-pdf")
+        bad = client.get(f"/api/protocols/{s.protocol_id}/draft-pdf?variant=other")
+    assert resp.status_code == 503, resp.text
+    assert (running.status_code, running.json()["code"]) == (409, "meeting_live")
+    assert not_draft.status_code == 409, not_draft.text
+    assert not_draft.json()["code"] == "protocol_not_draft"
+    assert missing.status_code == 404, missing.text
+    assert bad.status_code == 422, bad.text
+
+
 async def test_approval_needs_a_final_protocol_and_another_meeting_of_the_gremium(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:

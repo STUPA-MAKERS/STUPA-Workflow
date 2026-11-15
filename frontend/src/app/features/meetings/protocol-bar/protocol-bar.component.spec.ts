@@ -69,6 +69,18 @@ describe('ProtocolBarComponent', () => {
     expect(screen.queryByRole('link', { name: 'PDF öffentlich' })).toBeNull();
   });
 
+  /** § 000950 (draftPdf): every reader of a closed meeting opens the draft as a PDF. */
+  it('links the draft PDF in both variants', async () => {
+    const p = protocol();
+    const { fixture } = await setup(closed({ canFinalize: false, canWrite: false }), p);
+    const base = `/api/protocols/${p.id}/draft-pdf`;
+    expect(screen.getByRole('link', { name: 'PDF intern' })).toHaveAttribute('href', base);
+    expect(screen.getByRole('link', { name: 'PDF öffentlich' })).toHaveAttribute('href', `${base}?variant=public`);
+    fixture.componentRef.setInput('meeting', meeting());
+    fixture.detectChanges();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
   describe('draft mail and approval', () => {
     async function withSession(m: Meeting, p: Protocol, meetings: Meeting[] = []) {
       const session = {

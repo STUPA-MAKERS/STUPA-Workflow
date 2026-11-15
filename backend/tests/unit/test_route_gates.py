@@ -190,6 +190,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("DELETE", "/api/protocols/{protocol_id}"): _PROTOCOL_WRITE,
     ("POST", "/api/protocols/{protocol_id}/finalize"): "ProtocolService.authorize_finalize",
     ("POST", "/api/protocols/{protocol_id}/draft-mail"): "ProtocolService.authorize_write",
+    ("GET", "/api/protocols/{protocol_id}/draft-pdf"): _PROTOCOL_READ,
     ("PUT", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
     ("DELETE", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
     ("GET", "/api/protocols/{protocol_id}/pdf"): _PROTOCOL_READ,
