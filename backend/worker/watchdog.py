@@ -17,6 +17,7 @@ import logging
 import os
 import threading
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -31,11 +32,12 @@ BEAT_SECONDS = 5.0
 EXIT_STALLED = 70
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class Watchdog:
     """One beat on the loop and one check beside it.
 
-    A test injects the clock and the exit call.
+    A test injects the clock and the exit call. `beats` holds the time of the last
+    beat only.
     """
 
     limit_seconds: float = STALL_LIMIT_SECONDS
@@ -43,11 +45,16 @@ class Watchdog:
     clock: Callable[[], float] = time.monotonic
     exit: Callable[[int], Any] = os._exit
     stop: threading.Event = field(default_factory=threading.Event)
-    last_beat: float = 0.0
+    beats: deque[float] = field(default_factory=lambda: deque[float](maxlen=1))
 
     def beat(self) -> None:
         """Store the time of this beat."""
-        self.last_beat = self.clock()
+        self.beats.append(self.clock())
+
+    @property
+    def last_beat(self) -> float:
+        """The time of the last beat, or of this call before the first beat."""
+        return self.beats[-1] if self.beats else self.clock()
 
     def stalled(self) -> bool:
         """Tell whether the loop made no beat for longer than the limit."""

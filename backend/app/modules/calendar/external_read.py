@@ -17,8 +17,7 @@ import asyncio
 import multiprocessing
 from collections.abc import Callable
 from datetime import date
-from multiprocessing.connection import Connection
-from typing import Protocol
+from typing import Protocol, cast
 
 from app.modules.calendar.external_feed import FeedEntry, FeedError, parse_feed
 from app.modules.calendar.external_fetch import FetchError
@@ -29,8 +28,26 @@ READ_TIMEOUT_SECONDS = 10.0
 #: The result of one read: the entries, or the cause of the failure.
 Read = tuple[tuple[FeedEntry, ...] | None, FetchError | None]
 
+
+
+class Channel(Protocol):
+    """One end of the pipe between the worker and the child."""
+
+    def send(self, obj: object) -> None:
+        """Send one object."""
+        ...
+
+    def recv(self) -> object:
+        """Take one object."""
+        ...
+
+    def close(self) -> None:
+        """Close this end."""
+        ...
+
+
 #: The body of the child. A test gives one that never returns.
-Target = Callable[[Connection, bytes, date], None]
+Target = Callable[[Channel, bytes, date], None]
 
 
 class FeedReader(Protocol):
@@ -41,7 +58,7 @@ class FeedReader(Protocol):
         ...
 
 
-def parse_into(conn: Connection, data: bytes, today: date) -> None:
+def parse_into(conn: Channel, data: bytes, today: date) -> None:
     """Parse the feed and send the entries, or None for bytes that are no calendar."""
     try:
         conn.send(parse_feed(data, today))
@@ -51,13 +68,13 @@ def parse_into(conn: Connection, data: bytes, today: date) -> None:
         conn.close()
 
 
-def _answer(conn: Connection) -> Read:
+def _answer(conn: Channel) -> Read:
     """Take the answer of the child. A closed pipe without an answer is no calendar."""
     try:
         entries = conn.recv()
     except EOFError:
         return None, "format"
-    return (None, "format") if entries is None else (entries, None)
+    return (None, "format") if entries is None else (cast("tuple[FeedEntry, ...]", entries), None)
 
 
 def read_in_process(

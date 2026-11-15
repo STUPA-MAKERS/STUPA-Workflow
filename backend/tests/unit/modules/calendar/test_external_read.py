@@ -8,12 +8,16 @@ from __future__ import annotations
 
 import time
 from datetime import date
-from multiprocessing.connection import Connection
 from multiprocessing.connection import Pipe as pipe
 
 import pytest
 
-from app.modules.calendar.external_read import parse_into, read_feed, read_in_process
+from app.modules.calendar.external_read import (
+    Channel,
+    parse_into,
+    read_feed,
+    read_in_process,
+)
 
 TODAY = date(2026, 11, 15)
 FEED = (
@@ -22,12 +26,12 @@ FEED = (
 )
 
 
-def never_returns(conn: Connection, data: bytes, today: date) -> None:
+def never_returns(conn: Channel, data: bytes, today: date) -> None:
     """Stand in for a read that does not end."""
     time.sleep(3600)
 
 
-def ends_silent(conn: Connection, data: bytes, today: date) -> None:
+def ends_silent(conn: Channel, data: bytes, today: date) -> None:
     """Stand in for a child that ends without an answer."""
     conn.close()
 
