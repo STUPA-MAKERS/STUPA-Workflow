@@ -2,7 +2,7 @@
 id: "000950"
 title: The draft of a protocol reads as a PDF after the meeting
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:
