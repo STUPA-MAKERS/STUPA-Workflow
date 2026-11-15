@@ -2,7 +2,7 @@
 id: "000949"
 title: A circular decision shows in the list of decisions and in no protocol
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
