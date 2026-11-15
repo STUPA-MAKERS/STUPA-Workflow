@@ -543,7 +543,8 @@ async def test_guest_votes_without_quorum_and_late_admission(
 ) -> None:
     """Let guests vote without a quorum, also after a late admission.
 
-    The quorum is 100 % of 2 members, so a members-only vote without ballots cannot close.
+    The quorum is 100 % of 2 members, so a members-only vote with 1 present member cannot
+    close.
     The vote with guests counts 2 present members and 1 guest. A guest admitted while the
     vote runs votes too. Without a quorum the vote closes with 2 guest ballots although no
     member voted. A members-only vote keeps the quorum and refuses the close without
@@ -603,6 +604,16 @@ async def test_guest_votes_without_quorum_and_late_admission(
         assert closed.json()["result"] == "passed"
         assert closed.json()["tally"]["presentMembers"] == 2
         assert closed.json()["tally"]["presentGuests"] == 2
+        async with maker() as session:
+            await session.execute(
+                update(MeetingAttendance)
+                .where(
+                    MeetingAttendance.meeting_id == s.meeting_id,
+                    MeetingAttendance.principal_id == s.members[1],
+                )
+                .values(status="absent")
+            )
+            await session.commit()
         members_only = open_vote(lead, s, s.secret_item, guestsVote=False)
         assert members_only["guestsVote"] is False and members_only["quorum"] is not None
         refused = lead.post(f"/api/votes/{members_only['id']}/close")
