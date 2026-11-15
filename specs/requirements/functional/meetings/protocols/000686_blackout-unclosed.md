@@ -2,9 +2,9 @@
 id: "000686"
 title: An open blackout marker stops the finalize
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-11
+updated: 2026-11-15
 tests:
   - "backend/tests/integration/modules/protocol/test_protocol_blackout.py:test_start_finalize_refuses_an_open_marker"
 implementation:
@@ -18,7 +18,8 @@ scope:
 
 # An open blackout marker stops the finalize
 
-If a protocol text has a blackout marker without its closing `%%`, the finalize must refuse with
+If a protocol text has a blackout marker without its closing `%%`, or a blackout block (000965)
+without its closing line, the finalize must refuse with
 problem+json code `blackout_unclosed` and must name the TOP. The editor must show the open
 marker as an error.
 
