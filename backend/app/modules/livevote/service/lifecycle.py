@@ -31,6 +31,7 @@ from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service.handover import HandoverOps
 from app.modules.meetings.agenda_service import AgendaService
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.present import fix_counts, present_count
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteOut
 from app.shared.errors import (
@@ -482,6 +483,11 @@ class LifecycleOps(HandoverOps):
         """
         await self.close_periods(meeting, now)
         meeting.closed_at = now
+        fix_counts(
+            meeting,
+            await present_count(self.session, meeting.id),
+            await self.vote_eligible_count(meeting.gremium_id),
+        )
         from app.modules.voting.service import VotingService
 
         cancelled = await VotingService(self.session).cancel_drafts_for_meeting(

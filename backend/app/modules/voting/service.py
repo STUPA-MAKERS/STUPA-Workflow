@@ -48,13 +48,13 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.delegations.pool_seat import (
     claim_pool_seat,
-    pool_seat_counts,
     pool_seat_for,
     release_pool_seat_of,
 )
 from app.modules.delegations.service import Represented, counted_in, voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService, StagedFire
+from app.modules.meetings.present import NOBODY, Present, present_count
 from app.modules.meetings.protocol_models import ProtocolVoteRef
 from app.modules.voting import circular as circular_mod
 from app.modules.voting import election as election_mod
@@ -648,21 +648,14 @@ class VotingService:
         return tally_mod.tally(config.options, await self._choices(vote))
 
     async def _present_count(self, vote: Vote) -> int:
-        """Count the present meeting members, or 0 without a meeting."""
-        if vote.meeting_id is None:
-            return 0
-        from app.modules.meetings.models import MeetingAttendance
+        """Count the present members with a voting right, or 0 without a meeting."""
+        return (await self._presence(vote)).members
 
-        return (
-            await self.session.scalar(
-                select(func.count())
-                .select_from(MeetingAttendance)
-                .where(
-                    MeetingAttendance.meeting_id == vote.meeting_id,
-                    MeetingAttendance.status == "present",
-                )
-            )
-        ) or 0
+    async def _presence(self, vote: Vote) -> Present:
+        """Return the present count of the meeting of the vote (000946)."""
+        if vote.meeting_id is None:
+            return NOBODY
+        return await present_count(self.session, vote.meeting_id)
 
     async def _admitted_guest_count(self, vote: Vote) -> int:
         """Count the admitted guests of the meeting of the vote, or 0 without one."""
@@ -799,9 +792,13 @@ class VotingService:
                     0,
                 )
             case (False, True):
-                members = await self._present_count(vote)
+                here = await self._presence(vote)
                 guests = await self._guest_attendance(vote, config)
-                return members, guests, members + guests if config.guests_vote else members
+                return (
+                    here.members,
+                    guests,
+                    here.total + guests if config.guests_vote else here.total,
+                )
             case _:
                 return None, None, 0
 
@@ -879,13 +876,9 @@ class VotingService:
         if vote.meeting_id is None or config.quorum_basis != "present":
             return None
         fixed: int | None = getattr(vote, "present_members", None)
-        members = (
-            fixed
-            if vote.status == "closed" and fixed is not None
-            else await self._present_count(vote)
-        )
-        seats = await pool_seat_counts(self.session, [vote.meeting_id])
-        return members + seats.get(vote.meeting_id, 0)
+        presence = await self._presence(vote)
+        members = fixed if vote.status == "closed" and fixed is not None else presence.members
+        return members + presence.seats
 
     async def _poll_outcome(self, vote: Vote) -> tally_mod.PollOutcome:
         """Tally a poll from its stored ballots."""
@@ -1258,11 +1251,7 @@ class VotingService:
         await circular_mod.CircularService(self).check_open(vote, now)
         await self._take_plan_step(vote, actor)
         config = self._config(vote)
-        if eligible_count is not None:
-            vote.eligible_count = eligible_count
-        elif vote.meeting_id is None:
-            counted = await self._roster_count(vote)
-            vote.eligible_count = vote.eligible_count if counted is None else counted
+        vote.eligible_count = await self._opening_count(vote, eligible_count)
         vote.opens_at = now
         vote.status = "open"
         data: dict[str, object] = {
@@ -1285,6 +1274,17 @@ class VotingService:
         return self._to_out(
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
+
+    async def _opening_count(self, vote: Vote, given: int | None) -> int | None:
+        """Return the eligible count of an opening vote.
+
+        The caller of a meeting vote gives the count. A vote without a meeting counts
+        its roster now (000939) and keeps the stored count only with a free group key.
+        """
+        if given is not None or vote.meeting_id is not None:
+            return vote.eligible_count if given is None else given
+        counted = await self._roster_count(vote)
+        return vote.eligible_count if counted is None else counted
 
     async def _roster_count(self, vote: Vote) -> int | None:
         """Count the eligible members of the Gremium of ``vote`` now.

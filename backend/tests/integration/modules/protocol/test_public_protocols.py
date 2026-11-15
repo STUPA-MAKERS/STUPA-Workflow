@@ -107,6 +107,7 @@ async def _seed(
             title=title,
             date=day,
             status="closed",
+            present_count=1,
             protokollant_id=people[KEEPER].id,
         )
         session.add(meeting)

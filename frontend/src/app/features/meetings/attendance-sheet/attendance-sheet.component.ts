@@ -46,6 +46,7 @@ import { MeetingGuestsService } from '../meeting-guests.service';
 import { GuestListComponent } from '../guests/guest-list.component';
 import { GuestRequestsComponent } from '../guests/guest-requests.component';
 import { JoinLinkComponent } from '../public-join/join-link.component';
+import { eligibleCount, presentCount } from '@shared/present-count.util';
 import { SegmentedComponent, type SegmentedOption } from '@stupa-makers/ui-kit';
 import { personLabel } from '@shared/person-label.util';
 
@@ -242,18 +243,19 @@ export class AttendanceSheetComponent {
   protected readonly guestSummary = computed(() => {
     const m = this.meeting();
     if (!m.publicJoin && !this.admittedGuests()) return null;
-    const members = this.attendance().filter((a) => a.status === 'present').length;
+    const members = presentCount(m, this.attendance());
     const guests = this.admittedGuests();
     return { total: members + guests, members, guests };
   });
   /** The tabs "Mitglieder 19 / 23" and "Gäste 7" (watch mode: "Gäste (zuschauend) 7"). */
   protected readonly tabs = computed<SegmentedOption[]>(() => {
-    const present = this.attendance().filter((a) => a.status === 'present').length;
+    const present = presentCount(this.meeting(), this.attendance());
+    const eligible = eligibleCount(this.meeting(), this.attendance());
     const watch = this.meeting().guestsMode === 'watch';
     return [
       {
         value: 'members',
-        label: this.i18n.translate('guests.tab.members', { n: present, m: this.attendance().length }),
+        label: this.i18n.translate('guests.tab.members', { n: present, m: eligible }),
       },
       {
         value: 'guests',

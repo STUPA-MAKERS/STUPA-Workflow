@@ -18,6 +18,7 @@ import pytest
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.flow.schemas import TransitionOut, TransitionResult
+from app.modules.meetings.present import Present
 from app.modules.voting import service as voting_service
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteCreate, VoteCreateInternal
@@ -30,6 +31,7 @@ from app.shared.errors import (
     ValidationProblem,
 )
 from tests._support.flow_fakes import fake_session, result
+from tests.unit.conftest import Presence
 
 NOW = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
 OPTIONS = ["yes", "no", "abstain"]
@@ -190,14 +192,14 @@ async def test_open_with_a_free_group_key_keeps_the_count() -> None:
     """An old vote with a free group key has no Gremium to count."""
     vote = _vote(status="draft", eligible_count=20, eligible_group="legacy-key")
     db = fake_session(result(vote))
-    assert await VotingService(db)._roster_count(vote) is None
+    assert await VotingService(db)._roster_count(vote) is None  # type: ignore[arg-type]
     out = await VotingService(db).open(vote.id, now=NOW, actor="mgr")
     assert out.tally.eligible == 20
 
 
 async def test_roster_count_reads_the_members_of_the_gremium() -> None:
     db = fake_session(result())
-    assert await VotingService(db)._roster_count(_vote()) == 0
+    assert await VotingService(db)._roster_count(_vote()) == 0  # type: ignore[arg-type]
 
 
 async def test_open_non_draft_409() -> None:
@@ -1352,6 +1354,7 @@ async def test_delete_locked_votes_without_votes_writes_nothing() -> None:
 
 async def test_get_meeting_open_stays_hidden_when_all_present_voted(
     monkeypatch: pytest.MonkeyPatch,
+    presence: Presence,
 ) -> None:
     """An open meeting vote hides the tally even when every present member voted.
 
@@ -1359,7 +1362,8 @@ async def test_get_meeting_open_stays_hidden_when_all_present_voted(
     """
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [2, 1]
+    presence.here = Present(members=2)
+    db.scalar_results = [1]
     monkeypatch.setattr(VotingService, "voters", _persons(2))
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False

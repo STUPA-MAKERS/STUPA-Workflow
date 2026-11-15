@@ -58,11 +58,11 @@ from app.modules.livevote.service.paging import (
     _encode_cursor,
     _encode_offset,
 )
-from app.modules.livevote.service.votes import _Presence
 from app.modules.meetings import rules as permissions_mod
 from app.modules.meetings.agenda_service import AgendaService, title_of
 from app.modules.meetings.attendance_service import AttendanceService
 from app.modules.meetings.models import Meeting
+from app.modules.meetings.present import Present
 from app.shared.errors import (
     BadRequestError,
     ConflictError,
@@ -70,6 +70,7 @@ from app.shared.errors import (
     NotFoundError,
     ValidationProblem,
 )
+from tests.unit.conftest import Presence
 
 
 class _Scalars:
@@ -609,30 +610,30 @@ async def test_votes_for_empty() -> None:
     assert await svc._votes_for([]) == {}
 
 
-async def test_present_by_meeting_empty() -> None:
+async def test_present_seats_of_no_meeting_reads_nothing() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc._present_by_meeting([]) == {}
+    assert await svc._present_seats([]) == {}
 
 
 async def test_vote_tallies_empty() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc._vote_tallies([], _Presence({}, {})) == {}
+    assert await svc._vote_tallies([], {}) == {}
 
 
-async def test_votes_for_closed_revealed() -> None:
+async def test_votes_for_closed_revealed(presence: Presence) -> None:
     """Reveal a closed vote.
 
     The execute order: `_votes_for` selects the votes with `scalars().all()`.
     `_vote_tallies` then reads the secret ballots with one `execute().all()`.
-    `_present_by_meeting` comes last. The fake session returns, in order: the votes, the
-    secret ballots and the present count.
+    The fake session returns, in order: the votes and the secret ballots. The fixture
+    `presence` gives the present count (§F/meetings/meetings/000946).
     """
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="closed", result="passed", eligible=2)
+    presence.here = Present(members=2)
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((mid, 2)),
             res((vrow.id, "yes"), (vrow.id, "no")),
         ]
     )
@@ -674,7 +675,6 @@ async def test_votes_for_open_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((mid, 3)),
             res((vrow.id, "yes")),
         ]
     )
@@ -688,7 +688,9 @@ async def test_votes_for_open_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
     assert item.voted == 1
 
 
-async def test_votes_for_open_all_voted_stays_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_votes_for_open_all_voted_stays_hidden(
+    monkeypatch: pytest.MonkeyPatch, presence: Presence
+) -> None:
     """Keep the tally of an open vote hidden even when every present member voted.
 
     The fake session returns, in order: the votes, two secret ballots and two present
@@ -696,10 +698,10 @@ async def test_votes_for_open_all_voted_stays_hidden(monkeypatch: pytest.MonkeyP
     """
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="open", eligible=2)
+    presence.here = Present(members=2)
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((mid, 2)),
             res((vrow.id, "yes"), (vrow.id, "yes")),
         ]
     )
@@ -718,7 +720,7 @@ async def test_votes_for_skips_unbound_vote() -> None:
     """Skip a vote without a meeting.
 
     The vote with `meeting_id` None hits the `continue` branch of `_votes_for`. The call
-    passes the id on to `_present_by_meeting`, but the loop skips the vote.
+    passes the id on to the read of the present count, but the loop skips the vote.
     """
     vrow = _vote_row(meeting_id=None)
     sess = _QueueSession(
@@ -750,7 +752,6 @@ async def test_votes_for_config_not_dict() -> None:
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res((mid, 0)),
             res(),
         ]
     )
@@ -768,7 +769,7 @@ async def test_vote_tallies_failed_reason_set() -> None:
     vrow = _vote_row(meeting_id=mid, status="closed", result="rejected", eligible=10)
     sess = _QueueSession(executes=[res((vrow.id, "no"), (vrow.id, "no"))])
     svc = MeetingService(sess)  # type: ignore[arg-type]
-    out = await svc._vote_tallies([vrow], _Presence({}, {}))
+    out = await svc._vote_tallies([vrow], {})
     counts, _leading, reason = out[vrow.id]
     assert counts == {"yes": 0, "no": 2}
     assert reason in ("quorum", "majority")
@@ -3767,8 +3768,8 @@ async def test_assert_can_read_forbidden(monkeypatch: pytest.MonkeyPatch) -> Non
 async def test_get_with_votes_and_protocol() -> None:
     """Read a meeting with its votes and its protocol.
 
-    The fake session returns, in order: the meeting, the votes, the secret ballots, the
-    present count, no admitted guests, no voting delegations of the caller, no own voted
+    The fake session returns, in order: the meeting, the votes, the secret ballots,
+    no admitted guests, no voting delegations of the caller, no own voted
     markers and the protocol id.
     """
     mid = uuid4()
@@ -3780,7 +3781,6 @@ async def test_get_with_votes_and_protocol() -> None:
             res(m),
             res(vrow),
             res((vrow.id, "yes")),
-            res((mid, 1)),
             res(),
             res(),
             res(),

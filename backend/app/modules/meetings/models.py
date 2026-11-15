@@ -91,6 +91,12 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     #: `public_join` creates it, and a rotation replaces it. It is unique among the
     #: meetings that are not closed.
     join_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The present count and the number of members with a voting right, fixed at the
+    #: close (000946). The protocol reads them, so a new render of an old meeting gives
+    #: the same count and the same quorum (000357). NULL for a meeting that is not
+    #: closed or that closed before the columns existed: a reader then counts now.
+    present_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    eligible_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('planned','live','closed')", name="meeting_status"),

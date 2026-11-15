@@ -60,15 +60,15 @@ from app.modules.files.pdf_branding import (
     footer_render_config,
 )
 from app.modules.files.storage import ObjectStorage, StorageError
-from app.modules.gremien.models import Gremium
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.service import MeetingService
 from app.modules.media.models import MarkdownDocument
 from app.modules.media.service import MediaService
 from app.modules.meetings.agenda_service import agenda_order, title_of
 from app.modules.meetings.keepers import agenda_positions, keeper_periods, principal_names
 from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.meetings.present import VOTE_PERMISSION, meeting_present
 from app.modules.meetings.protocol_models import Protocol, ProtocolVoteRef
-from app.modules.meetings.roster import meeting_roster_filter, roster_filter
 from app.modules.notifications.layout import (
     append_link_text,
     reason_text,
@@ -181,8 +181,9 @@ BackfillOutcome = Literal["done", "transient", "failed"]
 class HeaderMeta:
     """The person-related header data of one protocol variant.
 
-    `present_count` holds the true number of attendees and feeds the quorum, also
-    in the public variant that leaves the names out.
+    `present_count` holds the one present count of the meeting
+    (§F/meetings/meetings/000946) and feeds the quorum, also in the public variant
+    that leaves the names out.
     """
 
     protokollant: str | None = None
@@ -1037,15 +1038,28 @@ class ProtocolService:
             for p in periods
         ]
 
+    async def _voting_members(self, gremium_id: UUID) -> int:
+        """Count the members of the Gremium whose role holds `vote.cast`."""
+        return (
+            await self.session.scalar(
+                select(func.count(GremiumMembership.principal_id.distinct()))
+                .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
+                .where(
+                    GremiumMembership.gremium_id == gremium_id,
+                    GremiumRole.permissions.contains([VOTE_PERMISSION]),
+                )
+            )
+        ) or 0
+
     async def _quorate(
         self, gremium: object | None, meeting: Meeting | None, present_count: int
     ) -> bool | None:
-        """Compute the quorum from the attendees and the members of the meeting.
+        """Compute the quorum from the present count and the members with a voting right.
 
-        The members are the roster of the meeting: the members of the Gremium,
-        plus each principal with an attendance record (see
-        `app.modules.meetings.roster`). Without a meeting the members of the
-        Gremium count. The threshold is `gremium.quorum_percent` when
+        A closed meeting gives the member count that its close fixed, so a new render
+        gives the same quorum (§F/meetings/protocols/000357). A meeting that is not
+        closed, and a meeting without a fixed count, counts the members of the Gremium
+        whose role holds `vote.cast` now. The threshold is `gremium.quorum_percent` when
         that value is set. If not, the threshold is more than half of the members.
 
         Returns:
@@ -1055,14 +1069,12 @@ class ProtocolService:
         gremium_id = getattr(gremium, "id", None)
         if gremium_id is None:
             return None
-        where = (
-            meeting_roster_filter(meeting)
-            if meeting is not None and getattr(meeting, "gremium_id", None) == gremium_id
-            else roster_filter(gremium_id)
-        )
+        fixed: int | None = getattr(meeting, "eligible_count", None)
         members = (
-            await self.session.scalar(select(func.count()).select_from(PrincipalRow).where(where))
-        ) or 0
+            fixed
+            if fixed is not None and getattr(meeting, "status", None) == "closed"
+            else await self._voting_members(gremium_id)
+        )
         percent = getattr(gremium, "quorum_percent", None)
         quorate = (
             present_count * 100 >= percent * members
@@ -1098,7 +1110,7 @@ class ProtocolService:
         present = [name or sub for status, name, sub in rows if status == "present"]
         excused = [name or sub for status, name, sub in rows if status == "excused"]
         absent = [name or sub for status, name, sub in rows if status == "absent"]
-        present_count = len(present)
+        present_count = await meeting_present(self.session, meeting)
         from app.modules.livevote.guests import GuestService
 
         guests = await GuestService(self.session).attended_count(meeting.id)

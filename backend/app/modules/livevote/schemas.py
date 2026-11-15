@@ -297,6 +297,13 @@ class MeetingOut(FrozenCamelModel, frozen=True):
     join_code: str | None = Field(default=None, alias="joinCode")
     admitted_guests: int = Field(default=0, alias="admittedGuests")
     pending_guests: int = Field(default=0, alias="pendingGuests")
+    #: The one present count of the meeting (000946). ``presentCount`` and
+    #: ``eligibleCount`` hold the values fixed at the close, ``None`` while the meeting
+    #: is not closed. A client then counts the present rows with ``canVote`` and adds
+    #: ``presentSeats``, the pool substitutes on a seat who are no present member.
+    present_count: int | None = Field(default=None, alias="presentCount")
+    eligible_count: int | None = Field(default=None, alias="eligibleCount")
+    present_seats: int = Field(default=0, alias="presentSeats")
     #: The Gremium lets admitted guests vote: its switch is on and it has no quorum.
     #: When this is false the guests only watch, and the mode control is locked.
     guests_vote_allowed: bool = Field(default=False, alias="guestsVoteAllowed")

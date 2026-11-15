@@ -1673,6 +1673,12 @@ export interface MeetingOutWire {
   readonly admittedGuests?: number;
   /** The open join requests; the meeting lead only, else 0. */
   readonly pendingGuests?: number;
+  /** The present count fixed at the close (000946); `null` while the meeting is not closed. */
+  readonly presentCount?: number | null;
+  /** The members with a voting right, fixed at the close; `null` while not closed. */
+  readonly eligibleCount?: number | null;
+  /** The pool substitutes on a seat who are no present member with a voting right. */
+  readonly presentSeats?: number;
   /** Guests can get a ballot: the Gremium has the switch on and no quorum. */
   readonly guestsVoteAllowed?: boolean;
   /** The kind of the meeting. */
@@ -1891,6 +1897,12 @@ export interface Meeting {
   readonly admittedGuests: number;
   /** The open join requests (meeting lead only, else 0). */
   readonly pendingGuests: number;
+  /** The present count fixed at the close (000946); `null` while the meeting is not closed. */
+  readonly presentCount?: number | null;
+  /** The members with a voting right, fixed at the close; `null` while not closed. */
+  readonly eligibleCount?: number | null;
+  /** The pool substitutes on a seat who are no present member with a voting right. */
+  readonly presentSeats?: number;
   /** Guests can get a ballot: the Gremium has the switch on and no quorum. */
   readonly guestsVoteAllowed: boolean;
   /** The kind of the meeting. Only a planned meeting changes it. */

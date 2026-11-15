@@ -13,10 +13,12 @@ from uuid import uuid4
 import pytest
 
 from app.modules.auth.principal import Principal
+from app.modules.meetings.present import Present
 from app.modules.voting.service import VotingService, guest_voter_sub
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, ValidationProblem
 from tests._support.flow_fakes import fake_session, result
+from tests.unit.conftest import Presence
 from tests.unit.modules.voting.test_voting_service_unit import (  # noqa: F401 - fixture
     GID,
     NOW,
@@ -106,7 +108,7 @@ async def test_cast_guest_unknown_option_422() -> None:
         )
 
 
-async def test_tally_counts_admitted_and_departed_guest_voters() -> None:
+async def test_tally_counts_admitted_and_departed_guest_voters(presence: Presence) -> None:
     """The tally counts the admitted guests and the guests who voted and left.
 
     The fake session serves the admitted guest and the guest markers. 2 present
@@ -120,17 +122,21 @@ async def test_tally_counts_admitted_and_departed_guest_voters() -> None:
         result(stay),
         result(f"guest:{stay}", f"guest:{gone}"),
     )
-    db.scalar_results = [2]
+    presence.here = Present(members=2)
+    db.scalar_results = []
     out = await VotingService(db).get(vote.id)
     assert out.guests_vote is True
     assert out.tally.present == 4 and out.tally.revealed is False
     assert (out.tally.present_members, out.tally.present_guests) == (2, 2)
 
 
-async def test_tally_members_vote_shows_guests_but_does_not_wait_for_them() -> None:
+async def test_tally_members_vote_shows_guests_but_does_not_wait_for_them(
+    presence: Presence,
+) -> None:
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [2, 5]
+    presence.here = Present(members=2)
+    db.scalar_results = [5]
     out = await VotingService(db).get(vote.id)
     assert out.tally.present == 2 and out.tally.revealed is False
     assert out.tally.present_guests == 5
@@ -161,6 +167,7 @@ async def test_counts_without_meeting_are_zero() -> None:
 async def test_close_fixes_attendance(
     _patch_flow: type[_FakeFlow],  # noqa: F811
     guests_vote: bool,
+    presence: Presence,
 ) -> None:
     vote = _vote(
         meeting_id=uuid4(),
@@ -170,7 +177,8 @@ async def test_close_fixes_attendance(
     )
     guest_rows = [result(*[uuid4() for _ in range(7)]), result()] if guests_vote else []
     db = fake_session(result(vote), result("yes", "yes", "no"), *guest_rows)
-    db.scalar_results = [None, 19] if guests_vote else [None, 19, 7]
+    presence.here = Present(members=19)
+    db.scalar_results = [None] if guests_vote else [None, 7]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.result == "passed"
     assert (vote.present_members, vote.present_guests) == (19, 7)
@@ -190,9 +198,10 @@ async def test_close_without_meeting_keeps_attendance_empty(
     assert GID
 
 
-async def test_open_meeting_vote_with_guests_stays_hidden() -> None:
+async def test_open_meeting_vote_with_guests_stays_hidden(presence: Presence) -> None:
     vote = _vote(meeting_id=uuid4(), config=_config(guestsVote=True))
     db = fake_session(result(vote), result("yes"))
-    db.scalar_results = [1]
+    presence.here = Present(members=1)
+    db.scalar_results = []
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False and out.tally.present == 1

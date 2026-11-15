@@ -17,6 +17,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.open_window import OpenWindow, load_meeting_settings, open_window
 from app.modules.livevote.schemas import CurrentAgendaItemOut, MeetingOut, MeetingVoteOut
+from app.modules.meetings import present as present_mod
 from app.modules.meetings.agenda_service import agenda_order, title_of
 from app.modules.meetings.keepers import KeeperSummary
 from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingGuest
@@ -57,6 +58,12 @@ def _current_item(
             )
 
 
+def _fixed_present(meeting: Meeting) -> int | None:
+    """Return the present count fixed at the close, or None while the count moves."""
+    fixed: int | None = getattr(meeting, "present_count", None)
+    return fixed if meeting.status == "closed" else None
+
+
 class MeetingServiceBase(MeetingReads):
     """Meeting operations bound to one `AsyncSession` and an optional publisher."""
 
@@ -94,6 +101,7 @@ class MeetingServiceBase(MeetingReads):
         guests: GuestCounts = (0, 0),
         guests_vote_allowed: bool = False,
         window: OpenWindow | None = None,
+        seats: int = 0,
     ) -> MeetingOut:
         """Build the meeting view for one principal.
 
@@ -143,6 +151,9 @@ class MeetingServiceBase(MeetingReads):
             admittedGuests=guests[0],
             pendingGuests=guests[1] if can_manage else 0,
             guestsVoteAllowed=guests_vote_allowed,
+            presentCount=_fixed_present(meeting),
+            eligibleCount=getattr(meeting, "eligible_count", None),
+            presentSeats=seats,
             opensAt=window.opens_at if window is not None else None,
             confirmUntil=window.confirm_until if window is not None else None,
         )
@@ -157,6 +168,15 @@ class MeetingServiceBase(MeetingReads):
         settings = await load_meeting_settings(self.session)
         tz_name = get_settings().local_timezone
         return {m.id: open_window(m, settings, tz_name) for m in meetings}
+
+    async def _present_seats(self, meetings: Sequence[Meeting]) -> dict[UUID, int]:
+        """Return per meeting the pool seats that add to the present members (000946).
+
+        A closed meeting with a fixed present count needs none, so it costs no read.
+        """
+        open_ids = [m.id for m in meetings if _fixed_present(m) is None]
+        counts = await present_mod.present_counts(self.session, open_ids)
+        return {meeting_id: here.seats for meeting_id, here in counts.items()}
 
     async def _guest_counts(self, meeting_ids: Sequence[UUID]) -> dict[UUID, GuestCounts]:
         """Count the admitted and the pending guests of each meeting, batched."""

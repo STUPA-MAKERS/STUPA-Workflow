@@ -32,7 +32,7 @@ from app.main import create_app
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.gremien.models import Gremium
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.livevote.router import get_broker_rest, get_broker_ws, get_ws_principal
 from app.modules.livevote.service import BrokerPublisher
@@ -197,10 +197,21 @@ async def seed(
             await session.flush()
             items.append(item.id)
         members = []
+        role = GremiumRole(
+            gremium_id=gremium.id,
+            key=f"member-{tag}",
+            name_i18n={"de": "Mitglied"},
+            permissions=["vote.cast"],
+        )
+        session.add(role)
+        await session.flush()
         for n in range(present):
             p = PrincipalRow(sub=f"m{n}-{tag}", display_name=f"M{n}", email=f"m{n}-{tag}@x.de")
             session.add(p)
             await session.flush()
+            session.add(
+                GremiumMembership(principal_id=p.id, gremium_id=gremium.id, gremium_role_id=role.id)
+            )
             session.add(
                 MeetingAttendance(meeting_id=meeting.id, principal_id=p.id, status="present")
             )
