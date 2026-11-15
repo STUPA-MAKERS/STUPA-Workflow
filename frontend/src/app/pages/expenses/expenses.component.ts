@@ -1143,7 +1143,8 @@ export class ExpensesComponent implements OnDestroy {
       .pipe(
         concatMap((id) => {
           const e = byId.get(id);
-          const rebook = !!budgetId && !!e && !e.applicationId && !e.parentExpenseId;
+          const rebook =
+            !!budgetId && !!e && !e.applicationId && !e.parentExpenseId && !e.transferId;
           const patch: ExpenseUpdate = {
             ...(category ? { category } : {}),
             ...(rebook ? { budgetId: budgetId as Uuid } : {}),

@@ -274,6 +274,10 @@ class ExpenseOps(BudgetTreeServiceBase):
         fiscal year: an orphan year, or a phantom row with allocated=0 and a negative
         available sum.
 
+        A booking that is one side of a transfer keeps its amount and its cost center
+        (409 `transfer_leg_fixed`), because the two sides of a transfer must carry the
+        same amount and the pair is fixed. The transfer changes both sides at once.
+
         The audit entry holds the prior and the new values of the patched fields. The
         revert uses the new values to detect a later edit and answers 409 instead of
         overwriting the changes of another user.
@@ -294,6 +298,11 @@ class ExpenseOps(BudgetTreeServiceBase):
             raise ValidationProblem(
                 "A sub-booking inherits its cost-centre from its parent.",
                 code="subbooking_inherited_field",
+            )
+        if expense.transfer_id is not None and fields & {"amount", "budget_id"}:
+            raise ConflictError(
+                "This booking is one side of a transfer. Change the transfer instead.",
+                code="transfer_leg_fixed",
             )
         before: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
         target = (
