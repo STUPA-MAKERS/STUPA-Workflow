@@ -89,11 +89,16 @@ class ElectionResultOut(FrozenCamelModel, frozen=True):
         The WebSocket channel of a meeting reaches the beamer and the guests, so it
         carries this form. ``byName`` stays for the lot note.
         """
-        return self.model_copy(
-            update={
-                "lot": _without_sub(self.lot),
-                "next_round_lot": _without_sub(self.next_round_lot),
-            }
+        lots = (self.lot, self.next_round_lot)
+        return (
+            self
+            if all(lot is None or lot.by is None for lot in lots)
+            else self.model_copy(
+                update={
+                    "lot": _without_sub(self.lot),
+                    "next_round_lot": _without_sub(self.next_round_lot),
+                }
+            )
         )
 
 

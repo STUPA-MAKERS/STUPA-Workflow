@@ -137,3 +137,16 @@ def test_protocol_names_the_lot_for_a_place_in_the_third_round() -> None:
     public = _snippet(2, next_round_lot_names=["Ben"], public=True)
     assert "das Los bestimmt einen Platz im 3. Wahlgang." in public
     assert "Ben" not in public.split("Gleichstand")[1]
+
+
+def test_public_result_drops_the_sub_of_the_lot_for_a_place() -> None:
+    from app.modules.voting.schemas import ElectionLotOut, ElectionResultOut
+
+    lot = ElectionLotOut(among=["c2", "c3"], drawn=["c3"], by="lead", byName="Mara Keller")
+    result = ElectionResultOut(counts={}, nextRoundLot=lot)
+    public = result.public()
+    assert public.next_round_lot is not None
+    assert public.next_round_lot.by is None
+    assert public.next_round_lot.by_name == "Mara Keller"
+    plain = ElectionResultOut(counts={})
+    assert plain.public() is plain
