@@ -2,7 +2,7 @@
 id: "000992"
 title: A new Stichtag moves only the fiscal years that are not closed
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:
