@@ -2,7 +2,7 @@
 id: "000940"
 title: A repeat meeting names its first meeting
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

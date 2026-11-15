@@ -456,7 +456,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000921](requirements/functional/meetings/meetings/000921_absence-notice.md) | The lead gets a mail before a member reaches the absence limit | approved |
 | [F/meetings/meetings/000922](requirements/functional/meetings/meetings/000922_late-excuse.md) | A member can give an excuse after the meeting | approved |
 | [F/meetings/meetings/000923](requirements/functional/meetings/meetings/000923_attendance-export.md) | The attendance of a Gremium exports as XLSX | approved |
-| [F/meetings/meetings/000940](requirements/functional/meetings/meetings/000940_repeat-names-first-meeting.md) | A repeat meeting names its first meeting | draft |
+| [F/meetings/meetings/000940](requirements/functional/meetings/meetings/000940_repeat-names-first-meeting.md) | A repeat meeting names its first meeting | approved |
 | [F/meetings/meetings/000941](requirements/functional/meetings/meetings/000941_absence-term-choice.md) | The absence count and the export offer each term | draft |
 | [F/meetings/meetings/000943](requirements/functional/meetings/meetings/000943_late-excuse-notice.md) | A late excuse sends a mail to the lead | draft |
 | [F/meetings/meetings/000946](requirements/functional/meetings/meetings/000946_one-present-count.md) | A meeting shows one count of present members | draft |
