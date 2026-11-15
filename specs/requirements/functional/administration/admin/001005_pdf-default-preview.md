@@ -2,7 +2,7 @@
 id: "001005"
 title: The branding page shows the built-in PDF graphics
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 tests:

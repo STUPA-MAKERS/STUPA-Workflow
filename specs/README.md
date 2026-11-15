@@ -92,7 +92,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/000917](requirements/functional/administration/admin/000917_meeting-periods.md) | The meeting settings hold the periods of the Geschäftsordnung | approved |
 | [F/administration/admin/000942](requirements/functional/administration/admin/000942_periods-fixed-at-start.md) | A changed period does not reach a started case | approved |
 | [F/administration/admin/000980](requirements/functional/administration/admin/000980_embedded-pdfs-follow-sitzungen.md) | The embedded PDFs belong to the feature Sitzungen | approved |
-| [F/administration/admin/001005](requirements/functional/administration/admin/001005_pdf-default-preview.md) | The branding page shows the built-in PDF graphics | draft |
+| [F/administration/admin/001005](requirements/functional/administration/admin/001005_pdf-default-preview.md) | The branding page shows the built-in PDF graphics | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
