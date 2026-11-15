@@ -34,14 +34,9 @@ services:
       # then trusts headers from whoever gets there. Use a host firewall with it, or
       # prefer the `proxy` network and publish nothing.
       - "${WEB_HOST:-127.0.0.1}:${WEB_PORT:-8080}:80"
-    environment:
-      # The exact address from which the edge proxy connects to this container, or
-      # several with commas. nginx takes the client address from X-Forwarded-For only
-      # for a request from one of them. Empty: nginx trusts no forwarded header.
-      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
     volumes:
       # The image already holds nginx.conf. This mount allows a production edit
-      # without a rebuild. The SPA HTML comes from the image.
+      # (real_ip CIDR) without a rebuild. The SPA HTML comes from the image.
       - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - internal

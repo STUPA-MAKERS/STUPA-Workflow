@@ -689,7 +689,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/network/000392](requirements/non-functional/security/network/000392_forwarded-ips.md) | Forwarded headers come only from the proxy | approved |
 | [NF/security/network/000454](requirements/non-functional/security/network/000454_api-security-headers.md) | The API sends strict security headers and no CORS | approved |
 | [NF/security/network/000466](requirements/non-functional/security/network/000466_webhook-host-allowlist.md) | Webhook targets can be limited to a host list | approved |
-| [NF/security/network/000972](requirements/non-functional/security/network/000972_trusted-proxy-address.md) | The web proxy takes the client address only from the edge | approved |
 | [NF/usability/controls/000203](requirements/non-functional/usability/controls/000203_app-popover.md) | Every dropdown uses the app popover | approved |
 | [NF/usability/controls/000204](requirements/non-functional/usability/controls/000204_whole-control.md) | The whole control is clickable | approved |
 | [NF/usability/controls/000205](requirements/non-functional/usability/controls/000205_empty-state.md) | Empty states use one component | approved |

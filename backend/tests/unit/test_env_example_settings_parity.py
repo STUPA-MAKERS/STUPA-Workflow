@@ -36,7 +36,6 @@ _NOT_READ_BY_THE_API = {
     "POSTGRES_PASSWORD": "postgres image",
     "ALTCHA_ROOT_PASSWORD": "altcha sidecar",
     "WEB_PORT": "compose interpolation",
-    "TRUSTED_PROXY_IPS": "compose interpolation (web/nginx)",
     "WEB_HOST": "compose interpolation",
     "TYPST_MAX_BODY_BYTES": "typst service",
     "TYPST_MAX_ASSETS": "typst service",
