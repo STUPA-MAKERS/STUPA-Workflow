@@ -95,3 +95,10 @@ class ProtocolDraftMailOut(FrozenCamelModel, frozen=True):
     recipients: int
     #: The stored time of the last send; null when no address got the draft yet.
     draft_sent_at: datetime | None = Field(default=None, alias="draftSentAt")
+
+
+class KnownNameOut(FrozenCamelModel, frozen=True):
+    """A known name of a Sitzung (spec 000970): only the first and the last name."""
+
+    first: str
+    last: str

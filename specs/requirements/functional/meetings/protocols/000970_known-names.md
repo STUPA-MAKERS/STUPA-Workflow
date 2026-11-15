@@ -2,7 +2,7 @@
 id: "000970"
 title: The known names are the persons of the platform
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation: null

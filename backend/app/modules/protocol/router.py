@@ -37,8 +37,10 @@ from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.pdf.typst_client import build_typst_client
 from app.modules.protocol.draft_mail import DraftMailer
+from app.modules.protocol.known_names import known_names
 from app.modules.protocol.queue import enqueue_public_backfill, protocol_render_queue_from_pool
 from app.modules.protocol.schemas import (
+    KnownNameOut,
     ProtocolApprovalBody,
     ProtocolDraftMailOut,
     ProtocolFinalizeBody,
@@ -146,6 +148,26 @@ async def get_protocol(
     """
     await service.authorize_read_meeting(meeting_id, principal)
     return await service.get_by_meeting(meeting_id)
+
+
+@router.get(
+    "/meetings/{meeting_id}/known-names",
+    response_model=list[KnownNameOut],
+    responses=_errors(401, 403, 404),
+)
+async def get_known_names(
+    meeting_id: UUID, session: DbSession, service: ServiceDep, principal: PrincipalDep
+) -> list[KnownNameOut]:
+    """List the known names of the meeting for the blackout in the editor (000970).
+
+    Only a person who can write a protocol text of the meeting reads the list. The
+    answer holds only pairs of first and last name.
+    """
+    await service.authorize_write_meeting(meeting_id, principal)
+    return [
+        KnownNameOut(first=first, last=last)
+        for first, last in await known_names(session, meeting_id)
+    ]
 
 
 @router.patch(
