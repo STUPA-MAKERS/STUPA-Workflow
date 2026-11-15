@@ -444,6 +444,8 @@ class ElectionSnippet:
     attempt: int = 1
     #: The election needs the majority of the members (one seat, spec 000912).
     members_majority: bool = False
+    #: The names that the lot gave a place in the third Wahlgang (spec 000971).
+    next_round_lot_names: Sequence[str] = ()
 
 
 def _election_head(view: ElectionSnippet) -> str:
@@ -478,10 +480,39 @@ def _election_outcome(view: ElectionSnippet, *, public: bool) -> list[str]:
     return [
         f"> Gewählt: {names}",
         *([f"> {others} weitere Kandidierende"] if public and others > 0 else []),
-        *(["> Keine Mehrheit der Mitglieder."] if view.members_majority and not elected else []),
+        *(["> Keine Mehrheit der Mitglieder."] if _needs_members(view) and not elected else []),
+        *_next_round_lot(view, public=public),
         *(["> Durch Los entschieden."] if view.by_lot else []),
         *(["> Gleichstand: das Los steht aus."] if view.lot_pending else []),
         *([runoff] if view.runoff_seats else []),
+    ]
+
+
+#: From this Wahlgang on the simple majority elects (spec 000971).
+_SIMPLE_MAJORITY_ROUND = 3
+
+
+def _needs_members(view: ElectionSnippet) -> bool:
+    """Tell whether this Wahlgang needs the majority of the members."""
+    return view.members_majority and view.round < _SIMPLE_MAJORITY_ROUND
+
+
+def _majority_note(view: ElectionSnippet) -> str:
+    """Return the majority part of the kind line of a `members_majority` election."""
+    if not view.members_majority:
+        return ""
+    return " · Mehrheit der Mitglieder" if _needs_members(view) else " · einfache Mehrheit"
+
+
+def _next_round_lot(view: ElectionSnippet, *, public: bool) -> list[str]:
+    """Return the line on the lot for a place in the third Wahlgang."""
+    if not view.next_round_lot_names:
+        return []
+    who = ", ".join(_md_escape(n) for n in view.next_round_lot_names)
+    return [
+        "> Gleichstand: das Los bestimmt einen Platz im 3. Wahlgang."
+        if public
+        else f"> Gleichstand: das Los bestimmt für den 3. Wahlgang: {who}"
     ]
 
 
@@ -501,10 +532,16 @@ def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> st
     which `replace_vote_blocks` and `votes_in_body` match on.
 
     An election with the rule `members_majority` names the rule in its kind line, and
-    a ballot without such a majority says „Keine Mehrheit der Mitglieder.“
+    a ballot without such a majority says „Keine Mehrheit der Mitglieder.“ Its third
+    Wahlgang names the simple majority instead, and its further Wahlgänge are no runoff
+    (spec 000971). The second Wahlgang names a lot for a place in the third.
     """
-    runoff = f" · Stichwahl ({view.round}. Wahlgang)" if view.round > 1 else ""
-    members = " · Mehrheit der Mitglieder" if view.members_majority else ""
+    runoff = (
+        f" · Stichwahl ({view.round}. Wahlgang)"
+        if view.round > 1 and not view.members_majority
+        else ""
+    )
+    members = _majority_note(view)
     ballot = _election_ballot(view) if view.closed and not public else []
     outcome = _election_outcome(view, public=public) if view.closed else []
     return "\n".join(

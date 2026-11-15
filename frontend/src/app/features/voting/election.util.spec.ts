@@ -17,6 +17,7 @@ import {
   isYesNoElection,
   lotPending,
   namesText,
+  nextRoundOf,
   runoffPending,
   seatsText,
 } from './election.util';
@@ -199,5 +200,21 @@ describe('election.util', () => {
     expect(closedStatus('election', 'no_majority').key).toBe('election.status.noMajority');
     expect(closedStatus('circular', 'passed').key).toBe('vote.result.passed');
     expect(CATALOG.de['election.status.noMajority']).toBe('Keine Mehrheit');
+  });
+
+  /** §F/meetings/voting/000971: the second and the third Wahlgang. */
+  it('names the Wahlgang and its majority, and finds the next Wahlgang', () => {
+    const members: ElectionConfig = { ...SINGLE, majorityRule: 'members_majority' };
+    expect(electionCaption(members, 2, t)).toBe(
+      'election.kind · meetings.vote.attemptElection{"n":2} · election.seats.one · meetings.vote.rule.members_majority',
+    );
+    expect(electionCaption(members, 3, t)).toContain(' · meetings.vote.rule.simple');
+    expect(nextRoundOf(members, 'no_majority', 1)).toBe(2);
+    expect(nextRoundOf(members, 'no_majority', 2)).toBe(3);
+    expect(nextRoundOf(members, 'no_majority', undefined)).toBe(2);
+    expect(nextRoundOf(members, 'no_majority', 3)).toBeNull();
+    expect(nextRoundOf(members, 'rejected', 1)).toBeNull();
+    expect(nextRoundOf(SINGLE, 'no_majority', 1)).toBeNull();
+    expect(nextRoundOf(null, 'no_majority', 1)).toBeNull();
   });
 });

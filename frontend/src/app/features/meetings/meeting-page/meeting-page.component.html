@@ -167,6 +167,7 @@
       [otherOpen]="anyOpenVote()"
       [repeated]="repeatedIds().has(vote.id)"
       [canRepeat]="repeatableIds().has(vote.id)"
+      [continued]="continuedIds().has(vote.id)"
       (edit)="voteSource.emit({ mode: 'edit', vote: $event })"
       (repeat)="voteSource.emit({ mode: 'repeat', vote: $event })"
       (close)="voteClose.emit($event)"

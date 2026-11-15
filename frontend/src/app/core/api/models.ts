@@ -1319,6 +1319,8 @@ export interface ElectionResult {
   readonly elected: readonly string[];
   readonly runoff?: ElectionRunoff | null;
   readonly lot?: ElectionLot | null;
+  /** The lot for a place in the third Wahlgang, after a tie for the second place. */
+  readonly nextRoundLot?: ElectionLot | null;
 }
 
 /** The election fields of a vote and the poll fields. A motion has
@@ -1329,7 +1331,7 @@ export interface ElectionFields {
   readonly electionResult?: ElectionResult | null;
   /** The election that this runoff continues. */
   readonly parentVoteId?: Uuid | null;
-  /** 1 for the first round, 2 for the first runoff. */
+  /** The number of the Wahlgang: 1 for the first one. */
   readonly round?: number;
   /** A poll: its mode and options. */
   readonly poll?: PollConfig | null;

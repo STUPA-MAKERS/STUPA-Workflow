@@ -433,6 +433,16 @@ export class MeetingPageComponent {
     this.meeting().votes.some((v) => v.status === 'open'),
   );
 
+  /** The elections of the open item that a next Wahlgang continues (§ 000971). */
+  protected readonly continuedIds = computed(
+    () =>
+      new Set(
+        this.votes()
+          .filter((v) => v.parentVoteId && v.status !== 'cancelled')
+          .map((v) => v.parentVoteId as string),
+      ),
+  );
+
   /** The closed votes of the open item whose repeat opened: their cards say "Wiederholt". */
   protected readonly repeatedIds = computed(
     () =>

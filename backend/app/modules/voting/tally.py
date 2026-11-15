@@ -302,14 +302,32 @@ def _members_majority(votes: int, eligible: int) -> bool:
     return eligible > 0 and votes * 2 > eligible
 
 
+#: From this Wahlgang on the simple majority elects (§F/meetings/voting/000971).
+SIMPLE_MAJORITY_ROUND = 3
+
+
+def needs_members_majority(config: ElectionConfig, round_: int) -> bool:
+    """Tell whether this Wahlgang of the election needs the majority of the members.
+
+    The first and the second Wahlgang of a ``members_majority`` election need it, the
+    third takes the simple majority (§F/meetings/voting/000971).
+    """
+    return config.members_majority and round_ < SIMPLE_MAJORITY_ROUND
+
+
 def _yes_no_outcome(
-    config: ElectionConfig, choices: Sequence[str | None], eligible: int, present: int | None
+    config: ElectionConfig,
+    choices: Sequence[str | None],
+    eligible: int,
+    present: int | None,
+    round_: int,
 ) -> ElectionOutcome:
     counts = tally(("yes", "no", "abstain"), choices)
     ballots = sum(counts.values())
     participation = ballots if config.abstain_counts_quorum else ballots - counts["abstain"]
     quorum_met = _election_quorum(config, participation, eligible, present)
-    enough = _members_majority(counts["yes"], eligible) if config.members_majority else True
+    members = needs_members_majority(config, round_)
+    enough = _members_majority(counts["yes"], eligible) if members else True
     elected = quorum_met and enough and counts["yes"] > counts["no"]
     missed: ElectionResult = "no_majority" if quorum_met and not enough else "rejected"
     return ElectionOutcome(
@@ -345,13 +363,15 @@ def tally_election(
 
     With ``majorityRule = members_majority`` (one seat) a candidate is elected only
     with more votes than half of ``eligible``. Otherwise the result is ``no_majority``.
+    This holds for the first and the second Wahlgang (``round_``). The third takes the
+    simple majority, and its tie goes to the lot (§F/meetings/voting/000971).
 
     The sort is stable, so candidates with equal votes keep the order of the candidate
     list.
     """
     raw = tuple(choices)
     if config.yes_no:
-        return _yes_no_outcome(config, raw, eligible, present)
+        return _yes_no_outcome(config, raw, eligible, present, round_)
     known = config.candidate_ids
     known_ids = frozenset(known)
     picks = tuple(_list_picks(item, known_ids, config.seats) for item in raw)
@@ -371,7 +391,7 @@ def tally_election(
     ranked = tuple(sorted((cid for cid in known if counts[cid] > 0), key=lambda c: -counts[c]))
     if not quorum_met:
         return missed
-    if config.members_majority:
+    if needs_members_majority(config, round_):
         return _members_outcome(missed, ranked, eligible)
     return _seat_outcome(missed, ranked, config.seats)
 
@@ -427,6 +447,39 @@ def _seat_outcome(base: ElectionOutcome, ranked: tuple[str, ...], seats: int) ->
             tied=tied,
             open_seats=seats - len(above),
         )
+    )
+
+
+#: The candidates of the third Wahlgang (§F/meetings/voting/000971).
+THIRD_ROUND_FIELD = 2
+
+
+@dataclass(frozen=True, slots=True)
+class RoundField:
+    """The candidates of a next Wahlgang: the sure ones and a tie for the open places."""
+
+    sure: tuple[str, ...]
+    tied: tuple[str, ...] = ()
+    open_places: int = 0
+
+
+def third_round_field(candidate_ids: Sequence[str], counts: Mapping[str, int]) -> RoundField:
+    """Find the two candidates with the most votes in the second Wahlgang.
+
+    Two candidates or fewer all stand. A tie that crosses the second place leaves
+    places open: the lot decides among ``tied`` (§F/meetings/voting/000971). The sort
+    is stable, so the order of the candidate list holds among equal votes.
+    """
+    ranked = tuple(sorted(candidate_ids, key=lambda c: -counts.get(c, 0)))
+    if len(ranked) <= THIRD_ROUND_FIELD:
+        return RoundField(sure=ranked)
+    boundary = counts.get(ranked[THIRD_ROUND_FIELD - 1], 0)
+    above = tuple(c for c in ranked if counts.get(c, 0) > boundary)
+    tied = tuple(c for c in ranked if counts.get(c, 0) == boundary)
+    return (
+        RoundField(sure=(*above, *tied))
+        if (len(above) + len(tied)) == THIRD_ROUND_FIELD
+        else RoundField(sure=above, tied=tied, open_places=THIRD_ROUND_FIELD - len(above))
     )
 
 

@@ -10,6 +10,7 @@
 * ``GET  /api/votes``                   - the votes the caller can read, with the own
   ballot state (no tally).
 * ``POST /api/votes/{id}/draw-lot``     - draw the lot of a tied election.
+* ``POST /api/votes/{id}/next-round``   - create the next Wahlgang of an election.
 * ``POST /api/votes``                   - create the poll of a Gremium (no meeting).
 * ``PATCH /api/votes/{id}``             - change a poll while it holds no ballot.
 
@@ -356,6 +357,33 @@ async def draw_lot(
     vote = await ElectionService(service).draw_lot(vote_id, principal, now=datetime.now(UTC))
     await publisher.vote_lot_drawn(vote)
     return vote
+
+
+@router.post(
+    "/votes/{vote_id}/next-round",
+    response_model=VoteOut,
+    status_code=201,
+    responses=_errors(401, 403, 404, 409),
+)
+async def next_round(
+    vote_id: UUID,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> VoteOut:
+    """Create the next Wahlgang of an election without the majority of the members.
+
+    Only a closed ``members_majority`` election with the result ``no_majority`` takes
+    the call, after its first or its second Wahlgang (§F/meetings/voting/000971). The
+    answer is the draft of the next Wahlgang on the same agenda item. The third
+    Wahlgang has the two candidates with the most votes; the server draws the lot for
+    a tied place. Another vote gives 409 ``no_next_round``, a second call 409
+    ``next_round_exists``, a motion 409 ``not_an_election``. Gremium-scoped manage
+    right (the meeting lead). A draft sends no event: the caller shows it from the answer.
+    """
+    await service.assert_can_manage_vote(vote_id, principal)
+    draft = await ElectionService(service).next_round(vote_id, principal, now=datetime.now(UTC))
+    await service.session.commit()
+    return await service.get(draft.id)
 
 
 @router.get(

@@ -4,7 +4,7 @@ title: An election for one seat can need the majority of the members
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-15
 implementation:
   - backend/app/modules/voting/tally.py
   - backend/app/shared/config_schemas.py
@@ -20,8 +20,8 @@ scope:
 
 An election for one seat must be able to have the rule `members_majority`. A candidate must
 then be elected only with more votes than half of the eligible count. If no candidate reaches
-this number, the result must be `no_majority`. The app must start no further round by itself. A
-further Wahlgang is a new election that the protokollant starts.
+this number, the result must be `no_majority`. The app must start no further round by itself. The
+further Wahlgänge follow 000971.
 
 Reason: The Organisationssatzung asks for the "Mehrheit der Mitglieder" for the Vorsitz and the
 other members of the AStA.
