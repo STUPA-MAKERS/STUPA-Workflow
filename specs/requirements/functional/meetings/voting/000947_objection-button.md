@@ -2,7 +2,7 @@
 id: "000947"
 title: The objection to a circular vote is a button
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
