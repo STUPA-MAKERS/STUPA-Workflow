@@ -311,42 +311,69 @@ class BudgetTreeServiceBase:
             ).all()
         )
 
-    def _is_choosable(self, fy: FiscalYear, decided: set[UUID] | None) -> bool:
+    def _is_choosable(
+        self, fy: FiscalYear, decided: set[UUID] | None, *, late: bool = False
+    ) -> bool:
         """Tell if a new booking can take the fiscal year (spec 000879)."""
         return tree_rules.is_choosable_year(
             fy.end_date,
             self._today(),
             closed=fy.closed_at is not None,
             plan_in_force=None if decided is None else fy.id in decided,
+            late=late,
         )
 
-    async def choosable_years(self, top: Budget) -> list[FiscalYear]:
+    async def choosable_years(self, top: Budget, *, late: bool = False) -> list[FiscalYear]:
         """Return the fiscal years of a budget that a new booking can take (spec 000879).
 
         A year that is not closed and not past. A budget with a plan gives only the
-        years whose plan is in force.
+        years whose plan is in force. `late` adds the past years that are not closed,
+        which a booking and a transfer with a date in the year can take (spec 000990).
         """
         decided = await self._decided_years(top)
-        return [f for f in await self._fiscal_years_of(top.id) if self._is_choosable(f, decided)]
+        return [
+            f
+            for f in await self._fiscal_years_of(top.id)
+            if self._is_choosable(f, decided, late=late)
+        ]
 
-    async def _require_choosable(self, top: Budget, fy: FiscalYear) -> None:
+    async def _require_choosable(
+        self, top: Budget, fy: FiscalYear, *, late: bool = False, on: date | None = None
+    ) -> None:
         """Refuse a fiscal year that a new booking or assignment cannot take.
+
+        `late` is for a booking and a transfer, which a past year takes when `on`, the
+        date of the booking, lies in the year (spec 000990).
 
         Raises:
             ConflictError: `fiscal_year_closed` (409).
             ValidationProblem: `fiscal_year_not_choosable` (422) for a year that is
                 past, or whose plan is not in force in a budget with a plan.
+                `booking_date_outside_year` (422) for a past year and a booking
+                without a date in the year.
         """
         self._refuse_closed(fy)
-        if not self._is_choosable(fy, await self._decided_years(top)):
+        if not self._is_choosable(fy, await self._decided_years(top), late=late):
             raise ValidationProblem(
                 "The fiscal year is past or its plan is not in force.",
                 code="fiscal_year_not_choosable",
                 errors=[{"field": "fiscalYearId", "msg": "past, or no plan in force"}],
             )
+        if not tree_rules.late_booking_date_fits(fy.start_date, fy.end_date, self._today(), on):
+            raise ValidationProblem(
+                "A booking into a past fiscal year needs a date in that year.",
+                code="booking_date_outside_year",
+                errors=[{"field": "paymentDate", "msg": "must lie in the fiscal year"}],
+            )
 
     async def _resolve_fiscal_year(
-        self, node: Budget, fiscal_year_id: UUID | None, *, kept: bool = False
+        self,
+        node: Budget,
+        fiscal_year_id: UUID | None,
+        *,
+        kept: bool = False,
+        late: bool = False,
+        on: date | None = None,
     ) -> UUID:
         """Resolve the fiscal year of a node operation.
 
@@ -354,14 +381,18 @@ class BudgetTreeServiceBase:
         year must belong to the top-level budget and must be a year that a new
         booking can take (`choosable_years`, spec 000879). `kept` is for a booking
         that moves to another cost center and keeps its year: the year must then
-        only be open. Without a fiscal year the method takes the current one of the
-        top-level budget: the single active year that a booking can take, or among
-        several the one that contains the local date. The result is never `None`.
+        only be open. `late` and `on` are for a booking and a transfer: an explicit
+        past year is taken when `on`, the date of the booking, lies in it (spec
+        000990). Without a fiscal year the method takes the current one of the
+        top-level budget: the single active year that is not past and that a booking
+        can take, or among several the one that contains the local date. The result
+        is never `None`.
 
         Raises:
             ValidationProblem: The fiscal year belongs to another top-level
-                budget, is `fiscal_year_not_choosable`, or no current fiscal year
-                can be derived (422).
+                budget, is `fiscal_year_not_choosable`, the date is
+                `booking_date_outside_year`, or no current fiscal year can be
+                derived (422).
             ConflictError: `fiscal_year_closed` (409) for an explicit closed
                 fiscal year.
         """
@@ -376,7 +407,7 @@ class BudgetTreeServiceBase:
             if kept:
                 self._refuse_closed(fy)
             else:
-                await self._require_choosable(top, fy)
+                await self._require_choosable(top, fy, late=late, on=on)
             return fy.id
         candidates = [
             (f.id, f.start_date, f.end_date) for f in await self.choosable_years(top) if f.active

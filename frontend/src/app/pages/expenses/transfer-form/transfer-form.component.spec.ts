@@ -117,7 +117,7 @@ class HostComponent {
 const tick = () => new Promise((r) => setTimeout(r));
 
 /** The one pair the field offers: the new transfer starts with it (spec 000879). */
-const PAIR = { budgetId: 'top', budgetName: 'Haushalt', fiscalYearId: 'fy', display: '2026', current: true };
+const PAIR = { budgetId: 'top', budgetName: 'Haushalt', fiscalYearId: 'fy', display: '2026', current: true, past: false, startDate: '2026-01-01', endDate: '2026-12-31' };
 
 async function setup(mode: 'create' | 'edit', layout: 'pane' | 'sheet' = 'pane') {
   localStorage.setItem('ap.locale', 'de');

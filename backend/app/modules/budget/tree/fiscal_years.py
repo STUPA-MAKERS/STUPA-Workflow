@@ -62,12 +62,15 @@ class FiscalYearOps(BudgetTreeServiceBase):
             for f in await self._fiscal_years_of(top.id)
         ]
 
-    async def choosable_pairs(self, member_gremium_ids: set[UUID] | None) -> list[BudgetYearOut]:
+    async def choosable_pairs(
+        self, member_gremium_ids: set[UUID] | None, *, late: bool = False
+    ) -> list[BudgetYearOut]:
         """List each top-level budget with each fiscal year that a booking can take.
 
         `member_gremium_ids` is `None` for the full view. Otherwise the list holds
         only the budgets with a cost center that one of the Gremien reads. The order
-        is the budget, then the year (spec 000879).
+        is the budget, then the year (spec 000879). `late` adds the past years that
+        are not closed, for the form of a booking and of a transfer (spec 000990).
         """
         tops = (
             await self.session.scalars(
@@ -98,10 +101,13 @@ class FiscalYearOps(BudgetTreeServiceBase):
                     fy.year, top.fiscal_start_month, top.fiscal_start_day
                 ),
                 current=fy.start_date <= today <= fy.end_date,
+                past=fy.end_date < today,
+                startDate=fy.start_date,
+                endDate=fy.end_date,
             )
             for top in tops
             if seen is None or top.tree_path in seen
-            for fy in await self.choosable_years(top)
+            for fy in await self.choosable_years(top, late=late)
         ]
 
     async def _root_of(self, node: Budget) -> Budget:

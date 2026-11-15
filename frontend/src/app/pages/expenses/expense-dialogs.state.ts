@@ -14,6 +14,7 @@ import {
   type PaymentMethod,
 } from '../budget/budget-tree.api';
 import { problemCode, problemDetail } from '@core/api/problem';
+import { dateFitsBudgetYear } from '../budget/budget-year-select/budget-year-select.util';
 import { findTopBudgetNode } from '../budget/expense-display.util';
 import type { ExpensesListState } from './expenses-list.state';
 import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
@@ -137,6 +138,11 @@ export class ExpenseDialogsState {
   readonly tFromId = signal('');
   readonly tToId = signal('');
   readonly tFiscalYearId = signal('');
+  /** The pair of the new transfer: a past year needs a payment date in the year. */
+  readonly tPair = signal<BudgetYear | null>(null);
+  readonly tPaymentDate = signal('');
+  /** The pair of the new booking: a past year needs a date in the year. */
+  readonly newPair = signal<BudgetYear | null>(null);
   /** The budget of the pair of a new transfer. */
   readonly tTopId = signal('');
   readonly tAmount = signal('');
@@ -163,7 +169,18 @@ export class ExpenseDialogsState {
       this.tFromId() !== this.tToId() &&
       !!this.tFiscalYearId() &&
       Number(this.tAmount()) > 0 &&
-      !!this.tDescription().trim(),
+      !!this.tDescription().trim() &&
+      this.transferDateFits(),
+  );
+  /** The payment date of the new transfer lies in its year, when the year is past. */
+  readonly transferDateFits = computed(() =>
+    dateFitsBudgetYear(this.tPair(), this.tPaymentDate()),
+  );
+  /** The payment date, else the invoice date, of the new booking lies in a past year. */
+  readonly bookingDateFits = computed(
+    () =>
+      !!this.newApplicationId() ||
+      dateFitsBudgetYear(this.newPair(), this.newPaymentDate() || this.newInvoiceDate()),
   );
 
   /**
@@ -173,7 +190,7 @@ export class ExpenseDialogsState {
   readonly canSubmitCreate = computed(() => {
     if (!this.newDescription().trim() || !(Number(this.newAmount()) > 0)) return false;
     if (this.newApplicationId()) return true;
-    return !!this.newBudgetId() && !!this.newFiscalYearId();
+    return !!this.newBudgetId() && !!this.newFiscalYearId() && this.bookingDateFits();
   });
 
   /** Called with the new booking after a create, so the page can open it. */
@@ -248,6 +265,7 @@ export class ExpenseDialogsState {
     this.newBudgetId.set(this.list.budgetId() || '');
     this.newFiscalYearId.set('');
     this.newTopId.set('');
+    this.newPair.set(null);
     this.newApplicationId.set('');
     this.newInvoiceId.set('');
     this.newInvoiceDate.set('');
@@ -355,6 +373,7 @@ export class ExpenseDialogsState {
    * budget goes, because the cost centre comes from the budget of the pair.
    */
   onPickPair(pair: BudgetYear): void {
+    this.newPair.set(pair);
     this.newTopId.set(pair.budgetId);
     this.newFiscalYearId.set(pair.fiscalYearId);
     const top = findTopBudgetNode(this.list.budgetTree(), this.newBudgetId());
@@ -363,6 +382,7 @@ export class ExpenseDialogsState {
 
   /** The pair of a new transfer. A leg in another budget goes. */
   onTransferPair(pair: BudgetYear): void {
+    this.tPair.set(pair);
     this.tTopId.set(pair.budgetId);
     this.tFiscalYearId.set(pair.fiscalYearId);
     const tree = this.list.budgetTree();
@@ -585,6 +605,8 @@ export class ExpenseDialogsState {
     this.tToId.set('');
     this.tFiscalYearId.set('');
     this.tTopId.set('');
+    this.tPair.set(null);
+    this.tPaymentDate.set('');
     this.tAmount.set('');
     this.tDescription.set('');
     this.transferOpen.set(true);
@@ -642,6 +664,7 @@ export class ExpenseDialogsState {
         fiscalYearId: this.tFiscalYearId(),
         amount: this.tAmount(),
         description: this.tDescription().trim(),
+        paymentDate: this.tPaymentDate() || null,
       })
       .subscribe({
         next: () => {

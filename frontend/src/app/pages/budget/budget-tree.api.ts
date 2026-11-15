@@ -74,6 +74,8 @@ export interface TransferCreate {
   readonly fiscalYearId: Uuid;
   readonly amount: string;
   readonly description: string;
+  /** A past fiscal year needs it, and it must lie in that year. */
+  readonly paymentDate?: string | null;
 }
 
 /**
@@ -458,6 +460,10 @@ export interface BudgetYear {
   readonly display: string;
   /** The year that holds the date of today. */
   readonly current: boolean;
+  /** The year has ended: it takes a booking only with a date in the year. */
+  readonly past: boolean;
+  readonly startDate: string;
+  readonly endDate: string;
 }
 
 export interface FiscalYearCreate {
@@ -547,9 +553,15 @@ export class BudgetTreeApi {
     return this.http.delete<void>(`${this.base}/budgets/${id}`);
   }
 
-  /** The pairs of a budget and a fiscal year that a new booking can take. */
-  listBudgetYears(): Observable<BudgetYear[]> {
-    return this.http.get<BudgetYear[]>(`${this.base}/budget-years`, { context: skipLoading() });
+  /**
+   * The pairs of a budget and a fiscal year that a new booking can take. `late` adds the
+   * past years that are not closed, for a booking and a transfer.
+   */
+  listBudgetYears(late = false): Observable<BudgetYear[]> {
+    return this.http.get<BudgetYear[]>(`${this.base}/budget-years`, {
+      context: skipLoading(),
+      params: late ? { late: 'true' } : {},
+    });
   }
 
   listFiscalYears(topId: Uuid): Observable<FiscalYear[]> {

@@ -38,7 +38,8 @@ function writeLast(budgetId: string): void {
  * The one field for a Haushalt and a Haushaltsjahr, which a form asks for before the
  * Kostenstelle (spec 000879).
  *
- * It loads the pairs that a new booking can take and starts with the current year. The
+ * It loads the pairs that a new booking can take and starts with the current year. With
+ * `late` the list also holds the past years that are not closed. The
  * form holds the fiscal year; `picked` gives the pair, also for the first choice that
  * the field makes itself.
  *
@@ -61,6 +62,8 @@ export class BudgetYearSelectComponent {
   /** The budget whose current year the field starts with, for a form with a Kostenstelle. */
   readonly preferBudgetId = input('');
   readonly required = input(true);
+  /** Also list the past years that are not closed: a booking and a transfer take them. */
+  readonly late = input(false);
 
   readonly picked = output<BudgetYear>();
 
@@ -79,9 +82,11 @@ export class BudgetYearSelectComponent {
   private readonly told = signal('');
 
   constructor() {
-    this.api.listBudgetYears().subscribe({
-      next: (pairs) => this.pairs.set(pairs),
-      error: () => this.pairs.set([]),
+    effect(() => {
+      this.api.listBudgetYears(this.late()).subscribe({
+        next: (pairs) => this.pairs.set(pairs),
+        error: () => this.pairs.set([]),
+      });
     });
     effect(() => {
       const pair = this.resolved();

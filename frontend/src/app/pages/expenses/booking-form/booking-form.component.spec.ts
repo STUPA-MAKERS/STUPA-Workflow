@@ -125,7 +125,7 @@ class HostComponent {
 }
 
 /** The one pair the field offers: the new booking starts with it (spec 000879). */
-const PAIR = { budgetId: 'top', budgetName: 'Haushalt', fiscalYearId: 'fy', display: '2026', current: true };
+const PAIR = { budgetId: 'top', budgetName: 'Haushalt', fiscalYearId: 'fy', display: '2026', current: true, past: false, startDate: '2026-01-01', endDate: '2026-12-31' };
 
 /** Answer each open request of the field of the pair, and let the form take the pair. */
 async function flushPairs(fixture: { detectChanges: () => void }): Promise<void> {

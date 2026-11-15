@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 
 import { BudgetTreeApi, type BudgetYear } from '../budget-tree.api';
 import { BudgetYearSelectComponent } from './budget-year-select.component';
-import { budgetYearLabel, defaultBudgetYear } from './budget-year-select.util';
+import { budgetYearLabel, dateFitsBudgetYear, defaultBudgetYear } from './budget-year-select.util';
 
 const PAIR = (budgetId: string, fiscalYearId: string, current: boolean): BudgetYear => ({
   budgetId,
@@ -12,6 +12,9 @@ const PAIR = (budgetId: string, fiscalYearId: string, current: boolean): BudgetY
   fiscalYearId,
   display: fiscalYearId.endsWith('27') ? '2027/28' : '2026/27',
   current,
+  past: false,
+  startDate: '2026-04-01',
+  endDate: '2027-03-31',
 });
 
 const PAIRS = [
@@ -107,5 +110,22 @@ describe('defaultBudgetYear', () => {
     expect(defaultBudgetYear(PAIRS.slice(1), '', '')?.fiscalYearId).toBe('vsm-27');
     expect(defaultBudgetYear([], '', '')).toBeNull();
     expect(budgetYearLabel(PAIRS[0])).toBe('VS-Mittel 2026/27');
+  });
+});
+
+describe('dateFitsBudgetYear', () => {
+  const past: BudgetYear = { ...PAIR('vsm', 'vsm-26', false), past: true };
+
+  it('takes every date and none for a year that is not past', () => {
+    expect(dateFitsBudgetYear(PAIR('vsm', 'vsm-26', true), '')).toBe(true);
+    expect(dateFitsBudgetYear(null, '')).toBe(true);
+  });
+
+  it('takes only a date in the year for a past year', () => {
+    expect(dateFitsBudgetYear(past, '')).toBe(false);
+    expect(dateFitsBudgetYear(past, '2026-03-31')).toBe(false);
+    expect(dateFitsBudgetYear(past, '2026-04-01')).toBe(true);
+    expect(dateFitsBudgetYear(past, '2027-03-31')).toBe(true);
+    expect(dateFitsBudgetYear(past, '2027-04-01')).toBe(false);
   });
 });

@@ -627,7 +627,7 @@ describe('ExpensesComponent (unit)', () => {
   it('onPickBudget keeps the pair, and onPickPair drops a cost centre of another budget', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     const d = dlg(cmp);
-    const pair = { budgetId: 'top-1', budgetName: 'VS', fiscalYearId: 'fy-active', display: '2026', current: true };
+    const pair = { budgetId: 'top-1', budgetName: 'VS', fiscalYearId: 'fy-active', display: '2026', current: true, past: false, startDate: '2026-01-01', endDate: '2026-12-31' };
     d.onPickPair(pair);
     expect(d.newTopId()).toBe('top-1');
     expect(d.newFiscalYearId()).toBe('fy-active');
@@ -1153,7 +1153,7 @@ describe('ExpensesComponent (unit)', () => {
   it('onTransferPair sets budget and year and drops the legs of another budget', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     const d = dlg(cmp);
-    const pair = { budgetId: 'top-1', budgetName: 'VS', fiscalYearId: 'fy-active', display: '2026', current: true };
+    const pair = { budgetId: 'top-1', budgetName: 'VS', fiscalYearId: 'fy-active', display: '2026', current: true, past: false, startDate: '2026-01-01', endDate: '2026-12-31' };
     d.onTransferFrom('child-1');
     d.tToId.set('top-1');
     d.onTransferPair(pair);

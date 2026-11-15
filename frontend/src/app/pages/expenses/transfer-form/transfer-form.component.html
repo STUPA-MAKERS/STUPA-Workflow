@@ -27,6 +27,7 @@
           @let legs = free();
           <app-budget-year-select
             class="tf__pair"
+            [late]="true"
             [fiscalYearId]="d.tFiscalYearId()"
             [preferBudgetId]="preferTop()"
             (picked)="d.onTransferPair($event)"
@@ -134,6 +135,19 @@
             [ngModel]="d.tDescription()"
             (ngModelChange)="d.tDescription.set($event)"
           />
+          @if (d.tPair()?.past) {
+            <app-datepicker
+              class="tf__desc"
+              name="tpay"
+              [label]="'expenses.field.paymentDate' | t"
+              [required]="true"
+              [min]="d.tPair()?.startDate ?? ''"
+              [max]="d.tPair()?.endDate ?? ''"
+              [error]="d.transferDateFits() ? '' : ('expenses.lateDate' | t)"
+              [ngModel]="d.tPaymentDate()"
+              (ngModelChange)="d.tPaymentDate.set($event)"
+            />
+          }
         </div>
       } @else {
         <div class="mf__cols">

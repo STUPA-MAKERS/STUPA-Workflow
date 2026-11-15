@@ -82,6 +82,7 @@
               }}</app-locked-field>
             } @else {
               <app-budget-year-select
+                [late]="true"
                 [fiscalYearId]="s.newFiscalYearId()"
                 [preferBudgetId]="preferTop()"
                 (picked)="s.onPickPair($event)"
@@ -266,6 +267,8 @@
               <app-datepicker
                 name="payDate"
                 [label]="'expenses.field.paymentDate' | t"
+                [required]="!!s.newPair()?.past && !s.newApplicationId()"
+                [error]="s.bookingDateFits() ? '' : ('expenses.lateDate' | t)"
                 [ngModel]="s.newPaymentDate()"
                 (ngModelChange)="s.newPaymentDate.set($event)"
               />

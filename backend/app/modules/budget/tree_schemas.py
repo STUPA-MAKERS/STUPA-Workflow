@@ -231,7 +231,8 @@ class BudgetYearOut(FrozenCamelModel, frozen=True):
     """A pair of a top-level budget and one of its fiscal years that a booking can take.
 
     A person chooses the pair before the cost center (spec 000879). `current` marks
-    the year that holds the date of today.
+    the year that holds the date of today. `past` marks a year that has ended: it takes
+    a booking only with a date from `startDate` to `endDate` (spec 000990).
     """
 
     budget_id: UUID = Field(alias="budgetId")
@@ -239,6 +240,9 @@ class BudgetYearOut(FrozenCamelModel, frozen=True):
     fiscal_year_id: UUID = Field(alias="fiscalYearId")
     display: str
     current: bool
+    past: bool
+    start_date: date = Field(alias="startDate")
+    end_date: date = Field(alias="endDate")
 
 
 class FiscalYearOut(FrozenCamelModel, frozen=True):
@@ -609,7 +613,8 @@ class TransferCreate(FrozenCamelModel, frozen=True):
 
     The service creates an expense on `fromBudgetId` and an income on
     `toBudgetId` with the same amount and fiscal year. A `transferId` links
-    both bookings.
+    both bookings. `paymentDate` goes on both bookings. A past fiscal year needs
+    it, and it must lie in that year.
     """
 
     from_budget_id: UUID = Field(alias="fromBudgetId")
@@ -617,6 +622,7 @@ class TransferCreate(FrozenCamelModel, frozen=True):
     fiscal_year_id: UUID = Field(alias="fiscalYearId")
     amount: Decimal = Field(gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
     description: str = Field(min_length=1)
+    payment_date: date | None = Field(default=None, alias="paymentDate")
 
     @model_validator(mode="after")
     def _distinct(self) -> TransferCreate:

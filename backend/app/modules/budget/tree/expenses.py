@@ -220,7 +220,9 @@ class ExpenseOps(BudgetTreeServiceBase):
         """Return the cost center and the resolved fiscal year of a standalone booking.
 
         Raises:
-            ValidationProblem: `budgetId` is missing, or no fiscal year resolves (422).
+            ValidationProblem: `budgetId` is missing, no fiscal year resolves, or the
+                year is past and neither the payment date nor the invoice date lies
+                in it (422).
         """
         if payload.budget_id is None:
             raise ValidationProblem(
@@ -228,7 +230,13 @@ class ExpenseOps(BudgetTreeServiceBase):
                 errors=[{"field": "budgetId", "msg": "required"}],
             )
         node = await self._get_node(payload.budget_id)
-        return node, await self._resolve_fiscal_year(node, payload.fiscal_year_id), None
+        year = await self._resolve_fiscal_year(
+            node,
+            payload.fiscal_year_id,
+            late=True,
+            on=payload.payment_date or payload.invoice_date,
+        )
+        return node, year, None
 
     async def _require_invoice(self, invoice_id: UUID) -> None:
         """Make sure that the invoice of a booking exists.

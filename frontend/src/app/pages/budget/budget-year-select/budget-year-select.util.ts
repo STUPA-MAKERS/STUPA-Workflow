@@ -23,3 +23,11 @@ export function defaultBudgetYear(
 export function budgetYearLabel(pair: BudgetYear): string {
   return `${pair.budgetName} ${pair.display}`;
 }
+
+/**
+ * A past year takes a booking only with a date in the year, any other year takes every
+ * date and none. `date` is ISO (`YYYY-MM-DD`) or ''.
+ */
+export function dateFitsBudgetYear(pair: BudgetYear | null, date: string): boolean {
+  return !pair?.past || (!!date && pair.startDate <= date && date <= pair.endDate);
+}

@@ -504,8 +504,9 @@ async def test_list_invoices_search_filter_pagination(session: AsyncSession) -> 
 async def test_a_new_booking_takes_only_a_year_that_is_not_past(session: AsyncSession) -> None:
     """A Haushalt without a plan gives each year that is not closed and not past.
 
-    The pairs name the current year, a booking into a past year is refused, and a
-    booking without a year takes the current one. Rule: §F/finance/budget/000879.
+    The pairs name the current year, a booking into a past year without a date is
+    refused, and a booking without a year takes the current one.
+    Rule: §F/finance/budget/000879.
     """
     svc = BudgetTreeService(session)
     g = await _gremium(session)
@@ -530,6 +531,62 @@ async def test_a_new_booking_takes_only_a_year_that_is_not_past(session: AsyncSe
 
     with pytest.raises(ValidationProblem) as refused:
         await svc.book_expense(booking(past.id), actor="tester")
-    assert refused.value.code == "fiscal_year_not_choosable"
+    assert refused.value.code == "booking_date_outside_year"
     assert (await svc.book_expense(booking(later.id), actor="tester")).fiscal_year_id == later.id
     assert (await svc.book_expense(booking(None), actor="tester")).fiscal_year_id == now.id
+
+
+async def test_a_past_open_year_takes_a_booking_with_a_date_in_the_year(
+    session: AsyncSession,
+) -> None:
+    """A booking and a transfer go into a past year that is not closed, with a date in it.
+
+    The pairs for a booking list the past year, the pairs for an assignment do not.
+    Rule: §F/finance/budget/000990.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"LB{_suffix()}", name="Top", gremiumId=g.id))
+    other = await svc.create_node(BudgetNodeCreate(key="01", name="Child", parentId=top.id))
+    this = date.today().year
+    past = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this - 1))
+    now = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this))
+
+    late = [p for p in await svc.choosable_pairs(None, late=True) if p.budget_id == top.id]
+    assert [(p.fiscal_year_id, p.past) for p in late] == [(past.id, True), (now.id, False)]
+    plain = [p for p in await svc.choosable_pairs(None) if p.budget_id == top.id]
+    assert [p.fiscal_year_id for p in plain] == [now.id]
+
+    def booking(on: date | None) -> ExpenseCreate:
+        return ExpenseCreate(
+            budgetId=top.id,
+            fiscalYearId=past.id,
+            amount=Decimal("5"),
+            description="x",
+            paymentDate=on,
+        )
+
+    with pytest.raises(ValidationProblem) as outside:
+        await svc.book_expense(booking(date(this, 1, 2)), actor="tester")
+    assert outside.value.code == "booking_date_outside_year"
+    booked = await svc.book_expense(booking(date(this - 1, 12, 30)), actor="tester")
+    assert booked.fiscal_year_id == past.id
+
+    def transfer(on: date | None) -> TransferCreate:
+        return TransferCreate(
+            fromBudgetId=top.id,
+            toBudgetId=other.id,
+            fiscalYearId=past.id,
+            amount=Decimal("1"),
+            description="t",
+            paymentDate=on,
+        )
+
+    with pytest.raises(ValidationProblem) as no_date:
+        await svc.create_transfer(transfer(None), actor="tester")
+    assert no_date.value.code == "booking_date_outside_year"
+    assert (await svc.create_transfer(transfer(date(this - 1, 12, 30)), actor="tester")).transfer_id
+
+    await svc.set_fiscal_year_closed(top.id, past.id, closed=True)
+    with pytest.raises(ConflictError):
+        await svc.book_expense(booking(date(this - 1, 12, 30)), actor="tester")
