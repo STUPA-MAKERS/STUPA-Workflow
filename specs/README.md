@@ -526,7 +526,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/voting/000915](requirements/functional/meetings/voting/000915_circular-objection.md) | An objection ends an Umlaufverfahren | approved |
 | [F/meetings/voting/000932](requirements/functional/meetings/voting/000932_one-cast-for-all-ballots.md) | One cast counts for the own ballot and all represented ballots | approved |
 | [F/meetings/voting/000933](requirements/functional/meetings/voting/000933_turnout-counts-persons.md) | The turnout of a running vote counts persons | approved |
-| [F/meetings/voting/000935](requirements/functional/meetings/voting/000935_quorum-not-per-vote.md) | A vote takes its quorum from the Gremium | draft |
+| [F/meetings/voting/000935](requirements/functional/meetings/voting/000935_quorum-not-per-vote.md) | A vote takes its quorum from the Gremium | approved |
 | [F/meetings/voting/000936](requirements/functional/meetings/voting/000936_cancelled-circular-in-list.md) | The vote list shows a circular vote that an objection ended | draft |
 | [F/meetings/voting/000939](requirements/functional/meetings/voting/000939_member-count-at-open.md) | A vote without a meeting counts the members at its open | draft |
 | [F/meetings/voting/000944](requirements/functional/meetings/voting/000944_circular-mails.md) | A circular vote sends a mail at its open and before its end | draft |

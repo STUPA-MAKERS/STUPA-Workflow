@@ -2,7 +2,7 @@
 id: "000935"
 title: A vote takes its quorum from the Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
