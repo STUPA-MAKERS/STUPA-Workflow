@@ -2,7 +2,7 @@
 id: "000941"
 title: The absence count and the export offer each term
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
