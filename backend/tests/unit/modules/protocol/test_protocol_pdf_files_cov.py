@@ -467,8 +467,8 @@ async def test_quorate_of_a_wiederholungssitzung_uses_the_repeat_quorum() -> Non
     session = FakeSession()
     svc = _service(session)
     gremium = _gremium(quorum_percent=50, repeat_quorum_percent=20)
-    repeat = SimpleNamespace(kind="repeat", status="live", eligible_count=None)
-    normal = SimpleNamespace(kind="ordinary", status="live", eligible_count=None)
+    repeat = cast("Any", SimpleNamespace(kind="repeat", status="live", eligible_count=None))
+    normal = cast("Any", SimpleNamespace(kind="ordinary", status="live", eligible_count=None))
     session.scalar_results = [10]
     assert await svc._quorate(gremium, repeat, present_count=2) is True
     session.scalar_results = [10]

@@ -736,9 +736,17 @@ class ProtocolService:
         await self.session.commit()
         await self._store(uploads)
         if await self._send(protocol, mail_pdf):
-            protocol.sent_at = now
-            await self.session.commit()
+            await self._mark_sent(protocol, now)
         return await self._to_out(protocol)
+
+    async def _mark_sent(self, protocol: Protocol, now: datetime) -> None:
+        """Store the moment of the mail of the final protocol (commits).
+
+        The mark comes after the mail went to the queue, so a protocol without a
+        recipient never counts as sent.
+        """
+        protocol.sent_at = now
+        await self.session.commit()
 
     async def _render_both(
         self, protocol: Protocol, *, mail_public: bool
