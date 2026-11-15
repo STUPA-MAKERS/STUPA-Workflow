@@ -71,34 +71,6 @@ describe('PublicProtocolDetailComponent', () => {
   });
 
   /** A PDF without a known size shows no size line. */
-  it('lists the circular votes above the agenda (§F/meetings/protocols/000934)', async () => {
-    await setup(
-      of(
-        detailFixture({
-          circular: [
-            {
-              kind: 'circular',
-              question: 'Lastenanhänger beschaffen',
-              counts: { yes: 5, no: 1 },
-              result: 'passed',
-              majorityRule: 'members_majority',
-              secret: true,
-              closedOn: '2026-10-20',
-            },
-          ],
-        }),
-      ),
-    );
-    expect(screen.getByRole('heading', { name: 'Beschlüsse im Umlaufverfahren' })).toBeInTheDocument();
-    expect(screen.getByText('Lastenanhänger beschaffen')).toBeInTheDocument();
-    expect(screen.getByText('Umlaufverfahren · beendet am 20.10.2026')).toBeInTheDocument();
-  });
-
-  it('shows no circular section without a circular vote', async () => {
-    await setup();
-    expect(screen.queryByRole('heading', { name: 'Beschlüsse im Umlaufverfahren' })).toBeNull();
-  });
-
   it('names guests as a count and an unknown option as it is', async () => {
     const base = detailFixture({
       attendance: { present: 5, excused: 0, absent: 0, guests: 7 },

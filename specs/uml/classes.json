@@ -4391,6 +4391,18 @@
           "type": "TEXT"
         },
         {
+          "name": "present_count",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "eligible_count",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,

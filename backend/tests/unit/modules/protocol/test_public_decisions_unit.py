@@ -79,17 +79,32 @@ def _row() -> tuple[Any, Any, Any]:
 class _Rows:
     """Stand-in for `PublicProtocolService`: answers `visible_rows` and keeps the filter."""
 
-    def __init__(self, rows: list[Any]) -> None:
+    def __init__(self, rows: list[Any], circular: list[Any] | None = None) -> None:
         self.rows = rows
+        self.circular = circular or []
         self.filters: list[PublicFilter] = []
+
+    async def circular_votes(self, _flt: PublicFilter) -> list[Any]:
+        return list(self.circular)
 
     async def visible_rows(self, flt: PublicFilter) -> list[Any]:
         self.filters.append(flt)
         return list(self.rows)
 
 
-def _service(rows: list[Any]) -> Any:
-    return _Rows(rows)
+def _service(rows: list[Any], circular: list[Any] | None = None) -> Any:
+    return _Rows(rows, circular)
+
+
+def _circular(question: str, closed_at: datetime | None, **over: Any) -> tuple[Any, Any]:
+    """A closed circular vote of the public Gremium, as `circular_votes` gives it."""
+    view = SimpleNamespace(
+        question=question,
+        closed_at=closed_at,
+        result=over.get("result", "passed"),
+        tally=SimpleNamespace(counts=over.get("counts", {"yes": 5, "no": 1})),
+    )
+    return view, SimpleNamespace(id=GID, name="StuPa", slug="stupa")
 
 
 async def test_list_holds_the_public_decisions_only() -> None:
@@ -115,34 +130,54 @@ async def test_list_holds_the_public_decisions_only() -> None:
     assert "Intern" not in dumped
 
 
-async def test_list_holds_the_circular_votes_of_a_public_protocol() -> None:
-    """§F/meetings/protocols/000934: a circular decision is public with its protocol."""
-    snapshot = _snapshot()
-    snapshot.circular = [
-        PublicDecision(
-            kind="circular",
-            question="Lastenanhänger beschaffen",
-            counts={"yes": 5, "no": 1},
-            result="passed",
-            closedOn=_date(2026, 10, 20),
-        ),
-        PublicDecision(kind="circular", question="Ohne Tag", result="rejected"),
+async def test_list_holds_the_circular_votes_of_a_public_gremium() -> None:
+    """§F/meetings/voting/000949: a circular decision shows from its close, by its day.
+
+    The vote of 20.11. stands in front of the decisions of the meeting of 03.11., the
+    vote of 20.10. after them. A vote without the time of its close stays out.
+    """
+    circular = [
+        _circular("Lastenanhänger beschaffen", datetime(2026, 11, 20, 23, 30, tzinfo=UTC)),
+        _circular("Beamer ersetzen", datetime(2026, 10, 20, 9, 0, tzinfo=UTC), result="rejected"),
+        _circular("Ohne Ende", None),
     ]
-    protocol, meeting, gremium = _row()
-    protocol.public_content = snapshot.model_dump(mode="json", by_alias=True)
     page = await list_public_decisions(
-        _service([(protocol, meeting, gremium)]), PublicFilter(), limit=20, offset=0
+        _service([_row()], circular), PublicFilter(), limit=20, offset=0
     )
-    assert page.total == 4
-    first, undated = page.items[:2]
+    assert [d.question for d in page.items] == [
+        "Lastenanhänger beschaffen",
+        "Zuschuss Sommerfest",
+        "Wahl Vorsitz",
+        "Beamer ersetzen",
+    ]
+    first = page.items[0]
     assert first.kind == "circular"
-    assert first.question == "Lastenanhänger beschaffen"
-    assert first.date == _date(2026, 10, 20)
+    assert first.date == _date(2026, 11, 21)
+    assert first.protocol_id is None
     assert first.meeting_title is None
     assert first.result == "passed"
     assert first.counts == {"yes": 5, "no": 1}
-    assert undated.date == _date(2026, 11, 3)
-    assert "Lastenanhänger" in snapshot.search_text()
+
+
+async def test_list_filters_the_circular_votes_by_day_and_question() -> None:
+    """§F/meetings/voting/000949: the semester, the year and the search apply."""
+    circular = [
+        _circular("Lastenanhänger beschaffen", datetime(2026, 11, 20, 12, 0, tzinfo=UTC)),
+        _circular("Beamer ersetzen", datetime(2026, 6, 2, 9, 0, tzinfo=UTC)),
+    ]
+    svc = _service([], circular)
+
+    async def questions(flt: PublicFilter) -> list[str | None]:
+        page = await list_public_decisions(svc, flt, limit=20, offset=0)
+        return [d.question for d in page.items]
+
+    assert await questions(PublicFilter(semester="ss-2026")) == ["Beamer ersetzen"]
+    assert await questions(PublicFilter(year=2026)) == [
+        "Lastenanhänger beschaffen",
+        "Beamer ersetzen",
+    ]
+    assert await questions(PublicFilter(year=2025)) == []
+    assert await questions(PublicFilter(q=" BEAMER ")) == ["Beamer ersetzen"]
 
 
 async def test_list_searches_the_question_and_cuts_the_page() -> None:

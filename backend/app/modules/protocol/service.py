@@ -87,12 +87,6 @@ from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient, TypstError
 from app.modules.protocol import approval
 from app.modules.protocol.approval import approval_fields
-from app.modules.protocol.circular import (
-    build_circular_block,
-    circular_decision,
-    circular_snippet,
-    circular_views,
-)
 from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.markdown import (
     ElectionLine,
@@ -922,8 +916,8 @@ class ProtocolService:
         snippets. If not, it falls back to the free text in `protocol.markdown`, which
         is then the whole public body too.
 
-        The circular votes of the Gremium since the meeting before stand in front of
-        the first TOP, in both variants (`protocol.circular`, spec 000916).
+        The document holds no circular vote of the Gremium: such a decision shows in the
+        list of decisions only (§F/meetings/voting/000949).
 
         `public=True` redacts a non-public item and the header metadata. The mailed
         variant must not carry the names of the attendees, of the excused members, of
@@ -943,12 +937,7 @@ class ProtocolService:
         free_text = (
             black_out(protocol.markdown) if public and protocol.markdown else protocol.markdown
         )
-        circular_votes = await circular_views(self.session, meeting, VotingService(self.session))
-        circular = build_circular_block(
-            [circular_snippet(view, self._tz()) for view in circular_votes]
-        )
         if snapshot is not None:
-            snapshot.circular = [circular_decision(view, self._tz()) for view in circular_votes]
             snapshot.attendance = PublicAttendance(
                 present=header.present_count,
                 excused=header.excused_count,
@@ -983,7 +972,7 @@ class ProtocolService:
                 absent=header.absent,
                 datalines=header.datalines,
                 quorate=await self._quorate(gremium, meeting, header.present_count),
-                markdown="\n\n".join(part for part in (circular, assembled or free_text) if part),
+                markdown=assembled or free_text,
             )
         )
 

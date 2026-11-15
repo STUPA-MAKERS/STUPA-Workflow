@@ -791,7 +791,7 @@
       "to": "budget"
     },
     {
-      "count": 2,
+      "count": 1,
       "from": "livevote",
       "to": "delegations"
     },
@@ -806,7 +806,7 @@
       "to": "gremien"
     },
     {
-      "count": 37,
+      "count": 41,
       "from": "livevote",
       "to": "meetings"
     },
@@ -871,7 +871,7 @@
       "to": "budget"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "meetings",
       "to": "delegations"
     },
@@ -881,7 +881,7 @@
       "to": "flow"
     },
     {
-      "count": 7,
+      "count": 8,
       "from": "meetings",
       "to": "gremien"
     },
@@ -1046,7 +1046,7 @@
       "to": "media"
     },
     {
-      "count": 17,
+      "count": 16,
       "from": "protocol",
       "to": "meetings"
     },
@@ -1061,12 +1061,12 @@
       "to": "pdf"
     },
     {
-      "count": 25,
+      "count": 26,
       "from": "protocol",
       "to": "shared"
     },
     {
-      "count": 11,
+      "count": 12,
       "from": "protocol",
       "to": "voting"
     },
@@ -1291,7 +1291,7 @@
       "to": "gremien"
     },
     {
-      "count": 19,
+      "count": 20,
       "from": "voting",
       "to": "meetings"
     },

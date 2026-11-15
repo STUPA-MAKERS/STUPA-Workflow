@@ -28,7 +28,7 @@ from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import ColumnElement, Date, Select, and_, cast, func, or_, select
+from sqlalchemy import ColumnElement, Date, Select, Text, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.storage import ObjectStorage, StorageError
@@ -37,6 +37,10 @@ from app.modules.media.refs import document_ids_in, image_ids_in
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.filename import protocol_pdf_filename
+from app.modules.voting.circular import CIRCULAR
+from app.modules.voting.models import Vote
+from app.modules.voting.schemas import VoteOut
+from app.modules.voting.service import VotingService
 from app.shared.config_schemas import ElectionConfig, MajorityRule
 from app.shared.errors import NotFoundError, ServiceUnavailableError
 from app.shared.schemas import FrozenCamelModel
@@ -73,10 +77,7 @@ class PublicDecision(FrozenCamelModel, frozen=True):
     conditions: list[str] = Field(default_factory=list)
     #: Personnel elections. The public version names the elected candidates
     #: only; the other candidates appear as a count, and no vote count travels.
-    #: ``circular`` is a vote of an Umlaufverfahren that the protocol lists. It belongs to
-    #: no TOP and carries the day of its close.
-    kind: Literal["motion", "election", "circular"] = "motion"
-    closed_on: _date | None = Field(default=None, alias="closedOn")
+    kind: Literal["motion", "election"] = "motion"
     seats: int | None = None
     round: int = 1
     elected: list[str] = Field(default_factory=list)
@@ -154,9 +155,6 @@ class PublicSnapshot(BaseModel):
 
     version: int = SNAPSHOT_VERSION
     tops: list[PublicTop] = Field(default_factory=list)
-    #: The circular votes that the protocol lists (§F/meetings/protocols/000934). A
-    #: snapshot from before this field has none.
-    circular: list[PublicDecision] = Field(default_factory=list)
     #: The free text of a meeting without agenda items. None when TOPs exist.
     markdown: str | None = None
     attendance: PublicAttendance = Field(default_factory=PublicAttendance)
@@ -170,8 +168,7 @@ class PublicSnapshot(BaseModel):
             for part in (top.title, top.markdown, *(d.question for d in top.decisions))
             if part
         )
-        circular = (d.question for d in self.circular if d.question)
-        return "\n".join([*circular, *parts, *([self.markdown] if self.markdown else [])])
+        return "\n".join([*parts, *([self.markdown] if self.markdown else [])])
 
 
 def apply_public_snapshot(protocol: Protocol, snapshot: PublicSnapshot, pdf: bytes | None) -> None:
@@ -272,8 +269,6 @@ class PublicProtocolDetail(FrozenCamelModel, frozen=True):
     #: The page puts it on the text as `lang` when it is not the UI language (spec 000523).
     lang: str = "de"
     tops: list[PublicTopOut]
-    #: The circular votes that the protocol lists, in the order of their close.
-    circular: list[PublicDecision] = Field(default_factory=list)
     markdown: str | None = None
     attendance: PublicAttendance
     has_pdf: bool = Field(alias="hasPdf")
@@ -462,6 +457,30 @@ class PublicProtocolService:
         )
         return [(p, m, g) for p, m, g in (await self.session.execute(stmt)).all()]
 
+    async def circular_votes(self, flt: PublicFilter) -> list[tuple[VoteOut, Gremium]]:
+        """Read the closed circular votes of the public gremien, newest close first.
+
+        A circular vote stands in no protocol, so its row is the source
+        (§F/meetings/voting/000949). Only the gremium filter applies here: the caller
+        filters by the day of the close and by the question.
+        """
+        stmt = (
+            select(Vote.id, Gremium)
+            .join(Gremium, Vote.eligible_group == cast(Gremium.id, Text))
+            .where(
+                Vote.kind == CIRCULAR,
+                Vote.status == "closed",
+                Gremium.protocols_public.is_(True),
+                *([Gremium.id.in_(flt.gremium_ids)] if flt.gremium_ids else []),
+            )
+            .order_by(Vote.closed_at.desc(), Vote.id)
+        )
+        voting = VotingService(self.session)
+        return [
+            (await voting.get(vote_id), gremium)
+            for vote_id, gremium in (await self.session.execute(stmt)).all()
+        ]
+
     async def list_semesters(self, flt: PublicFilter) -> list[PublicSemesterOut]:
         """Count the visible protocols per semester, newest semester first.
 
@@ -517,7 +536,6 @@ class PublicProtocolService:
                 )
                 for t in snap.tops
             ],
-            circular=snap.circular,
             markdown=snap.markdown,
             attendance=snap.attendance,
             hasPdf=self._has_pdf(protocol),

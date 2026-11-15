@@ -88,11 +88,6 @@ export class PublicProtocolDetailComponent {
   }
 
   /** "Di, 29.09.2026". */
-  /** A day `YYYY-MM-DD` in the format of the language. */
-  protected day(iso: string): string {
-    return dayMonthYear(iso, this.i18n.formatLocale());
-  }
-
   protected when(p: PublicProtocolDetail): string {
     return weekdayDate(p.date, this.i18n.formatLocale());
   }

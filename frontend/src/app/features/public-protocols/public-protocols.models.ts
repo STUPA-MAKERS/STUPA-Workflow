@@ -65,9 +65,7 @@ export interface PublicDecision {
   readonly conditions?: readonly string[];
   /** A personnel election: only the names of the elected persons travel; the
    *  other candidates are a count, and an election has no counts. */
-  readonly kind?: 'motion' | 'election' | 'circular';
-  /** The day a circular vote closed, `YYYY-MM-DD`. Only a circular vote has it. */
-  readonly closedOn?: string | null;
+  readonly kind?: 'motion' | 'election';
   readonly seats?: number | null;
   readonly round?: number;
   readonly elected?: readonly string[];
@@ -92,8 +90,6 @@ export interface PublicAttendance {
 /** One protocol (`GET /public/protocols/{id}`). */
 export interface PublicProtocolDetail extends Omit<PublicProtocolSummary, 'tops'> {
   readonly tops: readonly PublicTop[];
-  /** The circular votes that the protocol lists. An older snapshot has none. */
-  readonly circular?: readonly PublicDecision[];
   readonly attendance: PublicAttendance;
   /** The content language of the protocol text: the default language of the gremium. */
   readonly lang?: string;
@@ -129,7 +125,8 @@ export interface PublicProtocolQuery {
  * question and its date only: no meeting title, no result and no counts.
  */
 export interface PublicDecisionRow {
-  readonly protocolId: string;
+  /** The protocol that records the decision; a circular vote has none (`null`). */
+  readonly protocolId: string | null;
   readonly gremium: PublicGremiumRef;
   /** The meeting date, `YYYY-MM-DD`. */
   readonly date: string;

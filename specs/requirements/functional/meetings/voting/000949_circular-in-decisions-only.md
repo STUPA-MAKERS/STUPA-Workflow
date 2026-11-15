@@ -5,9 +5,16 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - backend/tests/unit/modules/protocol/test_public_decisions_unit.py:test_list_holds_the_circular_votes_of_a_public_gremium
+  - backend/tests/unit/modules/protocol/test_public_decisions_unit.py:test_list_filters_the_circular_votes_by_day_and_question
+  - backend/tests/integration/modules/protocol/test_protocol_circular.py:test_a_protocol_lists_no_circular_vote
+  - backend/tests/integration/modules/protocol/test_protocol_circular.py:test_the_public_decisions_hold_the_circular_votes_of_a_public_gremium
+  - frontend/src/app/features/public-protocols/public-decisions.component.spec.ts:PublicDecisionsComponent
 implementation:
   - backend/app/modules/protocol/public_decisions.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/public.py
+  - frontend/src/app/features/public-protocols/public-decisions.component.html
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/voting

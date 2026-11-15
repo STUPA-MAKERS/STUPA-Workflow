@@ -2,17 +2,10 @@
 id: "000934"
 title: A circular decision is public where the protocol is public
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
 updated: 2026-11-15
-tests:
-  - "backend/tests/unit/modules/protocol/test_public_decisions_unit.py:test_list_holds_the_circular_votes_of_a_public_protocol"
-  - "backend/tests/unit/modules/protocol/test_circular_protocol.py:test_public_form_of_a_circular_vote_has_no_name"
-implementation:
-  - backend/app/modules/protocol/circular.py
-  - backend/app/modules/protocol/public_decisions.py
-  - backend/app/modules/protocol/public.py
-  - frontend/src/app/features/public-protocols/public-protocol-detail.component.ts
+replaced_by: F/meetings/voting/000949
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/public-protocols

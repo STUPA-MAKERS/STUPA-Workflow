@@ -98,12 +98,14 @@
                 </p>
               }
             </div>
-            <div class="pp__side">
-              <a class="pp__view" [routerLink]="['/protocols', d.protocolId]">
-                {{ 'publicDecisions.protocol' | t }}
-                <app-icon name="right" [size]="15" />
-              </a>
-            </div>
+            @if (d.protocolId) {
+              <div class="pp__side">
+                <a class="pp__view" [routerLink]="['/protocols', d.protocolId]">
+                  {{ 'publicDecisions.protocol' | t }}
+                  <app-icon name="right" [size]="15" />
+                </a>
+              </div>
+            }
           </article>
         }
       }

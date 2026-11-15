@@ -2,11 +2,10 @@
 id: "000916"
 title: The next protocol lists the Umlaufverfahren
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-14
-implementation:
-  - backend/app/modules/protocol/circular.py
+updated: 2026-11-15
+replaced_by: F/meetings/voting/000949
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/voting

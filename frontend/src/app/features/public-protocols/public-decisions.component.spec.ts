@@ -89,17 +89,20 @@ describe('PublicDecisionsComponent', () => {
     expect(within(card).queryByText('Angenommen')).toBeNull();
   });
 
-  it('names a circular vote in place of a meeting (§F/meetings/protocols/000934)', async () => {
+  it('names a circular vote in place of a meeting and links no protocol (§F/meetings/voting/000949)', async () => {
     const circular = decisionRowFixture({
       kind: 'circular',
+      protocolId: null,
       question: 'Lastenanhänger beschaffen',
       meetingTitle: null,
       date: '2026-10-20',
     });
     await setup(makeApi({ decisions: jest.fn(() => of(page([circular]))) }));
-    expect(screen.getByText('Lastenanhänger beschaffen')).toBeInTheDocument();
-    expect(screen.getByText('Umlaufverfahren')).toBeInTheDocument();
-    expect(screen.getByText('Angenommen')).toBeInTheDocument();
+    const card = screen.getByRole('article');
+    expect(within(card).getByText('Lastenanhänger beschaffen')).toBeInTheDocument();
+    expect(within(card).getByText('Umlaufverfahren')).toBeInTheDocument();
+    expect(within(card).getByText('Angenommen')).toBeInTheDocument();
+    expect(within(card).queryByRole('link')).toBeNull();
   });
 
   it('words a rejected motion, another option and a missing question', async () => {
