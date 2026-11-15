@@ -226,6 +226,10 @@ class _Result:
         """Return no rows for the aggregate queries such as `_present_by_meeting`."""
         return []
 
+    def first(self) -> None:
+        """Return no row, because no election waits for the lot in these tests."""
+        return None
+
 
 class _FakeSession:
     def __init__(self, existing: object = None) -> None:
