@@ -54,11 +54,11 @@ from app.modules.meetings.keepers import (
     member_permissions,
 )
 from app.modules.meetings.models import (
-    DEFAULT_LATE_EXCUSE_DAYS,
     Meeting,
     MeetingAttendance,
     MeetingSettings,
 )
+from app.modules.meetings.periods import kept_late_excuse_days
 from app.modules.meetings.roster import meeting_roster_filter
 from app.modules.meetings.schemas import (
     AttendanceOut,
@@ -239,7 +239,7 @@ class AttendanceService:
         )
         by_principal = {r.principal_id: r for r in records}
         perms = await member_permissions(self.session, meeting.gremium_id)
-        until = late_excuse_until(meeting, await self._late_excuse_days())
+        until = late_excuse_until(meeting, await self._late_excuse_days(meeting))
         now = datetime.now(UTC)
         return [
             _attendance_out(
@@ -255,12 +255,21 @@ class AttendanceService:
             for m in members
         ]
 
-    async def _late_excuse_days(self) -> int:
-        """Return ``lateExcuseDays`` of the meeting settings."""
-        stored = await self.session.scalar(
-            select(MeetingSettings.late_excuse_days).where(MeetingSettings.id == 1)
+    async def _late_excuse_days(self, meeting: Meeting) -> int:
+        """Return the late-excuse period of the meeting, in days (spec 000942).
+
+        A meeting keeps the value of the time it was made. Only a meeting from before
+        the column reads the settings.
+        """
+        kept: int | None = getattr(meeting, "late_excuse_days", None)
+        if kept is not None:
+            return kept
+        return kept_late_excuse_days(
+            None,
+            await self.session.scalar(
+                select(MeetingSettings.late_excuse_days).where(MeetingSettings.id == 1)
+            ),
         )
-        return DEFAULT_LATE_EXCUSE_DAYS if stored is None else int(stored)
 
     async def excuse_late(
         self,
@@ -283,7 +292,7 @@ class AttendanceService:
                 over (``late_excuse_expired``).
         """
         meeting = await self._meeting(meeting_id, for_write=True)
-        until = late_excuse_until(meeting, await self._late_excuse_days())
+        until = late_excuse_until(meeting, await self._late_excuse_days(meeting))
         if until is None:
             raise ConflictError("A late excuse needs a closed meeting.", code="meeting_not_closed")
         member_id = await self.session.scalar(

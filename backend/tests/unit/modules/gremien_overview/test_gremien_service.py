@@ -328,7 +328,7 @@ async def test_member_attendance_states() -> None:
     day = date(2026, 5, 1)
     service = _svc(
         result(True),
-        result(*((mid, f"S{n}", day, time(18, 0), None) for n, mid in enumerate(m))),
+        result(*((mid, f"S{n}", day, time(18, 0), None, None) for n, mid in enumerate(m))),
         result((m[0], "present"), (m[1], "excused"), (m[2], "absent"), (m[3], "excused")),
         result(
             (m[3], "Kai"),
@@ -360,11 +360,11 @@ async def test_member_attendance_late_excuse_window_of_the_own_absence(stored: i
     service = _svc(
         result(True),
         result(
-            (m[0], "S0", day, time(18, 0), fresh),
-            (m[1], "S1", day, time(18, 0), old),
-            (m[2], "S2", day, time(18, 0), fresh),
-            (m[3], "S3", day, time(18, 0), None),
-            (m[4], "S4", day, time(18, 0), fresh),
+            (m[0], "S0", day, time(18, 0), fresh, None),
+            (m[1], "S1", day, time(18, 0), old, None),
+            (m[2], "S2", day, time(18, 0), fresh, None),
+            (m[3], "S3", day, time(18, 0), None, None),
+            (m[4], "S4", day, time(18, 0), fresh, None),
         ),
         result((m[0], "absent"), (m[1], "absent"), (m[2], "absent"), (m[3], "absent")),
         result((m[2], "Kai")),
@@ -380,6 +380,26 @@ async def test_member_attendance_late_excuse_window_of_the_own_absence(stored: i
         None,
         None,
     ]
+
+
+async def test_member_attendance_takes_the_period_that_the_meeting_kept() -> None:
+    """§F/administration/admin/000942: a changed setting does not move a kept window."""
+    kept, legacy = uuid.uuid4(), uuid.uuid4()
+    day = date(2026, 5, 1)
+    closed = datetime.now(UTC) - timedelta(days=5)
+    service = _svc(
+        result(True),
+        result(
+            (kept, "S0", day, time(18, 0), closed, 14),
+            (legacy, "S1", day, time(18, 0), closed, None),
+        ),
+        result((kept, "absent"), (legacy, "absent")),
+        result(),
+        result(2),
+        gets=(SimpleNamespace(display_name="Finn", sub="finn"),),
+    )
+    out = await service.member_attendance(G1, uuid.uuid4(), "2026-05", requester_sub="finn")
+    assert [r.late_excuse_until for r in out.meetings] == [closed + timedelta(days=14), None]
 
 
 @pytest.fixture

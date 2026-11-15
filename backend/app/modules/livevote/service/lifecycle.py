@@ -26,7 +26,7 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium
 from app.modules.livevote.guests import GuestEvents, GuestService
-from app.modules.livevote.open_window import check_open
+from app.modules.livevote.open_window import check_open, load_meeting_settings
 from app.modules.livevote.repeat import first_meeting_id
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service.handover import HandoverOps
@@ -131,6 +131,7 @@ class LifecycleOps(HandoverOps):
                 first_id=payload.repeat_of_id,
                 day=payload.date,
             ),
+            late_excuse_days=(await load_meeting_settings(self.session)).late_excuse_days,
             location=payload.location or None,
             form=payload.form,
             created_by=principal.sub,

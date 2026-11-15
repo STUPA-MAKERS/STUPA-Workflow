@@ -83,14 +83,13 @@ from app.modules.meetings.absence import unexcused_counts
 from app.modules.meetings.agenda_service import title_of
 from app.modules.meetings.models import (
     DEFAULT_ABSENCE_LIMIT,
-    DEFAULT_LATE_EXCUSE_DAYS,
     DEFAULT_TERM_START_MONTH,
     Meeting,
     MeetingAgendaItem,
     MeetingAttendance,
     MeetingSettings,
 )
-from app.modules.meetings.periods import term_end, term_start
+from app.modules.meetings.periods import kept_late_excuse_days, term_end, term_start
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.site_config.cd_logos import ALLOWED_SQUARE_LOGO_MIME
 from app.modules.site_config.features import Feature, feature_on
@@ -250,16 +249,16 @@ def _member_state(recorded: str | None, *, delegated: bool) -> AttendanceState:
 
 
 def _late_until(
-    recorded: str | None, closed: datetime | None, window: timedelta | None, *, delegated: bool
+    recorded: str | None, closed: datetime | None, days: int | None, *, delegated: bool
 ) -> datetime | None:
     """Return the end of the late-excuse window of an own ``absent`` record, while it is open.
 
     Only an explicit ``absent`` record can be excused later, so a meeting without a
     record and a vote transfer give None.
     """
-    if window is None or closed is None or delegated or recorded != "absent":
+    if days is None or closed is None or delegated or recorded != "absent":
         return None
-    until = closed + window
+    until = closed + timedelta(days=days)
     return until if datetime.now(UTC) <= until else None
 
 
@@ -833,7 +832,14 @@ class GremienService:
         first_month = parse_month(month)
         after = shift_month(first_month, 1)
         found = await self.session.execute(
-            select(Meeting.id, Meeting.title, Meeting.date, Meeting.start_time, Meeting.closed_at)
+            select(
+                Meeting.id,
+                Meeting.title,
+                Meeting.date,
+                Meeting.start_time,
+                Meeting.closed_at,
+                Meeting.late_excuse_days,
+            )
             .where(
                 self._closed_in(
                     gremium_id,
@@ -845,7 +851,7 @@ class GremienService:
         )
         meetings = tuple(found.all())
         records, delegates = await self._member_states(principal_id, [mid for mid, *_ in meetings])
-        window = await self._excuse_window(own=person.sub == requester_sub)
+        current = await self._excuse_days(own=person.sub == requester_sub)
         return MemberAttendanceOut(
             principal_id=principal_id,
             display_name=person.display_name,
@@ -859,21 +865,27 @@ class GremienService:
                     status=_member_state(records.get(mid), delegated=mid in delegates),
                     delegate_name=delegates.get(mid),
                     late_excuse_until=_late_until(
-                        records.get(mid), closed, window, delegated=mid in delegates
+                        records.get(mid),
+                        closed,
+                        None if current is None else kept_late_excuse_days(kept, current),
+                        delegated=mid in delegates,
                     ),
                 )
-                for mid, title, day, start, closed in meetings
+                for mid, title, day, start, closed, kept in meetings
             ],
         )
 
-    async def _excuse_window(self, *, own: bool) -> timedelta | None:
-        """Return the late-excuse period for the own rows, else None."""
+    async def _excuse_days(self, *, own: bool) -> int | None:
+        """Return ``lateExcuseDays`` of the settings for the own rows, else None.
+
+        A meeting that kept its own period takes that one (spec 000942).
+        """
         if not own:
             return None
         days = await self.session.scalar(
             select(MeetingSettings.late_excuse_days).where(MeetingSettings.id == 1)
         )
-        return timedelta(days=DEFAULT_LATE_EXCUSE_DAYS if days is None else int(days))
+        return kept_late_excuse_days(None, days)
 
     async def _member_states(
         self, principal_id: UUID, ids: Sequence[UUID]

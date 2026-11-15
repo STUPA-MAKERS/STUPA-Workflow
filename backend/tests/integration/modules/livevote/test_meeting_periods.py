@@ -132,6 +132,7 @@ def test_periods_start_values_update_bounds_and_audit(
             read = client.get(URL)
             bad_month = client.put(URL, json={**DEFAULTS, "termStartMonth": 13})
             bad_limit = client.put(URL, json={**DEFAULTS, "absenceLimit": 0})
+            no_period = client.put(URL, json={**DEFAULTS, "lateExcuseDays": 0})
             missing = client.put(URL, json={"inviteDaysOrdinary": 7})
             api.dependency_overrides[get_current_principal] = lambda: Principal(
                 sub="site-admin", roles=[], permissions={"admin.site"}
@@ -147,6 +148,7 @@ def test_periods_start_values_update_bounds_and_audit(
     assert read.json() == changed
     assert bad_month.status_code == 422, bad_month.text
     assert bad_limit.status_code == 422, bad_limit.text
+    assert no_period.status_code == 422, no_period.text
     assert missing.status_code == 422, missing.text
     assert forbidden_get.status_code == 403, forbidden_get.text
     assert forbidden_put.status_code == 403, forbidden_put.text

@@ -958,17 +958,19 @@ class MeetingPeriods(FrozenStrictCamelModel, frozen=True):
 
     ``GET`` and ``PUT /admin/meeting-periods`` read and replace them. The days count
     calendar days. ``termStartMonth`` is the month (1 to 12) on whose first day a term
-    starts.
+    starts. The two invitation periods, ``lateExcuseDays`` and ``circularMinDays`` are 1
+    day or more, because a period of 0 days is no period
+    (§F/administration/admin/000942).
     """
 
-    invite_days_ordinary: int = Field(alias="inviteDaysOrdinary", ge=0, le=MAX_PERIOD_DAYS)
+    invite_days_ordinary: int = Field(alias="inviteDaysOrdinary", ge=1, le=MAX_PERIOD_DAYS)
     invite_days_extraordinary: int = Field(
-        alias="inviteDaysExtraordinary", ge=0, le=MAX_PERIOD_DAYS
+        alias="inviteDaysExtraordinary", ge=1, le=MAX_PERIOD_DAYS
     )
     protocol_draft_days: int = Field(alias="protocolDraftDays", ge=0, le=MAX_PERIOD_DAYS)
-    late_excuse_days: int = Field(alias="lateExcuseDays", ge=0, le=MAX_PERIOD_DAYS)
+    late_excuse_days: int = Field(alias="lateExcuseDays", ge=1, le=MAX_PERIOD_DAYS)
     absence_limit: int = Field(alias="absenceLimit", ge=1, le=MAX_ABSENCE_LIMIT)
-    circular_min_days: int = Field(alias="circularMinDays", ge=0, le=MAX_PERIOD_DAYS)
+    circular_min_days: int = Field(alias="circularMinDays", ge=1, le=MAX_PERIOD_DAYS)
     term_start_month: int = Field(alias="termStartMonth", ge=1, le=12)
 
 

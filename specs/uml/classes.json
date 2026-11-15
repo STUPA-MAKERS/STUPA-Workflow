@@ -4404,6 +4404,12 @@
           "type": "CHAR(32)"
         },
         {
+          "name": "late_excuse_days",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "present_count",
           "nullable": true,
           "primaryKey": false,

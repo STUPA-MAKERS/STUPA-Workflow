@@ -12,8 +12,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
+from pydantic import ValidationError
 
 from app.main import create_app
+from app.modules.admin.schemas import MeetingPeriods
 from app.modules.gremien_overview.attendance_export import (
     AttendanceExport,
     ExportRow,
@@ -32,7 +34,7 @@ from app.modules.meetings.attendance_service import (
     _open_window,
     late_excuse_until,
 )
-from app.modules.meetings.periods import term_end, term_start
+from app.modules.meetings.periods import kept_late_excuse_days, term_end, term_start
 from app.shared.errors import ConflictError, ForbiddenError
 from tests._support.flow_fakes import FakeSession, result
 from tests.unit.modules.livevote.test_livevote_cov import (
@@ -123,6 +125,46 @@ def test_late_excuse_window_needs_a_closed_meeting() -> None:
     assert late_excuse_until(_meeting("live", None), 7) is None
     assert late_excuse_until(_meeting("closed", None), 7) is None
     assert late_excuse_until(_meeting(), 7) == NOW + timedelta(days=7)
+
+
+def test_a_meeting_keeps_its_late_excuse_period() -> None:
+    """§F/administration/admin/000942: the kept value wins over the setting."""
+    assert kept_late_excuse_days(14, 2) == 14
+    assert kept_late_excuse_days(None, 2) == 2
+    assert kept_late_excuse_days(None, None) == 7
+
+
+async def test_excuse_late_reads_the_period_of_the_meeting_not_the_setting() -> None:
+    """The setting went down to 1 day after the meeting was made with 7 days."""
+    meeting = _meeting()
+    meeting.late_excuse_days = 7
+    row = SimpleNamespace(status="absent", source="lead", note=None)
+    session = _session(meeting, result(row), scalars=[uuid4()])
+    service = AttendanceService(session)  # type: ignore[arg-type]
+    assert await service._late_excuse_days(meeting) == 7
+    late = NOW + timedelta(days=7, seconds=1)
+    with pytest.raises(ConflictError) as error:
+        await service.excuse_late(meeting.id, "me", "ill", now=late)
+    assert error.value.code == "late_excuse_expired"
+
+
+@pytest.mark.parametrize(
+    "key", ["inviteDaysOrdinary", "inviteDaysExtraordinary", "lateExcuseDays", "circularMinDays"]
+)
+def test_a_period_of_0_days_is_refused(key: str) -> None:
+    """§F/administration/admin/000942: each of these periods is 1 day or more."""
+    values = {
+        "inviteDaysOrdinary": 7,
+        "inviteDaysExtraordinary": 3,
+        "protocolDraftDays": 0,
+        "lateExcuseDays": 7,
+        "absenceLimit": 3,
+        "circularMinDays": 3,
+        "termStartMonth": 10,
+    }
+    assert MeetingPeriods.model_validate(values).protocol_draft_days == 0
+    with pytest.raises(ValidationError):
+        MeetingPeriods.model_validate({**values, key: 0})
 
 
 def test_open_window_is_for_the_own_absence_only() -> None:

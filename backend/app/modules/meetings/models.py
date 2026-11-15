@@ -97,6 +97,10 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     repeat_of_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
     )
+    #: `lateExcuseDays` of the settings at the time the meeting was made (spec 000942):
+    #: a later change of the setting does not move the window of this meeting. NULL for
+    #: a meeting from before the column: a reader then takes the setting.
+    late_excuse_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     #: The present count and the number of members with a voting right, fixed at the
     #: close (000946). The protocol reads them, so a new render of an old meeting gives
     #: the same count and the same quorum (000357). NULL for a meeting that is not
