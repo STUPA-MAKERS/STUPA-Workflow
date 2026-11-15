@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+implementation:
+  - backend/app/modules/protocol/known_names.py
+  - backend/app/modules/protocol/router.py
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings

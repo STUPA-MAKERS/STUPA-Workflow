@@ -14,6 +14,7 @@ import type { AgendaItem, Meeting, Protocol } from '@core/api/models';
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
 import { AGENDA, meeting, protocol } from '../../../../testing/meeting-fixtures';
 import { type SaveState, TopSheetComponent, documentUploadErrorKey } from './top-sheet.component';
+import { KnownNamesService } from './known-names.service';
 import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
 
 interface Inputs {
@@ -29,6 +30,12 @@ interface Inputs {
   canRename: boolean;
   renamingTopId: string | null;
 }
+
+/** The known names of the meeting (000970). */
+const KNOWN_NAMES: Provider = {
+  provide: KnownNamesService,
+  useValue: { names: () => [{ first: 'Lena', last: 'Hoffmann' }] },
+};
 
 async function setup(over: Partial<Inputs> = {}, extraProviders: Provider[] = []) {
   const bodyChange = jest.fn();
@@ -50,7 +57,7 @@ async function setup(over: Partial<Inputs> = {}, extraProviders: Provider[] = []
       ...over,
     },
     on: { bodyChange, finalize, startRename, cancelRename, renameTop, doneChange },
-    providers: [provideRouter([]), NO_LINKED_TODOS, ...extraProviders],
+    providers: [provideRouter([]), NO_LINKED_TODOS, KNOWN_NAMES, ...extraProviders],
   });
   await renderDeferred(view.fixture);
   return { ...view, bodyChange, finalize, startRename, cancelRename, renameTop, doneChange };
@@ -334,6 +341,39 @@ describe('TopSheetComponent', () => {
       expect(screen.queryByRole('textbox', { name: 'Markdown' })).toBeNull();
       await renderDeferred(view.fixture);
       expect(editorOf(view)).toBeTruthy();
+    });
+
+    it('blacks out a known name typed in the Markdown source (000969)', async () => {
+      const view = await setup({ top: { ...AGENDA[0], body: '' } });
+      await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+      const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+      await userEvent.type(area, 'Es spricht lena hoffmann. Lena sagt');
+      expect(area.value).toBe('Es spricht %%lena hoffmann%%. %%Lena%% sagt');
+      expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
+    });
+
+    it('marks through the undo stack of the browser where it has one', async () => {
+      await setup({ top: { ...AGENDA[0], body: '' } });
+      await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+      const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+      const exec = jest.fn((_cmd: string, _ui: boolean, text: string) => {
+        area.setRangeText(text, area.selectionStart, area.selectionEnd);
+        return true;
+      });
+      Object.defineProperty(document, 'execCommand', { value: exec, configurable: true });
+      try {
+        await userEvent.type(area, 'Lena,');
+      } finally {
+        Reflect.deleteProperty(document, 'execCommand');
+      }
+      expect(exec).toHaveBeenCalledWith('insertText', false, '%%Lena%%');
+      expect(area.value).toBe('%%Lena%%,');
+    });
+
+    it('marks no name for a reader', async () => {
+      const view = await setup({ editable: false, top: { ...AGENDA[0], body: '' } });
+      const cmp = view.fixture.componentInstance as unknown as { knownNames: () => readonly unknown[] };
+      expect(cmp.knownNames()).toEqual([]);
     });
 
     it('formats the Markdown source from the bar', async () => {

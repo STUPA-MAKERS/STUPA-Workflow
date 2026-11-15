@@ -11,6 +11,7 @@ import { type Observable, catchError, map, of, throwError } from 'rxjs';
 import { detailContext, listContext } from '@core/cache/cache.interceptor';
 import { I18nService } from '@core/i18n/i18n.service';
 import { skipLoading } from '@stupa-makers/ui-kit';
+import type { KnownName } from '@stupa-makers/ui-kit/markdown-editor';
 import { API_BASE_URL } from './api.config';
 import { type ParamValue, httpParams } from './http-params';
 import {
@@ -1303,6 +1304,13 @@ export class ApiClient {
         context: readContext(opts),
       })
       .pipe(map(mapProtocol));
+  }
+
+  /** GET /meetings/{id}/known-names — the first and last names for the automatic blackout (000970). */
+  getKnownNames(meetingId: Uuid): Observable<readonly KnownName[]> {
+    return this.http.get<readonly KnownName[]>(`${this.base}/meetings/${meetingId}/known-names`, {
+      context: skipLoading(),
+    });
   }
 
   /** PATCH /protocols/{id} — update markdown. */

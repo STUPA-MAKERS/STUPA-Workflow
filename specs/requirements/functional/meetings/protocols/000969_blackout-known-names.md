@@ -2,10 +2,13 @@
 id: "000969"
 title: The editor blacks out a known name after it is typed
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
-implementation: null
+implementation:
+  - frontend/vendor/ui-kit/markdown-editor/src/auto-blackout.extension.ts
+  - frontend/vendor/ui-kit/markdown-editor/src/known-names.ts
+  - frontend/src/app/features/meetings/top-sheet/raw-format.ts
 scope:
   - frontend/src/app/features/meetings
   - frontend/vendor/ui-kit/markdown-editor
