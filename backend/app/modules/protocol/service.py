@@ -1798,6 +1798,7 @@ def election_snippet_of(
     lines = sorted(listed, key=lambda line: -line.votes) if by_votes else listed
     lot = result.lot if result is not None else None
     runoff = result.runoff if result is not None else None
+    place_lot = result.next_round_lot if result is not None else None
     return ElectionSnippet(
         question=(question or "Wahlgang").strip() or "Wahlgang",
         seats=election.seats,
@@ -1807,6 +1808,9 @@ def election_snippet_of(
         yes=result.yes if result is not None else None,
         no=result.no if result is not None else None,
         by_lot=lot is not None and lot.drawn is not None,
+        next_round_lot_names=[names.get(cid, cid) for cid in (place_lot.drawn or ())]
+        if place_lot is not None
+        else [],
         lot_pending=lot is not None and lot.drawn is None,
         runoff_names=[names.get(cid, cid) for cid in runoff.candidate_ids] if runoff else [],
         runoff_seats=runoff.seats if runoff else 0,

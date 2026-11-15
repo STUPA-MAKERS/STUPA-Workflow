@@ -261,6 +261,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/votes/{vote_id}/cancel"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/close"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/draw-lot"): _MANAGE_VOTE,
+    ("POST", "/api/votes/{vote_id}/next-round"): _MANAGE_VOTE,
     ("POST", "/api/votes/{vote_id}/objection"): (
         "CircularService.object (VotingService.can_cast_own: roster of the vote)"
     ),

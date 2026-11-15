@@ -11,8 +11,10 @@ and the reveal rule. The differences live here:
   and fires no flow branch (an election never has an application).
 * The lot: ``POST /votes/{id}/draw-lot`` draws with ``secrets.choice`` when a tie is
   pending, audits ``vote_lot_drawn`` and refuses a second draw.
-* The runoff: ``POST /votes/{id}/runoff`` creates the draft runoff with the tied
-  candidates and the open seats, on the same agenda item, one round later.
+* The next Wahlgang: ``POST /votes/{id}/next-round`` creates the draft of the second
+  or the third Wahlgang of a ``members_majority`` election without a majority, on the
+  same agenda item (§F/meetings/voting/000971). A stored result can still hold a
+  runoff of the time before the lot decided every tie (§F/meetings/voting/000027).
 """
 
 from __future__ import annotations
@@ -36,6 +38,7 @@ from app.modules.voting.schemas import (
     ElectionLotOut,
     ElectionResultOut,
     ElectionRunoffOut,
+    VoteCreateInternal,
     VoteOut,
 )
 from app.shared.config_schemas import ElectionConfig
@@ -50,6 +53,9 @@ ELECTION = "election"
 NOT_AN_ELECTION = "not_an_election"
 NO_LOT_PENDING = "no_lot_pending"
 LOT_ALREADY_DRAWN = "lot_already_drawn"
+#: 409 codes of the next Wahlgang.
+NO_NEXT_ROUND = "no_next_round"
+NEXT_ROUND_EXISTS = "next_round_exists"
 
 
 def is_election(vote: object) -> bool:
@@ -247,3 +253,102 @@ class ElectionService:
         )
         await self.session.commit()
         return await self.voting.get(vote.id)
+
+    async def next_round(self, vote_id: UUID, principal: Principal, *, now: datetime) -> VoteOut:
+        """Create the draft of the next Wahlgang of an election without a majority.
+
+        Only a closed ``members_majority`` election with the result ``no_majority``
+        takes the call, and only its first and its second Wahlgang. The second Wahlgang
+        has the candidates of the first. The third has the two candidates with the most
+        votes of the second; a tie for a place goes to the lot, which the result of the
+        second Wahlgang and the audit log (``vote_lot_drawn``) keep. The draft sits on
+        the same agenda item, and the protokollant opens it. The caller checks the
+        manage right.
+
+        Raises:
+            ConflictError: The vote is no closed election (``not_an_election``), it
+                takes no next Wahlgang (``no_next_round``), it has one
+                (``next_round_exists``) or its meeting is not live (``meeting_closed``).
+        """
+        meeting_id = (await self.voting._get_vote(vote_id)).meeting_id
+        if meeting_id is not None:
+            await self.voting._lock_live_meeting(meeting_id)
+        vote, result = await self._closed_election(vote_id)
+        config = election_config(vote)
+        round_ = getattr(vote, "round", 1) or 1
+        if vote.result != "no_majority" or not tally_mod.needs_members_majority(config, round_):
+            raise ConflictError("The election takes no next Wahlgang.", code=NO_NEXT_ROUND)
+        if await self._has_next_round(vote.id):
+            raise ConflictError("The election has a next Wahlgang.", code=NEXT_ROUND_EXISTS)
+        standing = (
+            await self._third_round_candidates(vote, config, result, principal, now)
+            if (round_ + 1) >= tally_mod.SIMPLE_MAJORITY_ROUND
+            else config.candidate_ids
+        )
+        kept = [c for c in config.candidates if c.id in standing]
+        draft = await self.voting._insert(
+            None,
+            VoteCreateInternal(
+                config=config.model_copy(update={"candidates": kept}),
+                eligibleGroup=UUID(str(vote.eligible_group)),
+                question=vote.question,
+                parentVoteId=vote.id,
+                round=round_ + 1,
+                eligibleCount=vote.eligible_count,
+            ),
+            meeting_id=vote.meeting_id,
+            agenda_item_id=vote.agenda_item_id,
+            actor=principal.sub,
+        )
+        await self.session.commit()
+        return await self.voting.get(draft.id)
+
+    async def _has_next_round(self, vote_id: UUID) -> bool:
+        """Tell whether a Wahlgang that is not cancelled continues this election."""
+        stmt = select(Vote.id).where(Vote.parent_vote_id == vote_id, Vote.status != "cancelled")
+        return (await self.session.scalar(stmt.limit(1))) is not None
+
+    async def _third_round_candidates(
+        self,
+        vote: Vote,
+        config: ElectionConfig,
+        result: ElectionResultOut,
+        principal: Principal,
+        now: datetime,
+    ) -> Sequence[str]:
+        """Return the candidates of the third Wahlgang, with the lot for a tied place.
+
+        A lot that the second Wahlgang already holds stands: a cancelled third Wahlgang
+        does not draw again.
+        """
+        field = tally_mod.third_round_field(config.candidate_ids, result.counts)
+        if not field.open_places:
+            return field.sure
+        stored = result.next_round_lot
+        if stored is not None and stored.drawn is not None:
+            return [*field.sure, *stored.drawn]
+        drawn = tally_mod.draw_lot(field.tied, field.open_places, self.choose)
+        lot = ElectionLotOut(
+            among=list(field.tied),
+            seats=field.open_places,
+            drawn=drawn,
+            at=now,
+            by=principal.sub,
+            byName=principal.display_name,
+        )
+        vote.election_result = dump_result(result.model_copy(update={"next_round_lot": lot}))
+        await audit_record(
+            self.session,
+            actor=principal.sub,
+            action=AuditAction.VOTE_LOT_DRAWN,
+            target_type="vote",
+            target_id=str(vote.id),
+            data={
+                **self.voting._audit_refs(vote),
+                "among": list(field.tied),
+                "seats": field.open_places,
+                "drawn": drawn,
+                "for": "next_round",
+            },
+        )
+        return [*field.sure, *drawn]

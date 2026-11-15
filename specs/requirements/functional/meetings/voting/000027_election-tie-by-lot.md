@@ -4,7 +4,7 @@ title: A tie in an election is decided by lot
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-15
 implementation:
   - backend/app/modules/voting/election.py
 scope:
@@ -15,4 +15,5 @@ scope:
 # A tie in an election is decided by lot
 
 A tie at the seat limit of a personnel election must be decided by lot. The platform must draw
-the lot. There must be no runoff route. A stored result with `runoff` must still show.
+the lot. There must be no runoff route. A stored result with `runoff` must still show. The further
+Wahlgänge of an election by the majority of the members follow 000971.
