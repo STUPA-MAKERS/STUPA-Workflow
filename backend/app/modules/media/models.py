@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import BigInteger, CheckConstraint, Integer, Text, Uuid
+from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Index, Integer, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin
@@ -67,13 +67,17 @@ class MarkdownDocument(CreatedAtMixin, Base):
 
     Like an image, the row has no uploader column. ``name`` is the cleaned file
     name of the upload, the name of the download and the default label of the
-    reference. ``pages`` feeds the file badge (spec 000863).
+    reference. ``pages`` feeds the file badge (spec 000863). ``meeting_id`` is the
+    Sitzung of the upload: only a person who can read that Sitzung reads the PDF
+    (§NF/security/files/000979). A row without a Sitzung is readable only through the
+    public route of a public protocol.
     """
 
     __tablename__ = "markdown_document"
     __table_args__ = (
         CheckConstraint("size >= 0", name="size"),
         CheckConstraint("pages > 0", name="pages"),
+        Index("ix_markdown_document_meeting", "meeting_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -81,3 +85,6 @@ class MarkdownDocument(CreatedAtMixin, Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     size: Mapped[int] = mapped_column(BigInteger, nullable=False)
     pages: Mapped[int] = mapped_column(Integer, nullable=False)
+    meeting_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
+    )

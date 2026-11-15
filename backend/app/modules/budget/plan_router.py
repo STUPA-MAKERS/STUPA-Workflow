@@ -42,6 +42,7 @@ from app.modules.files.pdf_branding import (
     export_render_config,
 )
 from app.modules.pdf.typst_client import TypstError, build_typst_client
+from app.shared.antiabuse import rate_limit_pdf_render
 from app.shared.errors import (
     BadRequestError,
     ForbiddenError,
@@ -186,7 +187,8 @@ async def export_plan_xlsx(
 
 @router.get(
     "/budget-plan-versions/{version_id}/export.pdf",
-    responses=_errors(400, 401, 403, 404, 503),
+    dependencies=[Depends(rate_limit_pdf_render)],
+    responses=_errors(400, 401, 403, 404, 429, 503),
 )
 async def export_plan_pdf(
     version_id: UUID,

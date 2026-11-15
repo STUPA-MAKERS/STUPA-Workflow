@@ -48,7 +48,7 @@
   "elements": [
     {
       "id": "altcha",
-      "image": "ghcr.io/altcha-org/sentinel:1.31.1",
+      "image": "ghcr.io/altcha-org/sentinel:1.31.1@sha256:974647205e1fc0a7a7f4e70090d014bda89f5d582599f544fd7237bf1d3adc6f",
       "name": "altcha",
       "networks": [
         "internal"
@@ -67,7 +67,7 @@
     },
     {
       "id": "clamav",
-      "image": "clamav/clamav:1.4.3",
+      "image": "clamav/clamav:1.4.3@sha256:75fb5fd95fcbe1d7e6d240c369c1572b686ee2c95949d1042b5148de8eddebb4",
       "name": "clamav",
       "networks": [
         "internal"
@@ -85,7 +85,7 @@
     },
     {
       "id": "minio",
-      "image": "pgsty/minio:RELEASE.2026-08-04T00-00-00Z",
+      "image": "pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372",
       "name": "minio",
       "networks": [
         "internal"
@@ -94,7 +94,7 @@
     },
     {
       "id": "postgres",
-      "image": "postgres:16-alpine",
+      "image": "postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e",
       "name": "postgres",
       "networks": [
         "internal"
@@ -103,7 +103,7 @@
     },
     {
       "id": "redis",
-      "image": "redis:7-alpine",
+      "image": "redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe",
       "name": "redis",
       "networks": [
         "internal"
