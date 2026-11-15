@@ -2,7 +2,7 @@
 id: "000939"
 title: A vote without a meeting counts the members at its open
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
