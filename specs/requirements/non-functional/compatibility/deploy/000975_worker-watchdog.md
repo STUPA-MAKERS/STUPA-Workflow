@@ -2,7 +2,7 @@
 id: "000975"
 title: A worker that hangs ends its process
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

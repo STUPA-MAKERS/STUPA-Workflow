@@ -382,6 +382,57 @@ async def rate_limit_media_images(
     )
 
 
+async def rate_limit_pdf_render(
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+) -> None:
+    """A route that renders a PDF in the request: ``rl_pdf_render_per_hour`` per session.
+
+    §NF/security/access/000976. The routes are the PDF of an Antrag, the export of a
+    Haushaltsplan and the preview of a protocol draft. The render service has two
+    places, so a session that calls such a route in a loop holds back the render of a
+    protocol. The key is the ``sub`` of the principal, or the identity of the applicant.
+    The limit applies to an OAuth token (MCP) too. Without a session this dependency
+    does nothing, and the route answers 401.
+    """
+    identity = (
+        f"principal:{principal.sub}"
+        if principal is not None
+        else f"applicant:{applicant.identity}"
+        if applicant is not None
+        else None
+    )
+    if identity is None:
+        return
+    await _enforce(
+        limiter,
+        f"pdf-render:{identity}",
+        limit=settings.rl_pdf_render_per_hour,
+        window=_HOUR,
+        detail="Too many PDF downloads. Try again later.",
+    )
+
+
+async def enforce_observer_add_limit(
+    limiter: RateLimiter, settings: Settings, application_id: object
+) -> None:
+    """The add of an observer: ``rl_observers_per_hour`` per Antrag.
+
+    §NF/security/access/000977. Each add sends a mail to a free address. The route
+    calls this after its access check, so a caller without the right does not use up
+    the budget of the Antrag. A removed observer does not give the count back.
+    """
+    await _enforce(
+        limiter,
+        f"observers:application:{application_id}",
+        limit=settings.rl_observers_per_hour,
+        window=_HOUR,
+        detail="Too many observers added. Try again later.",
+    )
+
+
 async def rate_limit_media_documents(
     settings: SettingsDep,
     limiter: RateLimiterDep,

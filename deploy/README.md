@@ -39,7 +39,9 @@ docker compose up -d --build
 Docker builds `web` from the repository root `..` in two stages (`web/Dockerfile`). Stage 1
 builds the Angular frontend with Node. Stage 2 serves it with nginx. The image contains
 `web/nginx.conf`, but compose also mounts it. You can therefore edit the file in production
-without a rebuild, for example the `real_ip` CIDR of Caddy.
+without a rebuild. The address of the edge proxy is not in the file: set
+`TRUSTED_PROXY_IPS` in `.env` to the exact address from which Caddy reaches `web`. nginx
+takes the client address from `X-Forwarded-For` only for a request from that address.
 
 ## Migrations
 

@@ -2,7 +2,7 @@
 id: "000976"
 title: A PDF made on request has a rate limit
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
@@ -26,5 +26,5 @@ the preview of a protocol draft. Over the limit the route must answer 429 with `
 Reason: The render service has two places. A session that calls such a route in a loop holds
 both places, and the render of a protocol at its finalization waits or fails.
 
-Test: A backend unit test calls each of the three routes one time more than the limit and finds
-429 with `Retry-After`.
+Test: A backend unit test calls the limit one time more than allowed and finds the refusal. A
+second test finds the limit on each of the three routes.

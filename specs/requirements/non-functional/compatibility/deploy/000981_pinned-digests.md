@@ -2,7 +2,7 @@
 id: "000981"
 title: Images and CI actions are pinned by digest
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
@@ -24,5 +24,5 @@ comment. Dependabot must update the digests and the hashes.
 Reason: A tag can move to other content. A build then runs code that no person reviewed, and
 two builds of one release differ.
 
-Test: `scripts/check_ratchets.py` finds no `image:` and no `FROM` without `@sha256:` and no
+Test: `scripts/check_build_pins.py` finds no `image:` and no `FROM` without `@sha256:` and no
 `uses:` without a 40-character hash.

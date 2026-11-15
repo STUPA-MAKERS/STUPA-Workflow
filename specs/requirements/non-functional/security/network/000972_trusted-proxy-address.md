@@ -2,7 +2,7 @@
 id: "000972"
 title: The web proxy takes the client address only from the edge
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

@@ -308,8 +308,10 @@ class MediaService:
 
     # -- embedded PDFs (specs 000862, 000868, 000869) ------------------------
 
-    async def upload_document(self, data: bytes, filename: str | None) -> MarkdownDocumentOut:
-        """Scan, check and store one PDF for a protocol text.
+    async def upload_document(
+        self, data: bytes, filename: str | None, meeting_id: uuid.UUID | None = None
+    ) -> MarkdownDocumentOut:
+        """Scan, check and store one PDF for a protocol text of the Sitzung ``meeting_id``.
 
         The ClamAV scan runs before pypdf reads the bytes. The stored bytes are the
         bytes of the client: a PDF has no clean re-encode.
@@ -326,12 +328,16 @@ class MediaService:
         if len(data) > self.max_document_bytes:
             raise PayloadTooLargeError(f"PDF exceeds {self.max_document_bytes} bytes.")
         await scan_or_raise(data, self.settings or get_settings())
-        return await self.add_document(data, filename)
+        return await self.add_document(data, filename, meeting_id)
 
-    async def add_document(self, data: bytes, filename: str | None) -> MarkdownDocumentOut:
+    async def add_document(
+        self, data: bytes, filename: str | None, meeting_id: uuid.UUID | None = None
+    ) -> MarkdownDocumentOut:
         """Check and store one PDF that the platform made itself, without a virus scan.
 
         The protocol stores the PDF of a Haushaltsplan with this call (spec 000876).
+        The row keeps the Sitzung, because the read of the PDF needs the read right of
+        its Sitzung (§NF/security/files/000979).
 
         Raises:
             ServiceUnavailableError: The storage is off or failed (503).
@@ -348,6 +354,7 @@ class MediaService:
             name=sanitize_display_name(filename, default="Dokument.pdf"),
             size=len(data),
             pages=checked.pages,
+            meeting_id=meeting_id,
         )
         self.session.add(row)
         await self.session.flush()
@@ -368,6 +375,17 @@ class MediaService:
             raise UnsupportedMediaTypeError(str(exc)) from exc
         except DocumentTooLarge as exc:
             raise PayloadTooLargeError(str(exc)) from exc
+
+    async def document_meeting(self, document_id: uuid.UUID) -> uuid.UUID | None:
+        """Return the Sitzung of one PDF, or None for a PDF without one.
+
+        Raises:
+            NotFoundError: The id is unknown (404).
+        """
+        row = await self.session.get(MarkdownDocument, document_id)
+        if row is None:
+            raise NotFoundError("document not found")
+        return row.meeting_id
 
     async def document_info(self, document_id: uuid.UUID) -> MarkdownDocumentOut:
         """Return the name, size and page count of one PDF.

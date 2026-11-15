@@ -2,7 +2,7 @@
 id: "000974"
 title: The read of an external feed has a time limit
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

@@ -2,7 +2,7 @@
 id: "000977"
 title: Adding observers has a rate limit
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

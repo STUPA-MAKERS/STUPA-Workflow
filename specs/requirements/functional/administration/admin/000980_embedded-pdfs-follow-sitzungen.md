@@ -2,7 +2,7 @@
 id: "000980"
 title: The embedded PDFs belong to the feature Sitzungen
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

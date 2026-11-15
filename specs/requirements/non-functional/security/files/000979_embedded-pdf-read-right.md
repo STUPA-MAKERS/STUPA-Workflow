@@ -2,7 +2,7 @@
 id: "000979"
 title: An embedded PDF needs the read right of its Sitzung
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

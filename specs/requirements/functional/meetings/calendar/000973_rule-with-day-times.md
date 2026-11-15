@@ -2,7 +2,7 @@
 id: "000973"
 title: A recurrence rule with times of the day gives only the first date
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:

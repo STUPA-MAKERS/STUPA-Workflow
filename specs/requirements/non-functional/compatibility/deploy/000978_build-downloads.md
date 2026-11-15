@@ -2,7 +2,7 @@
 id: "000978"
 title: An image build fetches no signing key and repeats a download
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
@@ -26,5 +26,5 @@ Reason: Production builds its images on the machine at each release. One failed 
 another server then holds the release back, and the same request fails CI runs. A key that the
 build fetches is trusted only through TLS.
 
-Test: `scripts/check_ratchets.py` finds no URL of a key in a Dockerfile and no `curl` without
+Test: `scripts/check_build_pins.py` finds no URL of a key in a Dockerfile and no `curl` without
 `--retry` in a Dockerfile or a workflow.
