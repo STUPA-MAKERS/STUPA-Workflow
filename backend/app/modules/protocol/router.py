@@ -50,6 +50,7 @@ from app.modules.protocol.schemas import (
 )
 from app.modules.protocol.service import ProtocolService
 from app.settings import Settings
+from app.shared.antiabuse import rate_limit_pdf_render
 from app.shared.errors import ProblemDetail
 from app.shared.filenames import content_disposition
 
@@ -324,7 +325,8 @@ async def send_protocol_draft(
 
 @router.get(
     "/protocols/{protocol_id}/draft-pdf",
-    responses=_errors(400, 401, 403, 404, 409, 503),
+    dependencies=[Depends(rate_limit_pdf_render)],
+    responses=_errors(400, 401, 403, 404, 409, 429, 503),
     response_class=Response,
 )
 async def get_protocol_draft_pdf(

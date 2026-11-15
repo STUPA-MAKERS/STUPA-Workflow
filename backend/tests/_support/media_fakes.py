@@ -83,13 +83,19 @@ def add_document(
     *,
     name: str = "Dokument.pdf",
     pages: int = 1,
+    meeting_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
     document_id = uuid.uuid4()
     key = document_storage_key(document_id)
     storage.objects[key] = (data, "application/pdf")
     session.add(
         MarkdownDocument(
-            id=document_id, storage_key=key, name=name, size=len(data), pages=pages
+            id=document_id,
+            storage_key=key,
+            name=name,
+            size=len(data),
+            pages=pages,
+            meeting_id=meeting_id,
         )
     )
     return document_id

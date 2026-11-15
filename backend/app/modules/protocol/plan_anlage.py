@@ -118,5 +118,7 @@ async def attach_plans(
         )
         if file is not None:
             pdf = await _render(typst, session, storage, file)
-            item.plan_document_id = (await media.add_document(pdf, file.name)).id
+            item.plan_document_id = (
+                await media.add_document(pdf, file.name, meeting_id)
+            ).id
     await session.flush()

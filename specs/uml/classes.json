@@ -512,6 +512,13 @@
       "to": "Application"
     },
     {
+      "column": "meeting_id",
+      "from": "MarkdownDocument",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Meeting"
+    },
+    {
       "column": "active_application_id",
       "from": "Meeting",
       "multiplicity": "*",
@@ -4202,6 +4209,12 @@
           "nullable": false,
           "primaryKey": false,
           "type": "INTEGER"
+        },
+        {
+          "name": "meeting_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
         },
         {
           "name": "created_at",

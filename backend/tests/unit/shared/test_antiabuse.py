@@ -389,3 +389,61 @@ async def test_rate_limit_ticket_messages_keys_on_the_account() -> None:
     with pytest.raises(RateLimitedError):
         await rate_limit_ticket_messages(settings, limiter, Principal(sub="a"))
     assert _settings().rl_ticket_messages_per_hour == 60
+
+
+async def test_rate_limit_pdf_render_keys_on_the_session() -> None:
+    """§NF/security/access/000976: a PDF made on request counts per session."""
+    import pytest
+
+    from app.modules.auth.principal import Principal
+    from app.shared.antiabuse import rate_limit_pdf_render
+
+    settings = _settings(rl_pdf_render_per_hour=1)
+    limiter = InMemoryRateLimiter(now=lambda: 0.0)
+    applicant = SimpleNamespace(identity="app-1")
+    await rate_limit_pdf_render(settings, limiter, None, None)
+    await rate_limit_pdf_render(settings, limiter, None, None)
+    await rate_limit_pdf_render(settings, limiter, Principal(sub="a"), None)
+    await rate_limit_pdf_render(settings, limiter, Principal(sub="b"), None)
+    await rate_limit_pdf_render(settings, limiter, None, applicant)  # type: ignore[arg-type]
+    with pytest.raises(RateLimitedError):
+        await rate_limit_pdf_render(settings, limiter, Principal(sub="a"), None)
+    with pytest.raises(RateLimitedError):
+        await rate_limit_pdf_render(settings, limiter, None, applicant)  # type: ignore[arg-type]
+    mcp = Principal(sub="mcp", scope_permissions=frozenset({"application.read"}))
+    await rate_limit_pdf_render(settings, limiter, mcp, None)
+    with pytest.raises(RateLimitedError):
+        await rate_limit_pdf_render(settings, limiter, mcp, None)
+    assert _settings().rl_pdf_render_per_hour == 60
+
+
+def test_each_route_that_renders_a_pdf_has_the_limit() -> None:
+    """§NF/security/access/000976: the three routes carry the dependency and name 429."""
+    from app.shared.antiabuse import rate_limit_pdf_render
+    from tests.unit.test_public_routes import _routes
+
+    wanted = {
+        "/api/applications/{application_id}/pdf",
+        "/api/budget-plan-versions/{version_id}/export.pdf",
+        "/api/protocols/{protocol_id}/draft-pdf",
+    }
+    spec = create_app(_settings()).openapi()["paths"]
+    limited = {path for _, path, calls in _routes() if rate_limit_pdf_render in calls}
+    assert wanted <= limited
+    assert all("429" in spec[path]["get"]["responses"] for path in wanted)
+
+
+async def test_the_observer_add_limit_counts_per_antrag() -> None:
+    """§NF/security/access/000977: ten adds an hour per Antrag, none given back."""
+    import pytest
+
+    from app.shared.antiabuse import enforce_observer_add_limit
+
+    settings = _settings(rl_observers_per_hour=2)
+    limiter = InMemoryRateLimiter(now=lambda: 0.0)
+    await enforce_observer_add_limit(limiter, settings, "antrag-1")
+    await enforce_observer_add_limit(limiter, settings, "antrag-1")
+    await enforce_observer_add_limit(limiter, settings, "antrag-2")
+    with pytest.raises(RateLimitedError):
+        await enforce_observer_add_limit(limiter, settings, "antrag-1")
+    assert _settings().rl_observers_per_hour == 10
