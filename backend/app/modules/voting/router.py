@@ -39,7 +39,7 @@ from app.modules.meetings.publisher import MeetingPublisher, get_meeting_publish
 from app.modules.voting.circular import CircularService
 from app.modules.voting.election import ElectionService
 from app.modules.voting.poll import PollService
-from app.modules.voting.poll_mails import notify_poll_started
+from app.modules.voting.poll_mails import MAIL_KINDS, notify_poll_started
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,
@@ -93,12 +93,13 @@ ReaderDep = Annotated[Principal, Depends(require_principal())]
 def mail_poll_start(
     vote: VoteOut, background: BackgroundTasks, request: Request, settings: SettingsDep
 ) -> None:
-    """Send ``poll_started`` after the open of a poll of a Gremium (background task).
+    """Send the start mail after the open of a poll or an Umlaufverfahren of a Gremium.
 
-    A meeting poll runs in the room and sends no mail; a motion and an election send
-    none either.
+    It runs as a background task: ``poll_started`` for a poll, ``circular_open`` for an
+    Umlaufverfahren. A meeting poll runs in the room and sends no mail; a motion and an
+    election send none either.
     """
-    if vote.kind != "poll" or vote.meeting_id is not None or vote.status != "open":
+    if vote.kind not in MAIL_KINDS or vote.meeting_id is not None or vote.status != "open":
         return
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(notify_poll_started, settings, vote.id, pool)
@@ -121,17 +122,21 @@ async def create_poll(
 
     ``kind: poll`` or ``kind: circular``; a body without ``kind`` is a poll. An
     Umlaufverfahren is a motion with the majority of the members; ``closesAt`` lies at
-    least ``circularMinDays`` days ahead (422 ``circular_window_too_short``), and it
-    sends no mail. The rest describes the poll. The caller needs the gremium permission
+    least ``circularMinDays`` days ahead (422 ``circular_window_too_short``). The rest
+    describes the poll. The caller needs the gremium permission
     ``vote.manage`` in ``eligibleGroup`` (or the admin role), else 403. ``closesAt`` lies
     at least one hour ahead (422 ``closes_at_too_soon``); the deadline cron closes the poll then.
     Without ``draft`` the poll opens at once, and the eligible members (``vote.cast``)
-    get the mail ``poll_started``.
+    get the mail ``poll_started``. An Umlaufverfahren that opens sends ``circular_open``
+    to them, and ``circular_reminder`` goes one day before its end to each member
+    without a ballot.
     """
     now = datetime.now(UTC)
-    if isinstance(payload, CircularCreate):
-        return await CircularService(service).create(payload, principal, now=now)
-    vote = await PollService(service).create(payload, principal, now=now)
+    vote = (
+        await CircularService(service).create(payload, principal, now=now)
+        if isinstance(payload, CircularCreate)
+        else await PollService(service).create(payload, principal, now=now)
+    )
     mail_poll_start(vote, background, request, settings)
     return vote
 

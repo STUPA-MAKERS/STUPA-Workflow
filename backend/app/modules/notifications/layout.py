@@ -117,6 +117,16 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because you vote in this committee and "
         "have not answered yet.",
     },
+    "circular_open": {
+        "de": "Sie erhalten diese E-Mail, weil Sie in diesem Gremium stimmberechtigt sind.",
+        "en": "You are receiving this email because you have a vote in this committee.",
+    },
+    "circular_reminder": {
+        "de": "Sie erhalten diese E-Mail, weil Sie in diesem Gremium stimmberechtigt sind "
+        "und noch nicht abgestimmt haben.",
+        "en": "You are receiving this email because you have a vote in this committee "
+        "and have not cast a ballot yet.",
+    },
     "mention": {
         "de": "Sie erhalten diese E-Mail, weil Sie erwähnt wurden.",
         "en": "You are receiving this email because you were mentioned.",

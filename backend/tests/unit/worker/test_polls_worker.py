@@ -68,6 +68,8 @@ async def test_reminds_once_and_skips_a_failing_poll(monkeypatch: pytest.MonkeyP
     sql = str(session.statements[0].compile(dialect=postgresql.dialect()))
     assert "vote.reminded_at IS NULL" in sql
     assert "vote.meeting_id IS NULL" in sql
+    assert "vote.kind IN" in sql
+    assert wp.MAIL_KINDS == ("poll", "circular")
     assert "FOR UPDATE SKIP LOCKED" in sql
 
 

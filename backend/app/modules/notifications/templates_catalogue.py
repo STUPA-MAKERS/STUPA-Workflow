@@ -352,6 +352,20 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         polls.POLL_PLACEHOLDERS,
     ),
     MailTemplateSpec(
+        polls.CIRCULAR_OPEN_KEY,
+        polls.CIRCULAR_OPEN_KEY,
+        polls.CIRCULAR_OPEN_SUBJECT,
+        polls.CIRCULAR_OPEN_BODY,
+        polls.CIRCULAR_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        polls.CIRCULAR_REMINDER_KEY,
+        polls.CIRCULAR_REMINDER_KEY,
+        polls.CIRCULAR_REMINDER_SUBJECT,
+        polls.CIRCULAR_REMINDER_BODY,
+        polls.CIRCULAR_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
         todos.TODO_ASSIGNED_KEY,
         todos.TODO_ASSIGNED_KEY,
         todos.TODO_ASSIGNED_SUBJECT,

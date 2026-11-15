@@ -1,7 +1,8 @@
 """The Umlaufverfahren (``kind = circular``) against a real Postgres.
 
 Specs 000914 and 000915: the create with its cast window, the fixed rules, the close
-at the end of the window only, and the objection that cancels the vote.
+at the end of the window only, and the objection that cancels the vote. Spec 000944:
+the mail at the open and the reminder one day before the end.
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from sqlalchemy import Engine
@@ -19,8 +21,10 @@ from app.modules.auth.principal import Principal
 from app.modules.gremien.models import GremiumMembership, GremiumRole
 from app.modules.voting.circular import CircularService
 from app.modules.voting.models import Vote
+from app.modules.voting.poll_mails import notify_poll_started
 from app.modules.voting.schemas import CircularCreate
 from app.modules.voting.service import VotingService
+from app.settings import load_settings
 from app.shared.errors import ConflictError, ForbiddenError, ValidationProblem
 from tests.integration.modules.voting.vote_support import (
     VoteFlow,
@@ -288,3 +292,72 @@ async def test_only_the_gremium_reads_and_manages_a_circular_vote(session: Async
     reader = Principal(sub="reader", permissions={"application.read", "application.read_all"})
     with pytest.raises(ForbiddenError):
         await voting.get_scoped(out.id, reader)
+
+
+class _Queue:
+    def __init__(self) -> None:
+        self.messages: list[Any] = []
+
+    async def enqueue(self, message: Any) -> None:
+        self.messages.append(message)
+
+
+class _Maker:
+    """Hand the session of the test to the mail code and to the cron."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    def __call__(self) -> _Maker:
+        return self
+
+    async def __aenter__(self) -> AsyncSession:
+        return self.session
+
+    async def __aexit__(self, *_a: object) -> None:
+        return None
+
+
+async def test_a_circular_vote_mails_at_its_open_and_reminds_once(
+    session: AsyncSession, migrated: tuple[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """§F/meetings/voting/000944: each member at the open, the rest one day before the end."""
+    import worker.polls as polls_worker
+    from app.modules.voting import poll_mails
+
+    flow = await seed_vote_flow(session)
+    subs = await _members(session, flow.gremium_id, 3)
+    voting = VotingService(session)
+    out = await CircularService(voting).create(_body(flow), ADMIN, now=NOW)
+    await session.commit()
+    queue = _Queue()
+    settings = load_settings(
+        database_url=migrated[1],
+        session_secret="session-secret-circular-mail-00",
+        magic_link_secret="magic-link-secret-circular-mail",
+        cookie_secure=False,
+    )
+    monkeypatch.setattr(poll_mails, "mail_queue_from_pool", lambda _pool: queue)
+    assert await notify_poll_started(settings, out.id, None, sessionmaker=_Maker(session))  # type: ignore[arg-type]
+    opened = queue.messages
+    assert sorted(m.to for m in opened) == [("m0@x.de",), ("m1@x.de",), ("m2@x.de",)]
+    assert all(m.subject.startswith("Umlaufverfahren: Soll der AStA") for m in opened)
+    assert all(f"/voting/{out.id}" in m.text for m in opened)
+    assert all(END.strftime("%d.%m.%Y") in m.text for m in opened)
+
+    await voting.cast(out.id, voter(subs[0], flow), "yes", now=NOW)
+    await session.commit()
+    reminders = _Queue()
+    ctx: dict[str, Any] = {
+        "polls_sessionmaker": _Maker(session),
+        "settings": settings,
+        "mail_queue": reminders,
+    }
+    early = await polls_worker.process_poll_reminders(ctx, now=END - timedelta(days=2))
+    due = await polls_worker.process_poll_reminders(ctx, now=END - timedelta(hours=23))
+    again = await polls_worker.process_poll_reminders(ctx, now=END - timedelta(hours=22))
+    assert (early, due, again) == (0, 1, 0)
+    assert sorted(m.to for m in reminders.messages) == [("m1@x.de",), ("m2@x.de",)]
+    assert all(m.subject.startswith("Erinnerung: Umlaufverfahren") for m in reminders.messages)
+    vote = await session.get(Vote, out.id)
+    assert vote is not None and vote.reminded_at == END - timedelta(hours=23)

@@ -5,9 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
+tests:
+  - "backend/tests/integration/modules/voting/test_circular_vote.py:test_a_circular_vote_mails_at_its_open_and_reminds_once"
+  - "backend/tests/unit/modules/voting/test_poll_mails.py:test_a_circular_vote_sends_its_own_mails"
 implementation:
-  - backend/app/modules/voting/circular.py
-  - backend/app/modules/notifications
+  - backend/app/modules/voting/poll_mails.py
+  - backend/worker/polls.py
+  - backend/app/modules/notifications/texts/polls.py
 scope:
   - backend/app/modules/voting
   - backend/app/modules/notifications
