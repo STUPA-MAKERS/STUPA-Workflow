@@ -11,9 +11,11 @@ import pytest
 from app.modules.meetings.present import (
     NOBODY,
     Present,
+    fixed_present,
     meeting_present,
     present_count,
     present_counts,
+    quorum_present,
 )
 from tests._support.flow_fakes import fake_session, result
 from tests.unit.conftest import Presence
@@ -61,3 +63,21 @@ async def test_a_closed_meeting_shows_the_count_of_its_close(presence: Presence)
     assert await meeting_present(db, live) == 2
     assert await meeting_present(db, closed) == 7
     assert await meeting_present(db, old) == 2
+
+
+@pytest.mark.parametrize(
+    ("status", "members", "seats", "want"),
+    [
+        ("open", 9, 9, 5 + 2),
+        ("closed", 3, 1, 3 + 1),
+        ("closed", 3, None, 3 + 2),
+        ("closed", None, None, 5 + 2),
+        ("cancelled", 3, 1, 5 + 2),
+    ],
+)
+def test_quorum_present_takes_the_fixed_values_of_a_closed_vote(
+    status: str, members: int | None, seats: int | None, want: int
+) -> None:
+    """A closed vote counts what it fixed; the meeting of now fills what it has not."""
+    vote = SimpleNamespace(status=status, present_members=members, present_seats=seats)
+    assert quorum_present(fixed_present(vote), Present(members=5, seats=2)) == want

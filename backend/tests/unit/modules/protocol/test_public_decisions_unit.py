@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.modules.protocol.public import (
+    CircularRow,
     PublicDecision,
     PublicFilter,
     PublicSnapshot,
@@ -84,8 +85,14 @@ class _Rows:
         self.circular = circular or []
         self.filters: list[PublicFilter] = []
 
-    async def circular_votes(self, _flt: PublicFilter) -> list[Any]:
-        return list(self.circular)
+        self.counted: list[uuid.UUID] = []
+
+    async def circular_rows(self, _flt: PublicFilter) -> list[Any]:
+        return [row for row, _view in self.circular]
+
+    async def circular_view(self, vote_id: uuid.UUID) -> Any:
+        self.counted.append(vote_id)
+        return next(view for row, view in self.circular if row.vote_id == vote_id)
 
     async def visible_rows(self, flt: PublicFilter) -> list[Any]:
         self.filters.append(flt)
@@ -97,14 +104,14 @@ def _service(rows: list[Any], circular: list[Any] | None = None) -> Any:
 
 
 def _circular(question: str, closed_at: datetime | None, **over: Any) -> tuple[Any, Any]:
-    """A closed circular vote of the public Gremium, as `circular_votes` gives it."""
+    """A closed circular vote of the public Gremium: its row and its counted view."""
+    gremium: Any = SimpleNamespace(id=GID, name="StuPa", slug="stupa")
+    row = CircularRow(uuid.uuid4(), question, closed_at, gremium)
     view = SimpleNamespace(
-        question=question,
-        closed_at=closed_at,
         result=over.get("result", "passed"),
         tally=SimpleNamespace(counts=over.get("counts", {"yes": 5, "no": 1})),
     )
-    return view, SimpleNamespace(id=GID, name="StuPa", slug="stupa")
+    return row, view
 
 
 async def test_list_holds_the_public_decisions_only() -> None:
@@ -178,6 +185,19 @@ async def test_list_filters_the_circular_votes_by_day_and_question() -> None:
     ]
     assert await questions(PublicFilter(year=2025)) == []
     assert await questions(PublicFilter(q=" BEAMER ")) == ["Beamer ersetzen"]
+
+
+async def test_list_counts_only_the_circular_votes_of_the_page() -> None:
+    """The count of a vote costs queries, so a vote outside the page is not counted."""
+    circular = [
+        _circular("Lastenanhänger beschaffen", datetime(2026, 11, 20, 12, 0, tzinfo=UTC)),
+        _circular("Beamer ersetzen", datetime(2026, 10, 20, 9, 0, tzinfo=UTC), result="rejected"),
+    ]
+    svc = _service([_row()], circular)
+    page = await list_public_decisions(svc, PublicFilter(), limit=1, offset=3)
+    assert page.total == 4
+    assert [(d.question, d.result) for d in page.items] == [("Beamer ersetzen", "rejected")]
+    assert svc.counted == [circular[1][0].vote_id]
 
 
 async def test_list_searches_the_question_and_cuts_the_page() -> None:

@@ -20,7 +20,13 @@ from app.modules.livevote.schemas import MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
 from app.modules.meetings import present as present_mod
 from app.modules.meetings.models import MeetingGuest
-from app.modules.meetings.present import NOBODY, Present, present_count
+from app.modules.meetings.present import (
+    NOBODY,
+    Present,
+    fixed_present,
+    present_count,
+    quorum_present,
+)
 from app.modules.voting.election import election_config, election_fields, is_election
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.poll import is_poll, poll_config, poll_fields, result_of
@@ -148,11 +154,7 @@ def _quorum_present(vote: Vote, presence: Mapping[UUID, Present]) -> int | None:
     """
     if vote.meeting_id is None or not _counts_present(vote):
         return None
-    closed = vote.status == "closed"
-    fixed: int | None = getattr(vote, "present_members", None) if closed else None
-    seats: int | None = getattr(vote, "present_seats", None) if closed else None
-    here = presence.get(vote.meeting_id, NOBODY)
-    return (here.members if fixed is None else fixed) + (here.seats if seats is None else seats)
+    return quorum_present(fixed_present(vote), presence.get(vote.meeting_id, NOBODY))
 
 
 def _reload_tally(vote: Vote, choices: list[str | None], present: int | None) -> _Tally:

@@ -10,7 +10,7 @@ tests:
   - "backend/tests/unit/modules/voting/test_voting_service_unit.py:test_cast_own_ballot_counts_for_each_represented_member"
   - "frontend/src/app/features/voting/ballot/ballot.component.spec.ts:BallotComponent"
 implementation:
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
   - backend/app/modules/delegations/service.py
   - backend/app/modules/livevote/service/votes.py
   - frontend/src/app/features/voting/ballot/ballot.component.ts

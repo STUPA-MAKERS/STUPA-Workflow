@@ -1324,7 +1324,7 @@ LoginSettingsServiceDep = Annotated[LoginSettingsService, Depends(get_login_sett
     responses=_errors(401, 403),
 )
 async def get_meeting_settings(service: MeetingSettingsServiceDep) -> MeetingSettingsOut:
-    """Return the open window of meetings, in minutes before the planned start."""
+    """Return the earliest open of meetings, in minutes before the planned start."""
     row = await service.get()
     await service.session.commit()
     return MeetingSettingsOut.model_validate(row, from_attributes=True)
@@ -1340,19 +1340,13 @@ async def put_meeting_settings(
     service: MeetingSettingsServiceDep,
     principal: DeadlinesAdmin,
 ) -> MeetingSettingsOut:
-    """Replace both values.
+    """Replace the value.
 
-    ``openLeadMinutes`` is the earliest open before the planned start. Before
-    ``confirmLeadMinutes`` the open needs an extra confirmation, so the value must not
-    be larger than ``openLeadMinutes`` (422). The change applies to every planned
-    meeting at once and writes a ``config_change`` audit entry that the audit log
-    cannot revert.
+    ``openLeadMinutes`` is the earliest open before the planned start. The change
+    applies to every planned meeting at once and writes a ``config_change`` audit
+    entry that the audit log cannot revert.
     """
-    row = await service.update(
-        open_lead_minutes=payload.open_lead_minutes,
-        confirm_lead_minutes=payload.confirm_lead_minutes,
-        actor=principal.sub,
-    )
+    row = await service.update(open_lead_minutes=payload.open_lead_minutes, actor=principal.sub)
     return MeetingSettingsOut.model_validate(row, from_attributes=True)
 
 

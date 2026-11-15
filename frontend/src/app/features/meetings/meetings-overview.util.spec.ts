@@ -39,7 +39,6 @@ function meeting(id: string, over: Partial<Meeting> = {}): Meeting {
   location: null,
   form: 'presence',
     opensAt: null,
-    confirmUntil: null,
     ...over,
   };
 }

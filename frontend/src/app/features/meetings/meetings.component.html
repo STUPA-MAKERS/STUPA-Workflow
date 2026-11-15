@@ -164,13 +164,6 @@
     />
   }
 
-  <app-early-open-dialog
-    [open]="earlyOpenAsk()"
-    [meeting]="m"
-    (closed)="earlyOpenAsk.set(false)"
-    (confirmed)="startMeeting(true)"
-  />
-
   <app-close-meeting-dialog
     [open]="dialogs.closeOpen()"
     [meeting]="m"

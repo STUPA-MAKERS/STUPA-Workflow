@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from app.modules.voting import service as voting_mod
+from app.modules.voting.service import cast as voting_mod
 
 
 async def _none(*_args: Any, **_kw: Any) -> None:

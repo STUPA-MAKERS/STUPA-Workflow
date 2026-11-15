@@ -455,7 +455,7 @@ describe('MeetingPageComponent', () => {
     /** Before the open window the disabled button says when it opens. */
     it('keeps the opening disabled before the open window and says when it opens', async () => {
       const soon = (min: number): string => new Date(Date.now() + min * 60_000).toISOString();
-      const { on } = await setup({ meeting: planned({ opensAt: soon(30), confirmUntil: soon(80) }), protocol: null });
+      const { on } = await setup({ meeting: planned({ opensAt: soon(30) }), protocol: null });
       const start = screen.getByRole('button', { name: /^Möglich ab / });
       expect(start).toBeDisabled();
       await userEvent.click(start);

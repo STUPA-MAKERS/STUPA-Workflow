@@ -1,12 +1,14 @@
 """Meeting settings: the open window of a meeting.
 
 The upgrade creates the single-row table ``meeting_settings`` and inserts the row
-``(id=1, open_lead_minutes=60, confirm_lead_minutes=10)``. A meeting opens at the
-earliest 60 minutes before its planned start, and up to 10 minutes before the start
-the open needs an extra confirmation. The deadlines page changes both values.
+``(id=1, open_lead_minutes=60)``. A meeting opens at the earliest 60 minutes before its
+planned start. The table of this revision also has ``confirm_lead_minutes`` (default
+10); revision ``c4f9a2e6d815`` drops it.
 
 The statements are idempotent. A fresh database gets the table from the
-``create_all`` baseline (0001), because the model already declares it.
+``create_all`` baseline (0001), because the model already declares it. The model has
+no ``confirm_lead_minutes``, so the insert does not name this column: on a fresh
+database it does not exist, and on an old one its default applies.
 
 The downgrade drops the table.
 
@@ -43,8 +45,8 @@ CREATE TABLE IF NOT EXISTS meeting_settings (
 """
 
 _SEED = """
-INSERT INTO meeting_settings (id, open_lead_minutes, confirm_lead_minutes)
-VALUES (1, 60, 10)
+INSERT INTO meeting_settings (id, open_lead_minutes)
+VALUES (1, 60)
 ON CONFLICT (id) DO NOTHING
 """
 

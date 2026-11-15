@@ -17,6 +17,18 @@ export function meetingKindOptions(i18n: I18nService) {
   return MEETING_KINDS.map((value): SelectOption => ({ value, label: i18n.translate(`meetings.kind.${value}`) }));
 }
 
+/** The place of a meeting is too long for the server. */
+export function locationTooLong(location: string): boolean {
+  return location.trim().length > MEETING_LOCATION_MAX;
+}
+
+/** The error text under the place of a meeting, or `''`. The two meeting dialogs show it. */
+export function locationError(i18n: I18nService, location: string): string {
+  return locationTooLong(location)
+    ? i18n.translate('meetings.location.tooLong', { max: MEETING_LOCATION_MAX })
+    : '';
+}
+
 /** The forms of a meeting for a select (§ 000907). */
 export function meetingFormOptions(i18n: I18nService) {
   return MEETING_FORMS.map((value): SelectOption => ({ value, label: i18n.translate(`meetings.form.${value}`) }));

@@ -206,13 +206,12 @@ def test_a_period_of_0_days_is_refused(key: str) -> None:
     values = {
         "inviteDaysOrdinary": 7,
         "inviteDaysExtraordinary": 3,
-        "protocolDraftDays": 0,
         "lateExcuseDays": 7,
         "absenceLimit": 3,
         "circularMinDays": 3,
         "termStartMonth": 10,
     }
-    assert MeetingPeriods.model_validate(values).protocol_draft_days == 0
+    assert MeetingPeriods.model_validate(values).late_excuse_days == 7
     with pytest.raises(ValidationError):
         MeetingPeriods.model_validate({**values, key: 0})
 

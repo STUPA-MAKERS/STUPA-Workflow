@@ -1,4 +1,10 @@
-import type { MarkdownFormat } from '@stupa-makers/ui-kit/markdown-editor';
+import {
+  type KnownName,
+  MASK,
+  type MarkdownFormat,
+  type NameMatch,
+  matchKnownName,
+} from '@stupa-makers/ui-kit/markdown-editor';
 
 /** A text with a selection, as a textarea holds it. */
 export interface RawText {
@@ -220,4 +226,37 @@ export function insertRawInline({ text, start, end }: RawText, reference: string
   const insert = `${lead}${reference}${trail}`;
   const caret = start + insert.length;
   return { text: before + insert + after, start: caret, end: caret };
+}
+
+/** A closed blackout marker or a closed code span in one line. */
+const CLOSED_RE = /(?<!\\)%%[^%\n]*%%|`[^`\n]*`/g;
+
+/**
+ * The line up to the caret with each marker, each code span and everything after an
+ * open marker or an open code span as `MASK`, so the offsets stay the same.
+ */
+function maskedLine(line: string): string {
+  const closed = line.replace(CLOSED_RE, (m) => MASK.repeat(m.length));
+  const open = closed.search(/(?<!\\)%%|`/);
+  return open < 0 ? closed : closed.slice(0, open) + MASK.repeat(closed.length - open);
+}
+
+/** True if the line of the offset is in a code block. */
+function inCodeBlock(text: string, at: number): boolean {
+  const before = text.slice(0, text.lastIndexOf('\n', at - 1) + 1).split('\n');
+  return before.filter((l) => /^\s*(```|~~~)/.test(l)).length % 2 === 1;
+}
+
+/**
+ * The range of the Markdown source that gets the blackout marker `%%…%%` after the
+ * character just typed before the caret (000969), or `null`. A name in a blackout block,
+ * in code or in a marker gets none.
+ */
+export function rawKnownName(raw: RawText, names: readonly KnownName[]): NameMatch | null {
+  const { text, start, end } = raw;
+  if (start !== end || start === 0 || names.length === 0) return null;
+  if (enclosingBlock(raw) || inCodeBlock(text, start)) return null;
+  const from = text.lastIndexOf('\n', start - 1) + 1;
+  const match = matchKnownName(maskedLine(text.slice(from, start)), names);
+  return match ? { from: from + match.from, to: from + match.to } : null;
 }

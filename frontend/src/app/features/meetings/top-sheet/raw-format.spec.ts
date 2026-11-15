@@ -1,4 +1,4 @@
-import { applyRawFormat, insertRawInline, insertRawTable, insertRawTimeNote, protocolNow } from './raw-format';
+import { applyRawFormat, insertRawInline, insertRawTable, insertRawTimeNote, protocolNow, rawKnownName } from './raw-format';
 
 describe('applyRawFormat', () => {
   it('puts the blackout marks around the selection and takes them away again (000690)', () => {
@@ -151,5 +151,32 @@ describe('applyRawFormat blackout block, edge cases (000690)', () => {
     const code = '```\n%%\n```\nText';
     const out = applyRawFormat({ text: code, start: 11, end: 15 }, 'blackout');
     expect(out.text).toBe('```\n%%\n```\n%%Text%%');
+  });
+});
+
+describe('rawKnownName (000969)', () => {
+  const NAMES = [{ first: 'Lena', last: 'Hoffmann' }];
+  const at = (text: string) => rawKnownName({ text, start: text.length, end: text.length }, NAMES);
+  const marked = (text: string): string | null => {
+    const m = at(text);
+    return m ? text.slice(m.from, m.to) : null;
+  };
+
+  it('marks a known name in the line of the caret', () => {
+    expect(marked('Vorher\nEs spricht Lena Hoffmann ')).toBe('Lena Hoffmann');
+    expect(marked('Lena,')).toBe('Lena');
+  });
+
+  it('marks nothing in a marker, in code, in a block or with a selection', () => {
+    expect(marked('%%Lena Hoffmann%% ')).toBeNull();
+    expect(marked('%%offen Lena Hoffmann ')).toBeNull();
+    expect(marked('`Lena Hoffmann` ')).toBeNull();
+    expect(marked('```\nLena Hoffmann ')).toBeNull();
+    expect(marked('%%\nLena Hoffmann \n%%'.slice(0, 17))).toBe('Lena Hoffmann');
+    const block = '%%\nLena Hoffmann \n%%';
+    expect(rawKnownName({ text: block, start: 17, end: 17 }, NAMES)).toBeNull();
+    expect(rawKnownName({ text: 'Lena,', start: 0, end: 5 }, NAMES)).toBeNull();
+    expect(rawKnownName({ text: '', start: 0, end: 0 }, NAMES)).toBeNull();
+    expect(rawKnownName({ text: 'Lena,', start: 5, end: 5 }, [])).toBeNull();
   });
 });

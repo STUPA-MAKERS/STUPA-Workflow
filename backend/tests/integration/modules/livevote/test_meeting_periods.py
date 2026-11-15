@@ -1,6 +1,6 @@
 """The periods of the Geschäftsordnung through the real API.
 
-* ``GET/PUT /admin/meeting-periods`` hold the seven periods with their start values,
+* ``GET/PUT /admin/meeting-periods`` hold the six periods with their start values,
   check the bounds and write a ``config_change`` (§F/administration/admin/000917).
 * ``GET /committees/{id}/meeting-defaults`` gives the invitation periods to the meeting
   form (§F/meetings/meetings/000918).
@@ -39,7 +39,6 @@ pytestmark = pytest.mark.integration
 DEFAULTS = {
     "inviteDaysOrdinary": 7,
     "inviteDaysExtraordinary": 3,
-    "protocolDraftDays": 14,
     "lateExcuseDays": 7,
     "absenceLimit": 3,
     "circularMinDays": 3,

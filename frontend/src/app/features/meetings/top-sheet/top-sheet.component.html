@@ -201,7 +201,7 @@
             [ariaLabel]="'participant.top.protocol' | t"
             [placeholder]="'meetings.protocol.placeholder' | t"
             spellcheck="true"
-            (input)="onRawInput(t, raw.value)"
+            (input)="onRawInput(t, raw, $event)"
             (paste)="onRawPaste($event)"
             (drop)="onRawDrop($event)"
           ></textarea>
@@ -225,6 +225,7 @@
             [blackoutTitle]="'markdown.blackout.mark' | t"
             [timeNoteSuffix]="'meetings.editor.timeNoteSuffix' | t"
             [timeNoteLabel]="'meetings.editor.timeNoteTime' | t"
+            [knownNames]="editable() ? knownNames : null"
             (valueChange)="onEditorChange(t, $event)"
           />
         } @placeholder {

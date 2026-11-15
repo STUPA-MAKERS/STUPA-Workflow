@@ -19,10 +19,11 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.modules.meetings.present import Present
-from app.modules.voting import service as voting_service
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteCreate, VoteCreateInternal
 from app.modules.voting.service import VotingService
+from app.modules.voting.service import cast as voting_cast
+from app.modules.voting.service import close as voting_close
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import (
     ConflictError,
@@ -475,7 +476,7 @@ async def test_cast_pool_seat_claims_and_runs_under_the_member(
         claims.append((sub, meeting_id))
         return "absent-member"
 
-    monkeypatch.setattr(voting_service, "claim_pool_seat", _claim)
+    monkeypatch.setattr(voting_cast, "claim_pool_seat", _claim)
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(
@@ -503,7 +504,7 @@ async def test_cast_own_ballot_frees_a_pool_seat(
         released.append((meeting_id, sub))
         return True
 
-    monkeypatch.setattr(voting_service, "release_pool_seat_of", _release)
+    monkeypatch.setattr(voting_cast, "release_pool_seat_of", _release)
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result(), result(SimpleNamespace(inserted=True)))
@@ -656,7 +657,7 @@ def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     _FakeFlow.notes = []
     _FakeFlow.vote_ids = []
     _FakeFlow.after = []
-    monkeypatch.setattr(voting_service, "FlowService", _FakeFlow)
+    monkeypatch.setattr(voting_close, "FlowService", _FakeFlow)
     return _FakeFlow
 
 

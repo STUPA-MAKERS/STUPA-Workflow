@@ -34,6 +34,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
+  type KnownName,
   MarkdownEditorComponent,
   type MarkdownDocumentInfo,
   type MarkdownDocumentRef,
@@ -63,12 +64,14 @@ import { voteResultResolver } from '../vote-result/vote-result';
 import { hasOpenBlackout } from '../../../shared/markdown/markdown.util';
 import {
   applyRawFormat,
+  rawKnownName,
   insertRawInline,
   insertRawTable,
   insertRawTimeNote,
   protocolNow,
 } from './raw-format';
 import { topLead } from '../top-application-lead.util';
+import { KnownNamesService } from './known-names.service';
 
 /** The autosave state of the text of the open item. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -170,6 +173,7 @@ export class TopSheetComponent {
   private readonly i18n = inject(I18nService);
   private readonly injector = inject(Injector);
   private readonly toast = inject(ToastService);
+  private readonly namesService = inject(KnownNamesService);
 
   readonly meeting = input.required<Meeting>();
   readonly protocol = input.required<Protocol | null>();
@@ -504,10 +508,37 @@ export class TopSheetComponent {
     this.bodyChange.emit({ itemId: t.id, body: value });
   }
 
+  /**
+   * The known names for the automatic blackout (000969). The editors read it at each
+   * typed character, so the list loads at the first character and works from the next.
+   * A reader gets no list and loads nothing.
+   */
+  protected readonly knownNames = (): readonly KnownName[] =>
+    this.editable() ? this.namesService.names(this.meeting().id) : [];
+
   /** An edit of the Markdown source. A reader changes nothing. */
-  protected onRawInput(t: AgendaItem, value: string): void {
+  protected onRawInput(t: AgendaItem, area: HTMLTextAreaElement, event: Event): void {
     if (!this.editable()) return;
-    this.bodyChange.emit({ itemId: t.id, body: value });
+    if (event instanceof InputEvent && event.inputType === 'insertText') this.markRawName(area);
+    this.bodyChange.emit({ itemId: t.id, body: area.value });
+  }
+
+  /**
+   * Put the marker `%%…%%` around a known name before the caret (000969). The browser
+   * inserts the marked name as its own undo step, so one undo removes the marker.
+   */
+  private markRawName(area: HTMLTextAreaElement): void {
+    const match = rawKnownName(
+      { text: area.value, start: area.selectionStart, end: area.selectionEnd },
+      this.knownNames(),
+    );
+    if (!match) return;
+    const caret = area.selectionStart;
+    const marked = `%%${area.value.slice(match.from, match.to)}%%`;
+    area.setSelectionRange(match.from, match.to);
+    const inserted = 'execCommand' in document && document.execCommand('insertText', false, marked);
+    if (!inserted) area.setRangeText(marked, match.from, match.to);
+    area.setSelectionRange(caret + 4, caret + 4);
   }
 
   /** "TOP 3 · Antrag", "TOP 3 · Haushaltsplan", or "TOP 3" for a free-text item. */

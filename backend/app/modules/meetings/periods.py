@@ -6,7 +6,6 @@ invitation periods with ``GET /committees/{id}/meeting-defaults``.
 
 - ``inviteDaysOrdinary`` and ``inviteDaysExtraordinary``: the invitation period of a
   meeting, in days. Only an ``ordinary`` meeting has the first one.
-- ``protocolDraftDays``: the days after a meeting until the draft of its protocol is due.
 - ``lateExcuseDays``: the days after the close in which a member can still give an excuse.
 - ``absenceLimit``: the number of unexcused absences in one term that ends a Mandat.
 - ``circularMinDays``: the least number of days of an Umlaufverfahren.
@@ -30,7 +29,6 @@ from app.modules.meetings.models import DEFAULT_LATE_EXCUSE_DAYS, MeetingSetting
 PERIOD_FIELDS: tuple[tuple[str, str], ...] = (
     ("invite_days_ordinary", "inviteDaysOrdinary"),
     ("invite_days_extraordinary", "inviteDaysExtraordinary"),
-    ("protocol_draft_days", "protocolDraftDays"),
     ("late_excuse_days", "lateExcuseDays"),
     ("absence_limit", "absenceLimit"),
     ("circular_min_days", "circularMinDays"),

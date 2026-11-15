@@ -22,7 +22,7 @@ import {
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { AdminApiService } from '../../admin-api.service';
 import type { GremiumDefaults } from '../../admin.models';
-import { MAX_DELEGATION_LEAD_MINUTES, delegationMaxOf, percentOrNull } from '../gremium-dialog/gremium-dialog.component';
+import { delegationLeadOf, delegationMaxOf, percentOrNull } from '../gremium-dialog/gremium-dialog.component';
 
 /**
  * "Vorgaben für neue Gremien": the values that the form of a new Gremium starts with
@@ -92,14 +92,8 @@ export class GremiumDefaultsDialogComponent {
     this.patch({ [key]: percentOrNull(value) });
   }
 
-  /** Lead time: empty or invalid gives 0, else whole minutes from 0 to 30 days. */
   protected patchLead(value: number | string | null): void {
-    const n = Math.round(Number(value));
-    this.patch({
-      delegationLeadMinutes: Number.isFinite(n)
-        ? Math.min(MAX_DELEGATION_LEAD_MINUTES, Math.max(0, n))
-        : 0,
-    });
+    this.patch({ delegationLeadMinutes: delegationLeadOf(value) });
   }
 
   protected patchMax(value: number | string | null): void {
