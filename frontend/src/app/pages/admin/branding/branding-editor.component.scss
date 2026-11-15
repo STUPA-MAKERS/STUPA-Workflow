@@ -86,17 +86,18 @@
   background: #fff;
   box-shadow: inset 0 0 0 1px var(--color-border);
 }
-/* The Skyline is a thin strip across the page: show a slice of it at a readable height. */
+/* The Skyline is a thin strip across the page with its buildings at the left: show the left
+   end of it at a readable height. */
 .br__thumb--strip {
   align-items: flex-end;
   padding: 0;
 }
-.br__thumb--strip img {
+.br__thumb.br__thumb--strip img {
   width: 100%;
-  height: 1.5rem;
+  height: 2.5rem;
   max-height: none;
   object-fit: cover;
-  object-position: center bottom;
+  object-position: left bottom;
 }
 .br__thumb--none {
   color: var(--color-text-muted);
@@ -190,7 +191,7 @@
   color: var(--field-text, var(--field-label, var(--color-text-subtle)));
 }
 .br__areaInput--line {
-  min-height: 1.75rem;
+  min-height: 2.5rem;
 }
 
 .br__links {
