@@ -1,4 +1,13 @@
 @use 'breakpoints' as bp;
+@use 'surface';
+
+/* The sheet of the plan is surface 1. The rows of its tables take the next step, surface 2,
+   with surface 1 between them, as every row group on a pane does. Without the context the
+   rows had the colour of the sheet and only the 2px gaps showed them. On a phone the sheet
+   has no surface of its own, and the rows keep surface 1 on the page. */
+.bd--wide .bd__sheet {
+  @include surface.context(1);
+}
 
 .bp__node {
   display: flex;
@@ -73,6 +82,23 @@
   width: 12rem;
 }
 
+/* A field in a table row has no fill, only a thin edge. A filled field is a dark block in
+   each row, and the hover of a row takes the same surface step as the fill, so the box of
+   the field disappears under the pointer. The edge stays visible on every row surface.
+   The tokens of a display setting (highlighted fields, very high contrast) still win,
+   because the rule reads them first. */
+:host app-currency-input.bp__field ::ng-deep .cur {
+  background: var(--field-bg, transparent);
+}
+:host app-currency-input.bp__field ::ng-deep .cur:not(:focus-within, .cur--invalid) {
+  box-shadow: var(--field-edge, inset 0 0 0 1px var(--color-border));
+}
+@media (hover: hover) {
+  :host app-currency-input.bp__field ::ng-deep .cur:hover {
+    background: var(--field-bg-hover, transparent);
+  }
+}
+
 /* The Erläuterung of a version that takes no change shows the disabled state of the amount
    fields beside it. The textarea box of the ui-kit has no disabled state of its own. */
 .bp__note:has(textarea:disabled) {
@@ -106,9 +132,25 @@
   flex-direction: column;
   gap: var(--space-4);
 }
-.bp__sumCell {
-  display: block;
-  padding-inline-end: var(--space-3);
+/* The sum of a parent in a table with amount fields has the geometry of a field without its
+   box: the same width, the same inner padding and the € in the same place. So every
+   amount and every € of the column end on one edge, and the sum reads as a value that
+   nobody types. */
+.bp__sum {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  box-sizing: border-box;
+}
+.bp__sumDigits {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bp__sumSign {
+  color: var(--color-text-muted);
 }
 
 .bp__sub {

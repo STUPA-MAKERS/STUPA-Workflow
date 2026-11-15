@@ -4,7 +4,7 @@ title: The columns of the year before show only when that year has a plan
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-16
 tests:
   - "backend/tests/unit/modules/budget/test_plan_export.py:test_the_ist_needs_a_plan_in_the_year_before"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_a_version_exports_with_the_year_before_and_the_version_before"
@@ -23,7 +23,7 @@ scope:
 The page of a Haushaltsplan (000808, 000815) and its export (000875) must show the Ansatz
 and the Ist of the year before only when the year before has a plan in force. Without
 one, the tables, the detail of a line, the XLSX file and the PDF file must have neither
-of the two. The column "Änderung" stays.
+of the two. The export keeps the column "Änderung"; the page shows it as 001021 says.
 
 Reason: Without a plan in the year before there is no Ansatz to compare with, and the
 Ist holds only zeros and reads like a year without spending.

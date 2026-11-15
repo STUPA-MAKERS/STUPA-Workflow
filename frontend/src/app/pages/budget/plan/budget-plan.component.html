@@ -348,10 +348,12 @@
         <dd class="bd__figValue mono">{{ money(row.actual) }}</dd>
       </div>
     }
-    <div class="bd__fig" [class.bp__figWide]="nachtrag()">
-      <dt class="bd__figLabel">{{ 'budget.plan.col.change' | t }}</dt>
-      <dd class="bd__figValue mono">{{ changeText(row) }}</dd>
-    </div>
+    @if (compared()) {
+      <div class="bd__fig" [class.bp__figWide]="nachtrag()">
+        <dt class="bd__figLabel">{{ 'budget.plan.col.change' | t }}</dt>
+        <dd class="bd__figValue mono">{{ changeText(row) }}</dd>
+      </div>
+    }
   </dl>
 </ng-template>
 
@@ -463,8 +465,13 @@
           (click)="$event.stopPropagation()"
           (keydown.enter)="onFieldEnter($event, $any(row))"
         />
+      } @else if (tableFields()) {
+        <span class="bp__field bp__sum" [class.bp__field--wide]="wideFields()">
+          <span class="bp__sumDigits mono">{{ sumDigits($any(row).amount) }}</span>
+          <span class="bp__sumSign">€</span>
+        </span>
       } @else {
-        <span class="bp__num bp__plan mono" [class.bp__sumCell]="tableFields()">{{ money($any(row).amount) }}</span>
+        <span class="bp__num bp__plan mono">{{ money($any(row).amount) }}</span>
       }
     </ng-template>
     <ng-template appCell="base" let-row><span class="bp__num mono">{{ money($any(row).base) }}</span></ng-template>
