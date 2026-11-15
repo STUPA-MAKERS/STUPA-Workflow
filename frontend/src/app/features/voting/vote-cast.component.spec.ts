@@ -286,7 +286,7 @@ describe('VoteCastComponent', () => {
     const { toast, getVote } = await setup({ castError: conflict('already_voted') });
     getVote.mockClear();
     await castOwn();
-    expect(toast.error).toHaveBeenCalledWith('Du hast bereits abgestimmt.');
+    expect(toast.error).toHaveBeenCalledWith('Deine Stimme ist bereits abgegeben.');
     expect(screen.getByText('Danke! Deine Stimme ist abgegeben.')).toBeInTheDocument();
     expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
   });

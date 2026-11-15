@@ -2428,7 +2428,7 @@ class VotingService:
             members = here.members
             guests = await self._guest_attendance(vote, config)
             vote.present_members = members
-            vote.present_seats = here.seats
+            setattr(vote, "present_seats", here.seats)  # noqa: B010
             vote.present_guests = guests
             if config.guests_vote:
                 vote.eligible_count = members + guests

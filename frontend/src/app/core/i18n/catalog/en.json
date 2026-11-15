@@ -1430,7 +1430,7 @@
   "voting.cast.notEligible": "You are not eligible to vote in this ballot.",
   "voting.cast.delegation.blocked": "Your voting right for this meeting has been transferred to {name} — {name} votes on your behalf.",
   "voting.cast.toast.conflict": "The vote is no longer open.",
-  "voting.cast.toast.alreadyVoted": "You have already voted.",
+  "voting.cast.toast.alreadyVoted": "Your vote is already cast.",
   "voting.cast.toast.failed": "Your vote could not be counted.",
   "voting.cast.toast.asUnit": "Cast your own vote first. It also counts for the members you represent.",
   "voting.cast.toast.noDelegationInElection": "In an election you vote only for yourself.",

@@ -34,8 +34,9 @@ The rules:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -66,6 +67,7 @@ from app.modules.meetings.schemas import (
     MeetingMemberOut,
     SelfAttendanceStatus,
 )
+from app.settings import get_settings
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 _DELEGATION_ACTIVE = (
@@ -95,10 +97,16 @@ def _resolve_note(
 
 
 def late_excuse_until(meeting: Meeting, days: int) -> datetime | None:
-    """Return the end of the late-excuse window of a closed meeting, else None."""
+    """Return the end of the late-excuse window of a closed meeting, else None.
+
+    The window ends with the local day that is ``days`` days after the close, not at
+    the clock time of the close: a period in days ends with its last day.
+    """
     if meeting.status != "closed" or meeting.closed_at is None:
         return None
-    return meeting.closed_at + timedelta(days=days)
+    zone = ZoneInfo(get_settings().local_timezone)
+    last_day = (meeting.closed_at.astimezone(zone) + timedelta(days=days)).date()
+    return datetime.combine(last_day, time(23, 59, 59), tzinfo=zone).astimezone(UTC)
 
 
 def _open_window(

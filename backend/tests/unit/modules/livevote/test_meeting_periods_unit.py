@@ -170,7 +170,11 @@ def _meeting(status: str = "closed", closed_at: datetime | None = NOW) -> Any:
 def test_late_excuse_window_needs_a_closed_meeting() -> None:
     assert late_excuse_until(_meeting("live", None), 7) is None
     assert late_excuse_until(_meeting("closed", None), 7) is None
-    assert late_excuse_until(_meeting(), 7) == NOW + timedelta(days=7)
+
+
+def test_the_late_excuse_window_ends_with_its_last_day() -> None:
+    """Closed on 1 July at 14:00 local time, 7 days: open until 8 July, 23:59:59 local."""
+    assert late_excuse_until(_meeting(), 7) == datetime(2026, 7, 8, 21, 59, 59, tzinfo=UTC)
 
 
 def test_a_meeting_keeps_its_late_excuse_period() -> None:
@@ -188,7 +192,7 @@ async def test_excuse_late_reads_the_period_of_the_meeting_not_the_setting() -> 
     session = _session(meeting, result(row), scalars=[uuid4()])
     service = AttendanceService(session)  # type: ignore[arg-type]
     assert await service._late_excuse_days(meeting) == 7
-    late = NOW + timedelta(days=7, seconds=1)
+    late = NOW + timedelta(days=8)
     with pytest.raises(ConflictError) as error:
         await service.excuse_late(meeting.id, "me", "ill", now=late)
     assert error.value.code == "late_excuse_expired"
@@ -260,7 +264,7 @@ async def test_excuse_late_ends_with_the_window() -> None:
     meeting = _meeting()
     row = SimpleNamespace(status="absent", source="lead", note=None)
     session = _session(meeting, result(row), scalars=[7, uuid4()])
-    late = NOW + timedelta(days=7, seconds=1)
+    late = NOW + timedelta(days=8)
     with pytest.raises(ConflictError) as error:
         await AttendanceService(session).excuse_late(meeting.id, "me", "ill", now=late)  # type: ignore[arg-type]
     assert error.value.code == "late_excuse_expired"

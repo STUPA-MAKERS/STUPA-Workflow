@@ -1430,7 +1430,7 @@
   "voting.cast.notEligible": "Du bist für diese Abstimmung nicht stimmberechtigt.",
   "voting.cast.delegation.blocked": "Dein Stimmrecht für diese Sitzung ist an {name} übertragen — {name} stimmt an deiner Stelle ab.",
   "voting.cast.toast.conflict": "Die Abstimmung ist nicht mehr offen.",
-  "voting.cast.toast.alreadyVoted": "Du hast bereits abgestimmt.",
+  "voting.cast.toast.alreadyVoted": "Deine Stimme ist bereits abgegeben.",
   "voting.cast.toast.failed": "Stimme konnte nicht gezählt werden.",
   "voting.cast.toast.asUnit": "Gib zuerst deine eigene Stimme ab. Sie zählt auch für die Vertretenen.",
   "voting.cast.toast.noDelegationInElection": "In einer Wahl stimmst du nur für dich selbst ab.",

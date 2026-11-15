@@ -256,7 +256,7 @@ describe('ParticipantVoteService', () => {
     const { svc, toast, api, set } = setup();
     set(row());
     svc.onCastFailed({ asDelegation: false, alreadyVoted: true, error: { status: 409 } });
-    expect(toast.error).toHaveBeenLastCalledWith('Du hast bereits abgestimmt.');
+    expect(toast.error).toHaveBeenLastCalledWith('Deine Stimme ist bereits abgegeben.');
     svc.onCastFailed({ asDelegation: false, alreadyVoted: false, error: { status: 409 } });
     expect(toast.error).toHaveBeenLastCalledWith('Die Abstimmung ist nicht mehr offen.');
     expect(api.getVote).toHaveBeenCalledTimes(3);
