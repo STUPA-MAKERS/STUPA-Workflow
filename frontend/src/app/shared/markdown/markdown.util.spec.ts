@@ -379,3 +379,21 @@ describe('blackout blocks (000965, 000967)', () => {
     expect(hasOpenBlackout(text)).toBe(open);
   });
 });
+
+describe('blackout blocks, edge cases (000686, 000967)', () => {
+  it('renders an open block as text', () => {
+    const html = markdownToSafeHtml('Vorher.\n%%\nOffen', { blackout: { mark: 'm', bar: 'b' } });
+    expect(html).toContain('<p>%%</p>');
+    expect(html).toContain('<p>Offen</p>');
+    expect(html).not.toContain('md-blackout-block');
+  });
+
+  it('labels the bar of a block with the bar text when no block text is given', () => {
+    const html = markdownToSafeHtml('%%\n%%', { blackout: { mark: 'm', bar: 'geschwärzt' } });
+    expect(html).toContain('aria-label="geschwärzt"');
+  });
+
+  it('renders a block without blackout texts', () => {
+    expect(markdownToSafeHtml('%%\nText\n%%')).toContain('<div class="md-blackout-block" title="">');
+  });
+});

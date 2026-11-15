@@ -128,3 +128,28 @@ describe('applyRawFormat blackout block (000690, 000965)', () => {
     expect(out.text).toBe('%%\nEs spricht Lena.\n%%');
   });
 });
+
+describe('applyRawFormat blackout block, edge cases (000690)', () => {
+  const text = 'Vorher\n%%\nErster\n%%\nDanach';
+
+  it('keeps a selection before the block and moves one after it', () => {
+    const before = applyRawFormat({ text, start: 8, end: 8 }, 'blackout');
+    expect(before.text).toBe('Vorher\nErster\nDanach');
+    expect(before.start).toBe(7);
+    const whole = applyRawFormat({ text, start: 7, end: 19 }, 'blackout');
+    expect(whole.text).toBe('Vorher\nErster\nDanach');
+    expect(whole.start).toBe(7);
+    expect(whole.end).toBe(14);
+  });
+
+  it('takes a selection that ends on a line break as its lines only', () => {
+    const out = applyRawFormat({ text: 'A\nB\nC', start: 0, end: 4 }, 'blackout');
+    expect(out.text).toBe('%%\nA\nB\n%%\nC');
+  });
+
+  it('reads a %% line in code as code', () => {
+    const code = '```\n%%\n```\nText';
+    const out = applyRawFormat({ text: code, start: 11, end: 15 }, 'blackout');
+    expect(out.text).toBe('```\n%%\n```\n%%Text%%');
+  });
+});
