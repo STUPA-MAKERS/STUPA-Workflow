@@ -1882,6 +1882,10 @@ describe('mockApiInterceptor', () => {
     );
     expect(page.total).toBe(2);
     expect(page.items[0].tops[0]).not.toHaveProperty('markdown');
+    expect(await firstValueFrom(http.get('/api/public/decisions'))).toMatchObject({
+      total: 1,
+      items: [{ protocolId: 'pp-0001', result: 'passed', meetingTitle: '34. Sitzung des Studierendenparlaments' }],
+    });
     expect(await firstValueFrom(http.get('/api/public/protocols/semesters'))).toEqual([
       { key: 'ss-2026', count: 2 },
     ]);

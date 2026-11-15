@@ -42,6 +42,7 @@ ROUTE_PATTERNS: Final[tuple[tuple[Feature, re.Pattern[str]], ...]] = tuple(
         (Feature.MEETINGS, r"/protocols"),
         (Feature.MEETINGS, r"/public/protocols"),
         (Feature.MEETINGS, r"/public/committees"),
+        (Feature.MEETINGS, r"/public/decisions"),
         (Feature.MEETINGS, r"/delegations"),
         (Feature.MEETINGS, r"/admin/meeting-settings"),
         (Feature.MEETINGS, rf"{_COMMITTEE}/meeting-(?:defaults|members)"),

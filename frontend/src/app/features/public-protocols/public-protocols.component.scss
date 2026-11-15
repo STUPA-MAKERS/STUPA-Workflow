@@ -32,6 +32,10 @@
   color: var(--color-text-muted);
 }
 
+.pp__decisions {
+  align-self: flex-start;
+}
+
 .pp__toolbar {
   display: flex;
   flex-direction: column;

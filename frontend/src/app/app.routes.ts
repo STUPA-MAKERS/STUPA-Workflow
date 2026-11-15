@@ -96,6 +96,15 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'decisions',
+        canMatch: [featureMatch('meetings')],
+        data: { title: 'publicDecisions.title', footer: true },
+        loadComponent: () =>
+          import('./features/public-protocols/public-decisions.component').then(
+            (m) => m.PublicDecisionsComponent,
+          ),
+      },
+      {
         path: 'protocols',
         canMatch: [featureMatch('meetings')],
         data: { title: 'publicProtocols.title', footer: true },

@@ -1,4 +1,5 @@
 import type {
+  PublicDecisionRow,
   PublicProtocolDetail,
   PublicProtocolPage,
   PublicProtocolSummary,
@@ -82,6 +83,22 @@ export function detailFixture(over: Partial<PublicProtocolDetail> = {}): PublicP
       { number: 3, title: null, nonPublic: true, results: [], markdown: null, decisions: [] },
       { number: 4, title: 'Verschiedenes', nonPublic: false, results: [], markdown: null, decisions: [] },
     ],
+    ...over,
+  };
+}
+
+/** One public decision, for the specs. */
+export function decisionRowFixture(over: Partial<PublicDecisionRow> = {}): PublicDecisionRow {
+  return {
+    protocolId: 'p-1',
+    gremium: { id: 'g-1', name: 'Studierendenparlament', slug: 'stupa' },
+    date: '2026-09-29',
+    semester: 'ss-2026',
+    kind: 'motion',
+    question: 'Zuschuss für das Sommerfest',
+    meetingTitle: '34. Sitzung des Studierendenparlaments',
+    result: 'passed',
+    counts: { nein: 1, ja: 5, enthaltung: 0 },
     ...over,
   };
 }

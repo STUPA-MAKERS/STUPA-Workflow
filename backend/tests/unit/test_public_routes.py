@@ -129,6 +129,7 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("WS", "/api/public/meetings/{code}/ws"),
         ("GET", "/api/public/committees"),
         ("GET", "/api/public/protocols"),
+        ("GET", "/api/public/decisions"),
         ("GET", "/api/public/protocols/semesters"),
         ("GET", "/api/public/protocols/{protocol_id}"),
         ("GET", "/api/public/protocols/{protocol_id}/pdf"),

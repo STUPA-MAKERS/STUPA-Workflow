@@ -127,6 +127,7 @@ def test_uses_of_keeps_the_uses_of_the_given_features() -> None:
         ("/api/public/meetings/{code}", {Feature.MEETINGS}),
         ("/api/public/protocols/{protocol_id}/images/{image_id}", {Feature.MEETINGS}),
         ("/api/public/committees", {Feature.MEETINGS}),
+        ("/api/public/decisions", {Feature.MEETINGS}),
         ("/api/delegations/substitutes", {Feature.MEETINGS}),
         ("/api/admin/meeting-settings", {Feature.MEETINGS}),
         ("/api/committees/{gremium_id}/meeting-defaults", {Feature.MEETINGS}),

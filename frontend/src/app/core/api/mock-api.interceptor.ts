@@ -1661,7 +1661,7 @@ const PUBLIC_MEETING_PATH =
   /\/public\/meetings\/|\/meetings\/join\/[^/]+$|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
 
 /** The public protocol routes (`mock-public-protocols.ts`). */
-const PUBLIC_PROTOCOLS_PATH = /\/public\/(committees|protocols)(\/|$)/;
+const PUBLIC_PROTOCOLS_PATH = /\/public\/(committees|protocols|decisions)(\/|$)/;
 
 function path(url: string): string {
   return url.split('?')[0];
