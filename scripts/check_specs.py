@@ -4,7 +4,9 @@
 The script checks the rules for specs (`specs/style/specs/`): the file name, the
 place in the tree, the front matter (also `implementation`), the heading, the labels, `must` in the rule
 text, the scope paths, `replaced_by`, unique numbers, the index, and every `§`
-reference in the code. It needs only the Python standard library.
+reference in the code. For a protocol spec it also checks `version`, `media_type`, the fixed
+sections and the schema file, and for a requirement the `protocols` list. It needs only the
+Python standard library; `scripts/check_protocols.py` validates the schemas and the examples.
 
 Usage:
     python3 scripts/check_specs.py          check, exit 1 on a violation
@@ -13,6 +15,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -26,6 +29,7 @@ KINDS = {
     "style": ("S", "style"),
     "requirements/functional": ("F", "functional"),
     "requirements/non-functional": ("NF", "non-functional"),
+    "protocols": ("P", "protocol"),
 }
 KEYS = [
     "id",
@@ -35,7 +39,10 @@ KEYS = [
     "owner",
     "updated",
     "replaced_by",
+    "version",
+    "media_type",
     "tests",
+    "protocols",
     "implementation",
     "scope",
 ]
@@ -43,12 +50,17 @@ REQUIRED = {"id", "title", "kind", "status", "owner", "updated", "scope"}
 STATUSES = {"draft", "approved", "replaced", "removed"}
 FILE_NAME = re.compile(r"^[0-9]{6}_[a-z0-9]+(-[a-z0-9]+)*\.md$")
 FOLDER = re.compile(r"^[a-z0-9-]+$")
-FULL_ID = re.compile(r"^(F|NF|S)(/[a-z0-9-]+)+/[0-9]{6}$")
+FULL_ID = re.compile(r"^(F|NF|S|P)(/[a-z0-9-]+)+/[0-9]{6}$")
+VERSION = re.compile(r"^[1-9][0-9]*$")
+MEDIA_TYPE = re.compile(r"^[a-z]+/[a-z0-9.+-]+$")
+PROTOCOL_SECTIONS = ["## Transport", "## Schema", "## Example", "## Compatibility"]
+SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
+FENCE = re.compile(r"^```", re.MULTILINE)
 TEST_ENTRY = re.compile(r"^[^:\s]+\.(py|ts):[A-Za-z_][A-Za-z0-9_.]*$")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LABEL = re.compile(r"^(Reason|Test):", re.MULTILINE)
 MUST = re.compile(r"\bmust\b")
-SECTION_REF = re.compile(r"§ ?((?:F|NF|S)/[a-z0-9/-]+/[0-9]{6})")
+SECTION_REF = re.compile(r"§ ?((?:F|NF|S|P)/[a-z0-9/-]+/[0-9]{6})")
 CODE_DIRS = ["backend/app", "backend/worker", "backend/tests", "frontend/src", "mcp", "typst"]
 CODE_SUFFIXES = {".py", ".ts", ".html", ".scss"}
 INDEX_START = "## Index\n"
@@ -156,6 +168,7 @@ def _check_meta(spec: Spec, ids: dict[str, Spec]) -> list[str]:
             errors.append(f"{rel}: replaced_by {replaced_by!r} is no full ID of a spec (000002)")
         elif target.meta.get("status") in ("replaced", "removed"):
             errors.append(f"{rel}: replaced_by points to a rule that is not in force")
+    errors += _check_protocol_keys(spec, ids)
     tests = meta.get("tests", [])
     for entry in tests if isinstance(tests, list) else [tests]:
         if not TEST_ENTRY.match(entry) or not (ROOT / entry.split(":")[0]).is_file():
@@ -184,12 +197,116 @@ def _check_meta(spec: Spec, ids: dict[str, Spec]) -> list[str]:
     return errors
 
 
+def is_json_media(media_type: object) -> bool:
+    """Return True for `application/json` and every `+json` media type (000958)."""
+    return media_type == "application/json" or str(media_type).endswith("+json")
+
+
+def schema_path(spec_path: Path) -> Path:
+    """Return the path of the schema file beside a protocol spec (000958)."""
+    return spec_path.with_name(spec_path.name[: -len(".md")] + ".schema.json")
+
+
+def _check_protocol_keys(spec: Spec, ids: dict[str, Spec]) -> list[str]:
+    """Check `version`, `media_type`, the area of a protocol spec and `protocols`."""
+    rel = spec.path.relative_to(SPECS)
+    errors: list[str] = []
+    meta = spec.meta
+    is_protocol = spec.full_id.startswith("P/")
+    for key in ("version", "media_type"):
+        if is_protocol and key not in meta:
+            errors.append(f"{rel}: a protocol spec must have {key} (000002)")
+        if not is_protocol and key in meta:
+            errors.append(f"{rel}: {key} goes with kind protocol only (000002)")
+    if is_protocol:
+        if "version" in meta and not VERSION.match(str(meta["version"])):
+            errors.append(f"{rel}: version must be a whole number from 1 (000960)")
+        if "media_type" in meta and not MEDIA_TYPE.match(str(meta["media_type"])):
+            errors.append(f"{rel}: media_type {meta['media_type']!r} is no media type (000002)")
+        area = spec.full_id.split("/")[1]
+        if not (SPECS / "requirements" / "functional" / area).is_dir():
+            errors.append(f"{rel}: area {area!r} is no area of the functional specs (000010)")
+    protocols = meta.get("protocols")
+    if protocols is None:
+        return errors
+    if not spec.full_id.startswith(("F/", "NF/")):
+        errors.append(f"{rel}: protocols goes with an F or NF spec only (000962)")
+    if not isinstance(protocols, list) or not protocols:
+        errors.append(f"{rel}: protocols must be a list of protocol spec IDs (000962)")
+        return errors
+    for entry in protocols:
+        target = ids.get(entry)
+        if not entry.startswith("P/") or target is None:
+            errors.append(f"{rel}: protocols entry {entry!r} names no protocol spec (000962)")
+        elif target.meta.get("status") in ("replaced", "removed"):
+            errors.append(f"{rel}: protocols entry {entry!r} is not in force (000962)")
+    if len(set(protocols)) != len(protocols):
+        errors.append(f"{rel}: protocols lists an ID two times")
+    return errors
+
+
+def _check_protocol_body(spec: Spec) -> list[str]:
+    """Check the sections, the example and the schema file of a protocol spec."""
+    rel = spec.path.relative_to(SPECS)
+    errors: list[str] = []
+    headings = [line for line in spec.body.splitlines() if line.startswith("#")]
+    if headings != [f"# {spec.meta.get('title')}", *PROTOCOL_SECTIONS]:
+        errors.append(
+            f"{rel}: the body must have the # title, then {', '.join(PROTOCOL_SECTIONS)} (000957)"
+        )
+        return errors
+    sections = _sections(spec.body)
+    if len(FENCE.findall(sections.get("## Example", ""))) < 2:
+        errors.append(f"{rel}: ## Example must hold at least one code block (000959)")
+    schema = schema_path(spec.path)
+    if is_json_media(spec.meta.get("media_type")):
+        errors += _check_schema_file(rel, schema)
+    else:
+        if schema.exists():
+            errors.append(f"{rel}: a format that is not JSON has no schema file (000958)")
+        if not re.search(r"^\|", sections.get("## Schema", ""), re.MULTILINE):
+            errors.append(f"{rel}: ## Schema of a non-JSON format must hold a table (000958)")
+    return errors
+
+
+def _sections(body: str) -> dict[str, str]:
+    """Return the text below each `##` heading of a body."""
+    parts = re.split(r"^(## .+)$", body, flags=re.MULTILINE)
+    return {parts[i]: parts[i + 1] for i in range(1, len(parts) - 1, 2)}
+
+
+def _check_schema_file(rel: Path, schema: Path) -> list[str]:
+    """Check that the schema file of a JSON format exists and names the 2020-12 dialect."""
+    if not schema.is_file():
+        return [f"{rel}: the schema file {schema.name} is missing (000958)"]
+    try:
+        data = json.loads(schema.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        return [f"{rel}: {schema.name} is no JSON: {error} (000958)"]
+    if not isinstance(data, dict) or data.get("$schema") != SCHEMA_DIALECT:
+        return [f"{rel}: {schema.name} must set $schema to {SCHEMA_DIALECT} (000958)"]
+    return []
+
+
+def _orphan_schemas(specs: list[Spec]) -> list[str]:
+    """Return the schema files below `specs/protocols/` without a protocol spec (000958)."""
+    owned = {schema_path(s.path) for s in specs if s.full_id.startswith("P/")}
+    return [
+        f"{path.relative_to(SPECS)}: no protocol spec owns this schema file (000958)"
+        for path in sorted((SPECS / "protocols").rglob("*.json"))
+        if path not in owned
+    ]
+
+
 def _check_body(spec: Spec) -> list[str]:
     """Check the heading, the labels and `must` of one spec."""
     rel = spec.path.relative_to(SPECS)
     errors: list[str] = []
-    headings = [line for line in spec.body.splitlines() if line.startswith("#")]
-    if headings != [f"# {spec.meta.get('title')}"]:
+    if spec.full_id.startswith("P/"):
+        errors += _check_protocol_body(spec)
+    elif [line for line in spec.body.splitlines() if line.startswith("#")] != [
+        f"# {spec.meta.get('title')}"
+    ]:
         errors.append(f"{rel}: the body must have one # heading equal to the title (000004)")
     labels = LABEL.findall(spec.body)
     if labels not in ([], ["Reason"], ["Test"], ["Reason", "Test"]):
@@ -213,10 +330,12 @@ def _index(specs: list[Spec]) -> str:
 def _tree() -> str:
     """Return the tree block of README.md from the folders."""
     lines = ["specs/"]
-    for top in ("style", "requirements"):
+    for top in ("style", "requirements", "protocols"):
+        if not (SPECS / top).is_dir():
+            continue
         lines.append(f"  {top}/")
-        if top == "style":
-            groups = [("", SPECS / "style", "    ")]
+        if top in ("style", "protocols"):
+            groups = [("", SPECS / top, "    ")]
         else:
             groups = [
                 (f"    {k}/", SPECS / "requirements" / k, "      ")
@@ -270,6 +389,7 @@ def main(argv: list[str]) -> int:
         README.write_text(_readme(specs), encoding="utf-8")
     elif README.read_text(encoding="utf-8") != _readme(specs):
         errors.append("README.md: index or tree is not current; run with --write (000013)")
+    errors += _orphan_schemas(specs)
     errors += _section_refs(ids)
     for error in errors:
         print(error)

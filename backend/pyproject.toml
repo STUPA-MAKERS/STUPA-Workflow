@@ -92,6 +92,9 @@ dev = [
     "import-linter>=2.3",
     # Reads the compose file for the UML deployment view (scripts/build_uml.py).
     "pyyaml>=6",
+    # Validates the schemas and examples of the protocol specs (scripts/check_protocols.py)
+    # and the output of the code against them (tests/_support/protocols.py).
+    "jsonschema-rs>=0.58",
     "testcontainers[postgres]>=4.8",
     "psycopg[binary]>=3.2",
 ]

@@ -72,6 +72,8 @@ jobs:
       # script imports the backend models and reads its import graph.
       - run: pip install -e 'backend[dev]'
       - run: python3 scripts/build_uml.py --check
+      # The schema files and the examples of the protocol specs (specs 000958, 000959).
+      - run: python3 scripts/check_protocols.py
 
   # Functional style ratchet (specs/style/shared/functional/000437): the count of violations
   # per Python file must not rise above scripts/functional-baseline/. fe-unit checks the
